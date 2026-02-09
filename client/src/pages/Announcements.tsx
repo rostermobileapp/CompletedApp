@@ -953,11 +953,12 @@ function AnnouncementCard({
               variant="ghost"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-              className="h-8 px-2 text-sm ml-auto"
+              className="h-8 px-2 text-sm ml-auto text-blue-500 hover:text-blue-500 hover:bg-transparent"
               data-testid="button-comments"
             >
               <MessageCircle className="w-4 h-4 mr-1" />
-              {(announcement as any).commentCount > 0 && <span>{(announcement as any).commentCount}</span>}
+              <span>Comment</span>
+              {(announcement as any).commentCount > 0 && <span className="ml-1">({(announcement as any).commentCount})</span>}
             </Button>
           </div>
         )}
