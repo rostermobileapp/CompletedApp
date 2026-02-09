@@ -2328,7 +2328,7 @@ export default function Dashboard() {
           >
             <div className="h-full flex flex-col items-center justify-center">
               <Megaphone className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium text-center">The Board</p>
+              <p className="text-xs font-medium text-center">Wall</p>
             </div>
             {selectedType === 'tournament' && selectedId ? (
               <AnnouncementBadge tournamentId={selectedId} />
