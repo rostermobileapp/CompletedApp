@@ -953,7 +953,7 @@ function AnnouncementCard({
               variant="ghost"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-              className="h-8 px-2 text-sm ml-auto"
+              className="h-8 px-2 text-sm"
               data-testid="button-comments"
             >
               <MessageCircle className="w-4 h-4 mr-1" />
