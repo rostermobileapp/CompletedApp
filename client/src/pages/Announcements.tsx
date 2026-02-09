@@ -929,31 +929,33 @@ function AnnouncementCard({
             />
           </div>
         ) : (
-          <div className="flex items-center gap-2 flex-wrap">
-            {REACTION_EMOJIS.map(({ emoji, label }) => {
-              const count = reactionCounts[emoji] || 0;
-              const userReacted = userReactions.includes(emoji);
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+              {REACTION_EMOJIS.map(({ emoji, label }) => {
+                const count = reactionCounts[emoji] || 0;
+                const userReacted = userReactions.includes(emoji);
 
-              return (
-                <Button
-                  key={emoji}
-                  variant={userReacted ? "default" : "ghost"}
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); handleReaction(emoji); }}
-                  className="h-8 px-2 text-sm"
-                  title={label}
-                  data-testid={`button-reaction-${emoji}`}
-                >
-                  <span className="mr-1">{emoji}</span>
-                  {count > 0 && <span>{count}</span>}
-                </Button>
-              );
-            })}
+                return (
+                  <Button
+                    key={emoji}
+                    variant={userReacted ? "default" : "ghost"}
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); handleReaction(emoji); }}
+                    className="h-8 px-2 text-sm"
+                    title={label}
+                    data-testid={`button-reaction-${emoji}`}
+                  >
+                    <span className="mr-1">{emoji}</span>
+                    {count > 0 && <span>{count}</span>}
+                  </Button>
+                );
+              })}
+            </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-              className="h-8 px-2 text-sm ml-auto"
+              className="h-8 px-2 text-sm shrink-0"
               data-testid="button-comments"
             >
               <MessageCircle className="w-4 h-4 mr-1" />
