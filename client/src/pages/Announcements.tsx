@@ -22,7 +22,9 @@ import {
   Users,
   Edit2,
   Trash2,
-  FileText
+  FileText,
+  ArrowLeft,
+  Send
 } from 'lucide-react';
 import { ScrimmageRSVPButtons } from '@/components/ScrimmageRSVPButtons';
 import { Button } from '@/components/ui/button';
@@ -98,6 +100,7 @@ type Announcement = {
   attachments: AnnouncementAttachment[];
   reactions: AnnouncementReaction[];
   polls: AnnouncementPoll[];
+  commentCount?: number;
 };
 
 // Emoji reactions available
@@ -126,13 +129,15 @@ function CreateAnnouncementModal({
   onClose, 
   leagueId, 
   tournamentId,
-  canPost 
+  canPost,
+  isCommissioner 
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   leagueId: string | null;
   tournamentId?: string | null;
   canPost: boolean;
+  isCommissioner: boolean;
 }) {
   const [content, setContent] = useState('');
   const [isPinned, setIsPinned] = useState(false);
@@ -309,20 +314,22 @@ function CreateAnnouncementModal({
             </div>
           </div>
 
-          {/* Pin Option */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="pin-announcement"
-              checked={isPinned}
-              onChange={(e) => setIsPinned(e.target.checked)}
-              data-testid="checkbox-pin-announcement"
-            />
-            <Label htmlFor="pin-announcement" className="flex items-center gap-1">
-              <Pin className="w-4 h-4" />
-              Pin this announcement
-            </Label>
-          </div>
+          {/* Pin Option - Commissioner only */}
+          {isCommissioner && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="pin-announcement"
+                checked={isPinned}
+                onChange={(e) => setIsPinned(e.target.checked)}
+                data-testid="checkbox-pin-announcement"
+              />
+              <Label htmlFor="pin-announcement" className="flex items-center gap-1">
+                <Pin className="w-4 h-4" />
+                Pin this announcement
+              </Label>
+            </div>
+          )}
 
           {/* Poll Creator Toggle */}
           <div className="flex items-center gap-2">
@@ -588,13 +595,15 @@ function AnnouncementCard({
   leagueId, 
   tournamentId,
   currentUserId, 
-  isCommissioner 
+  isCommissioner,
+  onOpenDetail
 }: { 
   announcement: Announcement;
   leagueId: string | null;
   tournamentId?: string | null;
   currentUserId: string;
   isCommissioner: boolean;
+  onOpenDetail: () => void;
 }) {
   const { toast } = useToast();
   
@@ -745,7 +754,7 @@ function AnnouncementCard({
   };
 
   return (
-    <Card className="rounded-lg border text-card-foreground shadow-sm relative border-primary bg-[#e2e2e2] dark:bg-[#212121]">
+    <Card className="rounded-lg border text-card-foreground shadow-sm relative border-primary bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer" onClick={() => onOpenDetail()}>
       {announcement.isPinned && (
         <div className="absolute top-3 right-3">
           <Pin className="w-4 h-4 text-primary" />
@@ -783,7 +792,7 @@ function AnnouncementCard({
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 hover:bg-muted"
-                    onClick={() => setShowEditModal(true)}
+                    onClick={(e) => { e.stopPropagation(); setShowEditModal(true); }}
                     data-testid="button-edit-announcement"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
@@ -792,7 +801,7 @@ function AnnouncementCard({
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
+                    onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
                     data-testid="button-delete-announcement"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -895,12 +904,14 @@ function AnnouncementCard({
 
         {/* Enhanced Poll */}
         {announcement.polls && announcement.polls.length > 0 && announcement.polls[0] && (
-          <PollCard 
-            poll={announcement.polls[0]} 
-            currentUserId={currentUserId}
-            onVote={handlePollVote}
-            isPending={voteOnPollMutation.isPending}
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <PollCard 
+              poll={announcement.polls[0]} 
+              currentUserId={currentUserId}
+              onVote={handlePollVote}
+              isPending={voteOnPollMutation.isPending}
+            />
+          </div>
         )}
 
         <Separator />
@@ -928,7 +939,7 @@ function AnnouncementCard({
                   key={emoji}
                   variant={userReacted ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => handleReaction(emoji)}
+                  onClick={(e) => { e.stopPropagation(); handleReaction(emoji); }}
                   className="h-8 px-2 text-sm"
                   title={label}
                   data-testid={`button-reaction-${emoji}`}
@@ -938,6 +949,16 @@ function AnnouncementCard({
                 </Button>
               );
             })}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
+              className="h-8 px-2 text-sm ml-auto"
+              data-testid="button-comments"
+            >
+              <MessageCircle className="w-4 h-4 mr-1" />
+              {(announcement as any).commentCount > 0 && <span>{(announcement as any).commentCount}</span>}
+            </Button>
           </div>
         )}
       </CardContent>
@@ -964,16 +985,18 @@ function AnnouncementCard({
               />
             </div>
             
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="edit-pin"
-                checked={editIsPinned}
-                onChange={(e) => setEditIsPinned(e.target.checked)}
-                data-testid="checkbox-edit-pin"
-              />
-              <Label htmlFor="edit-pin">Pin this announcement</Label>
-            </div>
+            {isCommissioner && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="edit-pin"
+                  checked={editIsPinned}
+                  onChange={(e) => setEditIsPinned(e.target.checked)}
+                  data-testid="checkbox-edit-pin"
+                />
+                <Label htmlFor="edit-pin">Pin this announcement</Label>
+              </div>
+            )}
             
             <div className="flex justify-end gap-2">
               <Button
@@ -1030,11 +1053,156 @@ function AnnouncementCard({
   );
 }
 
+function PostDetailView({
+  announcement,
+  leagueId,
+  tournamentId,
+  currentUserId,
+  isCommissioner,
+  canComment,
+  onBack
+}: {
+  announcement: Announcement;
+  leagueId: string | null;
+  tournamentId: string | null;
+  currentUserId: string;
+  isCommissioner: boolean;
+  canComment: boolean;
+  onBack: () => void;
+}) {
+  const { toast } = useToast();
+  const [commentContent, setCommentContent] = useState('');
+
+  const { data: comments = [], isLoading: commentsLoading } = useQuery<{ id: string; content: string; createdAt: string; author: { id: string; firstName: string; lastName: string; profileImageUrl?: string | null } }[]>({
+    queryKey: ['/api/announcements', announcement.id, 'comments'],
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: async (data: { content: string }) => {
+      const response = await apiRequest('POST', `/api/announcements/${announcement.id}/comments`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/announcements', announcement.id, 'comments'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else if (leagueId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
+      setCommentContent('');
+      toast({ title: 'Comment added!' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to add comment', variant: 'destructive' });
+    }
+  });
+
+  const handleSendComment = () => {
+    if (!commentContent.trim()) return;
+    addCommentMutation.mutate({ content: commentContent.trim() });
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col" data-page-content>
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-xl font-semibold">Post</h1>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 max-w-2xl mx-auto px-4 py-6 w-full pb-32">
+        <AnnouncementCard
+          announcement={announcement}
+          leagueId={leagueId}
+          tournamentId={tournamentId}
+          currentUserId={currentUserId}
+          isCommissioner={isCommissioner}
+          onOpenDetail={() => {}}
+        />
+
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <MessageCircle className="w-5 h-5" />
+            Comments {Array.isArray(comments) && comments.length > 0 && `(${comments.length})`}
+          </h3>
+
+          {commentsLoading ? (
+            <div className="space-y-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="flex gap-3 animate-pulse">
+                  <div className="w-8 h-8 bg-muted rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-muted rounded w-24" />
+                    <div className="h-4 bg-muted rounded w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : Array.isArray(comments) && comments.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No comments yet. Be the first to comment!</p>
+          ) : (
+            <div className="space-y-4">
+              {Array.isArray(comments) && comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3">
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={comment.author.profileImageUrl ? getImageUrl(comment.author.profileImageUrl) || '' : ''} />
+                    <AvatarFallback className="text-xs">
+                      {comment.author.firstName?.[0] || '?'}{comment.author.lastName?.[0] || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">{comment.author.firstName} {comment.author.lastName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(comment.createdAt), 'MMM d, yyyy • h:mm a')}
+                      </span>
+                    </div>
+                    <p className="text-sm mt-1">{comment.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {canComment && (
+        <div className="sticky bottom-0 bg-background border-t p-4">
+          <div className="max-w-2xl mx-auto flex gap-2">
+            <Textarea
+              value={commentContent}
+              onChange={(e) => setCommentContent(e.target.value)}
+              placeholder="Write a comment..."
+              className="min-h-[40px] max-h-[120px] resize-none flex-1"
+              data-testid="input-comment"
+            />
+            <Button
+              onClick={handleSendComment}
+              disabled={!commentContent.trim() || addCommentMutation.isPending}
+              size="sm"
+              className="self-end"
+              data-testid="button-send-comment"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Announcements() {
   const { user, isLoading: authLoading } = useAuth();
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
   // Get the selected team or league from dashboard selection
   const { selectedTeamId, selectedLeagueId, selectedType, selectedId } = useDashboardSelection();
@@ -1100,10 +1268,10 @@ export default function Announcements() {
   // Check if user is a team captain in this league
   const isTeamCaptain = (teams as any[]).some((team: any) => team.captainId === user?.id);
   
-  // User can post if they're a commissioner or team captain AND have Player Pro tier or higher
+  // User can post if they have Player Pro tier or higher (includes Commissioner tier)
   const canPost = isTournamentContext 
-    ? isTournamentCommissioner // Only tournament commissioners can post
-    : (isLeagueCommissioner || isTeamCaptain) && canAccessPremiumFeatures();
+    ? isTournamentCommissioner
+    : canAccessPremiumFeatures();
 
   // Fetch announcements - either tournament or league
   const { data, isLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
@@ -1168,6 +1336,20 @@ export default function Announcements() {
 
   const contextName = isTournamentContext ? currentTournament?.name : currentLeague?.name;
 
+  if (selectedAnnouncement) {
+    return (
+      <PostDetailView
+        announcement={selectedAnnouncement}
+        leagueId={isTournamentContext ? null : leagueId}
+        tournamentId={isTournamentContext ? tournamentId : null}
+        currentUserId={user?.id || ''}
+        isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
+        canComment={canAccessPremiumFeatures()}
+        onBack={() => setSelectedAnnouncement(null)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background" data-page-content>
         {/* Header */}
@@ -1177,7 +1359,7 @@ export default function Announcements() {
               <div className="flex items-center gap-3">
                 <Megaphone className="w-6 h-6 text-primary" />
                 <div>
-                  <h1 className="text-xl font-semibold">News</h1>
+                  <h1 className="text-xl font-semibold">The Wall</h1>
                   <p className="text-sm text-muted-foreground">{contextName}</p>
                 </div>
               </div>
@@ -1247,6 +1429,7 @@ export default function Announcements() {
                   tournamentId={isTournamentContext ? tournamentId : null}
                   currentUserId={user?.id || ''}
                   isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
+                  onOpenDetail={() => setSelectedAnnouncement(announcement)}
                 />
               ))}
             </div>
@@ -1260,6 +1443,7 @@ export default function Announcements() {
           leagueId={isTournamentContext ? null : leagueId}
           tournamentId={isTournamentContext ? tournamentId : null}
           canPost={canPost}
+          isCommissioner={isTournamentContext ? isTournamentCommissioner : isLeagueCommissioner}
         />
     </div>
   );

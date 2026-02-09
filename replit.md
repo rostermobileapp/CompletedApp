@@ -85,3 +85,17 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 -   **React Query (TanStack Query)**: Server state management.
 -   **Wouter**: Lightweight client-side routing.
 -   **Drizzle ORM**: Type-safe database operations.
+
+## Recent Changes (Feb 2026)
+
+### "The Wall" (formerly "News") Feature Updates
+- Renamed "News" screen to "The Wall" in Dashboard card and page header
+- Updated posting permissions: Any league member with Player Pro or Commissioner tier can now post (previously required commissioner or team captain role)
+- Pinning posts is restricted to Commissioner tier only (enforced on both frontend and backend)
+- Added announcement comments system:
+  - New `announcement_comments` table in schema with relations
+  - Backend API routes: GET/POST `/api/announcements/:id/comments`, GET `/api/announcements/:id/comment-count`
+  - Comment count shown on each post card with a comment icon
+  - Clicking a post opens a detail view showing the full post and its comments
+  - Comment input for Player Pro or Commissioner tier users
+  - Comment counts are included in announcement list API responses

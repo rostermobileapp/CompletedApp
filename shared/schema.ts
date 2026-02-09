@@ -1035,6 +1035,17 @@ export const announcementVisibility = pgTable("announcement_visibility", {
   unique("unique_announcement_user_visibility").on(table.announcementId, table.userId),
 ]);
 
+// Announcement comments table
+export const announcementComments = pgTable("announcement_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_announcement_comments_announcement_id").on(table.announcementId),
+]);
+
 // Scrimmages table
 export const scrimmages = pgTable("scrimmages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1933,6 +1944,7 @@ export const announcementsRelations = relations(announcements, ({ one, many }) =
   attachments: many(announcementAttachments),
   reactions: many(announcementReactions),
   polls: many(announcementPolls),
+  comments: many(announcementComments),
 }));
 
 export const announcementAttachmentsRelations = relations(announcementAttachments, ({ one }) => ({
@@ -1968,6 +1980,17 @@ export const announcementPollVotesRelations = relations(announcementPollVotes, (
   }),
   user: one(users, {
     fields: [announcementPollVotes.userId],
+    references: [users.id],
+  }),
+}));
+
+export const announcementCommentsRelations = relations(announcementComments, ({ one }) => ({
+  announcement: one(announcements, {
+    fields: [announcementComments.announcementId],
+    references: [announcements.id],
+  }),
+  author: one(users, {
+    fields: [announcementComments.authorId],
     references: [users.id],
   }),
 }));
@@ -2557,6 +2580,11 @@ export const insertAnnouncementPollVoteSchema = createInsertSchema(announcementP
   createdAt: true,
 });
 
+export const insertAnnouncementCommentSchema = createInsertSchema(announcementComments).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertChatPollSchema = createInsertSchema(chatPolls).omit({
   id: true,
   createdAt: true,
@@ -3070,6 +3098,8 @@ export type AnnouncementPoll = typeof announcementPolls.$inferSelect;
 export type InsertAnnouncementPoll = z.infer<typeof insertAnnouncementPollSchema>;
 export type AnnouncementPollVote = typeof announcementPollVotes.$inferSelect;
 export type InsertAnnouncementPollVote = z.infer<typeof insertAnnouncementPollVoteSchema>;
+export type AnnouncementComment = typeof announcementComments.$inferSelect;
+export type InsertAnnouncementComment = z.infer<typeof insertAnnouncementCommentSchema>;
 export type CreateAnnouncementRequest = z.infer<typeof createAnnouncementRequestSchema>;
 export type UpdateAnnouncementRequest = z.infer<typeof updateAnnouncementRequestSchema>;
 export type CreateAnnouncementAttachmentRequest = z.infer<typeof createAnnouncementAttachmentRequestSchema>;

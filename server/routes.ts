@@ -9816,6 +9816,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const announcementsWithSignedUrls = await Promise.all(
         result.announcements.map(async (announcement: any) => {
+          const commentCount = await storage.getAnnouncementCommentCount(announcement.id);
+          let enriched = { ...announcement, commentCount };
           if (announcement.attachments && announcement.attachments.length > 0) {
             const attachmentsWithSignedUrls = await Promise.all(
               announcement.attachments.map(async (attachment: any) => {
@@ -9829,9 +9831,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 return attachment;
               })
             );
-            return { ...announcement, attachments: attachmentsWithSignedUrls };
+            enriched = { ...enriched, attachments: attachmentsWithSignedUrls };
           }
-          return announcement;
+          return enriched;
         })
       );
 
@@ -9863,25 +9865,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
 
-      // Check if user is commissioner or team captain
+      // Check if user has Player Pro or Commissioner tier
       const league = await storage.getLeague(leagueId);
       if (!league) {
         return res.status(404).json({ message: 'League not found' });
       }
 
+      const postingUser = await storage.getUser(userId);
+      if (!postingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Verify user is a member of this league
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'You must be an approved league member to post' });
+      }
+
       const isCommissioner = league.commissionerId === userId;
-      
+      const userRole = postingUser.role || 'free_tier';
+      const roleHierarchy: Record<string, number> = { free_tier: 0, player_pro: 1, secondary_commissioner: 2, commissioner: 3 };
+      const hasPlayerProOrHigher = (roleHierarchy[userRole] || 0) >= roleHierarchy['player_pro'];
+
+      if (!hasPlayerProOrHigher) {
+        return res.status(403).json({ message: 'Player Pro or Commissioner tier required to post' });
+      }
+
       // Check if user is a team captain in this league
       const teams = await storage.getTeamsByLeague(leagueId);
       const captainTeam = teams.find(team => team.captainId === userId);
       const isTeamCaptain = !!captainTeam;
 
-      if (!isCommissioner && !isTeamCaptain) {
-        return res.status(403).json({ message: 'Only commissioners and team captains can create announcements' });
-      }
-
       const requestBody = req.body;
       const { targetUserIds, ...announcementData } = createAnnouncementRequestSchema.parse(requestBody);
+
+      // Enforce commissioner-only pinning
+      if (announcementData.isPinned && !isCommissioner) {
+        announcementData.isPinned = false;
+      }
       
       // Set teamId based on user role:
       // - Commissioner posts: teamId = null (visible to everyone in league)
@@ -10030,6 +10051,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updates = updateAnnouncementRequestSchema.parse(req.body);
+
+      // Enforce commissioner-only pinning on updates
+      if (updates.isPinned !== undefined && updates.isPinned && !isCommissioner) {
+        updates.isPinned = false;
+      }
+
       const updatedAnnouncement = await storage.updateAnnouncement(announcementId, updates);
       res.json(updatedAnnouncement);
     } catch (error) {
@@ -10181,6 +10208,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error removing reaction:', error);
       res.status(500).json({ message: 'Failed to remove reaction' });
+    }
+  });
+
+  // Get comments for an announcement
+  app.get('/api/announcements/:id/comments', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const isVisible = await storage.isAnnouncementVisibleToUser(announcementId, userId);
+      if (!isVisible) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const comments = await storage.getAnnouncementComments(announcementId);
+      res.json(comments);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      res.status(500).json({ message: 'Failed to fetch comments' });
+    }
+  });
+
+  // Create a comment on an announcement (Player Pro or Commissioner tier required)
+  app.post('/api/announcements/:id/comments', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { content } = req.body;
+
+      if (!content || !content.trim()) {
+        return res.status(400).json({ message: 'Comment content is required' });
+      }
+
+      const announcement = await storage.getAnnouncement(announcementId);
+      if (!announcement) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const isVisible = await storage.isAnnouncementVisibleToUser(announcementId, userId);
+      if (!isVisible) {
+        return res.status(404).json({ message: 'Announcement not found' });
+      }
+
+      const commentUser = await storage.getUser(userId);
+      if (!commentUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const userRole = commentUser.role || 'free_tier';
+      const roleHierarchy: Record<string, number> = { free_tier: 0, player_pro: 1, secondary_commissioner: 2, commissioner: 3 };
+      const hasPlayerProOrHigher = (roleHierarchy[userRole] || 0) >= roleHierarchy['player_pro'];
+
+      if (!hasPlayerProOrHigher) {
+        return res.status(403).json({ message: 'Player Pro or Commissioner tier required to comment' });
+      }
+
+      const comment = await storage.createAnnouncementComment({
+        announcementId,
+        authorId: userId,
+        content: content.trim(),
+      });
+
+      const comments = await storage.getAnnouncementComments(announcementId);
+      const createdComment = comments.find(c => c.id === comment.id);
+      res.json(createdComment || comment);
+    } catch (error) {
+      console.error('Error creating comment:', error);
+      res.status(500).json({ message: 'Failed to create comment' });
+    }
+  });
+
+  // Get comment count for an announcement
+  app.get('/api/announcements/:id/comment-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const announcementId = req.params.id;
+      const count = await storage.getAnnouncementCommentCount(announcementId);
+      res.json({ count });
+    } catch (error) {
+      console.error('Error fetching comment count:', error);
+      res.status(500).json({ message: 'Failed to fetch comment count' });
     }
   });
 
@@ -10413,6 +10525,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const announcementsWithSignedUrls = await Promise.all(
         result.announcements.map(async (announcement: any) => {
+          const commentCount = await storage.getAnnouncementCommentCount(announcement.id);
+          let enriched = { ...announcement, commentCount };
           if (announcement.attachments && announcement.attachments.length > 0) {
             const attachmentsWithSignedUrls = await Promise.all(
               announcement.attachments.map(async (attachment: any) => {
@@ -10426,9 +10540,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 return attachment;
               })
             );
-            return { ...announcement, attachments: attachmentsWithSignedUrls };
+            enriched = { ...enriched, attachments: attachmentsWithSignedUrls };
           }
-          return announcement;
+          return enriched;
         })
       );
 

@@ -28,6 +28,7 @@ import {
   announcementReactions,
   announcementPolls,
   announcementPollVotes,
+  announcementComments,
   scrimmages,
   scrimmageRequests,
   scrimmageCoHosts,
@@ -154,6 +155,8 @@ import {
   type InsertAnnouncementPoll,
   type AnnouncementPollVote,
   type InsertAnnouncementPollVote,
+  type AnnouncementComment,
+  type InsertAnnouncementComment,
   type Scrimmage,
   type InsertScrimmage,
   type ScrimmageRequest,
@@ -472,6 +475,11 @@ export interface IStorage {
   getAnnouncementVisibility(announcementId: string): Promise<string[]>;
   isAnnouncementVisibleToUser(announcementId: string, userId: string): Promise<boolean>;
   
+  // Announcement comment operations
+  createAnnouncementComment(comment: InsertAnnouncementComment): Promise<AnnouncementComment>;
+  getAnnouncementComments(announcementId: string): Promise<(AnnouncementComment & { author: { id: string; firstName: string; lastName: string; profileImageUrl?: string | null } })[]>;
+  getAnnouncementCommentCount(announcementId: string): Promise<number>;
+
   // Bulk import operations
   createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
   updatePlayerImport(importId: string, updates: Partial<InsertPlayerImport>): Promise<PlayerImport>;
@@ -7519,6 +7527,52 @@ export class DatabaseStorage implements IStorage {
       );
     
     return userVisibility.length > 0;
+  }
+
+  // Announcement comment operations
+  async createAnnouncementComment(comment: InsertAnnouncementComment): Promise<AnnouncementComment> {
+    const [newComment] = await db.insert(announcementComments).values(comment).returning();
+    return newComment;
+  }
+
+  async getAnnouncementComments(announcementId: string): Promise<(AnnouncementComment & { author: { id: string; firstName: string; lastName: string; profileImageUrl?: string | null } })[]> {
+    const results = await db
+      .select({
+        id: announcementComments.id,
+        announcementId: announcementComments.announcementId,
+        authorId: announcementComments.authorId,
+        content: announcementComments.content,
+        createdAt: announcementComments.createdAt,
+        authorFirstName: users.firstName,
+        authorLastName: users.lastName,
+        authorProfileImage: users.profileImageUrl,
+      })
+      .from(announcementComments)
+      .leftJoin(users, eq(announcementComments.authorId, users.id))
+      .where(eq(announcementComments.announcementId, announcementId))
+      .orderBy(announcementComments.createdAt);
+
+    return results.map(r => ({
+      id: r.id,
+      announcementId: r.announcementId,
+      authorId: r.authorId,
+      content: r.content,
+      createdAt: r.createdAt,
+      author: {
+        id: r.authorId,
+        firstName: r.authorFirstName || '',
+        lastName: r.authorLastName || '',
+        profileImageUrl: r.authorProfileImage,
+      }
+    }));
+  }
+
+  async getAnnouncementCommentCount(announcementId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(announcementComments)
+      .where(eq(announcementComments.announcementId, announcementId));
+    return Number(result[0]?.count || 0);
   }
 
   // Scrimmage operations
