@@ -949,19 +949,21 @@ function AnnouncementCard({
                 </Button>
               );
             })}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-              className="h-8 px-2 text-sm ml-auto text-blue-500 hover:text-blue-500 hover:bg-transparent"
-              data-testid="button-comments"
-            >
-              <MessageCircle className="w-4 h-4 mr-1" />
-              <span>Comment</span>
-              {(announcement as any).commentCount > 0 && <span className="ml-1">({(announcement as any).commentCount})</span>}
-            </Button>
           </div>
         )}
+
+        <div className="flex justify-center">
+          <Button
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
+            className="bg-blue-600 hover:bg-blue-600 text-white hover:text-white"
+            data-testid="button-comments"
+          >
+            <MessageCircle className="w-4 h-4 mr-1" />
+            <span>Comment</span>
+            {(announcement as any).commentCount > 0 && <span className="ml-1">({(announcement as any).commentCount})</span>}
+          </Button>
+        </div>
       </CardContent>
       {/* Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
