@@ -479,6 +479,8 @@ export interface IStorage {
   createAnnouncementComment(comment: InsertAnnouncementComment): Promise<AnnouncementComment>;
   getAnnouncementComments(announcementId: string): Promise<(AnnouncementComment & { author: { id: string; firstName: string; lastName: string; profileImageUrl?: string | null } })[]>;
   getAnnouncementCommentCount(announcementId: string): Promise<number>;
+  deleteAnnouncementComment(commentId: string): Promise<void>;
+  getAnnouncementComment(commentId: string): Promise<AnnouncementComment | undefined>;
 
   // Bulk import operations
   createPlayerImport(importData: InsertPlayerImport): Promise<PlayerImport>;
@@ -7542,6 +7544,7 @@ export class DatabaseStorage implements IStorage {
         announcementId: announcementComments.announcementId,
         authorId: announcementComments.authorId,
         content: announcementComments.content,
+        parentId: announcementComments.parentId,
         createdAt: announcementComments.createdAt,
         authorFirstName: users.firstName,
         authorLastName: users.lastName,
@@ -7557,6 +7560,7 @@ export class DatabaseStorage implements IStorage {
       announcementId: r.announcementId,
       authorId: r.authorId,
       content: r.content,
+      parentId: r.parentId,
       createdAt: r.createdAt,
       author: {
         id: r.authorId,
@@ -7573,6 +7577,16 @@ export class DatabaseStorage implements IStorage {
       .from(announcementComments)
       .where(eq(announcementComments.announcementId, announcementId));
     return Number(result[0]?.count || 0);
+  }
+
+  async deleteAnnouncementComment(commentId: string): Promise<void> {
+    await db.delete(announcementComments).where(eq(announcementComments.parentId, commentId));
+    await db.delete(announcementComments).where(eq(announcementComments.id, commentId));
+  }
+
+  async getAnnouncementComment(commentId: string): Promise<AnnouncementComment | undefined> {
+    const [comment] = await db.select().from(announcementComments).where(eq(announcementComments.id, commentId));
+    return comment;
   }
 
   // Scrimmage operations

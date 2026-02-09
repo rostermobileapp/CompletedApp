@@ -24,7 +24,9 @@ import {
   Trash2,
   FileText,
   ArrowLeft,
-  Send
+  Send,
+  Reply,
+  CornerDownRight
 } from 'lucide-react';
 import { ScrimmageRSVPButtons } from '@/components/ScrimmageRSVPButtons';
 import { Button } from '@/components/ui/button';
@@ -1056,6 +1058,98 @@ function AnnouncementCard({
   );
 }
 
+type CommentType = {
+  id: string;
+  content: string;
+  createdAt: string;
+  parentId?: string | null;
+  authorId: string;
+  author: { id: string; firstName: string; lastName: string; profileImageUrl?: string | null };
+};
+
+function CommentItem({
+  comment,
+  repliesByParent,
+  currentUserId,
+  canComment,
+  onReply,
+  onDelete,
+  isDeleting,
+  depth,
+}: {
+  comment: CommentType;
+  repliesByParent: Record<string, CommentType[]>;
+  currentUserId: string;
+  canComment: boolean;
+  onReply: (parentId: string, authorName: string) => void;
+  onDelete: (commentId: string) => void;
+  isDeleting: boolean;
+  depth: number;
+}) {
+  const isOwn = comment.authorId === currentUserId;
+  const replies = repliesByParent[comment.id] || [];
+
+  return (
+    <div className={depth > 0 ? "ml-8 border-l-2 border-muted pl-4" : ""}>
+      <div className="flex gap-3">
+        <Avatar className="w-8 h-8 flex-shrink-0">
+          <AvatarImage src={comment.author.profileImageUrl ? getImageUrl(comment.author.profileImageUrl) || '' : ''} />
+          <AvatarFallback className="text-xs">
+            {comment.author.firstName?.[0] || '?'}{comment.author.lastName?.[0] || '?'}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold">{comment.author.firstName} {comment.author.lastName}</span>
+            <span className="text-xs text-muted-foreground">
+              {format(new Date(comment.createdAt), 'MMM d, yyyy • h:mm a')}
+            </span>
+          </div>
+          <p className="text-sm mt-1">{comment.content}</p>
+          <div className="flex items-center gap-3 mt-1">
+            {canComment && (
+              <button
+                onClick={() => onReply(comment.id, `${comment.author.firstName} ${comment.author.lastName}`)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
+                <Reply className="w-3 h-3" />
+                Reply
+              </button>
+            )}
+            {isOwn && (
+              <button
+                onClick={() => onDelete(comment.id)}
+                disabled={isDeleting}
+                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      {replies.length > 0 && (
+        <div className="mt-3 space-y-3">
+          {replies.map((reply) => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              repliesByParent={repliesByParent}
+              currentUserId={currentUserId}
+              canComment={canComment}
+              onReply={onReply}
+              onDelete={onDelete}
+              isDeleting={isDeleting}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PostDetailView({
   announcement,
   leagueId,
@@ -1075,13 +1169,14 @@ function PostDetailView({
 }) {
   const { toast } = useToast();
   const [commentContent, setCommentContent] = useState('');
+  const [replyingTo, setReplyingTo] = useState<{ parentId: string; authorName: string } | null>(null);
 
-  const { data: comments = [], isLoading: commentsLoading } = useQuery<{ id: string; content: string; createdAt: string; author: { id: string; firstName: string; lastName: string; profileImageUrl?: string | null } }[]>({
+  const { data: comments = [], isLoading: commentsLoading } = useQuery<CommentType[]>({
     queryKey: ['/api/announcements', announcement.id, 'comments'],
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async (data: { content: string }) => {
+    mutationFn: async (data: { content: string; parentId?: string }) => {
       const response = await apiRequest('POST', `/api/announcements/${announcement.id}/comments`, data);
       return response.json();
     },
@@ -1093,6 +1188,7 @@ function PostDetailView({
         queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
       }
       setCommentContent('');
+      setReplyingTo(null);
       toast({ title: 'Comment added!' });
     },
     onError: () => {
@@ -1100,10 +1196,46 @@ function PostDetailView({
     }
   });
 
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      await apiRequest('DELETE', `/api/announcements/comments/${commentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/announcements', announcement.id, 'comments'] });
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
+      } else if (leagueId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
+      }
+      toast({ title: 'Comment deleted' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete comment', variant: 'destructive' });
+    }
+  });
+
   const handleSendComment = () => {
     if (!commentContent.trim()) return;
-    addCommentMutation.mutate({ content: commentContent.trim() });
+    const data: { content: string; parentId?: string } = { content: commentContent.trim() };
+    if (replyingTo) {
+      data.parentId = replyingTo.parentId;
+    }
+    addCommentMutation.mutate(data);
   };
+
+  const handleReply = (parentId: string, authorName: string) => {
+    setReplyingTo({ parentId, authorName });
+  };
+
+  const topLevelComments = Array.isArray(comments) ? comments.filter(c => !c.parentId) : [];
+  const repliesByParent: Record<string, CommentType[]> = {};
+  if (Array.isArray(comments)) {
+    comments.filter(c => c.parentId).forEach(c => {
+      const key = c.parentId!;
+      if (!repliesByParent[key]) repliesByParent[key] = [];
+      repliesByParent[key].push(c);
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col" data-page-content>
@@ -1146,28 +1278,22 @@ function PostDetailView({
                 </div>
               ))}
             </div>
-          ) : Array.isArray(comments) && comments.length === 0 ? (
+          ) : topLevelComments.length === 0 ? (
             <p className="text-muted-foreground text-sm">No comments yet. Be the first to comment!</p>
           ) : (
             <div className="space-y-4">
-              {Array.isArray(comments) && comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={comment.author.profileImageUrl ? getImageUrl(comment.author.profileImageUrl) || '' : ''} />
-                    <AvatarFallback className="text-xs">
-                      {comment.author.firstName?.[0] || '?'}{comment.author.lastName?.[0] || '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{comment.author.firstName} {comment.author.lastName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(comment.createdAt), 'MMM d, yyyy • h:mm a')}
-                      </span>
-                    </div>
-                    <p className="text-sm mt-1">{comment.content}</p>
-                  </div>
-                </div>
+              {topLevelComments.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  repliesByParent={repliesByParent}
+                  currentUserId={currentUserId}
+                  canComment={canComment}
+                  onReply={handleReply}
+                  onDelete={(id) => deleteCommentMutation.mutate(id)}
+                  isDeleting={deleteCommentMutation.isPending}
+                  depth={0}
+                />
               ))}
             </div>
           )}
@@ -1176,23 +1302,37 @@ function PostDetailView({
 
       {canComment && (
         <div className="sticky bottom-0 bg-background border-t p-4">
-          <div className="max-w-2xl mx-auto flex gap-2">
-            <Textarea
-              value={commentContent}
-              onChange={(e) => setCommentContent(e.target.value)}
-              placeholder="Write a comment..."
-              className="min-h-[40px] max-h-[120px] resize-none flex-1"
-              data-testid="input-comment"
-            />
-            <Button
-              onClick={handleSendComment}
-              disabled={!commentContent.trim() || addCommentMutation.isPending}
-              size="sm"
-              className="self-end"
-              data-testid="button-send-comment"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+          <div className="max-w-2xl mx-auto">
+            {replyingTo && (
+              <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                <CornerDownRight className="w-3 h-3" />
+                <span>Replying to {replyingTo.authorName}</span>
+                <button
+                  onClick={() => setReplyingTo(null)}
+                  className="text-xs text-muted-foreground hover:text-foreground ml-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Textarea
+                value={commentContent}
+                onChange={(e) => setCommentContent(e.target.value)}
+                placeholder={replyingTo ? `Reply to ${replyingTo.authorName}...` : "Write a comment..."}
+                className="min-h-[40px] max-h-[120px] resize-none flex-1"
+                data-testid="input-comment"
+              />
+              <Button
+                onClick={handleSendComment}
+                disabled={!commentContent.trim() || addCommentMutation.isPending}
+                size="sm"
+                className="self-end"
+                data-testid="button-send-comment"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

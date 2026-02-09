@@ -10269,11 +10269,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Player Pro or Commissioner tier required to comment' });
       }
 
-      const comment = await storage.createAnnouncementComment({
+      const { parentId } = req.body;
+
+      const commentData: any = {
         announcementId,
         authorId: userId,
         content: content.trim(),
-      });
+      };
+      if (parentId) {
+        commentData.parentId = parentId;
+      }
+
+      const comment = await storage.createAnnouncementComment(commentData);
 
       const comments = await storage.getAnnouncementComments(announcementId);
       const createdComment = comments.find(c => c.id === comment.id);
@@ -10293,6 +10300,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching comment count:', error);
       res.status(500).json({ message: 'Failed to fetch comment count' });
+    }
+  });
+
+  // Delete a comment (only by the comment author)
+  app.delete('/api/announcements/comments/:commentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { commentId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const comment = await storage.getAnnouncementComment(commentId);
+      if (!comment) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+
+      if (comment.authorId !== userId) {
+        return res.status(403).json({ message: 'You can only delete your own comments' });
+      }
+
+      await storage.deleteAnnouncementComment(commentId);
+      res.json({ message: 'Comment deleted' });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      res.status(500).json({ message: 'Failed to delete comment' });
     }
   });
 

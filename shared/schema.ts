@@ -1041,6 +1041,7 @@ export const announcementComments = pgTable("announcement_comments", {
   announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
   authorId: varchar("author_id").references(() => users.id).notNull(),
   content: text("content").notNull(),
+  parentId: varchar("parent_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_announcement_comments_announcement_id").on(table.announcementId),
