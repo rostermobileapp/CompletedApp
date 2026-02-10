@@ -1299,7 +1299,7 @@ function PostDetailView({
         </div>
       </div>
       {canComment && (
-        <div className="sticky bottom-0 bg-background border-t p-4">
+        <div className="fixed left-0 right-0 bg-background border-t p-4 z-[99]" style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}>
           <div className="max-w-2xl mx-auto">
             {replyingTo && (
               <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
