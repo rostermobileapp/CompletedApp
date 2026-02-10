@@ -1240,7 +1240,7 @@ function PostDetailView({
   return (
     <div className="min-h-screen bg-background flex flex-col" data-page-content>
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+        <div className="max-w-2xl mx-auto px-4 py-4 pt-[4px] pb-[4px]">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
               <ArrowLeft className="w-5 h-5" />
@@ -1249,7 +1249,6 @@ function PostDetailView({
           </div>
         </div>
       </div>
-
       <div className="flex-1 max-w-2xl mx-auto px-4 py-6 w-full pb-32">
         <AnnouncementCard
           announcement={announcement}
@@ -1299,7 +1298,6 @@ function PostDetailView({
           )}
         </div>
       </div>
-
       {canComment && (
         <div className="sticky bottom-0 bg-background border-t p-4">
           <div className="max-w-2xl mx-auto">
