@@ -1,5 +1,6 @@
 import { Users, Calendar, MessageCircle, Check } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
+import rosterDarkLogo from "@assets/Dark_Mode_Logo_1770738054930.png";
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 
@@ -19,12 +20,12 @@ export default function Landing() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="w-24"></div>
-          <span 
-            className="text-2xl font-bold text-white"
+          <img 
+            src={rosterDarkLogo}
+            alt="Roster"
+            className="h-10 object-contain"
             data-testid="logo-image"
-          >
-            Roster
-          </span>
+          />
           <div className="w-24"></div>
         </div>
       </header>
