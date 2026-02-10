@@ -4113,16 +4113,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(isNotNull(tournamentMatches.gameId));
       const tournamentGameIds = new Set(tournamentLinkedGames.map(t => t.gameId).filter(Boolean));
       
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       
-      // Filter past games (exclude scrimmages and tournament-linked games - they don't require score verification here)
+      // Filter games that started more than 1 hour ago (exclude scrimmages and tournament-linked games)
       const pastGames = games.filter((game: any) => {
         if (game.isScrimmage) return false;
         if (tournamentGameIds.has(game.id)) return false;
-        const gameDate = new Date(game.scheduledAt);
-        gameDate.setHours(0, 0, 0, 0);
-        return gameDate < today;
+        const gameStart = new Date(game.scheduledAt);
+        return gameStart <= oneHourAgo;
       });
       
       // Batch fetch all score submissions for past games (optimization)
