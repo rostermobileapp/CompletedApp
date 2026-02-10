@@ -88,6 +88,14 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 
 ## Recent Changes (Feb 2026)
 
+### Real-Time Message Loading Fix
+- Fixed critical issue where new messages wouldn't appear when navigating to a conversation thread (required force-closing the app)
+- Root cause: Global `staleTime: Infinity` in queryClient meant message/conversation queries never auto-refetched on mount
+- Added `staleTime: 0` and `refetchOnMount: 'always'` to conversations, messages, and payment requests queries in Messages.tsx
+- Stabilized WebSocket connection: removed `selectedConversation` from dependency array, using a ref instead so WS stays connected across conversation switches (no more disconnects/reconnects when switching threads)
+- WebSocket now invalidates messages for ANY conversation receiving new messages (not just the currently viewed one)
+- Added automatic WebSocket reconnection with 3-second delay on unexpected disconnects
+
 ### "The Wall" (formerly "News") Feature Updates
 - Renamed "News" screen to "The Wall" in Dashboard card and page header
 - Updated posting permissions: Any league member with Player Pro or Commissioner tier can now post (previously required commissioner or team captain role)

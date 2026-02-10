@@ -499,6 +499,7 @@ export default function Messages() {
   const firstUnreadMessageRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const selectedConversationRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -587,9 +588,11 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
-  // Fetch ALL conversations once - stable query key for instant caching
+  // Fetch ALL conversations - always refetch on mount to get latest data
   const { data: allConversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ['/api/conversations'],
+    staleTime: 0,
+    refetchOnMount: 'always',
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
@@ -660,15 +663,19 @@ export default function Messages() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Fetch messages for selected conversation
+  // Fetch messages for selected conversation - always refetch to show new messages immediately
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
+    staleTime: 0,
+    refetchOnMount: 'always',
     enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
   // Fetch payment requests for selected conversation
   const { data: conversationPaymentRequests = [] } = useQuery<any[]>({
     queryKey: ['/api/conversations', selectedConversation, 'payment-requests'],
+    staleTime: 0,
+    refetchOnMount: 'always',
     enabled: !!selectedConversation
   });
 
@@ -1082,129 +1089,143 @@ export default function Messages() {
     return false;
   };
 
-  // Persistent WebSocket connection for real-time updates
+  // Keep the selectedConversation ref in sync so WebSocket handler always has latest value
   useEffect(() => {
-    // 🚨 FREE ACCESS - WEBSOCKET ENABLED FOR EVERYONE! 🚨
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
 
-    // More robust WebSocket URL construction for different environments
+  // Persistent WebSocket connection for real-time updates
+  // Only depends on currentUserId - does NOT reconnect when conversation changes
+  useEffect(() => {
+    if (!currentUserId) return;
+
     let wsUrl;
     try {
-      // Use window.location.origin and convert to WebSocket protocol
       const origin = window.location.origin;
       wsUrl = origin.replace('https:', 'wss:').replace('http:', 'ws:') + '/ws';
     } catch (error) {
-      // Fallback for development environment
       console.warn('Failed to get origin, using fallback:', error);
       wsUrl = 'ws://localhost:5000/ws';
     }
     
     console.log('Connecting to WebSocket at:', wsUrl);
     
-    const websocket = new WebSocket(wsUrl);
-    
-    websocket.onopen = () => {
-      console.log('Connected to messaging WebSocket');
-      wsRef.current = websocket;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isIntentionallyClosed = false;
+
+    const connect = () => {
+      const websocket = new WebSocket(wsUrl);
       
-      // Authenticate with the server so it knows which user this connection belongs to
-      if (currentUserId) {
+      websocket.onopen = () => {
+        console.log('Connected to messaging WebSocket');
+        wsRef.current = websocket;
+        
         websocket.send(JSON.stringify({
           type: 'authenticate',
           userId: currentUserId
         }));
-      }
-    };
-    
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      };
       
-      // Handle different message types
-      switch (data.type) {
-        case 'message':
-          // Refresh conversations and messages
-          queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
-          if (data.conversationId === selectedConversation) {
-            queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
-          }
-          break;
-          
-        case 'typing_start':
-          if (data.conversationId === selectedConversation && data.userId !== currentUserId) {
-            setTypingUsers(prev => Array.from(new Set([...prev, data.userId])));
-          }
-          break;
-          
-        case 'typing_stop':
-          if (data.conversationId === selectedConversation) {
-            setTypingUsers(prev => prev.filter(userId => userId !== data.userId));
-          }
-          break;
-          
-        case 'user_online':
-          if (data.conversationId === selectedConversation) {
-            setOnlineUsers(prev => Array.from(new Set([...prev, data.userId])));
-          }
-          break;
-          
-        case 'user_offline':
-          if (data.conversationId === selectedConversation) {
-            setOnlineUsers(prev => prev.filter(userId => userId !== data.userId));
-          }
-          break;
-          
-        case 'read_receipt':
-        case 'message_read':
-          // Refresh messages to show updated read receipts
-          // message_read is sent by mark-all-read endpoint with conversationId and messageIds array
-          if (data.conversationId === selectedConversation) {
-            queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
-          }
-          // Invalidate unread counts when read receipts are received
-          queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
-          break;
+      websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const currentConv = selectedConversationRef.current;
+        
+        switch (data.type) {
+          case 'message':
+            queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/conversations', data.conversationId, 'messages'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+            break;
+            
+          case 'typing_start':
+            if (data.conversationId === currentConv && data.userId !== currentUserId) {
+              setTypingUsers(prev => Array.from(new Set([...prev, data.userId])));
+            }
+            break;
+            
+          case 'typing_stop':
+            if (data.conversationId === currentConv) {
+              setTypingUsers(prev => prev.filter(userId => userId !== data.userId));
+            }
+            break;
+            
+          case 'user_online':
+            if (data.conversationId === currentConv) {
+              setOnlineUsers(prev => Array.from(new Set([...prev, data.userId])));
+            }
+            break;
+            
+          case 'user_offline':
+            if (data.conversationId === currentConv) {
+              setOnlineUsers(prev => prev.filter(userId => userId !== data.userId));
+            }
+            break;
+            
+          case 'read_receipt':
+          case 'message_read':
+            if (data.conversationId === currentConv) {
+              queryClient.invalidateQueries({ queryKey: ['/api/conversations', currentConv, 'messages'] });
+            }
+            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+            break;
 
-        case 'poll_created':
-          // Refresh messages to show new poll
-          if (data.conversationId === selectedConversation) {
-            queryClient.invalidateQueries({ queryKey: ['/api/conversations', selectedConversation, 'messages'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
-          }
-          break;
+          case 'poll_created':
+            if (data.conversationId === currentConv) {
+              queryClient.invalidateQueries({ queryKey: ['/api/conversations', currentConv, 'messages'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
+            }
+            break;
 
-        case 'poll_vote':
-          // Refresh poll results to show new vote
-          if (data.conversationId === selectedConversation) {
-            queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
-          }
-          break;
+          case 'poll_vote':
+            if (data.conversationId === currentConv) {
+              queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
+            }
+            break;
 
-        case 'poll_closed':
-          // Refresh poll data to show closed status
-          if (data.conversationId === selectedConversation) {
-            queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
-          }
-          break;
-          
-        case 'notification_update':
-          // Real-time notification badge update - invalidate notification queries
-          queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
-          break;
-      }
+          case 'poll_closed':
+            if (data.conversationId === currentConv) {
+              queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
+            }
+            break;
+            
+          case 'notification_update':
+            queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
+            break;
+        }
+      };
+      
+      websocket.onclose = () => {
+        console.log('Disconnected from messaging WebSocket');
+        wsRef.current = null;
+        if (!isIntentionallyClosed) {
+          reconnectTimeout = setTimeout(() => {
+            console.log('Attempting WebSocket reconnection...');
+            connect();
+          }, 3000);
+        }
+      };
+
+      websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
     };
-    
-    websocket.onclose = () => {
-      console.log('Disconnected from messaging WebSocket');
-      wsRef.current = null;
-    };
+
+    connect();
     
     return () => {
-      websocket.close();
+      isIntentionallyClosed = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
-  }, [currentUserId, selectedConversation]); // 🚨 FIXED DEPENDENCIES
+  }, [currentUserId]);
   
   // Reset conversation-scoped state when conversation changes
   useEffect(() => {
