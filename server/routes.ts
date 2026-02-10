@@ -10297,6 +10297,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const comment = await storage.createAnnouncementComment(commentData);
 
+      // Send push notification for replies to comments
+      if (parentId) {
+        try {
+          const parentComment = await storage.getAnnouncementComment(parentId);
+          if (parentComment && parentComment.authorId !== userId) {
+            const replier = await storage.getUser(userId);
+            const replierName = replier ? `${replier.firstName || ''} ${replier.lastName || ''}`.trim() || 'Someone' : 'Someone';
+            
+            const league = announcement.leagueId ? await storage.getLeague(announcement.leagueId) : null;
+            const leagueName = league?.name || 'League';
+            
+            const { sendWallReplyPushNotification } = await import('./oneSignalNotifications');
+            await sendWallReplyPushNotification(
+              parentComment.authorId,
+              replierName,
+              content.trim(),
+              leagueName,
+              announcementId
+            );
+          }
+        } catch (notifError) {
+          console.error('Failed to send wall reply push notification:', notifError);
+        }
+      }
+
       const comments = await storage.getAnnouncementComments(announcementId);
       const createdComment = comments.find(c => c.id === comment.id);
       res.json(createdComment || comment);

@@ -220,10 +220,39 @@ export async function sendAnnouncementPushNotification(
   
   return sendPushNotificationToUser({
     userId: recipientId,
-    title: `📢 ${leagueOrTournamentName}`,
+    title: `📢 ${leagueOrTournamentName} - The Wall`,
     message: `${authorName}: ${truncatedPreview}`,
     data: {
       type: 'announcement',
+      announcementId,
+    },
+  });
+}
+
+export async function sendWallReplyPushNotification(
+  recipientId: string,
+  replierName: string,
+  replyPreview: string,
+  leagueOrTournamentName: string,
+  announcementId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.newsAnnouncements === false) {
+    console.log(`[OneSignal] Wall reply notifications disabled for user ${recipientId}`);
+    return false;
+  }
+  
+  const truncatedPreview = replyPreview.length > 50 
+    ? replyPreview.substring(0, 50) + '...' 
+    : replyPreview;
+  
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `💬 ${leagueOrTournamentName} - The Wall`,
+    message: `${replierName} replied to your comment: ${truncatedPreview}`,
+    data: {
+      type: 'wall_reply',
       announcementId,
     },
   });
