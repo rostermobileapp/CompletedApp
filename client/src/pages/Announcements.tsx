@@ -818,7 +818,7 @@ function AnnouncementCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="p-6 space-y-4 pt-[4px] pb-[4px]">
         {/* Content */}
         <p className="text-base leading-relaxed whitespace-pre-wrap">
           {announcement.content}
