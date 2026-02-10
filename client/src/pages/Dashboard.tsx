@@ -26,7 +26,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import lightModeLogo from '@assets/Light_Mode_Logo_1768322748282.png';
-import darkModeLogo from '@assets/Dark_Mode_Logo_1768322748283.png';
+import darkModeLogo from '@assets/Dark_Mode_Logo_1770738054930.png';
 import FeedbackModal from '@/components/FeedbackModal';
 import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
