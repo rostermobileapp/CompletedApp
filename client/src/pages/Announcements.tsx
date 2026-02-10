@@ -1249,7 +1249,7 @@ function PostDetailView({
           </div>
         </div>
       </div>
-      <div className="flex-1 max-w-2xl mx-auto px-4 py-6 w-full pb-32">
+      <div className="flex-1 max-w-2xl mx-auto px-4 py-6 w-full pt-[4px] pb-[4px]">
         <AnnouncementCard
           announcement={announcement}
           leagueId={leagueId}
