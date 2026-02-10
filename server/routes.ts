@@ -4061,7 +4061,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.id;
       const games = await storage.getGamesByLeague(leagueId);
-      const formattedGames = games.map(formatGameForResponse);
+      
+      const tournamentLinkedGames = await db
+        .select({ gameId: tournamentMatches.gameId })
+        .from(tournamentMatches)
+        .where(isNotNull(tournamentMatches.gameId));
+      const tournamentGameIds = new Set(tournamentLinkedGames.map(t => t.gameId).filter(Boolean));
+      
+      const filteredGames = games.filter((game: any) => !tournamentGameIds.has(game.id));
+      const formattedGames = filteredGames.map(formatGameForResponse);
       res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching league games:", error);
@@ -4110,8 +4118,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter past games (exclude scrimmages and tournament-linked games - they don't require score verification here)
       const pastGames = games.filter((game: any) => {
-        if (game.isScrimmage) return false; // Scrimmages don't need score verification
-        if (tournamentGameIds.has(game.id)) return false; // Tournament games are handled separately
+        if (game.isScrimmage) return false;
+        if (tournamentGameIds.has(game.id)) return false;
         const gameDate = new Date(game.scheduledAt);
         gameDate.setHours(0, 0, 0, 0);
         return gameDate < today;
@@ -7649,7 +7657,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const games = await storage.getGamesByLeague(leagueId as string);
-      res.json(games);
+      
+      const tournamentLinkedGames = await db
+        .select({ gameId: tournamentMatches.gameId })
+        .from(tournamentMatches)
+        .where(isNotNull(tournamentMatches.gameId));
+      const tournamentGameIds = new Set(tournamentLinkedGames.map(t => t.gameId).filter(Boolean));
+      const filteredGames = games.filter((game: any) => !tournamentGameIds.has(game.id));
+      
+      res.json(filteredGames);
     } catch (error) {
       console.error('Error fetching scorekeeper games:', error);
       res.status(500).json({ message: 'Failed to fetch games' });
