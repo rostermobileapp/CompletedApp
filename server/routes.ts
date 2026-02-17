@@ -163,6 +163,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Initialize user registration count table
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_registration_count (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        count INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+    // Seed with current user count only if the row doesn't exist yet (first-time setup)
+    const existing = await db.execute(sql`SELECT count FROM user_registration_count WHERE id = 1`);
+    if (!existing.rows || existing.rows.length === 0) {
+      const userCountResult = await db.execute(sql`SELECT COUNT(*)::int as total FROM users`);
+      const currentUserCount = userCountResult.rows?.[0]?.total ?? 0;
+      await db.execute(sql`
+        INSERT INTO user_registration_count (id, count) VALUES (1, ${currentUserCount})
+      `);
+      console.log(`[Init] Seeded user registration count with ${currentUserCount} existing users`);
+    }
+  } catch (e) {
+    console.error('Error initializing user_registration_count table:', e);
+  }
+
+  // User registration count route (public)
+  app.get('/api/user-count', async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT count FROM user_registration_count WHERE id = 1
+      `);
+      const count = result.rows?.[0]?.count ?? 0;
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching user count:", error);
+      res.status(500).json({ message: "Failed to fetch user count" });
+    }
+  });
+
   // Visitor count routes (public)
   app.get('/api/visitor-count', async (req, res) => {
     try {

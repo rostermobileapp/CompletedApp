@@ -1,12 +1,50 @@
 import { Users, Calendar, MessageCircle, Check } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
 import rosterDarkLogo from "@assets/Dark_Mode_Logo_1770738054930.png";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+
+function AnimatedCounter({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+  const prevValue = useRef(0);
+
+  useEffect(() => {
+    if (value === 0) return;
+    const start = prevValue.current;
+    const end = value;
+    const duration = 1500;
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(start + (end - start) * eased);
+      setDisplayValue(current);
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        prevValue.current = end;
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [value]);
+
+  return (
+    <span className="tabular-nums">{displayValue.toLocaleString()}</span>
+  );
+}
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
   const [, setLocation] = useLocation();
+
+  const { data: userCountData } = useQuery<{ count: number }>({
+    queryKey: ['/api/user-count'],
+    refetchInterval: 30000,
+  });
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -77,6 +115,19 @@ export default function Landing() {
             </div>
           </div>
         </div>
+        {userCountData && userCountData.count > 0 && (
+          <div className="text-center mt-12 relative z-10">
+            <div className="inline-flex flex-col items-center gap-2 px-8 py-5 rounded-2xl bg-gray-900/60 backdrop-blur-sm border border-gray-800/50">
+              <div className="flex items-center gap-3">
+                <Users className="w-6 h-6 text-[#3c82f4]" />
+                <span className="text-4xl md:text-5xl font-bold text-white">
+                  <AnimatedCounter value={userCountData.count} />
+                </span>
+              </div>
+              <p className="text-sm text-gray-400 font-medium tracking-wide uppercase">Players on Roster</p>
+            </div>
+          </div>
+        )}
       </section>
       {/* Highlights Bar */}
       <section className="py-16 px-6 border-y border-gray-800/50 bg-gray-900/30">

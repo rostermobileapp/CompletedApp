@@ -33,6 +33,13 @@ export const visitorCount = pgTable("visitor_count", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// User registration count - monotonically increasing, never decreases
+export const userRegistrationCount = pgTable("user_registration_count", {
+  id: integer("id").primaryKey().default(1),
+  count: integer("count").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Sports enum
 export const sportEnum = pgEnum("sport", [
   "hockey",
@@ -3224,6 +3231,11 @@ export type EventParticipantWithUser = EventParticipant & {
 export const insertVisitorCountSchema = createInsertSchema(visitorCount);
 export type VisitorCount = typeof visitorCount.$inferSelect;
 export type InsertVisitorCount = z.infer<typeof insertVisitorCountSchema>;
+
+// User Registration Count
+export const insertUserRegistrationCountSchema = createInsertSchema(userRegistrationCount);
+export type UserRegistrationCount = typeof userRegistrationCount.$inferSelect;
+export type InsertUserRegistrationCount = z.infer<typeof insertUserRegistrationCountSchema>;
 
 // Tournament settings schema
 export const tournamentSettingsSchema = z.object({

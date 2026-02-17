@@ -733,9 +733,14 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     try {
+      // Check if this is a genuinely new user (not seen before by ID or email)
+      const existingById = await this.getUser(userData.id);
+      const existingByEmailCheck = userData.email ? await this.getUserByEmail(userData.email) : undefined;
+      const isNewUser = !existingById && !existingByEmailCheck;
+
       // First, check if a user with this email already exists (handles re-signup with new Supabase ID)
       if (userData.email) {
-        const existingByEmail = await this.getUserByEmail(userData.email);
+        const existingByEmail = existingByEmailCheck;
         if (existingByEmail && existingByEmail.id !== userData.id) {
           // User signed up again with same email but got a new Supabase ID
           // We need to migrate the user to the new Supabase ID
@@ -797,6 +802,20 @@ export class DatabaseStorage implements IStorage {
         })
         .returning();
       
+      // Increment user registration counter for genuinely new users
+      if (isNewUser) {
+        try {
+          await db.execute(sql`
+            UPDATE user_registration_count 
+            SET count = count + 1, updated_at = NOW() 
+            WHERE id = 1
+          `);
+          console.log('[Storage] Incremented user registration count for new user:', userData.id);
+        } catch (countError) {
+          console.error('[Storage] Failed to increment user registration count:', countError);
+        }
+      }
+
       return user;
     } catch (error: any) {
       // If there's still a conflict issue, fall back to explicit check and update
