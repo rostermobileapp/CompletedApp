@@ -52,19 +52,20 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
+      {userCountData && userCountData.count > 0 && (
+        <div className="fixed top-20 left-4 z-40 bg-gray-900/90 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            <span className="text-gray-400 text-xs font-medium">Players:</span>
+            <span className="text-sm font-bold text-white">
+              <AnimatedCounter value={userCountData.count} />
+            </span>
+          </div>
+        </div>
+      )}
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="w-24">
-            {userCountData && userCountData.count > 0 && (
-              <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className="text-gray-400 text-[16px]">Players:</span>
-                <span className="text-sm font-semibold text-white">
-                  <AnimatedCounter value={userCountData.count} />
-                </span>
-              </div>
-            )}
-          </div>
+          <div className="w-24"></div>
           <img 
             src={rosterDarkLogo}
             alt="Roster"
