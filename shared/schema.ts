@@ -244,7 +244,7 @@ export const users = pgTable("users", {
 // User notifications table
 export const userNotifications = pgTable("user_notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   type: notificationTypeEnum("type").notNull(),
   title: varchar("title").notNull(),
   message: text("message").notNull(),
@@ -266,7 +266,7 @@ export const userNotifications = pgTable("user_notifications", {
 // Push notification preferences table - stores user's OneSignal player ID and notification settings
 export const notificationPreferences = pgTable("notification_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
   oneSignalPlayerId: varchar("onesignal_player_id"), // OneSignal player/subscription ID
   oneSignalExternalId: varchar("onesignal_external_id"), // External ID linked in OneSignal (should match user's displayId)
   // JSONB field for flexible notification type preferences
@@ -302,7 +302,7 @@ export const leagues = pgTable("leagues", {
   rinkAddress: text("rink_address"), // Added for commissioner feature
   facilityId: varchar("facility_id"), // Link to facility - will add reference after facilities table is defined
   season: varchar("season"),
-  commissionerId: varchar("commissioner_id").references(() => users.id).notNull(),
+  commissionerId: varchar("commissioner_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   maxTeams: integer("max_teams").default(16),
   isActive: boolean("is_active").default(true).notNull(),
   playoffStarted: boolean("playoff_started").default(false).notNull(),
@@ -330,8 +330,8 @@ export const teams = pgTable("teams", {
   uniqueTeamId: varchar("unique_team_id").unique(), // ABC123 format for standalone teams to be searchable
   leagueId: varchar("league_id").references(() => leagues.id), // Made nullable for standalone teams
   seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
-  captainId: varchar("captain_id").references(() => users.id),
-  creatorId: varchar("creator_id").references(() => users.id), // Track who created the team
+  captainId: varchar("captain_id").references(() => users.id, { onDelete: 'cascade' }),
+  creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }), // Track who created the team
   facilityId: varchar("facility_id").references(() => facilities.id), // Optional facility for standalone teams
   logoUrl: varchar("logo_url"),
   wins: integer("wins").default(0).notNull(),
@@ -346,14 +346,14 @@ export const teams = pgTable("teams", {
 // League memberships table
 export const leagueMemberships = pgTable("league_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   skillLevel: varchar("skill_level"), // Text field for skill level (number or letter)
   status: membershipStatusEnum("status").default("pending").notNull(),
   message: text("message"), // Optional personalized message when requesting to join
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
-  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id, { onDelete: 'cascade' }),
   // Additional player management fields
   assignedTeamId: varchar("assigned_team_id").references(() => teams.id),
   position: varchar("position"),
@@ -373,14 +373,14 @@ export const leagueMemberships = pgTable("league_memberships", {
 // Team memberships table
 export const teamMemberships = pgTable("team_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
   skillLevel: varchar("skill_level"), // Text field for skill level (number or letter)
   status: membershipStatusEnum("status").default("pending").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
-  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id, { onDelete: 'cascade' }),
   isCaptain: boolean("is_captain").default(false).notNull(), // Allows multiple captains per team
 });
 
@@ -394,7 +394,7 @@ export const placeholderPlayers = pgTable("placeholder_players", {
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  addedBy: varchar("added_by").references(() => users.id), // Who added this placeholder
+  addedBy: varchar("added_by").references(() => users.id, { onDelete: 'cascade' }), // Who added this placeholder
 });
 
 // Team-to-league join requests table
@@ -402,12 +402,12 @@ export const teamLeagueRequests = pgTable("team_league_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
-  requestedBy: varchar("requested_by").references(() => users.id).notNull(), // Team creator who made the request
+  requestedBy: varchar("requested_by").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Team creator who made the request
   status: membershipStatusEnum("status").default("pending").notNull(),
   message: text("message"), // Optional personalized message when requesting to join
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
-  approvedBy: varchar("approved_by").references(() => users.id), // League commissioner who approved
+  approvedBy: varchar("approved_by").references(() => users.id, { onDelete: 'cascade' }), // League commissioner who approved
   rejectedAt: timestamp("rejected_at"),
 }, (table) => [
   unique("unique_team_league_request").on(table.teamId, table.leagueId),
@@ -433,9 +433,9 @@ export const games = pgTable("games", {
   awayScore: integer("away_score"),
   isCompleted: boolean("is_completed").default(false).notNull(),
   isScrimmage: boolean("is_scrimmage").default(false).notNull(), // True if scrimmage (doesn't count for standings/stats)
-  homeBeverageDutyUserId: varchar("home_beverage_duty_user_id").references(() => users.id),
+  homeBeverageDutyUserId: varchar("home_beverage_duty_user_id").references(() => users.id, { onDelete: 'cascade' }),
   homeBeverageDutyClaimedAt: timestamp("home_beverage_duty_claimed_at"),
-  awayBeverageDutyUserId: varchar("away_beverage_duty_user_id").references(() => users.id),
+  awayBeverageDutyUserId: varchar("away_beverage_duty_user_id").references(() => users.id, { onDelete: 'cascade' }),
   awayBeverageDutyClaimedAt: timestamp("away_beverage_duty_claimed_at"),
   resultType: gameResultTypeEnum("result_type").default("regulation"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -449,7 +449,7 @@ export const dutyTemplates = pgTable("duty_templates", {
   icon: varchar("icon").notNull(), // Icon name from lucide-react
   scope: dutyScopeEnum("scope").notNull(), // single_game or every_game
   isDefault: boolean("is_default").default(false).notNull(), // true for beverage duty
-  createdBy: varchar("created_by").references(() => users.id).notNull(), // Captain who created it
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Captain who created it
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_duty_templates_team_id").on(table.teamId),
@@ -461,7 +461,7 @@ export const dutyAssignments = pgTable("duty_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dutyTemplateId: varchar("duty_template_id").references(() => dutyTemplates.id).notNull(),
   gameId: varchar("game_id").notNull(), // Can be game ID or tournament match ID
-  userId: varchar("user_id").references(() => users.id).notNull(), // Who claimed it
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(), // Who claimed it
   teamId: varchar("team_id").references(() => teams.id).notNull(), // Which team they're representing
   claimedAt: timestamp("claimed_at").defaultNow().notNull(),
 }, (table) => [
@@ -479,7 +479,7 @@ export const dutyExclusions = pgTable("duty_exclusions", {
   gameId: varchar("game_id").notNull(), // Can be game ID or tournament match ID
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   excludedAt: timestamp("excluded_at").defaultNow().notNull(),
-  excludedBy: varchar("excluded_by").references(() => users.id).notNull(),
+  excludedBy: varchar("excluded_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
 }, (table) => [
   unique("unique_duty_game_exclusion").on(table.dutyTemplateId, table.gameId, table.teamId),
   index("idx_duty_exclusions_game_id").on(table.gameId),
@@ -498,7 +498,7 @@ export const tournaments = pgTable("tournaments", {
   numTeams: integer("num_teams").notNull(),
   startDate: timestamp("start_date"),
   description: text("description"),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   settings: jsonb("settings"), // seeding method, division count, etc.
   // Payment and access control fields
   uniqueTournamentId: varchar("unique_tournament_id", { length: 8 }).unique(),
@@ -569,7 +569,7 @@ export const tournamentMatches = pgTable("tournament_matches", {
 export const tournamentStats = pgTable("tournament_stats", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").references(() => tournamentTeams.id).notNull(),
   gamesPlayed: integer("games_played").default(0).notNull(),
   goals: integer("goals").default(0).notNull(),
@@ -589,13 +589,13 @@ export const tournamentStats = pgTable("tournament_stats", {
 export const tournamentParticipants = pgTable("tournament_participants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   tournamentTeamId: varchar("tournament_team_id").references(() => tournamentTeams.id), // assigned team
   role: tournamentParticipantRoleEnum("role").default("player").notNull(),
   status: tournamentParticipantStatusEnum("status").default("pending").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at"), // auto-set from tournament accessEndDate
-  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id, { onDelete: 'cascade' }),
   approvedAt: timestamp("approved_at"),
   message: text("message"), // optional message when joining
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -668,7 +668,7 @@ export const leaguePhotoTags = pgTable("league_photo_tags", {
 // Personal reminders table
 export const personalReminders = pgTable("personal_reminders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
   scheduledAt: timestamp("scheduled_at", { mode: 'string' }).notNull(),
@@ -685,7 +685,7 @@ export const personalReminders = pgTable("personal_reminders", {
 export const gameScoreSubmissions = pgTable("game_score_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
-  submittedBy: varchar("submitted_by").references(() => users.id).notNull(),
+  submittedBy: varchar("submitted_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   submitterRole: varchar("submitter_role").notNull(), // 'home_captain', 'away_captain', 'commissioner'
   homeScore: integer("home_score").notNull(),
   awayScore: integer("away_score").notNull(),
@@ -698,7 +698,7 @@ export const gameGoalies = pgTable("game_goalies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
-  goalieUserId: varchar("goalie_user_id").references(() => users.id).notNull(),
+  goalieUserId: varchar("goalie_user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   isStarter: boolean("is_starter").default(true).notNull(),
   goalsAgainst: integer("goals_against").default(0).notNull(),
   minutesPlayed: integer("minutes_played").default(0).notNull(),
@@ -714,10 +714,10 @@ export const gameGoalies = pgTable("game_goalies", {
 export const gameStars = pgTable("game_stars", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
-  firstStarUserId: varchar("first_star_user_id").references(() => users.id).notNull(),
-  secondStarUserId: varchar("second_star_user_id").references(() => users.id).notNull(),
-  thirdStarUserId: varchar("third_star_user_id").references(() => users.id).notNull(),
-  awardedBy: varchar("awarded_by").references(() => users.id).notNull(),
+  firstStarUserId: varchar("first_star_user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  secondStarUserId: varchar("second_star_user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  thirdStarUserId: varchar("third_star_user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  awardedBy: varchar("awarded_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   awardedAt: timestamp("awarded_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_game_stars").on(table.gameId),
@@ -731,7 +731,7 @@ export const gameStars = pgTable("game_stars", {
 export const gameRsvps = pgTable("game_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   status: rsvpStatusEnum("status").default("no_response").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -744,7 +744,7 @@ export const gameRsvps = pgTable("game_rsvps", {
 export const tournamentMatchRsvps = pgTable("tournament_match_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   matchId: varchar("match_id").references(() => tournamentMatches.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").notNull(),
   status: rsvpStatusEnum("status").default("no_response").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -757,10 +757,10 @@ export const tournamentMatchRsvps = pgTable("tournament_match_rsvps", {
 export const substituteRequests = pgTable("substitute_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
-  originalPlayerId: varchar("original_player_id").references(() => users.id).notNull(),
-  substitutePlayerId: varchar("substitute_player_id").references(() => users.id),
+  originalPlayerId: varchar("original_player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  substitutePlayerId: varchar("substitute_player_id").references(() => users.id, { onDelete: 'cascade' }),
   requestingTeamId: varchar("requesting_team_id").references(() => teams.id).notNull(),
-  requestedBy: varchar("requested_by").references(() => users.id).notNull(),
+  requestedBy: varchar("requested_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   status: substituteRequestStatusEnum("status").default("pending_opponent_approval").notNull(),
   reason: text("reason"),
   expiresAt: timestamp("expires_at"),
@@ -789,7 +789,7 @@ export const approvalStatusEnum = pgEnum("approval_status", [
 export const substitutionApprovals = pgTable("substitution_approvals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   substitutionRequestId: varchar("substitution_request_id").references(() => substituteRequests.id).notNull(),
-  approverId: varchar("approver_id").references(() => users.id).notNull(),
+  approverId: varchar("approver_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   approverType: approverTypeEnum("approver_type").notNull(),
   status: approvalStatusEnum("status").notNull(),
   comments: text("comments"),
@@ -830,7 +830,7 @@ export const conversations = pgTable("conversations", {
   leagueId: varchar("league_id").references(() => leagues.id), // For league-based conversations
   tournamentId: varchar("tournament_id").references(() => tournaments.id), // For tournament-based conversations
   teamId: varchar("team_id").references(() => teams.id), // For team group chats
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   lastMessageAt: timestamp("last_message_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -845,7 +845,7 @@ export const conversations = pgTable("conversations", {
 export const conversationParticipants = pgTable("conversation_participants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   leftAt: timestamp("left_at"), // For when users leave group chats
   lastReadAt: timestamp("last_read_at"), // For read receipts
@@ -863,7 +863,7 @@ export const conversationParticipants = pgTable("conversation_participants", {
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
-  senderId: varchar("sender_id").references(() => users.id).notNull(),
+  senderId: varchar("sender_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   content: text("content"),
   messageType: varchar("message_type").default("text").notNull(), // text, image, gif, file, poll, payment_request
   status: messageStatusEnum("status").default("sent").notNull(),
@@ -899,7 +899,7 @@ export const messageAttachments = pgTable("message_attachments", {
 export const messageReadReceipts = pgTable("message_read_receipts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   messageId: varchar("message_id").references(() => messages.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   readAt: timestamp("read_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_message_user_read").on(table.messageId, table.userId),
@@ -911,7 +911,7 @@ export const messageReadReceipts = pgTable("message_read_receipts", {
 export const typingIndicators = pgTable("typing_indicators", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   startedAt: timestamp("started_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(), // Auto-expire after 5 seconds
 }, (table) => [
@@ -923,7 +923,7 @@ export const typingIndicators = pgTable("typing_indicators", {
 // User online status table
 export const userOnlineStatus = pgTable("user_online_status", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
   status: onlineStatusEnum("status").default("offline").notNull(),
   lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -948,7 +948,7 @@ export const chatPolls = pgTable("chat_polls", {
 export const chatPollVotes = pgTable("chat_poll_votes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   pollId: varchar("poll_id").references(() => chatPolls.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   optionIndex: integer("option_index").notNull(), // Index of selected option in options array
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
@@ -962,7 +962,7 @@ export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id), // Either leagueId or tournamentId must be set, not both
   tournamentId: varchar("tournament_id").references(() => tournaments.id), // For tournament-specific announcements
-  authorId: varchar("author_id").references(() => users.id).notNull(),
+  authorId: varchar("author_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").references(() => teams.id), // null = commissioner post for everyone, set = team captain post for specific team
   content: text("content").notNull(),
   isPinned: boolean("is_pinned").default(false).notNull(),
@@ -992,7 +992,7 @@ export const announcementAttachments = pgTable("announcement_attachments", {
 export const announcementReactions = pgTable("announcement_reactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   emoji: varchar("emoji").notNull(), // Store emoji as string
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
@@ -1014,7 +1014,7 @@ export const announcementPolls = pgTable("announcement_polls", {
 export const announcementPollVotes = pgTable("announcement_poll_votes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   pollId: varchar("poll_id").references(() => announcementPolls.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   optionIndex: integer("option_index").notNull(), // Index of selected option in options array
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
@@ -1025,7 +1025,7 @@ export const announcementPollVotes = pgTable("announcement_poll_votes", {
 export const announcementReadStatus = pgTable("announcement_read_status", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   readAt: timestamp("read_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_announcement_user_read").on(table.announcementId, table.userId),
@@ -1036,7 +1036,7 @@ export const announcementReadStatus = pgTable("announcement_read_status", {
 export const announcementVisibility = pgTable("announcement_visibility", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_announcement_user_visibility").on(table.announcementId, table.userId),
@@ -1046,7 +1046,7 @@ export const announcementVisibility = pgTable("announcement_visibility", {
 export const announcementComments = pgTable("announcement_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   announcementId: varchar("announcement_id").references(() => announcements.id).notNull(),
-  authorId: varchar("author_id").references(() => users.id).notNull(),
+  authorId: varchar("author_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   content: text("content").notNull(),
   parentId: varchar("parent_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1058,7 +1058,7 @@ export const announcementComments = pgTable("announcement_comments", {
 export const scrimmages = pgTable("scrimmages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
-  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   title: varchar("title").notNull(),
   dateTime: timestamp("date_time", { mode: 'string' }).notNull(),
   location: varchar("location").notNull(),
@@ -1089,7 +1089,7 @@ export const scrimmages = pgTable("scrimmages", {
 export const scrimmageRequests = pgTable("scrimmage_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
-  playerId: varchar("player_id").references(() => users.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   status: scrimmageRequestStatusEnum("status").default("pending").notNull(),
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
@@ -1102,12 +1102,12 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
 export const scrimmageCoHosts = pgTable("scrimmage_co_hosts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   canApproveRequests: boolean("can_approve_requests").default(true).notNull(),
   canSendReminders: boolean("can_send_reminders").default(true).notNull(),
   canManagePayments: boolean("can_manage_payments").default(true).notNull(),
   addedAt: timestamp("added_at").defaultNow().notNull(),
-  addedBy: varchar("added_by").references(() => users.id).notNull(),
+  addedBy: varchar("added_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
 }, (table) => [
   unique("unique_scrimmage_cohost").on(table.scrimmageId, table.userId),
 ]);
@@ -1115,7 +1115,7 @@ export const scrimmageCoHosts = pgTable("scrimmage_co_hosts", {
 // Invite groups table - allows users to save groups of people for quick invites
 export const inviteGroups = pgTable("invite_groups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   leagueId: varchar("league_id").references(() => leagues.id), // Optional: group can be league-specific or user-wide
   name: varchar("name").notNull(),
   description: text("description"),
@@ -1127,7 +1127,7 @@ export const inviteGroups = pgTable("invite_groups", {
 export const inviteGroupMembers = pgTable("invite_group_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").references(() => inviteGroups.id).notNull(),
-  userId: varchar("user_id").references(() => users.id), // If member is a registered user
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }), // If member is a registered user
   email: varchar("email"), // If member is invited by email (not yet registered)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
@@ -1141,7 +1141,7 @@ export const scrimmageInvites = pgTable("scrimmage_invites", {
   scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
   email: varchar("email").notNull(),
   invitedAt: timestamp("invited_at").defaultNow().notNull(),
-  userId: varchar("user_id").references(() => users.id), // If the invited email matches a registered user
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }), // If the invited email matches a registered user
 }, (table) => [
   unique("unique_scrimmage_email_invite").on(table.scrimmageId, table.email),
 ]);
@@ -1150,7 +1150,7 @@ export const scrimmageInvites = pgTable("scrimmage_invites", {
 export const scrimmageRemindersSent = pgTable("scrimmage_reminders_sent", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id).notNull(),
-  playerId: varchar("player_id").references(() => users.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   hoursBefore: integer("hours_before").notNull(), // Which reminder was sent (e.g., 24, 48, 168)
   sentAt: timestamp("sent_at").defaultNow().notNull(),
 }, (table) => [
@@ -1210,7 +1210,7 @@ export const facilities = pgTable("facilities", {
 // Facility memberships table
 export const facilityMemberships = pgTable("facility_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   facilityId: varchar("facility_id").references(() => facilities.id).notNull(),
   membershipType: varchar("membership_type").default("basic").notNull(), // basic, premium, etc.
   status: facilityMembershipStatusEnum("status").default("active").notNull(),
@@ -1246,7 +1246,7 @@ export const calendarEvents = pgTable("calendar_events", {
   leagueId: varchar("league_id").references(() => leagues.id), // For league games
   gameId: varchar("game_id").references(() => games.id), // For league games
   scrimmageId: varchar("scrimmage_id").references(() => scrimmages.id), // For scrimmages
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -1260,7 +1260,7 @@ export const calendarEvents = pgTable("calendar_events", {
 export const eventParticipants = pgTable("event_participants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventId: varchar("event_id").references(() => calendarEvents.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   facilityMembershipId: varchar("facility_membership_id").references(() => facilityMemberships.id).notNull(),
   rsvpStatus: eventRsvpStatusEnum("rsvp_status").default("joined").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
@@ -1284,7 +1284,7 @@ export const teamEventTypeEnum = pgEnum("team_event_type", [
 export const teamEvents = pgTable("team_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
-  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   eventType: teamEventTypeEnum("event_type").notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
@@ -1311,7 +1311,7 @@ export const teamEvents = pgTable("team_events", {
 export const teamEventRsvps = pgTable("team_event_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   teamEventId: varchar("team_event_id").references(() => teamEvents.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   status: rsvpStatusEnum("status").default("no_response").notNull(),
   respondedAt: timestamp("responded_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1324,7 +1324,7 @@ export const teamEventRsvps = pgTable("team_event_rsvps", {
 // Payment requests table
 export const paymentRequests = pgTable("payment_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   title: varchar("title").notNull(),
   description: text("description"),
   amountPerPerson: decimal("amount_per_person", { precision: 10, scale: 2 }).notNull(),
@@ -1344,7 +1344,7 @@ export const paymentRequests = pgTable("payment_requests", {
 export const paymentRequestRecipients = pgTable("payment_request_recipients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   paymentRequestId: varchar("payment_request_id").references(() => paymentRequests.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   isPaid: boolean("is_paid").default(false).notNull(),
   paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
@@ -1394,7 +1394,7 @@ export const lineCombinationAssignments = pgTable("line_combination_assignments"
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   lineCombinationId: varchar("line_combination_id").references(() => lineCombinations.id).notNull(),
   position: positionEnum("position").notNull(),
-  playerId: varchar("player_id").references(() => users.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -1432,7 +1432,7 @@ export const drafts = pgTable("drafts", {
   scheduledAt: timestamp("scheduled_at"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1442,7 +1442,7 @@ export const draftPicks = pgTable("draft_picks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   draftId: varchar("draft_id").references(() => drafts.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
-  playerId: varchar("player_id").references(() => users.id),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }),
   round: integer("round").notNull(),
   pick: integer("pick").notNull(), // Overall pick number
   pickInRound: integer("pick_in_round").notNull(), // Pick number within round
@@ -1454,7 +1454,7 @@ export const draftPicks = pgTable("draft_picks", {
 export const playerImports = pgTable("player_imports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
-  importedBy: varchar("imported_by").references(() => users.id).notNull(),
+  importedBy: varchar("imported_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   fileName: varchar("file_name").notNull(),
   totalRecords: integer("total_records").notNull(),
   successfulRecords: integer("successful_records").notNull(),
@@ -1480,7 +1480,7 @@ export const importedPlayers = pgTable("imported_players", {
   notes: text("notes"),
   // Merge status
   isPlaceholder: boolean("is_placeholder").default(true).notNull(),
-  mergedWithUserId: varchar("merged_with_user_id").references(() => users.id),
+  mergedWithUserId: varchar("merged_with_user_id").references(() => users.id, { onDelete: 'cascade' }),
   mergedAt: timestamp("merged_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -1498,11 +1498,11 @@ export const playerMergeRequests = pgTable("player_merge_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   importedPlayerId: varchar("imported_player_id").references(() => importedPlayers.id).notNull(),
-  existingUserId: varchar("existing_user_id").references(() => users.id).notNull(),
+  existingUserId: varchar("existing_user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   confidenceScore: decimal("confidence_score", { precision: 3, scale: 2 }), // 0.00 to 1.00
   matchingFields: jsonb("matching_fields"), // Store which fields matched
   status: mergeStatusEnum("status").default("auto_suggested").notNull(),
-  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedBy: varchar("reviewed_by").references(() => users.id, { onDelete: 'cascade' }),
   reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -1511,7 +1511,7 @@ export const playerMergeRequests = pgTable("player_merge_requests", {
 export const scheduleImports = pgTable("schedule_imports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
-  importedBy: varchar("imported_by").references(() => users.id).notNull(),
+  importedBy: varchar("imported_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   fileName: varchar("file_name").notNull(),
   totalRecords: integer("total_records").notNull(),
   successfulRecords: integer("successful_records").notNull(),
@@ -1543,7 +1543,7 @@ export const importedSchedules = pgTable("imported_schedules", {
 // Player stats table
 export const playerStats = pgTable("player_stats", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   seasonId: varchar("season_id").references(() => seasons.id),
   gamesPlayed: integer("games_played").default(0).notNull(),
@@ -1563,9 +1563,9 @@ export const gameGoals = pgTable("game_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
-  scorerId: varchar("scorer_id").references(() => users.id).notNull(),
-  primaryAssistId: varchar("primary_assist_id").references(() => users.id),
-  secondaryAssistId: varchar("secondary_assist_id").references(() => users.id),
+  scorerId: varchar("scorer_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  primaryAssistId: varchar("primary_assist_id").references(() => users.id, { onDelete: 'cascade' }),
+  secondaryAssistId: varchar("secondary_assist_id").references(() => users.id, { onDelete: 'cascade' }),
   goalNumber: integer("goal_number").notNull(),
   timestamp: varchar("timestamp"),
   period: integer("period").default(1),
@@ -1582,7 +1582,7 @@ export const gamePenalties = pgTable("game_penalties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
-  playerId: varchar("player_id").references(() => users.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   penaltyNumber: integer("penalty_number").notNull(),
   minutes: integer("minutes").default(2),
   penaltyType: varchar("penalty_type"),
@@ -1605,7 +1605,7 @@ export const feedbackCategoryEnum = pgEnum("feedback_category", [
 // Feedback submissions table
 export const feedbackSubmissions = pgTable("feedback_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   category: feedbackCategoryEnum("category").notNull(),
   message: text("message").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -3334,7 +3334,7 @@ export const eventRemindersSent = pgTable("event_reminders_sent", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventType: eventTypeEnum("event_type").notNull(), // 'game' or 'scrimmage'
   eventId: varchar("event_id").notNull(), // game ID or scrimmage ID
-  playerId: varchar("player_id").references(() => users.id).notNull(),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   triggerKey: reminderTriggerEnum("trigger_key").notNull(), // '2_days_6pm' or '2_hours'
   sentAt: timestamp("sent_at").defaultNow().notNull(),
 }, (table) => [
@@ -3359,7 +3359,7 @@ export const rsvpRemindersSent = pgTable("rsvp_reminders_sent", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventType: rsvpEventTypeEnum("event_type").notNull(),
   eventId: varchar("event_id").notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_rsvp_reminder").on(table.eventType, table.eventId, table.userId),
