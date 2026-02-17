@@ -53,7 +53,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
       {userCountData && userCountData.count > 0 && (
-        <div className="fixed top-20 left-4 z-40 bg-gray-900/90 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30">
+        <div className="fixed top-20 left-4 z-40 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30 bg-[#3c82f4]">
           <div className="flex flex-col items-center text-center">
             <span className="font-medium text-[16px] text-[#ffffff] leading-tight">Players</span>
             <span className="font-medium text-[16px] text-[#ffffff] leading-tight">Using</span>
