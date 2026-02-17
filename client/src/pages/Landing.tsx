@@ -32,9 +32,7 @@ function AnimatedCounter({ value }: { value: number }) {
     requestAnimationFrame(animate);
   }, [value]);
 
-  return (
-    <span className="tabular-nums">{displayValue.toLocaleString()}</span>
-  );
+  return (<span className="tabular-nums text-[20px] font-extrabold">{displayValue.toLocaleString()}</span>);
 }
 
 export default function Landing() {
