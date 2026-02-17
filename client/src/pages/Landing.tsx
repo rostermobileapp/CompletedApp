@@ -55,7 +55,9 @@ export default function Landing() {
       {userCountData && userCountData.count > 0 && (
         <div className="fixed top-20 left-4 z-40 bg-gray-900/90 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30">
           <div className="flex items-center gap-2 whitespace-nowrap">
-            <span className="text-gray-400 text-xs font-medium">Players:</span>
+            <span className="font-medium text-[16px] text-[#ffffff]">Players
+            Using
+            Roster:</span>
             <span className="text-sm font-bold text-white">
               <AnimatedCounter value={userCountData.count} />
             </span>
