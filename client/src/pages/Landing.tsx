@@ -57,7 +57,17 @@ export default function Landing() {
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="w-24"></div>
+          <div className="w-24">
+            {userCountData && userCountData.count > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-[#3c82f4]" />
+                <span className="text-sm font-semibold text-white">
+                  <AnimatedCounter value={userCountData.count} />
+                </span>
+                <span className="text-xs text-gray-400 hidden sm:inline">players</span>
+              </div>
+            )}
+          </div>
           <img 
             src={rosterDarkLogo}
             alt="Roster"
@@ -115,19 +125,6 @@ export default function Landing() {
             </div>
           </div>
         </div>
-        {userCountData && userCountData.count > 0 && (
-          <div className="text-center mt-12 relative z-10">
-            <div className="inline-flex flex-col items-center gap-2 px-8 py-5 rounded-2xl bg-gray-900/60 backdrop-blur-sm border border-gray-800/50">
-              <div className="flex items-center gap-3">
-                <Users className="w-6 h-6 text-[#3c82f4]" />
-                <span className="text-4xl md:text-5xl font-bold text-white">
-                  <AnimatedCounter value={userCountData.count} />
-                </span>
-              </div>
-              <p className="text-sm text-gray-400 font-medium tracking-wide uppercase">Players on Roster</p>
-            </div>
-          </div>
-        )}
       </section>
       {/* Highlights Bar */}
       <section className="py-16 px-6 border-y border-gray-800/50 bg-gray-900/30">
