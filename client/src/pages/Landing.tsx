@@ -59,9 +59,9 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="w-24">
             {userCountData && userCountData.count > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-[#3c82f4]" />
-                <span className="text-xs text-gray-400 hidden sm:inline">Players Who Use Roster: </span>
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Users className="w-4 h-4 text-[#3c82f4] flex-shrink-0" />
+                <span className="text-xs text-gray-400">Players Who Use Roster:</span>
                 <span className="text-sm font-semibold text-white">
                   <AnimatedCounter value={userCountData.count} />
                 </span>
