@@ -96,6 +96,13 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 - WebSocket now invalidates messages for ANY conversation receiving new messages (not just the currently viewed one)
 - Added automatic WebSocket reconnection with 3-second delay on unexpected disconnects
 
+### Unified WebSocket Connection for Real-Time Messaging
+- Consolidated two competing WebSocket connections (one in useNotificationWebSocket, one in Messages.tsx) into a single app-wide WebSocketProvider context (`client/src/context/WebSocketContext.tsx`)
+- The old approach caused the server's `activeConnections` map to be overwritten (only one connection per user), so whichever connected last won and the other stopped receiving events
+- New messages, read receipts, poll events, and notifications are now handled globally regardless of which page the user is on
+- Messages.tsx uses the shared context's `subscribe()` API for page-specific events (typing indicators, online status) and `send()` for outgoing typing indicators
+- Old `useNotificationWebSocket` hook is deprecated (file retained but no longer imported)
+
 ### "The Wall" (formerly "News") Feature Updates
 - Renamed "News" screen to "The Wall" in Dashboard card and page header
 - Updated posting permissions: Any league member with Player Pro or Commissioner tier can now post (previously required commissioner or team captain role)
