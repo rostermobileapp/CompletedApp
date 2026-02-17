@@ -16,7 +16,7 @@ import { SlideUpOverlayProvider } from "@/components/SlideUpOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
-import { useNotificationWebSocket } from "@/hooks/useNotificationWebSocket";
+import { WebSocketProvider } from "@/context/WebSocketContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Waitlist from "@/pages/Waitlist";
@@ -103,7 +103,6 @@ function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
-  useNotificationWebSocket();
   
   // Minimum 3-second display time for the loading screen
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
@@ -250,8 +249,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <WebSocketProvider>
+            <Toaster />
+            <Router />
+          </WebSocketProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

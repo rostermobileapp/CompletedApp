@@ -15,6 +15,7 @@ import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useWebSocket } from '@/context/WebSocketContext';
 import { League, ChatPoll, ChatPollVote, Team } from '@shared/schema';
 
 import { MediaGallery } from '@/components/MediaGallery';
@@ -498,8 +499,8 @@ export default function Messages() {
   const pendingScrollConversation = useRef<string | null>(null);
   const firstUnreadMessageRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const selectedConversationRef = useRef<string | null>(null);
+  const { send: wsSend, subscribe: wsSubscribe, isConnected: wsIsConnected } = useWebSocket();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -1094,138 +1095,44 @@ export default function Messages() {
     selectedConversationRef.current = selectedConversation;
   }, [selectedConversation]);
 
-  // Persistent WebSocket connection for real-time updates
-  // Only depends on currentUserId - does NOT reconnect when conversation changes
   useEffect(() => {
     if (!currentUserId) return;
 
-    let wsUrl;
-    try {
-      const origin = window.location.origin;
-      wsUrl = origin.replace('https:', 'wss:').replace('http:', 'ws:') + '/ws';
-    } catch (error) {
-      console.warn('Failed to get origin, using fallback:', error);
-      wsUrl = 'ws://localhost:5000/ws';
-    }
-    
-    console.log('Connecting to WebSocket at:', wsUrl);
-    
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let isIntentionallyClosed = false;
-
-    const connect = () => {
-      const websocket = new WebSocket(wsUrl);
-      
-      websocket.onopen = () => {
-        console.log('Connected to messaging WebSocket');
-        wsRef.current = websocket;
-        
-        websocket.send(JSON.stringify({
-          type: 'authenticate',
-          userId: currentUserId
-        }));
-      };
-      
-      websocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        const currentConv = selectedConversationRef.current;
-        
-        switch (data.type) {
-          case 'message':
-            queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/conversations', data.conversationId, 'messages'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
-            break;
-            
-          case 'typing_start':
-            if (data.conversationId === currentConv && data.userId !== currentUserId) {
-              setTypingUsers(prev => Array.from(new Set([...prev, data.userId])));
-            }
-            break;
-            
-          case 'typing_stop':
-            if (data.conversationId === currentConv) {
-              setTypingUsers(prev => prev.filter(userId => userId !== data.userId));
-            }
-            break;
-            
-          case 'user_online':
-            if (data.conversationId === currentConv) {
-              setOnlineUsers(prev => Array.from(new Set([...prev, data.userId])));
-            }
-            break;
-            
-          case 'user_offline':
-            if (data.conversationId === currentConv) {
-              setOnlineUsers(prev => prev.filter(userId => userId !== data.userId));
-            }
-            break;
-            
-          case 'read_receipt':
-          case 'message_read':
-            if (data.conversationId === currentConv) {
-              queryClient.invalidateQueries({ queryKey: ['/api/conversations', currentConv, 'messages'] });
-            }
-            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
-            break;
-
-          case 'poll_created':
-            if (data.conversationId === currentConv) {
-              queryClient.invalidateQueries({ queryKey: ['/api/conversations', currentConv, 'messages'] });
-              queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
-            }
-            break;
-
-          case 'poll_vote':
-            if (data.conversationId === currentConv) {
-              queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
-            }
-            break;
-
-          case 'poll_closed':
-            if (data.conversationId === currentConv) {
-              queryClient.invalidateQueries({ queryKey: ['/api/chat-polls', data.pollId, 'results'] });
-              queryClient.invalidateQueries({ queryKey: ['/api/messages', data.messageId, 'polls'] });
-            }
-            break;
-            
-          case 'notification_update':
-            queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
-            queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
-            break;
-        }
-      };
-      
-      websocket.onclose = () => {
-        console.log('Disconnected from messaging WebSocket');
-        wsRef.current = null;
-        if (!isIntentionallyClosed) {
-          reconnectTimeout = setTimeout(() => {
-            console.log('Attempting WebSocket reconnection...');
-            connect();
-          }, 3000);
-        }
-      };
-
-      websocket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-    };
-
-    connect();
-    
-    return () => {
-      isIntentionallyClosed = true;
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+    const unsubTypingStart = wsSubscribe('typing_start', (data) => {
+      const currentConv = selectedConversationRef.current;
+      if (data.conversationId === currentConv && data.userId !== currentUserId) {
+        setTypingUsers(prev => Array.from(new Set([...prev, data.userId])));
       }
+    });
+
+    const unsubTypingStop = wsSubscribe('typing_stop', (data) => {
+      const currentConv = selectedConversationRef.current;
+      if (data.conversationId === currentConv) {
+        setTypingUsers(prev => prev.filter((uid: string) => uid !== data.userId));
+      }
+    });
+
+    const unsubOnline = wsSubscribe('user_online', (data) => {
+      const currentConv = selectedConversationRef.current;
+      if (data.conversationId === currentConv) {
+        setOnlineUsers(prev => Array.from(new Set([...prev, data.userId])));
+      }
+    });
+
+    const unsubOffline = wsSubscribe('user_offline', (data) => {
+      const currentConv = selectedConversationRef.current;
+      if (data.conversationId === currentConv) {
+        setOnlineUsers(prev => prev.filter((uid: string) => uid !== data.userId));
+      }
+    });
+
+    return () => {
+      unsubTypingStart();
+      unsubTypingStop();
+      unsubOnline();
+      unsubOffline();
     };
-  }, [currentUserId]);
+  }, [currentUserId, wsSubscribe]);
   
   // Reset conversation-scoped state when conversation changes
   useEffect(() => {
@@ -1281,13 +1188,13 @@ export default function Messages() {
 
   // Typing indicator functions
   const handleTypingStart = () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !selectedConversation || isTyping) return;
+    if (!wsIsConnected() || !selectedConversation || isTyping) return;
     
     setIsTyping(true);
-    wsRef.current.send(JSON.stringify({
+    wsSend({
       type: 'typing_start',
       conversationId: selectedConversation
-    }));
+    });
     
     // Clear existing timeout
     if (typingTimeoutRef.current) {
@@ -1301,13 +1208,13 @@ export default function Messages() {
   };
   
   const handleTypingStop = () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !selectedConversation || !isTyping) return;
+    if (!wsIsConnected() || !selectedConversation || !isTyping) return;
     
     setIsTyping(false);
-    wsRef.current.send(JSON.stringify({
+    wsSend({
       type: 'typing_stop',
       conversationId: selectedConversation
-    }));
+    });
     
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
