@@ -1,0 +1,55 @@
+Build a multi-step onboarding flow for new users creating an account in the Roster app. The onboarding should consist of 4 screens with a progress indicator, and all collected data should populate the corresponding fields in the user's profile.
+
+General Requirements:
+
+Display a step progress indicator at the top (e.g. Step 1 of 4) that updates as the user moves forward
+Include a "Next" button to advance and a "Back" button to return to the previous screen
+All fields marked as optional should be clearly labeled as "(Optional)"
+On completion, all data from Screens 1 and 2 must be saved to the user's profile in the database
+The final "Finish" button should navigate the user to the home page
+
+
+Screen 1 – Basic Information:
+
+First Name (required)
+Last Name (required)
+Phone Number (optional)
+Date of Birth (optional) — use a date picker
+Upload Profile Photo (optional) — allow the user to select an image from their device and preview it before continuing
+
+
+Screen 2 – Additional Information:
+
+Timezone (required) — dropdown populated with standard timezone options
+Venmo ID (optional)
+CashApp ID (optional)
+City (optional)
+Player Type (required) — dropdown with options: Recreational, Competitive, Semi-Pro, Pro
+
+
+Screen 3 – Use of Roster:
+
+Heading: "How do you plan to use Roster?"
+Three selectable options displayed as cards or large buttons (user picks one):
+
+Join a Team
+Create & Manage a Team
+Create & Manage a League
+
+
+The selected option should be visually highlighted and saved to the user's profile
+
+
+Screen 4 – About Roster:
+
+A short welcome/mission statement explaining why Roster was created (use placeholder copy for now, e.g. "Roster was built to make organizing and joining recreational sports teams simple, fair, and fun for everyone.")
+A link to the Terms of Service (URL to be added later — use "#" as placeholder)
+A link to the Privacy Policy (URL to be added later — use "#" as placeholder)
+A prominent "Finish" button that completes onboarding and navigates the user to the home page
+
+
+Data & Profile Sync:
+
+All fields from Screen 1 and Screen 2 must write to the corresponding fields on the user's profile record upon completion
+The selection from Screen 3 should also be saved to the user's profile (e.g. as a field called rosterUseCase)
+If the user has already completed onboarding, they should not be shown this flow again on future logins
