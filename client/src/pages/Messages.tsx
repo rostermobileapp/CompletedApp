@@ -1479,7 +1479,7 @@ export default function Messages() {
     if (!conversation.participants) {
       return 'Loading...';
     }
-    const otherParticipant = conversation.participants.find(p => p.user?.id !== currentUserId);
+    const otherParticipant = conversation.participants.find(p => p.userId !== currentUserId);
     return otherParticipant?.user?.displayName || 'Unknown User';
   };
 
@@ -1546,7 +1546,7 @@ export default function Messages() {
     if (currentConversation.type === 'direct') {
       // For direct messages, show the other person's name
       if (!currentConversation.participants) return 'Loading...';
-      const otherParticipant = currentConversation.participants.find(p => p.user?.id !== currentUserId);
+      const otherParticipant = currentConversation.participants.find(p => p.userId !== currentUserId);
       return otherParticipant?.user?.displayName || 'Unknown User';
     }
     
@@ -1572,7 +1572,7 @@ export default function Messages() {
   // Get other participant's profile image for direct messages
   const getOtherParticipantProfileImage = (conversation: Conversation) => {
     if (conversation.type !== 'direct' || !conversation.participants) return null;
-    const otherParticipant = conversation.participants.find(p => p.user?.id !== currentUserId);
+    const otherParticipant = conversation.participants.find(p => p.userId !== currentUserId);
     return otherParticipant?.user?.profileImageUrl || null;
   };
 
