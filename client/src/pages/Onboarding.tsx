@@ -157,8 +157,9 @@ export default function Onboarding() {
         onboardingCompleted: true,
         onboardingProgress: { step: 4, completed: true },
       });
+      queryClient.setQueryData(['/api/user'], (old: any) => old ? { ...old, onboardingCompleted: true } : old);
       toast({ title: 'Welcome to Roster!', description: 'Your profile has been set up successfully.' });
-      window.location.href = '/';
+      navigate('/');
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to complete onboarding. Please try again.', variant: 'destructive' });
     }

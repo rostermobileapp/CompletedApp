@@ -716,6 +716,11 @@ export class DatabaseStorage implements IStorage {
         timezone,
         timezone_manually_set as "timezoneManuallySet",
         navigation_preferences as "navigationPreferences",
+        onboarding_completed as "onboardingCompleted",
+        onboarding_progress as "onboardingProgress",
+        competitive_level as "competitiveLevel",
+        roster_use_case as "rosterUseCase",
+        selected_facility_id as "selectedFacilityId",
         last_updated as "lastUpdated", 
         created_at as "createdAt", 
         updated_at as "updatedAt"
