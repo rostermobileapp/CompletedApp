@@ -157,12 +157,8 @@ export default function Onboarding() {
         onboardingCompleted: true,
         onboardingProgress: { step: 4, completed: true },
       });
-      const cachedUser = queryClient.getQueryData(['/api/user']) as any;
-      if (cachedUser) {
-        queryClient.setQueryData(['/api/user'], { ...cachedUser, onboardingCompleted: true });
-      }
       toast({ title: 'Welcome to Roster!', description: 'Your profile has been set up successfully.' });
-      navigate('/');
+      window.location.href = '/';
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to complete onboarding. Please try again.', variant: 'destructive' });
     }
