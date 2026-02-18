@@ -374,36 +374,32 @@ function StepAdditionalInfo({
           <Label className="text-sm font-medium text-zinc-300">
             Timezone <span className="text-red-400">*</span>
           </Label>
-          <Select value={formData.timezone || undefined} onValueChange={(v) => updateField('timezone', v)}>
-            <SelectTrigger className="mt-1.5 bg-zinc-900 border-zinc-700 text-white h-12">
-              <SelectValue placeholder="Select your timezone" />
-            </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-700 max-h-60">
-              {TIMEZONE_OPTIONS.map((tz) => (
-                <SelectItem key={tz.value} value={tz.value} className="text-white focus:bg-zinc-800 focus:text-white">
-                  {tz.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            value={formData.timezone}
+            onChange={(e) => updateField('timezone', e.target.value)}
+            className="mt-1.5 w-full bg-zinc-900 border border-zinc-700 text-white h-12 rounded-md px-3 appearance-none focus:outline-none focus:ring-2 focus:ring-white"
+          >
+            <option value="" disabled>Select your timezone</option>
+            {TIMEZONE_OPTIONS.map((tz) => (
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
+            ))}
+          </select>
         </div>
 
         <div>
           <Label className="text-sm font-medium text-zinc-300">
             Player Type <span className="text-red-400">*</span>
           </Label>
-          <Select value={formData.competitiveLevel || undefined} onValueChange={(v) => updateField('competitiveLevel', v)}>
-            <SelectTrigger className="mt-1.5 bg-zinc-900 border-zinc-700 text-white h-12">
-              <SelectValue placeholder="Select your player type" />
-            </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-700">
-              {COMPETITIVE_LEVELS.map((level) => (
-                <SelectItem key={level.value} value={level.value} className="text-white focus:bg-zinc-800 focus:text-white">
-                  {level.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            value={formData.competitiveLevel}
+            onChange={(e) => updateField('competitiveLevel', e.target.value)}
+            className="mt-1.5 w-full bg-zinc-900 border border-zinc-700 text-white h-12 rounded-md px-3 appearance-none focus:outline-none focus:ring-2 focus:ring-white"
+          >
+            <option value="" disabled>Select your player type</option>
+            {COMPETITIVE_LEVELS.map((level) => (
+              <option key={level.value} value={level.value}>{level.label}</option>
+            ))}
+          </select>
         </div>
 
         <div>
