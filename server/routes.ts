@@ -489,8 +489,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName,
         email,
         phoneNumber,
+        dateOfBirth,
+        city,
         playerType,
         profileImageUrl,
+        venmoUsername,
+        cashappUsername,
+        timezone,
+        competitiveLevel,
+        rosterUseCase,
         selectedFacilityId,
         onboardingProgress,
         onboardingCompleted,
@@ -502,8 +509,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (lastName !== undefined) updateData.lastName = lastName;
       if (email !== undefined) updateData.email = email;
       if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+      if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
+      if (city !== undefined) updateData.city = city;
       if (playerType !== undefined) updateData.playerType = playerType;
       if (profileImageUrl !== undefined) updateData.profileImageUrl = profileImageUrl;
+      if (venmoUsername !== undefined) updateData.venmoUsername = venmoUsername;
+      if (cashappUsername !== undefined) updateData.cashappUsername = cashappUsername;
+      if (timezone !== undefined) updateData.timezone = timezone;
+      if (competitiveLevel !== undefined) updateData.competitiveLevel = competitiveLevel;
+      if (rosterUseCase !== undefined) updateData.rosterUseCase = rosterUseCase;
       if (selectedFacilityId !== undefined) updateData.selectedFacilityId = selectedFacilityId;
       if (onboardingProgress !== undefined) updateData.onboardingProgress = onboardingProgress;
       if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;

@@ -185,6 +185,19 @@ export const playerTypeEnum = pgEnum("player_type", [
   "Goalie"
 ]);
 
+export const competitiveLevelEnum = pgEnum("competitive_level", [
+  "Recreational",
+  "Competitive",
+  "Semi-Pro",
+  "Pro"
+]);
+
+export const rosterUseCaseEnum = pgEnum("roster_use_case", [
+  "join_team",
+  "manage_team",
+  "manage_league"
+]);
+
 // Notification type enum
 export const notificationTypeEnum = pgEnum("notification_type", [
   "payment_failed",
@@ -232,6 +245,8 @@ export const users = pgTable("users", {
   timezoneManuallySet: boolean("timezone_manually_set").default(false),
   // Navigation preferences
   navigationPreferences: jsonb("navigation_preferences"),
+  competitiveLevel: competitiveLevelEnum("competitive_level"),
+  rosterUseCase: rosterUseCaseEnum("roster_use_case"),
   // Onboarding tracking
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   onboardingProgress: jsonb("onboarding_progress"),
@@ -2314,8 +2329,15 @@ export const updateOnboardingSchema = createInsertSchema(users).pick({
   lastName: true,
   email: true,
   phoneNumber: true,
+  dateOfBirth: true,
+  city: true,
   playerType: true,
   profileImageUrl: true,
+  venmoUsername: true,
+  cashappUsername: true,
+  timezone: true,
+  competitiveLevel: true,
+  rosterUseCase: true,
   selectedFacilityId: true,
   onboardingProgress: true,
   onboardingCompleted: true,

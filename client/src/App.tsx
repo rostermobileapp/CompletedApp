@@ -69,6 +69,7 @@ import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 import TeamView from "@/pages/TeamView";
 import TeamEventDetails from "@/pages/TeamEventDetails";
+import Onboarding from "@/pages/Onboarding";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function LoadingScreen() {
@@ -170,6 +171,11 @@ function Router() {
   // OR if max timeout is reached, proceed anyway to prevent infinite loading
   if ((!minDelayElapsed || dataLoading) && !maxTimeoutReached) {
     return <LoadingScreen />;
+  }
+
+  const userData = queryClient.getQueryData(['/api/user']) as any;
+  if (userData && !userData.onboardingCompleted) {
+    return <Onboarding />;
   }
 
   return (
