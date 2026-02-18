@@ -374,11 +374,11 @@ function StepAdditionalInfo({
           <Label className="text-sm font-medium text-zinc-300">
             Timezone <span className="text-red-400">*</span>
           </Label>
-          <Select value={formData.timezone} onValueChange={(v) => updateField('timezone', v)}>
+          <Select value={formData.timezone || undefined} onValueChange={(v) => updateField('timezone', v)}>
             <SelectTrigger className="mt-1.5 bg-zinc-900 border-zinc-700 text-white h-12">
               <SelectValue placeholder="Select your timezone" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-700">
+            <SelectContent className="bg-zinc-900 border-zinc-700 max-h-60">
               {TIMEZONE_OPTIONS.map((tz) => (
                 <SelectItem key={tz.value} value={tz.value} className="text-white focus:bg-zinc-800 focus:text-white">
                   {tz.label}
@@ -392,7 +392,7 @@ function StepAdditionalInfo({
           <Label className="text-sm font-medium text-zinc-300">
             Player Type <span className="text-red-400">*</span>
           </Label>
-          <Select value={formData.competitiveLevel} onValueChange={(v) => updateField('competitiveLevel', v)}>
+          <Select value={formData.competitiveLevel || undefined} onValueChange={(v) => updateField('competitiveLevel', v)}>
             <SelectTrigger className="mt-1.5 bg-zinc-900 border-zinc-700 text-white h-12">
               <SelectValue placeholder="Select your player type" />
             </SelectTrigger>
