@@ -137,6 +137,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               queryClient.invalidateQueries({ queryKey: ['/api/conversations', data.conversationId, 'messages'] });
               queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
               queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
               break;
 
             case 'read_receipt':

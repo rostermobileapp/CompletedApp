@@ -1475,8 +1475,7 @@ export default function Messages() {
       return 'Captains Only';
     }
     
-    // For direct messages, find the other participant
-    if (!conversation.participants) {
+    if (!conversation.participants || !currentUserId) {
       return 'Loading...';
     }
     const otherParticipant = conversation.participants.find(p => p.userId !== currentUserId);
@@ -1544,8 +1543,8 @@ export default function Messages() {
     if (!currentConversation) return 'Chat';
     
     if (currentConversation.type === 'direct') {
-      // For direct messages, show the other person's name
       if (!currentConversation.participants) return 'Loading...';
+      if (!currentUserId) return 'Loading...';
       const otherParticipant = currentConversation.participants.find(p => p.userId !== currentUserId);
       return otherParticipant?.user?.displayName || 'Unknown User';
     }
@@ -2113,7 +2112,9 @@ export default function Messages() {
               <div className="flex-1">
                 <h2 className="font-semibold" data-testid="text-chat-title">{getChatTitle()}</h2>
                 <p className="text-xs text-muted-foreground" data-testid="text-chat-status">
-                  {onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Team members'}
+                  {currentConversation?.type === 'direct' 
+                    ? (onlineUsers.length > 0 ? 'Online' : 'Offline')
+                    : (onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Team members')}
                 </p>
               </div>
               

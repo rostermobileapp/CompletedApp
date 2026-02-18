@@ -35,8 +35,8 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   
   const { data: unreadData } = useQuery({
     queryKey: ['/api/messages/unread-count'],
-    refetchInterval: 60000, // Reduced from 10s to 60s to lower egress
-    staleTime: 30000,
+    refetchInterval: 30000,
+    staleTime: 0,
   });
   
   const unreadCount = (unreadData as { count: number } | undefined)?.count ?? 0;
