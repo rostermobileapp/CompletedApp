@@ -34,6 +34,12 @@ interface Message {
   replyToId?: string;
   attachments: MessageAttachment[];
   readReceipts: ReadReceipt[];
+  sender?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    profileImageUrl?: string | null;
+  };
 }
 
 interface MessageAttachment {
@@ -466,7 +472,11 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
 export default function Messages() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, hasRole } = usePermissions();
-  const currentUserId = (user as any)?.id;
+  const { data: dbUser } = useQuery<{ id: string }>({
+    queryKey: ['/api/user'],
+    enabled: !!user,
+  });
+  const currentUserId = dbUser?.id || (user as any)?.id;
   const params = useParams();
   const [, navigate] = useLocation();
   const { selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
@@ -2736,8 +2746,12 @@ export default function Messages() {
               return (
                 <div
                   key={participant.id}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
                   data-testid={`member-${participant.userId}`}
+                  onClick={() => {
+                    setShowMembersModal(false);
+                    navigate(`/user/${participant.userId}`);
+                  }}
                 >
                   <ClickableAvatar
                     userId={participant.userId}

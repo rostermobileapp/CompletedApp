@@ -115,6 +115,7 @@ export default function Profile() {
       toast({ title: 'Profile updated successfully' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
       setIsEditing(false);
     },
     onError: () => {
