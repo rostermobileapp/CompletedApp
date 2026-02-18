@@ -104,6 +104,11 @@ function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
+  const { data: userData } = useQuery<any>({
+    queryKey: ['/api/user'],
+    enabled: isAuthenticated && !authLoading,
+    staleTime: Infinity,
+  });
   
   // Minimum 3-second display time for the loading screen
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
@@ -173,11 +178,6 @@ function Router() {
     return <LoadingScreen />;
   }
 
-  const { data: userData } = useQuery<any>({
-    queryKey: ['/api/user'],
-    enabled: isAuthenticated && !authLoading,
-    staleTime: Infinity,
-  });
   if (userData && !userData.onboardingCompleted) {
     return <Onboarding />;
   }
