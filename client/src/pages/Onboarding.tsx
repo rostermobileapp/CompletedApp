@@ -40,7 +40,7 @@ const COMPETITIVE_LEVELS = [
 ];
 
 const USE_CASE_OPTIONS = [
-  { value: 'join_team', label: 'Join a Team', icon: Users, description: 'Find and join existing teams in your area' },
+  { value: 'join_team', label: 'Join a Team/League', icon: Users, description: 'Find and join existing teams in your area' },
   { value: 'manage_team', label: 'Create & Manage a Team', icon: Shield, description: 'Start your own team and invite players' },
   { value: 'manage_league', label: 'Create & Manage a League', icon: Trophy, description: 'Organize leagues, schedule games, and manage teams' },
 ];
