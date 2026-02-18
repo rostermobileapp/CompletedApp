@@ -334,6 +334,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.updateUserProfile(userId, profileData);
+      
+      if (firstName !== undefined || lastName !== undefined) {
+        try {
+          const updateFields: any = {};
+          if (firstName !== undefined) updateFields.displayFirstName = firstName;
+          if (lastName !== undefined) updateFields.displayLastName = lastName;
+          await db.update(leagueMemberships)
+            .set(updateFields)
+            .where(eq(leagueMemberships.userId, userId));
+        } catch (err) {
+          console.error("Error syncing league membership display names:", err);
+        }
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error updating user profile:", error);
