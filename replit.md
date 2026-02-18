@@ -114,3 +114,15 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
   - Clicking a post opens a detail view showing the full post and its comments
   - Comment input for Player Pro or Commissioner tier users
   - Comment counts are included in announcement list API responses
+
+### Multi-Step Onboarding Flow
+- Added a 4-screen onboarding flow for new users after account creation
+- Screen 1: Basic info (first name, last name, phone, DOB, profile photo upload)
+- Screen 2: Additional info (timezone, competitive level, Venmo/CashApp, city)
+- Screen 3: Use case selection (Join a Team, Create & Manage a Team, Create & Manage a League)
+- Screen 4: Welcome/about screen with Terms of Service and Privacy Policy links
+- New database fields: `competitive_level` enum (Recreational/Competitive/Semi-Pro/Pro), `roster_use_case` enum (join_team/manage_team/manage_league)
+- All data persists to user profile via PATCH `/api/user/onboarding`
+- Progress indicator with step counter and segmented bar
+- Users who completed onboarding are never shown the flow again (checked via `onboardingCompleted` flag)
+- App.tsx intercepts authenticated users with `onboardingCompleted=false` and renders the Onboarding page
