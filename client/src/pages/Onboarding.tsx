@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, ArrowRight, Camera, Check, Users, Shield, Trophy, Calendar } from 'lucide-react';
+import rosterLogo from '@assets/Untitled_design_(42)_1771448459349.png';
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -503,9 +504,7 @@ function StepAbout() {
   return (
     <div className="space-y-8 pt-4">
       <div className="text-center pt-8">
-        <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-6">
-          <Trophy className="w-10 h-10 text-white" />
-        </div>
+        <img src={rosterLogo} alt="Roster Logo" className="w-24 h-24 rounded-2xl mx-auto mb-6" />
         <h1 className="text-2xl font-bold">Welcome to Roster</h1>
       </div>
 
