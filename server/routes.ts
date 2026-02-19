@@ -16891,9 +16891,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // If teams provided, regenerate bracket
+      // If teams provided, check if we need to regenerate bracket or just add new teams
       if (teams && teams.length > 0) {
-        // Clear existing teams and matches
+        const existingTeams = await db
+          .select()
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.tournamentId, id));
+
+        const existingTeamIds = new Set(existingTeams.map(t => t.teamId));
+        const incomingTeamIds = new Set(teams.map((t: any) => t.teamId));
+
+        const formatChanged = format && format !== tournament.format;
+        const teamsRemoved = [...existingTeamIds].some(id => !incomingTeamIds.has(id));
+        const teamsAdded = teams.filter((t: any) => !existingTeamIds.has(t.teamId));
+        const addOnly = !formatChanged && !teamsRemoved && teamsAdded.length > 0;
+        const regenerateBracket = req.body.regenerateBracket !== false && !addOnly;
+
+        if (addOnly || !regenerateBracket) {
+          if (teamsAdded.length > 0) {
+            const maxSeed = existingTeams.reduce((max, t) => Math.max(max, t.seed || 0), 0);
+            await db
+              .insert(tournamentTeams)
+              .values(teamsAdded.map((team: any, idx: number) => ({
+                ...team,
+                seed: maxSeed + idx + 1,
+                tournamentId: id
+              })));
+          }
+
+          const newTotal = existingTeams.length + teamsAdded.length;
+          await db
+            .update(tournaments)
+            .set({
+              numTeams: newTotal,
+              updatedAt: new Date()
+            })
+            .where(eq(tournaments.id, id));
+
+          const [finalUpdated] = await db
+            .select()
+            .from(tournaments)
+            .where(eq(tournaments.id, id));
+
+          return res.json(finalUpdated);
+        }
+
+        // Full regeneration: clear existing teams and matches
         await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
         await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
 

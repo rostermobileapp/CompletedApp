@@ -109,6 +109,13 @@ export default function TournamentEdit() {
   const watchedFormat = form.watch("format");
   const watchedType = form.watch("type");
 
+  const originalTeamIds = currentTeams?.map(t => t.teamId).filter((id): id is string => id !== null) || [];
+  const formatChanged = tournament ? watchedFormat !== tournament.format : false;
+  const teamsRemoved = originalTeamIds.some(id => !watchedTeamIds.includes(id));
+  const teamsAdded = watchedTeamIds.filter(id => !originalTeamIds.includes(id));
+  const willRegenerateBracket = formatChanged || teamsRemoved;
+  const isAddOnly = !formatChanged && !teamsRemoved && teamsAdded.length > 0;
+
   const { data: recommendations } = useQuery<FormatRecommendation[]>({
     queryKey: ['/api/tournaments/format-recommendations', watchedTeamIds.length],
     enabled: watchedTeamIds.length > 0
@@ -275,7 +282,7 @@ export default function TournamentEdit() {
             Edit Tournament
           </h1>
           <p className="text-muted-foreground">
-            Modify tournament settings. Changes will regenerate the bracket.
+            Modify tournament settings and participating teams.
           </p>
         </div>
 
@@ -304,12 +311,14 @@ export default function TournamentEdit() {
                   <CardDescription>Basic information about your tournament</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Warning:</strong> Changing the format or teams will regenerate the entire bracket and reset all match data.
-                    </AlertDescription>
-                  </Alert>
+                  {formatChanged && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Warning:</strong> Changing the format will regenerate the entire bracket and reset all match data.
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   <FormField
                     control={form.control}
@@ -440,6 +449,15 @@ export default function TournamentEdit() {
                       Teams will be seeded in the order you select them. You can reorder by deselecting and reselecting.
                     </AlertDescription>
                   </Alert>
+
+                  {teamsRemoved && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Removing teams will regenerate the bracket and clear existing match data.
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   <FormField
                     control={form.control}
@@ -630,12 +648,21 @@ export default function TournamentEdit() {
                     </div>
                   </div>
 
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Warning:</strong> Updating this tournament will regenerate the bracket and clear all existing match data.
-                    </AlertDescription>
-                  </Alert>
+                  {willRegenerateBracket ? (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Warning:</strong> Updating this tournament will regenerate the bracket and clear all existing match data.
+                      </AlertDescription>
+                    </Alert>
+                  ) : isAddOnly ? (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        {teamsAdded.length} new {teamsAdded.length === 1 ? 'team' : 'teams'} will be added as {teamsAdded.length === 1 ? 'a participant' : 'participants'}. The existing bracket and match data will not be affected.
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
                 </CardContent>
               </Card>
             )}
