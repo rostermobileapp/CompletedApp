@@ -172,15 +172,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       )
     `);
-    // Seed with current user count only if the row doesn't exist yet (first-time setup)
+    // Seed or re-sync: only count authenticated (non-placeholder) users
+    const userCountResult = await db.execute(sql`
+      SELECT COUNT(*)::int as total FROM users 
+      WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+    `);
+    const currentUserCount = userCountResult.rows?.[0]?.total ?? 0;
     const existing = await db.execute(sql`SELECT count FROM user_registration_count WHERE id = 1`);
     if (!existing.rows || existing.rows.length === 0) {
-      const userCountResult = await db.execute(sql`SELECT COUNT(*)::int as total FROM users`);
-      const currentUserCount = userCountResult.rows?.[0]?.total ?? 0;
       await db.execute(sql`
         INSERT INTO user_registration_count (id, count) VALUES (1, ${currentUserCount})
       `);
-      console.log(`[Init] Seeded user registration count with ${currentUserCount} existing users`);
+      console.log(`[Init] Seeded user registration count with ${currentUserCount} authenticated users`);
+    } else {
+      await db.execute(sql`
+        UPDATE user_registration_count SET count = ${currentUserCount}, updated_at = NOW() WHERE id = 1
+      `);
+      console.log(`[Init] Re-synced user registration count to ${currentUserCount} authenticated users`);
     }
   } catch (e) {
     console.error('Error initializing user_registration_count table:', e);

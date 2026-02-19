@@ -807,15 +807,16 @@ export class DatabaseStorage implements IStorage {
         })
         .returning();
       
-      // Increment user registration counter for genuinely new users
-      if (isNewUser) {
+      // Increment user registration counter only for genuinely new authenticated (non-placeholder) users
+      const isPlaceholder = userData.email?.includes('@placeholder.roster');
+      if (isNewUser && !isPlaceholder) {
         try {
           await db.execute(sql`
             UPDATE user_registration_count 
             SET count = count + 1, updated_at = NOW() 
             WHERE id = 1
           `);
-          console.log('[Storage] Incremented user registration count for new user:', userData.id);
+          console.log('[Storage] Incremented user registration count for new authenticated user:', userData.id);
         } catch (countError) {
           console.error('[Storage] Failed to increment user registration count:', countError);
         }
