@@ -739,14 +739,27 @@ export class DatabaseStorage implements IStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
     try {
       // Check if this is a genuinely new user (not seen before by ID or email)
-      const existingById = await this.getUser(userData.id);
+      const existingById = userData.id ? await this.getUser(userData.id) : undefined;
       const existingByEmailCheck = userData.email ? await this.getUserByEmail(userData.email) : undefined;
       const isNewUser = !existingById && !existingByEmailCheck;
 
       // First, check if a user with this email already exists (handles re-signup with new Supabase ID)
       if (userData.email) {
         const existingByEmail = existingByEmailCheck;
-        if (existingByEmail && existingByEmail.id !== userData.id) {
+        if (existingByEmail && !userData.id) {
+          // No ID provided (e.g., CSV import) - update existing user with new data and return
+          const updateSet: any = { updatedAt: new Date() };
+          if (userData.firstName && !existingByEmail.firstName) updateSet.firstName = userData.firstName;
+          if (userData.lastName && !existingByEmail.lastName) updateSet.lastName = userData.lastName;
+          if (userData.profileImageUrl && !existingByEmail.profileImageUrl) updateSet.profileImageUrl = userData.profileImageUrl;
+          
+          if (Object.keys(updateSet).length > 1) {
+            const [user] = await db.update(users).set(updateSet).where(eq(users.id, existingByEmail.id)).returning();
+            return user;
+          }
+          return existingByEmail;
+        }
+        if (existingByEmail && userData.id && existingByEmail.id !== userData.id) {
           // User signed up again with same email but got a new Supabase ID
           // We need to migrate the user to the new Supabase ID
           console.log(`[Storage] Found existing user by email, migrating from ID ${existingByEmail.id} to ${userData.id}`);
