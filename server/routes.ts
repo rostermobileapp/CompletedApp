@@ -15,7 +15,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
@@ -271,6 +271,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("RESEND_WAITLIST_AUDIENCE_ID is not configured");
         return res.status(500).json({ message: "Waitlist is not configured properly" });
       }
+
+      // Save signup to database
+      await db.insert(waitlistSignups).values({
+        firstName,
+        email,
+        phone: phone || null,
+        howHeard: howHeard || null,
+      });
 
       // Add contact to Resend for marketing campaigns
       const { client: resend } = await getUncachableResendClient();
