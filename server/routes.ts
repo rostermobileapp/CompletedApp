@@ -16904,10 +16904,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const formatChanged = format && format !== tournament.format;
         const teamsRemoved = [...existingTeamIds].some(id => !incomingTeamIds.has(id));
         const teamsAdded = teams.filter((t: any) => !existingTeamIds.has(t.teamId));
+        const teamsUnchanged = !teamsRemoved && teamsAdded.length === 0;
         const addOnly = !formatChanged && !teamsRemoved && teamsAdded.length > 0;
-        const regenerateBracket = req.body.regenerateBracket !== false && !addOnly;
+        const skipRegeneration = teamsUnchanged || addOnly || req.body.regenerateBracket === false;
 
-        if (addOnly || !regenerateBracket) {
+        if (!formatChanged && skipRegeneration) {
           if (teamsAdded.length > 0) {
             const maxSeed = existingTeams.reduce((max, t) => Math.max(max, t.seed || 0), 0);
             await db
@@ -16965,6 +16966,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case 'round_robin_split':
             bracketResult = generateRoundRobinSplit(insertedTeams, id);
             break;
+          case 'three_game_guarantee':
+            bracketResult = generateThreeGameGuarantee(insertedTeams, id, mergedSettings);
+            break;
+          case 'custom_bracket':
+            return res.json(updated);
           default:
             return res.status(400).json({ message: "Invalid tournament format" });
         }
