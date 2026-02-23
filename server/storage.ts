@@ -736,6 +736,95 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  private async migrateUserForeignKeys(oldId: string, newId: string): Promise<void> {
+    await db.execute(sql`DELETE FROM user_online_status WHERE user_id = ${oldId}`);
+    await db.execute(sql`DELETE FROM typing_indicators WHERE user_id = ${oldId}`);
+    
+    await db.execute(sql`UPDATE league_memberships SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE team_memberships SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE player_stats SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_rsvps SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_goals SET scorer_id = ${newId} WHERE scorer_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_goals SET primary_assist_id = ${newId} WHERE primary_assist_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_goals SET secondary_assist_id = ${newId} WHERE secondary_assist_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_penalties SET player_id = ${newId} WHERE player_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_goalies SET goalie_user_id = ${newId} WHERE goalie_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_stars SET first_star_user_id = ${newId} WHERE first_star_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_stars SET second_star_user_id = ${newId} WHERE second_star_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_stars SET third_star_user_id = ${newId} WHERE third_star_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE game_stars SET awarded_by = ${newId} WHERE awarded_by = ${oldId}`);
+    await db.execute(sql`UPDATE game_score_submissions SET submitted_by = ${newId} WHERE submitted_by = ${oldId}`);
+    await db.execute(sql`UPDATE messages SET sender_id = ${newId} WHERE sender_id = ${oldId}`);
+    await db.execute(sql`UPDATE conversation_participants SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE conversations SET created_by = ${newId} WHERE created_by = ${oldId}`);
+    await db.execute(sql`UPDATE message_read_receipts SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE user_notifications SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE notification_preferences SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE announcements SET author_id = ${newId} WHERE author_id = ${oldId}`);
+    await db.execute(sql`UPDATE announcement_comments SET author_id = ${newId} WHERE author_id = ${oldId}`);
+    await db.execute(sql`UPDATE announcement_reactions SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE announcement_read_status SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE announcement_poll_votes SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE announcement_visibility SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE payment_requests SET creator_id = ${newId} WHERE creator_id = ${oldId}`);
+    await db.execute(sql`UPDATE payment_request_recipients SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE substitute_requests SET original_player_id = ${newId} WHERE original_player_id = ${oldId}`);
+    await db.execute(sql`UPDATE substitute_requests SET substitute_player_id = ${newId} WHERE substitute_player_id = ${oldId}`);
+    await db.execute(sql`UPDATE substitute_requests SET requested_by = ${newId} WHERE requested_by = ${oldId}`);
+    await db.execute(sql`UPDATE substitution_approvals SET approver_id = ${newId} WHERE approver_id = ${oldId}`);
+    await db.execute(sql`UPDATE scrimmages SET creator_id = ${newId} WHERE creator_id = ${oldId}`);
+    await db.execute(sql`UPDATE scrimmage_invites SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE scrimmage_requests SET player_id = ${newId} WHERE player_id = ${oldId}`);
+    await db.execute(sql`UPDATE scrimmage_co_hosts SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE scrimmage_co_hosts SET added_by = ${newId} WHERE added_by = ${oldId}`);
+    await db.execute(sql`UPDATE scrimmage_reminders_sent SET player_id = ${newId} WHERE player_id = ${oldId}`);
+    await db.execute(sql`UPDATE team_events SET creator_id = ${newId} WHERE creator_id = ${oldId}`);
+    await db.execute(sql`UPDATE team_event_rsvps SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE event_participants SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE event_reminders_sent SET player_id = ${newId} WHERE player_id = ${oldId}`);
+    await db.execute(sql`UPDATE rsvp_reminders_sent SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE personal_reminders SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE duty_assignments SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE duty_exclusions SET excluded_by = ${newId} WHERE excluded_by = ${oldId}`);
+    await db.execute(sql`UPDATE duty_templates SET created_by = ${newId} WHERE created_by = ${oldId}`);
+    await db.execute(sql`UPDATE feedback_submissions SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE tournaments SET created_by = ${newId} WHERE created_by = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_participants SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_participants SET approved_by = ${newId} WHERE approved_by = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_stats SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_match_rsvps SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_photos SET uploaded_by = ${newId} WHERE uploaded_by = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_photo_tags SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE tournament_photo_tags SET tagged_by = ${newId} WHERE tagged_by = ${oldId}`);
+    await db.execute(sql`UPDATE league_photos SET uploaded_by = ${newId} WHERE uploaded_by = ${oldId}`);
+    await db.execute(sql`UPDATE league_photo_tags SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE league_photo_tags SET tagged_by = ${newId} WHERE tagged_by = ${oldId}`);
+    await db.execute(sql`UPDATE facility_memberships SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE drafts SET created_by = ${newId} WHERE created_by = ${oldId}`);
+    await db.execute(sql`UPDATE draft_picks SET player_id = ${newId} WHERE player_id = ${oldId}`);
+    await db.execute(sql`UPDATE calendar_events SET created_by = ${newId} WHERE created_by = ${oldId}`);
+    await db.execute(sql`UPDATE chat_poll_votes SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE invite_groups SET creator_id = ${newId} WHERE creator_id = ${oldId}`);
+    await db.execute(sql`UPDATE invite_group_members SET user_id = ${newId} WHERE user_id = ${oldId}`);
+    await db.execute(sql`UPDATE imported_players SET merged_with_user_id = ${newId} WHERE merged_with_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE player_imports SET imported_by = ${newId} WHERE imported_by = ${oldId}`);
+    await db.execute(sql`UPDATE player_merge_requests SET existing_user_id = ${newId} WHERE existing_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE player_merge_requests SET reviewed_by = ${newId} WHERE reviewed_by = ${oldId}`);
+    await db.execute(sql`UPDATE schedule_imports SET imported_by = ${newId} WHERE imported_by = ${oldId}`);
+    await db.execute(sql`UPDATE placeholder_players SET added_by = ${newId} WHERE added_by = ${oldId}`);
+    await db.execute(sql`UPDATE line_combination_assignments SET player_id = ${newId} WHERE player_id = ${oldId}`);
+    await db.execute(sql`UPDATE games SET home_beverage_duty_user_id = ${newId} WHERE home_beverage_duty_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE games SET away_beverage_duty_user_id = ${newId} WHERE away_beverage_duty_user_id = ${oldId}`);
+    await db.execute(sql`UPDATE leagues SET commissioner_id = ${newId} WHERE commissioner_id = ${oldId}`);
+    await db.execute(sql`UPDATE teams SET captain_id = ${newId} WHERE captain_id = ${oldId}`);
+    await db.execute(sql`UPDATE teams SET creator_id = ${newId} WHERE creator_id = ${oldId}`);
+    await db.execute(sql`UPDATE team_league_requests SET requested_by = ${newId} WHERE requested_by = ${oldId}`);
+    await db.execute(sql`UPDATE team_league_requests SET approved_by = ${newId} WHERE approved_by = ${oldId}`);
+    await db.execute(sql`UPDATE league_memberships SET approved_by = ${newId} WHERE approved_by = ${oldId}`);
+    await db.execute(sql`UPDATE team_memberships SET approved_by = ${newId} WHERE approved_by = ${oldId}`);
+    console.log(`[Storage] Migrated all FK references from ${oldId} to ${newId}`);
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     try {
       // Check if this is a genuinely new user (not seen before by ID or email)
@@ -765,20 +854,20 @@ export class DatabaseStorage implements IStorage {
           console.log(`[Storage] Found existing user by email, migrating from ID ${existingByEmail.id} to ${userData.id}`);
           
           try {
-            // Clean up foreign key references that prevent ID update
-            // Delete online status records (they can be recreated)
-            await db.execute(sql`DELETE FROM user_online_status WHERE user_id = ${existingByEmail.id}`);
+            const oldId = existingByEmail.id;
+            const newId = userData.id;
             
-            // Now update the user ID
+            await this.migrateUserForeignKeys(oldId, newId);
+            
             const [user] = await db
               .update(users)
               .set({
-                id: userData.id,
+                id: newId,
                 updatedAt: new Date(),
               })
               .where(eq(users.email, userData.email))
               .returning();
-            console.log(`[Storage] Successfully migrated user to new ID: ${userData.id}`);
+            console.log(`[Storage] Successfully migrated user to new ID: ${newId}`);
             return user;
           } catch (migrationError: any) {
             console.error(`[Storage] Migration failed, returning existing user:`, migrationError.message);
@@ -846,13 +935,14 @@ export class DatabaseStorage implements IStorage {
         if (existingByEmail) {
           console.log(`[Storage] Fallback: Found user by email, attempting migration to ${userData.id}`);
           try {
-            // Clean up foreign key references
-            await db.execute(sql`DELETE FROM user_online_status WHERE user_id = ${existingByEmail.id}`);
+            const oldId = existingByEmail.id;
+            const newId = userData.id;
+            await this.migrateUserForeignKeys(oldId, newId);
             
             const [user] = await db
               .update(users)
               .set({
-                id: userData.id,
+                id: newId,
                 updatedAt: new Date(),
               })
               .where(eq(users.email, userData.email))
