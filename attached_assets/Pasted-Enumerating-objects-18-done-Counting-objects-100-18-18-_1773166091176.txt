@@ -1,0 +1,36 @@
+Enumerating objects: 18, done.
+Counting objects: 100% (18/18), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (15/15), done.
+Writing objects: 100% (15/15), 306.54 KiB | 34.06 MiB/s, done.
+Total 15 (delta 9), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (9/9), completed with 3 local objects.
+remote: error: GH013: Repository rule violations found for refs/heads/12.21.2025.
+remote: 
+remote: - GITHUB PUSH PROTECTION
+remote:   —————————————————————————————————————————
+remote:     Resolve the following violations before pushing again
+remote: 
+remote:     - Push cannot contain secrets
+remote: 
+remote:     
+remote:      (?) Learn how to resolve a blocked push
+remote:      https://docs.github.com/code-security/secret-scanning/working-with-secret-scanning-and-push-protection/working-with-push-protection-from-the-command-line#resolving-a-blocked-push
+remote:     
+remote:      (?) This repository does not have Secret Scanning enabled, but is eligible. Enable Secret Scanning to view and manage detected secrets.
+remote:      Visit the repository settings page, https://github.com/rostermobileapp/CompletedApp/settings/security_analysis
+remote:     
+remote:     
+remote:       —— Google Cloud Service Account Credentials ——————————
+remote:        locations:
+remote:          - commit: 5511d3912c71efd16abfde887d98cf21fd526221
+remote:            path: attached_assets/rosterapp-203579-firebase-adminsdk-fbsvc-1c1fd38ee8_1773165387267.json:1
+remote:     
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.
+remote:        https://github.com/rostermobileapp/CompletedApp/security/secret-scanning/unblock-secret/3AlSNJcUJ8fIwlGr4NUaBKojNgI
+remote:     
+remote: 
+remote: 
+To https://github.com/rostermobileapp/CompletedApp
+ ! [remote rejected] 12.21.2025 -> 12.21.2025 (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/rostermobileapp/CompletedApp'
