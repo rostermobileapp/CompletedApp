@@ -47,7 +47,7 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         contents: { en: message },
         ios_badgeType: 'Increase',
         ios_badgeCount: 1,
-        android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID,
+        ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
         data,
       }),
     });
