@@ -8,3 +8,4 @@ vite.config.ts.*
 # Firebase configuration (contains sensitive keys)
 google-services.json
 GoogleService-Info.plist
+attached_assets/*firebase-adminsdk*.json
