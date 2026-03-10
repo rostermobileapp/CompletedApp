@@ -70,6 +70,7 @@ export function useNativelyNotifications() {
   const [permissionState, setPermissionState] = useState<'default' | 'granted' | 'denied'>('default');
   const hasInitialized = useRef(false);
   const nativelyInstanceRef = useRef<NativelyNotificationsSDK | null>(null);
+  const playerIdRef = useRef<string | null>(null);
 
   // Check which SDK is available - prefer Natively native SDK over web SDK
   const checkSDK = useCallback(() => {
@@ -334,6 +335,7 @@ export function useNativelyNotifications() {
     notifications.getOneSignalId((resp) => {
       console.log('[OneSignal] Natively Player ID response:', resp);
       if (resp.playerId) {
+        playerIdRef.current = resp.playerId;
         setPlayerId(resp.playerId);
         registerPlayerId(resp.playerId);
       }
@@ -361,19 +363,32 @@ export function useNativelyNotifications() {
         setExternalIdSet(true);
         
         // Save external ID to backend
-        try {
-          const authHeaders = await getAuthHeaders();
-          await fetch('/api/notification-preferences/link-external-id', {
-            method: 'POST',
-            body: JSON.stringify({ 
-              oneSignalId: playerId || '', 
-              userId: userDisplayId 
-            }),
-            headers: { ...authHeaders, 'Content-Type': 'application/json' },
-            credentials: 'include',
-          });
-        } catch (err) {
-          console.error('[OneSignal] Failed to save external ID to backend:', err);
+        // Use playerIdRef.current (sync) instead of playerId state (async) to avoid race condition
+        // where setExternalId callback fires before getOneSignalId updates React state
+        const currentPlayerId = playerIdRef.current;
+        if (currentPlayerId) {
+          try {
+            const authHeaders = await getAuthHeaders();
+            const linkResp = await fetch('/api/notification-preferences/link-external-id', {
+              method: 'POST',
+              body: JSON.stringify({ 
+                oneSignalId: currentPlayerId, 
+                userId: userDisplayId 
+              }),
+              headers: { ...authHeaders, 'Content-Type': 'application/json' },
+              credentials: 'include',
+            });
+            if (linkResp.ok) {
+              console.log('[OneSignal] ✅ External ID linked to player ID in backend:', currentPlayerId);
+            } else {
+              console.warn('[OneSignal] link-external-id failed:', linkResp.status);
+            }
+          } catch (err) {
+            console.error('[OneSignal] Failed to save external ID to backend:', err);
+          }
+        } else {
+          // Player ID not yet available — getOneSignalId callback will register the player ID separately
+          console.log('[OneSignal] Player ID not yet available at setExternalId time — registerPlayerId will handle it');
         }
       } else {
         const errorMessage = (resp && resp.error) || (resp && resp.message) || 'Failed to set external ID';
@@ -383,7 +398,7 @@ export function useNativelyNotifications() {
 
     setIsInitialized(true);
     hasInitialized.current = true;
-  }, [getNativelyInstance, registerPlayerId, playerId, updateInAppTrigger]);
+  }, [getNativelyInstance, registerPlayerId, updateInAppTrigger]);
 
   // Initialize with OneSignal web SDK
   const initWebSDK = useCallback(async (userDisplayId: string, userFirstName: string | null) => {
@@ -510,6 +525,7 @@ export function useNativelyNotifications() {
             notifications.getOneSignalId((idResp) => {
               console.log('[OneSignal] Got Player ID after permission:', idResp);
               if (idResp.playerId) {
+                playerIdRef.current = idResp.playerId;
                 setPlayerId(idResp.playerId);
                 registerPlayerId(idResp.playerId);
               }
