@@ -971,13 +971,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: JSON.stringify({
           app_id: oneSignalAppId,
           ...targetFilter,
+          // Required when using include_external_user_ids to specify push channel
+          ...(preferences.oneSignalExternalId ? { channel_for_external_user_ids: 'push' } : {}),
           headings: { en: content.title },
           contents: { en: content.message },
-          // iOS specific
           ios_badgeType: 'Increase',
           ios_badgeCount: 1,
-          // Android specific  
-          android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID,
+          ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
         }),
       });
       

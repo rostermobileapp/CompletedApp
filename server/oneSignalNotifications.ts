@@ -43,6 +43,8 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
       body: JSON.stringify({
         app_id: oneSignalAppId,
         ...targetFilter,
+        // Required when using include_external_user_ids to specify push channel
+        ...(preferences.oneSignalExternalId ? { channel_for_external_user_ids: 'push' } : {}),
         headings: { en: title },
         contents: { en: message },
         ios_badgeType: 'Increase',
