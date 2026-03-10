@@ -700,8 +700,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { oneSignalId, userId: externalId } = req.body;
       
-      if (!oneSignalId || !externalId) {
-        return res.status(400).json({ message: "oneSignalId and userId are required" });
+      if (!externalId) {
+        return res.status(400).json({ message: "userId (externalId) is required" });
       }
       
       // Get user's displayId to use as external ID
@@ -712,17 +712,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const externalIdToUse = user.displayId || externalId;
       
-      // Save the external ID to our database
-      const preferences = await storage.upsertNotificationPreferences(userId, {
-        oneSignalPlayerId: oneSignalId,
+      // Save to our database — only update oneSignalPlayerId if a non-empty value was provided
+      const updateData: { oneSignalExternalId: string; oneSignalPlayerId?: string } = {
         oneSignalExternalId: externalIdToUse,
-      });
+      };
+      if (oneSignalId) {
+        updateData.oneSignalPlayerId = oneSignalId;
+      }
+      const preferences = await storage.upsertNotificationPreferences(userId, updateData);
       
       // Try to link via OneSignal REST API if API key is configured
       const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
       const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
       
-      if (oneSignalAppId && oneSignalRestApiKey) {
+      if (oneSignalId && oneSignalAppId && oneSignalRestApiKey) {
         try {
           // Build tags object with user email for cross-referencing with Supabase
           const tags: Record<string, string> = {};
