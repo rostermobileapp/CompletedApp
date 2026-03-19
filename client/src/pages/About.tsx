@@ -72,9 +72,7 @@ export default function About() {
             {/* Pull quote card */}
             <div className="space-y-5">
               <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
-                <p className="text-white text-2xl font-semibold leading-snug mb-4">
-                  "We paid for full-sheet ice and skated 4-on-4. That was the last time."
-                </p>
+                <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
                 <p className="text-blue-200 text-sm font-medium">— Tobin, on the moment Roster was born</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -199,7 +197,6 @@ export default function About() {
           </div>
         </div>
       </section>
-
       {/* Photo expansion modal */}
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
         <DialogContent className="max-w-2xl w-full p-0 border-0">
