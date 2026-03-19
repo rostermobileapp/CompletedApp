@@ -80,9 +80,9 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
             </button>
             <button
               onClick={() => setLocation('/waitlist')}
-              className="hidden sm:block px-5 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
+              className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-xs sm:text-sm"
             >
-              Join the Waitlist
+              Join Waitlist
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -100,15 +100,6 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
               <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">About</Link>
-              <button
-                onClick={() => {
-                  setLocation('/waitlist');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 rounded-full bg-[#3c82f4] text-white font-semibold text-sm hover:bg-[#3c82f4]/90 transition-colors"
-              >
-                Join the Waitlist
-              </button>
             </div>
           </div>
         )}
