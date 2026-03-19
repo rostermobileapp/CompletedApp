@@ -1,6 +1,7 @@
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { useLocation } from 'wouter';
 import { Users, MessageSquare, CheckCircle } from 'lucide-react';
+import founderPhoto from '@assets/signal-2026-03-19-124000_1773938439115.jpeg';
 
 export default function About() {
   const [, setLocation] = useLocation();
@@ -17,20 +18,14 @@ export default function About() {
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row items-center gap-12">
-            {/* Photo placeholder */}
-            <div className="flex-shrink-0">
-              <div className="relative w-52 h-52 md:w-64 md:h-64">
-                <div className="w-full h-full rounded-3xl bg-gradient-to-br from-[#3c82f4] to-blue-700 flex flex-col items-center justify-center shadow-2xl shadow-blue-200">
-                  <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mb-2">
-                    <svg className="w-10 h-10 text-white/70" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                    </svg>
-                  </div>
-                  <span className="text-white/60 text-xs font-medium tracking-wide">Founder Photo</span>
-                </div>
-                <div className="absolute -bottom-3 -right-3 bg-white rounded-2xl shadow-lg px-3 py-2 border border-gray-100">
-                  <span className="text-lg">🏒</span>
-                </div>
+            {/* Founder photo — 9:16 portrait */}
+            <div className="flex-shrink-0 w-48 md:w-56">
+              <div className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-100">
+                <img
+                  src={founderPhoto}
+                  alt="Tyler Frenette, Roster founder, on the ice"
+                  className="w-full h-full object-cover object-top"
+                />
               </div>
             </div>
 
