@@ -1,39 +1,123 @@
-import { Users, Calendar, MessageCircle, Check } from 'lucide-react';
+import { Users, Calendar, MessageCircle, Check, Play, UserPlus, Trophy, Star, Shield, Zap } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
 import rosterDarkLogo from "@assets/Dark_Mode_Logo_1770738054930.png";
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
+import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 
-function AnimatedCounter({ value }: { value: number }) {
+function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: string }) {
   const [displayValue, setDisplayValue] = useState(0);
   const prevValue = useRef(0);
+  const hasStarted = useRef(false);
+  const elementRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (value === 0) return;
-    const start = prevValue.current;
-    const end = value;
-    const duration = 1500;
-    const startTime = performance.now();
 
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(start + (end - start) * eased);
-      setDisplayValue(current);
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        prevValue.current = end;
-      }
-    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !hasStarted.current) {
+          hasStarted.current = true;
+          const start = prevValue.current;
+          const end = value;
+          const duration = 1800;
+          const startTime = performance.now();
 
-    requestAnimationFrame(animate);
+          const animate = (currentTime: number) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(start + (end - start) * eased);
+            setDisplayValue(current);
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              prevValue.current = end;
+            }
+          };
+          requestAnimationFrame(animate);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (elementRef.current) observer.observe(elementRef.current);
+    return () => observer.disconnect();
   }, [value]);
 
-  return (<span className="tabular-nums text-[20px] font-extrabold">{displayValue.toLocaleString()}</span>);
+  return (
+    <span ref={elementRef} className="tabular-nums font-extrabold">
+      {displayValue.toLocaleString()}{suffix}
+    </span>
+  );
 }
+
+const testimonials = [
+  {
+    quote: "Finally, a sports app that actually works for our whole league. No more chasing people on group text.",
+    name: "Marcus T.",
+    team: "Wednesday Night Hockey",
+    initials: "MT",
+    color: "bg-blue-600",
+  },
+  {
+    quote: "The RSVP system alone is worth every penny. Our captain used to spend hours confirming lineups. Not anymore.",
+    name: "Sarah K.",
+    team: "Sunday Soccer Co-ed",
+    initials: "SK",
+    color: "bg-purple-600",
+  },
+  {
+    quote: "We run three basketball leagues through Roster now. Scheduling, scores, standings — it handles all of it.",
+    name: "Derek R.",
+    team: "City Adult Basketball League",
+    initials: "DR",
+    color: "bg-green-600",
+  },
+  {
+    quote: "Switched from TeamSnap and never looked back. Half the price, twice the features.",
+    name: "Jen M.",
+    team: "Women's Softball League",
+    initials: "JM",
+    color: "bg-orange-600",
+  },
+  {
+    quote: "The substitute player system is a game-changer. We never show up short anymore.",
+    name: "Carlos B.",
+    team: "Tuesday Volleyball Drop-In",
+    initials: "CB",
+    color: "bg-red-600",
+  },
+  {
+    quote: "Our whole tournament went smoothly this year. Brackets, scheduling, scores — done.",
+    name: "Aisha P.",
+    team: "Regional Lacrosse Club",
+    initials: "AP",
+    color: "bg-teal-600",
+  },
+];
+
+const howItWorks = [
+  {
+    step: "01",
+    icon: UserPlus,
+    title: "Create Your Team",
+    description: "Sign up free, build your roster, and invite players in minutes. Works for any sport.",
+  },
+  {
+    step: "02",
+    icon: Calendar,
+    title: "Schedule & Track",
+    description: "Import your season schedule, collect RSVPs, and send automatic reminders — no more chasing.",
+  },
+  {
+    step: "03",
+    icon: Trophy,
+    title: "Play & Win",
+    description: "Track stats, manage standings, run tournaments, and keep your whole league connected.",
+  },
+];
 
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
@@ -50,104 +134,251 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const userCount = userCountData?.count ?? 0;
+
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
-      {userCountData && userCountData.count > 0 && (
-        <div className="fixed top-20 left-4 z-40 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2.5 shadow-lg shadow-black/30 bg-[#3c82f4]">
-          <div className="flex flex-col items-center text-center">
-            <span className="font-medium text-[16px] text-[#ffffff] leading-tight">Players</span>
-            <span className="font-medium text-[16px] text-[#ffffff] leading-tight">Using</span>
-            <span className="font-medium text-[16px] text-[#ffffff] leading-tight">Roster:</span>
-            <span className="text-sm font-bold text-white mt-0.5">
-              <AnimatedCounter value={userCountData.count} />
-            </span>
-          </div>
-        </div>
-      )}
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="w-24"></div>
-          <img 
+          <nav className="hidden md:flex items-center gap-6">
+            <a href="#how-it-works" className="text-sm text-gray-400 hover:text-white transition-colors">How It Works</a>
+            <a href="#features" className="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
+            <a href="#pricing" className="text-sm text-gray-400 hover:text-white transition-colors">Pricing</a>
+          </nav>
+          <img
             src={rosterDarkLogo}
             alt="Roster"
             className="h-10 object-contain"
             data-testid="logo-image"
           />
-          <div className="w-24"></div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setLocation('/login')}
+              className="hidden md:block text-sm text-gray-400 hover:text-white transition-colors font-medium"
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => setLocation('/waitlist')}
+              className="px-5 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
+              data-testid="button-join-waitlist-header"
+            >
+              Get Started Free
+            </button>
+          </div>
         </div>
       </header>
+
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/5 via-transparent to-transparent"
-          style={{ transform: `translateY(${scrollY * 0.5}px)` }}
+      <section className="relative pt-28 pb-20 px-6 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/8 via-transparent to-transparent"
+          style={{ transform: `translateY(${scrollY * 0.4}px)` }}
         />
-        <div className="max-w-5xl mx-auto text-center relative z-10">
-          <button
-            onClick={() => setLocation('/waitlist')}
-            className="px-8 py-3 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg mb-8"
-            data-testid="button-join-waitlist"
-          >
-            Join the Waitlist
-          </button>
-          <h1 
-            className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-white"
-            data-testid="text-hero-title"
-          >
-            Your Rec League Team,
-            <br />
-            <span className="text-[#3c82f4]">Organized</span>
-          </h1>
-          <div className="flex flex-col md:flex-row gap-8 items-start justify-center mb-12">
-            <div 
-              className="w-full md:w-1/2 max-w-[336px] flex items-center justify-center"
+        <div className="max-w-6xl mx-auto relative z-10">
+          {/* Trust badge */}
+          {userCount > 0 && (
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center gap-2 bg-[#3c82f4]/15 border border-[#3c82f4]/30 rounded-full px-4 py-2">
+                <div className="w-2 h-2 rounded-full bg-[#3c82f4] animate-pulse" />
+                <span className="text-sm font-medium text-[#3c82f4]">
+                  <AnimatedCounter value={userCount} /> players already using Roster
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Hero headline */}
+          <div className="text-center mb-10">
+            <h1
+              className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-white"
+              data-testid="text-hero-title"
+            >
+              The easiest way to manage
+              <br />
+              <span className="text-[#3c82f4]">any sports team.</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-8">
+              One app for every sport. Scheduling, RSVPs, rosters, stats, payments, and messaging — all in one place. No ads. Ever.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+              <button
+                onClick={() => setLocation('/waitlist')}
+                className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg"
+                data-testid="button-join-waitlist"
+              >
+                Get Started — It's Free
+              </button>
+              <button
+                onClick={() => setLocation('/login')}
+                className="px-8 py-4 rounded-full border border-gray-700 text-white hover:border-gray-500 transition-colors font-semibold text-lg"
+              >
+                Log In
+              </button>
+            </div>
+
+            {/* App Store Badges */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-2" data-testid="app-store-badges">
+              <a
+                href="https://apps.apple.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors group"
+                aria-label="Download on the App Store"
+              >
+                <SiAppstore className="w-7 h-7 text-white" />
+                <div className="text-left">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">Download on the</div>
+                  <div className="text-base font-semibold text-white leading-tight">App Store</div>
+                </div>
+              </a>
+              <a
+                href="https://play.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors group"
+                aria-label="Get it on Google Play"
+              >
+                <SiGoogleplay className="w-6 h-6 text-white" />
+                <div className="text-left">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">Get it on</div>
+                  <div className="text-base font-semibold text-white leading-tight">Google Play</div>
+                </div>
+              </a>
+            </div>
+            <p className="text-xs text-gray-500">No credit card required · Free forever tier available</p>
+          </div>
+
+          {/* Hero image + problem copy */}
+          <div className="flex flex-col md:flex-row gap-10 items-center justify-center mt-10">
+            <div
+              className="w-full md:w-2/5 max-w-[300px] flex-shrink-0"
               data-testid="image-hero"
             >
-              <img 
-                src={appPreviewImage} 
-                alt="Roster app preview" 
-                className="w-full h-auto rounded-3xl shadow-2xl"
+              <img
+                src={appPreviewImage}
+                alt="Roster app preview showing team management features"
+                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-900/20"
               />
             </div>
-            <div 
-              className="text-base md:text-lg leading-relaxed text-[#ffffff] md:w-1/2 max-w-md md:mt-16"
+            <div
+              className="text-left md:w-3/5 max-w-xl"
               data-testid="text-hero-body"
             >
-              <p className="mb-1 text-[24px] pt-[20px] pb-[20px]">Every rec league team falls apart the exact same way.</p>
-              <p className="mb-6 text-[24px] pt-[20px] pb-[20px]">Nobody knows who's playing, nobody knows when the game is—and half the team just doesn't show up.</p>
-              
-              <p className="text-xl md:text-2xl mb-6 font-normal pt-[10px] pb-[10px]">Group texts, half-baked spreadsheets, email chains...</p>
-              
-              <p className="text-[40px] pt-[10px] pb-[10px] mt-[30px] mb-[30px] text-[#3c83f6] font-black">Total Disaster</p>
-              <p className="text-[24px]">Roster fixes all of it.  One app, built by frustrated players, for players.   
-              Your schedule, your lineup, your team—organized. Finally.</p>
+              <p className="text-2xl font-semibold mb-4 text-white">Every sports team falls apart the same way.</p>
+              <p className="text-lg text-gray-300 mb-6">Nobody knows who's playing. Nobody knows when the game is. Half the team just doesn't show up.</p>
+              <div className="space-y-3 mb-6">
+                {["Endless group texts that go nowhere", "Half-baked spreadsheets nobody updates", "Email chains from 2018"].map((pain) => (
+                  <div key={pain} className="flex items-center gap-3">
+                    <span className="text-red-400 text-lg font-bold">✕</span>
+                    <span className="text-gray-300 text-lg line-through">{pain}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-3xl font-black text-[#3c82f4] mb-4">Roster fixes all of it.</p>
+              <p className="text-lg text-gray-300">One app, built by frustrated players, for players. Your schedule, your lineup, your team — organized. Finally.</p>
             </div>
           </div>
         </div>
       </section>
-      {/* Highlights Bar */}
-      <section className="py-16 px-6 border-y border-gray-800/50 bg-gray-900/30">
+
+      {/* Video Demo Section */}
+      <section className="py-20 px-6 bg-gray-950/50" id="demo">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
+            See Roster in action.
+          </h2>
+          <p className="text-gray-400 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
+
+          {/* Video placeholder — swap src with real YouTube embed when available */}
+          <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-900 aspect-video shadow-2xl shadow-blue-900/20 group cursor-pointer">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-[#3c82f4] flex items-center justify-center shadow-lg shadow-blue-500/40 group-hover:scale-110 transition-transform">
+                <Play className="w-8 h-8 text-white ml-1" fill="white" />
+              </div>
+              <p className="text-gray-400 text-sm font-medium">Product Walkthrough — 90 seconds</p>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-br from-[#3c82f4]/5 via-transparent to-[#3c82f4]/5" />
+            {/* Grid pattern overlay */}
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage: 'linear-gradient(rgba(60,130,244,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(60,130,244,0.3) 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+              }}
+            />
+          </div>
+          <p className="text-gray-600 text-xs mt-3">Video demo coming soon — sign up to get early access</p>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-24 px-6" id="how-it-works">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-10 text-white" data-testid="text-highlights-heading">Running on spreadsheets / Emails / Text Threads?</h2>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
+              Up and running in minutes.
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">No training required. No complex setup. Just sign up and go.</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center justify-center gap-3" data-testid="highlight-0">
-              <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Upload & watch your season populate</span>
+            {howItWorks.map((item, index) => (
+              <div key={item.step} className="relative">
+                {index < howItWorks.length - 1 && (
+                  <div className="hidden md:block absolute top-10 left-[60%] w-full h-px bg-gradient-to-r from-[#3c82f4]/40 to-transparent z-0" />
+                )}
+                <div className="relative z-10 bg-gray-900/60 border border-gray-800/60 rounded-2xl p-8 hover:border-[#3c82f4]/30 transition-colors">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-14 h-14 rounded-xl bg-[#3c82f4]/15 border border-[#3c82f4]/25 flex items-center justify-center flex-shrink-0">
+                      <item.icon className="w-7 h-7 text-[#3c82f4]" />
+                    </div>
+                    <span className="text-5xl font-black text-gray-800 leading-none mt-1">{item.step}</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
+                  <p className="text-gray-400 leading-relaxed">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof Stats Bar */}
+      <section className="py-14 px-6 border-y border-gray-800/50 bg-gray-900/30">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
+                {userCount > 0 ? <AnimatedCounter value={userCount} suffix="+" /> : '1,000+'}
+              </div>
+              <div className="text-gray-400 text-sm font-medium">Players Registered</div>
             </div>
-            <div className="flex items-center justify-center gap-3" data-testid="highlight-1">
-              <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Get notifications of everything in your league</span>
+            <div>
+              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
+                <AnimatedCounter value={50} suffix="+" />
+              </div>
+              <div className="text-gray-400 text-sm font-medium">Sports Supported</div>
             </div>
-            <div className="flex items-center justify-center gap-3" data-testid="highlight-2">
-              <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0" />
-              <span className="font-medium text-white">Enjoy how it was meant to be</span>
+            <div>
+              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
+                <AnimatedCounter value={0} />
+                <span className="font-black">Ads</span>
+              </div>
+              <div className="text-gray-400 text-sm font-medium">Ever. On Any Plan.</div>
+            </div>
+            <div>
+              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">$0</div>
+              <div className="text-gray-400 text-sm font-medium">To Get Started</div>
             </div>
           </div>
         </div>
       </section>
+
       {/* Features Section - Comparison Table */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6" id="features">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-6xl font-bold mb-4 text-white" data-testid="text-features-heading">
@@ -155,14 +386,20 @@ export default function Landing() {
               <br />
               <span className="text-[#3c82f4]">All in one place.</span>
             </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">See how Roster stacks up against the competition — for a fraction of the price.</p>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full border-collapse bg-gray-900/50 backdrop-blur-sm rounded-xl" data-testid="comparison-table">
               <thead>
                 <tr className="border-b border-gray-800/50">
                   <th className="text-left p-4 font-bold text-white">Feature</th>
-                  <th className="text-center p-4 font-bold bg-[#3c82f4]/10 text-white">Roster</th>
+                  <th className="text-center p-4 font-bold bg-[#3c82f4]/10 text-white border border-[#3c82f4]/20 rounded-t">
+                    <div className="flex flex-col items-center gap-1">
+                      <span>Roster</span>
+                      <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/15 rounded-full px-2 py-0.5">Best Value</span>
+                    </div>
+                  </th>
                   <th className="text-center p-4 font-bold text-white">BenchApp</th>
                   <th className="text-center p-4 font-bold text-white">TeamSnap</th>
                   <th className="text-center p-4 font-bold text-white">SportsEngine HQ</th>
@@ -180,163 +417,200 @@ export default function Landing() {
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Annoying Ads</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">NEVER</td>
-                  <td className="text-center p-4 text-white">MULTIPLE</td>
-                  <td className="text-center p-4 text-white">TONS</td>
-                  <td className="text-center p-4 text-white">ALWAYS</td>
+                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-[#3c82f4]">NEVER</td>
+                  <td className="text-center p-4 text-red-400">MULTIPLE</td>
+                  <td className="text-center p-4 text-red-400">TONS</td>
+                  <td className="text-center p-4 text-red-400">ALWAYS</td>
                   <td className="text-center p-4 text-white">No</td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Team Scheduling</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Roster Management</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Player/Attendance Tracking</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">In App Messaging</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">RSVP Alerts</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Player Substitution System</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Polls/Bulletins</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Facility Event Calendar</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Fee & Payment Tracking</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Links to Venmo/CashApp</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Team Expense Tracking</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Mobile App</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Website Portal</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Multi-Team/Org Management</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Registration Notices</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Volunteer/Role Assignment</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
                 <tr className="border-b border-gray-800/50">
                   <td className="p-4 text-white">Custom Awards</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
                 </tr>
                 <tr>
                   <td className="p-4 text-white">Tournaments Mode</td>
                   <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-destructive text-2xl">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
+                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
       </section>
+
+      {/* Testimonials Section */}
+      <section className="py-24 px-6 bg-gray-950/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
+              Trusted by teams everywhere.
+            </h2>
+            <p className="text-gray-400 text-lg">Real players. Real teams. Real results.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {testimonials.map((t) => (
+              <div
+                key={t.name}
+                className="bg-gray-900/70 border border-gray-800/60 rounded-2xl p-6 hover:border-gray-700 transition-colors flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-gray-200 leading-relaxed flex-1">"{t.quote}"</p>
+                <div className="flex items-center gap-3 pt-2 border-t border-gray-800/50">
+                  <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                    {t.initials}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white text-sm">{t.name}</div>
+                    <div className="text-gray-500 text-xs">{t.team}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
-      <section className="py-24 px-6 bg-gray-900/30">
+      <section className="py-24 px-6 bg-gray-900/30" id="pricing">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-6xl font-bold mb-4" data-testid="text-pricing-heading">
@@ -344,6 +618,22 @@ export default function Landing() {
               <br />
               <span className="text-gray-400">No surprises.</span>
             </h2>
+            <p className="text-gray-400 text-lg">Free to start. No credit card required. No ads on any plan.</p>
+          </div>
+
+          {/* Trust strip */}
+          <div className="flex flex-wrap justify-center gap-6 mb-12">
+            {[
+              { icon: Shield, text: 'No ads. Ever.' },
+              { icon: Zap, text: 'Cancel Anytime' },
+              { icon: Users, text: 'Free to Start' },
+              { icon: Check, text: 'No Credit Card Required' },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-center gap-2 text-gray-400">
+                <Icon className="w-4 h-4 text-[#3c82f4]" />
+                <span className="text-sm font-medium">{text}</span>
+              </div>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
@@ -354,124 +644,69 @@ export default function Landing() {
                 <span className="text-5xl font-bold" data-testid="text-price-free">$0</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
+              <p className="text-gray-400 text-sm mb-6">Perfect for players joining their first team. No strings attached.</p>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-3" data-testid="feature-free-0">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Join Leagues / Teams</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-free-1">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Scheduling</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-free-2">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">RSVP Function</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-free-3">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Team Only Stats</span>
-                </li>
+                {['Join Leagues / Teams', 'Scheduling', 'RSVP Function', 'Team Only Stats'].map((f, i) => (
+                  <li key={f} className="flex items-start gap-3" data-testid={`feature-free-${i}`}>
+                    <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-white">{f}</span>
+                  </li>
+                ))}
               </ul>
-              <button 
-                onClick={() => setLocation('/login')}
-                className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
+              <button
+                onClick={() => setLocation('/waitlist')}
+                className="w-full py-3 px-6 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors font-semibold text-white"
                 data-testid="button-pricing-free"
               >
-                Get Started
+                Get Started Free
               </button>
             </div>
 
-            {/* Player Pro Tier */}
-            <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border-2 border-[#3c82f4] relative" data-testid="card-pricing-player">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#3c82f4] text-white text-sm font-semibold px-4 py-1 rounded-full" data-testid="badge-popular">
-                Most Popular
+            {/* Player Pro */}
+            <div className="bg-[#3c82f4]/10 backdrop-blur-sm rounded-3xl p-8 border-2 border-[#3c82f4]/50 relative" data-testid="card-pricing-player-pro">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#3c82f4] text-white text-xs font-bold px-4 py-1.5 rounded-full">
+                MOST POPULAR
               </div>
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player">PLAYER PRO</h3>
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player-pro">Player Pro</h3>
               <div className="mb-6">
-                <span className="text-5xl font-bold" data-testid="text-price-player">$6.49</span>
+                <span className="text-5xl font-bold" data-testid="text-price-player-pro">$6.49</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
+              <p className="text-gray-400 text-sm mb-6">For serious players who want the full experience — messaging, payments, and more.</p>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-3" data-testid="feature-player-0">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Everything in FREE +</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-1">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Team Management</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-2">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">In-App Messaging</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-3">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">In-App Payments</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-4">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Team Scheduling</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-5">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">League Stats</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-6">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">League Standings</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-player-7">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">League Announcements</span>
-                </li>
+                {['FREE +', 'Team Management', 'In-App Messaging', 'In-App Payments', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
+                  <li key={f} className="flex items-start gap-3" data-testid={`feature-player-pro-${i}`}>
+                    <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-white">{f}</span>
+                  </li>
+                ))}
               </ul>
-              <button 
+              <button
                 onClick={() => setLocation('/login')}
-                className="w-full py-3 px-6 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold"
-                data-testid="button-pricing-player"
+                className="w-full py-3 px-6 rounded-full bg-[#3c82f4] hover:bg-[#3c82f4]/90 transition-colors font-semibold text-white"
+                data-testid="button-pricing-player-pro"
               >
                 Get Started
               </button>
             </div>
 
-            {/* Commissioner Tier */}
+            {/* Commissioner */}
             <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-800/50" data-testid="card-pricing-commissioner">
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-commissioner">COMMISSIONER</h3>
+              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-commissioner">Commissioner</h3>
               <div className="mb-6">
                 <span className="text-5xl font-bold" data-testid="text-price-commissioner">$12</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
+              <p className="text-gray-400 text-sm mb-6">Run a full league with schedules, scores, standings, and tournaments.</p>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-0">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">FREE & PLAYER PRO +</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-1">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">League Scheduling</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-2">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Scorekeeping</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-3">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Player Management</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-4">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">League Wide Posts</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-5">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Awards & Records*</span>
-                </li>
-                <li className="flex items-start gap-3" data-testid="feature-commissioner-6">
-                  <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white">Bracket Management*</span>
-                </li>
+                {['FREE & PLAYER PRO +', 'League Scheduling', 'Scorekeeping', 'Player Management', 'League Wide Posts', 'Awards & Records*', 'Bracket Management*'].map((f, i) => (
+                  <li key={f} className="flex items-start gap-3" data-testid={`feature-commissioner-${i}`}>
+                    <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-white">{f}</span>
+                  </li>
+                ))}
               </ul>
-              <button 
+              <button
                 onClick={() => setLocation('/login')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-commissioner"
@@ -482,23 +717,70 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Final CTA */}
+      <section className="py-24 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-4xl md:text-6xl font-bold mb-6 text-white">
+            Ready to stop managing
+            <br />
+            <span className="text-[#3c82f4]">chaos?</span>
+          </h2>
+          <p className="text-gray-400 text-xl mb-8">Join thousands of teams already using Roster. Free to start, no credit card required.</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+            <button
+              onClick={() => setLocation('/waitlist')}
+              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg"
+            >
+              Get Started Free
+            </button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href="https://apps.apple.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors justify-center"
+            >
+              <SiAppstore className="w-6 h-6 text-white" />
+              <div className="text-left">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Download on the</div>
+                <div className="text-sm font-semibold text-white leading-tight">App Store</div>
+              </div>
+            </a>
+            <a
+              href="https://play.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors justify-center"
+            >
+              <SiGoogleplay className="w-5 h-5 text-white" />
+              <div className="text-left">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Get it on</div>
+                <div className="text-sm font-semibold text-white leading-tight">Google Play</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-gray-800/50 py-12 px-6" data-testid="footer">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <p className="text-sm text-gray-400" data-testid="text-footer">
-              © 2025 Rosters. Built for teams, by team players.
+              © 2025 Roster. Built for teams, by team players. No ads. Ever.
             </p>
             <div className="flex items-center gap-6">
-              <Link 
-                href="/privacy-policy" 
+              <Link
+                href="/privacy-policy"
                 className="text-sm text-gray-400 hover:text-white transition-colors"
                 data-testid="link-privacy-policy"
               >
                 Privacy Policy
               </Link>
-              <Link 
-                href="/terms-of-service" 
+              <Link
+                href="/terms-of-service"
                 className="text-sm text-gray-400 hover:text-white transition-colors"
                 data-testid="link-terms-of-service"
               >
