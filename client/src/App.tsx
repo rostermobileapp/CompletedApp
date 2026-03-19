@@ -19,6 +19,7 @@ import { NativelyNotificationsInitializer } from "@/components/NativelyNotificat
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import Pricing from "@/pages/Pricing";
 import Waitlist from "@/pages/Waitlist";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -161,6 +162,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/pricing" component={Pricing} />
         <Route path="/waitlist" component={Waitlist} />
         <Route path="/login" component={Login} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />

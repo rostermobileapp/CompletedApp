@@ -162,7 +162,7 @@ export default function Landing() {
           <nav className="hidden md:flex items-center gap-6">
             <a href="#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
             <a href="#features" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</a>
-            <a href="#pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Pricing</a>
+            <Link href="/pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
           </nav>
           <img
             src={rosterLightLogo}
