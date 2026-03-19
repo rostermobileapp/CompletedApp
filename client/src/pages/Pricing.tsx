@@ -83,10 +83,12 @@ export default function Pricing() {
 
   const proMonthly = 6.49;
   const commMonthly = 12.00;
-  const discount = 0.20;
 
-  const proPrice = annual ? (proMonthly * (1 - discount)).toFixed(2) : proMonthly.toFixed(2);
-  const commPrice = annual ? (commMonthly * (1 - discount)).toFixed(2) : commMonthly.toFixed(2);
+  const proAnnualTotal = 65;
+  const commAnnualTotal = 110;
+
+  const proPrice = annual ? (proAnnualTotal / 12).toFixed(2) : proMonthly.toFixed(2);
+  const commPrice = annual ? (commAnnualTotal / 12).toFixed(2) : commMonthly.toFixed(2);
 
   return (
     <div className="min-h-screen bg-white text-gray-900" data-testid="pricing-page">
@@ -151,7 +153,7 @@ export default function Pricing() {
           </button>
           <span className={`text-sm font-semibold ${annual ? 'text-gray-900' : 'text-gray-400'}`}>
             Annual
-            <span className="ml-2 inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+            <span className="ml-2 inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">Save up to 24%</span>
           </span>
         </div>
         {annual && (
@@ -218,8 +220,8 @@ export default function Pricing() {
             </div>
             {annual && (
               <div className="mb-4">
-                <span className="text-blue-200 text-sm">Billed annually (${(parseFloat(proPrice) * 12).toFixed(2)}/yr)</span>
-                <span className="ml-2 inline-block bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+                <span className="text-blue-200 text-sm">Billed annually (${proAnnualTotal}/yr)</span>
+                <span className="ml-2 inline-block bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">Save 17%</span>
               </div>
             )}
             {!annual && <div className="mb-4" />}
@@ -250,8 +252,8 @@ export default function Pricing() {
             </div>
             {annual && (
               <div className="mb-4">
-                <span className="text-gray-400 text-sm">Billed annually (${(parseFloat(commPrice) * 12).toFixed(2)}/yr)</span>
-                <span className="ml-2 inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+                <span className="text-gray-400 text-sm">Billed annually (${commAnnualTotal}/yr)</span>
+                <span className="ml-2 inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">Save 24%</span>
               </div>
             )}
             {!annual && <div className="mb-4" />}
