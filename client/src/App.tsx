@@ -20,6 +20,9 @@ import { WebSocketProvider } from "@/context/WebSocketContext";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Pricing from "@/pages/Pricing";
+import About from "@/pages/About";
+import SportLanding from "@/pages/SportLanding";
+import SegmentLanding from "@/pages/SegmentLanding";
 import Waitlist from "@/pages/Waitlist";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -163,6 +166,13 @@ function Router() {
       <Switch>
         <Route path="/" component={Landing} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/about" component={About} />
+        <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>
+        <Route path="/soccer">{() => <SportLanding sport="soccer" />}</Route>
+        <Route path="/baseball">{() => <SportLanding sport="baseball" />}</Route>
+        <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
+        <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
+        <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
         <Route path="/waitlist" component={Waitlist} />
         <Route path="/login" component={Login} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
@@ -241,6 +251,13 @@ function Router() {
               <Route path="/media/league/:id" component={MediaGalleryPage} />
               <Route path="/media/team/:id" component={MediaGalleryPage} />
               <Route path="/pricing" component={Pricing} />
+              <Route path="/about" component={About} />
+              <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>
+              <Route path="/soccer">{() => <SportLanding sport="soccer" />}</Route>
+              <Route path="/baseball">{() => <SportLanding sport="baseball" />}</Route>
+              <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
+              <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
+              <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
               <Route path="/privacy" component={Privacy} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />

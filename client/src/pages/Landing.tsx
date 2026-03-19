@@ -163,6 +163,7 @@ export default function Landing() {
             <a href="#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
             <a href="#features" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</a>
             <Link href="/pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
+            <Link href="/about" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">About</Link>
           </nav>
           <img
             src={rosterLightLogo}
@@ -684,26 +685,44 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-gray-200 py-12 px-6 bg-white" data-testid="footer">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <p className="text-sm text-gray-400" data-testid="text-footer">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10 text-sm">
+            <div>
+              <p className="font-semibold text-gray-900 mb-3">Product</p>
+              <ul className="space-y-2 text-gray-400">
+                <li><Link href="/#features" className="hover:text-gray-900 transition-colors">Features</Link></li>
+                <li><Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link></li>
+                <li><Link href="/waitlist" className="hover:text-gray-900 transition-colors">Join Waitlist</Link></li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-3">Company</p>
+              <ul className="space-y-2 text-gray-400">
+                <li><Link href="/about" className="hover:text-gray-900 transition-colors">About</Link></li>
+                <li><Link href="/privacy-policy" className="hover:text-gray-900 transition-colors" data-testid="link-privacy-policy">Privacy Policy</Link></li>
+                <li><Link href="/terms-of-service" className="hover:text-gray-900 transition-colors" data-testid="link-terms-of-service">Terms of Service</Link></li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-3">By Sport</p>
+              <ul className="space-y-2 text-gray-400">
+                <li><Link href="/hockey" className="hover:text-gray-900 transition-colors">Hockey</Link></li>
+                <li><Link href="/soccer" className="hover:text-gray-900 transition-colors">Soccer</Link></li>
+                <li><Link href="/baseball" className="hover:text-gray-900 transition-colors">Baseball</Link></li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 mb-3">By Team Type</p>
+              <ul className="space-y-2 text-gray-400">
+                <li><Link href="/for-youth-teams" className="hover:text-gray-900 transition-colors">Youth Teams</Link></li>
+                <li><Link href="/for-adult-leagues" className="hover:text-gray-900 transition-colors">Adult Leagues</Link></li>
+                <li><Link href="/for-varsity" className="hover:text-gray-900 transition-colors">Varsity & Competitive</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 pt-6">
+            <p className="text-sm text-gray-400 text-center" data-testid="text-footer">
               © 2025 Roster. Built for teams, by team players. No ads. Ever.
             </p>
-            <div className="flex items-center gap-6">
-              <Link
-                href="/privacy-policy"
-                className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
-                data-testid="link-privacy-policy"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="/terms-of-service"
-                className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
-                data-testid="link-terms-of-service"
-              >
-                Terms of Service
-              </Link>
-            </div>
           </div>
         </div>
       </footer>
