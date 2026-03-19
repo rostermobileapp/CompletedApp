@@ -159,11 +159,11 @@ export default function Landing() {
       {/* Fixed Header */}
       <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
-            <a href="#features" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</a>
-            <Link href="/pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
-            <Link href="/about" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">About</Link>
+          <nav className="flex flex-wrap items-center gap-2 md:gap-6 text-xs md:text-sm">
+            <a href="#how-it-works" className="text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
+            <a href="#features" className="text-gray-500 hover:text-gray-900 transition-colors">Features</a>
+            <Link href="/pricing" className="text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
+            <Link href="/about" className="text-gray-500 hover:text-gray-900 transition-colors">About</Link>
           </nav>
           <img
             src={rosterLightLogo}
