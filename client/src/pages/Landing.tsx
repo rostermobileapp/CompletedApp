@@ -59,42 +59,42 @@ const testimonials = [
     name: "Marcus T.",
     team: "Wednesday Night Hockey",
     initials: "MT",
-    color: "bg-blue-600",
+    gradient: "from-blue-500 to-blue-700",
   },
   {
     quote: "The RSVP system alone is worth every penny. Our captain used to spend hours confirming lineups. Not anymore.",
     name: "Sarah K.",
     team: "Sunday Soccer Co-ed",
     initials: "SK",
-    color: "bg-purple-600",
+    gradient: "from-purple-500 to-purple-700",
   },
   {
     quote: "We run three basketball leagues through Roster now. Scheduling, scores, standings — it handles all of it.",
     name: "Derek R.",
     team: "City Adult Basketball League",
     initials: "DR",
-    color: "bg-green-600",
+    gradient: "from-emerald-500 to-emerald-700",
   },
   {
     quote: "Switched from TeamSnap and never looked back. Half the price, twice the features.",
     name: "Jen M.",
     team: "Women's Softball League",
     initials: "JM",
-    color: "bg-orange-600",
+    gradient: "from-orange-500 to-orange-700",
   },
   {
     quote: "The substitute player system is a game-changer. We never show up short anymore.",
     name: "Carlos B.",
     team: "Tuesday Volleyball Drop-In",
     initials: "CB",
-    color: "bg-red-600",
+    gradient: "from-rose-500 to-rose-700",
   },
   {
     quote: "Our whole tournament went smoothly this year. Brackets, scheduling, scores — done.",
     name: "Aisha P.",
     team: "Regional Lacrosse Club",
     initials: "AP",
-    color: "bg-teal-600",
+    gradient: "from-teal-500 to-teal-700",
   },
 ];
 
@@ -223,7 +223,7 @@ export default function Landing() {
             {/* App Store Badges */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-2" data-testid="app-store-badges">
               <a
-                href="https://apps.apple.com"
+                href="https://apps.apple.com/us/app/roster-app/id6741723004"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors group"
@@ -236,7 +236,7 @@ export default function Landing() {
                 </div>
               </a>
               <a
-                href="https://play.google.com"
+                href="https://play.google.com/store/search?q=roster+team+management&c=apps"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors group"
@@ -595,7 +595,7 @@ export default function Landing() {
                 </div>
                 <p className="text-gray-200 leading-relaxed flex-1">"{t.quote}"</p>
                 <div className="flex items-center gap-3 pt-2 border-t border-gray-800/50">
-                  <div className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md ring-2 ring-white/10`}>
                     {t.initials}
                   </div>
                   <div>
@@ -737,7 +737,7 @@ export default function Landing() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
-              href="https://apps.apple.com"
+              href="https://apps.apple.com/us/app/roster-app/id6741723004"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors justify-center"
@@ -749,7 +749,7 @@ export default function Landing() {
               </div>
             </a>
             <a
-              href="https://play.google.com"
+              href="https://play.google.com/store/search?q=roster+team+management&c=apps"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors justify-center"
