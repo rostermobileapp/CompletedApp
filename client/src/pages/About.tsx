@@ -13,7 +13,6 @@ export default function About() {
       ogTitle="About Roster — The Founder's Story"
       ogDescription="A hockey team management app built by a frustrated captain, for captains. Here's the story behind Roster."
     >
-
       {/* ── 1. FOUNDER INTRO ─────────────────────────────────────── */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
         <div className="max-w-5xl mx-auto">
@@ -39,14 +38,11 @@ export default function About() {
               </h1>
               <p className="text-[#3c82f4] font-semibold text-lg mb-1">Founder & CEO, Roster</p>
               <p className="text-gray-400 text-sm mb-6">Hockey player · Team captain · Beer-leaguer for life</p>
-              <p className="text-gray-600 text-lg leading-relaxed max-w-xl">
-                Tyler didn't set out to build a software company. He set out to stop losing ice time because nobody could figure out who was showing up.
-              </p>
+              <p className="text-gray-600 text-lg leading-relaxed max-w-xl">I didn't set out to build a software company. I set out to stop losing ice time because nobody could figure out who was showing up.</p>
             </div>
           </div>
         </div>
       </section>
-
       {/* ── 2. WHY HE STARTED ROSTER ─────────────────────────────── */}
       <section className="py-20 px-6 bg-white">
         <div className="max-w-5xl mx-auto">
@@ -91,7 +87,6 @@ export default function About() {
           </div>
         </div>
       </section>
-
       {/* ── 3. HOW HE BUILT IT RIGHT ─────────────────────────────── */}
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
@@ -144,7 +139,6 @@ export default function About() {
           </div>
         </div>
       </section>
-
       {/* ── 4. HOCKEY COMMUNITY CONNECTION ───────────────────────── */}
       <section className="py-20 px-6 bg-white">
         <div className="max-w-5xl mx-auto">
@@ -201,7 +195,6 @@ export default function About() {
           </div>
         </div>
       </section>
-
     </MarketingLayout>
   );
 }
