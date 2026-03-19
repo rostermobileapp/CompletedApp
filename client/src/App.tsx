@@ -240,6 +240,7 @@ function Router() {
               <Route path="/media/tournament/:id" component={MediaGalleryPage} />
               <Route path="/media/league/:id" component={MediaGalleryPage} />
               <Route path="/media/team/:id" component={MediaGalleryPage} />
+              <Route path="/pricing" component={Pricing} />
               <Route path="/privacy" component={Privacy} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />

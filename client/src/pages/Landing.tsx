@@ -626,6 +626,11 @@ export default function Landing() {
               </button>
             </div>
           </div>
+          <div className="text-center mt-10">
+            <Link href="/pricing" className="inline-flex items-center gap-2 text-[#3c82f4] font-semibold hover:underline underline-offset-4 transition-colors">
+              View full pricing details &rarr;
+            </Link>
+          </div>
         </div>
       </section>
 
