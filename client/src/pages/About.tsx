@@ -74,7 +74,7 @@ export default function About() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
                   <p className="text-3xl font-black text-gray-900 mb-1">10</p>
-                  <p className="text-sm text-gray-500">Years as captain before building Roster</p>
+                  <p className="text-sm text-gray-500">Years with a BenchApp account before building Roster</p>
                 </div>
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
                   <p className="text-3xl font-black text-gray-900 mb-1">4</p>
