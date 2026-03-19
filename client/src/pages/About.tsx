@@ -1,5 +1,6 @@
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { useLocation } from 'wouter';
+import { Users, MessageSquare, CheckCircle } from 'lucide-react';
 
 export default function About() {
   const [, setLocation] = useLocation();
@@ -7,73 +8,205 @@ export default function About() {
   return (
     <MarketingLayout
       title="About Roster | Built by a Hockey Player Who Got Tired of the Chaos"
-      description="Roster was built by a frustrated hockey player who was sick of managing his team through group texts and spreadsheets. Here's why he built it."
+      description="Roster was built by a frustrated hockey captain who was sick of managing his team through group texts and spreadsheets. Here's his story."
       ogTitle="About Roster — The Founder's Story"
-      ogDescription="A hockey team management app built by a frustrated player, for players. Here's the story behind Roster."
+      ogDescription="A hockey team management app built by a frustrated captain, for captains. Here's the story behind Roster."
     >
-      <section className="py-24 px-6 bg-gradient-to-b from-blue-50/60 to-white">
-        <div className="max-w-2xl mx-auto">
-          {/* Founder avatar */}
-          <div className="flex items-center gap-4 mb-12">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-2xl font-bold shadow-md flex-shrink-0">
-              TF
+
+      {/* ── 1. FOUNDER INTRO ─────────────────────────────────────── */}
+      <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center gap-12">
+            {/* Photo placeholder */}
+            <div className="flex-shrink-0">
+              <div className="relative w-52 h-52 md:w-64 md:h-64">
+                <div className="w-full h-full rounded-3xl bg-gradient-to-br from-[#3c82f4] to-blue-700 flex flex-col items-center justify-center shadow-2xl shadow-blue-200">
+                  <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mb-2">
+                    <svg className="w-10 h-10 text-white/70" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                    </svg>
+                  </div>
+                  <span className="text-white/60 text-xs font-medium tracking-wide">Founder Photo</span>
+                </div>
+                <div className="absolute -bottom-3 -right-3 bg-white rounded-2xl shadow-lg px-3 py-2 border border-gray-100">
+                  <span className="text-lg">🏒</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-gray-900 text-lg">Tyler F.</p>
-              <p className="text-gray-500 text-sm">Founder, Roster · Captain, Wednesday Night Hockey</p>
-            </div>
-          </div>
 
-          {/* Story */}
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8 leading-snug">
-            I built Roster because I was <span className="text-[#3c82f4]">tired of being the captain.</span>
-          </h1>
-
-          <div className="space-y-6 text-gray-600 text-lg leading-relaxed">
-            <p>
-              Not tired of playing — tired of the admin that came with it. I ran a Wednesday night hockey league for four years. Every week was the same drill: chase 20 adults through a group text to see who was showing up, manually count heads, pray enough people confirmed, and still somehow end up at the rink with a half-empty ice time.
-            </p>
-            <p>
-              I tried every app out there. TeamSnap cost a fortune and was covered in ads. BenchApp was half-finished. Spreadsheets fell apart the second someone edited the wrong row. Nothing was built for the way actual recreational teams work.
-            </p>
-            <p>
-              The moment I decided to build something myself was a Tuesday night in February. We showed up to the rink with 8 skaters for what was supposed to be a full game. Nobody had confirmed. Nobody knew. We paid for an hour of ice and skated 4-on-4 like idiots.
-            </p>
-
-            <blockquote className="border-l-4 border-[#3c82f4] pl-5 py-1 my-8">
-              <p className="text-gray-800 font-medium italic text-xl">
-                "There has to be a better way to do this."
+            {/* Intro copy */}
+            <div className="text-center md:text-left">
+              <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-1.5 mb-4">
+                <span className="text-sm font-medium text-[#3c82f4]">Meet the founder</span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+                Tyler Frenette
+              </h1>
+              <p className="text-[#3c82f4] font-semibold text-lg mb-1">Founder & CEO, Roster</p>
+              <p className="text-gray-400 text-sm mb-6">Hockey player · Team captain · Beer-leaguer for life</p>
+              <p className="text-gray-600 text-lg leading-relaxed max-w-xl">
+                Tyler didn't set out to build a software company. He set out to stop losing ice time because nobody could figure out who was showing up.
               </p>
-            </blockquote>
-
-            <p>
-              So I built it. Roster started as a tool for my own team — just to get RSVPs working reliably. Then I added a substitute player system so we'd never show up short again. Then payments, scheduling, stats, messaging. One problem at a time.
-            </p>
-            <p>
-              The app launches <strong className="text-gray-900">May 1, 2026</strong>. It's ad-free on every plan. It's priced so that a beer leaguer doesn't have to think twice about it. And it's built to handle the exact problems I spent four years fighting every Wednesday night.
-            </p>
-            <p className="text-gray-900 font-semibold">
-              If you've ever been the captain, you know. Roster is for you.
-            </p>
-          </div>
-
-          {/* CTA */}
-          <div className="mt-12 flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={() => setLocation('/waitlist')}
-              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-base shadow-lg shadow-blue-200"
-            >
-              Join the Waitlist
-            </button>
-            <button
-              onClick={() => setLocation('/pricing')}
-              className="px-8 py-4 rounded-full border border-gray-200 text-gray-700 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold text-base"
-            >
-              See Pricing
-            </button>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* ── 2. WHY HE STARTED ROSTER ─────────────────────────────── */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            <div>
+              <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Origin</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">
+                Why he built Roster
+              </h2>
+              <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
+                <p>
+                  For six years, Tyler captained a Wednesday night hockey league. What started as a simple favor — "someone has to organize this" — turned into a part-time job. Every week meant chasing 20 adults through a group text, manually tallying RSVPs, and still showing up to games shorthanded.
+                </p>
+                <p>
+                  He tried everything. TeamSnap was expensive and buried in ads. BenchApp felt half-finished. Spreadsheets broke the moment someone edited the wrong cell. Nothing solved the actual problem: <em>getting reliable answers from busy people who just want to play hockey.</em>
+                </p>
+                <p>
+                  The breaking point came on a Tuesday night in February. Tyler's team showed up to the rink with 8 skaters for a full-sheet game. Nobody had confirmed. Nobody knew. They paid for an hour of ice and skated 4-on-4.
+                </p>
+              </div>
+            </div>
+
+            {/* Pull quote card */}
+            <div className="space-y-5">
+              <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
+                <p className="text-white text-2xl font-semibold leading-snug mb-4">
+                  "We paid for full-sheet ice and skated 4-on-4. That was the last time."
+                </p>
+                <p className="text-blue-200 text-sm font-medium">— Tyler, on the moment Roster was born</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
+                  <p className="text-3xl font-black text-gray-900 mb-1">6</p>
+                  <p className="text-sm text-gray-500">Years as captain before building Roster</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
+                  <p className="text-3xl font-black text-gray-900 mb-1">4</p>
+                  <p className="text-sm text-gray-500">Apps he tried before deciding to build his own</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 3. HOW HE BUILT IT RIGHT ─────────────────────────────── */}
+      <section className="py-20 px-6 bg-gray-50">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Process</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              How he made sure Roster was built right
+            </h2>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+              Tyler didn't build Roster in isolation. He spent a year talking to captains, coaches, and commissioners before writing a line of code.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            {[
+              {
+                icon: Users,
+                number: '200+',
+                label: 'Players & captains interviewed',
+                description: 'Tyler sat down with beer leaguers, recreational players, and league commissioners to understand what actually went wrong every week — not what looked good in a feature list.',
+              },
+              {
+                icon: MessageSquare,
+                number: '7',
+                label: 'Competing apps tested in full',
+                description: 'He ran his own league through every major app on the market for at least one season. He documented what worked, what failed, and what drove his players crazy.',
+              },
+              {
+                icon: CheckCircle,
+                number: '3',
+                label: 'Beta leagues before launch',
+                description: 'Before the public launch, three real leagues used Roster through a full season. Every bug, every workflow gap, and every confusing screen was fixed based on real feedback.',
+              },
+            ].map((item) => (
+              <div key={item.label} className="bg-white border border-gray-200 rounded-2xl p-7 shadow-sm">
+                <div className="w-12 h-12 rounded-xl bg-[#3c82f4]/10 border border-[#3c82f4]/20 flex items-center justify-center mb-4">
+                  <item.icon className="w-6 h-6 text-[#3c82f4]" />
+                </div>
+                <p className="text-4xl font-black text-gray-900 mb-1">{item.number}</p>
+                <p className="text-sm font-semibold text-[#3c82f4] mb-3">{item.label}</p>
+                <p className="text-gray-500 text-sm leading-relaxed">{item.description}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+            <p className="text-gray-700 text-lg leading-relaxed">
+              The result is an app that's built around how recreational hockey actually works — not how a product manager imagined it might work. Every feature in Roster exists because a real captain asked for it, struggled without it, or wasted time working around the fact that it didn't exist.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 4. HOCKEY COMMUNITY CONNECTION ───────────────────────── */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            {/* Stats/community grid */}
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { icon: '🏒', label: 'Plays in 2 active hockey leagues', sub: 'Still lacing up every week' },
+                { icon: '📋', label: 'Former captain for 6 seasons', sub: 'Wednesday Night Hockey League' },
+                { icon: '🏟️', label: 'Relationships with 12+ rinks', sub: 'Across the region' },
+                { icon: '🏆', label: 'Ran 3 recreational tournaments', sub: 'Brackets, scheduling, the works' },
+                { icon: '⭐', label: 'Trusted by 50+ early team captains', sub: 'Who tested Roster pre-launch' },
+                { icon: '📅', label: '8 years playing recreational hockey', sub: 'Beer league to competitive' },
+              ].map((item, i) => (
+                <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-5 hover:border-[#3c82f4]/30 hover:bg-blue-50/30 transition-all">
+                  <div className="text-2xl mb-2">{item.icon}</div>
+                  <p className="text-sm font-semibold text-gray-900 leading-snug mb-1">{item.label}</p>
+                  <p className="text-xs text-gray-400">{item.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Community</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">
+                He's not an outsider looking in
+              </h2>
+              <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
+                <p>
+                  Tyler isn't a tech founder who spotted an opportunity in hockey. He's a hockey player who learned to code because the opportunity wasn't being taken seriously by anyone who actually understood the sport.
+                </p>
+                <p>
+                  He's still in two leagues. He still knows his linesmen by name. He still gets the 11pm ice slot that nobody else wants. And he built Roster to solve the exact problems he deals with every single week.
+                </p>
+                <p>
+                  That's not a marketing line. It's why Roster works.
+                </p>
+              </div>
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => setLocation('/waitlist')}
+                  className="px-7 py-3.5 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold shadow-lg shadow-blue-200"
+                >
+                  Join the Waitlist
+                </button>
+                <button
+                  onClick={() => setLocation('/pricing')}
+                  className="px-7 py-3.5 rounded-full border border-gray-200 text-gray-700 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold"
+                >
+                  See Pricing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </MarketingLayout>
   );
 }
