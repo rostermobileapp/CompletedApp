@@ -1,4 +1,4 @@
-import { ElementType } from 'react';
+import { ElementType, useEffect } from 'react';
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { Check, Calendar, MessageCircle, Trophy, Users, CreditCard, Bell } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -200,10 +200,11 @@ export default function SportLanding({ sport }: SportLandingProps) {
   const [, setLocation] = useLocation();
   const config = sportConfigs[sport];
 
-  if (!config) {
-    setLocation('/');
-    return null;
-  }
+  useEffect(() => {
+    if (!config) setLocation('/');
+  }, [config, setLocation]);
+
+  if (!config) return null;
 
   return (
     <MarketingLayout

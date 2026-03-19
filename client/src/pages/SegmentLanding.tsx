@@ -1,4 +1,4 @@
-import { ElementType } from 'react';
+import { ElementType, useEffect } from 'react';
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { Check, Calendar, MessageCircle, Trophy, Users, CreditCard, Bell, Shield } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -168,10 +168,11 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
   const [, setLocation] = useLocation();
   const config = segmentConfigs[segment];
 
-  if (!config) {
-    setLocation('/');
-    return null;
-  }
+  useEffect(() => {
+    if (!config) setLocation('/');
+  }, [config, setLocation]);
+
+  if (!config) return null;
 
   return (
     <MarketingLayout

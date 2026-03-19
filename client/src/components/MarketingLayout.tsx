@@ -38,6 +38,16 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
 
     return () => {
       document.title = 'Roster — Hockey Team Management App';
+      const clearMeta = (name: string, property = false) => {
+        const attr = property ? 'property' : 'name';
+        const el = document.querySelector(`meta[${attr}="${name}"]`);
+        if (el) el.setAttribute('content', '');
+      };
+      clearMeta('description');
+      clearMeta('og:title', true);
+      clearMeta('og:description', true);
+      clearMeta('twitter:title');
+      clearMeta('twitter:description');
     };
   }, [title, description, ogTitle, ogDescription]);
 
