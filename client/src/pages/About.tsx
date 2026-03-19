@@ -38,7 +38,7 @@ export default function About() {
               </h1>
               <p className="text-[#3c82f4] font-semibold text-lg mb-1">Founder & CEO, Roster</p>
               <p className="text-gray-400 text-sm mb-6">Hockey player · Beer-leaguer for life</p>
-              <p className="text-gray-600 text-lg leading-relaxed max-w-xl">I didn't set out to build a software company. I set out to stop losing ice time because nobody could figure out who was showing up.</p>
+              <p className="text-gray-600 text-lg leading-relaxed max-w-xl">I didn't set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players. </p>
             </div>
           </div>
         </div>
