@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { useLocation } from 'wouter';
 import { Users, MessageSquare, CheckCircle } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import founderPhoto from '@assets/PXL_20210123_194151447.MP_1773953996231.jpg';
 
 export default function About() {
   const [, setLocation] = useLocation();
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
 
   return (
     <MarketingLayout
@@ -19,7 +22,10 @@ export default function About() {
           <div className="flex flex-col md:flex-row items-center gap-12">
             {/* Founder photo — 9:16 portrait */}
             <div className="flex-shrink-0 w-48 md:w-56">
-              <div className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-100">
+              <div 
+                onClick={() => setPhotoModalOpen(true)}
+                className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-100 cursor-pointer hover:shadow-2xl hover:shadow-blue-300 transition-shadow"
+              >
                 <img
                   src={founderPhoto}
                   alt="Tobin K., Roster founder, on the ice"
@@ -193,6 +199,17 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {/* Photo expansion modal */}
+      <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
+        <DialogContent className="max-w-2xl w-full p-0 border-0">
+          <img
+            src={founderPhoto}
+            alt="Tobin K., Roster founder, on the ice"
+            className="w-full h-auto rounded-lg"
+          />
+        </DialogContent>
+      </Dialog>
     </MarketingLayout>
   );
 }
