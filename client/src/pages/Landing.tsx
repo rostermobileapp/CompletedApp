@@ -1,6 +1,6 @@
-import { Users, Calendar, MessageCircle, Check, Play, UserPlus, Trophy, Star, Shield, Zap } from 'lucide-react';
+import { Calendar, Check, Play, UserPlus, Trophy, Star, Shield, Zap } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
-import rosterDarkLogo from "@assets/Dark_Mode_Logo_1770738054930.png";
+import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
@@ -64,35 +64,35 @@ const testimonials = [
   {
     quote: "The RSVP system alone is worth every penny. Our captain used to spend hours confirming lineups. Not anymore.",
     name: "Sarah K.",
-    team: "Sunday Soccer Co-ed",
+    team: "Sunday Hockey Co-ed",
     initials: "SK",
     gradient: "from-purple-500 to-purple-700",
   },
   {
-    quote: "We run three basketball leagues through Roster now. Scheduling, scores, standings — it handles all of it.",
+    quote: "We run three hockey leagues through Roster now. Scheduling, scores, standings — it handles all of it.",
     name: "Derek R.",
-    team: "City Adult Basketball League",
+    team: "City Adult Hockey League",
     initials: "DR",
     gradient: "from-emerald-500 to-emerald-700",
   },
   {
     quote: "Switched from TeamSnap and never looked back. Half the price, twice the features.",
     name: "Jen M.",
-    team: "Women's Softball League",
+    team: "Women's Hockey League",
     initials: "JM",
     gradient: "from-orange-500 to-orange-700",
   },
   {
     quote: "The substitute player system is a game-changer. We never show up short anymore.",
     name: "Carlos B.",
-    team: "Tuesday Volleyball Drop-In",
+    team: "Tuesday Drop-In Hockey",
     initials: "CB",
     gradient: "from-rose-500 to-rose-700",
   },
   {
     quote: "Our whole tournament went smoothly this year. Brackets, scheduling, scores — done.",
     name: "Aisha P.",
-    team: "Regional Lacrosse Club",
+    team: "Regional Hockey Club",
     initials: "AP",
     gradient: "from-teal-500 to-teal-700",
   },
@@ -143,7 +143,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white" data-testid="landing-page">
+    <div className="min-h-screen bg-white text-gray-900" data-testid="landing-page">
       {/* Launch date banner — fixed at very top */}
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
         🚀 Launching May 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
@@ -151,21 +151,21 @@ export default function Landing() {
 
       {/* "Come back May 1st" toast */}
       {loginMessageVisible && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 border border-gray-700 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold animate-fade-in">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-white border border-gray-200 text-gray-900 px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold">
           🗓️ Come back May 1st — we're not live yet!
         </div>
       )}
 
       {/* Fixed Header */}
-      <header className="fixed top-10 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
+      <header className="fixed top-10 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-6">
-            <a href="#how-it-works" className="text-sm text-gray-400 hover:text-white transition-colors">How It Works</a>
-            <a href="#features" className="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
-            <a href="#pricing" className="text-sm text-gray-400 hover:text-white transition-colors">Pricing</a>
+            <a href="#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
+            <a href="#features" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</a>
+            <a href="#pricing" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Pricing</a>
           </nav>
           <img
-            src={rosterDarkLogo}
+            src={rosterLightLogo}
             alt="Roster"
             className="h-10 object-contain"
             data-testid="logo-image"
@@ -173,7 +173,7 @@ export default function Landing() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleLoginClick}
-              className="hidden md:block text-sm text-gray-600 cursor-not-allowed font-medium"
+              className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
               title="Come back May 1st"
             >
               Log In
@@ -190,16 +190,16 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-28 pb-20 px-6 overflow-hidden">
+      <section className="relative pt-28 pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white">
         <div
-          className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/8 via-transparent to-transparent"
+          className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/5 via-transparent to-transparent"
           style={{ transform: `translateY(${scrollY * 0.4}px)` }}
         />
         <div className="max-w-6xl mx-auto relative z-10">
           {/* Trust badge */}
           {userCount > 0 && (
             <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-[#3c82f4]/15 border border-[#3c82f4]/30 rounded-full px-4 py-2">
+              <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-2">
                 <div className="w-2 h-2 rounded-full bg-[#3c82f4] animate-pulse" />
                 <span className="text-sm font-medium text-[#3c82f4]">
                   <AnimatedCounter value={userCount} /> players already using Roster
@@ -211,14 +211,14 @@ export default function Landing() {
           {/* Hero headline */}
           <div className="text-center mb-10">
             <h1
-              className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-white"
+              className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-gray-900"
               data-testid="text-hero-title"
             >
               The easiest way to manage
               <br />
               <span className="text-[#3c82f4]">your hockey team.</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-8">
+            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-8">
               Built for hockey. Scheduling, RSVPs, rosters, stats, payments, and messaging — all in one place. No ads. Ever.
             </p>
 
@@ -226,14 +226,14 @@ export default function Landing() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <button
                 onClick={() => setLocation('/waitlist')}
-                className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg"
+                className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
                 data-testid="button-join-waitlist"
               >
                 Join the Waitlist
               </button>
               <button
                 onClick={handleLoginClick}
-                className="px-8 py-4 rounded-full border border-gray-800 text-gray-600 cursor-not-allowed font-semibold text-lg"
+                className="px-8 py-4 rounded-full border border-gray-300 text-gray-400 cursor-not-allowed font-semibold text-lg"
                 title="Come back May 1st"
               >
                 Log In
@@ -246,7 +246,7 @@ export default function Landing() {
                 href="https://apps.apple.com/us/app/roster-app/id6741723004"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors group"
+                className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors group"
                 aria-label="Download on the App Store"
               >
                 <SiAppstore className="w-7 h-7 text-white" />
@@ -259,7 +259,7 @@ export default function Landing() {
                 href="https://play.google.com/store/search?q=roster+team+management&c=apps"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors group"
+                className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors group"
                 aria-label="Get it on Google Play"
               >
                 <SiGoogleplay className="w-6 h-6 text-white" />
@@ -269,7 +269,7 @@ export default function Landing() {
                 </div>
               </a>
             </div>
-            <p className="text-xs text-gray-500">No credit card required · Free forever tier available</p>
+            <p className="text-xs text-gray-400">No credit card required · Free forever tier available</p>
           </div>
 
           {/* Hero image + problem copy */}
@@ -281,84 +281,82 @@ export default function Landing() {
               <img
                 src={appPreviewImage}
                 alt="Roster app preview showing team management features"
-                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-900/20"
+                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100"
               />
             </div>
             <div
               className="text-left md:w-3/5 max-w-xl"
               data-testid="text-hero-body"
             >
-              <p className="text-2xl font-semibold mb-4 text-white">Every hockey team falls apart the same way.</p>
-              <p className="text-lg text-gray-300 mb-6">Nobody knows who's on the ice. Nobody knows when the game is. Half the team just doesn't show up.</p>
+              <p className="text-2xl font-semibold mb-4 text-gray-900">Every hockey team falls apart the same way.</p>
+              <p className="text-lg text-gray-600 mb-6">Nobody knows who's on the ice. Nobody knows when the game is. Half the team just doesn't show up.</p>
               <div className="space-y-3 mb-6">
                 {["Endless group texts that go nowhere", "Half-baked spreadsheets nobody updates", "Email chains from 2018"].map((pain) => (
                   <div key={pain} className="flex items-center gap-3">
-                    <span className="text-red-400 text-lg font-bold">✕</span>
-                    <span className="text-gray-300 text-lg line-through">{pain}</span>
+                    <span className="text-red-500 text-lg font-bold">✕</span>
+                    <span className="text-gray-500 text-lg line-through">{pain}</span>
                   </div>
                 ))}
               </div>
               <p className="text-3xl font-black text-[#3c82f4] mb-4">Roster fixes all of it.</p>
-              <p className="text-lg text-gray-300">One app, built by frustrated players, for players. Your schedule, your lineup, your team — organized. Finally.</p>
+              <p className="text-lg text-gray-600">One app, built by frustrated players, for players. Your schedule, your lineup, your team — organized. Finally.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Video Demo Section */}
-      <section className="py-20 px-6 bg-gray-950/50" id="demo">
+      <section className="py-20 px-6 bg-gray-50" id="demo">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
             See Roster in action.
           </h2>
-          <p className="text-gray-400 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
+          <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
 
-          {/* Video placeholder — swap src with real YouTube embed when available */}
-          <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-900 aspect-video shadow-2xl shadow-blue-900/20 group cursor-pointer">
+          <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 aspect-video shadow-xl group cursor-pointer">
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-[#3c82f4] flex items-center justify-center shadow-lg shadow-blue-500/40 group-hover:scale-110 transition-transform">
+              <div className="w-20 h-20 rounded-full bg-[#3c82f4] flex items-center justify-center shadow-lg shadow-blue-300/50 group-hover:scale-110 transition-transform">
                 <Play className="w-8 h-8 text-white ml-1" fill="white" />
               </div>
-              <p className="text-gray-400 text-sm font-medium">Product Walkthrough — 90 seconds</p>
+              <p className="text-gray-500 text-sm font-medium">Product Walkthrough — 90 seconds</p>
             </div>
             <div className="absolute inset-0 bg-gradient-to-br from-[#3c82f4]/5 via-transparent to-[#3c82f4]/5" />
-            {/* Grid pattern overlay */}
             <div
-              className="absolute inset-0 opacity-10"
+              className="absolute inset-0 opacity-30"
               style={{
-                backgroundImage: 'linear-gradient(rgba(60,130,244,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(60,130,244,0.3) 1px, transparent 1px)',
+                backgroundImage: 'linear-gradient(rgba(60,130,244,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(60,130,244,0.15) 1px, transparent 1px)',
                 backgroundSize: '40px 40px',
               }}
             />
           </div>
-          <p className="text-gray-600 text-xs mt-3">Video demo coming soon — sign up to get early access</p>
+          <p className="text-gray-400 text-xs mt-3">Video demo coming soon — sign up to get early access</p>
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="py-24 px-6" id="how-it-works">
+      <section className="py-24 px-6 bg-white" id="how-it-works">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
               Up and running in minutes.
             </h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">No training required. No complex setup. Just sign up and go.</p>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto">No training required. No complex setup. Just sign up and go.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {howItWorks.map((item, index) => (
               <div key={item.step} className="relative">
                 {index < howItWorks.length - 1 && (
-                  <div className="hidden md:block absolute top-10 left-[60%] w-full h-px bg-gradient-to-r from-[#3c82f4]/40 to-transparent z-0" />
+                  <div className="hidden md:block absolute top-10 left-[60%] w-full h-px bg-gradient-to-r from-[#3c82f4]/30 to-transparent z-0" />
                 )}
-                <div className="relative z-10 bg-gray-900/60 border border-gray-800/60 rounded-2xl p-8 hover:border-[#3c82f4]/30 transition-colors">
+                <div className="relative z-10 bg-white border border-gray-200 rounded-2xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all shadow-sm">
                   <div className="flex items-start gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-xl bg-[#3c82f4]/15 border border-[#3c82f4]/25 flex items-center justify-center flex-shrink-0">
+                    <div className="w-14 h-14 rounded-xl bg-[#3c82f4]/10 border border-[#3c82f4]/20 flex items-center justify-center flex-shrink-0">
                       <item.icon className="w-7 h-7 text-[#3c82f4]" />
                     </div>
-                    <span className="text-5xl font-black text-gray-800 leading-none mt-1">{item.step}</span>
+                    <span className="text-5xl font-black text-gray-200 leading-none mt-1">{item.step}</span>
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
-                  <p className="text-gray-400 leading-relaxed">{item.description}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>
+                  <p className="text-gray-500 leading-relaxed">{item.description}</p>
                 </div>
               </div>
             ))}
@@ -367,224 +365,119 @@ export default function Landing() {
       </section>
 
       {/* Social Proof Stats Bar */}
-      <section className="py-14 px-6 border-y border-gray-800/50 bg-gray-900/30">
+      <section className="py-14 px-6 border-y border-gray-100 bg-blue-50/40">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
                 {userCount > 0 ? <AnimatedCounter value={userCount} suffix="+" /> : '1,000+'}
               </div>
-              <div className="text-gray-400 text-sm font-medium">Players Registered</div>
+              <div className="text-gray-500 text-sm font-medium">Players Registered</div>
             </div>
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">🏒</div>
-              <div className="text-gray-400 text-sm font-medium">Built for Hockey</div>
+              <div className="text-gray-500 text-sm font-medium">Built for Hockey</div>
             </div>
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
                 <AnimatedCounter value={0} />
                 <span className="font-black">Ads</span>
               </div>
-              <div className="text-gray-400 text-sm font-medium">Ever. On Any Plan.</div>
+              <div className="text-gray-500 text-sm font-medium">Ever. On Any Plan.</div>
             </div>
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">$0</div>
-              <div className="text-gray-400 text-sm font-medium">To Get Started</div>
+              <div className="text-gray-500 text-sm font-medium">To Get Started</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section - Comparison Table */}
-      <section className="py-24 px-6" id="features">
+      <section className="py-24 px-6 bg-white" id="features">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-bold mb-4 text-white" data-testid="text-features-heading">
+            <h2 className="text-4xl md:text-6xl font-bold mb-4 text-gray-900" data-testid="text-features-heading">
               Everything you need.
               <br />
               <span className="text-[#3c82f4]">All in one place.</span>
             </h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">See how Roster stacks up against the competition — for a fraction of the price.</p>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto">See how Roster stacks up against the competition — for a fraction of the price.</p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse bg-gray-900/50 backdrop-blur-sm rounded-xl" data-testid="comparison-table">
+            <table className="w-full border-collapse bg-white rounded-xl border border-gray-200 shadow-sm" data-testid="comparison-table">
               <thead>
-                <tr className="border-b border-gray-800/50">
-                  <th className="text-left p-4 font-bold text-white">Feature</th>
-                  <th className="text-center p-4 font-bold bg-[#3c82f4]/10 text-white border border-[#3c82f4]/20 rounded-t">
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left p-4 font-bold text-gray-900">Feature</th>
+                  <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border border-[#3c82f4]/20">
                     <div className="flex flex-col items-center gap-1">
                       <span>Roster</span>
-                      <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/15 rounded-full px-2 py-0.5">Best Value</span>
+                      <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/10 rounded-full px-2 py-0.5">Best Value</span>
                     </div>
                   </th>
-                  <th className="text-center p-4 font-bold text-white">BenchApp</th>
-                  <th className="text-center p-4 font-bold text-white">TeamSnap</th>
-                  <th className="text-center p-4 font-bold text-white">SportsEngine HQ</th>
-                  <th className="text-center p-4 font-bold text-white">Crossbar</th>
+                  <th className="text-center p-4 font-bold text-gray-700">BenchApp</th>
+                  <th className="text-center p-4 font-bold text-gray-700">TeamSnap</th>
+                  <th className="text-center p-4 font-bold text-gray-700">SportsEngine HQ</th>
+                  <th className="text-center p-4 font-bold text-gray-700">Crossbar</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 font-medium text-white">Price</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-white">$6.49 / Month</td>
-                  <td className="text-center p-4 text-white">$9 / Month</td>
-                  <td className="text-center p-4 text-white">$16 / Month</td>
-                  <td className="text-center p-4 text-white">$1,299 / Year</td>
-                  <td className="text-center p-4 text-white">$995 / Year</td>
+                <tr className="border-b border-gray-100">
+                  <td className="p-4 font-medium text-gray-900">Price</td>
+                  <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">$6.49 / Month</td>
+                  <td className="text-center p-4 text-gray-700">$9 / Month</td>
+                  <td className="text-center p-4 text-gray-700">$16 / Month</td>
+                  <td className="text-center p-4 text-gray-700">$1,299 / Year</td>
+                  <td className="text-center p-4 text-gray-700">$995 / Year</td>
                 </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Annoying Ads</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10 font-bold text-[#3c82f4]">NEVER</td>
-                  <td className="text-center p-4 text-red-400">MULTIPLE</td>
-                  <td className="text-center p-4 text-red-400">TONS</td>
-                  <td className="text-center p-4 text-red-400">ALWAYS</td>
-                  <td className="text-center p-4 text-white">No</td>
+                <tr className="border-b border-gray-100">
+                  <td className="p-4 text-gray-900">Annoying Ads</td>
+                  <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">NEVER</td>
+                  <td className="text-center p-4 text-red-500 font-semibold">MULTIPLE</td>
+                  <td className="text-center p-4 text-red-500 font-semibold">TONS</td>
+                  <td className="text-center p-4 text-red-500 font-semibold">ALWAYS</td>
+                  <td className="text-center p-4 text-gray-700">No</td>
                 </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Team Scheduling</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Roster Management</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Player/Attendance Tracking</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">In App Messaging</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">RSVP Alerts</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Player Substitution System</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Polls/Bulletins</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Facility Event Calendar</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Fee & Payment Tracking</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Links to Venmo/CashApp</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Team Expense Tracking</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Mobile App</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Website Portal</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Multi-Team/Org Management</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Registration Notices</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Volunteer/Role Assignment</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
-                <tr className="border-b border-gray-800/50">
-                  <td className="p-4 text-white">Custom Awards</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                </tr>
-                <tr>
-                  <td className="p-4 text-white">Tournaments Mode</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/10"><Check className="w-5 h-5 text-[#3c82f4] inline" /></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><span className="text-red-400 text-xl font-bold">✕</span></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                  <td className="text-center p-4 text-white"><Check className="w-5 h-5 text-green-400 inline" /></td>
-                </tr>
+                {[
+                  { label: "Team Scheduling", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Roster Management", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Player/Attendance Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "In App Messaging", roster: true, bench: false, snap: true, engine: true, cross: true },
+                  { label: "RSVP Alerts", roster: true, bench: true, snap: true, engine: false, cross: true },
+                  { label: "Player Substitution System", roster: true, bench: false, snap: false, engine: false, cross: false },
+                  { label: "Polls/Bulletins", roster: true, bench: true, snap: true, engine: false, cross: false },
+                  { label: "Facility Event Calendar", roster: true, bench: false, snap: false, engine: false, cross: false },
+                  { label: "Fee & Payment Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Links to Venmo/CashApp", roster: true, bench: false, snap: false, engine: false, cross: false },
+                  { label: "Team Expense Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Mobile App", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Website Portal", roster: true, bench: false, snap: true, engine: true, cross: true },
+                  { label: "Multi-Team/Org Management", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Registration Notices", roster: true, bench: false, snap: true, engine: true, cross: true },
+                  { label: "Volunteer/Role Assignment", roster: true, bench: true, snap: true, engine: true, cross: true },
+                  { label: "Custom Awards", roster: true, bench: false, snap: false, engine: false, cross: false },
+                  { label: "Tournaments Mode", roster: true, bench: false, snap: false, engine: true, cross: true },
+                ].map(({ label, roster, bench, snap, engine, cross }) => (
+                  <tr key={label} className="border-b border-gray-100 last:border-0">
+                    <td className="p-4 text-gray-800">{label}</td>
+                    <td className="text-center p-4 bg-[#3c82f4]/5">
+                      {roster ? <Check className="w-5 h-5 text-[#3c82f4] inline" /> : <span className="text-red-500 text-xl font-bold">✕</span>}
+                    </td>
+                    <td className="text-center p-4">
+                      {bench ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                    </td>
+                    <td className="text-center p-4">
+                      {snap ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                    </td>
+                    <td className="text-center p-4">
+                      {engine ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                    </td>
+                    <td className="text-center p-4">
+                      {cross ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -592,33 +485,33 @@ export default function Landing() {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-24 px-6 bg-gray-950/50">
+      <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
               Trusted by teams everywhere.
             </h2>
-            <p className="text-gray-400 text-lg">Real players. Real teams. Real results.</p>
+            <p className="text-gray-500 text-lg">Real players. Real teams. Real results.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {testimonials.map((t) => (
               <div
                 key={t.name}
-                className="bg-gray-900/70 border border-gray-800/60 rounded-2xl p-6 hover:border-gray-700 transition-colors flex flex-col gap-4"
+                className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-md transition-all flex flex-col gap-4 shadow-sm"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                   ))}
                 </div>
-                <p className="text-gray-200 leading-relaxed flex-1">"{t.quote}"</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-gray-800/50">
-                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md ring-2 ring-white/10`}>
+                <p className="text-gray-700 leading-relaxed flex-1">"{t.quote}"</p>
+                <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm ring-2 ring-white`}>
                     {t.initials}
                   </div>
                   <div>
-                    <div className="font-semibold text-white text-sm">{t.name}</div>
-                    <div className="text-gray-500 text-xs">{t.team}</div>
+                    <div className="font-semibold text-gray-900 text-sm">{t.name}</div>
+                    <div className="text-gray-400 text-xs">{t.team}</div>
                   </div>
                 </div>
               </div>
@@ -628,15 +521,15 @@ export default function Landing() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-24 px-6 bg-gray-900/30" id="pricing">
+      <section className="py-24 px-6 bg-white" id="pricing">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-bold mb-4" data-testid="text-pricing-heading">
+            <h2 className="text-4xl md:text-6xl font-bold mb-4 text-gray-900" data-testid="text-pricing-heading">
               Simple pricing.
               <br />
               <span className="text-gray-400">No surprises.</span>
             </h2>
-            <p className="text-gray-400 text-lg">Free to start. No credit card required. No ads on any plan.</p>
+            <p className="text-gray-500 text-lg">Free to start. No credit card required. No ads on any plan.</p>
           </div>
 
           {/* Trust strip */}
@@ -644,10 +537,10 @@ export default function Landing() {
             {[
               { icon: Shield, text: 'No ads. Ever.' },
               { icon: Zap, text: 'Cancel Anytime' },
-              { icon: Users, text: 'Free to Start' },
+              { icon: Check, text: 'Free to Start' },
               { icon: Check, text: 'No Credit Card Required' },
             ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-2 text-gray-400">
+              <div key={text} className="flex items-center gap-2 text-gray-500">
                 <Icon className="w-4 h-4 text-[#3c82f4]" />
                 <span className="text-sm font-medium">{text}</span>
               </div>
@@ -656,24 +549,24 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
             {/* Free Tier */}
-            <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-800/50" data-testid="card-pricing-free">
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-free">FREE</h3>
+            <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm" data-testid="card-pricing-free">
+              <h3 className="text-2xl font-bold mb-2 text-gray-900" data-testid="text-tier-free">FREE</h3>
               <div className="mb-6">
-                <span className="text-5xl font-bold" data-testid="text-price-free">$0</span>
+                <span className="text-5xl font-bold text-gray-900" data-testid="text-price-free">$0</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
-              <p className="text-gray-400 text-sm mb-6">Perfect for players joining their first team. No strings attached.</p>
+              <p className="text-gray-500 text-sm mb-6">Perfect for players joining their first team. No strings attached.</p>
               <ul className="space-y-3 mb-8">
                 {['Join Leagues / Teams', 'Scheduling', 'RSVP Function', 'Team Only Stats'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-free-${i}`}>
                     <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-white">{f}</span>
+                    <span className="text-sm text-gray-700">{f}</span>
                   </li>
                 ))}
               </ul>
               <button
                 onClick={() => setLocation('/waitlist')}
-                className="w-full py-3 px-6 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors font-semibold text-white"
+                className="w-full py-3 px-6 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors font-semibold text-gray-900"
                 data-testid="button-pricing-free"
               >
                 Join the Waitlist
@@ -681,27 +574,27 @@ export default function Landing() {
             </div>
 
             {/* Player Pro */}
-            <div className="bg-[#3c82f4]/10 backdrop-blur-sm rounded-3xl p-8 border-2 border-[#3c82f4]/50 relative" data-testid="card-pricing-player-pro">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#3c82f4] text-white text-xs font-bold px-4 py-1.5 rounded-full">
+            <div className="bg-[#3c82f4] rounded-3xl p-8 border-2 border-[#3c82f4] relative shadow-xl shadow-blue-200" data-testid="card-pricing-player-pro">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs font-bold px-4 py-1.5 rounded-full">
                 MOST POPULAR
               </div>
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-player-pro">Player Pro</h3>
+              <h3 className="text-2xl font-bold mb-2 text-white" data-testid="text-tier-player-pro">Player Pro</h3>
               <div className="mb-6">
-                <span className="text-5xl font-bold" data-testid="text-price-player-pro">$6.49</span>
-                <span className="text-gray-400"> / Month</span>
+                <span className="text-5xl font-bold text-white" data-testid="text-price-player-pro">$6.49</span>
+                <span className="text-blue-200"> / Month</span>
               </div>
-              <p className="text-gray-400 text-sm mb-6">For serious players who want the full experience — messaging, payments, and more.</p>
+              <p className="text-blue-100 text-sm mb-6">For serious players who want the full experience — messaging, payments, and more.</p>
               <ul className="space-y-3 mb-8">
                 {['FREE +', 'Team Management', 'In-App Messaging', 'In-App Payments', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-player-pro-${i}`}>
-                    <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
+                    <Check className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-white">{f}</span>
                   </li>
                 ))}
               </ul>
               <button
                 onClick={() => setLocation('/waitlist')}
-                className="w-full py-3 px-6 rounded-full bg-[#3c82f4] hover:bg-[#3c82f4]/90 transition-colors font-semibold text-white"
+                className="w-full py-3 px-6 rounded-full bg-white hover:bg-blue-50 transition-colors font-semibold text-[#3c82f4]"
                 data-testid="button-pricing-player-pro"
               >
                 Join the Waitlist
@@ -709,24 +602,24 @@ export default function Landing() {
             </div>
 
             {/* Commissioner */}
-            <div className="bg-gray-900/50 backdrop-blur-sm rounded-3xl p-8 border border-gray-800/50" data-testid="card-pricing-commissioner">
-              <h3 className="text-2xl font-bold mb-2" data-testid="text-tier-commissioner">Commissioner</h3>
+            <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm" data-testid="card-pricing-commissioner">
+              <h3 className="text-2xl font-bold mb-2 text-gray-900" data-testid="text-tier-commissioner">Commissioner</h3>
               <div className="mb-6">
-                <span className="text-5xl font-bold" data-testid="text-price-commissioner">$12</span>
+                <span className="text-5xl font-bold text-gray-900" data-testid="text-price-commissioner">$12</span>
                 <span className="text-gray-400"> / Month</span>
               </div>
-              <p className="text-gray-400 text-sm mb-6">Run a full league with schedules, scores, standings, and tournaments.</p>
+              <p className="text-gray-500 text-sm mb-6">Run a full league with schedules, scores, standings, and tournaments.</p>
               <ul className="space-y-3 mb-8">
                 {['FREE & PLAYER PRO +', 'League Scheduling', 'Scorekeeping', 'Player Management', 'League Wide Posts', 'Awards & Records*', 'Bracket Management*'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-commissioner-${i}`}>
                     <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-white">{f}</span>
+                    <span className="text-sm text-gray-700">{f}</span>
                   </li>
                 ))}
               </ul>
               <button
                 onClick={() => setLocation('/waitlist')}
-                className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
+                className="w-full py-3 px-6 rounded-full border-2 border-gray-200 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold text-gray-900"
                 data-testid="button-pricing-commissioner"
               >
                 Join the Waitlist
@@ -737,19 +630,19 @@ export default function Landing() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 bg-gradient-to-b from-blue-50 to-white">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl md:text-6xl font-bold mb-6 text-white">
+          <h2 className="text-4xl md:text-6xl font-bold mb-6 text-gray-900">
             Ready for your
             <br />
             <span className="text-[#3c82f4]">best season yet?</span>
           </h2>
-          <p className="text-gray-400 text-xl mb-3">We launch <span className="text-white font-semibold">May 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
-          <p className="text-gray-600 text-sm mb-8">No credit card required · No ads on any plan</p>
+          <p className="text-gray-500 text-xl mb-3">We launch <span className="text-gray-900 font-semibold">May 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
+          <p className="text-gray-400 text-sm mb-8">No credit card required · No ads on any plan</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <button
               onClick={() => setLocation('/waitlist')}
-              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg"
+              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
               Join the Waitlist
             </button>
@@ -759,7 +652,7 @@ export default function Landing() {
               href="https://apps.apple.com/us/app/roster-app/id6741723004"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors justify-center"
+              className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"
             >
               <SiAppstore className="w-6 h-6 text-white" />
               <div className="text-left">
@@ -771,7 +664,7 @@ export default function Landing() {
               href="https://play.google.com/store/search?q=roster+team+management&c=apps"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl px-5 py-3 transition-colors justify-center"
+              className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"
             >
               <SiGoogleplay className="w-5 h-5 text-white" />
               <div className="text-left">
@@ -784,7 +677,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-12 px-6" data-testid="footer">
+      <footer className="border-t border-gray-200 py-12 px-6 bg-white" data-testid="footer">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <p className="text-sm text-gray-400" data-testid="text-footer">
@@ -793,14 +686,14 @@ export default function Landing() {
             <div className="flex items-center gap-6">
               <Link
                 href="/privacy-policy"
-                className="text-sm text-gray-400 hover:text-white transition-colors"
+                className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
                 data-testid="link-privacy-policy"
               >
                 Privacy Policy
               </Link>
               <Link
                 href="/terms-of-service"
-                className="text-sm text-gray-400 hover:text-white transition-colors"
+                className="text-sm text-gray-400 hover:text-gray-900 transition-colors"
                 data-testid="link-terms-of-service"
               >
                 Terms of Service
