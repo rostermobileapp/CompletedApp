@@ -34,7 +34,7 @@ export default function About() {
                 <span className="text-sm font-medium text-[#3c82f4]">Meet the founder</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-                Tyler Frenette
+                Tobin K.
               </h1>
               <p className="text-[#3c82f4] font-semibold text-lg mb-1">Founder & CEO, Roster</p>
               <p className="text-gray-400 text-sm mb-6">Hockey player · Beer-leaguer for life</p>
