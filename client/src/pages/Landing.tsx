@@ -103,7 +103,7 @@ const howItWorks = [
     step: "01",
     icon: UserPlus,
     title: "Create Your Team",
-    description: "Sign up free, build your roster, and invite players in minutes. Works for any sport.",
+    description: "Sign up free, build your hockey roster, and invite players in minutes.",
   },
   {
     step: "02",
@@ -122,6 +122,7 @@ const howItWorks = [
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
   const [, setLocation] = useLocation();
+  const [loginMessageVisible, setLoginMessageVisible] = useState(false);
 
   const { data: userCountData } = useQuery<{ count: number }>({
     queryKey: ['/api/user-count'],
@@ -136,10 +137,27 @@ export default function Landing() {
 
   const userCount = userCountData?.count ?? 0;
 
+  const handleLoginClick = () => {
+    setLoginMessageVisible(true);
+    setTimeout(() => setLoginMessageVisible(false), 3000);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white" data-testid="landing-page">
+      {/* Launch date banner — fixed at very top */}
+      <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
+        🚀 Launching May 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
+      </div>
+
+      {/* "Come back May 1st" toast */}
+      {loginMessageVisible && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 border border-gray-700 text-white px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold animate-fade-in">
+          🗓️ Come back May 1st — we're not live yet!
+        </div>
+      )}
+
       {/* Fixed Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
+      <header className="fixed top-10 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-6">
             <a href="#how-it-works" className="text-sm text-gray-400 hover:text-white transition-colors">How It Works</a>
@@ -154,8 +172,9 @@ export default function Landing() {
           />
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setLocation('/login')}
-              className="hidden md:block text-sm text-gray-400 hover:text-white transition-colors font-medium"
+              onClick={handleLoginClick}
+              className="hidden md:block text-sm text-gray-600 cursor-not-allowed font-medium"
+              title="Come back May 1st"
             >
               Log In
             </button>
@@ -164,7 +183,7 @@ export default function Landing() {
               className="px-5 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
               data-testid="button-join-waitlist-header"
             >
-              Get Started Free
+              Join the Waitlist
             </button>
           </div>
         </div>
@@ -197,10 +216,10 @@ export default function Landing() {
             >
               The easiest way to manage
               <br />
-              <span className="text-[#3c82f4]">any sports team.</span>
+              <span className="text-[#3c82f4]">your hockey team.</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-8">
-              One app for every sport. Scheduling, RSVPs, rosters, stats, payments, and messaging — all in one place. No ads. Ever.
+              Built for hockey. Scheduling, RSVPs, rosters, stats, payments, and messaging — all in one place. No ads. Ever.
             </p>
 
             {/* CTA Buttons */}
@@ -210,11 +229,12 @@ export default function Landing() {
                 className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg"
                 data-testid="button-join-waitlist"
               >
-                Get Started — It's Free
+                Join the Waitlist
               </button>
               <button
-                onClick={() => setLocation('/login')}
-                className="px-8 py-4 rounded-full border border-gray-700 text-white hover:border-gray-500 transition-colors font-semibold text-lg"
+                onClick={handleLoginClick}
+                className="px-8 py-4 rounded-full border border-gray-800 text-gray-600 cursor-not-allowed font-semibold text-lg"
+                title="Come back May 1st"
               >
                 Log In
               </button>
@@ -268,8 +288,8 @@ export default function Landing() {
               className="text-left md:w-3/5 max-w-xl"
               data-testid="text-hero-body"
             >
-              <p className="text-2xl font-semibold mb-4 text-white">Every sports team falls apart the same way.</p>
-              <p className="text-lg text-gray-300 mb-6">Nobody knows who's playing. Nobody knows when the game is. Half the team just doesn't show up.</p>
+              <p className="text-2xl font-semibold mb-4 text-white">Every hockey team falls apart the same way.</p>
+              <p className="text-lg text-gray-300 mb-6">Nobody knows who's on the ice. Nobody knows when the game is. Half the team just doesn't show up.</p>
               <div className="space-y-3 mb-6">
                 {["Endless group texts that go nowhere", "Half-baked spreadsheets nobody updates", "Email chains from 2018"].map((pain) => (
                   <div key={pain} className="flex items-center gap-3">
@@ -357,10 +377,8 @@ export default function Landing() {
               <div className="text-gray-400 text-sm font-medium">Players Registered</div>
             </div>
             <div>
-              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
-                <AnimatedCounter value={50} suffix="+" />
-              </div>
-              <div className="text-gray-400 text-sm font-medium">Sports Supported</div>
+              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">🏒</div>
+              <div className="text-gray-400 text-sm font-medium">Built for Hockey</div>
             </div>
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
@@ -658,7 +676,7 @@ export default function Landing() {
                 className="w-full py-3 px-6 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors font-semibold text-white"
                 data-testid="button-pricing-free"
               >
-                Get Started Free
+                Join the Waitlist
               </button>
             </div>
 
@@ -682,11 +700,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/login')}
+                onClick={() => setLocation('/waitlist')}
                 className="w-full py-3 px-6 rounded-full bg-[#3c82f4] hover:bg-[#3c82f4]/90 transition-colors font-semibold text-white"
                 data-testid="button-pricing-player-pro"
               >
-                Get Started
+                Join the Waitlist
               </button>
             </div>
 
@@ -707,11 +725,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/login')}
+                onClick={() => setLocation('/waitlist')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-800 hover:border-[#3c82f4] transition-colors font-semibold"
                 data-testid="button-pricing-commissioner"
               >
-                Get Started
+                Join the Waitlist
               </button>
             </div>
           </div>
@@ -722,17 +740,18 @@ export default function Landing() {
       <section className="py-24 px-6">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl md:text-6xl font-bold mb-6 text-white">
-            Ready to stop managing
+            Ready for your
             <br />
-            <span className="text-[#3c82f4]">chaos?</span>
+            <span className="text-[#3c82f4]">best season yet?</span>
           </h2>
-          <p className="text-gray-400 text-xl mb-8">Join thousands of teams already using Roster. Free to start, no credit card required.</p>
+          <p className="text-gray-400 text-xl mb-3">We launch <span className="text-white font-semibold">May 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
+          <p className="text-gray-600 text-sm mb-8">No credit card required · No ads on any plan</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <button
               onClick={() => setLocation('/waitlist')}
               className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg"
             >
-              Get Started Free
+              Join the Waitlist
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
