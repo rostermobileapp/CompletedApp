@@ -151,13 +151,13 @@ export default function Landing() {
 
       {/* "Come back May 1st" toast */}
       {loginMessageVisible && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-white border border-gray-200 text-gray-900 px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold">
+        <div className="fixed top-[80px] left-1/2 -translate-x-1/2 z-[100] bg-white border border-gray-200 text-gray-900 px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold">
           🗓️ Come back May 1st — we're not live yet!
         </div>
       )}
 
       {/* Fixed Header */}
-      <header className="fixed top-10 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
+      <header className="fixed top-[40px] left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-6">
             <a href="#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
@@ -191,7 +191,7 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-28 pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white">
+      <section className="relative pt-20 pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white" style={{ paddingTop: 'max(80px, env(safe-area-inset-top, 0px) + 80px)' }}>
         <div
           className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/5 via-transparent to-transparent"
           style={{ transform: `translateY(${scrollY * 0.4}px)` }}
