@@ -112,7 +112,7 @@ export default function About() {
               },
               {
                 icon: MessageSquare,
-                number: '7',
+                number: '4',
                 label: 'Competing apps tested in full',
                 description: 'He ran his own league through every major app on the market for at least one season. He documented what worked, what failed, and what drove his players crazy.',
               },
