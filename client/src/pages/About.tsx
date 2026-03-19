@@ -141,62 +141,6 @@ export default function About() {
           </div>
         </div>
       </section>
-      {/* ── 4. HOCKEY COMMUNITY CONNECTION ───────────────────────── */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            {/* Stats/community grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { icon: '🏒', label: 'Plays in 2 active hockey leagues', sub: 'Still lacing up every week' },
-                { icon: '📋', label: 'Former captain for 6 seasons', sub: 'Wednesday Night Hockey League' },
-                { icon: '🏟️', label: 'Relationships with 12+ rinks', sub: 'Across the region' },
-                { icon: '🏆', label: 'Ran 3 recreational tournaments', sub: 'Brackets, scheduling, the works' },
-                { icon: '⭐', label: 'Trusted by 50+ early team captains', sub: 'Who tested Roster pre-launch' },
-                { icon: '📅', label: '8 years playing recreational hockey', sub: 'Beer league to competitive' },
-              ].map((item, i) => (
-                <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-5 hover:border-[#3c82f4]/30 hover:bg-blue-50/30 transition-all">
-                  <div className="text-2xl mb-2">{item.icon}</div>
-                  <p className="text-sm font-semibold text-gray-900 leading-snug mb-1">{item.label}</p>
-                  <p className="text-xs text-gray-400">{item.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            <div>
-              <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Community</span>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">
-                He's not an outsider looking in
-              </h2>
-              <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
-                <p>
-                  Tobin isn't a tech founder who spotted an opportunity in hockey. He's a hockey player who learned to code because the opportunity wasn't being taken seriously by anyone who actually understood the sport.
-                </p>
-                <p>
-                  He's still in two leagues. He still knows his linesmen by name. He still gets the 11pm ice slot that nobody else wants. And he built Roster to solve the exact problems he deals with every single week.
-                </p>
-                <p>
-                  That's not a marketing line. It's why Roster works.
-                </p>
-              </div>
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={() => setLocation('/waitlist')}
-                  className="px-7 py-3.5 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold shadow-lg shadow-blue-200"
-                >
-                  Join the Waitlist
-                </button>
-                <button
-                  onClick={() => setLocation('/pricing')}
-                  className="px-7 py-3.5 rounded-full border border-gray-200 text-gray-700 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold"
-                >
-                  See Pricing
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
       {/* Photo expansion modal */}
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
         <DialogContent className="max-w-2xl w-full p-0 border-0">
