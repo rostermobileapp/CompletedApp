@@ -82,7 +82,7 @@ export default function About() {
                 </div>
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
                   <p className="text-3xl font-black text-gray-900 mb-1">4</p>
-                  <p className="text-sm text-gray-500">Apps he tried before deciding to build his own</p>
+                  <p className="text-sm text-gray-500">Apps he tested before deciding to build his own</p>
                 </div>
               </div>
             </div>
