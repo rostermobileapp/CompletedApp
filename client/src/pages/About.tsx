@@ -1,7 +1,7 @@
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { useLocation } from 'wouter';
 import { Users, MessageSquare, CheckCircle } from 'lucide-react';
-import founderPhoto from '@assets/signal-2026-03-19-124000_1773938439115.jpeg';
+import founderPhoto from '@assets/PXL_20210123_194151447.MP_1773953996231.jpg';
 
 export default function About() {
   const [, setLocation] = useLocation();
@@ -22,8 +22,8 @@ export default function About() {
               <div className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-100">
                 <img
                   src={founderPhoto}
-                  alt="Tyler Frenette, Roster founder, on the ice"
-                  className="w-full h-full object-cover object-top"
+                  alt="Tobin K., Roster founder, on the ice"
+                  className="w-full h-full object-cover object-center"
                 />
               </div>
             </div>
