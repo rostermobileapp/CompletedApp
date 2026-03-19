@@ -2227,7 +2227,7 @@ export class DatabaseStorage implements IStorage {
 
     // Get teams from league memberships with assigned teams
     const leagueMembershipResult = await db
-      .select({ team: teams })
+      .select({ team: teams, leagueId: leagueMemberships.leagueId })
       .from(teams)
       .innerJoin(leagueMemberships, eq(teams.id, leagueMemberships.assignedTeamId))
       .where(
@@ -2237,9 +2237,30 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    // Build a map of leagueId -> authoritative assignedTeamId from leagueMemberships
+    // This is the source of truth for which team a user is on within each league
+    const leagueToAssignedTeam = new Map<string, string>();
+    for (const r of leagueMembershipResult) {
+      if (r.leagueId) {
+        leagueToAssignedTeam.set(r.leagueId, r.team.id);
+      }
+    }
+
+    // Filter out teamMembership teams that are superseded by a league assignment
+    // If a team belongs to a league and the user has a leagueMembership for that league
+    // pointing to a DIFFERENT team, this teamMembership is stale (user was reassigned)
+    const filteredTeamMembershipTeams = teamMembershipResult
+      .map(r => r.team)
+      .filter(team => {
+        if (!team.leagueId) return true; // Not a league team, always include
+        const authoritative = leagueToAssignedTeam.get(team.leagueId);
+        if (authoritative === undefined) return true; // No league membership for this league, include it
+        return authoritative === team.id; // Only include if it matches the current assignment
+      });
+
     // Combine both and deduplicate by team ID
     const allTeams = [
-      ...teamMembershipResult.map(r => r.team),
+      ...filteredTeamMembershipTeams,
       ...leagueMembershipResult.map(r => r.team)
     ];
     
