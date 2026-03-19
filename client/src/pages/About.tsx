@@ -57,7 +57,7 @@ export default function About() {
                   Since 2016 we used BenchApp for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
                 </p>
                 <p>
-                  He tried everything. TeamSnap was expensive and buried in ads. BenchApp felt half-finished. Spreadsheets broke the moment someone edited the wrong cell. Nothing solved the actual problem: <em>getting reliable answers from busy people who just want to play hockey.</em>
+                  He tried everything. TeamSnap was expensive and buried in ads. BenchApp felt half-finished. Spreadsheets broke the moment someone edited the wrong cell. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
                 </p>
                 <p>
                   The breaking point came on a Tuesday night in February. Tyler's team showed up to the rink with 8 skaters for a full-sheet game. Nobody had confirmed. Nobody knew. They paid for an hour of ice and skated 4-on-4.
