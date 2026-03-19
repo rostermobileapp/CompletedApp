@@ -60,7 +60,7 @@ export default function About() {
                   He tried everything. TeamSnap was expensive and buried in ads. BenchApp felt half-finished. Spreadsheets broke the moment someone edited the wrong cell. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
                 </p>
                 <p>
-                  The breaking point came on a Tuesday night in February. Tyler's team showed up to the rink with 8 skaters for a full-sheet game. Nobody had confirmed. Nobody knew. They paid for an hour of ice and skated 4-on-4.
+                  The breaking point came on a Tuesday night in February. Tobin's team showed up to the rink with 8 skaters for a full-sheet game. Nobody had confirmed. Nobody knew. They paid for an hour of ice and skated 4-on-4.
                 </p>
               </div>
             </div>
@@ -71,7 +71,7 @@ export default function About() {
                 <p className="text-white text-2xl font-semibold leading-snug mb-4">
                   "We paid for full-sheet ice and skated 4-on-4. That was the last time."
                 </p>
-                <p className="text-blue-200 text-sm font-medium">— Tyler, on the moment Roster was born</p>
+                <p className="text-blue-200 text-sm font-medium">— Tobin, on the moment Roster was born</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
@@ -96,7 +96,7 @@ export default function About() {
               How he made sure Roster was built right
             </h2>
             <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-              Tyler didn't build Roster in isolation. He spent a year talking to captains, coaches, and commissioners before writing a line of code.
+              Tobin didn't build Roster in isolation. He spent a year talking to captains, coaches, and commissioners before writing a line of code.
             </p>
           </div>
 
@@ -106,7 +106,7 @@ export default function About() {
                 icon: Users,
                 number: '200+',
                 label: 'Players & captains interviewed',
-                description: 'Tyler sat down with beer leaguers, recreational players, and league commissioners to understand what actually went wrong every week — not what looked good in a feature list.',
+                description: 'Tobin sat down with beer leaguers, recreational players, and league commissioners to understand what actually went wrong every week — not what looked good in a feature list.',
               },
               {
                 icon: MessageSquare,
@@ -168,7 +168,7 @@ export default function About() {
               </h2>
               <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
                 <p>
-                  Tyler isn't a tech founder who spotted an opportunity in hockey. He's a hockey player who learned to code because the opportunity wasn't being taken seriously by anyone who actually understood the sport.
+                  Tobin isn't a tech founder who spotted an opportunity in hockey. He's a hockey player who learned to code because the opportunity wasn't being taken seriously by anyone who actually understood the sport.
                 </p>
                 <p>
                   He's still in two leagues. He still knows his linesmen by name. He still gets the 11pm ice slot that nobody else wants. And he built Roster to solve the exact problems he deals with every single week.
