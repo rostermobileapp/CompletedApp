@@ -54,7 +54,7 @@ export default function About() {
               </h2>
               <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
                 <p>
-                  For six years, Tyler captained a Wednesday night hockey league. What started as a simple favor — "someone has to organize this" — turned into a part-time job. Every week meant chasing 20 adults through a group text, manually tallying RSVPs, and still showing up to games shorthanded.
+                  Since 2016 we used BenchApp for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
                 </p>
                 <p>
                   He tried everything. TeamSnap was expensive and buried in ads. BenchApp felt half-finished. Spreadsheets broke the moment someone edited the wrong cell. Nothing solved the actual problem: <em>getting reliable answers from busy people who just want to play hockey.</em>
