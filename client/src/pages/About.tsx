@@ -106,7 +106,7 @@ export default function About() {
             {[
               {
                 icon: Users,
-                number: '200+',
+                number: '100+',
                 label: 'Players & captains interviewed',
                 description: 'Tobin sat down with beer leaguers, recreational players, and league commissioners to understand what actually went wrong every week — not what looked good in a feature list.',
               },
