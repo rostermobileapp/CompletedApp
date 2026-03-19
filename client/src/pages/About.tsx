@@ -73,7 +73,7 @@ export default function About() {
             <div className="space-y-5">
               <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
                 <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
-                <p className="text-blue-200 text-sm font-medium">— Tobin, on the moment Roster was born</p>
+                <p className="text-blue-200 text-sm font-medium">Brian - Tobin's league commissioner</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
