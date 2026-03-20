@@ -395,7 +395,7 @@ export default function Landing() {
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
                 <AnimatedCounter value={0} />
-                <span className="font-black">Ads</span>
+                <span className="font-black"> Ads</span>
               </div>
               <div className="text-gray-500 text-sm font-medium">Ever. On Any Plan.</div>
             </div>
