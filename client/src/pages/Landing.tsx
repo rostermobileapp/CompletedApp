@@ -83,10 +83,10 @@ const testimonials = [
     gradient: "from-orange-500 to-orange-700",
   },
   {
-    quote: "The substitute player system is a game-changer. We never show up short anymore.",
-    name: "Carlos B.",
+    quote: "The player sub system is the crown jewel of Roster. This feature alone makes Roster worth it if you are a captain.",
+    name: "TJ K.",
     team: "Tuesday Drop-In Hockey",
-    initials: "CB",
+    initials: "TJ",
     gradient: "from-rose-500 to-rose-700",
   },
   {
