@@ -7575,11 +7575,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leaguesWithAccess = allLeagues;
       }
 
-      // Format leagues
+      // Fetch active seasons for each league
+      const leagueIds = leaguesWithAccess.map(l => l.id);
+      let seasonMap: Record<string, string | null> = {};
+      if (leagueIds.length > 0) {
+        const activeSeasons = await db
+          .select({ leagueId: seasons.leagueId, name: seasons.name })
+          .from(seasons)
+          .where(and(
+            inArray(seasons.leagueId, leagueIds),
+            eq(seasons.isActive, true)
+          ));
+        activeSeasons.forEach(s => {
+          seasonMap[s.leagueId] = s.name;
+        });
+      }
+
+      // Format leagues with season info
       const leagueOptions = leaguesWithAccess.map(league => ({
         id: league.id,
         name: league.name,
-        type: 'league' as const
+        type: 'league' as const,
+        seasonName: seasonMap[league.id] || null
       }));
 
       // Get accessible league IDs for tournament filtering

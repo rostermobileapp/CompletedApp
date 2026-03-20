@@ -43,7 +43,7 @@ interface Game {
 }
 
 interface ScorekeeperOptions {
-  leagues: { id: string; name: string; type: 'league' }[];
+  leagues: { id: string; name: string; type: 'league'; seasonName?: string | null }[];
   tournaments: { id: string; name: string; type: 'tournament'; leagueName?: string | null; status: string; paymentStatus?: string }[];
 }
 
@@ -800,7 +800,12 @@ export default function ScorekeeperDashboard() {
                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Leagues</div>
                 {commissionerLeagues.map((league: any) => (
                   <SelectItem key={`league:${league.id}`} value={`league:${league.id}`}>
-                    {league.name}
+                    <span className="flex items-center gap-2">
+                      {league.name}
+                      {league.seasonName && (
+                        <span className="text-xs text-muted-foreground">({league.seasonName})</span>
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </>
