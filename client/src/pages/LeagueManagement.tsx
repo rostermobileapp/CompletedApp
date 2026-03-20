@@ -505,6 +505,16 @@ export default function LeagueManagement() {
   const [showMergeRequests, setShowMergeRequests] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
+  // Manual player add state
+  const [showManualAddPlayer, setShowManualAddPlayer] = useState(false);
+  const [manualPlayerForm, setManualPlayerForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    assignedTeamId: '',
+  });
+  
   // Schedule import state  
   const [showScheduleImport, setShowScheduleImport] = useState(false);
   const [scheduleImportFile, setScheduleImportFile] = useState<File | null>(null);
@@ -1518,6 +1528,51 @@ export default function LeagueManagement() {
     scheduleUploadMutation.mutate(scheduleImportFile);
   };
 
+  // Mutation for manual player addition
+  const manualAddPlayerMutation = useMutation({
+    mutationFn: async (playerData: typeof manualPlayerForm) => {
+      if (!leagueId) {
+        throw new Error('League ID is required');
+      }
+
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/members/manual-add`, {
+        firstName: playerData.firstName,
+        lastName: playerData.lastName,
+        email: playerData.email,
+        phoneNumber: playerData.phoneNumber,
+        assignedTeamId: playerData.assignedTeamId || null,
+      });
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Player Added',
+        description: `${manualPlayerForm.firstName} ${manualPlayerForm.lastName} has been added to the league.`,
+      });
+      
+      // Reset form
+      setManualPlayerForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        assignedTeamId: '',
+      });
+      setShowManualAddPlayer(false);
+      
+      // Refetch members
+      refetchMembers();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Add Player',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Bulk delete mutations
   const deleteAllPlayersMutation = useMutation({
     mutationFn: async () => {
@@ -2389,14 +2444,24 @@ export default function LeagueManagement() {
                 <Users className="w-5 h-5 text-muted-foreground" />
                 <h3 className="text-lg font-semibold">Players</h3>
               </div>
-              <button
-                onClick={() => setShowBulkImport(!showBulkImport)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
-                data-testid="button-import-players"
-              >
-                <Upload className="w-3 h-3" />
-                Import Players
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowBulkImport(!showBulkImport)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                  data-testid="button-import-players"
+                >
+                  <Upload className="w-3 h-3" />
+                  Import Players
+                </button>
+                <button
+                  onClick={() => setShowManualAddPlayer(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                  data-testid="button-add-player-manually"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  Add Manually
+                </button>
+              </div>
             </div>
 
             {/* Import Panel */}
@@ -2472,6 +2537,116 @@ export default function LeagueManagement() {
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Manual Add Player Modal */}
+            {showManualAddPlayer && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-card rounded-lg border border-border p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                  <h3 className="text-lg font-semibold mb-4">Add Player Manually</h3>
+                  
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    manualAddPlayerMutation.mutate(manualPlayerForm);
+                  }} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">First Name *</label>
+                      <input
+                        type="text"
+                        value={manualPlayerForm.firstName}
+                        onChange={(e) => setManualPlayerForm({...manualPlayerForm, firstName: e.target.value})}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="First name"
+                        required
+                        data-testid="input-manual-player-first-name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Last Name *</label>
+                      <input
+                        type="text"
+                        value={manualPlayerForm.lastName}
+                        onChange={(e) => setManualPlayerForm({...manualPlayerForm, lastName: e.target.value})}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Last name"
+                        required
+                        data-testid="input-manual-player-last-name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Email *</label>
+                      <input
+                        type="email"
+                        value={manualPlayerForm.email}
+                        onChange={(e) => setManualPlayerForm({...manualPlayerForm, email: e.target.value})}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Email address"
+                        required
+                        data-testid="input-manual-player-email"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Phone Number</label>
+                      <input
+                        type="tel"
+                        value={manualPlayerForm.phoneNumber}
+                        onChange={(e) => setManualPlayerForm({...manualPlayerForm, phoneNumber: e.target.value})}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Phone number (optional)"
+                        data-testid="input-manual-player-phone"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Assign to Team</label>
+                      <select
+                        value={manualPlayerForm.assignedTeamId}
+                        onChange={(e) => setManualPlayerForm({...manualPlayerForm, assignedTeamId: e.target.value})}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="select-manual-player-team"
+                      >
+                        <option value="">No team (optional)</option>
+                        {teams.map((team: Team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <button
+                        type="submit"
+                        disabled={manualAddPlayerMutation.isPending || !manualPlayerForm.firstName || !manualPlayerForm.lastName || !manualPlayerForm.email}
+                        className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid="button-submit-manual-player"
+                      >
+                        {manualAddPlayerMutation.isPending ? 'Adding...' : 'Add Player'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowManualAddPlayer(false);
+                          setManualPlayerForm({
+                            firstName: '',
+                            lastName: '',
+                            email: '',
+                            phoneNumber: '',
+                            assignedTeamId: '',
+                          });
+                        }}
+                        className="px-3 py-2 border border-border rounded-md hover:bg-muted text-sm"
+                        data-testid="button-cancel-manual-player"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}

@@ -8852,6 +8852,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual player addition endpoint
+  app.post('/api/leagues/:leagueId/members/manual-add', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+      const { firstName, lastName, email, phoneNumber, assignedTeamId } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({ message: 'First name, last name, and email are required' });
+      }
+
+      // Check if user has commissioner access to this league
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: 'League not found' });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only commissioners can add players' });
+      }
+
+      // Check if team exists (if provided)
+      if (assignedTeamId) {
+        const team = await storage.getTeam(assignedTeamId);
+        if (!team || team.leagueId !== leagueId) {
+          return res.status(400).json({ message: 'Invalid team' });
+        }
+      }
+
+      // Create or get user by email
+      let user;
+      try {
+        const { data: existingUsers, error } = await supabaseAdmin.auth.admin.listUsers();
+        const existingUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+        
+        if (existingUser) {
+          user = existingUser;
+        } else {
+          // Create new user
+          const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password: Math.random().toString(36).slice(-16), // Temporary password
+            user_metadata: {
+              first_name: firstName,
+              last_name: lastName,
+              phone: phoneNumber || undefined,
+            }
+          });
+          
+          if (createError) {
+            return res.status(400).json({ message: `Failed to create user: ${createError.message}` });
+          }
+          
+          user = newUser;
+        }
+      } catch (error) {
+        console.error('Error managing user:', error);
+        return res.status(500).json({ message: 'Failed to process user' });
+      }
+
+      // Create league membership
+      const newMembership = await storage.createLeagueMembership({
+        leagueId,
+        userId: user.id,
+        displayFirstName: firstName,
+        displayLastName: lastName,
+        assignedTeamId: assignedTeamId || undefined,
+        status: 'approved', // Auto-approve when manually added by commissioner
+      });
+
+      // Send welcome email
+      try {
+        const emailContent = `Welcome to ${league.name}!\n\nYou have been added to the league. Click the link below to set up your account:\n\n${import.meta.env.VITE_APP_URL || 'https://replit.app'}/login`;
+        
+        if (resend && resend.emails) {
+          await resend.emails.send({
+            from: 'noreply@example.com',
+            to: email,
+            subject: `Welcome to ${league.name}`,
+            text: emailContent,
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to send welcome email:', error);
+        // Don't fail the operation if email fails
+      }
+
+      return res.status(201).json({
+        id: newMembership.id,
+        userId: user.id,
+        leagueId,
+        displayFirstName: firstName,
+        displayLastName: lastName,
+        assignedTeamId: assignedTeamId || undefined,
+        status: 'approved',
+      });
+
+    } catch (error) {
+      console.error('Error adding player:', error);
+      res.status(500).json({ message: 'Failed to add player' });
+    }
+  });
+
   // Get import history for a league
   app.get('/api/leagues/:leagueId/players/imports', isAuthenticated, async (req: any, res) => {
     try {
