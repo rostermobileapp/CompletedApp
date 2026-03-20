@@ -400,12 +400,12 @@ export default function Profile() {
         <div className="px-6 pt-[24px] pb-[8px]">
           <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
             <div className="relative flex-shrink-0">
-              <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center ${(user as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}>
                 {(user as any)?.profileImageUrl ? (
                   <img 
                     src={getImageUrl((user as any).profileImageUrl) || ''}
                     alt="Profile" 
-                    className="w-full h-full rounded-full object-cover"
+                    className="w-full h-full rounded-full object-cover bg-transparent"
                     data-testid="img-profile-avatar"
                   />
                 ) : (

@@ -170,12 +170,12 @@ export default function UserProfile() {
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left" data-testid="card-profile-info">
           <div className="relative flex-shrink-0">
-            <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center">
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center ${user.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}>
               {user.profileImageUrl ? (
                 <img 
                   src={getImageUrl(user.profileImageUrl) || ''}
                   alt="Profile" 
-                  className="w-full h-full rounded-full object-cover"
+                  className="w-full h-full rounded-full object-cover bg-transparent"
                   data-testid="img-profile-avatar"
                 />
               ) : (
