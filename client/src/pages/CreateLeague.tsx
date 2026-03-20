@@ -127,7 +127,7 @@ export default function CreateLeague() {
       <div className="px-6">
         <form id="create-league-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Basic Information */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6 pt-[4px] pb-[4px]">
             <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
             
             <div className="space-y-4">
