@@ -19,7 +19,7 @@ export default function About() {
       {/* ── 1. FOUNDER INTRO ─────────────────────────────────────── */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
         <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row items-start gap-12 justify-center md:justify-start">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-12">
             {/* Founder photo — 9:16 portrait */}
             <div className="flex-shrink-0 w-72 md:w-80">
               <div 
