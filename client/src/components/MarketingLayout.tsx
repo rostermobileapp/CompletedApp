@@ -61,7 +61,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
       </div>
 
       {/* Header */}
-      <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
+      <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-1">
         <div className="max-w-7xl mx-auto px-6 py-0 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-6 text-sm">
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
@@ -106,7 +106,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
       </header>
 
       {/* Page content */}
-      <main style={{ paddingTop: 'calc(40px + 40px)' }}>
+      <main style={{ paddingTop: 'calc(44px + 40px)' }}>
         {children}
       </main>
 
