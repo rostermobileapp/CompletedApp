@@ -1182,7 +1182,7 @@ export default function GameDetails() {
         <SubstituteRequestModal
           gameId={game.id}
           gameDate={format(new Date(game.scheduledAt), 'yyyy-MM-dd')}
-          leagueId={league?.id ?? game.leagueId ?? ''}
+          leagueId={league?.id ?? game.leagueId ?? game.homeTeam?.leagueId ?? ''}
           originalPlayerId={substituteRequestData.playerId || undefined}
           originalPlayerName={substituteRequestData.playerName || undefined}
           homeTeamId={game.homeTeamId ?? ''}
