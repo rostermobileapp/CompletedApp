@@ -3584,7 +3584,7 @@ export default function LeagueManagement() {
                                           <img 
                                             src={getImageUrl(homeTeam.logoUrl) || ''} 
                                             alt={`${homeTeam.name} logo`}
-                                            className="w-8 h-8 rounded object-cover"
+                                            className="w-8 h-8 rounded object-cover bg-transparent"
                                             data-testid={`img-home-team-logo-${game.id}`}
                                           />
                                         ) : (
@@ -3609,7 +3609,7 @@ export default function LeagueManagement() {
                                             <img 
                                               src={getImageUrl(awayTeam.logoUrl) || ''} 
                                               alt={`${awayTeam.name} logo`}
-                                              className="w-8 h-8 rounded object-cover"
+                                              className="w-8 h-8 rounded object-cover bg-transparent"
                                               data-testid={`img-away-team-logo-${game.id}`}
                                             />
                                           ) : (
@@ -3696,12 +3696,12 @@ export default function LeagueManagement() {
                               <div className="flex items-center justify-between">
                                 {/* Home Team */}
                                 <div className="flex flex-col items-center flex-1">
-                                  <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
+                                  <div className={`w-14 h-14 rounded-lg flex items-center justify-center mb-1.5 ${homeTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                                     {homeTeam?.logoUrl ? (
                                       <img 
                                         src={getImageUrl(homeTeam.logoUrl) || ''} 
                                         alt={`${homeTeam.name} logo`}
-                                        className="w-full h-full rounded-lg object-cover"
+                                        className="w-full h-full rounded-lg object-cover bg-transparent"
                                         data-testid={`img-home-team-logo-${game.id}`}
                                       />
                                     ) : (
@@ -3728,12 +3728,12 @@ export default function LeagueManagement() {
                                 <div className="flex flex-col items-center flex-1">
                                   {awayTeam ? (
                                     <>
-                                      <div className="w-14 h-14 bg-primary rounded-lg flex items-center justify-center mb-1.5">
+                                      <div className={`w-14 h-14 rounded-lg flex items-center justify-center mb-1.5 ${awayTeam.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                                         {awayTeam.logoUrl ? (
                                           <img 
                                             src={getImageUrl(awayTeam.logoUrl) || ''} 
                                             alt={`${awayTeam.name} logo`}
-                                            className="w-full h-full rounded-lg object-cover"
+                                            className="w-full h-full rounded-lg object-cover bg-transparent"
                                             data-testid={`img-away-team-logo-${game.id}`}
                                           />
                                         ) : (
