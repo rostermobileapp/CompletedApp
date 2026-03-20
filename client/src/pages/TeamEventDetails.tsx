@@ -2,20 +2,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Calendar, ArrowLeft, MapPin, Clock, Users, Check, X } from "lucide-react";
+import { Trophy, Calendar, ArrowLeft, MapPin, Clock, Users, Check, X, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
+import { useState } from "react";
 import type { User } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
+import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 
 interface TeamEventData {
   id: string;
   teamId: string;
   creatorId: string;
-  eventType: 'general_event' | 'scrimmage';
+  eventType: 'general' | 'practice' | 'scrimmage' | 'social';
   title: string;
   description?: string | null;
   scheduledAt: string;
@@ -38,6 +40,7 @@ interface TeamEventData {
     id: string;
     name: string;
     captainId?: string | null;
+    leagueId?: string | null;
   };
   teamMembers: Array<{
     userId: string;
@@ -61,6 +64,7 @@ export default function TeamEventDetails() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/team-event/:id");
   const eventId = params?.id;
+  const [substituteModalOpen, setSubstituteModalOpen] = useState(false);
 
   const { data: eventData, isLoading } = useQuery<TeamEventData>({
     queryKey: [`/api/team-events/${eventId}`],
@@ -145,10 +149,26 @@ export default function TeamEventDetails() {
   }
 
   const isScrimmage = eventData.eventType === 'scrimmage';
+  const isGeneralEvent = eventData.eventType === 'general';
+  const showSubstituteButton = !isGeneralEvent && eventData.isCaptain && !!eventData.team.leagueId;
+
   const attendingCount = eventData.rsvps.filter(r => r.status === 'attending').length;
   const notAttendingCount = eventData.rsvps.filter(r => r.status === 'not_attending').length;
   const noResponseCount = eventData.teamMembers.length - attendingCount - notAttendingCount;
   const userStatus = eventData.userRsvp?.status || 'no_response';
+
+  const notAttendingPlayers = eventData.rsvps
+    .filter(r => r.status === 'not_attending')
+    .map(r => ({
+      user: {
+        id: r.userId,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        profileImageUrl: r.profileImageUrl,
+      }
+    }));
+
+  const gameDate = format(new Date(eventData.scheduledAt), 'yyyy-MM-dd');
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -230,7 +250,7 @@ export default function TeamEventDetails() {
 
           <div className="mt-6 pt-4 border-t border-border">
             <h3 className="font-medium mb-3">Your RSVP</h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant={userStatus === 'attending' ? 'default' : 'outline'}
                 size="sm"
@@ -251,6 +271,16 @@ export default function TeamEventDetails() {
                 <X className="w-4 h-4 mr-1" />
                 Not Attending
               </Button>
+              {showSubstituteButton && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSubstituteModalOpen(true)}
+                >
+                  <UserPlus className="w-4 h-4 mr-1" />
+                  Find Substitutes
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -284,15 +314,15 @@ export default function TeamEventDetails() {
                 .map((rsvp) => (
                   <div 
                     key={rsvp.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-[#e2e2e2] dark:bg-[#212121] border"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border"
                   >
-                    <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                      <span className="text-black dark:text-white text-xs font-semibold">
+                    <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                      <span className="text-foreground text-xs font-semibold">
                         {rsvp.firstName?.[0] || '?'}{rsvp.lastName?.[0] || ''}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-black dark:text-white">
+                      <p className="font-medium text-foreground">
                         {rsvp.firstName} {rsvp.lastName}
                       </p>
                     </div>
@@ -315,6 +345,20 @@ export default function TeamEventDetails() {
           />
         )}
       </div>
+
+      {showSubstituteButton && (
+        <SubstituteRequestModal
+          teamEventId={eventData.id}
+          gameDate={gameDate}
+          leagueId={eventData.team.leagueId || ''}
+          homeTeamId={eventData.teamId}
+          awayTeamId=""
+          originalPlayerTeamId={eventData.teamId}
+          isOpen={substituteModalOpen}
+          onClose={() => setSubstituteModalOpen(false)}
+          notAttendingPlayers={notAttendingPlayers}
+        />
+      )}
     </div>
   );
 }

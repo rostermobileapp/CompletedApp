@@ -7959,34 +7959,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'User ID not found' });
       }
 
-      // Validate input with Zod schema
       const validatedData = createSubstituteRequestSchema.parse(req.body);
-      const { gameId, originalPlayerId, substitutePlayerId, reason, expiresAt } = validatedData;
-      
-      // Verify the game exists and get league info
-      const game = await storage.getGameById(gameId);
+      const { gameId, teamEventId, originalPlayerId, substitutePlayerId, reason, expiresAt } = validatedData;
+
+      // ── TEAM EVENT PATH ──────────────────────────────────────────────────────
+      if (teamEventId) {
+        const [teamEvent] = await db.select().from(teamEvents).where(eq(teamEvents.id, teamEventId)).limit(1);
+        if (!teamEvent) return res.status(404).json({ message: 'Team event not found' });
+
+        const now = new Date();
+        if (new Date(teamEvent.scheduledAt) <= now) {
+          return res.status(409).json({ message: 'Cannot create substitute request for events that have already started' });
+        }
+
+        const team = await storage.getTeam(teamEvent.teamId);
+        if (!team) return res.status(404).json({ message: 'Team not found' });
+
+        const isCaptain = team.captainId === userId;
+        const membership = await storage.getTeamMembership(userId, teamEvent.teamId);
+        if (!isCaptain && !membership?.isCaptain) {
+          return res.status(403).json({ message: 'Captain access required' });
+        }
+
+        const requestingTeamId = teamEvent.teamId;
+        const teamMembers = await storage.getTeamMembers(requestingTeamId);
+
+        const originalPlayerOnTeam = teamMembers.some(m => m.userId === originalPlayerId);
+        if (!originalPlayerOnTeam) {
+          return res.status(403).json({ message: 'Original player must be on your team' });
+        }
+
+        if (substitutePlayerId === originalPlayerId) {
+          return res.status(400).json({ message: 'Substitute player cannot be the same as original player' });
+        }
+
+        const requestData = insertSubstituteRequestSchema.parse({
+          teamEventId,
+          originalPlayerId,
+          substitutePlayerId,
+          requestedBy: userId,
+          requestingTeamId,
+          reason,
+          status: 'approved',
+          expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const request = await storage.createSubstituteRequest(requestData);
+
+        try {
+          if (substitutePlayerId) {
+            const originalPlayer = await storage.getUser(originalPlayerId);
+            await storage.createNotification({
+              userId: substitutePlayerId,
+              type: 'general',
+              title: 'You\'ve Been Requested as a Substitute!',
+              message: `${team.name} is requesting you to substitute for ${originalPlayer?.firstName || ''} ${originalPlayer?.lastName || ''}.`,
+              actionUrl: `/team-event/${teamEventId}`,
+              actionText: 'View Event',
+            });
+            broadcastNotificationUpdate(substitutePlayerId);
+          }
+        } catch (notifyError) {
+          console.error('Error notifying substitute player:', notifyError);
+        }
+
+        return res.json(request);
+      }
+
+      // ── GAME PATH ────────────────────────────────────────────────────────────
+      const game = await storage.getGameById(gameId!);
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
       }
       
-      // Substitute requests are only available for league games
       if (!game.leagueId) {
         return res.status(400).json({ message: 'Substitute requests are only available for league games' });
       }
       
-      // Get league to verify commissioner ownership if needed
       const league = await storage.getLeague(game.leagueId);
       if (!league) {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      // CRITICAL: Validate game hasn't started yet
       const now = new Date();
       if (game.scheduledAt && game.scheduledAt <= now) {
         return res.status(409).json({ message: 'Cannot create substitute request for games that have already started or finished' });
       }
 
-      // Check if user is captain of either team
       const homeTeam = await storage.getTeam(game.homeTeamId);
       const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
       const isHomeCaptain = homeTeam && homeTeam.captainId === userId;
@@ -7996,11 +8055,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Captain access required' });
       }
 
-      // Determine requesting team
       const requestingTeamId = isHomeCaptain ? game.homeTeamId : game.awayTeamId;
       
-      // VALIDATION: Check for duplicate active substitute requests for the same original player
-      const existingRequests = await storage.getSubstituteRequests({ gameId });
+      const existingRequests = await storage.getSubstituteRequests({ gameId: gameId! });
       const duplicateRequest = existingRequests.find(req => 
         ['pending_opponent_approval', 'pending_commissioner_approval', 'pending_substitute_approval'].includes(req.status) &&
         req.originalPlayerId === originalPlayerId && 
@@ -8010,7 +8067,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'An active substitute request already exists for this player in this game' });
       }
 
-      // SECURITY: Validate that originalPlayer belongs to requesting team
       const requestingTeamMembers = await storage.getTeamMembers(requestingTeamId);
       const requestingLeagueMembers = await storage.getLeagueMembers(game.leagueId);
       const originalPlayerOnTeam = requestingTeamMembers.some(m => m.userId === originalPlayerId) ||
@@ -8020,7 +8076,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Original player must be on your team' });
       }
       
-      // SECURITY: If substitute player specified, validate they exist and are league members
       if (substitutePlayerId) {
         const substitutePlayer = await storage.getUser(substitutePlayerId);
         if (!substitutePlayer) {
@@ -8032,12 +8087,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Substitute player must be a league member' });
         }
 
-        // VALIDATION: Prevent substitute player from being the same as original player
         if (substitutePlayerId === originalPlayerId) {
           return res.status(400).json({ message: 'Substitute player cannot be the same as original player' });
         }
 
-        // VALIDATION: Check if substitute player is already on either team for this game
         const homeTeamMembers = await storage.getTeamMembers(game.homeTeamId);
         const awayTeamMembers = game.awayTeamId ? await storage.getTeamMembers(game.awayTeamId) : [];
         const substituteOnHomeTeam = homeTeamMembers.some(m => m.userId === substitutePlayerId);
@@ -8048,32 +8101,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // If there's no opposing team (null, undefined, or placeholder like "opponent"), skip to approved
-      // Otherwise, require substitute confirmation first
       const hasOpposingTeam = game.awayTeamId && game.awayTeamId !== 'opponent' && game.awayTeamId.length > 0;
       const initialStatus = hasOpposingTeam ? 'pending_substitute_approval' : 'approved';
 
       const requestData = insertSubstituteRequestSchema.parse({
-        gameId,
+        gameId: gameId!,
         originalPlayerId,
         substitutePlayerId,
         requestedBy: userId,
         requestingTeamId,
         reason,
-        status: initialStatus, // If no opposing team, auto-approve; otherwise require substitute confirmation
-        expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+        status: initialStatus,
+        expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
 
       const request = await storage.createSubstituteRequest(requestData);
       
-      // Notify the substitute player about the new substitute request via push notification (bell icon)
-      // Workflow: Captain → Substitute Player → Opposing Captain → Done
       try {
         if (substitutePlayerId) {
           const requestingTeam = await storage.getTeam(requestingTeamId);
           const originalPlayer = await storage.getUser(originalPlayerId);
           
-          // Create an in-app notification (bell icon) for the substitute player
           await storage.createNotification({
             userId: substitutePlayerId,
             type: 'general',
@@ -8084,21 +8132,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           broadcastNotificationUpdate(substitutePlayerId);
           
-          // Send push notification to device (fire and forget)
           const gameInfo = `${homeTeam?.name || 'Home'} vs ${awayTeam?.name || 'Away'}`;
           import('./oneSignalNotifications').then(({ sendSubstitutionPushNotification }) => {
             sendSubstitutionPushNotification(
               substitutePlayerId,
               'Substitute Request',
               `${requestingTeam?.name || 'A team'} wants you to sub for ${gameInfo}`,
-              gameId,
+              gameId!,
               request.id
             ).catch(err => console.error('[Push] Failed to send substitution push:', err));
           }).catch(console.error);
         }
       } catch (notifyError) {
         console.error('Error notifying substitute player:', notifyError);
-        // Don't fail the request creation if notification fails
       }
       
       res.json(request);
@@ -15538,6 +15584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: teams.id,
           name: teams.name,
           captainId: teams.captainId,
+          leagueId: teams.leagueId,
         })
         .from(teams)
         .where(eq(teams.id, teamEvent.teamId));

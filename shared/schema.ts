@@ -771,7 +771,8 @@ export const tournamentMatchRsvps = pgTable("tournament_match_rsvps", {
 // Substitute requests table
 export const substituteRequests = pgTable("substitute_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  gameId: varchar("game_id").references(() => games.id).notNull(),
+  gameId: varchar("game_id").references(() => games.id),
+  teamEventId: varchar("team_event_id").references(() => teamEvents.id),
   originalPlayerId: varchar("original_player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   substitutePlayerId: varchar("substitute_player_id").references(() => users.id, { onDelete: 'cascade' }),
   requestingTeamId: varchar("requesting_team_id").references(() => teams.id).notNull(),
@@ -784,6 +785,7 @@ export const substituteRequests = pgTable("substitute_requests", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_substitute_requests_game_id").on(table.gameId),
+  index("idx_substitute_requests_team_event_id").on(table.teamEventId),
   index("idx_substitute_requests_requesting_team_id").on(table.requestingTeamId),
 ]);
 
@@ -2840,6 +2842,8 @@ export const createSubstituteRequestSchema = createInsertSchema(substituteReques
   finalizedAt: true,
 }).extend({
   expiresAt: z.string().transform((val) => new Date(val)).optional(),
+}).refine(data => data.gameId || data.teamEventId, {
+  message: 'Either gameId or teamEventId must be provided',
 });
 
 export const getSubstituteRequestsQuerySchema = z.object({

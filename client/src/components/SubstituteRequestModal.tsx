@@ -17,7 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 
 interface SubstituteRequestModalProps {
-  gameId: string;
+  gameId?: string;
+  teamEventId?: string;
   gameDate: string;
   leagueId: string;
   originalPlayerId?: string;
@@ -31,7 +32,8 @@ interface SubstituteRequestModalProps {
 }
 
 export function SubstituteRequestModal({ 
-  gameId, 
+  gameId,
+  teamEventId,
   gameDate,
   leagueId,
   originalPlayerId,
@@ -83,8 +85,9 @@ export function SubstituteRequestModal({
   
   console.log('[SubstituteModal] isOpen:', isOpen, 'gameDate:', gameDate, 'leagueId:', leagueId, 'enabled:', isOpen && !!gameDate && !!leagueId);
 
+  const eventKey = gameId || teamEventId;
   const { data: existingRequests = [] } = useQuery({
-    queryKey: ["/api/substitute-requests", gameId],
+    queryKey: ["/api/substitute-requests", eventKey],
     queryFn: async () => {
       const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/substitute-requests", {
@@ -95,11 +98,11 @@ export function SubstituteRequestModal({
       }
       const allRequests = await response.json();
       return allRequests.filter((req: any) => 
-        req.gameId === gameId && 
+        (gameId ? req.gameId === gameId : req.teamEventId === teamEventId) &&
         ['pending_opponent_approval', 'pending_commissioner_approval', 'pending_substitute_approval'].includes(req.status)
       );
     },
-    enabled: isOpen && !!gameId,
+    enabled: isOpen && !!eventKey,
   });
 
   const playersWithPendingRequests = new Set(
@@ -132,7 +135,7 @@ export function SubstituteRequestModal({
       if (!playerToReplace) throw new Error('No player to replace selected');
       
       await apiRequest("POST", "/api/substitute-requests", {
-        gameId,
+        ...(gameId ? { gameId } : { teamEventId }),
         originalPlayerId: playerToReplace,
         substitutePlayerId: selectedPlayer,
       });
