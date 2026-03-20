@@ -540,7 +540,7 @@ export async function sendWelcomeEmail(
                   <!-- Header -->
                   <tr>
                     <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #000000; border-radius: 8px 8px 0 0;">
-                      <img src="https://rosters.replit.app/roster-logo.png" alt="Roster Logo" style="max-width: 280px; height: auto; margin: 0 auto; display: block;">
+                      <img src="${appUrl}/roster-logo.png" alt="Roster Logo" style="max-width: 280px; height: auto; margin: 0 auto; display: block;">
                     </td>
                   </tr>
                   
