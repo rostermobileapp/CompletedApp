@@ -261,32 +261,30 @@ export default function Landing() {
 
             {/* App Store Badges */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-2" data-testid="app-store-badges">
-              <a
-                href="https://apps.apple.com/us/app/roster-app/id6741723004"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors group"
-                aria-label="Download on the App Store"
+              <button
+                disabled
+                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50"
+                title="Coming May 1st"
+                aria-label="Download on the App Store - Coming May 1st"
               >
-                <SiAppstore className="w-7 h-7 text-white" />
+                <SiAppstore className="w-7 h-7 text-gray-500" />
                 <div className="text-left">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">Download on the</div>
-                  <div className="text-base font-semibold text-white leading-tight">App Store</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Download on the</div>
+                  <div className="text-base font-semibold text-gray-600 leading-tight">App Store</div>
                 </div>
-              </a>
-              <a
-                href="https://play.google.com/store/search?q=roster+team+management&c=apps"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors group"
-                aria-label="Get it on Google Play"
+              </button>
+              <button
+                disabled
+                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50"
+                title="Coming May 1st"
+                aria-label="Get it on Google Play - Coming May 1st"
               >
-                <SiGoogleplay className="w-6 h-6 text-white" />
+                <SiGoogleplay className="w-6 h-6 text-gray-500" />
                 <div className="text-left">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">Get it on</div>
-                  <div className="text-base font-semibold text-white leading-tight">Google Play</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Get it on</div>
+                  <div className="text-base font-semibold text-gray-600 leading-tight">Google Play</div>
                 </div>
-              </a>
+              </button>
             </div>
             <p className="text-xs text-gray-400">No credit card required · Free forever tier available</p>
           </div>
