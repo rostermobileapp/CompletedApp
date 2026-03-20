@@ -57,7 +57,7 @@ const testimonials = [
   {
     quote: "The app is sweet! You nailed it!",
     name: "Donny U.",
-    team: "Wednesday Night Hockey",
+    team: "Mentor Hockey League",
     initials: "DU",
     gradient: "from-blue-500 to-blue-700",
   },
@@ -85,15 +85,15 @@ const testimonials = [
   {
     quote: "The player sub system is the crown jewel of Roster. This feature alone makes Roster worth it if you are a captain.",
     name: "TJ K.",
-    team: "Tuesday Drop-In Hockey",
+    team: "The Edge Ice Arena",
     initials: "TJ",
     gradient: "from-rose-500 to-rose-700",
   },
   {
     quote: "Our whole tournament went smoothly this year. Brackets, scheduling, scores — done.",
-    name: "Aisha P.",
-    team: "Regional Hockey Club",
-    initials: "AP",
+    name: "Scott C.",
+    team: "RMRHL Legend",
+    initials: "SC",
     gradient: "from-teal-500 to-teal-700",
   },
 ];
