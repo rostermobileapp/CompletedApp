@@ -63,7 +63,7 @@ export default function About() {
                 <p>
                   Our league used everything.  Excel for schedules and drafts, esportsdesk for standings and player stats, team text threads. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
                 </p>
-                <p>So while driving back to Ohio from his annual family vacation, he planned out Roster.  4 months later, some of the players had a working beta app to test. </p>
+                <p>So while driving back to Ohio from our annual family vacation, I planned out Roster.  4 months later, some of the players had a working beta app to test. </p>
               </div>
             </div>
 
