@@ -43,9 +43,9 @@ const createLeagueSchema = insertLeagueSchema.extend({
   rinkName: insertLeagueSchema.shape.rinkName.optional(),
   rinkAddress: insertLeagueSchema.shape.rinkAddress.optional(),
   season: insertLeagueSchema.shape.season.optional(),
+  sport: insertLeagueSchema.shape.sport.optional(),
 }).partial().extend({
   name: insertLeagueSchema.shape.name, // Keep name as required
-  sport: insertLeagueSchema.shape.sport, // Keep sport as required
   maxTeams: insertLeagueSchema.shape.maxTeams, // Keep maxTeams as required
 });
 
@@ -163,53 +163,6 @@ export default function CreateLeague() {
                 {form.formState.errors.uniqueLeagueId && (
                   <p className="text-destructive text-sm mt-1">{form.formState.errors.uniqueLeagueId.message}</p>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" data-testid="label-sport">
-                  Sport *
-                </label>
-                <select
-                  {...form.register('sport')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  data-testid="select-sport"
-                  onChange={(e) => {
-                    if (e.target.value !== 'hockey') {
-                      toast({
-                        title: 'Coming Soon',
-                        description: 'Other sports coming soon',
-                      });
-                      form.setValue('sport', 'hockey');
-                      e.target.value = 'hockey';
-                    }
-                  }}
-                >
-                  <option value="hockey">Hockey</option>
-                  <option value="basketball" style={{ color: '#888' }}>Basketball</option>
-                  <option value="soccer" style={{ color: '#888' }}>Soccer</option>
-                  <option value="baseball" style={{ color: '#888' }}>Baseball</option>
-                  <option value="softball" style={{ color: '#888' }}>Softball</option>
-                  <option value="football" style={{ color: '#888' }}>Football</option>
-                  <option value="volleyball" style={{ color: '#888' }}>Volleyball</option>
-                  <option value="tennis" style={{ color: '#888' }}>Tennis</option>
-                  <option value="other" style={{ color: '#888' }}>Other</option>
-                </select>
-                <p className="text-muted-foreground text-xs mt-1">
-                  Other sports coming soon
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" data-testid="label-description">
-                  Description
-                </label>
-                <textarea
-                  {...form.register('description')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  rows={3}
-                  placeholder="Describe your league..."
-                  data-testid="textarea-description"
-                />
               </div>
             </div>
           </div>
