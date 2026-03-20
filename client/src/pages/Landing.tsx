@@ -62,27 +62,6 @@ const testimonials = [
     gradient: "from-blue-500 to-blue-700",
   },
   {
-    quote: "The RSVP system alone is worth every penny. Our captain used to spend hours confirming lineups. Not anymore.",
-    name: "Sarah K.",
-    team: "Sunday Hockey Co-ed",
-    initials: "SK",
-    gradient: "from-purple-500 to-purple-700",
-  },
-  {
-    quote: "We run three hockey leagues through Roster now. Scheduling, scores, standings — it handles all of it.",
-    name: "Derek R.",
-    team: "City Adult Hockey League",
-    initials: "DR",
-    gradient: "from-emerald-500 to-emerald-700",
-  },
-  {
-    quote: "Switched from TeamSnap and never looked back. Half the price, twice the features.",
-    name: "Jen M.",
-    team: "Women's Hockey League",
-    initials: "JM",
-    gradient: "from-orange-500 to-orange-700",
-  },
-  {
     quote: "The player sub system is the crown jewel of Roster. This feature alone makes Roster worth it if you are a captain.",
     name: "TJ K.",
     team: "The Edge Ice Arena",
