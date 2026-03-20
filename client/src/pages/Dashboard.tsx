@@ -2143,7 +2143,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select Team</span>
+                <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select</span>
                 {/* Total notification count for ALL other teams/leagues/tournaments */}
                 {(() => {
                   if (!notificationCounts) return null;

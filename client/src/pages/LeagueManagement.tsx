@@ -513,6 +513,7 @@ export default function LeagueManagement() {
     email: '',
     phoneNumber: '',
     assignedTeamId: '',
+    seasonId: '',
   });
   
   // Schedule import state  
@@ -2598,6 +2599,23 @@ export default function LeagueManagement() {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium mb-2">Season</label>
+                      <select
+                        value={manualPlayerForm.seasonId}
+                        onChange={(e) => setManualPlayerForm({...manualPlayerForm, seasonId: e.target.value})}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="select-manual-player-season"
+                      >
+                        <option value="">Select a season (optional)</option>
+                        {seasons.map((season: Season) => (
+                          <option key={season.id} value={season.id}>
+                            {season.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
                       <label className="block text-sm font-medium mb-2">Assign to Team</label>
                       <select
                         value={manualPlayerForm.assignedTeamId}
@@ -2633,6 +2651,7 @@ export default function LeagueManagement() {
                             email: '',
                             phoneNumber: '',
                             assignedTeamId: '',
+                            seasonId: '',
                           });
                         }}
                         className="px-3 py-2 border border-border rounded-md hover:bg-muted text-sm"
