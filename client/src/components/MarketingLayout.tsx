@@ -61,7 +61,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
       </div>
 
       {/* Header */}
-      <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-1">
+      <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
         <div className="max-w-7xl mx-auto px-6 py-0 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-6 text-sm">
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
