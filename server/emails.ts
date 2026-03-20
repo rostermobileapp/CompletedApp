@@ -539,8 +539,8 @@ export async function sendWelcomeEmail(
                 <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                   <!-- Header -->
                   <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius: 8px 8px 0 0;">
-                      <img src="https://rosters.replit.app/favicon.png" alt="Roster Logo" style="max-width: 120px; height: auto; margin: 0 auto; display: block;">
+                    <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #000000; border-radius: 8px 8px 0 0;">
+                      <img src="https://rosters.replit.app/roster-logo.png" alt="Roster Logo" style="max-width: 280px; height: auto; margin: 0 auto; display: block;">
                     </td>
                   </tr>
                   
