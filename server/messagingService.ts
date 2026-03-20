@@ -584,9 +584,10 @@ export class MessagingService {
     const conversationIds = userConversations.map(c => c.id);
 
     // Count messages in user's conversations that they haven't read
+    // Use DISTINCT to avoid counting the same message multiple times if there's a join issue
     const [result] = await db
       .select({ 
-        count: sql<number>`count(*)::int` 
+        count: sql<number>`count(DISTINCT ${messages.id})::int` 
       })
       .from(messages)
       .leftJoin(
@@ -630,10 +631,11 @@ export class MessagingService {
     const conversationIds = userConversations.map(c => c.id);
 
     // Count unread messages per conversation
+    // Use DISTINCT on messages.id to avoid counting the same message multiple times
     const results = await db
       .select({ 
         conversationId: messages.conversationId,
-        count: sql<number>`count(*)::int` 
+        count: sql<number>`count(DISTINCT ${messages.id})::int` 
       })
       .from(messages)
       .leftJoin(
