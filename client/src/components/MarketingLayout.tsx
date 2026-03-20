@@ -16,6 +16,12 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
   const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Always scroll to top when this component mounts
+  useEffect(() => {
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     document.title = title;
 
