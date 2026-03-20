@@ -263,7 +263,7 @@ export default function Landing() {
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-2" data-testid="app-store-badges">
               <button
                 disabled
-                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50"
+                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50 pl-[4px] pr-[4px]"
                 title="Coming May 1st"
                 aria-label="Download on the App Store - Coming May 1st"
               >
