@@ -10,6 +10,7 @@ export default function About() {
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
 
   useEffect(() => {
+    window.history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);
   }, []);
 
