@@ -286,7 +286,7 @@ export function SubstituteRequestModal({
                           </div>
                         )}
                       </div>
-                      <span className="text-sm">{rsvp.user.firstName} {rsvp.user.lastName}</span>
+                      <span className="text-sm text-[#ffffff] font-semibold">{rsvp.user.firstName} {rsvp.user.lastName}</span>
                       {hasPendingRequest && (
                         <span className="text-xs text-green-500 opacity-75">requested</span>
                       )}
