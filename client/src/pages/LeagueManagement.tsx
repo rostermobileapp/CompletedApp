@@ -712,7 +712,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch seasons for this league
-  const { data: seasons = [], refetch: refetchSeasons } = useQuery<Season[]>({
+  const { data: seasons = [], refetch: refetchSeasons, isLoading: seasonsLoading } = useQuery<Season[]>({
     queryKey: ['/api/leagues', leagueId, 'seasons'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/seasons`);
@@ -2603,10 +2603,13 @@ export default function LeagueManagement() {
                       <select
                         value={manualPlayerForm.seasonId}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, seasonId: e.target.value})}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        disabled={seasonsLoading}
+                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="select-manual-player-season"
                       >
-                        <option value="">Select a season (optional)</option>
+                        <option value="">
+                          {seasonsLoading ? 'Loading seasons...' : 'Select a season (optional)'}
+                        </option>
                         {seasons.map((season: Season) => (
                           <option key={season.id} value={season.id}>
                             {season.name}
