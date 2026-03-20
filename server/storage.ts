@@ -6875,6 +6875,11 @@ export class DatabaseStorage implements IStorage {
           ? request.game.awayTeamId 
           : request.game.homeTeamId;
         
+        // If there's no opposing team, this approver type should not be used
+        if (!opposingTeamId) {
+          throw new Error('Cannot validate opposing captain approval: no opposing team exists for this game');
+        }
+        
         const opposingTeam = await this.getTeam(opposingTeamId);
         if (!opposingTeam || opposingTeam.captainId !== approverId) {
           throw new Error(`User ${approverId} is not the captain of the opposing team`);

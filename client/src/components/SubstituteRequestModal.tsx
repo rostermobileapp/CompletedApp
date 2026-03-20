@@ -58,7 +58,8 @@ export function SubstituteRequestModal({
   };
 
   // Determine opposing team ID based on the original player's team
-  const opposingTeamId = originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId;
+  // If there's no opposing team (awayTeamId is null), set opposingTeamId to null
+  const opposingTeamId = awayTeamId ? (originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId) : null;
 
   // Fetch all league players with availability status
   const { data: allPlayers = [], isLoading, error: playersError, isError } = useQuery({

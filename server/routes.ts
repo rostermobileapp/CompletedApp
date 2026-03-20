@@ -8043,6 +8043,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // If there's no opposing team, skip substitute approval and go straight to approved
+      // Otherwise, require substitute confirmation first
+      const hasOpposingTeam = game.awayTeamId !== null && game.awayTeamId !== undefined;
+      const initialStatus = hasOpposingTeam ? 'pending_substitute_approval' : 'approved';
+
       const requestData = insertSubstituteRequestSchema.parse({
         gameId,
         originalPlayerId,
@@ -8050,7 +8055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestedBy: userId,
         requestingTeamId,
         reason,
-        status: 'pending_substitute_approval', // First goes to substitute player for confirmation
+        status: initialStatus, // If no opposing team, auto-approve; otherwise require substitute confirmation
         expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
       });
 
