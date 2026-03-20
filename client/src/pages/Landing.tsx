@@ -55,10 +55,10 @@ function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: strin
 
 const testimonials = [
   {
-    quote: "Finally, a sports app that actually works for our whole league. No more chasing people on group text.",
-    name: "Marcus T.",
+    quote: "The app is sweet! You nailed it!",
+    name: "Donny U.",
     team: "Wednesday Night Hockey",
-    initials: "MT",
+    initials: "DU",
     gradient: "from-blue-500 to-blue-700",
   },
   {
