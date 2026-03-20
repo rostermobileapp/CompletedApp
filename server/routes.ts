@@ -8887,16 +8887,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let newUserId: string;
 
       if (existingLocalUser) {
-        // User exists, use existing ID
+        // User already exists in Roster, just use their ID
         newUserId = existingLocalUser.id;
       } else {
-        // Create or get user in Supabase Auth
+        // User doesn't exist locally, check Supabase Auth or create
         let authUser;
         try {
           const { data: existingUsers } = await supabase.auth.admin.listUsers();
           const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
           
           if (existingAuthUser) {
+            // User exists in Supabase Auth but not in Roster - add them to Roster
             authUser = existingAuthUser;
           } else {
             // Create new auth user
@@ -8921,14 +8922,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ message: 'Failed to process user' });
         }
 
-        // Create user in local database
+        // Add user to local Roster database using upsert
         newUserId = authUser.id;
-        await storage.createUser({
+        await storage.upsertUser({
           id: authUser.id,
           email,
           firstName,
           lastName,
-          profileImageUrl: null,
           displayName: `${firstName} ${lastName}`,
         });
       }
