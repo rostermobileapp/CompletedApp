@@ -8027,19 +8027,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ── GAME PATH ────────────────────────────────────────────────────────────
-      const game = await storage.getGameById(gameId!);
+      // Try regular game first, then fall back to tournament match (stored in a separate table)
+      let game: any = await storage.getGameById(gameId!);
+      if (!game) {
+        game = await storage.getTournamentMatchAsGame(gameId!);
+      }
       if (!game) {
         return res.status(404).json({ message: 'Game not found' });
       }
-      
-      if (!game.leagueId) {
-        return res.status(400).json({ message: 'Substitute requests are only available for league games' });
-      }
-      
-      const league = await storage.getLeague(game.leagueId);
-      if (!league) {
-        return res.status(404).json({ message: 'League not found' });
-      }
+
+      // Look up league only if this game is league-linked (league games, playoffs, league tournaments)
+      // Standalone tournament games (no leagueId) are still allowed but skip league member checks
+      const league = game.leagueId ? await storage.getLeague(game.leagueId) : null;
 
       const now = new Date();
       if (game.scheduledAt && game.scheduledAt <= now) {
@@ -8068,7 +8067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const requestingTeamMembers = await storage.getTeamMembers(requestingTeamId);
-      const requestingLeagueMembers = await storage.getLeagueMembers(game.leagueId);
+      const requestingLeagueMembers = league ? await storage.getLeagueMembers(game.leagueId) : [];
       const originalPlayerOnTeam = requestingTeamMembers.some(m => m.userId === originalPlayerId) ||
         requestingLeagueMembers.some(m => m.userId === originalPlayerId && m.assignedTeamId === requestingTeamId);
       
@@ -8081,10 +8080,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!substitutePlayer) {
           return res.status(400).json({ message: 'Substitute player not found' });
         }
-        
-        const substituteInLeague = requestingLeagueMembers.some(m => m.userId === substitutePlayerId);
-        if (!substituteInLeague) {
-          return res.status(403).json({ message: 'Substitute player must be a league member' });
+
+        // Only enforce league membership check for league-linked games
+        if (league) {
+          const substituteInLeague = requestingLeagueMembers.some(m => m.userId === substitutePlayerId);
+          if (!substituteInLeague) {
+            return res.status(403).json({ message: 'Substitute player must be a league member' });
+          }
         }
 
         if (substitutePlayerId === originalPlayerId) {
