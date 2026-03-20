@@ -8834,17 +8834,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               // Send welcome email if new user with email was created
               if (isNewUser && player.email) {
+                console.log(`[CSVImport] isNewUser=${isNewUser}, sending welcome email to ${player.email}`);
                 try {
                   const teamName = player.teamId ? (await storage.getTeam(player.teamId))?.name : undefined;
+                  console.log(`[CSVImport] Team name: ${teamName || 'none'}, League: ${league.name}`);
                   await sendWelcomeEmail(player.email, {
                     playerName: `${player.firstName} ${player.lastName}`,
                     leagueName: league.name,
                     teamName: teamName,
                   });
+                  console.log(`[CSVImport] Welcome email sent successfully to ${player.email}`);
                 } catch (emailError) {
-                  console.error(`Failed to send welcome email to ${player.email}:`, emailError);
+                  console.error(`[CSVImport] Failed to send welcome email to ${player.email}:`, emailError);
                   // Don't fail the import if email fails
                 }
+              } else if (player.email) {
+                console.log(`[CSVImport] isNewUser=${isNewUser}, skipping welcome email for ${player.email}`);
               }
 
               // Track new player's team for chat syncing
@@ -9043,17 +9048,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send welcome email if new user was created
       if (isNewUser) {
+        console.log(`[ManualAdd] isNewUser=${isNewUser}, sending welcome email to ${email}`);
         try {
           const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
+          console.log(`[ManualAdd] Team name: ${teamName || 'none'}, League: ${league.name}`);
           await sendWelcomeEmail(email, {
             playerName: `${firstName} ${lastName}`,
             leagueName: league.name,
             teamName: teamName,
           });
+          console.log(`[ManualAdd] Welcome email sent successfully to ${email}`);
         } catch (emailError) {
-          console.error(`Failed to send welcome email to ${email}:`, emailError);
+          console.error(`[ManualAdd] Failed to send welcome email to ${email}:`, emailError);
           // Don't fail the operation if email fails
         }
+      } else {
+        console.log(`[ManualAdd] isNewUser=${isNewUser}, skipping welcome email for ${email}`);
       }
 
       return res.status(201).json({

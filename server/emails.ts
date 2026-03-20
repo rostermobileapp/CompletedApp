@@ -515,7 +515,9 @@ export async function sendWelcomeEmail(
   data: WelcomeEmailData
 ): Promise<void> {
   try {
+    console.log(`[Email] Starting sendWelcomeEmail for ${recipientEmail}`);
     const { client, fromEmail } = await getUncachableResendClient();
+    console.log(`[Email] Resend client initialized, fromEmail: ${fromEmail}`);
     
     const appUrl = process.env.REPLIT_DEV_DOMAIN 
       ? `https://${process.env.REPLIT_DEV_DOMAIN}`
