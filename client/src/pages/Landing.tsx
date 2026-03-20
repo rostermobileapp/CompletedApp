@@ -135,7 +135,7 @@ export default function Landing() {
         </div>
       )}
       {/* Fixed Header */}
-      <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
+      <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
         <div className="max-w-7xl mx-auto px-6 py-0 flex justify-between items-center">
           <nav className="hidden md:flex flex-wrap items-center gap-6 text-sm">
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
@@ -188,7 +188,7 @@ export default function Landing() {
         )}
       </header>
       {/* Hero Section */}
-      <section className="relative pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white" style={{ paddingTop: 'calc(44px + 40px)' }}>
+      <section className="relative pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white" style={{ paddingTop: 'calc(40px + 40px)' }}>
         <div
           className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/5 via-transparent to-transparent"
           style={{ transform: `translateY(${scrollY * 0.4}px)` }}
