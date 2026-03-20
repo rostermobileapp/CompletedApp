@@ -220,8 +220,8 @@ export default function Landing() {
             <div className="flex justify-center mb-6">
               <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-2">
                 <div className="w-2 h-2 rounded-full bg-[#3c82f4] animate-pulse" />
-                <span className="text-sm font-medium text-[#3c82f4]">
-                  <AnimatedCounter value={userCount} /> players already using Roster
+                <span className="text-sm font-medium text-[#3c82f4] flex items-center gap-1">
+                  <AnimatedCounter value={userCount} /> players already using <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />
                 </span>
               </div>
             </div>
@@ -315,7 +315,7 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              <p className="text-3xl font-black text-[#3c82f4] mb-4">Roster fixes all of it.</p>
+              <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
               <p className="text-lg text-gray-600">One app, built by frustrated players, for players. Your schedule, your lineup, your team — organized. Finally.</p>
             </div>
           </div>
@@ -324,8 +324,8 @@ export default function Landing() {
       {/* Video Demo Section */}
       <section className="py-20 px-6 bg-gray-50" id="demo">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
-            See Roster in action.
+          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900 flex items-center justify-center gap-2">
+            See <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> in action.
           </h2>
           <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
 
