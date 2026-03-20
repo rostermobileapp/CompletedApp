@@ -2177,21 +2177,11 @@ export default function LeagueManagement() {
   // League delete mutation
   const deleteLeagueMutation = useMutation({
     mutationFn: async () => {
-      console.log('[DeleteLeague] Attempting to delete league:', leagueId);
-      alert('[DeleteLeague] Inside mutationFn, leagueId=' + leagueId);
-      try {
-        const response = await apiRequest('DELETE', `/api/leagues/${leagueId}`);
-        alert('[DeleteLeague] apiRequest returned successfully');
-        return response.json();
-      } catch (err: any) {
-        alert('[DeleteLeague] apiRequest threw error: ' + err?.message);
-        throw err;
-      }
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}`);
+      return response.json();
     },
     onSuccess: () => {
-      console.log('[DeleteLeague] League deleted successfully');
-      toast({ title: 'League deleted successfully' });
-      // Invalidate all league-related queries to update the UI
+      // Silently delete in background - just invalidate queries and navigate
       queryClient.invalidateQueries({ queryKey: ['/api/leagues/commissioner'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/league-memberships'] });
@@ -2200,7 +2190,7 @@ export default function LeagueManagement() {
       navigate('/league-list');
     },
     onError: (error: Error) => {
-      console.error('[DeleteLeague] Delete failed:', error.message);
+      // Only show error toast if something goes wrong
       toast({
         title: 'Delete Failed',
         description: error.message || 'Failed to delete league.',
