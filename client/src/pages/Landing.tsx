@@ -457,7 +457,7 @@ export default function Landing() {
                   { label: "Roster Management", roster: true, bench: true, snap: true, engine: true, cross: true },
                   { label: "Player/Attendance Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
                   { label: "In App Messaging", roster: true, bench: false, snap: true, engine: true, cross: true },
-                  { label: "In App RSVP", roster: true, bench: true, snap: true, engine: false, cross: true },
+                  { label: "In App RSVP", roster: true, bench: false, snap: true, engine: false, cross: true },
                   { label: "Player Substitution System", roster: true, bench: false, snap: false, engine: false, cross: false },
                   { label: "Polls/Bulletins", roster: true, bench: true, snap: true, engine: false, cross: false },
                   { label: "Facility Event Calendar", roster: true, bench: false, snap: false, engine: false, cross: false },
