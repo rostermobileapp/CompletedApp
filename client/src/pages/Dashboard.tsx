@@ -1732,12 +1732,15 @@ export default function Dashboard() {
       return team.name;
     }
     
-    // If team is in a league, show "LeagueName: TeamName"
+    // If team is in a league, show "LeagueName: TeamName" with season if available
     const league = Array.isArray(userLeagues) 
       ? userLeagues.find(l => l.id === team.leagueId) 
       : null;
     
     if (league) {
+      if (league.seasonName) {
+        return `${league.name}: ${league.seasonName} - ${team.name}`;
+      }
       return `${league.name}: ${team.name}`;
     }
     
@@ -1748,6 +1751,9 @@ export default function Dashboard() {
   // Helper function to get league display name
   const getLeagueDisplayName = React.useCallback((league: any) => {
     if (!league) return 'Select League';
+    if (league.seasonName) {
+      return `${league.name}: ${league.seasonName}`;
+    }
     return league.name;
   }, []);
   

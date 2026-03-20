@@ -1687,7 +1687,7 @@ export class DatabaseStorage implements IStorage {
     return league;
   }
 
-  async getUserLeagues(userId: string): Promise<(League & { facility?: Facility })[]> {
+  async getUserLeagues(userId: string): Promise<(League & { facility?: Facility; seasonName?: string | null })[]> {
     // Get leagues where user is a member
     const memberLeagues = await db
       .select({ 
@@ -1721,7 +1721,33 @@ export class DatabaseStorage implements IStorage {
     ];
     const uniqueLeagues = Array.from(new Map(allLeagueData.map(league => [league.id, league])).values());
     
-    return uniqueLeagues;
+    // Fetch active seasons for all leagues
+    const leagueIds = uniqueLeagues.map(l => l.id);
+    let seasonMap: Record<string, string | null> = {};
+    
+    if (leagueIds.length > 0) {
+      try {
+        const activeSeasons = await db
+          .select({ leagueId: seasons.leagueId, name: seasons.name })
+          .from(seasons)
+          .where(and(
+            inArray(seasons.leagueId, leagueIds),
+            eq(seasons.isActive, true)
+          ));
+        activeSeasons.forEach(s => {
+          seasonMap[s.leagueId] = s.name;
+        });
+      } catch (error) {
+        // If there's an error fetching seasons, just continue without them
+        console.debug("Error fetching seasons:", error);
+      }
+    }
+    
+    // Attach season names to leagues
+    return uniqueLeagues.map(league => ({
+      ...league,
+      seasonName: seasonMap[league.id] || null
+    }));
   }
 
   async getUserLeagueMemberships(userId: string): Promise<LeagueMembership[]> {
