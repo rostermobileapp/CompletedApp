@@ -76,7 +76,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail } from "./emails";
+import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail } from "./emails";
 import { startEventReminderJob } from "./eventReminderJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
@@ -8750,6 +8750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } else {
               // Create new user and membership
               let newUserId: string;
+              let isNewUser = false; // Track if we're creating a brand new user
               
               if (player.email) {
                 // Email provided: auto-assign to league/team
@@ -8762,6 +8763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else {
                   // User doesn't exist locally, check Supabase Auth or create
                   let authUser;
+                  let authUserExists = false;
                   try {
                     const { data: existingUsers } = await supabase.auth.admin.listUsers();
                     const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === player.email.toLowerCase());
@@ -8769,6 +8771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     if (existingAuthUser) {
                       // User exists in Supabase Auth but not in Roster - add them to Roster
                       authUser = existingAuthUser;
+                      authUserExists = true;
                     } else {
                       // Create new auth user
                       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
@@ -8786,6 +8789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       }
                       
                       authUser = newUser;
+                      isNewUser = true; // Brand new user created
                     }
                   } catch (error) {
                     console.error('Error managing auth user during CSV import:', error);
@@ -8827,6 +8831,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 isGoalie: player.isGoalie,
                 approvedAt: new Date(),
               });
+
+              // Send welcome email if new user with email was created
+              if (isNewUser && player.email) {
+                try {
+                  const teamName = player.teamId ? (await storage.getTeam(player.teamId))?.name : undefined;
+                  await sendWelcomeEmail(player.email, {
+                    playerName: `${player.firstName} ${player.lastName}`,
+                    leagueName: league.name,
+                    teamName: teamName,
+                  });
+                } catch (emailError) {
+                  console.error(`Failed to send welcome email to ${player.email}:`, emailError);
+                  // Don't fail the import if email fails
+                }
+              }
 
               // Track new player's team for chat syncing
               if (player.teamId) {
@@ -8958,6 +8977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already exists locally
       let existingLocalUser = await storage.getUserByEmail(email);
       let newUserId: string;
+      let isNewUser = false; // Track if we're creating a brand new user
 
       if (existingLocalUser) {
         // User already exists in Roster, just use their ID
@@ -8965,6 +8985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // User doesn't exist locally, check Supabase Auth or create
         let authUser;
+        let authUserExists = false;
         try {
           const { data: existingUsers } = await supabase.auth.admin.listUsers();
           const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
@@ -8972,6 +8993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingAuthUser) {
             // User exists in Supabase Auth but not in Roster - add them to Roster
             authUser = existingAuthUser;
+            authUserExists = true;
           } else {
             // Create new auth user
             const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
@@ -8989,6 +9011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             authUser = newUser;
+            isNewUser = true; // Brand new user created
           }
         } catch (error) {
           console.error('Error managing auth user:', error);
@@ -9017,6 +9040,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Auto-approve the membership since it was manually added by commissioner
       const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
+
+      // Send welcome email if new user was created
+      if (isNewUser) {
+        try {
+          const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
+          await sendWelcomeEmail(email, {
+            playerName: `${firstName} ${lastName}`,
+            leagueName: league.name,
+            teamName: teamName,
+          });
+        } catch (emailError) {
+          console.error(`Failed to send welcome email to ${email}:`, emailError);
+          // Don't fail the operation if email fails
+        }
+      }
 
       return res.status(201).json({
         id: approvedMembership.id,

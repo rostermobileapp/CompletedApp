@@ -503,3 +503,152 @@ Visit: ${appUrl}
     throw error;
   }
 }
+
+interface WelcomeEmailData {
+  playerName: string;
+  leagueName: string;
+  teamName?: string;
+}
+
+export async function sendWelcomeEmail(
+  recipientEmail: string,
+  data: WelcomeEmailData
+): Promise<void> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    const appUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : 'https://rosters.replit.app';
+    const signupUrl = `${appUrl}/?email=${encodeURIComponent(recipientEmail)}`;
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to Roster</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <!-- Header -->
+                  <tr>
+                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius: 8px 8px 0 0;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: bold;">Welcome to Roster! 🏒</h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
+                        Hey <strong>${data.playerName}</strong>,
+                      </p>
+                      
+                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
+                        You've been added to <strong>${data.leagueName}</strong>${data.teamName ? ` to play for <strong>${data.teamName}</strong>` : ''} on Roster. Now it's time to create your account and join the action!
+                      </p>
+                      
+                      <!-- CTA Button -->
+                      <div style="text-align: center; margin: 30px 0;">
+                        <a href="${signupUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 16px; font-weight: 600; transition: background-color 0.2s;">
+                          Create Your Account
+                        </a>
+                      </div>
+                      
+                      <!-- Download Info -->
+                      <div style="background-color: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 24px; margin: 30px 0;">
+                        <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e40af;">
+                          🎮 Download the Roster App
+                        </p>
+                        <p style="margin: 0 0 16px 0; font-size: 14px; color: #475569;">
+                          For the best experience, download Roster on your phone and stay connected with your team.
+                        </p>
+                        
+                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                          <tr>
+                            <td style="padding: 0 8px 0 0; text-align: center; width: 50%;">
+                              <a href="https://apps.apple.com/app/roster-hockey-league/id6479073192" style="display: inline-block; text-decoration: none;">
+                                <img src="https://img.shields.io/badge/Download-App_Store-black?style=for-the-badge&logo=apple" alt="Download on App Store" style="max-width: 100%; height: auto; border-radius: 6px;">
+                              </a>
+                            </td>
+                            <td style="padding: 0 0 0 8px; text-align: center; width: 50%;">
+                              <a href="https://play.google.com/store/apps/details?id=com.natively.roster" style="display: inline-block; text-decoration: none;">
+                                <img src="https://img.shields.io/badge/Get_it_on-Google_Play-414141?style=for-the-badge&logo=google-play" alt="Get it on Google Play" style="max-width: 100%; height: auto; border-radius: 6px;">
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                      
+                      <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 21px; color: #666666;">
+                        If you already have a Roster account, you can simply log in with <strong>${recipientEmail}</strong> and you'll automatically be added to the team.
+                      </p>
+                      
+                      <p style="margin: 0; font-size: 14px; line-height: 21px; color: #666666;">
+                        Questions? Contact your league commissioner or visit our support page.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
+                        This email was sent to you because you were added to a team on <strong>Roster</strong><br>
+                        <a href="${appUrl}" style="color: #3b82f6; text-decoration: none;">Visit Roster</a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+    
+    const textContent = `
+Welcome to Roster! 🏒
+
+Hey ${data.playerName},
+
+You've been added to ${data.leagueName}${data.teamName ? ` to play for ${data.teamName}` : ''} on Roster. Now it's time to create your account and join the action!
+
+CREATE YOUR ACCOUNT:
+${signupUrl}
+
+DOWNLOAD THE ROSTER APP:
+Apple App Store:
+https://apps.apple.com/app/roster-hockey-league/id6479073192
+
+Google Play Store:
+https://play.google.com/store/apps/details?id=com.natively.roster
+
+If you already have a Roster account, you can simply log in with ${recipientEmail} and you'll automatically be added to the team.
+
+Questions? Contact your league commissioner or visit our support page.
+
+---
+This email was sent to you because you were added to a team on Roster
+Visit: ${appUrl}
+    `.trim();
+    
+    await client.emails.send({
+      from: fromEmail,
+      to: recipientEmail,
+      subject: `🏒 Welcome to Roster - Join ${data.leagueName}!`,
+      html: htmlContent,
+      text: textContent,
+    });
+    
+    console.log(`✅ Sent welcome email to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send welcome email to ${recipientEmail}:`, error);
+    throw error;
+  }
+}
