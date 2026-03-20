@@ -311,7 +311,7 @@ export function SubstituteRequestModal({
               <p className="text-sm text-muted-foreground mt-1">Please try again or contact support</p>
             </div>
           ) : (
-            <ScrollArea className="flex-1 overflow-auto" style={{ height: '50vh' }}>
+            <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-2">
                 {sortedPlayers.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
