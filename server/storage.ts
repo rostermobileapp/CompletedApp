@@ -883,6 +883,31 @@ export class DatabaseStorage implements IStorage {
       // Generate display ID upfront for both insert and update scenarios
       const displayId = await this.generateUniqueDisplayId();
       
+      // Build safe update set - filter out undefined values
+      const updateSet: any = {
+        // Always update timestamp
+        updatedAt: new Date(),
+        // Only update displayId if not already set
+        displayId: sql`COALESCE(${users.displayId}, ${displayId})`,
+      };
+      
+      // Only add conditional updates if values are provided
+      if (userData.email !== undefined) {
+        updateSet.email = userData.email;
+      }
+      if (userData.firstName !== undefined) {
+        updateSet.firstName = sql`COALESCE(${users.firstName}, ${userData.firstName})`;
+      }
+      if (userData.lastName !== undefined) {
+        updateSet.lastName = sql`COALESCE(${users.lastName}, ${userData.lastName})`;
+      }
+      if (userData.profileImageUrl !== undefined) {
+        updateSet.profileImageUrl = sql`COALESCE(${users.profileImageUrl}, ${userData.profileImageUrl})`;
+      }
+      if (userData.role !== undefined) {
+        updateSet.role = userData.role;
+      }
+      
       // Use INSERT...ON CONFLICT to handle race conditions properly
       const [user] = await db
         .insert(users)
@@ -892,22 +917,7 @@ export class DatabaseStorage implements IStorage {
         })
         .onConflictDoUpdate({
           target: users.id,
-          set: {
-            // Only update email (user might change it in Supabase)
-            email: userData.email || undefined,
-            // Only update firstName if not already set
-            firstName: sql`COALESCE(${users.firstName}, ${userData.firstName})`,
-            // Only update lastName if not already set
-            lastName: sql`COALESCE(${users.lastName}, ${userData.lastName})`,
-            // Only update profileImageUrl if not already set
-            profileImageUrl: sql`COALESCE(${users.profileImageUrl}, ${userData.profileImageUrl})`,
-            // Only update displayId if not already set
-            displayId: sql`COALESCE(${users.displayId}, ${displayId})`,
-            // Update role if provided
-            role: userData.role || sql`${users.role}`,
-            // Always update timestamp
-            updatedAt: new Date(),
-          },
+          set: updateSet,
         })
         .returning();
       
