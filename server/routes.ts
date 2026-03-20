@@ -8749,17 +8749,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
               actualSuccessCount++;
             } else {
               // Create new user and membership
-              const uniqueEmail = player.email || `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}.${Date.now()}@placeholder.roster`;
-              const placeholderUser = await storage.upsertUser({
-                email: uniqueEmail,
-                firstName: player.firstName,
-                lastName: player.lastName,
-                profileImageUrl: null,
-              });
+              let newUserId: string;
+              
+              if (player.email) {
+                // Email provided: auto-assign to league/team
+                // Check if user already exists locally
+                let existingLocalUser = await storage.getUserByEmail(player.email);
+                
+                if (existingLocalUser) {
+                  // User already exists in Roster, just use their ID
+                  newUserId = existingLocalUser.id;
+                } else {
+                  // User doesn't exist locally, check Supabase Auth or create
+                  let authUser;
+                  try {
+                    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+                    const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === player.email.toLowerCase());
+                    
+                    if (existingAuthUser) {
+                      // User exists in Supabase Auth but not in Roster - add them to Roster
+                      authUser = existingAuthUser;
+                    } else {
+                      // Create new auth user
+                      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+                        email: player.email,
+                        password: Math.random().toString(36).slice(-16), // Temporary password
+                        user_metadata: {
+                          first_name: player.firstName,
+                          last_name: player.lastName,
+                          phone: player.phoneNumber || undefined,
+                        }
+                      });
+                      
+                      if (createError) {
+                        throw new Error(`Failed to create user: ${createError.message}`);
+                      }
+                      
+                      authUser = newUser;
+                    }
+                  } catch (error) {
+                    console.error('Error managing auth user during CSV import:', error);
+                    throw error;
+                  }
+
+                  // Add user to local Roster database using upsert
+                  newUserId = authUser.id;
+                  await storage.upsertUser({
+                    id: authUser.id,
+                    email: player.email,
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    displayName: `${player.firstName} ${player.lastName}`,
+                  });
+                }
+              } else {
+                // No email provided: create with placeholder email for later matching
+                const uniqueEmail = `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}.${Date.now()}@placeholder.roster`;
+                const placeholderUser = await storage.upsertUser({
+                  email: uniqueEmail,
+                  firstName: player.firstName,
+                  lastName: player.lastName,
+                  profileImageUrl: null,
+                });
+                newUserId = placeholderUser.id;
+              }
               
               // Create league membership for this user
               await db.insert(leagueMemberships).values({
-                userId: placeholderUser.id,
+                userId: newUserId,
                 leagueId: leagueId,
                 assignedTeamId: player.teamId,
                 status: 'approved',
@@ -8777,7 +8834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               actualSuccessCount++;
-              createdPlayerIds.push(placeholderUser.id);
+              createdPlayerIds.push(newUserId);
             }
             
           } catch (error) {
