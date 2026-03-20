@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -311,7 +310,7 @@ export function SubstituteRequestModal({
               <p className="text-sm text-muted-foreground mt-1">Please try again or contact support</p>
             </div>
           ) : (
-            <ScrollArea className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="space-y-2 px-4">
                 {sortedPlayers.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
@@ -391,7 +390,7 @@ export function SubstituteRequestModal({
                   ))
                 )}
               </div>
-            </ScrollArea>
+            </div>
           )}
 
           {/* Action Buttons */}
