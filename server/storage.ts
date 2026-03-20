@@ -6193,19 +6193,25 @@ export class DatabaseStorage implements IStorage {
     
     for (const game of gamesOnDate) {
       const homeMembers = await this.getTeamMembers(game.homeTeamId);
-      const awayMembers = await this.getTeamMembers(game.awayTeamId);
+      const awayMembers = game.awayTeamId ? await this.getTeamMembers(game.awayTeamId) : [];
       
       console.log(`🔍 Game ${game.id.substring(0, 8)}...`);
       console.log(`  Home team ${game.homeTeamId.substring(0, 8)}: ${homeMembers.length} members`);
-      console.log(`  Away team ${game.awayTeamId.substring(0, 8)}: ${awayMembers.length} members`);
+      if (game.awayTeamId) {
+        console.log(`  Away team ${game.awayTeamId.substring(0, 8)}: ${awayMembers.length} members`);
+      } else {
+        console.log(`  Away team: none (no opposing team)`);
+      }
       
       homeMembers.forEach(member => {
         userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.homeTeamId });
       });
       
-      awayMembers.forEach(member => {
-        userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.awayTeamId });
-      });
+      if (game.awayTeamId) {
+        awayMembers.forEach(member => {
+          userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.awayTeamId });
+        });
+      }
     }
 
     console.log(`🔍 Total players scheduled: ${userGameInfo.size} out of ${leagueMembers.length} league members`);

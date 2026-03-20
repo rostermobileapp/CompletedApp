@@ -170,7 +170,8 @@ export function SubstituteRequestModal({
     
     // Exclude players on BOTH teams in this game (same team AND opposing team)
     if (player.teamId === originalPlayerTeamId) return false;
-    if (player.teamId === opposingTeamId) return false;
+    // Only filter by opposing team if one exists
+    if (opposingTeamId && player.teamId === opposingTeamId) return false;
     
     // Filter by position type: if goalie needs substitute, only show goalies; if skater, only show skaters
     if (originalPlayerIsGoalie && !player.isGoalie) return false;
