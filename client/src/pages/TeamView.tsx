@@ -286,7 +286,7 @@ export default function TeamView() {
                   <img 
                     src={getImageUrl(typedTeam.logoUrl) || ''} 
                     alt={`${typedTeam.name} logo`}
-                    className="w-full h-full rounded-lg object-contain"
+                    className="w-full h-full rounded-lg object-contain bg-transparent"
                     data-testid="img-team-logo"
                   />
                 ) : (

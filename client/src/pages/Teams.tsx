@@ -364,7 +364,7 @@ export default function Teams() {
                             <img 
                               src={getImageUrl(team.logoUrl) || ''} 
                               alt={`${team.name} logo`}
-                              className="w-full h-full rounded-lg object-contain"
+                              className="w-full h-full rounded-lg object-contain bg-transparent"
                               data-testid={`img-team-logo-${team.id}`}
                             />
                           ) : (

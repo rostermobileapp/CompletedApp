@@ -629,7 +629,7 @@ export default function GameDetails() {
                 <img 
                   src={getImageUrl(opponentTeam.logoUrl) || ''} 
                   alt={`${opponentTeam.name} logo`}
-                  className="w-full h-full rounded-lg object-cover"
+                  className="w-full h-full rounded-lg object-cover bg-transparent"
                   data-testid="img-opponent-logo"
                 />
               ) : (
