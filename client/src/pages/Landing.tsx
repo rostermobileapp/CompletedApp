@@ -304,7 +304,7 @@ export default function Landing() {
       <section className="py-20 px-6 bg-gray-50" id="demo">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900 flex items-center justify-center gap-2">
-            See <img src={rosterLightLogo} alt="Roster" className="h-12 md:h-16 object-contain" /> in action.
+            See <img src={rosterLightLogo} alt="Roster" className="h-8 md:h-16 object-contain" /> in action.
           </h2>
           <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
 
