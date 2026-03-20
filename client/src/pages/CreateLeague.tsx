@@ -214,7 +214,7 @@ export default function CreateLeague() {
           </div>
 
           {/* League Settings */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6 mt-[4px] pt-[4px] pb-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">League Settings</h3>
