@@ -176,7 +176,7 @@ export default function TermsOfService() {
               If you have any questions about these Terms of Service, please contact us:
             </p>
             <p className="text-gray-300 mt-4">
-              <strong>Email:</strong> contact@roster-app.com
+              <strong>Email:</strong> roster.mobile.app@gmail.com
             </p>
           </section>
         </div>
