@@ -540,7 +540,7 @@ export async function sendWelcomeEmail(
                   <!-- Header -->
                   <tr>
                     <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius: 8px 8px 0 0;">
-                      <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: bold;">Welcome to Roster! 🏒</h1>
+                      <img src="https://rosters.replit.app/favicon.png" alt="Roster Logo" style="max-width: 120px; height: auto; margin: 0 auto; display: block;">
                     </td>
                   </tr>
                   
