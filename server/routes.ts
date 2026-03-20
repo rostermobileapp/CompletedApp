@@ -3419,9 +3419,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leagues", isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { season, ...leagueBody } = req.body;
       
       const leagueData = insertLeagueSchema.parse({
-        ...req.body,
+        ...leagueBody,
         commissionerId: userId
       });
       
@@ -3440,6 +3441,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...leagueData,
         commissionerId: userId,
       });
+
+      // Automatically create season if one was provided during league creation
+      if (season && season.trim()) {
+        try {
+          await storage.createSeason({
+            leagueId: league.id,
+            name: season,
+            isActive: true,
+          });
+        } catch (seasonError) {
+          console.warn("Failed to create season during league creation:", seasonError);
+          // Don't fail the whole operation if season creation fails
+        }
+      }
+
       res.json(league);
     } catch (error) {
       console.error("Error creating league:", error);
