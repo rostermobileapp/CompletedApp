@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MarketingLayout } from '@/components/MarketingLayout';
 import { useLocation } from 'wouter';
 import { Users, MessageSquare, CheckCircle } from 'lucide-react';
@@ -8,11 +8,6 @@ import founderPhoto from '@assets/PXL_20210123_194151447.MP_1773953996231.jpg';
 export default function About() {
   const [, setLocation] = useLocation();
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
-
-  useEffect(() => {
-    window.history.scrollRestoration = 'manual';
-    window.scrollTo(0, 0);
-  }, []);
 
   return (
     <MarketingLayout

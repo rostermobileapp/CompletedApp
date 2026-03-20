@@ -163,24 +163,27 @@ function Router() {
 
   if (!isAuthenticated) {
     return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route path="/pricing" component={Pricing} />
-        <Route path="/about" component={About} />
-        <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>
-        <Route path="/soccer">{() => <SportLanding sport="soccer" />}</Route>
-        <Route path="/baseball">{() => <SportLanding sport="baseball" />}</Route>
-        <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
-        <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
-        <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
-        <Route path="/waitlist" component={Waitlist} />
-        <Route path="/login" component={Login} />
-        <Route path="/privacy-policy" component={PrivacyPolicy} />
-        <Route path="/terms-of-service" component={TermsOfService} />
-        <Route path="/facilities" component={FacilityBrowse} />
-        <Route path="/facilities/:id" component={FacilityDetail} />
-        <Route component={Landing} />
-      </Switch>
+      <>
+        <ScrollToTop />
+        <Switch>
+          <Route path="/" component={Landing} />
+          <Route path="/pricing" component={Pricing} />
+          <Route path="/about" component={About} />
+          <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>
+          <Route path="/soccer">{() => <SportLanding sport="soccer" />}</Route>
+          <Route path="/baseball">{() => <SportLanding sport="baseball" />}</Route>
+          <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
+          <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
+          <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
+          <Route path="/waitlist" component={Waitlist} />
+          <Route path="/login" component={Login} />
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/terms-of-service" component={TermsOfService} />
+          <Route path="/facilities" component={FacilityBrowse} />
+          <Route path="/facilities/:id" component={FacilityDetail} />
+          <Route component={Landing} />
+        </Switch>
+      </>
     );
   }
 
