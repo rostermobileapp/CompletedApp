@@ -375,14 +375,17 @@ export default function Calendar() {
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center relative ${(() => {
+                      const opponentTeam = game.homeTeam?.id === activeTeam?.id ? game.awayTeam : game.homeTeam;
+                      return opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary';
+                    })()}`}>
                     {(() => {
                       const opponentTeam = game.homeTeam?.id === activeTeam?.id ? game.awayTeam : game.homeTeam;
                       return opponentTeam?.logoUrl ? (
                         <img 
                           src={getImageUrl(opponentTeam.logoUrl) || ''} 
                           alt={`${opponentTeam.name} logo`}
-                          className="w-full h-full rounded-lg object-cover"
+                          className="w-full h-full rounded-lg object-cover bg-transparent"
                           data-testid={`img-opponent-logo-${game.id}`}
                         />
                       ) : (

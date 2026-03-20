@@ -624,7 +624,7 @@ export default function GameDetails() {
       <div className="px-6 py-6 space-y-6 pt-[4px] pb-[4px] pl-[12px] pr-[12px]">
         <div className="rounded-xl border border-border p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
+            <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
               {opponentTeam?.logoUrl ? (
                 <img 
                   src={getImageUrl(opponentTeam.logoUrl) || ''} 
