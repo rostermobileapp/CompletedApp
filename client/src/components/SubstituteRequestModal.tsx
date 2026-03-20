@@ -233,7 +233,7 @@ export function SubstituteRequestModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 gap-4 overflow-hidden min-h-0">
           {/* Players Who Need Substitutes Section */}
           {showPlayerToReplaceSelection && (
             <div className="space-y-2">
