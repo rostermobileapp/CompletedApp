@@ -167,7 +167,7 @@ export default function CreateLeague() {
           </div>
 
           {/* Location & Venue */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-border p-6 pt-[4px] pb-[4px] mt-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <MapPin className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">Location & Venue</h3>
