@@ -6193,21 +6193,23 @@ export class DatabaseStorage implements IStorage {
     
     for (const game of gamesOnDate) {
       const homeMembers = await this.getTeamMembers(game.homeTeamId);
-      const awayMembers = game.awayTeamId ? await this.getTeamMembers(game.awayTeamId) : [];
+      // Check if away team is a real team (not a placeholder like "opponent")
+      const hasRealAwayTeam = game.awayTeamId && game.awayTeamId !== 'opponent' && game.awayTeamId.length > 0;
+      const awayMembers = hasRealAwayTeam ? await this.getTeamMembers(game.awayTeamId) : [];
       
       console.log(`🔍 Game ${game.id.substring(0, 8)}...`);
       console.log(`  Home team ${game.homeTeamId.substring(0, 8)}: ${homeMembers.length} members`);
-      if (game.awayTeamId) {
+      if (hasRealAwayTeam) {
         console.log(`  Away team ${game.awayTeamId.substring(0, 8)}: ${awayMembers.length} members`);
       } else {
-        console.log(`  Away team: none (no opposing team)`);
+        console.log(`  Away team: none (no opposing team or placeholder "${game.awayTeamId}")`);
       }
       
       homeMembers.forEach(member => {
         userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.homeTeamId });
       });
       
-      if (game.awayTeamId) {
+      if (hasRealAwayTeam) {
         awayMembers.forEach(member => {
           userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.awayTeamId });
         });

@@ -65,6 +65,7 @@ export function SubstituteRequestModal({
   const { data: allPlayers = [], isLoading, error: playersError, isError } = useQuery({
     queryKey: ['/api/substitute-requests/players-availability', gameDate, leagueId],
     queryFn: async () => {
+      console.log('🔍 Fetching players availability with:', { gameDate, leagueId });
       const authHeaders = await getAuthHeaders();
       const response = await fetch('/api/substitute-requests/players-availability', {
         method: 'POST',
@@ -78,10 +79,14 @@ export function SubstituteRequestModal({
       if (!response.ok) {
         throw new Error(`Failed to fetch players: ${response.status}`);
       }
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 Received players:', data.length, 'players');
+      return data;
     },
     enabled: isOpen && !!gameDate && !!leagueId,
   });
+  
+  console.log('[SubstituteModal] isOpen:', isOpen, 'gameDate:', gameDate, 'leagueId:', leagueId, 'enabled:', isOpen && !!gameDate && !!leagueId);
 
   // Fetch existing substitute requests for this game to show which players already have requests
   const { data: existingRequests = [] } = useQuery({
