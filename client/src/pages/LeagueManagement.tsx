@@ -1543,12 +1543,17 @@ export default function LeagueManagement() {
         assignedTeamId: playerData.assignedTeamId || null,
       });
 
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add player');
+      }
+
       return response.json();
     },
     onSuccess: () => {
       toast({
         title: 'Player Added',
-        description: `${manualPlayerForm.firstName} ${manualPlayerForm.lastName} has been added to the league.`,
+        description: `${manualPlayerForm.firstName} ${manualPlayerForm.lastName} has been added to the league. You can send a welcome email from the batch email feature.`,
       });
       
       // Reset form

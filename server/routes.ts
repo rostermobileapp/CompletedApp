@@ -8882,41 +8882,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create or get user by email
-      let user;
-      try {
-        const { data: existingUsers, error } = await supabase.auth.admin.listUsers();
-        const existingUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-        
-        if (existingUser) {
-          user = existingUser;
-        } else {
-          // Create new user
-          const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-            email,
-            password: Math.random().toString(36).slice(-16), // Temporary password
-            user_metadata: {
-              first_name: firstName,
-              last_name: lastName,
-              phone: phoneNumber || undefined,
+      // Check if user already exists locally
+      let existingLocalUser = await storage.getUserByEmail(email);
+      let newUserId: string;
+
+      if (existingLocalUser) {
+        // User exists, use existing ID
+        newUserId = existingLocalUser.id;
+      } else {
+        // Create or get user in Supabase Auth
+        let authUser;
+        try {
+          const { data: existingUsers } = await supabase.auth.admin.listUsers();
+          const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+          
+          if (existingAuthUser) {
+            authUser = existingAuthUser;
+          } else {
+            // Create new auth user
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+              email,
+              password: Math.random().toString(36).slice(-16), // Temporary password
+              user_metadata: {
+                first_name: firstName,
+                last_name: lastName,
+                phone: phoneNumber || undefined,
+              }
+            });
+            
+            if (createError) {
+              return res.status(400).json({ message: `Failed to create user: ${createError.message}` });
             }
-          });
-          
-          if (createError) {
-            return res.status(400).json({ message: `Failed to create user: ${createError.message}` });
+            
+            authUser = newUser;
           }
-          
-          user = newUser;
+        } catch (error) {
+          console.error('Error managing auth user:', error);
+          return res.status(500).json({ message: 'Failed to process user' });
         }
-      } catch (error) {
-        console.error('Error managing user:', error);
-        return res.status(500).json({ message: 'Failed to process user' });
+
+        // Create user in local database
+        newUserId = authUser.id;
+        await storage.createUser({
+          id: authUser.id,
+          email,
+          firstName,
+          lastName,
+          profileImageUrl: null,
+          displayName: `${firstName} ${lastName}`,
+        });
       }
 
       // Create league membership
       const newMembership = await storage.requestLeagueMembership({
         leagueId,
-        userId: user.id,
+        userId: newUserId,
         displayFirstName: firstName,
         displayLastName: lastName,
         assignedTeamId: assignedTeamId || undefined,
@@ -8925,26 +8945,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-approve the membership since it was manually added by commissioner
       const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
 
-      // Send welcome email
-      try {
-        const emailContent = `Welcome to ${league.name}!\n\nYou have been added to the league. Click the link below to set up your account:\n\n${import.meta.env.VITE_APP_URL || 'https://replit.app'}/login`;
-        
-        if (resend && resend.emails) {
-          await resend.emails.send({
-            from: 'noreply@example.com',
-            to: email,
-            subject: `Welcome to ${league.name}`,
-            text: emailContent,
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to send welcome email:', error);
-        // Don't fail the operation if email fails
-      }
-
       return res.status(201).json({
         id: approvedMembership.id,
-        userId: user.id,
+        userId: newUserId,
         leagueId,
         displayFirstName: firstName,
         displayLastName: lastName,
