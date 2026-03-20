@@ -8832,9 +8832,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 approvedAt: new Date(),
               });
 
-              // Send welcome email if new user with email was created
-              if (isNewUser && player.email) {
-                console.log(`[CSVImport] isNewUser=${isNewUser}, sending welcome email to ${player.email}`);
+              // Send welcome email when a player is newly added to the league (only if email provided)
+              // This notifies them that they've been added to a team/league
+              if (player.email) {
+                console.log(`[CSVImport] Sending welcome email to newly added player: ${player.email}`);
                 try {
                   const teamName = player.teamId ? (await storage.getTeam(player.teamId))?.name : undefined;
                   console.log(`[CSVImport] Team name: ${teamName || 'none'}, League: ${league.name}`);
@@ -8848,8 +8849,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.error(`[CSVImport] Failed to send welcome email to ${player.email}:`, emailError);
                   // Don't fail the import if email fails
                 }
-              } else if (player.email) {
-                console.log(`[CSVImport] isNewUser=${isNewUser}, skipping welcome email for ${player.email}`);
               }
 
               // Track new player's team for chat syncing
@@ -9046,24 +9045,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-approve the membership since it was manually added by commissioner
       const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
 
-      // Send welcome email if new user was created
-      if (isNewUser) {
-        console.log(`[ManualAdd] isNewUser=${isNewUser}, sending welcome email to ${email}`);
-        try {
-          const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
-          console.log(`[ManualAdd] Team name: ${teamName || 'none'}, League: ${league.name}`);
-          await sendWelcomeEmail(email, {
-            playerName: `${firstName} ${lastName}`,
-            leagueName: league.name,
-            teamName: teamName,
-          });
-          console.log(`[ManualAdd] Welcome email sent successfully to ${email}`);
-        } catch (emailError) {
-          console.error(`[ManualAdd] Failed to send welcome email to ${email}:`, emailError);
-          // Don't fail the operation if email fails
-        }
-      } else {
-        console.log(`[ManualAdd] isNewUser=${isNewUser}, skipping welcome email for ${email}`);
+      // Send welcome email when a player is newly added to the league (regardless of whether they're a new system user)
+      // This notifies them that they've been added to a team/league
+      console.log(`[ManualAdd] Sending welcome email to newly added player: ${email}`);
+      try {
+        const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
+        console.log(`[ManualAdd] Team name: ${teamName || 'none'}, League: ${league.name}`);
+        await sendWelcomeEmail(email, {
+          playerName: `${firstName} ${lastName}`,
+          leagueName: league.name,
+          teamName: teamName,
+        });
+        console.log(`[ManualAdd] Welcome email sent successfully to ${email}`);
+      } catch (emailError) {
+        console.error(`[ManualAdd] Failed to send welcome email to ${email}:`, emailError);
+        // Don't fail the operation if email fails
       }
 
       return res.status(201).json({
