@@ -363,7 +363,7 @@ export default function Landing() {
                 {index < howItWorks.length - 1 && (
                   <div className="hidden md:block absolute top-10 left-[60%] w-full h-px bg-gradient-to-r from-[#3c82f4]/30 to-transparent z-0" />
                 )}
-                <div className="relative z-10 bg-white border border-gray-200 rounded-2xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all shadow-sm">
+                <div className="relative z-10 bg-white border border-gray-200 rounded-2xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all shadow-sm h-full flex flex-col">
                   <div className="flex items-start gap-4 mb-4">
                     <div className="w-14 h-14 rounded-xl bg-[#3c82f4]/10 border border-[#3c82f4]/20 flex items-center justify-center flex-shrink-0">
                       <item.icon className="w-7 h-7 text-[#3c82f4]" />
@@ -371,7 +371,7 @@ export default function Landing() {
                     <span className="text-5xl font-black text-gray-200 leading-none mt-1">{item.step}</span>
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>
-                  <p className="text-gray-500 leading-relaxed">{item.description}</p>
+                  <p className="text-gray-500 leading-relaxed flex-1">{item.description}</p>
                 </div>
               </div>
             ))}
