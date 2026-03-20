@@ -275,7 +275,7 @@ export default function Landing() {
               </button>
               <button
                 disabled
-                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50"
+                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50 pl-[4px] pr-[4px]"
                 title="Coming May 1st"
                 aria-label="Get it on Google Play - Coming May 1st"
               >
