@@ -24,7 +24,7 @@ export default function About() {
             <div className="flex-shrink-0 w-72 md:w-80">
               <div 
                 onClick={() => setPhotoModalOpen(true)}
-                className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-100 cursor-pointer hover:shadow-2xl hover:shadow-blue-300 transition-shadow"
+                className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-300 cursor-pointer transition-shadow"
               >
                 <img
                   src={founderPhoto}
