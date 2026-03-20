@@ -104,7 +104,7 @@ export default function CreateLeague() {
   return (
     <div className="min-h-screen flex flex-col pb-48" data-testid="create-league-page">
       {/* Header */}
-      <div className="p-6 pt-12">
+      <div className="p-6 pt-[12px] pb-[12px]">
         <div className="flex items-center gap-4 mb-6">
           <button 
             onClick={() => {
@@ -123,7 +123,6 @@ export default function CreateLeague() {
           Set up a new league for your sport community
         </p>
       </div>
-      
       {/* Form */}
       <div className="px-6">
         <form id="create-league-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -288,7 +287,6 @@ export default function CreateLeague() {
 
         </form>
       </div>
-      
       <FixedBottomButton>
         <button
           type="submit"
