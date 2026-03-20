@@ -149,17 +149,15 @@ export default function Landing() {
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
         🚀 Launching May 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
       </div>
-
       {/* "Come back May 1st" toast */}
       {loginMessageVisible && (
         <div className="fixed top-[80px] left-1/2 -translate-x-1/2 z-[100] bg-white border border-gray-200 text-gray-900 px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold">
           🗓️ Come back May 1st — we're not live yet!
         </div>
       )}
-
       {/* Fixed Header */}
       <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center pt-[0px] pb-[0px]">
           <nav className="hidden md:flex flex-wrap items-center gap-6 text-sm">
             <a href="#how-it-works" className="text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
             <a href="#features" className="text-gray-500 hover:text-gray-900 transition-colors">Features</a>
@@ -208,7 +206,6 @@ export default function Landing() {
           </div>
         )}
       </header>
-
       {/* Hero Section */}
       <section className="relative pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white" style={{ paddingTop: 'calc(44px + 60px)' }}>
         <div
@@ -324,7 +321,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Video Demo Section */}
       <section className="py-20 px-6 bg-gray-50" id="demo">
         <div className="max-w-4xl mx-auto text-center">
@@ -352,7 +348,6 @@ export default function Landing() {
           <p className="text-gray-400 text-xs mt-3">Video demo coming soon — sign up to get early access</p>
         </div>
       </section>
-
       {/* How It Works */}
       <section className="py-24 px-6 bg-white" id="how-it-works">
         <div className="max-w-6xl mx-auto">
@@ -383,7 +378,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Social Proof Stats Bar */}
       <section className="py-14 px-6 border-y border-gray-100 bg-blue-50/40">
         <div className="max-w-5xl mx-auto">
@@ -412,7 +406,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Features Section - Comparison Table */}
       <section className="py-24 px-6 bg-white" id="features">
         <div className="max-w-7xl mx-auto">
@@ -503,7 +496,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Testimonials Section */}
       <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-7xl mx-auto">
@@ -539,7 +531,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Pricing Section */}
       <section className="py-24 px-6 bg-white" id="pricing">
         <div className="max-w-7xl mx-auto">
@@ -653,7 +644,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Final CTA */}
       <section className="py-24 px-6 bg-gradient-to-b from-blue-50 to-white">
         <div className="max-w-3xl mx-auto text-center">
@@ -700,7 +690,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Footer */}
       <footer className="border-t border-gray-200 py-12 px-6 bg-white" data-testid="footer">
         <div className="max-w-7xl mx-auto">
