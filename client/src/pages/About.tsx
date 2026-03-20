@@ -50,7 +50,7 @@ export default function About() {
         </div>
       </section>
       {/* ── 2. WHY HE STARTED ROSTER ─────────────────────────────── */}
-      <section className="py-20 px-6 bg-white">
+      <section className="py-20 px-6 bg-white pt-[2px] pb-[2px]">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
