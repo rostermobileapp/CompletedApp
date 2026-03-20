@@ -8914,14 +8914,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create league membership
-      const newMembership = await storage.createLeagueMembership({
+      const newMembership = await storage.requestLeagueMembership({
         leagueId,
         userId: user.id,
         displayFirstName: firstName,
         displayLastName: lastName,
         assignedTeamId: assignedTeamId || undefined,
-        status: 'approved', // Auto-approve when manually added by commissioner
       });
+
+      // Auto-approve the membership since it was manually added by commissioner
+      const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
 
       // Send welcome email
       try {
@@ -8941,13 +8943,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       return res.status(201).json({
-        id: newMembership.id,
+        id: approvedMembership.id,
         userId: user.id,
         leagueId,
         displayFirstName: firstName,
         displayLastName: lastName,
         assignedTeamId: assignedTeamId || undefined,
-        status: 'approved',
+        status: approvedMembership.status,
       });
 
     } catch (error) {
