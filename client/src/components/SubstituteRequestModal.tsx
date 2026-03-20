@@ -50,19 +50,15 @@ export function SubstituteRequestModal({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get the selected original player's name
   const getSelectedOriginalPlayerName = () => {
     if (originalPlayerName) return originalPlayerName;
     const player = notAttendingPlayers.find(p => p.user.id === selectedOriginalPlayer);
     return player ? `${player.user.firstName} ${player.user.lastName}` : '';
   };
 
-  // Determine opposing team ID based on the original player's team
-  // If there's no opposing team (awayTeamId is null), set opposingTeamId to null
   const opposingTeamId = awayTeamId ? (originalPlayerTeamId === homeTeamId ? awayTeamId : homeTeamId) : null;
 
-  // Fetch all league players with availability status
-  const { data: allPlayers = [], isLoading, error: playersError, isError } = useQuery({
+  const { data: allPlayers = [], isLoading, error: playersError } = useQuery({
     queryKey: ['/api/substitute-requests/players-availability', gameDate, leagueId],
     queryFn: async () => {
       console.log('🔍 Fetching players availability with:', { gameDate, leagueId });
@@ -88,7 +84,6 @@ export function SubstituteRequestModal({
   
   console.log('[SubstituteModal] isOpen:', isOpen, 'gameDate:', gameDate, 'leagueId:', leagueId, 'enabled:', isOpen && !!gameDate && !!leagueId);
 
-  // Fetch existing substitute requests for this game to show which players already have requests
   const { data: existingRequests = [] } = useQuery({
     queryKey: ["/api/substitute-requests", gameId],
     queryFn: async () => {
@@ -100,7 +95,6 @@ export function SubstituteRequestModal({
         return [];
       }
       const allRequests = await response.json();
-      // Filter to only this game's pending requests
       return allRequests.filter((req: any) => 
         req.gameId === gameId && 
         ['pending_opponent_approval', 'pending_commissioner_approval', 'pending_substitute_approval'].includes(req.status)
@@ -109,12 +103,10 @@ export function SubstituteRequestModal({
     enabled: isOpen && !!gameId,
   });
 
-  // Create a set of player IDs who already have pending substitute requests
   const playersWithPendingRequests = new Set(
     existingRequests.map((req: any) => req.originalPlayerId)
   );
 
-  // Fetch original player's league membership to get their position
   const effectiveOriginalPlayerId = originalPlayerId || selectedOriginalPlayer;
   const { data: originalPlayerMembership } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`, effectiveOriginalPlayerId],
@@ -134,7 +126,6 @@ export function SubstituteRequestModal({
 
   const originalPlayerIsGoalie = originalPlayerMembership?.isGoalie || false;
 
-  // Create substitute request mutation
   const createRequestMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPlayer) throw new Error('No substitute player selected');
@@ -167,22 +158,14 @@ export function SubstituteRequestModal({
     },
   });
 
-  // Filter players based on requirements
   const filteredPlayers = allPlayers.filter((player: any) => {
-    // Exclude the original player (either from prop or selected in browse mode)
     if (player.id === originalPlayerId) return false;
     if (player.id === selectedOriginalPlayer) return false;
-    
-    // Exclude players on BOTH teams in this game (same team AND opposing team)
     if (player.teamId === originalPlayerTeamId) return false;
-    // Only filter by opposing team if one exists
     if (opposingTeamId && player.teamId === opposingTeamId) return false;
-    
-    // Filter by position type: if goalie needs substitute, only show goalies; if skater, only show skaters
     if (originalPlayerIsGoalie && !player.isGoalie) return false;
     if (!originalPlayerIsGoalie && player.isGoalie) return false;
     
-    // Filter by search term
     const searchLower = searchTerm.toLowerCase();
     if (searchTerm && !(
       `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchLower) ||
@@ -194,17 +177,11 @@ export function SubstituteRequestModal({
     return true;
   });
 
-  // Sort players by the specified logic:
-  // 1. Bye week players (not scheduled) at the top
-  // 2. Then scheduled players sorted by game time
   const sortedPlayers = [...filteredPlayers].sort((a: any, b: any) => {
-    // Bye week players (no game) first
     if (!a.isScheduled && b.isScheduled) return -1;
     if (a.isScheduled && !b.isScheduled) return 1;
     
-    // Both have bye week or both are scheduled
     if (a.isScheduled && b.isScheduled && a.gameTime && b.gameTime) {
-      // Sort by game time
       return new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime();
     }
     
@@ -243,13 +220,13 @@ export function SubstituteRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-[#e2e2e2] dark:bg-[#212121] border-border" data-testid="substitute-request-modal">
+      <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-background border-border" data-testid="substitute-request-modal">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-foreground">
             <UserPlus className="h-5 w-5" />
             {originalPlayerId ? `Request Substitute for ${originalPlayerName}` : 'Find Substitutes'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-muted-foreground">
             {originalPlayerId 
               ? 'Search and select a player to request as a substitute'
               : 'Select a player who needs a substitute, then find an available replacement'}
@@ -273,10 +250,10 @@ export function SubstituteRequestModal({
                       onClick={() => setSelectedOriginalPlayer(rsvp.user.id)}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all relative ${
                         selectedOriginalPlayer === rsvp.user.id
-                          ? 'border-red-500 bg-red-500/20 text-red-400'
+                          ? 'border-red-500 bg-red-500/20 text-red-600 dark:text-red-400'
                           : hasPendingRequest
-                            ? 'border-green-600/50 bg-green-900/20 text-green-400'
-                            : 'border-border bg-[#1a1a1a] hover:bg-[#252525] text-muted-foreground'
+                            ? 'border-green-600/50 bg-green-500/10 text-green-700 dark:text-green-400'
+                            : 'border-border bg-muted/50 hover:bg-muted text-foreground'
                       }`}
                       data-testid={`player-to-replace-${rsvp.user.id}`}
                     >
@@ -293,9 +270,9 @@ export function SubstituteRequestModal({
                           </div>
                         )}
                       </div>
-                      <span className="text-sm text-[#ffffff] font-semibold">{rsvp.user.firstName} {rsvp.user.lastName}</span>
+                      <span className="text-sm font-semibold">{rsvp.user.firstName} {rsvp.user.lastName}</span>
                       {hasPendingRequest && (
-                        <span className="text-xs text-green-500 opacity-75">requested</span>
+                        <span className="text-xs text-green-600 dark:text-green-500 opacity-75">requested</span>
                       )}
                     </button>
                   );
@@ -309,7 +286,7 @@ export function SubstituteRequestModal({
             placeholder="Search for any player..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-[#1a1a1a]"
+            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground"
             data-testid="input-search-players"
           />
 
@@ -317,7 +294,7 @@ export function SubstituteRequestModal({
           {isLoading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-[#1a1a1a] animate-pulse">
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30 animate-pulse">
                   <div className="h-10 w-10 bg-muted rounded-full"></div>
                   <div className="flex-1">
                     <div className="h-4 bg-muted rounded w-32 mb-1"></div>
@@ -361,7 +338,7 @@ export function SubstituteRequestModal({
                       className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
                         selectedPlayer === player.id 
                           ? 'border-primary bg-primary/10' 
-                          : 'border-border bg-[#1a1a1a] hover:bg-[#252525]'
+                          : 'border-border bg-muted/30 hover:bg-muted/60'
                       }`}
                       onClick={() => setSelectedPlayer(player.id)}
                       data-testid={`player-option-${player.id}`}
@@ -375,20 +352,18 @@ export function SubstituteRequestModal({
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium">
+                            <p className="font-medium text-foreground">
                               {player.firstName} {player.lastName}
                             </p>
                             {!player.isScheduled ? (
-                              <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-500 border-green-500/30">
+                              <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30">
                                 Bye Week
                               </Badge>
                             ) : (
                               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
                                 {player.gameTime ? (() => {
-                                  // Extract time from ISO string and display in local timezone
                                   const date = new Date(player.gameTime);
-                                  // Format using the UTC time to avoid double conversion
                                   const hours = date.getUTCHours();
                                   const minutes = date.getUTCMinutes();
                                   const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -431,7 +406,7 @@ export function SubstituteRequestModal({
             <Button
               onClick={handleSubmit}
               disabled={!selectedPlayer || createRequestMutation.isPending}
-              className="bg-primary text-primary-foreground hover:bg-primary"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               data-testid="button-send-request"
             >
               {createRequestMutation.isPending ? "Sending..." : "Send Request"}
