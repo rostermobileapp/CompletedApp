@@ -159,6 +159,7 @@ export default function Landing() {
       <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center pt-[0px] pb-[0px]">
           <nav className="hidden md:flex flex-wrap items-center gap-6 text-sm">
+            <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
             <a href="#how-it-works" className="text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
             <a href="#features" className="text-gray-500 hover:text-gray-900 transition-colors">Features</a>
             <Link href="/pricing" className="text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
@@ -198,6 +199,7 @@ export default function Landing() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-6 py-4 space-y-3">
+              <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
               <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">How It Works</a>
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</a>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
