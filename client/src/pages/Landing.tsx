@@ -425,7 +425,7 @@ export default function Landing() {
                   <th className="text-left p-4 font-bold text-gray-900">Feature</th>
                   <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border border-[#3c82f4]/20">
                     <div className="flex flex-col items-center gap-1">
-                      <span>Roster</span>
+                      <img src={rosterLightLogo} alt="Roster" className="h-6 object-contain" />
                       <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/10 rounded-full px-2 py-0.5">Best Value</span>
                     </div>
                   </th>
@@ -728,8 +728,8 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t border-gray-100 pt-6">
-            <p className="text-sm text-gray-400 text-center" data-testid="text-footer">
-              © 2025 Roster. Built for teams, by team players. No ads. Ever.
+            <p className="text-sm text-gray-400 text-center flex items-center justify-center gap-2" data-testid="text-footer">
+              © 2025 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.
             </p>
           </div>
         </div>
