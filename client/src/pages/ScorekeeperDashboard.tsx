@@ -36,6 +36,7 @@ interface Game {
   awayScore: number | null;
   status: string | null;
   leagueId: string | null;
+  seasonName?: string | null;
   tournamentId?: string;
   round?: string;
   matchNumber?: number;
@@ -880,6 +881,9 @@ export default function ScorekeeperDashboard() {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {format(new Date(game.scheduledAt), 'MMM d, h:mm a')}
+                              {game.seasonName && (
+                                <span className="ml-2">— {game.seasonName}</span>
+                              )}
                             </div>
                           </div>
                           <Button 
@@ -925,6 +929,9 @@ export default function ScorekeeperDashboard() {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {format(new Date(game.scheduledAt), 'MMM d')}
+                              {game.seasonName && (
+                                <span className="ml-2">— {game.seasonName}</span>
+                              )}
                             </div>
                           </div>
                           <div className="font-bold text-sm ml-2">

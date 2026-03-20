@@ -7764,7 +7764,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tournamentGameIds = new Set(tournamentLinkedGames.map(t => t.gameId).filter(Boolean));
       const filteredGames = games.filter((game: any) => !tournamentGameIds.has(game.id));
       
-      res.json(filteredGames);
+      // Fetch season names for all games that have a seasonId
+      const seasonIds = [...new Set(filteredGames.map((g: any) => g.seasonId).filter(Boolean))] as string[];
+      let seasonMap: Record<string, string> = {};
+      if (seasonIds.length > 0) {
+        const seasonsData = await db
+          .select({ id: seasons.id, name: seasons.name })
+          .from(seasons)
+          .where(inArray(seasons.id, seasonIds));
+        seasonsData.forEach(s => {
+          seasonMap[s.id] = s.name;
+        });
+      }
+      
+      // Attach season name to each game
+      const gamesWithSeasons = filteredGames.map((game: any) => ({
+        ...game,
+        seasonName: game.seasonId ? seasonMap[game.seasonId] : null
+      }));
+      
+      res.json(gamesWithSeasons);
     } catch (error) {
       console.error('Error fetching scorekeeper games:', error);
       res.status(500).json({ message: 'Failed to fetch games' });
