@@ -34,36 +34,35 @@ export default function About() {
               </div>
             </div>
 
-            {/* Intro copy */}
-            <div className="text-center md:text-left">
-              <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-1.5 mb-4">
-                <span className="text-sm font-medium text-[#3c82f4]">Meet the founder</span>
+            {/* Intro copy and quote/stats */}
+            <div className="flex-1">
+              <div className="text-center md:text-left mb-8">
+                <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-1.5 mb-4">
+                  <span className="text-sm font-medium text-[#3c82f4]">Meet the founder</span>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+                  Tobin K.
+                </h1>
+                <p className="text-[#3c82f4] font-semibold text-lg mb-1">Hockey Player - Lifetime Beer League Member</p>
+                <p className="text-gray-600 text-lg leading-relaxed max-w-xl">I didn't set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players. </p>
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-                Tobin K.
-              </h1>
-              <p className="text-[#3c82f4] font-semibold text-lg mb-1">Hockey Player - Lifetime Beer League Member</p>
-              <p className="text-gray-600 text-lg leading-relaxed max-w-xl">I didn't set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players. </p>
-            </div>
-          </div>
-        </div>
-      </section>
-      {/* ── 2. PULL QUOTE & STATS ─────────────────────────────── */}
-      <section className="py-20 px-6 bg-white pt-[2px] pb-[2px]">
-        <div className="max-w-5xl mx-auto">
-          <div className="space-y-5 max-w-2xl mx-auto">
-            <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
-              <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
-              <p className="text-blue-200 text-sm font-medium">Brian - Tobin's league commissioner</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
-                <p className="text-3xl font-black text-gray-900 mb-1">10</p>
-                <p className="text-sm text-gray-500">Years with a BenchApp account before building Roster</p>
-              </div>
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
-                <p className="text-3xl font-black text-gray-900 mb-1">4</p>
-                <p className="text-sm text-gray-500">Apps he tested before deciding to build his own</p>
+
+              {/* Pull quote card */}
+              <div className="space-y-5">
+                <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
+                  <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
+                  <p className="text-blue-200 text-sm font-medium">Brian - Tobin's league commissioner</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
+                    <p className="text-3xl font-black text-gray-900 mb-1">10</p>
+                    <p className="text-sm text-gray-500">Years with a BenchApp account before building Roster</p>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
+                    <p className="text-3xl font-black text-gray-900 mb-1">4</p>
+                    <p className="text-sm text-gray-500">Apps he tested before deciding to build his own</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
