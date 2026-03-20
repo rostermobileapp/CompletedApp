@@ -2091,14 +2091,14 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate('/profile')}
-              className="w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden bg-primary"
+              className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}
               data-testid="button-profile"
             >
               {(userProfile as any)?.profileImageUrl ? (
                 <img 
                   src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
                   alt="Profile"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover bg-transparent"
                 />
               ) : (
                 <span className="text-primary-foreground text-lg font-semibold">
@@ -2428,12 +2428,12 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                   {primaryTeam?.logoUrl ? (
                     <img 
                       src={getImageUrl(primaryTeam.logoUrl) || ''} 
                       alt={`${primaryTeam.name} logo`}
-                      className="w-full h-full rounded-lg object-cover"
+                      className="w-full h-full rounded-lg object-cover bg-transparent"
                       data-testid="img-team-logo"
                     />
                   ) : (
@@ -2880,7 +2880,13 @@ export default function Dashboard() {
                 data-testid={`card-game-${game.id}`}
               >
                 <div className="flex items-center gap-4 bg-[212121]">
-                  <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center relative">
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center relative ${(() => {
+                      const isHomeTeamUser = game.isTournamentMatch 
+                        ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
+                        : game.homeTeam?.id === primaryTeam?.id;
+                      const opponentTeam = isHomeTeamUser ? game.awayTeam : game.homeTeam;
+                      return opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary';
+                    })()}`}>
                     {(() => {
                       // For tournament matches, compare by name since IDs may be null
                       const isHomeTeamUser = game.isTournamentMatch 
@@ -2891,7 +2897,7 @@ export default function Dashboard() {
                         <img 
                           src={getImageUrl(opponentTeam.logoUrl) || ''} 
                           alt={`${opponentTeam.name} logo`}
-                          className="w-full h-full rounded-lg object-cover"
+                          className="w-full h-full rounded-lg object-cover bg-transparent"
                           data-testid={`img-opponent-logo-${game.id}`}
                         />
                       ) : (
