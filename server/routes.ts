@@ -8885,14 +8885,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create or get user by email
       let user;
       try {
-        const { data: existingUsers, error } = await supabaseAdmin.auth.admin.listUsers();
+        const { data: existingUsers, error } = await supabase.auth.admin.listUsers();
         const existingUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
         
         if (existingUser) {
           user = existingUser;
         } else {
           // Create new user
-          const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
             email,
             password: Math.random().toString(36).slice(-16), // Temporary password
             user_metadata: {
