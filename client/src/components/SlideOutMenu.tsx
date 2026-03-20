@@ -220,7 +220,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
             </div>
           </SheetHeader>
           
-          <div className="flex-1 flex flex-col justify-evenly px-6 pb-6">
+          <div className="flex-1 flex flex-col gap-2 px-6 pb-6">
             {menuItems.map((item) => {
               const showLock = item.locked;
               return (
