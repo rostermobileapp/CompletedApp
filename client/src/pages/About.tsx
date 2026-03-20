@@ -21,7 +21,7 @@ export default function About() {
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row items-center gap-12">
             {/* Founder photo — 9:16 portrait */}
-            <div className="flex-shrink-0 w-48 md:w-56">
+            <div className="flex-shrink-0 w-72 md:w-80">
               <div 
                 onClick={() => setPhotoModalOpen(true)}
                 className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-100 cursor-pointer hover:shadow-2xl hover:shadow-blue-300 transition-shadow"
@@ -48,45 +48,44 @@ export default function About() {
           </div>
         </div>
       </section>
-      {/* ── 2. WHY HE STARTED ROSTER ─────────────────────────────── */}
+      {/* ── 2. PULL QUOTE & STATS ─────────────────────────────── */}
       <section className="py-20 px-6 bg-white pt-[2px] pb-[2px]">
         <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Origin</span>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">Why I built Roster</h2>
-              <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
-                <p>
-                  Since 2016 we used BenchApp for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
-                </p>
-                <p>
-                  Our league used everything.  Excel for schedules and drafts, esportsdesk for standings and player stats, team text threads. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
-                </p>
-                <p>So while driving back to Ohio from our annual family vacation, I planned out Roster.  4 months later, some of the players had a working beta app to test. </p>
-              </div>
+          <div className="space-y-5 max-w-2xl mx-auto">
+            <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
+              <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
+              <p className="text-blue-200 text-sm font-medium">Brian - Tobin's league commissioner</p>
             </div>
-
-            {/* Pull quote card */}
-            <div className="space-y-5">
-              <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
-                <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
-                <p className="text-blue-200 text-sm font-medium">Brian - Tobin's league commissioner</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
+                <p className="text-3xl font-black text-gray-900 mb-1">10</p>
+                <p className="text-sm text-gray-500">Years with a BenchApp account before building Roster</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
-                  <p className="text-3xl font-black text-gray-900 mb-1">10</p>
-                  <p className="text-sm text-gray-500">Years with a BenchApp account before building Roster</p>
-                </div>
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
-                  <p className="text-3xl font-black text-gray-900 mb-1">4</p>
-                  <p className="text-sm text-gray-500">Apps he tested before deciding to build his own</p>
-                </div>
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-5 text-center">
+                <p className="text-3xl font-black text-gray-900 mb-1">4</p>
+                <p className="text-sm text-gray-500">Apps he tested before deciding to build his own</p>
               </div>
             </div>
           </div>
         </div>
       </section>
-      {/* ── 3. HOW HE BUILT IT RIGHT ─────────────────────────────── */}
+      {/* ── 3. WHY I BUILT ROSTER ─────────────────────────────── */}
+      <section className="py-20 px-6 bg-white pt-[2px] pb-[2px]">
+        <div className="max-w-5xl mx-auto">
+          <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Origin</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">Why I built Roster</h2>
+          <div className="space-y-4 text-gray-600 text-lg leading-relaxed max-w-3xl">
+            <p>
+              Since 2016 we used BenchApp for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
+            </p>
+            <p>
+              Our league used everything.  Excel for schedules and drafts, esportsdesk for standings and player stats, team text threads. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
+            </p>
+            <p>So while driving back to Ohio from our annual family vacation, I planned out Roster.  4 months later, some of the players had a working beta app to test. </p>
+          </div>
+        </div>
+      </section>
+      {/* ── 4. HOW HE BUILT IT RIGHT ─────────────────────────────── */}
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
