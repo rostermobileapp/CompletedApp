@@ -6409,14 +6409,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const effectiveHomeTeamId = linkedHomeTeamId || homeTeamId;
       const effectiveAwayTeamId = linkedAwayTeamId || awayTeamId;
       
-      const [league, homeTeamMembers, awayTeamMembers, scoreSubmissions, userTeams] = await Promise.all([
-        game.leagueId ? storage.getLeague(game.leagueId) : null,
+      const [homeTeamMembers, awayTeamMembers, scoreSubmissions, userTeams, homeTeamForLeague] = await Promise.all([
         // Only fetch team members if we have a valid team ID (not 'tbd' or tournament team ID)
         effectiveHomeTeamId && effectiveHomeTeamId !== 'tbd' ? storage.getTeamMembers(effectiveHomeTeamId).catch(() => []) : Promise.resolve([]),
         effectiveAwayTeamId && effectiveAwayTeamId !== 'tbd' ? storage.getTeamMembers(effectiveAwayTeamId).catch(() => []) : Promise.resolve([]),
         isTournamentMatch ? Promise.resolve([]) : storage.getGameScoreSubmissions(gameId),
-        storage.getUserTeams(userId)
+        storage.getUserTeams(userId),
+        // Fetch home team to derive leagueId if the game itself doesn't have one
+        !game.leagueId && effectiveHomeTeamId && effectiveHomeTeamId !== 'tbd' ? storage.getTeam(effectiveHomeTeamId).catch(() => null) : Promise.resolve(null)
       ]);
+      
+      // Determine the effective leagueId: prefer the game's own, fall back to home team's
+      const effectiveLeagueId = game.leagueId || (homeTeamForLeague as any)?.leagueId || null;
+      const league = effectiveLeagueId ? await storage.getLeague(effectiveLeagueId) : null;
       
       // Get captain status for user's teams in this game
       // For tournament matches, include both the tournament team IDs and linked regular team IDs
