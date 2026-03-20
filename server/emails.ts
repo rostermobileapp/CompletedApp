@@ -558,7 +558,7 @@ export async function sendWelcomeEmail(
                       <!-- CTA Button -->
                       <div style="text-align: center; margin: 30px 0;">
                         <a href="${signupUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 16px; font-weight: 600; transition: background-color 0.2s;">
-                          Create Your Account
+                          Log In
                         </a>
                       </div>
                       
