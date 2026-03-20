@@ -91,7 +91,7 @@ export default function About() {
             <span className="inline-block text-[#3c82f4] text-sm font-bold uppercase tracking-widest mb-3">The Process</span>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How I made sure Roster was built right</h2>
             <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-              Tobin didn't build Roster in isolation. He spent a year talking to captains, coaches, and commissioners before writing a line of code.
+              Roster wasn't built in isolation. I spent a full season talking to captains, coaches, and commissioners in order to release Roster
             </p>
           </div>
 
