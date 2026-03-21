@@ -31,6 +31,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
+import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import Announcements from '@/pages/Announcements';
 import MediaGalleryPage from '@/pages/MediaGallery';
@@ -1624,6 +1625,9 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
     refetchInterval: 90000, // Refetch every 90 seconds (reduced from 30s to lower egress)
   });
+
+  // Unread message counts per league (for cross-league notification indicators)
+  const leagueUnreadMessages = useLeagueUnreadMessages();
   
   // Filter leagues to only show those where user has no team
   const leaguesWithoutTeams = React.useMemo(() => {
@@ -2166,20 +2170,34 @@ export default function Dashboard() {
                 <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select</span>
                 {/* Total notification count for ALL other teams/leagues/tournaments */}
                 {(() => {
-                  if (!notificationCounts) return null;
-                  
                   let totalNotifications = 0;
-                  
+
+                  // Determine the league currently visible on the home screen
+                  // (messages for this league show on the bottom nav, not here)
+                  let currentlySelectedLeagueId: string | null = null;
+                  if (selectedType === 'league') {
+                    currentlySelectedLeagueId = selectedId;
+                  } else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
+                    const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
+                    currentlySelectedLeagueId = sel?.leagueId ?? null;
+                  }
+
+                  // Track which league message counts we've already added (avoid double-counting
+                  // when a user has multiple teams in the same league)
+                  const countedMessageLeagues = new Set<string>();
+
                   // Count notifications from other teams (via their league)
                   if (Array.isArray(userTeamsAll)) {
                     userTeamsAll.forEach((team: any) => {
-                      // Skip the currently selected team
                       if (selectedType === 'team' && selectedId === team.id) return;
-                      
-                      // Get the league ID for this team and check notifications
                       const leagueId = team.leagueId;
-                      if (leagueId && notificationCounts.leagues[leagueId]) {
+                      if (leagueId && notificationCounts?.leagues[leagueId]) {
                         totalNotifications += notificationCounts.leagues[leagueId];
+                      }
+                      // Add unread message count for other leagues only
+                      if (leagueId && leagueId !== currentlySelectedLeagueId && !countedMessageLeagues.has(leagueId) && leagueUnreadMessages[leagueId]) {
+                        totalNotifications += leagueUnreadMessages[leagueId];
+                        countedMessageLeagues.add(leagueId);
                       }
                     });
                   }
@@ -2187,11 +2205,14 @@ export default function Dashboard() {
                   // Count notifications from leagues (without teams)
                   if (Array.isArray(leaguesWithoutTeams)) {
                     leaguesWithoutTeams.forEach((league: any) => {
-                      // Skip the currently selected league
                       if (selectedType === 'league' && selectedId === league.id) return;
-                      
-                      if (notificationCounts.leagues[league.id]) {
+                      if (notificationCounts?.leagues[league.id]) {
                         totalNotifications += notificationCounts.leagues[league.id];
+                      }
+                      // Add unread message count for other leagues only
+                      if (league.id !== currentlySelectedLeagueId && !countedMessageLeagues.has(league.id) && leagueUnreadMessages[league.id]) {
+                        totalNotifications += leagueUnreadMessages[league.id];
+                        countedMessageLeagues.add(league.id);
                       }
                     });
                   }
@@ -2199,10 +2220,8 @@ export default function Dashboard() {
                   // Count notifications from tournaments
                   if (Array.isArray(userPaidTournaments)) {
                     userPaidTournaments.forEach((tournament: any) => {
-                      // Skip the currently selected tournament
                       if (selectedType === 'tournament' && selectedId === tournament.id) return;
-                      
-                      if (notificationCounts.tournaments[tournament.id]) {
+                      if (notificationCounts?.tournaments[tournament.id]) {
                         totalNotifications += notificationCounts.tournaments[tournament.id];
                       }
                     });
@@ -2223,8 +2242,10 @@ export default function Dashboard() {
                       MY TEAMS
                     </div>
                     {userTeamsAll.map((team: any) => {
-                      // Get notification count for this team's league
-                      const teamNotificationCount = team.leagueId && notificationCounts?.leagues[team.leagueId] || 0;
+                      // Get notification count for this team's league (announcements + unread messages)
+                      const teamNotificationCount =
+                        (team.leagueId && notificationCounts?.leagues[team.leagueId] || 0) +
+                        (team.leagueId && leagueUnreadMessages[team.leagueId] || 0);
                       
                       return (
                         <button
@@ -2261,7 +2282,9 @@ export default function Dashboard() {
                       MY LEAGUES
                     </div>
                     {leaguesWithoutTeams.map((league: any) => {
-                      const leagueNotificationCount = notificationCounts?.leagues[league.id] || 0;
+                      const leagueNotificationCount =
+                        (notificationCounts?.leagues[league.id] || 0) +
+                        (leagueUnreadMessages[league.id] || 0);
                       
                       return (
                         <button

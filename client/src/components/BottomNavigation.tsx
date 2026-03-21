@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Users, MessageCircle, User, DollarSign } from 'lucide-react';
 import { useLocation } from 'wouter';
 import homeLogo from '@assets/Home_Logo_1768323157245.png';
@@ -8,6 +9,7 @@ import { useKeyboard } from '@/hooks/use-keyboard';
 import { useSwipeableNav, SCREEN_ORDER, ScreenId } from '@/context/SwipeableNavContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
+import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 
 interface BottomNavigationProps {
   useSwipeNav?: boolean;
@@ -32,18 +34,10 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   } catch {
     slideOverlay = null;
   }
-  
-  const { data: unreadData } = useQuery({
-    queryKey: ['/api/messages/unread-count'],
-    refetchInterval: 30000,
-    staleTime: 0,
-  });
-  
-  const unreadCount = (unreadData as { count: number } | undefined)?.count ?? 0;
 
   const { data: unpaidPaymentData } = useQuery({
     queryKey: ['/api/payment-requests/unpaid-count'],
-    refetchInterval: 60000, // Reduced from 10s to 60s to lower egress
+    refetchInterval: 60000,
     staleTime: 30000,
   });
   
@@ -55,6 +49,22 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   });
   
   const primaryTeamId = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0].id : null;
+
+  // Unread message counts mapped by league
+  const leagueUnreadMessages = useLeagueUnreadMessages();
+
+  // Resolve current league ID from dashboard selection
+  const currentLeagueId = useMemo(() => {
+    if (selectedType === 'league') return selectedId;
+    if (selectedType === 'team' && Array.isArray(userTeams)) {
+      const team = (userTeams as any[]).find((t: any) => t.id === selectedId);
+      return team?.leagueId ?? null;
+    }
+    return null;
+  }, [selectedType, selectedId, userTeams]);
+
+  // Only count unread messages for the currently selected league
+  const currentLeagueUnread = currentLeagueId ? (leagueUnreadMessages[currentLeagueId] ?? 0) : 0;
   
   const getActiveId = (pathname: string): ScreenId | '' => {
     if (pathname === '/') return 'home';
@@ -132,9 +142,9 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
               ) : Icon && (
                 <div className="relative">
                   <Icon className="w-[25px] h-[25px] mb-1" />
-                  {shortcut.id === 'messages' && unreadCount > 0 && (
+                  {shortcut.id === 'messages' && currentLeagueUnread > 0 && (
                     <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="message-badge">
-                      {unreadCount > 99 ? '99+' : unreadCount}
+                      {currentLeagueUnread > 99 ? '99+' : currentLeagueUnread}
                     </div>
                   )}
                   {shortcut.id === 'payments' && unpaidPaymentCount > 0 && (
