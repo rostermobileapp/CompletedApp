@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 // Custom event for notifying same-tab changes
-const DASHBOARD_SELECTION_CHANGE_EVENT = 'dashboardSelectionChange';
+export const DASHBOARD_SELECTION_CHANGE_EVENT = 'dashboardSelectionChange';
 
 // Helper function to dispatch selection change event
 export function notifyDashboardSelectionChange() {

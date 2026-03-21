@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { usePermissions } from '@/context/SubscriptionContext';
-import { notifyDashboardSelectionChange } from '@/hooks/useDashboardSelection';
+import { notifyDashboardSelectionChange, DASHBOARD_SELECTION_CHANGE_EVENT } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
 import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, BrickWall, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -1102,6 +1102,20 @@ export default function Dashboard() {
     // Notify other components in the same tab about the selection change
     notifyDashboardSelectionChange();
   }, [selectedType, selectedId]);
+
+  // Listen for selection changes made by other components (e.g. Teams page tab)
+  React.useEffect(() => {
+    const syncFromStorage = () => {
+      const type = localStorage.getItem('dashboardSelectedType');
+      const id = localStorage.getItem('dashboardSelectedId');
+      if (type === 'team' || type === 'league' || type === 'tournament') {
+        setSelectedType(type);
+        setSelectedId(id);
+      }
+    };
+    window.addEventListener(DASHBOARD_SELECTION_CHANGE_EVENT, syncFromStorage);
+    return () => window.removeEventListener(DASHBOARD_SELECTION_CHANGE_EVENT, syncFromStorage);
+  }, []);
   
   // Backward compatibility
   const selectedLeagueId = selectedType === 'league' ? selectedId : null;

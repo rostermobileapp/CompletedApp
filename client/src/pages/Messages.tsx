@@ -500,6 +500,20 @@ export default function Messages() {
   const [showContactDiscovery, setShowContactDiscovery] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
+
+  // Pre-select the league when the new conversation dialog opens, based on dashboard selection
+  // dialogLeagueId and dialogLeagues are computed below from the dashboard context
+  // We need a separate state reset when dialog closes
+  useEffect(() => {
+    if (!showContactDiscovery) {
+      setSelectedLeague(null);
+      setConversationType('direct');
+      setSelectedTeam(null);
+      setSelectedContacts([]);
+      setGroupTitle('');
+      setSearchQuery('');
+    }
+  }, [showContactDiscovery]);
   const [conversationType, setConversationType] = useState<'direct' | 'team_group' | 'custom_group' | 'captain_only'>('direct');
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -599,11 +613,38 @@ export default function Messages() {
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
+  // Compute the relevant league for the new conversation dialog based on dashboard selection
+  const dialogLeagueId = useMemo(() => {
+    if (selectedLeagueId) return selectedLeagueId;
+    if (selectedTeamId) {
+      const team = (userTeams as any[]).find((t: any) => t.id === selectedTeamId);
+      return team?.leagueId ?? null;
+    }
+    return null;
+  }, [selectedLeagueId, selectedTeamId, userTeams]);
+
+  // Filter leagues shown in the new conversation dialog to the current dashboard context
+  const dialogLeagues = useMemo(() => {
+    if (dialogLeagueId) {
+      const match = (userLeagues as any[]).filter((l: any) => l.id === dialogLeagueId);
+      return match.length > 0 ? match : (userLeagues as any[]);
+    }
+    return userLeagues as any[];
+  }, [dialogLeagueId, userLeagues]);
+
+  // When the dialog opens, auto-select the league based on dashboard context
+  useEffect(() => {
+    if (showContactDiscovery && dialogLeagueId) {
+      setSelectedLeague(dialogLeagueId);
+    }
+  }, [showContactDiscovery, dialogLeagueId]);
+
   // Fetch ALL conversations - always refetch on mount to get latest data
   const { data: allConversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ['/api/conversations'],
     staleTime: 0,
     refetchOnMount: 'always',
+    refetchInterval: 10000,
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
@@ -675,10 +716,12 @@ export default function Messages() {
   }, {} as Record<string, number>);
 
   // Fetch messages for selected conversation - always refetch to show new messages immediately
+  // refetchInterval acts as fallback if WebSocket delivery is missed
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
     staleTime: 0,
     refetchOnMount: 'always',
+    refetchInterval: 8000,
     enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
@@ -1599,34 +1642,38 @@ export default function Messages() {
   });
 
   const handleStartConversation = (contact: Contact) => {
-    if (!selectedLeague) return;
+    const leagueId = selectedLeague || dialogLeagues[0]?.id;
+    if (!leagueId) return;
     createConversationMutation.mutate({
       otherUserId: contact.id,
-      leagueId: selectedLeague
+      leagueId
     });
   };
 
   const handleCreateTeamGroup = () => {
-    if (!selectedTeam || !selectedLeague) return;
+    const leagueId = selectedLeague || dialogLeagues[0]?.id;
+    if (!selectedTeam || !leagueId) return;
     createTeamGroupMutation.mutate({
       teamId: selectedTeam,
-      leagueId: selectedLeague
+      leagueId
     });
   };
 
   const handleCreateCustomGroup = () => {
-    if (!groupTitle.trim() || selectedContacts.length === 0 || !selectedLeague) return;
+    const leagueId = selectedLeague || dialogLeagues[0]?.id;
+    if (!groupTitle.trim() || selectedContacts.length === 0 || !leagueId) return;
     createCustomGroupMutation.mutate({
       title: groupTitle,
-      leagueId: selectedLeague,
+      leagueId,
       participantIds: selectedContacts
     });
   };
 
   const handleCreateCaptainChat = () => {
-    if (!selectedLeague) return;
+    const leagueId = selectedLeague || dialogLeagues[0]?.id;
+    if (!leagueId) return;
     createCaptainChatMutation.mutate({
-      leagueId: selectedLeague
+      leagueId
     });
   };
 
@@ -1654,7 +1701,7 @@ export default function Messages() {
           <div className="space-y-4">
             
             {/* Fallback content if no leagues but user is authenticated */}
-            {userLeagues.length === 0 && !userLeaguesLoading && (
+            {dialogLeagues.length === 0 && !userLeaguesLoading && (
               <div className="p-4 bg-muted rounded-md text-center">
                 <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">
@@ -1663,8 +1710,8 @@ export default function Messages() {
               </div>
             )}
             
-            {/* League Selection */}
-            {userLeagues.length > 1 && (
+            {/* League Selection - only shown when there are multiple choices and no auto-selected context */}
+            {dialogLeagues.length > 1 && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Select League</label>
                 <select 
@@ -1674,23 +1721,23 @@ export default function Messages() {
                   data-testid="select-league"
                 >
                   <option value="">Choose a league...</option>
-                  {userLeagues.map((league) => (
+                  {dialogLeagues.map((league: any) => (
                     <option key={league.id} value={league.id}>{league.name}</option>
                   ))}
                 </select>
               </div>
             )}
             
-            {/* Always show league info if single league */}
-            {userLeagues.length === 1 && (
+            {/* Always show league info if single applicable league */}
+            {dialogLeagues.length === 1 && (
               <div className="p-3 bg-muted rounded-md">
-                <div className="text-sm font-medium">League: {userLeagues[0]?.name}</div>
+                <div className="text-sm font-medium">League: {dialogLeagues[0]?.name}</div>
                 <div className="text-xs text-muted-foreground">Auto-selected</div>
               </div>
             )}
 
             {/* Conversation Type Selection */}
-            {(selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+            {(selectedLeague || (dialogLeagues.length === 1 && dialogLeagues[0])) && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Conversation Type</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1743,7 +1790,7 @@ export default function Messages() {
             )}
             
             {/* Team Selection for Team Group Chat */}
-            {conversationType === 'team_group' && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+            {conversationType === 'team_group' && (selectedLeague || (dialogLeagues.length === 1 && dialogLeagues[0])) && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Select Team</label>
                 <select 
@@ -1754,8 +1801,8 @@ export default function Messages() {
                 >
                   <option value="">Choose a team...</option>
                   {userTeams
-                    .filter(team => team.leagueId === (selectedLeague || userLeagues[0]?.id))
-                    .map((team) => (
+                    .filter((team: any) => team.leagueId === (selectedLeague || dialogLeagues[0]?.id))
+                    .map((team: any) => (
                       <option key={team.id} value={team.id}>{team.name}</option>
                     ))}
                 </select>
@@ -1773,7 +1820,7 @@ export default function Messages() {
             )}
 
             {/* Captain-Only Chat Creation */}
-            {conversationType === 'captain_only' && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+            {conversationType === 'captain_only' && (selectedLeague || (dialogLeagues.length === 1 && dialogLeagues[0])) && (
               <div className="space-y-3">
                 <div className="p-3 bg-muted rounded-md">
                   <div className="flex items-start gap-2">
@@ -1795,7 +1842,7 @@ export default function Messages() {
             )}
 
             {/* Group Title for Custom Group Chat */}
-            {conversationType === 'custom_group' && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+            {conversationType === 'custom_group' && (selectedLeague || (dialogLeagues.length === 1 && dialogLeagues[0])) && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Group Name</label>
                 <Input
@@ -1808,7 +1855,7 @@ export default function Messages() {
             )}
 
             {/* Search Contacts */}
-            {(conversationType === 'direct' || conversationType === 'custom_group') && (selectedLeague || (userLeagues.length === 1 && userLeagues[0])) && (
+            {(conversationType === 'direct' || conversationType === 'custom_group') && (selectedLeague || (dialogLeagues.length === 1 && dialogLeagues[0])) && (
               <>
                 <Input
                   placeholder="Search contacts..."
@@ -1920,9 +1967,6 @@ export default function Messages() {
                   data-testid="button-new-message"
                   onClick={() => {
                     setShowContactDiscovery(true);
-                    if (userLeagues.length === 1) {
-                      setSelectedLeague(userLeagues[0].id);
-                    }
                   }}
                 >
                   <Edit className="w-5 h-5" />
