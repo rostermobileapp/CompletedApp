@@ -698,7 +698,7 @@ export class MessagingService {
       readAt: new Date()
     }));
 
-    await db.insert(messageReadReceipts).values(readReceiptData);
+    await db.insert(messageReadReceipts).values(readReceiptData).onConflictDoNothing();
     
     // Return the marked messages with their sender IDs for WebSocket notifications
     return unreadMessages.map(m => ({ messageId: m.id, senderId: m.senderId }));

@@ -13,26 +13,37 @@ export function useLeagueUnreadMessages(): Record<string, number> {
     staleTime: 30000,
   });
 
-  const { data: unreadData } = useQuery<{ unreadCounts: Record<string, number> }>({
+  // Server returns: { unreadCounts: Array<{ conversationId: string; unreadCount: number }> }
+  // staleTime is intentionally omitted here — Messages.tsx owns the polling for this key.
+  // This hook just reads from the shared TanStack Query cache.
+  const { data: unreadData } = useQuery<{
+    unreadCounts: Array<{ conversationId: string; unreadCount: number }>;
+  }>({
     queryKey: ['/api/messages/unread-count-per-conversation'],
-    staleTime: 0,
   });
 
   return useMemo(() => {
-    const map: Record<string, number> = {};
-    const unreadCounts = unreadData?.unreadCounts ?? {};
+    const leagueMap: Record<string, number> = {};
+    const unreadArray = unreadData?.unreadCounts ?? [];
 
-    if (!Array.isArray(conversations)) return map;
+    if (!Array.isArray(conversations) || unreadArray.length === 0) return leagueMap;
 
+    // Build a quick conversationId → unreadCount lookup from the array
+    const convUnreadMap: Record<string, number> = {};
+    unreadArray.forEach((item) => {
+      convUnreadMap[item.conversationId] = item.unreadCount;
+    });
+
+    // Accumulate unread counts per league
     conversations.forEach((conv: any) => {
       const leagueId = conv.leagueId;
       if (!leagueId) return;
-      const count = unreadCounts[conv.id] || 0;
+      const count = convUnreadMap[conv.id] || 0;
       if (count > 0) {
-        map[leagueId] = (map[leagueId] || 0) + count;
+        leagueMap[leagueId] = (leagueMap[leagueId] || 0) + count;
       }
     });
 
-    return map;
+    return leagueMap;
   }, [conversations, unreadData]);
 }
