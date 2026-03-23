@@ -71,6 +71,7 @@ export default function Profile() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingPaymentMethods, setIsEditingPaymentMethods] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
   const [showLeagueRequestDialog, setShowLeagueRequestDialog] = useState(false);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
@@ -937,7 +938,7 @@ export default function Profile() {
           ))}
           
           {/* Delete Profile */}
-          <AlertDialog>
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <AlertDialogTrigger asChild>
               <button
                 className="w-full border border-destructive rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-destructive/10 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
@@ -962,7 +963,7 @@ export default function Profile() {
                   {(user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier' && (
                     <>
                       <br /><br />
-                      <strong className="text-destructive">Note: You have an active paid subscription. Please cancel your subscription first before deleting your profile.</strong>
+                      <strong className="text-orange-600 dark:text-orange-400">⚠ You have an active subscription. To delete your account, you must first cancel your subscription from the Manage Subscription screen.</strong>
                     </>
                   )}
                   {userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === (user as any)?.id) && (
@@ -973,20 +974,34 @@ export default function Profile() {
                   )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => deleteProfileMutation.mutate()}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={
-                    deleteProfileMutation.isPending || 
-                    ((user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier') ||
-                    (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === (user as any)?.id))
-                  }
-                  data-testid="button-confirm-delete"
-                >
-                  {deleteProfileMutation.isPending ? 'Deleting...' : 'Delete Profile'}
-                </AlertDialogAction>
+              <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+                {(user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteDialogOpen(false);
+                      navigate('/subscription');
+                    }}
+                    className="w-full rounded-md border border-orange-500 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-600 hover:bg-orange-500/20 dark:text-orange-400"
+                  >
+                    Go to Manage Subscription
+                  </button>
+                )}
+                <div className="flex w-full gap-2">
+                  <AlertDialogCancel className="flex-1" data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteProfileMutation.mutate()}
+                    className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={
+                      deleteProfileMutation.isPending || 
+                      ((user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier') ||
+                      (userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === (user as any)?.id))
+                    }
+                    data-testid="button-confirm-delete"
+                  >
+                    {deleteProfileMutation.isPending ? 'Deleting...' : 'Delete Profile'}
+                  </AlertDialogAction>
+                </div>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
