@@ -1767,6 +1767,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel subscription immediately via Stripe API
+  app.post('/api/stripe/cancel-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (!user.stripeSubscriptionId) {
+        return res.status(400).json({ message: 'No active subscription found' });
+      }
+
+      // Cancel immediately via Stripe API (not at period end)
+      await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+
+      // Immediately downgrade role and clear subscription info in our DB
+      // (the webhook will also fire and confirm this, but we do it here for instant feedback)
+      await storage.updateUserRole(userId, 'free_tier');
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+
+      console.log(`[Stripe] Subscription ${user.stripeSubscriptionId} cancelled immediately for user ${userId}`);
+
+      res.json({ message: 'Subscription cancelled successfully' });
+    } catch (error: any) {
+      console.error('[Stripe] Error cancelling subscription:', error);
+      res.status(500).json({ message: error.message || 'Failed to cancel subscription' });
+    }
+  });
+
   // Get Stripe pricing configuration (public endpoint)
   app.get('/api/stripe/prices', async (req, res) => {
     try {

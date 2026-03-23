@@ -1,12 +1,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export default function Subscription() {
   const { role } = usePermissions();
@@ -215,6 +216,29 @@ export default function Subscription() {
     }
   };
 
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/stripe/cancel-subscription');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Subscription Cancelled',
+        description: 'Your subscription has been cancelled immediately. You have been moved to the Free Tier.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      window.location.reload();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Cancellation Failed',
+        description: error.message || 'Failed to cancel subscription. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
       {/* Header */}
@@ -261,24 +285,69 @@ export default function Subscription() {
           
           {/* Manage Subscription Button for Paid Users */}
           {!isFree && (
-            <button
-              onClick={handleManageSubscription}
-              disabled={isLoading}
-              className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="button-manage-subscription"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  Manage Subscription via Stripe
-                  <ExternalLink className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            <>
+              <button
+                onClick={handleManageSubscription}
+                disabled={isLoading || cancelSubscriptionMutation.isPending}
+                className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="button-manage-subscription"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    Manage Subscription via Stripe
+                    <ExternalLink className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    disabled={isLoading || cancelSubscriptionMutation.isPending}
+                    className="w-full mt-3 border border-destructive text-destructive rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="button-cancel-subscription"
+                  >
+                    {cancelSubscriptionMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Cancelling...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-4 h-4" />
+                        Cancel Subscription
+                      </>
+                    )}
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to cancel your subscription? This will:
+                      <br />• Take effect <strong>immediately</strong> — no waiting until the end of your billing period
+                      <br />• Downgrade your account to the Free Tier right away
+                      <br />• Remove access to all paid features
+                      <br /><br />This action cannot be undone. You would need to re-subscribe to regain access.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => cancelSubscriptionMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Yes, Cancel Immediately
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           )}
 
           {/* Sync Subscription Button for Free Users who might have paid in Stripe */}
