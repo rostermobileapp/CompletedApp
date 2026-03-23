@@ -679,19 +679,20 @@ export default function ScorekeeperDashboard() {
     return (
       <div className="h-screen flex flex-col p-3 overflow-hidden">
         {/* Compact Header Bar */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col landscape:flex-row landscape:items-center landscape:justify-between mb-3 gap-2">
+          {/* Back button + Game title */}
+          <div className="flex items-center gap-3 min-w-0">
             <Button 
               variant="ghost" 
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 shrink-0"
               onClick={() => { setSelectedGame(null); setActiveTab('schedule'); }}
               data-testid="back-to-schedule"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <div className="font-bold text-lg">
+            <div className="min-w-0">
+              <div className="font-bold text-lg truncate">
                 {selectedGame.awayTeam?.name} @ {selectedGame.homeTeam?.name}
               </div>
               <div className="text-xs text-muted-foreground">
@@ -699,38 +700,41 @@ export default function ScorekeeperDashboard() {
               </div>
             </div>
           </div>
-          
-          {/* Central Score Display */}
-          <div className="flex items-center gap-4">
-            <span className="text-3xl font-bold text-blue-500">{awayScore}</span>
-            <span className="text-2xl text-muted-foreground">-</span>
-            <span className="text-3xl font-bold text-blue-500">{homeScore}</span>
-            <Badge variant="destructive" className="ml-2">LIVE</Badge>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Button 
-              variant={showPenalties ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowPenalties(!showPenalties)}
-              data-testid="toggle-penalties"
-            >
-              {showPenalties ? 'Goals' : 'Penalties'}
-            </Button>
-            <Button 
-              size="sm"
-              onClick={() => {
-                if (window.confirm(`Finalize game?\n\n${selectedGame.awayTeam?.name}: ${awayScore}\n${selectedGame.homeTeam?.name}: ${homeScore}\n\nThis will update all player stats.`)) {
-                  finalizeGameMutation.mutate(selectedGame.id);
-                }
-              }}
-              disabled={finalizeGameMutation.isPending || rostersLoading}
-              data-testid="finalize-game"
-            >
-              <Check className="mr-1 h-4 w-4" />
-              Finalize
-            </Button>
+          {/* Score + Action Buttons (second row in portrait, right side in landscape) */}
+          <div className="flex items-center justify-between landscape:gap-4">
+            {/* Score Display */}
+            <div className="flex items-center gap-4">
+              <span className="text-3xl font-bold text-blue-500">{awayScore}</span>
+              <span className="text-2xl text-muted-foreground">-</span>
+              <span className="text-3xl font-bold text-blue-500">{homeScore}</span>
+              <Badge variant="destructive" className="ml-2">LIVE</Badge>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <Button 
+                variant={showPenalties ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowPenalties(!showPenalties)}
+                data-testid="toggle-penalties"
+              >
+                {showPenalties ? 'Goals' : 'Penalties'}
+              </Button>
+              <Button 
+                size="sm"
+                onClick={() => {
+                  if (window.confirm(`Finalize game?\n\n${selectedGame.awayTeam?.name}: ${awayScore}\n${selectedGame.homeTeam?.name}: ${homeScore}\n\nThis will update all player stats.`)) {
+                    finalizeGameMutation.mutate(selectedGame.id);
+                  }
+                }}
+                disabled={finalizeGameMutation.isPending || rostersLoading}
+                data-testid="finalize-game"
+              >
+                <Check className="mr-1 h-4 w-4" />
+                Finalize
+              </Button>
+            </div>
           </div>
         </div>
 
