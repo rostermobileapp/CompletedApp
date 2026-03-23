@@ -963,7 +963,7 @@ export default function Profile() {
                   {(user as any)?.stripeSubscriptionId && (user as any)?.role !== 'free_tier' && (
                     <>
                       <br /><br />
-                      <strong className="text-orange-600 dark:text-orange-400">⚠ You have an active subscription. To delete your account, you must first cancel your subscription from the Manage Subscription screen.</strong>
+                      <strong className="text-destructive">⚠ You have an active subscription. To delete your account, you must first cancel your subscription from the Manage Subscription screen.</strong>
                     </>
                   )}
                   {userLeagues && Array.isArray(userLeagues) && userLeagues.some((l: any) => l.commissionerId === (user as any)?.id) && (
@@ -982,7 +982,7 @@ export default function Profile() {
                       setDeleteDialogOpen(false);
                       navigate('/subscription');
                     }}
-                    className="w-full rounded-md border border-orange-500 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-600 hover:bg-orange-500/20 dark:text-orange-400"
+                    className="w-full rounded-md border border-destructive bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/20"
                   >
                     Go to Manage Subscription
                   </button>
