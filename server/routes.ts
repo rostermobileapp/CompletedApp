@@ -391,12 +391,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      // Use the real Supabase auth ID for auth deletion — in migration scenarios
+      // the DB user ID (sub) may differ from the current Supabase auth ID
+      const supabaseAuthId = req.user.claims.supabaseId || userId;
       
       // First delete user data from our database
       await storage.deleteUser(userId);
       
-      // Then delete the user from Supabase authentication
-      const { error: supabaseError } = await supabase.auth.admin.deleteUser(userId);
+      // Then delete the user from Supabase authentication using the real auth ID
+      const { error: supabaseError } = await supabase.auth.admin.deleteUser(supabaseAuthId);
       if (supabaseError) {
         console.error("Error deleting user from Supabase auth:", supabaseError);
         // Continue anyway since database deletion succeeded

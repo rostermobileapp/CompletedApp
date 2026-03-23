@@ -67,6 +67,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     (req as any).user = {
       claims: {
         sub: dbUser.id, // Use database user ID
+        supabaseId: user.id, // Always the real Supabase auth ID (for auth operations like deletion)
         email: dbUser.email || user.email,
         first_name: dbUser.firstName || user.user_metadata?.first_name,
         last_name: dbUser.lastName || user.user_metadata?.last_name,
