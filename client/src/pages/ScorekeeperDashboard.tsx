@@ -752,7 +752,7 @@ export default function ScorekeeperDashboard() {
 
         {/* Main Scoring Area - Two Columns */}
         {!rostersLoading && !rostersError && (
-          <div className="flex-1 flex gap-4 min-h-0">
+          <div className="flex-1 flex flex-col landscape:flex-row gap-4 min-h-0 overflow-y-auto landscape:overflow-y-hidden">
             <TeamScoringPanel 
               team="away"
               teamName={selectedGame.awayTeam?.name || 'Away'}
