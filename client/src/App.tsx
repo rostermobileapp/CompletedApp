@@ -108,10 +108,11 @@ function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
-  const { data: userData } = useQuery<any>({
+  const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
     enabled: isAuthenticated && !authLoading,
     staleTime: Infinity,
+    retry: 3,
   });
   
   // Minimum 3-second display time for the loading screen
@@ -193,6 +194,15 @@ function Router() {
     return <LoadingScreen />;
   }
 
+  // If the user data query failed entirely and we have no cached data, keep showing
+  // the loading screen rather than pushing completed users into onboarding during
+  // a transient backend outage. The query will auto-retry (retry: 3 above).
+  if (userDataError && !userData) {
+    return <LoadingScreen />;
+  }
+
+  // Default to showing onboarding when userData is absent or onboarding incomplete.
+  // This ensures new users are never silently routed to the Dashboard.
   if (!userData || !userData.onboardingCompleted) {
     return <Onboarding />;
   }
