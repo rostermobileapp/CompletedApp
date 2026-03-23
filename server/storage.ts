@@ -2851,7 +2851,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserLeagueMembership(userId: string, leagueId: string): Promise<LeagueMembership | undefined> {
-    const [membership] = await db
+    const results = await db
       .select()
       .from(leagueMemberships)
       .where(
@@ -2859,8 +2859,10 @@ export class DatabaseStorage implements IStorage {
           eq(leagueMemberships.userId, userId),
           eq(leagueMemberships.leagueId, leagueId)
         )
-      );
-    return membership;
+      )
+      .orderBy(sql`CASE status WHEN 'approved' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END`)
+      .limit(1);
+    return results[0];
   }
 
   async rejectLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership> {
@@ -8692,21 +8694,21 @@ export class DatabaseStorage implements IStorage {
       const leagueTeamIds = leagueTeams.map(t => t.id);
 
       // 3. Handle teamMemberships merge with conflict resolution
-      const fromTeamMemberships = await tx
+      const fromTeamMemberships = leagueTeamIds.length > 0 ? await tx
         .select()
         .from(teamMemberships)
         .where(and(
           eq(teamMemberships.userId, fromUserId),
           inArray(teamMemberships.teamId, leagueTeamIds)
-        ));
+        )) : [];
 
-      const toTeamMemberships = await tx
+      const toTeamMemberships = leagueTeamIds.length > 0 ? await tx
         .select()
         .from(teamMemberships)
         .where(and(
           eq(teamMemberships.userId, toUserId),
           inArray(teamMemberships.teamId, leagueTeamIds)
-        ));
+        )) : [];
 
       // Merge team memberships, preferring existing toUser memberships
       const teamMembershipsByTeam = new Map();
@@ -8725,10 +8727,11 @@ export class DatabaseStorage implements IStorage {
               status: existingTm.status !== 'pending' ? existingTm.status : fromTm.status,
               joinedAt: existingTm.joinedAt || fromTm.joinedAt,
               approvedBy: existingTm.approvedBy || fromTm.approvedBy,
+              isCaptain: existingTm.isCaptain || fromTm.isCaptain,
             })
             .where(eq(teamMemberships.id, existingTm.id));
         } else {
-          // Create new membership for toUser
+          // Create new membership for toUser, transferring all fields including captain role
           await tx
             .insert(teamMemberships)
             .values({
@@ -8740,17 +8743,20 @@ export class DatabaseStorage implements IStorage {
               status: fromTm.status,
               joinedAt: fromTm.joinedAt,
               approvedBy: fromTm.approvedBy,
+              isCaptain: fromTm.isCaptain,
             });
         }
       }
 
       // Delete fromUser team memberships
-      await tx
-        .delete(teamMemberships)
-        .where(and(
-          eq(teamMemberships.userId, fromUserId),
-          inArray(teamMemberships.teamId, leagueTeamIds)
-        ));
+      if (leagueTeamIds.length > 0) {
+        await tx
+          .delete(teamMemberships)
+          .where(and(
+            eq(teamMemberships.userId, fromUserId),
+            inArray(teamMemberships.teamId, leagueTeamIds)
+          ));
+      }
 
       // 4. Update all foreign key references with proper league scoping
 
@@ -9041,13 +9047,15 @@ export class DatabaseStorage implements IStorage {
         ));
 
       // Update team memberships approvedBy references
-      await tx
-        .update(teamMemberships)
-        .set({ approvedBy: toUserId })
-        .where(and(
-          eq(teamMemberships.approvedBy, fromUserId),
-          inArray(teamMemberships.teamId, leagueTeamIds)
-        ));
+      if (leagueTeamIds.length > 0) {
+        await tx
+          .update(teamMemberships)
+          .set({ approvedBy: toUserId })
+          .where(and(
+            eq(teamMemberships.approvedBy, fromUserId),
+            inArray(teamMemberships.teamId, leagueTeamIds)
+          ));
+      }
 
       // Update import-related tables
       await tx
@@ -9194,22 +9202,32 @@ export class DatabaseStorage implements IStorage {
         ));
 
       // 5. Merge league membership data
+      // Determine which membership was approved (prefer the approved one for status/timing)
+      const approvedMembership = fromMembership.status === 'approved' ? fromMembership 
+        : (toMembership?.status === 'approved' ? toMembership : null);
+      const mergedStatus = (fromMembership.status === 'approved' || toMembership?.status === 'approved')
+        ? 'approved'
+        : (toMembership?.status || fromMembership.status);
+
       const mergedData: Partial<LeagueMembership> = {
         userId: toUserId,
-        // Preserve team assignment and player details from placeholder
+        // Preserve team assignment and player details from placeholder (fromMembership)
         assignedTeamId: fromMembership.assignedTeamId || toMembership?.assignedTeamId,
         position: fromMembership.position || toMembership?.position,
         skillLevel: fromMembership.skillLevel || toMembership?.skillLevel,
         jerseyNumber: fromMembership.jerseyNumber || toMembership?.jerseyNumber,
         notes: fromMembership.notes || toMembership?.notes,
+        isGoalie: fromMembership.isGoalie ?? toMembership?.isGoalie ?? false,
+        isSkater: fromMembership.isSkater ?? toMembership?.isSkater ?? true,
         // Set display names from placeholder user if preserveName is true
         displayFirstName: preserveName ? fromMembership.displayFirstName : null,
         displayLastName: preserveName ? fromMembership.displayLastName : null,
-        // Preserve approval status and timing
-        status: toMembership?.status || fromMembership.status,
+        // Prefer 'approved' status — if either membership is approved, the merged one is too
+        status: mergedStatus as 'approved' | 'pending' | 'rejected',
         requestedAt: toMembership?.requestedAt || fromMembership.requestedAt,
-        approvedAt: toMembership?.approvedAt || fromMembership.approvedAt,
-        approvedBy: toMembership?.approvedBy || fromMembership.approvedBy,
+        // Use timing/approver from whichever membership was approved
+        approvedAt: approvedMembership?.approvedAt || null,
+        approvedBy: approvedMembership?.approvedBy || null,
       };
 
       // 6. Create or update the target membership
