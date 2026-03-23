@@ -402,10 +402,10 @@ export default function ScorekeeperDashboard() {
     const textColor = 'text-blue-500';
 
     return (
-      <div className="flex-1 border rounded-lg p-3 bg-[#212121] border-border">
+      <div className="flex-1 border rounded-lg p-3 bg-card border-border">
         {/* Team Header with Score */}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-lg truncate text-white">{team === 'home' ? 'HOME' : 'AWAY'}: {teamName}</h3>
+          <h3 className="font-bold text-lg truncate text-card-foreground">{team === 'home' ? 'HOME' : 'AWAY'}: {teamName}</h3>
           <div className={`text-5xl font-bold ${textColor}`} data-testid={`score-${team}`}>
             {goals.length}
           </div>
