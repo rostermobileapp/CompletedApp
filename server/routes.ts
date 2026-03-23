@@ -9322,8 +9322,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can delete all players' });
       }
 
+      // Find placeholder users in this league before deleting memberships
+      const placeholderMembers = await db
+        .select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .innerJoin(users, eq(users.id, leagueMemberships.userId))
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, leagueId),
+            ilike(users.email, '%@placeholder.roster')
+          )
+        );
+
       // Delete all league memberships for this league
       await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, leagueId));
+
+      // Delete placeholder user records that have no remaining memberships in other leagues
+      for (const pm of placeholderMembers) {
+        const remaining = await db.select({ id: leagueMemberships.id })
+          .from(leagueMemberships)
+          .where(eq(leagueMemberships.userId, pm.userId));
+        if (remaining.length === 0) {
+          await db.delete(users).where(eq(users.id, pm.userId));
+        }
+      }
 
       res.json({ message: 'All players deleted successfully' });
     } catch (error) {

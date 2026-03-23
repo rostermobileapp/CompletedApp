@@ -3062,6 +3062,21 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(leagueMemberships)
       .where(eq(leagueMemberships.id, membershipId));
+
+    // If the user is a placeholder, delete their user record when they have no remaining memberships
+    const [memberUser] = await db.select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.id, membership.userId));
+
+    if (memberUser?.email?.includes('@placeholder.roster')) {
+      const remainingMemberships = await db.select({ id: leagueMemberships.id })
+        .from(leagueMemberships)
+        .where(eq(leagueMemberships.userId, membership.userId));
+
+      if (remainingMemberships.length === 0) {
+        await db.delete(users).where(eq(users.id, membership.userId));
+      }
+    }
   }
 
   async leaveLeague(userId: string, leagueId: string): Promise<void> {
@@ -5485,7 +5500,41 @@ export class DatabaseStorage implements IStorage {
       // Note: playerStats table doesn't have teamId - stats are associated by userId/leagueId/seasonId
       // Player stats are preserved even when team is deleted since they're player-centric
 
-      // Update league memberships to remove team assignment (set to null instead of delete)
+      // Find placeholder users assigned to this team before touching memberships
+      console.log(`Finding placeholder users for team ${teamId}`);
+      const placeholderMembersOnTeam = await db
+        .select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .innerJoin(users, eq(users.id, leagueMemberships.userId))
+        .where(
+          and(
+            eq(leagueMemberships.assignedTeamId, teamId),
+            ilike(users.email, '%@placeholder.roster')
+          )
+        );
+
+      // Delete league memberships for placeholder users on this team
+      if (placeholderMembersOnTeam.length > 0) {
+        const placeholderUserIds = placeholderMembersOnTeam.map(m => m.userId);
+        await db.delete(leagueMemberships).where(
+          and(
+            inArray(leagueMemberships.userId, placeholderUserIds),
+            eq(leagueMemberships.assignedTeamId, teamId)
+          )
+        );
+
+        // Delete placeholder user records if they have no remaining memberships
+        for (const pm of placeholderMembersOnTeam) {
+          const remaining = await db.select({ id: leagueMemberships.id })
+            .from(leagueMemberships)
+            .where(eq(leagueMemberships.userId, pm.userId));
+          if (remaining.length === 0) {
+            await db.delete(users).where(eq(users.id, pm.userId));
+          }
+        }
+      }
+
+      // Update non-placeholder league memberships to remove team assignment (set to null instead of delete)
       console.log(`Updating league memberships assigned to team ${teamId}`);
       await db.update(leagueMemberships)
         .set({ assignedTeamId: null })
