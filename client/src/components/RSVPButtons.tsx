@@ -200,7 +200,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
             <button
               key={rsvp.user.id}
               onClick={() => handlePlayerClick(rsvp.user.id)}
-              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
+              className="flex items-center gap-2 p-1.5 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors w-full text-left cursor-pointer"
               data-testid={`player-attending-${rsvp.user.id}`}
             >
               <Avatar className="h-6 w-6">
@@ -209,7 +209,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
                   {rsvp.user.firstName?.[0]}{rsvp.user.lastName?.[0]}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-xs font-medium truncate text-white">
+              <span className="text-xs font-medium truncate text-zinc-900 dark:text-white">
                 {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
               </span>
             </button>
@@ -219,7 +219,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
           {teamSubstitutes.map((sub) => (
             <div
               key={sub.requestId}
-              className="flex items-center gap-2 p-1.5 rounded-md bg-purple-900/40 border border-purple-500/30 w-full"
+              className="flex items-center gap-2 p-1.5 rounded-md bg-purple-100/60 border border-purple-400/40 dark:bg-purple-900/40 dark:border-purple-500/30 w-full"
               data-testid={`player-substitute-${sub.substitutePlayer.id}`}
             >
               <button
@@ -232,7 +232,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
                     {sub.substitutePlayer.firstName?.[0]}{sub.substitutePlayer.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-xs font-medium truncate text-purple-300 flex-1 min-w-0">
+                <span className="text-xs font-medium truncate text-purple-700 dark:text-purple-300 flex-1 min-w-0">
                   {formatPlayerName(sub.substitutePlayer.firstName || undefined, sub.substitutePlayer.lastName || undefined)}
                 </span>
               </button>
@@ -302,8 +302,8 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
                 className={cn(
                   "flex items-center gap-2 p-1.5 rounded-md transition-colors w-full text-left cursor-pointer",
                   hasPendingRequest 
-                    ? "bg-green-900/30 hover:bg-green-900/40 border border-green-600/30" 
-                    : "bg-zinc-800 hover:bg-zinc-700"
+                    ? "bg-green-100/60 hover:bg-green-100/80 border border-green-600/30 dark:bg-green-900/30 dark:hover:bg-green-900/40" 
+                    : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                 )}
                 data-testid={`player-not-attending-${rsvp.user.id}`}
               >
@@ -322,7 +322,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
                 </div>
                 <span className={cn(
                   "text-xs font-medium truncate",
-                  hasPendingRequest ? "text-green-400" : "text-white"
+                  hasPendingRequest ? "text-green-700 dark:text-green-400" : "text-zinc-900 dark:text-white"
                 )}>
                   {formatPlayerName(rsvp.user.firstName, rsvp.user.lastName)}
                 </span>
