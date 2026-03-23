@@ -428,7 +428,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                               </span>
                             </div>
                             <div className="flex-1">
-                              <p className="font-medium text-[#ffffff]">
+                              <p className="font-medium text-foreground">
                                 {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'User'}
                               </p>
                               <p className="text-sm text-muted-foreground">
