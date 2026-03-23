@@ -193,7 +193,7 @@ function Router() {
     return <LoadingScreen />;
   }
 
-  if (userData && !userData.onboardingCompleted) {
+  if (!userData || !userData.onboardingCompleted) {
     return <Onboarding />;
   }
 

@@ -157,7 +157,7 @@ export default function Onboarding() {
         onboardingCompleted: true,
         onboardingProgress: { step: 4, completed: true },
       });
-      queryClient.setQueryData(['/api/user'], (old: any) => old ? { ...old, onboardingCompleted: true } : old);
+      queryClient.setQueryData(['/api/user'], (old: any) => ({ ...(old || {}), onboardingCompleted: true }));
       toast({ title: 'Welcome to Roster!', description: 'Your profile has been set up successfully.' });
       navigate('/');
     } catch (error) {
