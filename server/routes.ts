@@ -8960,6 +8960,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 approvedAt: new Date(),
               });
 
+              // Add the newly created member to the in-memory list so that subsequent
+              // players in the same CSV batch don't create duplicate records for the
+              // same person (e.g. if the same name without email appears more than once).
+              existingMemberships.push({
+                userId: newUserId,
+                leagueId: leagueId,
+                assignedTeamId: player.teamId ?? null,
+                user: {
+                  id: newUserId,
+                  email: player.email ?? null,
+                  firstName: player.firstName,
+                  lastName: player.lastName,
+                },
+              } as any);
+
               // Send welcome email when a player is newly added to the league (only if email provided)
               // This notifies them that they've been added to a team/league
               if (player.email) {
