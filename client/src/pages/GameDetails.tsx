@@ -103,13 +103,30 @@ export default function GameDetails() {
   const earlyCaptainTeamId = isEarlyCaptainOfHome ? game?.homeTeam?.id : 
                               isEarlyCaptainOfAway ? game?.awayTeam?.id : null;
 
+  // Compute opponent team ID early (for the opponent RSVP count on the game card)
+  const earlyUserTeamIds = Array.isArray(userTeams) ? userTeams.map((t) => t.id) : [];
+  const earlyUserTeamId = game?.homeTeam && game?.awayTeam
+    ? (earlyUserTeamIds.includes(game.homeTeam.id) ? game.homeTeam.id :
+       earlyUserTeamIds.includes(game.awayTeam.id) ? game.awayTeam.id : null)
+    : null;
+  const earlyOpponentTeamId = earlyUserTeamId
+    ? (earlyUserTeamId === game?.homeTeam?.id ? game?.awayTeam?.id : game?.homeTeam?.id)
+    : null;
+
   // Fetch RSVP summary for captain's team (to check if any players are not attending)
   const { data: captainRsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[] } | null>({
     queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${earlyCaptainTeamId}`],
     enabled: !!gameId && !!earlyCaptainTeamId && !isScrimmage,
   });
 
+  // Fetch RSVP summary for opponent team (to show their confirmed skater count)
+  const { data: opponentRsvpSummary } = useQuery<{ attending?: any[]; notAttending?: any[] } | null>({
+    queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${earlyOpponentTeamId}`],
+    enabled: !!gameId && !!earlyOpponentTeamId && !isScrimmage,
+  });
+
   const notAttendingCount = captainRsvpSummary?.notAttending?.length || 0;
+  const opponentInCount = opponentRsvpSummary?.attending?.length || 0;
 
 
 
@@ -638,7 +655,7 @@ export default function GameDetails() {
                   {formatInTimeZone(
                     new Date(game.scheduledAt), 
                     (league as any)?.timezone || 'America/New_York',
-                    'EEEE, MMM d • h:mm a zzz'
+                    'MMM d • h:mm a zzz'
                   )}
                 </span>
               </div>
@@ -646,6 +663,14 @@ export default function GameDetails() {
                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
                   <MapPin className="w-4 h-4" />
                   <span data-testid="text-game-venue">{game.venue}</span>
+                </div>
+              )}
+              {!isGameCompleted && earlyOpponentTeamId && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Users className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-600" data-testid="text-opponent-in-count">
+                    {opponentInCount} {opponentInCount === 1 ? 'skater' : 'skaters'} in
+                  </span>
                 </div>
               )}
             </div>
