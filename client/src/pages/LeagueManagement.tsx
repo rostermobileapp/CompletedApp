@@ -2338,7 +2338,7 @@ export default function LeagueManagement() {
           </div>
           <button
             onClick={() => setShowEditLeague(true)}
-            className="px-3 py-1.5 text-sm text-primary hover:text-primary/80 font-medium"
+            className="px-3 py-1.5 text-sm text-primary hover:text-primary/80 font-extrabold"
             data-testid="button-edit-league"
           >Settings</button>
         </div>
