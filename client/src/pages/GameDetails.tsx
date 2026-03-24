@@ -57,6 +57,7 @@ export default function GameDetails() {
     isTournamentMatch?: boolean;
     linkedHomeTeamId?: string | null;
     linkedAwayTeamId?: string | null;
+    approvedSubstitute?: { teamId: string } | null;
   }
 
   const { data: fullGameData, isLoading: gameLoading } = useQuery<FullGameData>({
@@ -75,6 +76,7 @@ export default function GameDetails() {
   const isTournamentMatch = fullGameData?.isTournamentMatch || false;
   const linkedHomeTeamId = fullGameData?.linkedHomeTeamId;
   const linkedAwayTeamId = fullGameData?.linkedAwayTeamId;
+  const approvedSubstitute = fullGameData?.approvedSubstitute ?? null;
 
   // Get primary team (first team for now)
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
@@ -492,8 +494,14 @@ export default function GameDetails() {
     awayTeamIncluded: userTeamIds.includes(game.awayTeam?.id)
   });
   
-  const userTeam = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
+  const userTeamFromMembership = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
                    userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+  // If the user is an approved substitute, use the team they're subbing for
+  const userTeamFromSub = !userTeamFromMembership && approvedSubstitute
+    ? (game.homeTeam?.id === approvedSubstitute.teamId ? game.homeTeam : 
+       game.awayTeam?.id === approvedSubstitute.teamId ? game.awayTeam : null)
+    : null;
+  const userTeam = userTeamFromMembership ?? userTeamFromSub;
   const opponentTeam = userTeam?.id === game.homeTeam?.id ? game.awayTeam : game.homeTeam;
   
   // Separate beverage duty logic for each team

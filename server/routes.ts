@@ -15,7 +15,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
@@ -6482,6 +6482,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Check if the current user is an approved substitute for this game
+      const [approvedSubRow] = await db
+        .select({ requestingTeamId: substituteRequests.requestingTeamId })
+        .from(substituteRequests)
+        .where(and(
+          eq(substituteRequests.gameId, gameId),
+          eq(substituteRequests.substitutePlayerId, userId),
+          eq(substituteRequests.status, 'approved')
+        ))
+        .limit(1);
+      const approvedSubstitute = approvedSubRow ? { teamId: approvedSubRow.requestingTeamId } : null;
+
       res.json({
         game: formattedGame,
         league,
@@ -6492,7 +6504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userTeamMemberships,
         isTournamentMatch,
         linkedHomeTeamId,
-        linkedAwayTeamId
+        linkedAwayTeamId,
+        approvedSubstitute,
       });
     } catch (error) {
       console.error('Error fetching full game details:', error);
@@ -6808,6 +6821,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Also allow approved substitutes to claim duties
+      if (!isMember) {
+        const game = await storage.getGameById(gameId);
+        if (game) {
+          const [subRow] = await db
+            .select({ id: substituteRequests.id })
+            .from(substituteRequests)
+            .where(and(
+              eq(substituteRequests.gameId, gameId),
+              eq(substituteRequests.substitutePlayerId, userId),
+              eq(substituteRequests.requestingTeamId, teamId),
+              eq(substituteRequests.status, 'approved')
+            ))
+            .limit(1);
+          if (subRow) isMember = true;
+        }
+      }
+
       if (!isMember) {
         return res.status(403).json({ message: 'You are not a member of this team' });
       }
@@ -6980,7 +7011,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasLeagueTeamAssignment = !!(leagueMembership && leagueMembership.assignedTeamId === teamId);
       }
       
+      // Also allow approved substitutes to RSVP
+      let isApprovedSubstitute = false;
       if (!hasDirectTeamMembership && !hasLeagueTeamAssignment) {
+        const [subRow] = await db
+          .select({ id: substituteRequests.id })
+          .from(substituteRequests)
+          .where(and(
+            eq(substituteRequests.gameId, gameId),
+            eq(substituteRequests.substitutePlayerId, userId),
+            eq(substituteRequests.requestingTeamId, teamId),
+            eq(substituteRequests.status, 'approved')
+          ))
+          .limit(1);
+        isApprovedSubstitute = !!subRow;
+      }
+
+      if (!hasDirectTeamMembership && !hasLeagueTeamAssignment && !isApprovedSubstitute) {
         return res.status(403).json({ message: 'You must be on this team to RSVP' });
       }
 
