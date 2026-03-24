@@ -675,7 +675,7 @@ export default function GameDetails() {
                   </div>
                   <div className="flex items-center gap-1">
                     <X className="w-4 h-4 text-red-500" />
-                    <span className="text-sm font-medium text-red-500" data-testid="text-opponent-out-count">
+                    <span className="font-medium text-red-500 text-[16px]" data-testid="text-opponent-out-count">
                       {opponentRsvpSummary?.notAttending?.length || 0} Out
                     </span>
                   </div>
