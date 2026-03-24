@@ -642,7 +642,7 @@ export default function GameDetails() {
                   <Button
                     variant="outline"
                     onClick={() => navigate(`/team/${opponentTeam.id}`)}
-                    className="flex items-center gap-2 bg-[#0079f2] hover:bg-[#0079f2]"
+                    className="flex items-center gap-2 bg-[#0079f2] hover:bg-[#0079f2] text-white hover:text-white border-0"
                     data-testid="button-view-team"
                   >
                     View Team
