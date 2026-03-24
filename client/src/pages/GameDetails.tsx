@@ -105,12 +105,17 @@ export default function GameDetails() {
 
   // Compute opponent team ID early (for the opponent RSVP count on the game card)
   const earlyUserTeamIds = Array.isArray(userTeams) ? userTeams.map((t) => t.id) : [];
+  const earlySubTeamId = approvedSubstitute?.teamId ?? null;
   const earlyUserTeamId = game?.homeTeam && game?.awayTeam
     ? (earlyUserTeamIds.includes(game.homeTeam.id) ? game.homeTeam.id :
-       earlyUserTeamIds.includes(game.awayTeam.id) ? game.awayTeam.id : null)
+       earlyUserTeamIds.includes(game.awayTeam.id) ? game.awayTeam.id :
+       earlySubTeamId === game.homeTeam.id ? game.homeTeam.id :
+       earlySubTeamId === game.awayTeam.id ? game.awayTeam.id : null)
     : null;
-  const earlyOpponentTeamId = earlyUserTeamId
-    ? (earlyUserTeamId === game?.homeTeam?.id ? game?.awayTeam?.id : game?.homeTeam?.id)
+  // Fall back to home team perspective if user has no team connection, so counts always show
+  const earlyEffectiveUserTeamId = earlyUserTeamId ?? game?.homeTeam?.id ?? null;
+  const earlyOpponentTeamId = earlyEffectiveUserTeamId
+    ? (earlyEffectiveUserTeamId === game?.homeTeam?.id ? game?.awayTeam?.id : game?.homeTeam?.id)
     : null;
 
   // Fetch RSVP summary for captain's team (to check if any players are not attending)
