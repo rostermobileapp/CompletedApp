@@ -4158,25 +4158,25 @@ export default function LeagueManagement() {
       {/* Edit League Modal */}
       {showEditLeague && league && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Edit League</h2>
-                <button
-                  onClick={() => setShowEditLeague(false)}
-                  className="text-muted-foreground hover:text-foreground p-1"
-                  data-testid="button-close-edit-league"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] flex flex-col">
+            <div className="px-6 pt-6 pb-4 flex-shrink-0 flex items-center justify-between">
+              <h2 className="text-xl font-bold">Edit League</h2>
+              <button
+                onClick={() => setShowEditLeague(false)}
+                className="text-muted-foreground hover:text-foreground p-1"
+                data-testid="button-close-edit-league"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
               <form
                 onSubmit={editLeagueForm.handleSubmit((data) => {
                   updateLeagueMutation.mutate(data);
                 })}
-                className="space-y-4"
+                className="flex flex-col flex-1 min-h-0"
               >
+              <div className="px-6 overflow-y-auto flex-1 space-y-4 pb-4">
                 {/* League Name */}
                 <div>
                   <label className="block text-sm font-medium mb-2">League Name</label>
@@ -4648,8 +4648,10 @@ export default function LeagueManagement() {
                   </button>
                 </div>
 
+              </div>
+
                 {/* Submit Buttons */}
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 px-6 py-4 border-t border-border flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowEditLeague(false)}
@@ -4668,7 +4670,6 @@ export default function LeagueManagement() {
                   </button>
                 </div>
               </form>
-            </div>
           </div>
         </div>
       )}
