@@ -481,12 +481,12 @@ export default function GameDetails() {
   const isUserOnAwayTeam = userTeam?.id === game.awayTeam?.id;
   
   // Home team beverage duty state
-  const homeTeamHasBeverageDuty = game.homeBeverageDutyUserId === (user as User)?.id;
+  const homeTeamHasBeverageDuty = game.homeBeverageDutyUserId === dbUserId;
   const homeTeamBeverageDutyClaimed = !!game.homeBeverageDutyUserId;
   const homeTeamBeverageDutyClaimedByOther = homeTeamBeverageDutyClaimed && !homeTeamHasBeverageDuty;
   
   // Away team beverage duty state  
-  const awayTeamHasBeverageDuty = game.awayBeverageDutyUserId === (user as User)?.id;
+  const awayTeamHasBeverageDuty = game.awayBeverageDutyUserId === dbUserId;
   const awayTeamBeverageDutyClaimed = !!game.awayBeverageDutyUserId;
   const awayTeamBeverageDutyClaimedByOther = awayTeamBeverageDutyClaimed && !awayTeamHasBeverageDuty;
 
@@ -498,16 +498,16 @@ export default function GameDetails() {
 
   // Check if user is a captain or commissioner - use membership isCaptain flag for multi-captain support
   const isHomeCaptain = userTeamMemberships.find(m => m.teamId === game.homeTeam?.id)?.isCaptain || 
-                        game.homeTeam?.captainId === (user as User)?.id;
+                        game.homeTeam?.captainId === dbUserId;
   const isAwayCaptain = userTeamMemberships.find(m => m.teamId === game.awayTeam?.id)?.isCaptain ||
-                        game.awayTeam?.captainId === (user as User)?.id;
+                        game.awayTeam?.captainId === dbUserId;
   const isCaptain = isHomeCaptain || isAwayCaptain;
   
   // Derive captain team ID directly from captain status for RSVPSummary
   const captainTeamId = isHomeCaptain ? game.homeTeam?.id : isAwayCaptain ? game.awayTeam?.id : undefined;
   
   // Check if user is commissioner
-  const isCommissioner = league?.commissionerId === (user as User)?.id;
+  const isCommissioner = league?.commissionerId === dbUserId;
   
   // Debug logging (temporary)
   console.log('UserTeam Assignment Debug:', {
@@ -529,7 +529,7 @@ export default function GameDetails() {
 
   // Get existing submissions for display
   const userSubmissions = Array.isArray(scoreSubmissions) 
-    ? scoreSubmissions.filter((submission) => submission.submittedBy === (user as User)?.id)
+    ? scoreSubmissions.filter((submission) => submission.submittedBy === dbUserId)
     : [];
   const latestUserSubmission = userSubmissions.length > 0 ? userSubmissions[userSubmissions.length - 1] : null;
   
@@ -550,8 +550,8 @@ export default function GameDetails() {
   const validAwayTeamBeverageDutyClaimedByOther = validAwayTeamBeverageDutyClaimed && !awayTeamHasBeverageDuty;
 
   // Check if user can delete the game (captain/creator of either team, or commissioner)
-  const isHomeTeamCreator = game.homeTeam?.creatorId === (user as User)?.id;
-  const isAwayTeamCreator = game.awayTeam?.creatorId === (user as User)?.id;
+  const isHomeTeamCreator = game.homeTeam?.creatorId === dbUserId;
+  const isAwayTeamCreator = game.awayTeam?.creatorId === dbUserId;
   const canDeleteGame = isHomeCaptain || isAwayCaptain || isHomeTeamCreator || isAwayTeamCreator || isCommissioner;
 
   const handleDeleteGame = () => {
