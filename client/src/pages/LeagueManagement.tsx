@@ -298,6 +298,13 @@ const TIMEZONES = [
   { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
 ];
 
+const subApprovalWorkflowOptions = [
+  { value: 'substitute_only', label: 'No Commissioner or opposing team approval needed' },
+  { value: 'captain_only', label: 'By Captain of Opposing Team' },
+  { value: 'commissioner_only', label: 'By League Commissioner' },
+  { value: 'captain_and_commissioner', label: 'Commissioner & Captain of Opposing Team' },
+] as const;
+
 const editLeagueSchema = z.object({
   name: z.string().min(1, 'League name is required'),
   description: z.string().optional(),
@@ -306,6 +313,7 @@ const editLeagueSchema = z.object({
   facilityId: z.string().optional(),
   timezone: z.string().optional(),
   isActive: z.boolean(),
+  subApprovalWorkflow: z.enum(['substitute_only', 'captain_only', 'commissioner_only', 'captain_and_commissioner']).optional(),
 });
 
 type EditLeagueForm = z.infer<typeof editLeagueSchema>;
@@ -962,6 +970,7 @@ export default function LeagueManagement() {
       facilityId: league?.facilityId || '',
       timezone: (league as any)?.timezone || 'America/New_York',
       isActive: league?.isActive ?? true,
+      subApprovalWorkflow: (league as any)?.subApprovalWorkflow || 'captain_and_commissioner',
     },
   });
 
@@ -1039,6 +1048,7 @@ export default function LeagueManagement() {
         isActive: league.isActive ?? true,
         facilityId: league.facilityId || '',
         timezone: (league as any)?.timezone || 'America/New_York',
+        subApprovalWorkflow: (league as any)?.subApprovalWorkflow || 'captain_and_commissioner',
       });
     }
   }, [league]);
@@ -4319,6 +4329,42 @@ export default function LeagueManagement() {
                   <p className="text-xs text-muted-foreground mt-1">
                     This timezone will be used for all game schedules and notifications
                   </p>
+                </div>
+
+                {/* Sub Approval Workflow */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">How Are Subs Approved?</label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    This controls who must approve a substitution request after the substitute player confirms availability.
+                  </p>
+                  <Controller
+                    name="subApprovalWorkflow"
+                    control={editLeagueForm.control}
+                    render={({ field }) => (
+                      <div className="space-y-2">
+                        {subApprovalWorkflowOptions.map((option) => (
+                          <label
+                            key={option.value}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              field.value === option.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                            data-testid={`radio-sub-approval-${option.value}`}
+                          >
+                            <input
+                              type="radio"
+                              value={option.value}
+                              checked={field.value === option.value}
+                              onChange={() => field.onChange(option.value)}
+                              className="accent-primary"
+                            />
+                            <span className="text-sm">{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  />
                 </div>
 
                 {/* Active Status */}

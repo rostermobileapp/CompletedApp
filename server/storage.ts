@@ -6864,7 +6864,15 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       // 6. SECURITY: Determine next status based on CURRENT status and approval decision
-      const nextStatus = this.deriveNextStatus(request.status, approverType, status);
+      // Fetch the league's configured sub approval workflow so we can branch correctly
+      let subApprovalWorkflow: 'substitute_only' | 'captain_only' | 'commissioner_only' | 'captain_and_commissioner' = 'captain_and_commissioner';
+      if (request.game?.leagueId) {
+        const [leagueRow] = await tx.select({ subApprovalWorkflow: leagues.subApprovalWorkflow }).from(leagues).where(eq(leagues.id, request.game.leagueId)).limit(1);
+        if (leagueRow?.subApprovalWorkflow) {
+          subApprovalWorkflow = leagueRow.subApprovalWorkflow as typeof subApprovalWorkflow;
+        }
+      }
+      const nextStatus = this.deriveNextStatus(request.status, approverType, status, subApprovalWorkflow);
       const finalizedAt = (nextStatus === 'approved' || nextStatus === 'denied') ? new Date() : undefined;
 
       // 7. Update the substitute request status using controlled method
@@ -6915,7 +6923,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // 9. Send notifications for workflow progression
-      await this.createSubstitutionNotification(tx, request, updatedRequest, approverType, status);
+      await this.createSubstitutionNotification(tx, request, updatedRequest, approverType, status, subApprovalWorkflow);
 
       return { approval, updatedRequest };
     });
@@ -6986,7 +6994,8 @@ export class DatabaseStorage implements IStorage {
     originalRequest: SubstituteRequest & { game: Game & { homeTeam: Team; awayTeam: Team }; originalPlayer: User; substitutePlayer?: User },
     updatedRequest: SubstituteRequest,
     approverType: 'opposing_captain' | 'commissioner' | 'substitute_player',
-    decision: 'approved' | 'denied'
+    decision: 'approved' | 'denied',
+    subApprovalWorkflow: 'substitute_only' | 'captain_only' | 'commissioner_only' | 'captain_and_commissioner' = 'captain_and_commissioner'
   ): Promise<void> {
     try {
       const leagueId = originalRequest.game.leagueId;
@@ -6994,14 +7003,13 @@ export class DatabaseStorage implements IStorage {
       const { sendSubstitutionPushNotification } = await import('./oneSignalNotifications');
       
       if (decision === 'denied') {
-        // Handle denials based on new workflow
-        if (approverType === 'opposing_captain') {
-          // Opposing captain denied → notify commissioner for final decision
+        // Handle denials based on configured workflow
+        if (approverType === 'opposing_captain' && subApprovalWorkflow === 'captain_and_commissioner') {
+          // Opposing captain denied AND commissioner escalation is configured → notify commissioner
           const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
           if (league[0]?.commissionerId) {
             const notifTitle = 'Commissioner Decision Needed';
             const notifMessage = `A substitution request for the ${originalRequest.game.homeTeam.name} vs ${originalRequest.game.awayTeam.name} game was denied by the opposing captain. Check your To-Do section to make a final decision.`;
-            // In-app notification (bell icon) for commissioner
             await tx.insert(userNotifications).values({
               userId: league[0].commissionerId,
               type: 'general',
@@ -7010,20 +7018,18 @@ export class DatabaseStorage implements IStorage {
               actionUrl: `/game/${gameId}`,
               actionText: 'View Game',
             });
-            // Push notification to device
             sendSubstitutionPushNotification(league[0].commissionerId, notifTitle, notifMessage, gameId, originalRequest.id).catch(console.error);
           }
         } else {
-          // All other denials (substitute player or commissioner) - notify requesting team captain
+          // All other denials — notify requesting team captain
           const requestingTeam = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
             ? originalRequest.game.homeTeam 
             : originalRequest.game.awayTeam;
           
           if (requestingTeam.captainId) {
-            const approverRole = approverType === 'commissioner' ? 'league commissioner' : 'substitute player';
+            const approverRole = approverType === 'commissioner' ? 'league commissioner' : approverType === 'opposing_captain' ? 'opposing team captain' : 'substitute player';
             const notifTitle = 'Substitute Request Denied';
             const notifMessage = `Your substitution request for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName} was denied by the ${approverRole}.`;
-            // In-app notification (bell icon) for requesting captain
             await tx.insert(userNotifications).values({
               userId: requestingTeam.captainId,
               type: 'general',
@@ -7032,16 +7038,14 @@ export class DatabaseStorage implements IStorage {
               actionUrl: `/game/${gameId}`,
               actionText: 'View Game',
             });
-            // Push notification to device
             sendSubstitutionPushNotification(requestingTeam.captainId, notifTitle, notifMessage, gameId, originalRequest.id).catch(console.error);
           }
         }
       } else if (decision === 'approved') {
-        // Approval notifications - notify next person in workflow
-        // Workflow: Captain → Substitute Player → Opposing Captain → Done
+        // Approval notifications - notify next person in workflow based on the updated status
         switch (updatedRequest.status) {
           case 'pending_opponent_approval':
-            // Substitute player confirmed availability → notify opposing captain
+            // Substitute player confirmed availability → notify opposing captain (captain_only or captain_and_commissioner)
             const opposingTeamId = originalRequest.requestingTeamId === originalRequest.game.homeTeamId 
               ? originalRequest.game.awayTeamId 
               : originalRequest.game.homeTeamId;
@@ -7062,7 +7066,6 @@ export class DatabaseStorage implements IStorage {
               const pendingTitle = 'Substitute Request Needs Your Approval';
               const pendingMessage = `${requestingTeamForNotify?.name || 'A team'} is requesting ${substitutePlayerNameForCaptain} to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. The substitute has confirmed availability. Check your To-Do section to approve or deny.`;
               
-              // In-app notification (bell icon) for opposing captain
               await tx.insert(userNotifications).values({
                 userId: opposingTeamForNotify.captainId,
                 type: 'general',
@@ -7071,8 +7074,34 @@ export class DatabaseStorage implements IStorage {
                 actionUrl: `/game/${gameId}`,
                 actionText: 'View Game',
               });
-              // Push notification to device
               sendSubstitutionPushNotification(opposingTeamForNotify.captainId, pendingTitle, pendingMessage, gameId, originalRequest.id).catch(console.error);
+            }
+            break;
+
+          case 'pending_commissioner_approval':
+            // Sub confirmed and workflow goes directly to commissioner (commissioner_only mode)
+            // OR could be reached after oppose captain denied in captain_and_commissioner mode (handled in denial block above)
+            if (approverType === 'substitute_player') {
+              const league = await tx.select().from(leagues).where(eq(leagues.id, leagueId)).limit(1);
+              if (league[0]?.commissionerId) {
+                const requestingTeamName = originalRequest.requestingTeamId === originalRequest.game.homeTeamId
+                  ? originalRequest.game.homeTeam.name
+                  : originalRequest.game.awayTeam.name;
+                const substitutePlayerName = originalRequest.substitutePlayer
+                  ? `${originalRequest.substitutePlayer.firstName} ${originalRequest.substitutePlayer.lastName}`
+                  : 'a substitute player';
+                const commTitle = 'Substitute Request Needs Your Approval';
+                const commMessage = `${requestingTeamName} is requesting ${substitutePlayerName} to substitute for ${originalRequest.originalPlayer.firstName} ${originalRequest.originalPlayer.lastName}. The substitute has confirmed availability. Check your To-Do section to approve or deny.`;
+                await tx.insert(userNotifications).values({
+                  userId: league[0].commissionerId,
+                  type: 'general',
+                  title: commTitle,
+                  message: commMessage,
+                  actionUrl: `/game/${gameId}`,
+                  actionText: 'View Game',
+                });
+                sendSubstitutionPushNotification(league[0].commissionerId, commTitle, commMessage, gameId, originalRequest.id).catch(console.error);
+              }
             }
             break;
             
@@ -7148,29 +7177,44 @@ export class DatabaseStorage implements IStorage {
   private deriveNextStatus(
     currentStatus: string, 
     approverType: 'opposing_captain' | 'commissioner' | 'substitute_player', 
-    decision: 'approved' | 'denied'
+    decision: 'approved' | 'denied',
+    subApprovalWorkflow: 'substitute_only' | 'captain_only' | 'commissioner_only' | 'captain_and_commissioner' = 'captain_and_commissioner'
   ): 'pending_opponent_approval' | 'pending_commissioner_approval' | 'pending_substitute_approval' | 'approved' | 'denied' | 'expired' {
-    // Handle denials based on who denied
+    // Handle denials based on who denied and the configured workflow
     if (decision === 'denied') {
-      // If opposing captain denies, send to commissioner for final decision
       if (approverType === 'opposing_captain') {
-        return 'pending_commissioner_approval';
+        // In captain_and_commissioner mode, escalate to commissioner on opponent denial
+        // In captain_only mode, denial by captain is final
+        if (subApprovalWorkflow === 'captain_and_commissioner') {
+          return 'pending_commissioner_approval';
+        }
+        return 'denied';
       }
-      // All other denials are final
+      // All other denials (substitute player or commissioner) are final
       return 'denied';
     }
 
     // Only allow approved decisions to advance workflow
     switch (approverType) {
       case 'substitute_player':
-        // First step: substitute confirms availability → send to opposing captain for approval
+        // First step: substitute confirms availability
         if (currentStatus !== 'pending_substitute_approval') {
           throw new Error(`Invalid transition: cannot process substitute_player approval from status ${currentStatus}`);
         }
+        // Branch based on the league's configured workflow
+        if (subApprovalWorkflow === 'substitute_only') {
+          // No further approval needed — immediately approved
+          return 'approved';
+        }
+        if (subApprovalWorkflow === 'commissioner_only') {
+          // Skip opposing captain — go straight to commissioner
+          return 'pending_commissioner_approval';
+        }
+        // captain_only or captain_and_commissioner — send to opposing captain next
         return 'pending_opponent_approval';
         
       case 'opposing_captain':
-        // Second step: opposing captain approves → FULLY APPROVED
+        // Second step (captain_only / captain_and_commissioner modes): opposing captain approves
         if (currentStatus !== 'pending_opponent_approval') {
           throw new Error(`Invalid transition: cannot process opposing_captain approval from status ${currentStatus}`);
         }

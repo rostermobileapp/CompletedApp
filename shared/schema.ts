@@ -68,6 +68,14 @@ export const rsvpStatusEnum = pgEnum("rsvp_status", [
   "no_response"
 ]);
 
+// Sub approval workflow enum - configures who must approve substitutions after the sub player confirms
+export const subApprovalWorkflowEnum = pgEnum("sub_approval_workflow", [
+  "substitute_only",
+  "captain_only",
+  "commissioner_only",
+  "captain_and_commissioner",
+]);
+
 // Substitute request status enum
 export const substituteRequestStatusEnum = pgEnum("substitute_request_status", [
   "pending_opponent_approval",
@@ -322,6 +330,7 @@ export const leagues = pgTable("leagues", {
   isActive: boolean("is_active").default(true).notNull(),
   playoffStarted: boolean("playoff_started").default(false).notNull(),
   playoffBracket: jsonb("playoff_bracket"), // Store playoff bracket data
+  subApprovalWorkflow: subApprovalWorkflowEnum("sub_approval_workflow").default("captain_and_commissioner").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
