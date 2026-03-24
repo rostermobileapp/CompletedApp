@@ -246,7 +246,7 @@ export default function GameDetails() {
     },
   });
 
-  if ((isScrimmage && (scrimmageLoading || !scrimmageData)) || (!isScrimmage && (gameLoading || !game))) {
+  if ((isScrimmage && scrimmageLoading) || (!isScrimmage && gameLoading)) {
     return (
       <div className="min-h-screen bg-background">
         <div className="bg-card border-b border-border px-6 py-4">
@@ -275,66 +275,37 @@ export default function GameDetails() {
     );
   }
 
+  if ((isScrimmage && !scrimmageData) || (!isScrimmage && !game)) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/");
+              }}
+              className="p-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Game Details</h1>
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="bg-card rounded-xl border border-border p-6">
+            <p className="text-center text-muted-foreground">Game not found</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Early return with scrimmage-specific UI if viewing a scrimmage
   if (isScrimmage) {
-    if (scrimmageLoading) {
-      return (
-        <div className="min-h-screen bg-background pb-20">
-          <div className="bg-card border-b border-border px-6 py-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setPageTransitionDirection('down');
-                  navigate("/calendar");
-                }}
-                className="p-2"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <h1 className="text-xl font-semibold">Scrimmage Details</h1>
-            </div>
-          </div>
-          <div className="px-6 py-6">
-            <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
-              <div className="h-32 bg-muted rounded"></div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (!scrimmageData) {
-      return (
-        <div className="min-h-screen bg-background pb-20">
-          <div className="bg-card border-b border-border px-6 py-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setPageTransitionDirection('down');
-                  navigate("/calendar");
-                }}
-                className="p-2"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <h1 className="text-xl font-semibold">Scrimmage Details</h1>
-            </div>
-          </div>
-          <div className="px-6 py-6">
-            <div className="bg-card rounded-xl border border-border p-6">
-              <p className="text-center text-muted-foreground">Scrimmage not found</p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     const { scrimmage, approvedPlayers } = scrimmageData as any;
     
     return (
@@ -443,41 +414,8 @@ export default function GameDetails() {
     );
   }
 
-  // Return error if not loading and no game data (invalid route)
-  if (!gameLoading && !game) {
-    return (
-      <div className="min-h-screen bg-background pb-20">
-        <div className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setPageTransitionDirection('down');
-                navigate("/calendar");
-              }}
-              className="p-2"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <h1 className="text-xl font-semibold">Game Details</h1>
-          </div>
-        </div>
-        <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-6">
-            <p className="text-center text-muted-foreground">Game not found</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // At this point, we know game is defined for non-scrimmage cases
-  // TypeScript type guard to ensure game is defined
-  if (!game) {
-    throw new Error("Game should be defined at this point in the component flow");
-  }
+  // TypeScript narrowing: game is guaranteed to be defined at this point (caught by early returns above)
+  if (!game) return null;
 
   // Find which of user's teams is playing in this game
   const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team) => team.id) : [];

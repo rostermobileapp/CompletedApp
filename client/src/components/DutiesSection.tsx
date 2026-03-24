@@ -107,6 +107,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/duty-assignments'] });
       toast({
         title: 'Success',
         description: 'Duty claimed successfully',
@@ -130,6 +131,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/duty-assignments'] });
       toast({
         title: 'Success',
         description: 'Duty released successfully',
