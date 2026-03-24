@@ -122,7 +122,7 @@ export default function TeamEventDetails() {
 
   if (!eventData) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background pb-36">
         <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
@@ -171,7 +171,7 @@ export default function TeamEventDetails() {
   const gameDate = format(new Date(eventData.scheduledAt), 'yyyy-MM-dd');
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-36">
       <div className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center gap-4">
           <Button

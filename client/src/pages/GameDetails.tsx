@@ -306,7 +306,7 @@ export default function GameDetails() {
 
   if ((isScrimmage && !scrimmageData) || (!isScrimmage && !game)) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background pb-36">
         <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
@@ -338,7 +338,7 @@ export default function GameDetails() {
     const { scrimmage, approvedPlayers } = scrimmageData as any;
     
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background pb-36">
         <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
@@ -447,7 +447,7 @@ export default function GameDetails() {
   // show "Game not found" rather than a blank screen.
   if (!game) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background pb-36">
         <div className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center gap-4">
             <Button
