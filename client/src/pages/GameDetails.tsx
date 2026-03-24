@@ -669,7 +669,7 @@ export default function GameDetails() {
                 <div className="flex items-center gap-3 mt-2">
                   <div className="flex items-center gap-1">
                     <Users className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-600" data-testid="text-opponent-in-count">
+                    <span className="font-medium text-green-600 text-[16px]" data-testid="text-opponent-in-count">
                       {opponentInCount} In
                     </span>
                   </div>
