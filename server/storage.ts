@@ -7177,9 +7177,9 @@ export class DatabaseStorage implements IStorage {
         return 'approved';
         
       case 'commissioner':
-        // Commissioner only sees requests if opposing captain denied them
-        // Commissioners can approve at pending_commissioner_approval stage
-        if (currentStatus !== 'pending_commissioner_approval') {
+        // Commissioners can approve at pending_commissioner_approval stage (after opponent denied)
+        // or directly at pending_opponent_approval stage (overriding the opponent step)
+        if (currentStatus !== 'pending_commissioner_approval' && currentStatus !== 'pending_opponent_approval') {
           throw new Error(`Invalid transition: cannot process commissioner approval from status ${currentStatus}`);
         }
         // Commissioner approval finalizes the request
