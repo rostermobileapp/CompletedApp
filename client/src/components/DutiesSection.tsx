@@ -105,9 +105,46 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newAssignment: any) => {
+      const template = dutyTemplates.find((t: any) => t.id === newAssignment.dutyTemplateId);
+      const enriched = { ...newAssignment, dutyTemplate: template };
+
+      queryClient.setQueryData(
+        ['/api/games', gameId, 'duties'],
+        (old: any) => {
+          const arr = Array.isArray(old) ? old : [];
+          const filtered = arr.filter((a: any) => a.dutyTemplateId !== newAssignment.dutyTemplateId);
+          return [...filtered, enriched];
+        }
+      );
+
+      queryClient.setQueriesData(
+        {
+          predicate: (query) => {
+            const key = query.queryKey as unknown[];
+            return Array.isArray(key) && key[0] === '/api/duty-assignments';
+          },
+        },
+        (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((gameData: any) => {
+            if (gameData.gameId !== gameId) return gameData;
+            const filtered = (gameData.assignments || []).filter(
+              (a: any) => a.dutyTemplateId !== newAssignment.dutyTemplateId
+            );
+            return { ...gameData, assignments: [...filtered, enriched] };
+          });
+        }
+      );
+
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/duty-assignments'] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey as unknown[];
+          return Array.isArray(key) && key[0] === '/api/duty-assignments';
+        },
+      });
+
       toast({
         title: 'Success',
         description: 'Duty claimed successfully',
@@ -129,9 +166,44 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_: any, { dutyTemplateId }: { dutyTemplateId: string }) => {
+      queryClient.setQueryData(
+        ['/api/games', gameId, 'duties'],
+        (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.filter((a: any) => a.dutyTemplateId !== dutyTemplateId);
+        }
+      );
+
+      queryClient.setQueriesData(
+        {
+          predicate: (query) => {
+            const key = query.queryKey as unknown[];
+            return Array.isArray(key) && key[0] === '/api/duty-assignments';
+          },
+        },
+        (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((gameData: any) => {
+            if (gameData.gameId !== gameId) return gameData;
+            return {
+              ...gameData,
+              assignments: (gameData.assignments || []).filter(
+                (a: any) => a.dutyTemplateId !== dutyTemplateId
+              ),
+            };
+          });
+        }
+      );
+
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/duty-assignments'] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey as unknown[];
+          return Array.isArray(key) && key[0] === '/api/duty-assignments';
+        },
+      });
+
       toast({
         title: 'Success',
         description: 'Duty released successfully',
