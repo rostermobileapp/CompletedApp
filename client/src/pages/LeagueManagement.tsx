@@ -4158,7 +4158,7 @@ export default function LeagueManagement() {
       {/* Edit League Modal */}
       {showEditLeague && league && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] flex flex-col">
+          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden">
             <div className="px-6 pt-6 pb-4 flex-shrink-0 flex items-center justify-between">
               <h2 className="text-xl font-bold">Edit League</h2>
               <button
