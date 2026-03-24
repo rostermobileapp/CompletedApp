@@ -666,11 +666,19 @@ export default function GameDetails() {
                 </div>
               )}
               {!isGameCompleted && earlyOpponentTeamId && (
-                <div className="flex items-center gap-2 mt-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-600" data-testid="text-opponent-in-count">
-                    {opponentInCount} {opponentInCount === 1 ? 'Player' : 'Players'} Confirmed
-                  </span>
+                <div className="flex items-center gap-3 mt-2">
+                  <div className="flex items-center gap-1">
+                    <Users className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-600" data-testid="text-opponent-in-count">
+                      {opponentInCount} {opponentInCount === 1 ? 'Player' : 'Players'} Confirmed
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <X className="w-4 h-4 text-red-500" />
+                    <span className="text-sm font-medium text-red-500" data-testid="text-opponent-out-count">
+                      {opponentRsvpSummary?.notAttending?.length || 0} Out
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
