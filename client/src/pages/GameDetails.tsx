@@ -414,8 +414,35 @@ export default function GameDetails() {
     );
   }
 
-  // TypeScript narrowing: game is guaranteed to be defined at this point (caught by early returns above)
-  if (!game) return null;
+  // Safety net: if game is somehow undefined here (should never happen after the checks above),
+  // show "Game not found" rather than a blank screen.
+  if (!game) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate("/");
+              }}
+              className="p-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-xl font-semibold">Game Details</h1>
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="bg-card rounded-xl border border-border p-6">
+            <p className="text-center text-muted-foreground">Game not found</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Find which of user's teams is playing in this game
   const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team) => team.id) : [];

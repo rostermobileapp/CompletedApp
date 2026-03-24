@@ -96,6 +96,7 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       const response = await apiRequest('GET', `/api/games/${gameId}/duties`);
       return response.json();
     },
+    refetchOnMount: 'always',
   });
 
   const claimDutyMutation = useMutation({
@@ -166,7 +167,10 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
       });
       return response.json();
     },
-    onSuccess: (_: any, { dutyTemplateId }: { dutyTemplateId: string }) => {
+    onMutate: async ({ dutyTemplateId }: { dutyTemplateId: string }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/games', gameId, 'duties'] });
+      const previousDuties = queryClient.getQueryData(['/api/games', gameId, 'duties']);
+
       queryClient.setQueryData(
         ['/api/games', gameId, 'duties'],
         (old: any) => {
@@ -196,6 +200,9 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
         }
       );
 
+      return { previousDuties };
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/games', gameId, 'duties'] });
       queryClient.invalidateQueries({
         predicate: (query) => {
@@ -209,7 +216,10 @@ export default function DutiesSection({ gameId, teamId, userId, isCaptain, isTea
         description: 'Duty released successfully',
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables: any, context: any) => {
+      if (context?.previousDuties !== undefined) {
+        queryClient.setQueryData(['/api/games', gameId, 'duties'], context.previousDuties);
+      }
       toast({
         title: 'Error',
         description: error.message || 'Failed to release duty',
