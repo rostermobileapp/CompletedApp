@@ -65,6 +65,13 @@ export default function GameDetails() {
     enabled: !!gameId && !isScrimmage,
   });
 
+  // Fetch DB user profile so we get the database user ID (may differ from Supabase auth UUID
+  // for users created before their Supabase account was linked)
+  const { data: userProfile } = useQuery<{ id: string }>({
+    queryKey: ['/api/user'],
+  });
+  const dbUserId = userProfile?.id || (user as any)?.id;
+
   // Extract data from consolidated response
   const game = fullGameData?.game;
   const league = fullGameData?.league;
@@ -660,7 +667,7 @@ export default function GameDetails() {
                   <p className="text-sm font-medium text-muted-foreground mb-2">Your Response:</p>
                   <RSVPButtons 
                     gameId={game.id} 
-                    userId={(user as User).id}
+                    userId={dbUserId}
                     userTeamId={userTeam.id}
                     isCaptain={isCaptain}
                     isCommissioner={isCommissioner}
@@ -718,7 +725,7 @@ export default function GameDetails() {
           <DutiesSection 
             gameId={game.id}
             teamId={linkedHomeTeamId || game.homeTeam?.id}
-            userId={(user as User).id}
+            userId={dbUserId}
             isCaptain={isHomeCaptain}
             isTeamMember={isUserOnHomeTeam}
           />
@@ -729,7 +736,7 @@ export default function GameDetails() {
           <DutiesSection 
             gameId={game.id}
             teamId={linkedAwayTeamId || game.awayTeam?.id}
-            userId={(user as User).id}
+            userId={dbUserId}
             isCaptain={isAwayCaptain}
             isTeamMember={isUserOnAwayTeam}
           />
