@@ -6914,6 +6914,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+
+      // Also allow approved substitutes to release duties
+      if (!isMember) {
+        const game = await storage.getGameById(gameId);
+        if (game) {
+          const [subRow] = await db
+            .select({ id: substituteRequests.id })
+            .from(substituteRequests)
+            .where(and(
+              eq(substituteRequests.gameId, gameId),
+              eq(substituteRequests.substitutePlayerId, userId),
+              eq(substituteRequests.requestingTeamId, teamId),
+              eq(substituteRequests.status, 'approved')
+            ))
+            .limit(1);
+          if (subRow) isMember = true;
+        }
+      }
       
       if (!isMember) {
         return res.status(403).json({ message: 'You are not a member of this team' });
