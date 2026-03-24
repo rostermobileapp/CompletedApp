@@ -670,7 +670,7 @@ export default function GameDetails() {
                   <span data-testid="text-game-venue">{game.venue}</span>
                 </div>
               )}
-              {!isGameCompleted && earlyOpponentTeamId && (
+              {!isGameCompleted && opponentTeam && (
                 <div className="flex items-center gap-3 mt-2">
                   <div className="flex items-center gap-1">
                     <Users className="w-4 h-4 text-green-600" />
