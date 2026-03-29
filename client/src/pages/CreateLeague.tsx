@@ -83,6 +83,8 @@ export default function CreateLeague() {
         description: `${league.name} has been created successfully!`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues/commissioner'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
       navigate(`/league-management?leagueId=${league.id}`);
     },
     onError: (error: any) => {

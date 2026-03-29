@@ -25,9 +25,10 @@ export default function LeagueList() {
     retry: false,
   });
 
-  // Filter leagues by search term (case-insensitive search on uniqueLeagueId)
+  // Filter leagues by search term (case-insensitive search on name or uniqueLeagueId)
   const filteredLeagues = leagues?.filter(league => 
-    league.uniqueLeagueId.toLowerCase().includes(searchTerm.toLowerCase())
+    (league.uniqueLeagueId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (league.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   if (isLoading) {
@@ -79,7 +80,7 @@ export default function LeagueList() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by League ID..."
+            placeholder="Search by name or League ID..."
             className="w-full bg-card border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             data-testid="input-search-league"
           />
