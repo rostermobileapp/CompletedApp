@@ -146,7 +146,7 @@ async function seedDemoSeason() {
         id: crypto.randomUUID(),
         name: DEMO_SEASON_NAME,
         leagueId: LEAGUE_ID,
-        isActive: true,
+        isActive: false,
       })
       .returning();
     seasonId = season.id;
