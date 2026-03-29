@@ -35,10 +35,19 @@ export function useKeyboard() {
           isKeyboardOpen = true;
           keyboardHeight = heightDiff;
         } else {
-          const offsetTop = viewport.offsetTop;
-          if (offsetTop > threshold) {
-            isKeyboardOpen = true;
-            keyboardHeight = window.innerHeight - currentHeight - offsetTop;
+          // Only use offsetTop as a keyboard signal when an input/textarea is focused.
+          // On iOS Safari, visualViewport.offsetTop increases as the user scrolls down,
+          // so checking it unconditionally causes false positives that hide the bottom nav.
+          const activeEl = document.activeElement;
+          const hasInputFocus = activeEl && (
+            activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA'
+          );
+          if (hasInputFocus) {
+            const offsetTop = viewport.offsetTop;
+            if (offsetTop > threshold) {
+              isKeyboardOpen = true;
+              keyboardHeight = window.innerHeight - currentHeight - offsetTop;
+            }
           }
         }
         
