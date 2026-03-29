@@ -15,21 +15,30 @@ type League = {
   uniqueLeagueId: string;
 };
 
+type StatusFilter = 'active' | 'inactive' | 'all';
+
 export default function LeagueList() {
   const [, navigate] = useLocation();
   const { canManageLeague } = usePermissions();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
 
   const { data: leagues, isLoading } = useQuery<League[]>({
     queryKey: ['/api/leagues/commissioner'],
     retry: false,
   });
 
-  // Filter leagues by search term (case-insensitive search on name or uniqueLeagueId)
-  const filteredLeagues = leagues?.filter(league => 
-    (league.uniqueLeagueId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (league.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  // Filter leagues by search term and active status
+  const filteredLeagues = leagues?.filter(league => {
+    const matchesSearch =
+      (league.uniqueLeagueId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (league.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && league.isActive) ||
+      (statusFilter === 'inactive' && !league.isActive);
+    return matchesSearch && matchesStatus;
+  }) || [];
 
   if (isLoading) {
     return (
@@ -41,6 +50,9 @@ export default function LeagueList() {
       </div>
     );
   }
+
+  const totalActive = leagues?.filter(l => l.isActive).length ?? 0;
+  const totalInactive = leagues?.filter(l => !l.isActive).length ?? 0;
 
   return (
     <div className="min-h-screen flex flex-col pb-24">
@@ -62,7 +74,7 @@ export default function LeagueList() {
       </div>
 
       {/* Create League Button */}
-      <div className="px-6 mb-6">
+      <div className="px-6 mb-4">
         <button
           onClick={() => navigate('/create-league')}
           className="w-full bg-primary text-primary-foreground rounded-lg px-4 py-3 flex items-center justify-center gap-2 font-medium"
@@ -72,6 +84,37 @@ export default function LeagueList() {
           Create New League
         </button>
       </div>
+
+      {/* Status Filter Toggle */}
+      {leagues && leagues.length > 0 && (
+        <div className="px-6 mb-4">
+          <div className="flex bg-muted rounded-lg p-1 gap-1">
+            {([
+              { value: 'active', label: 'Active', count: totalActive },
+              { value: 'all', label: 'All', count: (leagues?.length ?? 0) },
+              { value: 'inactive', label: 'Inactive', count: totalInactive },
+            ] as { value: StatusFilter; label: string; count: number }[]).map(({ value, label, count }) => (
+              <button
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className={`flex-1 py-1.5 px-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                  statusFilter === value
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                data-testid={`filter-${value}`}
+              >
+                {label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  statusFilter === value ? 'bg-primary/10 text-primary' : 'bg-muted-foreground/20'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search Input */}
       {leagues && leagues.length > 0 && (
@@ -109,14 +152,16 @@ export default function LeagueList() {
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No leagues found</h3>
             <p className="text-muted-foreground mb-4">
-              No leagues match "{searchTerm}". Try a different search term.
+              {searchTerm
+                ? `No ${statusFilter !== 'all' ? statusFilter : ''} leagues match "${searchTerm}".`
+                : `No ${statusFilter} leagues. Switch the filter above to see all leagues.`}
             </p>
             <button
-              onClick={() => setSearchTerm('')}
+              onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}
               className="bg-primary text-primary-foreground rounded-lg px-6 py-2 font-medium"
               data-testid="button-clear-search"
             >
-              Clear Search
+              Show All Leagues
             </button>
           </div>
         ) : (
@@ -124,12 +169,23 @@ export default function LeagueList() {
             {filteredLeagues.map((league) => (
               <div
                 key={league.id}
-                className="bg-card rounded-xl border border-border p-6 cursor-pointer hover:bg-card/80 transition-colors"
+                className={`bg-card rounded-xl border p-6 cursor-pointer hover:bg-card/80 transition-colors ${
+                  league.isActive ? 'border-border' : 'border-dashed border-border opacity-75'
+                }`}
                 onClick={() => navigate(`/league-management?leagueId=${league.id}`)}
                 data-testid={`league-card-${league.id}`}
               >
                 <div className="mb-3">
-                  <h3 className="text-lg font-semibold mb-1">{league.name}</h3>
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-lg font-semibold">{league.name}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      league.isActive
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                    }`}>
+                      {league.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                     <span className="font-mono bg-muted px-2 py-0.5 rounded" data-testid={`league-id-${league.id}`}>
                       {league.uniqueLeagueId}
@@ -143,10 +199,6 @@ export default function LeagueList() {
                         <span>{league.location}</span>
                       </>
                     )}
-                    <span>•</span>
-                    <span className={league.isActive ? 'text-green-600/50' : 'text-yellow-600/50'}>
-                      {league.isActive ? 'Active' : 'Inactive'}
-                    </span>
                   </div>
                 </div>
                 

@@ -4368,16 +4368,45 @@ export default function LeagueManagement() {
                 </div>
 
                 {/* Active Status */}
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      {...editLeagueForm.register('isActive')}
-                      type="checkbox"
-                      className="rounded border-border focus:ring-primary"
-                      data-testid="checkbox-league-active"
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">League Status</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Inactive leagues are hidden from players but remain editable by commissioners.
+                      </p>
+                    </div>
+                    <Controller
+                      control={editLeagueForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <div className="flex bg-muted rounded-lg p-1 gap-1 shrink-0" data-testid="toggle-league-active">
+                          <button
+                            type="button"
+                            onClick={() => field.onChange(true)}
+                            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                              field.value
+                                ? 'bg-green-500 text-white shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Active
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => field.onChange(false)}
+                            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                              !field.value
+                                ? 'bg-yellow-500 text-white shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            Inactive
+                          </button>
+                        </div>
+                      )}
                     />
-                    <span className="text-sm font-medium">League is active</span>
-                  </label>
+                  </div>
                 </div>
 
                 {/* Co-Commissioner Management */}
