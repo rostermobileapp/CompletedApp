@@ -23,7 +23,7 @@ interface BracketViewProps {
 }
 
 export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType }: BracketViewProps) {
-  const [zoom, setZoom] = useState(0.5); // Start zoomed out to show full bracket
+  const [zoom, setZoom] = useState(0.65); // Start slightly zoomed out to show full bracket
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -272,12 +272,12 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const bracketTypes = Object.keys(bracketMaps);
 
   // Calculate match positions using center-based algorithm
-  const MATCH_WIDTH = 240; // Reduced by 40px
-  const MATCH_HEIGHT = 140; // Increased to contain both teams
-  const ROUND_GAP = 200;
-  const MATCH_GAP = 40; // Gap between game cards
+  const MATCH_WIDTH = 240;
+  const MATCH_HEIGHT = 160; // Taller cards for better readability
+  const ROUND_GAP = 220;
+  const MATCH_GAP = 80; // Generous gap between game cards to prevent overlap
   const BASE_VERTICAL_GAP = MATCH_HEIGHT + MATCH_GAP; // Uniform gap for both brackets
-  const BRACKET_VERTICAL_GAP = MATCH_GAP; // Space between winners and losers brackets (same as between game cards)
+  const BRACKET_VERTICAL_GAP = MATCH_GAP * 2; // Extra space between winners and losers brackets
 
   // Build match maps for parent lookup
   const matchById = new Map<string, TournamentMatch>();
@@ -484,22 +484,21 @@ export default function BracketView({ matches, teams, format, settings, tourname
       winnerBgClass = 'bg-[#32CD32] text-black';
     }
 
-    // Calculate position and size with zoom (add 50, 80 offset like the SVG g transform)
+    // Use CSS transform scale so all internal padding, fonts, and spacing scale uniformly
     const cardX = (x + 50) * zoom;
     const cardY = (y + 80) * zoom;
-    const cardWidth = MATCH_WIDTH * zoom;
-    const cardHeight = MATCH_HEIGHT * zoom;
 
     return (
       <Card 
         key={match.id}
         className={`match-card absolute bg-card ${borderColor} border-[4px] cursor-pointer hover:opacity-90 transition-opacity group`} 
         style={{
-          width: cardWidth,
-          height: cardHeight,
+          width: MATCH_WIDTH,
+          height: MATCH_HEIGHT,
           left: cardX,
           top: cardY,
-          fontSize: `${zoom * 100}%`
+          transform: `scale(${zoom})`,
+          transformOrigin: 'top left',
         }}
         data-testid={`card-match-${match.matchNumber}`}
         onClick={() => setSelectedMatchId(match.id)}
@@ -724,7 +723,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
   console.log('🔍 SVG Dimensions:', { width: svgWidth, height: svgHeight, hasLosers, losersRounds: losersRounds.length });
 
   const resetZoom = () => {
-    setZoom(0.5);
+    setZoom(0.65);
   };
 
   // Calculate effective dimensions - ensure minimum size for scrolling
