@@ -1756,8 +1756,11 @@ export default function Dashboard() {
       : null;
     
     if (league) {
-      if (league.seasonName) {
-        return `${league.name}: ${league.seasonName} - ${team.name}`;
+      // Prefer the team's own season name (set when the team belongs to a specific season),
+      // fall back to the league's active season name for league-level teams (no seasonId).
+      const seasonLabel = team.seasonName ?? league.seasonName;
+      if (seasonLabel) {
+        return `${league.name}: ${seasonLabel} - ${team.name}`;
       }
       return `${league.name}: ${team.name}`;
     }

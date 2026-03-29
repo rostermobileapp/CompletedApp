@@ -2248,7 +2248,7 @@ export class DatabaseStorage implements IStorage {
     return team;
   }
 
-  async getUserTeams(userId: string): Promise<Team[]> {
+  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null })[]> {
     // Get teams from direct team memberships
     const teamMembershipResult = await db
       .select({ team: teams })
@@ -2313,8 +2313,23 @@ export class DatabaseStorage implements IStorage {
     
     // Deduplicate teams by ID
     const uniqueTeams = Array.from(new Map(allTeams.map(team => [team.id, team])).values());
-    
-    return uniqueTeams;
+
+    // Fetch season names for any teams that have a seasonId so the frontend can
+    // display each team under its own season label (e.g. "Winter 2025" vs "Demo - Winter 2025")
+    const seasonIds = [...new Set(uniqueTeams.map(t => t.seasonId).filter(Boolean))] as string[];
+    let seasonNameMap: Record<string, string> = {};
+    if (seasonIds.length > 0) {
+      const seasonRows = await db
+        .select({ id: seasons.id, name: seasons.name })
+        .from(seasons)
+        .where(inArray(seasons.id, seasonIds));
+      seasonRows.forEach(s => { seasonNameMap[s.id] = s.name; });
+    }
+
+    return uniqueTeams.map(team => ({
+      ...team,
+      seasonName: team.seasonId ? (seasonNameMap[team.seasonId] ?? null) : null,
+    }));
   }
 
   async getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]> {
