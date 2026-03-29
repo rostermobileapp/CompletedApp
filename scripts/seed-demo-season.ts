@@ -12,8 +12,8 @@
  *   - Tobin Kern (commissioner) is the only real user in the demo season.
  *   - Team captains who are NOT approved league members get captain_id = null in the demo;
  *     no extra users are created for them.
- *   - Team member flags (is_captain, goalie/skater, position) are preserved.
- *   - An idempotency guard prevents duplicate runs.
+ *   - All inserts run inside a single transaction — a failure at any step rolls back
+ *     completely, preventing partial data from blocking the idempotency guard.
  */
 
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -26,6 +26,13 @@ const DEST_URL = process.env.DATABASE_URL!;
 // Source league / season identifiers
 const LEAGUE_ID = '8f4c9613-80e3-41d4-a940-f69893268687';
 const SOURCE_SEASON_ID = 'd2af8ac6-199a-45d8-abf4-825524cf1bb3'; // "Winter 2025"
+
+// Expected team names in this league — used to guard against accidental duplication
+// of any league-level teams that shouldn't be included.
+const EXPECTED_SOURCE_TEAMS = new Set([
+  'Orange', 'Mavericks', "Puck'n Bucks", 'Lumberjacks', 'Red Barons',
+  'Muffin Men', 'Red Barrons', 'RW&B', 'Gold', 'Lot Lizards',
+]);
 
 const TOBIN_KERN_ID = '005a021a-9cd1-4e15-85c0-95a4fcdb01fa';
 const DEMO_SEASON_NAME = 'Demo - Winter 2025';
@@ -58,70 +65,82 @@ async function seedDemoSeason() {
   const client = postgres(DEST_URL);
   const db = drizzle(client, { schema });
 
-  try {
-    // ── Guard: prevent duplicate runs ────────────────────────────────────────
-    const existing = await db
+  // ── Guard: prevent duplicate runs ──────────────────────────────────────────
+  const existing = await db
+    .select()
+    .from(schema.seasons)
+    .where(and(eq(schema.seasons.leagueId, LEAGUE_ID), eq(schema.seasons.name, DEMO_SEASON_NAME)));
+
+  if (existing.length > 0) {
+    console.log(`⚠️  Demo season "${DEMO_SEASON_NAME}" already exists (ID: ${existing[0].id}). Aborting.`);
+    await client.end();
+    return;
+  }
+
+  // ── Step 1: Read source data (outside transaction) ─────────────────────────
+  console.log('1️⃣  Reading source data...');
+
+  // Source teams: league-level (season_id IS NULL) or linked to source season,
+  // filtered to only the known expected team names to prevent accidental inclusion
+  // of any other teams that may exist in the league.
+  const allCandidateTeams = await db
+    .select()
+    .from(schema.teams)
+    .where(
+      and(
+        eq(schema.teams.leagueId, LEAGUE_ID),
+        or(isNull(schema.teams.seasonId), eq(schema.teams.seasonId, SOURCE_SEASON_ID))
+      )
+    );
+
+  const sourceTeams = allCandidateTeams.filter(t => EXPECTED_SOURCE_TEAMS.has(t.name));
+
+  // Assert exact expected count before doing any writes
+  if (sourceTeams.length !== EXPECTED_SOURCE_TEAMS.size) {
+    const found = sourceTeams.map(t => t.name).join(', ');
+    throw new Error(
+      `Expected ${EXPECTED_SOURCE_TEAMS.size} source teams but found ${sourceTeams.length}. ` +
+      `Found: ${found}`
+    );
+  }
+
+  const leagueMembers = await db
+    .select()
+    .from(schema.leagueMemberships)
+    .where(and(eq(schema.leagueMemberships.leagueId, LEAGUE_ID), eq(schema.leagueMemberships.status, 'approved')));
+
+  const memberUserRecords: schema.User[] = [];
+  for (const m of leagueMembers) {
+    const [u] = await db.select().from(schema.users).where(eq(schema.users.id, m.userId));
+    if (u) memberUserRecords.push(u);
+  }
+  const userById = new Map(memberUserRecords.map(u => [u.id, u]));
+
+  const allTeamMemberships: schema.TeamMembership[] = [];
+  for (const team of sourceTeams) {
+    const memberships = await db
       .select()
-      .from(schema.seasons)
-      .where(and(eq(schema.seasons.leagueId, LEAGUE_ID), eq(schema.seasons.name, DEMO_SEASON_NAME)));
+      .from(schema.teamMemberships)
+      .where(eq(schema.teamMemberships.teamId, team.id));
+    allTeamMemberships.push(...memberships);
+  }
 
-    if (existing.length > 0) {
-      console.log(`⚠️  Demo season "${DEMO_SEASON_NAME}" already exists (ID: ${existing[0].id}). Aborting.`);
-      await client.end();
-      return;
-    }
+  const nonTobinMembers = leagueMembers.filter(m => m.userId !== TOBIN_KERN_ID);
 
-    // ── Step 1: Read source data ─────────────────────────────────────────────
-    console.log('1️⃣  Reading source data...');
+  console.log(`   Source season ID: ${SOURCE_SEASON_ID}`);
+  console.log(`   Teams: ${sourceTeams.length} (${sourceTeams.map(t => t.name).join(', ')})`);
+  console.log(`   League members: ${leagueMembers.length} (${nonTobinMembers.length} → placeholders, 1 = Tobin)`);
+  console.log(`   Source team memberships: ${allTeamMemberships.length}`);
 
-    // Source teams: those explicitly linked to the source season, OR league-level
-    // teams with no season_id (which is how Mentor 35+ teams are currently stored).
-    // We explicitly exclude any teams already linked to a demo/other season.
-    const sourceTeams = await db
-      .select()
-      .from(schema.teams)
-      .where(
-        and(
-          eq(schema.teams.leagueId, LEAGUE_ID),
-          or(isNull(schema.teams.seasonId), eq(schema.teams.seasonId, SOURCE_SEASON_ID))
-        )
-      );
+  // ── Steps 2-6 inside a single transaction ─────────────────────────────────
+  let seasonId!: string;
+  const userIdMap = new Map<string, string>();
+  userIdMap.set(TOBIN_KERN_ID, TOBIN_KERN_ID);
 
-    // Source approved league members
-    const leagueMembers = await db
-      .select()
-      .from(schema.leagueMemberships)
-      .where(and(eq(schema.leagueMemberships.leagueId, LEAGUE_ID), eq(schema.leagueMemberships.status, 'approved')));
-
-    const approvedMemberUserIds = new Set(leagueMembers.map(m => m.userId));
-
-    // Fetch user records for all members
-    const memberUserRecords: schema.User[] = [];
-    for (const m of leagueMembers) {
-      const [u] = await db.select().from(schema.users).where(eq(schema.users.id, m.userId));
-      if (u) memberUserRecords.push(u);
-    }
-    const userById = new Map(memberUserRecords.map(u => [u.id, u]));
-    const leagueMembershipByUserId = new Map(leagueMembers.map(m => [m.userId, m]));
-
-    // Collect team memberships only for source teams
-    const allTeamMemberships: schema.TeamMembership[] = [];
-    for (const team of sourceTeams) {
-      const memberships = await db
-        .select()
-        .from(schema.teamMemberships)
-        .where(eq(schema.teamMemberships.teamId, team.id));
-      allTeamMemberships.push(...memberships);
-    }
-
-    console.log(`   Source season: "${SOURCE_SEASON_ID}"`);
-    console.log(`   Teams to duplicate: ${sourceTeams.length}`);
-    console.log(`   League members: ${leagueMembers.length} (${leagueMembers.length - 1} placeholders + Tobin)`);
-    console.log(`   Source team memberships: ${allTeamMemberships.length}`);
-
-    // ── Step 2: Create demo season ───────────────────────────────────────────
+  await db.transaction(async (tx) => {
+    // 2. Create demo season
     console.log('\n2️⃣  Creating demo season...');
-    const [season] = await db
+    const [season] = await tx
       .insert(schema.seasons)
       .values({
         id: crypto.randomUUID(),
@@ -130,16 +149,11 @@ async function seedDemoSeason() {
         isActive: true,
       })
       .returning();
+    seasonId = season.id;
     console.log(`   ✅ Season: "${season.name}" (${season.id})`);
 
-    // ── Step 3: Create placeholder users ────────────────────────────────────
+    // 3. Create placeholder users
     console.log('\n3️⃣  Creating placeholder users...');
-
-    // userIdMap: original userId → demo userId
-    // Tobin maps to himself; all others get a fresh placeholder
-    const userIdMap = new Map<string, string>();
-    userIdMap.set(TOBIN_KERN_ID, TOBIN_KERN_ID);
-
     let placeholderCount = 0;
     for (const lm of leagueMembers) {
       if (lm.userId === TOBIN_KERN_ID) continue;
@@ -151,7 +165,7 @@ async function seedDemoSeason() {
       const newUserId = crypto.randomUUID();
       userIdMap.set(lm.userId, newUserId);
 
-      await db.insert(schema.users).values({
+      await tx.insert(schema.users).values({
         id: newUserId,
         displayId: generateDisplayId(),
         email: placeholderEmail(firstName, lastName),
@@ -165,20 +179,16 @@ async function seedDemoSeason() {
     }
     console.log(`   ✅ Created ${placeholderCount} placeholder users`);
 
-    // ── Step 4: Create demo teams ────────────────────────────────────────────
+    // 4. Create demo teams
     console.log('\n4️⃣  Creating demo teams...');
-
-    // teamIdMap: original teamId → demo teamId
     const teamIdMap = new Map<string, string>();
 
     for (const srcTeam of sourceTeams) {
       const newTeamId = crypto.randomUUID();
       teamIdMap.set(srcTeam.id, newTeamId);
 
-      // Resolve captain_id for the demo team:
-      //   - Tobin → his real ID
-      //   - League member → their placeholder ID
-      //   - Non-league-member → null (no captain; we don't invent a captain)
+      // Captain resolution:
+      //   Tobin → real ID | league member → placeholder ID | non-member → null
       let demoCaptainId: string | null = null;
       if (srcTeam.captainId) {
         if (srcTeam.captainId === TOBIN_KERN_ID) {
@@ -186,10 +196,9 @@ async function seedDemoSeason() {
         } else if (userIdMap.has(srcTeam.captainId)) {
           demoCaptainId = userIdMap.get(srcTeam.captainId)!;
         }
-        // else: captain not in league → captainId stays null
       }
 
-      await db.insert(schema.teams).values({
+      await tx.insert(schema.teams).values({
         id: newTeamId,
         name: srcTeam.name,
         leagueId: LEAGUE_ID,
@@ -202,15 +211,15 @@ async function seedDemoSeason() {
         goalsFor: 0,
         goalsAgainst: 0,
       });
+
       const captainNote = demoCaptainId
-        ? ` (captain: ${demoCaptainId === TOBIN_KERN_ID ? 'Tobin Kern [real]' : 'placeholder'})`
+        ? ` (captain: ${demoCaptainId === TOBIN_KERN_ID ? 'Tobin [real]' : 'placeholder'})`
         : ' (no captain)';
       console.log(`   ✅ Team: "${srcTeam.name}"${captainNote}`);
     }
 
-    // ── Step 5: Add league memberships for placeholder users ─────────────────
+    // 5. Add league memberships for placeholder users
     console.log('\n5️⃣  Adding league memberships...');
-
     let leagueMembershipCount = 0;
     for (const srcLm of leagueMembers) {
       if (srcLm.userId === TOBIN_KERN_ID) continue;
@@ -218,7 +227,7 @@ async function seedDemoSeason() {
       const newUserId = userIdMap.get(srcLm.userId);
       if (!newUserId) continue;
 
-      await db.insert(schema.leagueMemberships).values({
+      await tx.insert(schema.leagueMemberships).values({
         id: crypto.randomUUID(),
         userId: newUserId,
         leagueId: LEAGUE_ID,
@@ -237,12 +246,8 @@ async function seedDemoSeason() {
     console.log(`   ✅ Added ${leagueMembershipCount} placeholder league memberships`);
     console.log(`   ℹ️  Tobin Kern's existing league membership is unchanged`);
 
-    // ── Step 6: Add team memberships ─────────────────────────────────────────
+    // 6. Add team memberships
     console.log('\n6️⃣  Adding team memberships...');
-
-    // Replicate all source team memberships.
-    // Tobin maps to himself via userIdMap so his is_captain=true record is preserved.
-    // Members not in userIdMap (non-league captains who had no membership) are skipped.
     let teamMembershipCount = 0;
     let skipped = 0;
     for (const srcTm of allTeamMemberships) {
@@ -254,7 +259,7 @@ async function seedDemoSeason() {
         continue;
       }
 
-      await db.insert(schema.teamMemberships).values({
+      await tx.insert(schema.teamMemberships).values({
         id: crypto.randomUUID(),
         userId: newUserId,
         teamId: newTeamId,
@@ -268,54 +273,52 @@ async function seedDemoSeason() {
       teamMembershipCount++;
     }
     if (skipped > 0) {
-      console.log(`   ⚠️  Skipped ${skipped} membership(s) (user not a league member in source)`);
+      console.log(`   ⚠️  Skipped ${skipped} record(s) (user not a league member)`);
     }
     console.log(`   ✅ Added ${teamMembershipCount} team memberships`);
+  });
 
-    // ── Step 7: Post-seed verification ───────────────────────────────────────
-    console.log('\n7️⃣  Running verification...');
+  // ── Step 7: Post-seed verification (reads; outside transaction) ───────────
+  console.log('\n7️⃣  Running verification...');
 
-    const demoTeamCount = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.seasonId, season.id));
+  const demoTeams = await db
+    .select()
+    .from(schema.teams)
+    .where(eq(schema.teams.seasonId, seasonId));
 
-    const demoLeagueMembershipCount = await db
-      .select()
-      .from(schema.leagueMemberships)
-      .where(and(eq(schema.leagueMemberships.leagueId, LEAGUE_ID), eq(schema.leagueMemberships.status, 'approved')));
+  const tobinTeamMembership = await db
+    .select()
+    .from(schema.teamMemberships)
+    .where(eq(schema.teamMemberships.userId, TOBIN_KERN_ID));
 
-    const demoTeamMemberCount = (await db
-      .select()
-      .from(schema.teamMemberships)
-      .where(eq(schema.teamMemberships.teamId, teamIdMap.values().next().value!))).length;
+  // Filter to only demo season team memberships
+  const demoTeamIds = new Set(demoTeams.map(t => t.id));
+  const tobinDemoMemberships = tobinTeamMembership.filter(tm => demoTeamIds.has(tm.teamId));
 
-    const expectedTeams = sourceTeams.length;
-    const expectedPlaceholders = placeholderCount;
+  const teamCountOk = demoTeams.length === EXPECTED_SOURCE_TEAMS.size;
+  const teamNamesOk = demoTeams.every(t => EXPECTED_SOURCE_TEAMS.has(t.name));
+  const tobinIsCaptain = tobinDemoMemberships.some(tm => tm.isCaptain);
+  const tobinInMavericks = tobinDemoMemberships.length > 0;
 
-    const teamCheck = demoTeamCount.length === expectedTeams ? '✅' : '❌';
-    const memberCheck = leagueMembershipCount === expectedPlaceholders ? '✅' : '❌';
-    const tobinTeamCheck = teamMembershipCount > 0 && userIdMap.has(TOBIN_KERN_ID) ? '✅' : '❌';
+  const allGreen = teamCountOk && teamNamesOk && tobinIsCaptain;
 
-    console.log(`   ${teamCheck} Teams: ${demoTeamCount.length} / ${expectedTeams} expected`);
-    console.log(`   ${memberCheck} Placeholder league memberships: ${leagueMembershipCount} / ${expectedPlaceholders} expected`);
-    console.log(`   ${tobinTeamCheck} Tobin Kern is the only real user (all others are placeholders)`);
+  console.log(`   ${teamCountOk ? '✅' : '❌'} Teams: ${demoTeams.length} / ${EXPECTED_SOURCE_TEAMS.size} expected`);
+  console.log(`   ${teamNamesOk ? '✅' : '❌'} All expected team names present`);
+  console.log(`   ${tobinInMavericks ? '✅' : '❌'} Tobin Kern has team membership in demo season`);
+  console.log(`   ${tobinIsCaptain ? '✅' : '❌'} Tobin Kern has is_captain = true`);
 
-    await client.end();
-
-    console.log('\n✨ Demo season seeding completed!');
-    console.log(`\n📊 Summary:`);
-    console.log(`   Season: "${DEMO_SEASON_NAME}" (ID: ${season.id})`);
-    console.log(`   Teams: ${demoTeamCount.length}`);
-    console.log(`   Placeholder users: ${placeholderCount}`);
-    console.log(`   Placeholder league memberships: ${leagueMembershipCount}`);
-    console.log(`   Team memberships: ${teamMembershipCount}`);
-    console.log(`   Real users: 1 (Tobin Kern — commissioner)`);
-  } catch (error) {
-    console.error('\n❌ Seeding failed:', error);
-    await client.end();
-    throw error;
+  if (!allGreen) {
+    throw new Error('Post-seed verification failed — see above');
   }
+
+  await client.end();
+
+  console.log('\n✨ Demo season seeding completed successfully!');
+  console.log(`\n📊 Summary:`);
+  console.log(`   Season: "${DEMO_SEASON_NAME}" (ID: ${seasonId})`);
+  console.log(`   Teams: ${demoTeams.length}`);
+  console.log(`   Placeholder users: ${nonTobinMembers.length}`);
+  console.log(`   Real users: 1 (Tobin Kern — commissioner)`);
 }
 
 seedDemoSeason().catch(console.error);
