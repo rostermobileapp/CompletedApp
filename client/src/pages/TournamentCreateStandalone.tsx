@@ -255,44 +255,57 @@ export default function TournamentCreateStandalone() {
   });
 
   const onSubmit = (data: FormData) => {
-    createMutation.mutate(data);
+    // Ensure the React teams state is used — the form field may not be
+    // registered so its value can be lost between steps.
+    const dataWithTeams: FormData = {
+      ...data,
+      teams: data.type === "standalone" ? teams.map(t => ({ name: t.name })) : data.teams
+    };
+    createMutation.mutate(dataWithTeams);
   };
 
   const nextStep = async () => {
-    let fieldsToValidate: readonly string[];
-    
     if (step === 1) {
-      fieldsToValidate = ["name", "format", "description"] as const;
-    } else if (step === 2) {
-      // Step 2: Validate teams based on tournament type
-      if (watchedType === "season_playoff") {
-        fieldsToValidate = ["teamIds"] as const;
-      } else {
-        fieldsToValidate = ["teams"] as const;
+      const isValid = await form.trigger(["name", "format", "description"] as any);
+      if (isValid) {
+        setStep(step + 1);
       }
-    } else {
-      fieldsToValidate = [];
+      return;
     }
-    
-    const isValid = await form.trigger(fieldsToValidate as any);
-    if (isValid) {
-      setStep(step + 1);
-    } else {
-      // Show validation error
-      const errors = form.formState.errors;
-      if (errors.teamIds) {
-        toast({
-          title: "Validation Error",
-          description: errors.teamIds.message || "Please select at least 3 teams",
-          variant: "destructive"
-        });
-      } else if (errors.teams) {
-        toast({
-          title: "Validation Error",
-          description: errors.teams.message || "Please add at least 3 teams",
-          variant: "destructive"
-        });
+
+    if (step === 2) {
+      if (watchedType === "season_playoff") {
+        const isValid = await form.trigger(["teamIds"] as any);
+        if (!isValid) {
+          toast({
+            title: "Validation Error",
+            description: "Please select at least 3 teams",
+            variant: "destructive"
+          });
+          return;
+        }
+      } else {
+        // For standalone type, validate against the React state directly
+        if (teams.length < 3) {
+          toast({
+            title: "Not enough teams",
+            description: "Please add at least 3 teams",
+            variant: "destructive"
+          });
+          return;
+        }
+        if (teams.length > 128) {
+          toast({
+            title: "Too many teams",
+            description: "Maximum 128 teams allowed",
+            variant: "destructive"
+          });
+          return;
+        }
+        // Sync state to form field before advancing
+        form.setValue('teams', teams.map(t => ({ name: t.name })), { shouldValidate: true });
       }
+      setStep(step + 1);
     }
   };
 
