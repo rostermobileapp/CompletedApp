@@ -2282,16 +2282,27 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Filter out teamMembership teams that are superseded by a league assignment
-    // If a team belongs to a league and the user has a leagueMembership for that league
-    // pointing to a DIFFERENT team, this teamMembership is stale (user was reassigned)
+    // Build a lookup of teamId -> seasonId so we can compare seasons across teams
+    const teamSeasonMap = new Map<string, string | null>();
+    for (const r of teamMembershipResult) teamSeasonMap.set(r.team.id, r.team.seasonId ?? null);
+    for (const r of leagueMembershipResult) teamSeasonMap.set(r.team.id, r.team.seasonId ?? null);
+
+    // Filter out teamMembership teams that are superseded by a league assignment.
+    // A team is only considered stale if it is in the SAME season context as the authoritative
+    // assignment. Teams in a different season (e.g., a demo/historical season) are kept so
+    // the user can still select them from the dashboard.
     const filteredTeamMembershipTeams = teamMembershipResult
       .map(r => r.team)
       .filter(team => {
         if (!team.leagueId) return true; // Not a league team, always include
         const authoritative = leagueToAssignedTeam.get(team.leagueId);
         if (authoritative === undefined) return true; // No league membership for this league, include it
-        return authoritative === team.id; // Only include if it matches the current assignment
+        if (authoritative === team.id) return true; // Matches current assignment, include it
+        // Allow season-specific teams that belong to a different season than the authoritative
+        // assignment (e.g., user is in both a live season and a demo season of the same league)
+        const authoritativeSeasonId = teamSeasonMap.get(authoritative) ?? null;
+        if (team.seasonId !== null && team.seasonId !== authoritativeSeasonId) return true;
+        return false; // Same season context, different team → stale, filter out
       });
 
     // Combine both and deduplicate by team ID
