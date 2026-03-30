@@ -1009,11 +1009,17 @@ export default function Profile() {
           {/* Log Out */}
           <button
             onClick={async () => {
+              // Clear stored OneSignal IDs from backend first (while still authenticated)
+              // This prevents push notifications from being sent to this device after logout
               try {
-                // Remove OneSignal external ID to unlink this device from the user
+                await apiRequest('POST', '/api/notification-preferences/clear-device');
+              } catch (e) {
+                console.log('Failed to clear device IDs from backend, continuing with logout');
+              }
+              // Unlink device from OneSignal on the client side
+              try {
                 await removeExternalId();
               } catch (e) {
-                // Ignore errors from removeExternalId - continue with logout
                 console.log('Failed to remove external ID, continuing with logout');
               }
               try {

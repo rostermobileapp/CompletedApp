@@ -696,6 +696,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear OneSignal IDs on logout so the device no longer receives push notifications
+  app.post('/api/notification-preferences/clear-device', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.clearOneSignalIds(userId);
+      console.log(`[OneSignal] Cleared subscription IDs for user ${userId} on logout`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing OneSignal IDs:", error);
+      res.status(500).json({ message: "Failed to clear device IDs" });
+    }
+  });
+
   // Link External ID to OneSignal subscription via backend REST API
   // This is a fallback method when the SDK methods fail
   app.post('/api/notification-preferences/link-external-id', isAuthenticated, async (req: any, res) => {

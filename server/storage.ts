@@ -272,6 +272,7 @@ export interface IStorage {
   getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
   upsertNotificationPreferences(userId: string, data: Partial<UpdateNotificationPreferences>): Promise<NotificationPreferences>;
   updateOneSignalPlayerId(userId: string, playerId: string): Promise<NotificationPreferences>;
+  clearOneSignalIds(userId: string): Promise<void>;
   getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[]>;
   getAllNotificationPreferencesWithUsers(): Promise<{ userId: string; oneSignalPlayerId: string | null; user: { email: string | null; displayId: string | null } }[]>;
   
@@ -1246,6 +1247,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateOneSignalPlayerId(userId: string, playerId: string): Promise<NotificationPreferences> {
     return this.upsertNotificationPreferences(userId, { oneSignalPlayerId: playerId });
+  }
+
+  async clearOneSignalIds(userId: string): Promise<void> {
+    await db
+      .update(notificationPreferences)
+      .set({ oneSignalPlayerId: null, oneSignalExternalId: null, updatedAt: new Date() })
+      .where(eq(notificationPreferences.userId, userId));
   }
 
   async getUsersWithPushEnabled(userIds: string[]): Promise<{ userId: string; displayId: string | null; oneSignalPlayerId: string; notificationSettings: any }[]> {
