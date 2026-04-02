@@ -1109,6 +1109,7 @@ export const scrimmages = pgTable("scrimmages", {
   inviteDaysBefore: integer("invite_days_before"), // Number of days before each occurrence to send invites (e.g., 5 for Sunday invite for Friday scrimmage)
   inviteTimeOfDay: varchar("invite_time_of_day"), // Time to send invites in HH:MM format (e.g., "09:00" for 9am)
   inviteSentAt: timestamp("invite_sent_at"), // When the invite was sent for this occurrence (null if not sent yet)
+  color: text("color"), // Optional color for calendar display (e.g. "#ef4444" or "blue")
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

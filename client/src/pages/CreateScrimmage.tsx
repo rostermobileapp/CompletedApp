@@ -86,6 +86,19 @@ export default function CreateScrimmage() {
   // Invite group states
   const [selectedInviteGroupId, setSelectedInviteGroupId] = useState<string>("");
   
+  // Color picker state
+  const SCRIMMAGE_COLORS = [
+    { value: '#ef4444', label: 'Red' },
+    { value: '#f97316', label: 'Orange' },
+    { value: '#eab308', label: 'Yellow' },
+    { value: '#22c55e', label: 'Green' },
+    { value: '#3b82f6', label: 'Blue' },
+    { value: '#8b5cf6', label: 'Purple' },
+    { value: '#ec4899', label: 'Pink' },
+    { value: '#14b8a6', label: 'Teal' },
+  ];
+  const [selectedColor, setSelectedColor] = useState<string>(SCRIMMAGE_COLORS[4].value); // Default: Blue
+
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -265,6 +278,9 @@ export default function CreateScrimmage() {
         selectedEmails: [],
         coHostIds: [],
       });
+      if (existingScrimmage.color) {
+        setSelectedColor(existingScrimmage.color);
+      }
       setFormInitialized(true);
     }
   }, [isEditMode, existingScrimmage, form, formInitialized]);
@@ -353,6 +369,8 @@ export default function CreateScrimmage() {
         reminderHoursBefore: data.enableReminders ? data.reminderHoursBefore : null,
         // Send invite immediately when scrimmage is created (only for new scrimmages)
         sendInviteNow: !isEditMode && data.sendInviteNow,
+        // Calendar color
+        color: selectedColor || null,
       };
 
       if (isEditMode && scrimmageId) {
@@ -589,6 +607,29 @@ export default function CreateScrimmage() {
                 rows={3}
                 data-testid="input-notes"
               />
+            </div>
+
+            {/* Calendar Color Picker */}
+            <div>
+              <Label>Calendar Color</Label>
+              <p className="text-xs text-muted-foreground mb-2">Choose a color to identify this scrimmage on the calendar</p>
+              <div className="flex gap-2 flex-wrap">
+                {SCRIMMAGE_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    title={color.label}
+                    onClick={() => setSelectedColor(color.value)}
+                    className="w-8 h-8 rounded-full border-2 transition-all"
+                    style={{
+                      backgroundColor: color.value,
+                      borderColor: selectedColor === color.value ? 'white' : 'transparent',
+                      boxShadow: selectedColor === color.value ? `0 0 0 2px ${color.value}` : 'none',
+                    }}
+                    data-testid={`color-swatch-${color.label.toLowerCase()}`}
+                  />
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -12015,6 +12015,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch delete scrimmages (Creator only) - must be before :id route to avoid conflict
+  app.delete('/api/scrimmages/batch', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: 'ids must be a non-empty array of scrimmage IDs' });
+      }
+
+      let deleted = 0;
+      let skipped = 0;
+      for (const scrimmageId of ids) {
+        try {
+          const scrimmage = await storage.getScrimmage(scrimmageId);
+          if (!scrimmage) { skipped++; continue; }
+          if (scrimmage.creatorId !== userId) { skipped++; continue; }
+          await storage.deleteScrimmage(scrimmageId);
+          deleted++;
+        } catch (err) {
+          console.error(`Error deleting scrimmage ${scrimmageId} in batch:`, err);
+          skipped++;
+        }
+      }
+
+      res.json({ message: `Deleted ${deleted} scrimmages, skipped ${skipped}`, deleted, skipped });
+    } catch (error) {
+      console.error('Error batch deleting scrimmages:', error);
+      res.status(500).json({ message: 'Failed to batch delete scrimmages' });
+    }
+  });
+
   // Delete scrimmage (Creator only)
   app.delete('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
     try {
