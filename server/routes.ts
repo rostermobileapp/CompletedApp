@@ -13452,6 +13452,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!isParticipant) {
         return res.status(403).json({ message: 'Access denied' });
       }
+
+      // Free tier restriction: can only send messages in team_group conversations
+      const senderUser = await storage.getUser(userId);
+      if (senderUser && (senderUser.role === 'free_tier' || !senderUser.role)) {
+        const conversation = await messagingService.getConversation(conversationId);
+        if (!conversation || conversation.type !== 'team_group') {
+          return res.status(403).json({ message: 'A Player Pro subscription is required to reply in this conversation.' });
+        }
+      }
       
       // Create message
       const message = await messagingService.createMessage({

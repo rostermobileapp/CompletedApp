@@ -1533,17 +1533,15 @@ export default function Messages() {
   // Use cached conversation if available, otherwise use fetched data
   const currentConversation = cachedConversation || fetchedConversation;
   
-  // Free tier users can view all conversations they are part of.
-  // isConversationAllowedForFreeTier is kept for legacy reference but now always true.
-  const isConversationAllowedForFreeTier = true;
-
   // Whether the current user can send/reply in the current conversation.
   // Free tier users can only send messages in their own team group chats.
+  // Defaults to false (safe) when free tier and conversation metadata has not yet loaded.
   const canSendMessage = useMemo(() => {
     if (!isFreeTier) return true;
-    if (!currentConversation) return true;
+    if (!selectedConversation) return true;
+    if (!currentConversation) return false;
     return currentConversation.type === 'team_group' && userTeamIds.includes(currentConversation.teamId);
-  }, [isFreeTier, currentConversation, userTeamIds]);
+  }, [isFreeTier, selectedConversation, currentConversation, userTeamIds]);
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
