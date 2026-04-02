@@ -506,6 +506,7 @@ export interface IStorage {
   getUserScrimmages(userId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
   updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage>;
   deleteScrimmage(scrimmageId: string): Promise<void>;
+  getScrimmageSeries(parentId: string): Promise<Scrimmage[]>;
   
   // Scrimmage request operations
   createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest>;
@@ -8359,6 +8360,18 @@ export class DatabaseStorage implements IStorage {
           isNull(scrimmages.parentScrimmageId)
         )
       );
+  }
+
+  async getScrimmageSeries(parentId: string): Promise<Scrimmage[]> {
+    // Returns the parent scrimmage + all children in the series
+    const [parentRows, children] = await Promise.all([
+      db.select().from(scrimmages).where(eq(scrimmages.id, parentId)).limit(1),
+      db.select().from(scrimmages).where(eq(scrimmages.parentScrimmageId, parentId)),
+    ]);
+    const result: Scrimmage[] = [];
+    if (parentRows[0]) result.push(parentRows[0]);
+    result.push(...children);
+    return result;
   }
 
   // User search operations

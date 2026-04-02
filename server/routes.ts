@@ -12072,6 +12072,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete entire recurring scrimmage series (Creator only) - must be before :id route
+  app.delete('/api/scrimmages/series/:parentId', isAuthenticated, async (req: any, res) => {
+    try {
+      const parentId = req.params.parentId;
+      const userId = req.user.claims.sub;
+
+      // Fetch the full series (parent + all children)
+      const seriesScrimmages = await storage.getScrimmageSeries(parentId);
+      if (seriesScrimmages.length === 0) {
+        return res.status(404).json({ message: 'Series not found' });
+      }
+
+      // Enforce creator ownership on the parent
+      const parent = seriesScrimmages.find(s => s.id === parentId);
+      if (!parent) {
+        return res.status(404).json({ message: 'Parent scrimmage not found' });
+      }
+      if (parent.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only the creator can delete this series' });
+      }
+
+      // Collect all approved players across all occurrences (deduplicated by userId)
+      const allApprovedPlayerIds = new Set<string>();
+      for (const scrimmage of seriesScrimmages) {
+        const scrimmageRequests = await storage.getScrimmageRequests(scrimmage.id);
+        scrimmageRequests.filter(r => r.status === 'approved').forEach(r => allApprovedPlayerIds.add(r.playerId));
+      }
+
+      // Delete all scrimmages in the series
+      for (const scrimmage of seriesScrimmages) {
+        await storage.deleteScrimmage(scrimmage.id);
+      }
+
+      // Send a single series-cancellation notification to all affected players
+      if (allApprovedPlayerIds.size > 0) {
+        try {
+          const league = await storage.getLeague(parent.leagueId);
+          const timezone = league?.timezone || 'America/New_York';
+          const targetUserIds = Array.from(allApprovedPlayerIds);
+          const announcementContent = `❌ Recurring Series Cancelled: The entire "${parent.title}" recurring scrimmage series has been cancelled by the organizer. All ${seriesScrimmages.length} occurrence(s) have been removed.`;
+          const announcement = await storage.createAnnouncement({
+            content: announcementContent,
+            leagueId: parent.leagueId,
+            authorId: userId,
+            isPinned: false,
+          });
+          await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+        } catch (notifyErr) {
+          console.error(`Error sending series cancellation notifications for series ${parentId}:`, notifyErr);
+        }
+      }
+
+      res.json({ message: `Deleted ${seriesScrimmages.length} scrimmage(s) in the series`, deleted: seriesScrimmages.length });
+    } catch (error) {
+      console.error('Error deleting scrimmage series:', error);
+      res.status(500).json({ message: 'Failed to delete scrimmage series' });
+    }
+  });
+
   // Delete scrimmage (Creator only)
   app.delete('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
     try {

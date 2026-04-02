@@ -62,6 +62,9 @@ export default function ScrimmageManagement() {
   const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
 
+  // Delete recurring series dialog state: stores the scrimmage being deleted
+  const [deleteRecurringDialog, setDeleteRecurringDialog] = useState<ScrimmageWithCreatorAndCount | null>(null);
+
   // Detail expansion state
   const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
   const [viewRosterScrimmage, setViewRosterScrimmage] = useState<string | null>(null);
@@ -183,6 +186,7 @@ export default function ScrimmageManagement() {
       toast({ title: 'Scrimmage Cancelled', description: 'The scrimmage has been cancelled and players have been notified.' });
       queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
       setSelectedScrimmage(null);
+      setDeleteRecurringDialog(null);
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to cancel scrimmage', variant: 'destructive' });
@@ -203,6 +207,22 @@ export default function ScrimmageManagement() {
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to delete scrimmages', variant: 'destructive' });
+    },
+  });
+
+  const deleteSeriesMutation = useMutation({
+    mutationFn: async (parentId: string) => {
+      const response = await apiRequest('DELETE', `/api/scrimmages/series/${parentId}`, {});
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({ title: 'Series Cancelled', description: `${result.deleted} occurrence(s) cancelled and players notified.` });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+      setSelectedScrimmage(null);
+      setDeleteRecurringDialog(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to cancel series', variant: 'destructive' });
     },
   });
 
@@ -424,11 +444,16 @@ export default function ScrimmageManagement() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  if (confirm('Are you sure you want to cancel this scrimmage? All confirmed players will be notified.')) {
-                    deleteMutation.mutate(scrimmage.id);
+                  const isRecurringScrimmage = scrimmage.isRecurring || !!scrimmage.parentScrimmageId;
+                  if (isRecurringScrimmage) {
+                    setDeleteRecurringDialog(scrimmage);
+                  } else {
+                    if (confirm('Are you sure you want to cancel this scrimmage? All confirmed players will be notified.')) {
+                      deleteMutation.mutate(scrimmage.id);
+                    }
                   }
                 }}
-                disabled={deleteMutation.isPending}
+                disabled={deleteMutation.isPending || deleteSeriesMutation.isPending}
                 className="text-destructive hover:text-destructive border-destructive/20 hover:border-destructive"
               >
                 <Trash2 className="w-4 h-4" />
@@ -989,6 +1014,78 @@ export default function ScrimmageManagement() {
 
         {mainTab === 'calendar' ? renderCalendarView() : renderListView()}
       </div>
+
+      {/* Delete Recurring Series Dialog */}
+      <Dialog open={!!deleteRecurringDialog} onOpenChange={(open) => { if (!open) setDeleteRecurringDialog(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Cancel Recurring Scrimmage
+            </DialogTitle>
+            <DialogDescription>
+              <span className="font-medium text-foreground">"{deleteRecurringDialog?.title}"</span> is part of a recurring series.
+              {deleteRecurringDialog && (
+                <span className="block mt-1 text-xs text-muted-foreground">
+                  Series ID: {deleteRecurringDialog.parentScrimmageId ?? deleteRecurringDialog.id}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <p className="text-sm text-muted-foreground">What would you like to cancel?</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-destructive hover:text-destructive border-destructive/30 hover:border-destructive"
+                disabled={deleteMutation.isPending || deleteSeriesMutation.isPending}
+                onClick={() => {
+                  if (deleteRecurringDialog) {
+                    deleteMutation.mutate(deleteRecurringDialog.id);
+                  }
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2 flex-shrink-0" />
+                <div className="text-left">
+                  <div className="font-medium">Delete this occurrence</div>
+                  <div className="text-xs text-muted-foreground font-normal">Only removes this single event</div>
+                </div>
+              </Button>
+              <Button
+                variant="destructive"
+                className="w-full justify-start"
+                disabled={deleteMutation.isPending || deleteSeriesMutation.isPending}
+                onClick={() => {
+                  if (deleteRecurringDialog) {
+                    const parentId = deleteRecurringDialog.parentScrimmageId ?? deleteRecurringDialog.id;
+                    deleteSeriesMutation.mutate(parentId);
+                  }
+                }}
+              >
+                {deleteSeriesMutation.isPending ? (
+                  <><div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2 flex-shrink-0" />Cancelling series...</>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2 flex-shrink-0" />
+                    <div className="text-left">
+                      <div className="font-medium">Delete entire series</div>
+                      <div className="text-xs text-destructive-foreground/80 font-normal">Removes all occurrences and notifies all players</div>
+                    </div>
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setDeleteRecurringDialog(null)}
+                disabled={deleteMutation.isPending || deleteSeriesMutation.isPending}
+              >
+                Keep
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
