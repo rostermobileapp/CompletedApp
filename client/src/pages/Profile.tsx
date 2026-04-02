@@ -310,14 +310,14 @@ export default function Profile() {
       try {
         await removeExternalId();
       } catch (e) {
-        console.log('Failed to remove external ID during profile deletion');
+        // continue
       }
       
       // Sign out from Supabase
       try {
         await supabase.auth.signOut();
       } catch (e) {
-        console.error('Error signing out:', e);
+        // continue
       }
       
       // Clear all cached data
@@ -1014,19 +1014,19 @@ export default function Profile() {
               try {
                 await apiRequest('POST', '/api/notification-preferences/clear-device');
               } catch (e) {
-                console.log('Failed to clear device IDs from backend, continuing with logout');
+                // continue
               }
               // Unlink device from OneSignal on the client side
               try {
                 await removeExternalId();
               } catch (e) {
-                console.log('Failed to remove external ID, continuing with logout');
+                // continue
               }
               try {
                 // Sign out user
                 await supabase.auth.signOut();
               } catch (e) {
-                console.error('Error signing out:', e);
+                // continue
               }
               // Clear all cached data to prevent stale user data from showing
               queryClient.clear();
