@@ -14863,8 +14863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? 'Product Improvement' 
           : 'Report an Issue';
 
-        // Send to FEEDBACK_EMAIL, or fallback to roster.mobile.app@gmail.com
-        const recipientEmail = process.env.FEEDBACK_EMAIL || 'roster.mobile.app@gmail.com';
+        const recipientEmail = 'roster.mobile.app@gmail.com';
 
         const emailResult = await client.emails.send({
           from: fromEmail,
