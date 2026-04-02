@@ -12092,6 +12092,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (parent.creatorId !== userId) {
         return res.status(403).json({ message: 'Only the creator can delete this series' });
       }
+      // Reject if the given ID is actually a child (not a canonical series parent)
+      if (parent.parentScrimmageId !== null) {
+        return res.status(400).json({ message: 'Provided ID is a child occurrence, not a series parent. Use the parent series ID.' });
+      }
 
       // Collect all approved players across all occurrences (deduplicated by userId)
       const allApprovedPlayerIds = new Set<string>();
