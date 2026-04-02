@@ -657,14 +657,6 @@ export default function Messages() {
   const conversations = useMemo(() => {
     let filtered = allConversations;
     
-    // FREE TIER RESTRICTION: Only show team group chats for the user's OWN teams
-    // (no direct messages, no custom groups, no captain chats, no other teams' chats)
-    if (isFreeTier) {
-      filtered = filtered.filter(conv => 
-        conv.type === 'team_group' && userTeamIds.includes(conv.teamId)
-      );
-    }
-    
     // Filter by tournament if one is selected
     if (selectedTournamentId) {
       filtered = filtered.filter(conv => conv.tournamentId === selectedTournamentId);
@@ -680,23 +672,15 @@ export default function Messages() {
         filtered = filtered.filter(conv => conv.leagueId === teamLeagueId);
       }
       
-      // Then filter to show team chat AND league-wide chats (direct, captain)
+      // Show team chat AND league-wide chats (direct, captain)
       // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
-      // But for free tier, we already filtered to own team chats only above
-      if (!isFreeTier) {
-        filtered = filtered.filter(conv => 
-          conv.teamId === selectedTeamId || conv.teamId === null
-        );
-      } else {
-        // Free tier: only show their own team's chat (already restricted above)
-        filtered = filtered.filter(conv => conv.teamId === selectedTeamId);
-      }
+      filtered = filtered.filter(conv => 
+        conv.teamId === selectedTeamId || conv.teamId === null
+      );
     }
     // Filter by league if one is selected
     else if (selectedLeagueId) {
       filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
-      // For free tier with league context but no team selected, 
-      // they still only see their own team chats (already filtered above)
     }
     
     return filtered;
@@ -1549,18 +1533,17 @@ export default function Messages() {
   // Use cached conversation if available, otherwise use fetched data
   const currentConversation = cachedConversation || fetchedConversation;
   
-  // FREE TIER RESTRICTION: Check if current conversation is allowed for free tier users
-  // For free tier, we ONLY allow team_group conversations (the conversation list is already filtered to user's own teams)
-  const isConversationAllowedForFreeTier = useMemo(() => {
-    // Premium users can access everything
+  // Free tier users can view all conversations they are part of.
+  // isConversationAllowedForFreeTier is kept for legacy reference but now always true.
+  const isConversationAllowedForFreeTier = true;
+
+  // Whether the current user can send/reply in the current conversation.
+  // Free tier users can only send messages in their own team group chats.
+  const canSendMessage = useMemo(() => {
     if (!isFreeTier) return true;
-    // If no conversation selected, allow (no restriction needed yet)
     if (!currentConversation) return true;
-    // Free tier can only access team_group conversations
-    // The conversation list is already filtered to only show user's own team chats
-    // So if they have a team_group selected, it must be their own team
-    return currentConversation.type === 'team_group';
-  }, [isFreeTier, currentConversation]);
+    return currentConversation.type === 'team_group' && userTeamIds.includes(currentConversation.teamId);
+  }, [isFreeTier, currentConversation, userTeamIds]);
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
@@ -2102,47 +2085,6 @@ export default function Messages() {
             )}
           </div>
         </>
-      ) : !isConversationAllowedForFreeTier ? (
-        /* FREE TIER RESTRICTION: Block access to unauthorized conversations */
-        <>
-          <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[12px] pb-[12px] pl-[12px] pr-[12px]" data-testid="chat-header">
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setSelectedConversation(null)}
-                className="p-2 hover:bg-accent rounded-lg transition-colors" 
-                data-testid="button-back"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="flex-1">
-                <h2 className="font-semibold" data-testid="text-chat-title">Premium Feature</h2>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col items-center justify-center p-8 flex-1">
-            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
-            <p className="text-muted-foreground text-center max-w-sm mb-6">
-              {currentConversation?.type === 'direct' 
-                ? 'Direct messaging is available with a Player Pro or Commissioner subscription.'
-                : currentConversation?.type === 'captain_only'
-                ? 'Captain chat is available with a Player Pro or Commissioner subscription.'
-                : 'This conversation is available with a Player Pro or Commissioner subscription.'}
-            </p>
-            <Button 
-              onClick={() => {
-                setPageTransitionDirection('up');
-                navigate('/subscription');
-              }}
-              size="lg"
-              data-testid="button-upgrade-conversation"
-            >
-              Upgrade to Access
-            </Button>
-          </div>
-        </>
       ) : (
         <>
           {/* Chat Header */}
@@ -2410,8 +2352,35 @@ export default function Messages() {
         </>
       )}
         </FeatureLockOverlay>
-      {/* Message Input - only show when conversation is selected and accessible */}
-      {selectedConversation && (canAccessPremiumFeatures() || isConversationAllowedForFreeTier) && (
+      {/* Upgrade to reply banner - shown for free tier users in non-team conversations */}
+      {selectedConversation && !canSendMessage && (
+        <div
+          className="bg-background border-t border-border p-4 flex items-center justify-between gap-4"
+          style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }}
+          data-testid="upgrade-to-reply-banner"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <MessageCircle className="w-4 h-4 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground truncate">
+              Upgrade to Player Pro to reply in this conversation.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              setPageTransitionDirection('up');
+              navigate('/subscription');
+            }}
+            data-testid="button-upgrade-to-reply"
+          >
+            Upgrade
+          </Button>
+        </div>
+      )}
+      {/* Message Input - only show when conversation is selected and user can send */}
+      {selectedConversation && canSendMessage && (
         <div 
           ref={inputContainerRef}
           className="bg-background border-t border-border p-4"
