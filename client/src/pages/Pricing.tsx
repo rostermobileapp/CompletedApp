@@ -1,6 +1,7 @@
 import { Check, Shield, Zap, Star, X } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 
@@ -29,7 +30,6 @@ const pricingTestimonials = [
 ];
 
 const featureRows = [
-  { label: "Price (Monthly)", free: "$0", pro: "$6.49/mo", comm: "$12/mo", bench: "$9/mo" },
   { label: "Annoying Ads", free: "never", pro: "never", comm: "never", bench: "multiple", special: "ads" },
   { label: "Join Leagues / Teams", free: true, pro: true, comm: true, bench: true },
   { label: "Team Scheduling", free: true, pro: true, comm: true, bench: true },
@@ -77,18 +77,58 @@ function Cell({ val, highlight }: { val: CellValue; highlight?: boolean }) {
   return <X className="w-4 h-4 inline text-gray-300" />;
 }
 
+type StripePriceEntry = { id: string; amount: number | null; currency: string | null };
+type StripePricesResponse = {
+  player_pro_monthly?: StripePriceEntry;
+  commissioner_monthly?: StripePriceEntry;
+  player_pro_yearly?: StripePriceEntry;
+  commissioner_yearly?: StripePriceEntry;
+};
+
 export default function Pricing() {
   const [, setLocation] = useLocation();
   const [annual, setAnnual] = useState(false);
 
-  const proMonthly = 6.49;
-  const commMonthly = 12.00;
+  const { data: stripePrices } = useQuery<StripePricesResponse>({
+    queryKey: ['/api/stripe/prices'],
+  });
 
-  const proAnnualTotal = 65;
-  const commAnnualTotal = 110;
+  const proMonthlyAmount = stripePrices?.player_pro_monthly?.amount ?? null;
+  const commMonthlyAmount = stripePrices?.commissioner_monthly?.amount ?? null;
+  const proYearlyAmount = stripePrices?.player_pro_yearly?.amount ?? null;
+  const commYearlyAmount = stripePrices?.commissioner_yearly?.amount ?? null;
 
-  const proPrice = annual ? (proAnnualTotal / 12).toFixed(2) : proMonthly.toFixed(2);
-  const commPrice = annual ? (commAnnualTotal / 12).toFixed(2) : commMonthly.toFixed(2);
+  const formatAmountNoSign = (amount: number | null) =>
+    amount !== null ? (amount % 1 === 0 ? amount.toFixed(0) : amount.toFixed(2)) : '...';
+
+  const formatAmountWithSign = (amount: number | null) =>
+    amount !== null ? `$${formatAmountNoSign(amount)}` : '...';
+
+  const proMonthlyDisplay = formatAmountWithSign(proMonthlyAmount);
+  const commMonthlyDisplay = formatAmountWithSign(commMonthlyAmount);
+
+  const proYearlyMonthly = proYearlyAmount !== null ? proYearlyAmount / 12 : null;
+  const commYearlyMonthly = commYearlyAmount !== null ? commYearlyAmount / 12 : null;
+
+  const proPrice = annual && proYearlyMonthly !== null
+    ? proYearlyMonthly.toFixed(2)
+    : formatAmountNoSign(proMonthlyAmount);
+  const commPrice = annual && commYearlyMonthly !== null
+    ? commYearlyMonthly.toFixed(2)
+    : formatAmountNoSign(commMonthlyAmount);
+
+  const proAnnualLabel = proYearlyAmount !== null ? `$${proYearlyAmount.toFixed(0)}/yr` : null;
+  const commAnnualLabel = commYearlyAmount !== null ? `$${commYearlyAmount.toFixed(0)}/yr` : null;
+
+  const priceRow = {
+    label: "Price (Monthly)",
+    free: "$0",
+    pro: proMonthlyAmount !== null ? `${proMonthlyDisplay}/mo` : '...',
+    comm: commMonthlyAmount !== null ? `${commMonthlyDisplay}/mo` : '...',
+    bench: "$9/mo",
+  };
+
+  const allFeatureRows = [priceRow, ...featureRows];
 
   return (
     <div className="min-h-screen bg-white text-gray-900" data-testid="pricing-page">
@@ -220,7 +260,9 @@ export default function Pricing() {
             </div>
             {annual && (
               <div className="mb-4">
-                <span className="text-blue-200 text-sm">Billed annually (${proAnnualTotal}/yr)</span>
+                <span className="text-blue-200 text-sm">
+                  Billed annually{proAnnualLabel ? ` (${proAnnualLabel})` : ''}
+                </span>
                 <span className="ml-2 inline-block bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">Save 17%</span>
               </div>
             )}
@@ -252,7 +294,9 @@ export default function Pricing() {
             </div>
             {annual && (
               <div className="mb-4">
-                <span className="text-gray-400 text-sm">Billed annually (${commAnnualTotal}/yr)</span>
+                <span className="text-gray-400 text-sm">
+                  Billed annually{commAnnualLabel ? ` (${commAnnualLabel})` : ''}
+                </span>
                 <span className="ml-2 inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">Save 24%</span>
               </div>
             )}
@@ -302,7 +346,7 @@ export default function Pricing() {
                 </tr>
               </thead>
               <tbody>
-                {featureRows.map(({ label, free, pro, comm, bench }) => (
+                {allFeatureRows.map(({ label, free, pro, comm, bench }) => (
                   <tr key={label} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
                     <td className="p-4 text-gray-800 font-medium">{label}</td>
                     <td className="text-center p-4 text-gray-600"><Cell val={free as CellValue} /></td>

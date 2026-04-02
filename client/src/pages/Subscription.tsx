@@ -34,15 +34,26 @@ export default function Subscription() {
     syncSubscription();
   }, []);
 
-  // Fetch Stripe price IDs from backend
-  const { data: stripePrices, isLoading: pricesLoading } = useQuery<{
-    player_pro_monthly?: string;
-    commissioner_monthly?: string;
-    player_pro_yearly?: string;
-    commissioner_yearly?: string;
-  }>({
+  type StripePriceEntry = { id: string; amount: number | null; currency: string | null };
+  type StripePricesResponse = {
+    player_pro_monthly?: StripePriceEntry;
+    commissioner_monthly?: StripePriceEntry;
+    player_pro_yearly?: StripePriceEntry;
+    commissioner_yearly?: StripePriceEntry;
+  };
+
+  // Fetch Stripe price IDs and live amounts from backend
+  const { data: stripePrices, isLoading: pricesLoading } = useQuery<StripePricesResponse>({
     queryKey: ['/api/stripe/prices'],
   });
+
+  const formatPrice = (entry?: StripePriceEntry) => {
+    if (!entry || entry.amount === null) return null;
+    return `$${entry.amount % 1 === 0 ? entry.amount.toFixed(0) : entry.amount.toFixed(2)}`;
+  };
+
+  const proMonthlyDisplay = formatPrice(stripePrices?.player_pro_monthly) ?? '...';
+  const commMonthlyDisplay = formatPrice(stripePrices?.commissioner_monthly) ?? '...';
 
   const subscriptionPlans = [
     {
@@ -63,7 +74,7 @@ export default function Subscription() {
     },
     {
       name: "Player Pro",
-      price: "$6.49",
+      price: proMonthlyDisplay,
       period: "month",
       description: "Enhanced features for serious players",
       features: [
@@ -84,7 +95,7 @@ export default function Subscription() {
     },
     {
       name: "Commissioner",
-      price: "$12", 
+      price: commMonthlyDisplay,
       period: "month",
       description: "Full league management capabilities",
       features: [
@@ -156,9 +167,11 @@ export default function Subscription() {
         throw new Error('Pricing information not available. Please try again.');
       }
 
-      const priceId = tier === 'player_pro' 
-        ? stripePrices.player_pro_monthly 
+      const priceEntry = tier === 'player_pro'
+        ? stripePrices.player_pro_monthly
         : stripePrices.commissioner_monthly;
+
+      const priceId = priceEntry?.id;
 
       if (!priceId) {
         throw new Error(`Price not configured for ${tier}. Please contact support.`);
@@ -271,7 +284,11 @@ export default function Subscription() {
                 {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Pro' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-current-plan-price">
-                {isCommissioner ? '$12/month' : isPlayerPlus ? '$8/month' : 'Free forever'}
+                {isCommissioner
+                  ? `${commMonthlyDisplay}/month`
+                  : isPlayerPlus
+                  ? `${proMonthlyDisplay}/month`
+                  : 'Free forever'}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
