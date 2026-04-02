@@ -12032,8 +12032,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const scrimmage = await storage.getScrimmage(scrimmageId);
           if (!scrimmage) { skipped++; continue; }
           if (scrimmage.creatorId !== userId) { skipped++; continue; }
+
+          // Get approved players before deleting (for cancellation notifications)
+          const scrimmageRequests = await storage.getScrimmageRequests(scrimmageId);
+          const approvedRequests = scrimmageRequests.filter(r => r.status === 'approved');
+
           await storage.deleteScrimmage(scrimmageId);
           deleted++;
+
+          // Send cancellation notification to approved players (mirrors single-delete logic)
+          if (approvedRequests.length > 0) {
+            try {
+              const league = await storage.getLeague(scrimmage.leagueId);
+              const timezone = league?.timezone || 'America/New_York';
+              const targetUserIds = approvedRequests.map(r => r.playerId);
+              const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location} has been cancelled by the organizer.`;
+              const announcement = await storage.createAnnouncement({
+                content: announcementContent,
+                leagueId: scrimmage.leagueId,
+                authorId: userId,
+                isPinned: false,
+              });
+              await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+            } catch (notifyErr) {
+              console.error(`Error sending cancellation notifications for scrimmage ${scrimmageId}:`, notifyErr);
+              // Don't fail the deletion if notification fails
+            }
+          }
         } catch (err) {
           console.error(`Error deleting scrimmage ${scrimmageId} in batch:`, err);
           skipped++;

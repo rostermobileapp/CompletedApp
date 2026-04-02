@@ -25,6 +25,7 @@ const DEFAULT_SCRIMMAGE_COLOR = '#3b82f6';
 type ScrimmageWithCreatorAndCount = Scrimmage & {
   creator: User;
   requestCount: number;
+  // All fields from Scrimmage are already included (color, costPerPlayer, skillLevel, parentScrimmageId, etc.)
 };
 
 type ScrimmageRequestWithPlayer = ScrimmageRequest & {
@@ -36,7 +37,7 @@ type ScrimmageCoHostWithUser = ScrimmageCoHost & {
 };
 
 function getScrimmageColor(scrimmage: ScrimmageWithCreatorAndCount): string {
-  return (scrimmage as any).color || DEFAULT_SCRIMMAGE_COLOR;
+  return scrimmage.color || DEFAULT_SCRIMMAGE_COLOR;
 }
 
 function parseScrimmageDate(dateTime: string | Date): Date {
@@ -250,7 +251,7 @@ export default function ScrimmageManagement() {
 
     for (const s of scrimmages) {
       if (s.isRecurring) {
-        const groupKey = (s as any).parentScrimmageId || s.id;
+        const groupKey = s.parentScrimmageId || s.id;
         if (!groups.has(groupKey)) {
           groups.set(groupKey, { label: s.title, ids: [], color: getScrimmageColor(s) });
         }
@@ -362,15 +363,15 @@ export default function ScrimmageManagement() {
                     <Users className="w-4 h-4" />
                     <span>Max {scrimmage.maxPlayers} players</span>
                   </div>
-                  {(scrimmage as any).costPerPlayer && (
+                  {scrimmage.costPerPlayer && (
                     <div className="flex items-center gap-2 text-sm">
                       <DollarSign className="w-4 h-4" />
-                      <span>${(scrimmage as any).costPerPlayer}/player</span>
+                      <span>${scrimmage.costPerPlayer}/player</span>
                     </div>
                   )}
-                  {(scrimmage as any).skillLevel && (
+                  {scrimmage.skillLevel && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Skill: {(scrimmage as any).skillLevel}</span>
+                      <span className="text-muted-foreground">Skill: {scrimmage.skillLevel}</span>
                     </div>
                   )}
                 </CardDescription>
@@ -451,7 +452,7 @@ export default function ScrimmageManagement() {
                 )}
               </Button>
               <p className="text-xs text-muted-foreground mt-1 text-center">
-                {(scrimmage as any).costPerPlayer
+                {scrimmage.costPerPlayer
                   ? 'Confirm roster, send notifications & create payment requests'
                   : 'Confirm roster and send notifications to approved players'}
               </p>
