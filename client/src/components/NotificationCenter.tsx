@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Bell, X, Check, Calendar, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Bell, X, Check, Calendar, CheckCircle2, XCircle, AlertCircle, Camera } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLocation } from 'wouter';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -78,6 +78,8 @@ export function NotificationCenter() {
         return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'scrimmage_canceled':
         return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'photo_tag':
+        return <Camera className="w-4 h-4 text-purple-500" />;
       default:
         return <Bell className="w-4 h-4 text-muted-foreground" />;
     }

@@ -470,3 +470,28 @@ export async function sendRsvpReminderPushNotification(
     },
   });
 }
+
+export async function sendPhotoTagPushNotification(
+  recipientId: string,
+  taggerName: string,
+  entityType: 'league' | 'tournament',
+  entityId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.photoTagNotifications === false) {
+    console.log(`[OneSignal] Photo tag notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `📸 You were tagged in a photo`,
+    message: `${taggerName} tagged you in a photo`,
+    data: {
+      type: 'photo_tag',
+      entityType,
+      entityId,
+    },
+  });
+}

@@ -3115,6 +3115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Photo not found" });
       }
 
+      const tagger = await storage.getUser(userId);
+      const taggerName = tagger
+        ? [tagger.firstName, tagger.lastName].filter(Boolean).join(' ') || 'Someone'
+        : 'Someone';
+
       const results = [];
       for (const taggedUserId of taggedUserIds) {
         try {
@@ -3124,6 +3129,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             taggedBy: userId,
           });
           results.push(tag);
+
+          if (taggedUserId !== userId) {
+            await storage.createNotification({
+              userId: taggedUserId,
+              type: 'photo_tag',
+              title: 'You were tagged in a photo',
+              message: `${taggerName} tagged you in a photo`,
+              actionUrl: `/tournaments/${photo.tournamentId}/photos`,
+              actionText: 'View Photo',
+              isRead: false,
+              isDismissed: false,
+            });
+            broadcastNotificationUpdate(taggedUserId);
+            import('./oneSignalNotifications').then(({ sendPhotoTagPushNotification }) => {
+              sendPhotoTagPushNotification(taggedUserId, taggerName, 'tournament', photo.tournamentId);
+            });
+          }
         } catch (error) {
           console.error(`Error tagging user ${taggedUserId}:`, error);
         }
@@ -3200,6 +3222,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Photo not found" });
       }
 
+      const tagger = await storage.getUser(userId);
+      const taggerName = tagger
+        ? [tagger.firstName, tagger.lastName].filter(Boolean).join(' ') || 'Someone'
+        : 'Someone';
+
       const results = [];
       for (const taggedUserId of taggedUserIds) {
         try {
@@ -3209,6 +3236,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             taggedBy: userId,
           });
           results.push(tag);
+
+          if (taggedUserId !== userId) {
+            await storage.createNotification({
+              userId: taggedUserId,
+              type: 'photo_tag',
+              title: 'You were tagged in a photo',
+              message: `${taggerName} tagged you in a photo`,
+              actionUrl: `/leagues/${photo.leagueId}/photos`,
+              actionText: 'View Photo',
+              isRead: false,
+              isDismissed: false,
+            });
+            broadcastNotificationUpdate(taggedUserId);
+            import('./oneSignalNotifications').then(({ sendPhotoTagPushNotification }) => {
+              sendPhotoTagPushNotification(taggedUserId, taggerName, 'league', photo.leagueId);
+            });
+          }
         } catch (error) {
           console.error(`Error tagging user ${taggedUserId}:`, error);
         }

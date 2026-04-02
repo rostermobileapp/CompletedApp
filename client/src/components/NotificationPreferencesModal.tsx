@@ -29,7 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   BellRing,
-  UserCheck
+  UserCheck,
+  Camera
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -43,6 +44,7 @@ interface NotificationSettings {
   upcomingEvents: boolean;
   newsAnnouncements: boolean;
   playerRsvpUpdates?: boolean;
+  photoTagNotifications?: boolean;
 }
 
 interface NotificationPreferences {
@@ -66,6 +68,7 @@ const defaultSettings: NotificationSettings = {
   upcomingEvents: true,
   newsAnnouncements: true,
   playerRsvpUpdates: true,
+  photoTagNotifications: true,
 };
 
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
@@ -387,6 +390,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   { key: 'joinRequests', label: 'Join Requests', icon: UserPlus, color: 'text-purple-500' },
                   { key: 'upcomingEvents', label: 'Game Reminders', icon: Calendar, color: 'text-red-500' },
                   { key: 'newsAnnouncements', label: 'The Wall', icon: Newspaper, color: 'text-cyan-500' },
+                  { key: 'photoTagNotifications', label: 'Photo Tags', icon: Camera, color: 'text-violet-500' },
                 ].map(({ key, label, icon: Icon, color }) => (
                   <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50">
                     <div className="flex items-center gap-3">

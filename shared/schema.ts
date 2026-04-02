@@ -220,7 +220,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "game_reminder",
   "scrimmage_cohost_added",
   "scrimmage_cohost_removed",
-  "player_rsvp"
+  "player_rsvp",
+  "photo_tag"
 ]);
 
 // Users table (required for Replit Auth)
