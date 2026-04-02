@@ -12084,17 +12084,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Series not found' });
       }
 
-      // Enforce creator ownership on the parent
+      // Use the parent row for ownership/metadata if it exists; fall back to any child
       const parent = seriesScrimmages.find(s => s.id === parentId);
-      if (!parent) {
-        return res.status(404).json({ message: 'Parent scrimmage not found' });
-      }
-      if (parent.creatorId !== userId) {
+      const representative = parent ?? seriesScrimmages[0];
+
+      if (representative.creatorId !== userId) {
         return res.status(403).json({ message: 'Only the creator can delete this series' });
-      }
-      // Reject if the given ID is actually a child (not a canonical series parent)
-      if (parent.parentScrimmageId !== null) {
-        return res.status(400).json({ message: 'Provided ID is a child occurrence, not a series parent. Use the parent series ID.' });
       }
 
       // Collect all approved players across all occurrences (deduplicated by userId)
@@ -12112,13 +12107,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send a single series-cancellation notification to all affected players
       if (allApprovedPlayerIds.size > 0) {
         try {
-          const league = await storage.getLeague(parent.leagueId);
+          const league = await storage.getLeague(representative.leagueId);
           const timezone = league?.timezone || 'America/New_York';
           const targetUserIds = Array.from(allApprovedPlayerIds);
-          const announcementContent = `❌ Recurring Series Cancelled: The entire "${parent.title}" recurring scrimmage series has been cancelled by the organizer. All ${seriesScrimmages.length} occurrence(s) have been removed.`;
+          const announcementContent = `❌ Recurring Series Cancelled: The entire "${representative.title}" recurring scrimmage series has been cancelled by the organizer. All ${seriesScrimmages.length} occurrence(s) have been removed.`;
           const announcement = await storage.createAnnouncement({
             content: announcementContent,
-            leagueId: parent.leagueId,
+            leagueId: representative.leagueId,
             authorId: userId,
             isPinned: false,
           });
