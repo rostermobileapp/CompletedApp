@@ -304,6 +304,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
     newsAnnouncements: true,
     scrimmageInvites: true,
     playerRsvpUpdates: true,
+    photoTagNotifications: true,
   }).notNull(),
   pushEnabled: boolean("push_enabled").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

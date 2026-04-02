@@ -398,7 +398,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                       <Label className="text-sm cursor-pointer font-normal">{label}</Label>
                     </div>
                     <Switch
-                      checked={localSettings[key as keyof NotificationSettings]}
+                      checked={localSettings[key as keyof NotificationSettings] ?? true}
                       onCheckedChange={() => handleToggle(key as keyof NotificationSettings)}
                     />
                   </div>
