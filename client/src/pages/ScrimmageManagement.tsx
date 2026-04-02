@@ -913,7 +913,7 @@ export default function ScrimmageManagement() {
                   onClick={() => setBatchDeleteDialogOpen(true)}
                   className="bg-white text-destructive hover:bg-white/90 font-semibold"
                 >
-                  Delete All
+                  Delete Selected
                 </Button>
               </div>
             </div>
