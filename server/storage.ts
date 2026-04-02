@@ -1237,6 +1237,8 @@ export class DatabaseStorage implements IStorage {
             upcomingEvents: true,
             newsAnnouncements: true,
             scrimmageInvites: true,
+            playerRsvpUpdates: true,
+            photoTagNotifications: true,
           },
           pushEnabled: data.pushEnabled ?? true,
         })

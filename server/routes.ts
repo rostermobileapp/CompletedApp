@@ -3150,8 +3150,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               broadcastNotificationUpdate(taggedUserId);
               import('./oneSignalNotifications').then(({ sendPhotoTagPushNotification }) => {
-                sendPhotoTagPushNotification(taggedUserId, taggerName, 'tournament', photo.tournamentId);
-              }).catch((err) => console.error('[Push] Failed to send photo tag push (tournament):', err));
+                sendPhotoTagPushNotification(taggedUserId, taggerName, 'tournament', photo.tournamentId)
+                  .catch((err: unknown) => console.error('[Push] Photo tag push failed (tournament):', err));
+              }).catch((err) => console.error('[Push] Failed to load push module (tournament):', err));
             }
           }
         } catch (error) {
@@ -3262,8 +3263,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
               broadcastNotificationUpdate(taggedUserId);
               import('./oneSignalNotifications').then(({ sendPhotoTagPushNotification }) => {
-                sendPhotoTagPushNotification(taggedUserId, taggerName, 'league', photo.leagueId);
-              }).catch((err) => console.error('[Push] Failed to send photo tag push (league):', err));
+                sendPhotoTagPushNotification(taggedUserId, taggerName, 'league', photo.leagueId)
+                  .catch((err: unknown) => console.error('[Push] Photo tag push failed (league):', err));
+              }).catch((err) => console.error('[Push] Failed to load push module (league):', err));
             }
           }
         } catch (error) {
