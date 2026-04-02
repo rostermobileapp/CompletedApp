@@ -212,7 +212,8 @@ function Router() {
       <SlideUpOverlayProvider>
       <ScrollToTop />
       <NativelyNotificationsInitializer />
-      <div className="relative min-h-screen w-full">
+      <div className="min-h-screen w-full bg-background">
+        <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
         <SlideOutMenu />
         <SwipeableMainScreens>
           <PageTransition>
@@ -281,6 +282,7 @@ function Router() {
         </SwipeableMainScreens>
           <HPIBBanner placement="bottom-nav" />
           <BottomNavigation />
+        </div>
         </div>
       </SlideUpOverlayProvider>
     </PermissionProvider>
