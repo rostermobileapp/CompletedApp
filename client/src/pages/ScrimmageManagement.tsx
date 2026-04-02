@@ -720,34 +720,34 @@ export default function ScrimmageManagement() {
             const isSelected = selectedDay === key;
             const isToday = isSameDay(day, today);
 
+            const primaryColor = dayScrimmages.length > 0 ? getScrimmageColor(dayScrimmages[0]) : null;
+
             return (
               <button
                 key={key}
-                onClick={() => setSelectedDay(isSelected ? null : key)}
+                onClick={() => dayScrimmages.length > 0 ? setSelectedDay(isSelected ? null : key) : undefined}
                 className={`
-                  aspect-square flex flex-col items-center justify-start pt-1 rounded-lg text-sm transition-all relative
-                  ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}
-                  ${isToday ? 'font-bold' : ''}
-                  ${dayScrimmages.length > 0 ? 'hover:bg-muted/70 cursor-pointer' : 'cursor-default'}
+                  aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all relative
+                  ${dayScrimmages.length > 0 ? 'cursor-pointer' : 'cursor-default'}
                 `}
+                style={{
+                  backgroundColor: primaryColor ? `${primaryColor}30` : undefined,
+                  ...(isSelected && primaryColor ? { outline: `2px solid ${primaryColor}`, outlineOffset: '2px' } : {}),
+                }}
               >
-                <span className={`text-xs leading-none ${isToday ? 'bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center' : ''}`}>
+                <span
+                  className={`text-xs leading-none ${isToday ? 'bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center' : ''}`}
+                  style={dayScrimmages.length > 0 && !isToday ? { color: primaryColor || undefined, fontWeight: 600 } : undefined}
+                >
                   {format(day, 'd')}
                 </span>
-                {/* Color dots for scrimmages */}
-                {dayScrimmages.length > 0 && (
-                  <div className="flex gap-0.5 flex-wrap justify-center mt-0.5 px-0.5">
-                    {dayScrimmages.slice(0, 3).map((s) => (
-                      <div
-                        key={s.id}
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: getScrimmageColor(s) }}
-                      />
-                    ))}
-                    {dayScrimmages.length > 3 && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" />
-                    )}
-                  </div>
+                {dayScrimmages.length > 1 && (
+                  <span
+                    className="absolute bottom-0.5 right-1 text-[9px] font-bold leading-none"
+                    style={{ color: primaryColor || undefined }}
+                  >
+                    {dayScrimmages.length}
+                  </span>
                 )}
               </button>
             );
