@@ -3151,7 +3151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               broadcastNotificationUpdate(taggedUserId);
               import('./oneSignalNotifications').then(({ sendPhotoTagPushNotification }) => {
                 sendPhotoTagPushNotification(taggedUserId, taggerName, 'tournament', photo.tournamentId);
-              });
+              }).catch((err) => console.error('[Push] Failed to send photo tag push (tournament):', err));
             }
           }
         } catch (error) {
@@ -3263,7 +3263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               broadcastNotificationUpdate(taggedUserId);
               import('./oneSignalNotifications').then(({ sendPhotoTagPushNotification }) => {
                 sendPhotoTagPushNotification(taggedUserId, taggerName, 'league', photo.leagueId);
-              });
+              }).catch((err) => console.error('[Push] Failed to send photo tag push (league):', err));
             }
           }
         } catch (error) {
