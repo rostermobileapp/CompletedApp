@@ -624,6 +624,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             joinRequests: true,
             upcomingEvents: true,
             newsAnnouncements: true,
+            scrimmageInvites: true,
+            playerRsvpUpdates: true,
+            photoTagNotifications: true,
           },
           pushEnabled: false,
           oneSignalPlayerId: null,
@@ -645,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: any = {};
       if (notificationSettings !== undefined) {
         // Validate notification settings structure
-        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents', 'newsAnnouncements', 'scrimmageInvites'];
+        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents', 'newsAnnouncements', 'scrimmageInvites', 'playerRsvpUpdates', 'photoTagNotifications'];
         const settings: Record<string, boolean> = {};
         
         for (const key of validKeys) {

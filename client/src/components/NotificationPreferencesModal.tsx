@@ -115,7 +115,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
 
   useEffect(() => {
     if (preferences?.notificationSettings) {
-      setLocalSettings(preferences.notificationSettings);
+      setLocalSettings({ ...defaultSettings, ...preferences.notificationSettings });
     }
   }, [preferences?.notificationSettings]);
 
