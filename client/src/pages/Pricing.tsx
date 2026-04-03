@@ -238,7 +238,7 @@ export default function Pricing() {
               <span className="text-gray-400"> / forever</span>
             </div>
             <ul className="space-y-3 mb-8 flex-1">
-              {['Join Leagues / Teams', 'Scheduling', 'RSVP Alerts', 'Team Only Stats'].map((f) => (
+              {['Team Schedule', 'In App RSVP', 'In App Messaging (Team Chat)', 'Facility Event Calendar', 'Website Portal', 'Team Stats', 'Standings'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{f}</span>
@@ -275,7 +275,7 @@ export default function Pricing() {
             )}
             {!annual && <div className="mb-4" />}
             <ul className="space-y-3 mb-8 flex-1">
-              {['FREE +', 'Team Management', 'In-App Messaging', 'In-App Payments', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements', 'Player Substitution System', 'Venmo/CashApp Integration'].map((f) => (
+              {['FREE +', 'Create Team Events/Games', 'Roster Management', 'Player/Attendance Tracking', 'Intelligent Sub Request Tool', 'Polls/Bulletins', 'Fee & Payment Tracking', 'Links to Venmo/CashApp', 'Team Expense Tracking', 'Multi-Team/Org Management', 'Registration Notices', 'Volunteer/Role Assignment', 'League Stats'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-white">{f}</span>
@@ -309,7 +309,7 @@ export default function Pricing() {
             )}
             {!annual && <div className="mb-4" />}
             <ul className="space-y-3 mb-8 flex-1">
-              {['FREE & PLAYER PRO +', 'League Scheduling', 'Scorekeeping', 'Player Management', 'League Wide Posts', 'Awards & Records*', 'Bracket Management*', 'Tournaments Mode'].map((f) => (
+              {['FREE & PLAYER PRO +', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'League Drafts', '3 Stars of the Game', 'Custom Awards', 'Tournaments Mode'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{f}</span>
@@ -325,7 +325,6 @@ export default function Pricing() {
             </button>
           </div>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-6">* Coming soon</p>
       </section>
 
       {/* Feature comparison table */}
