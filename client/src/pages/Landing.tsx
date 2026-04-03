@@ -372,7 +372,7 @@ export default function Landing() {
             </div>
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">100%</div>
-              <div className="text-gray-500 text-sm font-medium">To Get Started</div>
+              <div className="text-gray-500 text-sm font-medium">Better Than the Competition</div>
             </div>
           </div>
         </div>
