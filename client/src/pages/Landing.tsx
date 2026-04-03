@@ -679,22 +679,6 @@ export default function Landing() {
                 <li><Link href="/terms-of-service" className="hover:text-gray-900 transition-colors" data-testid="link-terms-of-service">Terms of Service</Link></li>
               </ul>
             </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-3">By Sport</p>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/hockey" className="hover:text-gray-900 transition-colors">Hockey</Link></li>
-                <li><Link href="/soccer" className="hover:text-gray-900 transition-colors">Soccer</Link></li>
-                <li><Link href="/baseball" className="hover:text-gray-900 transition-colors">Baseball</Link></li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 mb-3">By Team Type</p>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/for-youth-teams" className="hover:text-gray-900 transition-colors">Youth Teams</Link></li>
-                <li><Link href="/for-adult-leagues" className="hover:text-gray-900 transition-colors">Adult Leagues</Link></li>
-                <li><Link href="/for-varsity" className="hover:text-gray-900 transition-colors">Varsity & Competitive</Link></li>
-              </ul>
-            </div>
           </div>
           <div className="border-t border-gray-100 pt-6">
             <p className="text-sm text-gray-400 text-center flex items-center justify-center gap-2" data-testid="text-footer">
