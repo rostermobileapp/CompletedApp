@@ -195,20 +195,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('Error initializing user_registration_count table:', e);
   }
 
-  // Demo video streaming route (public) — served directly from filesystem
-  app.get('/demo-video', (req, res) => {
-    // Try dist/public first (production build output), then client/public (dev)
-    const candidates = [
-      path.resolve(process.cwd(), 'dist', 'public', 'demo.mp4'),
-      path.resolve(process.cwd(), 'client', 'public', 'demo.mp4'),
-    ];
-    const videoPath = candidates.find(p => fs.existsSync(p));
-    if (!videoPath) {
-      console.error('[demo-video] File not found in any candidate path:', candidates);
-      return res.status(404).json({ message: 'Video not found' });
+  // Returns a signed GCS URL for the demo video so the browser streams directly from GCS
+  app.get('/api/demo-video-url', async (req, res) => {
+    const SIDECAR = 'http://127.0.0.1:1106';
+    const BUCKET = 'replit-objstore-79978f98-4528-493b-b950-64f3b6ab9dbf';
+    const OBJECT = 'public/demo.mp4';
+    try {
+      const response = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket_name: BUCKET,
+          object_name: OBJECT,
+          method: 'GET',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+        }),
+      });
+      if (!response.ok) throw new Error(`Sidecar responded ${response.status}`);
+      const { signed_url } = await response.json();
+      res.json({ url: signed_url });
+    } catch (err) {
+      console.warn('[demo-video-url] Sidecar unavailable, falling back to static path:', err);
+      res.json({ url: '/demo.mp4' });
     }
-    console.log('[demo-video] Serving from:', videoPath);
-    res.sendFile(videoPath);
   });
 
   // User registration count route (public)

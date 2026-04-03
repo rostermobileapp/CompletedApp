@@ -109,6 +109,11 @@ export default function Landing() {
     refetchInterval: 30000,
   });
 
+  const { data: demoVideoData } = useQuery<{ url: string }>({
+    queryKey: ['/api/demo-video-url'],
+    staleTime: 50 * 60 * 1000, // refetch before the 1-hour signed URL expires
+  });
+
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
@@ -314,9 +319,8 @@ export default function Landing() {
             controls
             playsInline
             preload="metadata"
-          >
-            <source src="/demo.mp4" type="video/mp4" />
-          </video>
+            src={demoVideoData?.url}
+          />
         </div>
       </section>
       {/* How It Works */}
