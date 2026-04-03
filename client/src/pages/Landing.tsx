@@ -308,15 +308,15 @@ export default function Landing() {
           </h2>
           <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
 
-          <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-black aspect-video shadow-xl">
-            <video
-              className="w-full h-full object-contain"
-              controls
-              playsInline
-            >
-              <source src="/demo-video" type="video/mp4" />
-            </video>
-          </div>
+          <video
+            className="w-full rounded-2xl border border-gray-200 shadow-xl bg-black"
+            style={{ aspectRatio: '16/9' }}
+            controls
+            playsInline
+            preload="metadata"
+          >
+            <source src="/demo.mp4" type="video/mp4" />
+          </video>
         </div>
       </section>
       {/* How It Works */}
