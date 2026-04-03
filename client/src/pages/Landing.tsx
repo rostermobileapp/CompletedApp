@@ -433,7 +433,7 @@ export default function Landing() {
                   { label: "League Drafts", roster: true, bench: false, snap: false, engine: false, cross: false },
                   { label: "3 Stars of the Game", roster: true, bench: false, snap: false, engine: false, cross: false },
                   { label: "In App RSVP", roster: true, bench: false, snap: true, engine: false, cross: true },
-                  { label: "Player Substitution System", roster: true, bench: false, snap: false, engine: false, cross: false },
+                  { label: "Intelligent Sub Request Tool", roster: true, bench: false, snap: false, engine: false, cross: false },
                   { label: "Polls/Bulletins", roster: true, bench: true, snap: true, engine: false, cross: false },
                   { label: "Facility Event Calendar", roster: true, bench: false, snap: false, engine: false, cross: false },
                   { label: "Fee & Payment Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
