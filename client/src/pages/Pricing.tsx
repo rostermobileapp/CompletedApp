@@ -53,6 +53,7 @@ const featureRows = [
   { label: "Volunteer/Role Assignment", free: false, pro: true, comm: true },
   { label: "League Stats", free: false, pro: true, comm: true },
   // Commissioner tier
+  { label: "A-Z League Management", free: false, pro: false, comm: true },
   { label: "Bracket Generation Tool", free: false, pro: false, comm: true },
   { label: "In-Game Scorekeeping", free: false, pro: false, comm: true },
   { label: "League Drafts", free: false, pro: false, comm: true },
@@ -309,7 +310,7 @@ export default function Pricing() {
             )}
             {!annual && <div className="mb-4" />}
             <ul className="space-y-3 mb-8 flex-1">
-              {['FREE & PLAYER PRO +', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'League Drafts', '3 Stars of the Game', 'Custom Awards', 'Tournaments Mode'].map((f) => (
+              {['FREE & PLAYER PRO +', 'A-Z League Management', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'League Drafts', '3 Stars of the Game', 'Custom Awards', 'Tournaments Mode'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{f}</span>
