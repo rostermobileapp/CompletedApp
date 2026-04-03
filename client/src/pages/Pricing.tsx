@@ -30,29 +30,29 @@ const pricingTestimonials = [
 ];
 
 const featureRows = [
-  { label: "Annoying Ads", free: "never", pro: "never", comm: "never", bench: "multiple", special: "ads" },
-  { label: "Team Scheduling", free: true, pro: true, comm: true, bench: true },
-  { label: "Roster Management", free: false, pro: true, comm: true, bench: true },
-  { label: "Player/Attendance Tracking", free: false, pro: true, comm: true, bench: true },
-  { label: "In App Messaging", free: false, pro: true, comm: true, bench: false },
-  { label: "Bracket Generation Tool", free: false, pro: false, comm: true, bench: false },
-  { label: "In-Game Scorekeeping", free: false, pro: false, comm: true, bench: false },
-  { label: "League Drafts", free: false, pro: false, comm: true, bench: false },
-  { label: "3 Stars of the Game", free: false, pro: false, comm: true, bench: false },
-  { label: "In App RSVP", free: true, pro: true, comm: true, bench: true },
-  { label: "Intelligent Sub Request Tool", free: false, pro: true, comm: true, bench: false },
-  { label: "Polls/Bulletins", free: false, pro: true, comm: true, bench: true },
-  { label: "Facility Event Calendar", free: false, pro: true, comm: true, bench: false },
-  { label: "Fee & Payment Tracking", free: false, pro: true, comm: true, bench: false },
-  { label: "Links to Venmo/CashApp", free: false, pro: true, comm: true, bench: false },
-  { label: "Team Expense Tracking", free: false, pro: true, comm: true, bench: true },
-  { label: "Mobile App", free: true, pro: true, comm: true, bench: true },
-  { label: "Website Portal", free: false, pro: true, comm: true, bench: true },
-  { label: "Multi-Team/Org Management", free: false, pro: true, comm: true, bench: true },
-  { label: "Registration Notices", free: false, pro: true, comm: true, bench: false },
-  { label: "Volunteer/Role Assignment", free: false, pro: true, comm: true, bench: true },
-  { label: "Custom Awards", free: false, pro: false, comm: true, bench: false },
-  { label: "Tournaments Mode", free: false, pro: false, comm: true, bench: false },
+  { label: "Annoying Ads", free: "never", pro: "never", comm: "never", special: "ads" },
+  { label: "Team Scheduling", free: true, pro: true, comm: true },
+  { label: "Roster Management", free: false, pro: true, comm: true },
+  { label: "Player/Attendance Tracking", free: false, pro: true, comm: true },
+  { label: "In App Messaging", free: false, pro: true, comm: true },
+  { label: "Bracket Generation Tool", free: false, pro: false, comm: true },
+  { label: "In-Game Scorekeeping", free: false, pro: false, comm: true },
+  { label: "League Drafts", free: false, pro: false, comm: true },
+  { label: "3 Stars of the Game", free: false, pro: false, comm: true },
+  { label: "In App RSVP", free: true, pro: true, comm: true },
+  { label: "Intelligent Sub Request Tool", free: false, pro: true, comm: true },
+  { label: "Polls/Bulletins", free: false, pro: true, comm: true },
+  { label: "Facility Event Calendar", free: false, pro: true, comm: true },
+  { label: "Fee & Payment Tracking", free: false, pro: true, comm: true },
+  { label: "Links to Venmo/CashApp", free: false, pro: true, comm: true },
+  { label: "Team Expense Tracking", free: false, pro: true, comm: true },
+  { label: "Mobile App", free: true, pro: true, comm: true },
+  { label: "Website Portal", free: false, pro: true, comm: true },
+  { label: "Multi-Team/Org Management", free: false, pro: true, comm: true },
+  { label: "Registration Notices", free: false, pro: true, comm: true },
+  { label: "Volunteer/Role Assignment", free: false, pro: true, comm: true },
+  { label: "Custom Awards", free: false, pro: false, comm: true },
+  { label: "Tournaments Mode", free: false, pro: false, comm: true },
 ];
 
 type CellValue = boolean | string;
@@ -127,7 +127,6 @@ export default function Pricing() {
     free: "$0",
     pro: proMonthlyAmount !== null ? `${proMonthlyDisplay}/mo` : '...',
     comm: commMonthlyAmount !== null ? `${commMonthlyDisplay}/mo` : '...',
-    bench: "$9/mo",
   };
 
   const allFeatureRows = [priceRow, ...featureRows];
@@ -329,7 +328,7 @@ export default function Pricing() {
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-3 text-gray-900">
             See every feature, side by side.
           </h2>
-          <p className="text-gray-500 text-center mb-10">Including how we stack up against BenchApp — our closest competitor.</p>
+          <p className="text-gray-500 text-center mb-10">Every feature, across every plan — side by side.</p>
 
           <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-sm">
             <table className="w-full border-collapse bg-white text-sm" data-testid="pricing-comparison-table">
@@ -344,17 +343,15 @@ export default function Pricing() {
                     </div>
                   </th>
                   <th className="text-center p-4 font-semibold text-gray-700 w-28">Commissioner</th>
-                  <th className="text-center p-4 font-semibold text-gray-500 w-28">BenchApp</th>
                 </tr>
               </thead>
               <tbody>
-                {allFeatureRows.map(({ label, free, pro, comm, bench }) => (
+                {allFeatureRows.map(({ label, free, pro, comm }) => (
                   <tr key={label} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
                     <td className="p-4 text-gray-800 font-medium">{label}</td>
                     <td className="text-center p-4 text-gray-600"><Cell val={free as CellValue} /></td>
                     <td className="text-center p-4 bg-[#3c82f4]/5 border-x border-[#3c82f4]/10"><Cell val={pro as CellValue} highlight /></td>
                     <td className="text-center p-4 text-gray-600"><Cell val={comm as CellValue} /></td>
-                    <td className="text-center p-4 text-gray-500"><Cell val={bench as CellValue} /></td>
                   </tr>
                 ))}
               </tbody>
