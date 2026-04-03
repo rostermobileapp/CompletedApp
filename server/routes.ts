@@ -195,42 +195,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('Error initializing user_registration_count table:', e);
   }
 
-  // Demo video streaming route (public) — serves from object storage with range request support
-  app.get('/demo-video', async (req, res) => {
-    try {
-      const bucket = objectStorageClient.bucket('replit-objstore-79978f98-4528-493b-b950-64f3b6ab9dbf');
-      const file = bucket.file('public/demo.mp4');
-      const [metadata] = await file.getMetadata();
-      const totalSize = parseInt(String(metadata.size), 10);
-      const rangeHeader = req.headers.range;
-
-      if (rangeHeader) {
-        const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-');
-        const start = parseInt(startStr, 10);
-        const end = endStr ? parseInt(endStr, 10) : Math.min(start + 10 * 1024 * 1024 - 1, totalSize - 1);
-        const chunkSize = end - start + 1;
-
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize,
-          'Content-Type': 'video/mp4',
-          'Cache-Control': 'public, max-age=86400',
-        });
-        file.createReadStream({ start, end }).pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': totalSize,
-          'Content-Type': 'video/mp4',
-          'Accept-Ranges': 'bytes',
-          'Cache-Control': 'public, max-age=86400',
-        });
-        file.createReadStream().pipe(res);
-      }
-    } catch (error) {
-      console.error('Error streaming demo video:', error);
-      res.status(500).json({ message: 'Failed to stream video' });
+  // Demo video streaming route (public) — served directly from filesystem
+  app.get('/demo-video', (req, res) => {
+    // Try dist/public first (production build output), then client/public (dev)
+    const candidates = [
+      path.resolve(process.cwd(), 'dist', 'public', 'demo.mp4'),
+      path.resolve(process.cwd(), 'client', 'public', 'demo.mp4'),
+    ];
+    const videoPath = candidates.find(p => fs.existsSync(p));
+    if (!videoPath) {
+      console.error('[demo-video] File not found in any candidate path:', candidates);
+      return res.status(404).json({ message: 'Video not found' });
     }
+    console.log('[demo-video] Serving from:', videoPath);
+    res.sendFile(videoPath);
   });
 
   // User registration count route (public)
