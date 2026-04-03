@@ -436,7 +436,7 @@ export default function Landing() {
                   { label: "Links to Venmo/CashApp", roster: true, bench: false, snap: false, engine: false, cross: false },
                   { label: "Team Expense Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
                   { label: "Mobile App", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Website Portal", roster: true, bench: false, snap: true, engine: true, cross: true },
+                  { label: "Website Portal", roster: true, bench: true, snap: true, engine: true, cross: true },
                   { label: "Multi-Team/Org Management", roster: true, bench: true, snap: true, engine: true, cross: true },
                   { label: "Registration Notices", roster: true, bench: false, snap: true, engine: true, cross: true },
                   { label: "Volunteer/Role Assignment", roster: true, bench: true, snap: true, engine: true, cross: true },
