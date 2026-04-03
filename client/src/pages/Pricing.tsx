@@ -31,26 +31,29 @@ const pricingTestimonials = [
 
 const featureRows = [
   { label: "Annoying Ads", free: "never", pro: "never", comm: "never", special: "ads" },
+  // Free tier
   { label: "Team Scheduling", free: true, pro: true, comm: true },
+  { label: "In App RSVP", free: true, pro: true, comm: true },
+  { label: "Mobile App", free: true, pro: true, comm: true },
+  // Player Pro tier
   { label: "Roster Management", free: false, pro: true, comm: true },
   { label: "Player/Attendance Tracking", free: false, pro: true, comm: true },
   { label: "In App Messaging", free: false, pro: true, comm: true },
-  { label: "Bracket Generation Tool", free: false, pro: false, comm: true },
-  { label: "In-Game Scorekeeping", free: false, pro: false, comm: true },
-  { label: "League Drafts", free: false, pro: false, comm: true },
-  { label: "3 Stars of the Game", free: false, pro: false, comm: true },
-  { label: "In App RSVP", free: true, pro: true, comm: true },
   { label: "Intelligent Sub Request Tool", free: false, pro: true, comm: true },
   { label: "Polls/Bulletins", free: false, pro: true, comm: true },
   { label: "Facility Event Calendar", free: false, pro: true, comm: true },
   { label: "Fee & Payment Tracking", free: false, pro: true, comm: true },
   { label: "Links to Venmo/CashApp", free: false, pro: true, comm: true },
   { label: "Team Expense Tracking", free: false, pro: true, comm: true },
-  { label: "Mobile App", free: true, pro: true, comm: true },
   { label: "Website Portal", free: false, pro: true, comm: true },
   { label: "Multi-Team/Org Management", free: false, pro: true, comm: true },
   { label: "Registration Notices", free: false, pro: true, comm: true },
   { label: "Volunteer/Role Assignment", free: false, pro: true, comm: true },
+  // Commissioner tier
+  { label: "Bracket Generation Tool", free: false, pro: false, comm: true },
+  { label: "In-Game Scorekeeping", free: false, pro: false, comm: true },
+  { label: "League Drafts", free: false, pro: false, comm: true },
+  { label: "3 Stars of the Game", free: false, pro: false, comm: true },
   { label: "Custom Awards", free: false, pro: false, comm: true },
   { label: "Tournaments Mode", free: false, pro: false, comm: true },
 ];
