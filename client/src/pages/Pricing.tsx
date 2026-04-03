@@ -32,15 +32,14 @@ const pricingTestimonials = [
 const featureRows = [
   { label: "Annoying Ads", free: "never", pro: "never", comm: "never", special: "ads" },
   // Free tier
-  { label: "Team Scheduling", free: true, pro: true, comm: true },
   { label: "In App RSVP", free: true, pro: true, comm: true },
-  { label: "Mobile App", free: true, pro: true, comm: true },
   { label: "In App Messaging", free: true, pro: true, comm: true },
   { label: "Facility Event Calendar", free: true, pro: true, comm: true },
   { label: "Website Portal", free: true, pro: true, comm: true },
   { label: "Team Stats", free: true, pro: true, comm: true },
   { label: "Standings", free: true, pro: true, comm: true },
   // Player Pro tier
+  { label: "Team Scheduling", free: false, pro: true, comm: true },
   { label: "Roster Management", free: false, pro: true, comm: true },
   { label: "Player/Attendance Tracking", free: false, pro: true, comm: true },
   { label: "Intelligent Sub Request Tool", free: false, pro: true, comm: true },
