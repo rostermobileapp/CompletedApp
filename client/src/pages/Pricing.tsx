@@ -334,15 +334,15 @@ export default function Pricing() {
             <table className="w-full border-collapse bg-white text-sm" data-testid="pricing-comparison-table">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left p-4 font-bold text-gray-900 min-w-[180px]">Feature</th>
-                  <th className="text-center p-4 font-semibold text-gray-600 w-24">Free</th>
-                  <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border-x border-[#3c82f4]/20 w-28">
+                  <th className="text-left p-4 font-bold text-gray-900 w-[30%]">Feature</th>
+                  <th className="text-center p-4 font-semibold text-gray-600 w-[23%]">Free</th>
+                  <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border-x border-[#3c82f4]/20 w-[23%]">
                     <div className="flex flex-col items-center gap-1">
                       <span>Player Pro</span>
                       <span className="text-[10px] font-normal text-[#3c82f4] bg-[#3c82f4]/10 rounded-full px-2 py-0.5">Best Value</span>
                     </div>
                   </th>
-                  <th className="text-center p-4 font-semibold text-gray-700 w-28">Commissioner</th>
+                  <th className="text-center p-4 font-semibold text-gray-700 w-[24%]">Commissioner</th>
                 </tr>
               </thead>
               <tbody>
