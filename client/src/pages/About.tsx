@@ -75,7 +75,7 @@ export default function About() {
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6 leading-snug">Why I built Roster</h2>
           <div className="space-y-4 text-gray-600 text-lg leading-relaxed max-w-3xl">
             <p>
-              Since 2016 we used BenchApp for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
+              Since 2016 we used a different app for the teams.  It worked well for surface level items like calendar and planning.  But as I moved into a more community-oriented league with fantastic people, I realized that we could benefit from a more personal app experience.
             </p>
             <p>
               Our league used everything.  Excel for schedules and drafts, esportsdesk for standings and player stats, team text threads. Nothing solved the actual problem: <em>having 1 app for everything... literally everything.</em>
