@@ -1,7 +1,6 @@
-import { Calendar, Check, Play, UserPlus, Trophy, Star, Shield, Zap, Menu, X } from 'lucide-react';
+import { Calendar, Check, UserPlus, Trophy, Star, Shield, Zap, Menu, X } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
-import demoVideoSrc from "@assets/20_SECONDS!_1775183744973.mp4";
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
@@ -315,7 +314,7 @@ export default function Landing() {
               controls
               playsInline
             >
-              <source src={demoVideoSrc} type="video/mp4" />
+              <source src="/demo.mp4" type="video/mp4" />
             </video>
           </div>
         </div>

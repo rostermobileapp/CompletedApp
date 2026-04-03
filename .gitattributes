@@ -1,1 +1,2 @@
 attached_assets/20_SECONDS!_1775183744973.mp4 filter=lfs diff=lfs merge=lfs -text
+client/public/demo.mp4 filter=lfs diff=lfs merge=lfs -text
