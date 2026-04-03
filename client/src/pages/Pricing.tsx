@@ -34,7 +34,7 @@ const featureRows = [
   // Free tier
   { label: "Team Schedule", free: true, pro: true, comm: true },
   { label: "In App RSVP", free: true, pro: true, comm: true },
-  { label: "In App Messaging", free: true, pro: true, comm: true },
+  { label: "In App Messaging", free: true, pro: true, comm: true, freeNote: "Team Chat Only" },
   { label: "Facility Event Calendar", free: true, pro: true, comm: true },
   { label: "Website Portal", free: true, pro: true, comm: true },
   { label: "Team Stats", free: true, pro: true, comm: true },
@@ -352,10 +352,13 @@ export default function Pricing() {
                 </tr>
               </thead>
               <tbody>
-                {allFeatureRows.map(({ label, free, pro, comm }) => (
+                {allFeatureRows.map(({ label, free, pro, comm, freeNote }: any) => (
                   <tr key={label} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
                     <td className="p-4 text-gray-800 font-medium">{label}</td>
-                    <td className="text-center p-4 text-gray-600"><Cell val={free as CellValue} /></td>
+                    <td className="text-center p-4 text-gray-600">
+                      <Cell val={free as CellValue} />
+                      {freeNote && <div className="text-[10px] text-gray-400 mt-1">{freeNote}</div>}
+                    </td>
                     <td className="text-center p-4 bg-[#3c82f4]/5 border-x border-[#3c82f4]/10"><Cell val={pro as CellValue} highlight /></td>
                     <td className="text-center p-4 text-gray-600"><Cell val={comm as CellValue} /></td>
                   </tr>
