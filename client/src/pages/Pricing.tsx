@@ -1,33 +1,9 @@
-import { Check, Shield, Zap, Star, X } from 'lucide-react';
+import { Check, Shield, Zap, X } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
-
-const pricingTestimonials = [
-  {
-    quote: "Switched from TeamSnap and never looked back. Half the price, twice the features. The free tier alone beats what we were paying for before.",
-    name: "Jen M.",
-    team: "Women's Hockey League",
-    initials: "JM",
-    gradient: "from-orange-500 to-orange-700",
-  },
-  {
-    quote: "We run three teams through Roster. The Commissioner plan at $12/month is honestly a steal compared to what the league used to pay for SportsEngine.",
-    name: "Derek R.",
-    team: "City Adult Hockey League",
-    initials: "DR",
-    gradient: "from-emerald-500 to-emerald-700",
-  },
-  {
-    quote: "No ads. I cannot stress that enough. Every other app hammers you with banners. Roster is just clean — and cheaper than BenchApp with more features.",
-    name: "Marcus T.",
-    team: "Wednesday Night Hockey",
-    initials: "MT",
-    gradient: "from-blue-500 to-blue-700",
-  },
-];
 
 const featureRows = [
   { label: "Annoying Ads", free: "never", pro: "never", comm: "never", special: "ads" },
@@ -365,38 +341,6 @@ export default function Pricing() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-16 px-6 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-3 text-gray-900">Teams love the price.</h2>
-          <p className="text-gray-500 text-center mb-10">Real players, real savings.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {pricingTestimonials.map((t) => (
-              <div
-                key={t.name}
-                className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col gap-4 shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-gray-700 leading-relaxed flex-1">"{t.quote}"</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
-                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm ring-2 ring-white`}>
-                    {t.initials}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 text-sm">{t.name}</div>
-                    <div className="text-gray-400 text-xs">{t.team}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
