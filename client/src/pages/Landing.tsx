@@ -295,7 +295,7 @@ export default function Landing() {
                 ))}
               </div>
               <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
-              <p className="text-lg text-gray-600">One app, built by frustrated players, for players. Your schedule, your lineup, your team — organized. Finally.</p>
+              <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
             </div>
           </div>
         </div>
