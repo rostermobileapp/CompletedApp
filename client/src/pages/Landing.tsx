@@ -662,7 +662,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-gray-200 py-12 px-6 bg-white" data-testid="footer">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10 text-sm">
+          <div className="flex flex-wrap justify-center gap-16 mb-10 text-sm">
             <div>
               <p className="font-semibold text-gray-900 mb-3">Product</p>
               <ul className="space-y-2 text-gray-400">
