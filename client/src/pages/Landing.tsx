@@ -109,11 +109,6 @@ export default function Landing() {
     refetchInterval: 30000,
   });
 
-  const { data: demoVideoData } = useQuery<{ url: string }>({
-    queryKey: ['/api/demo-video-url'],
-    staleTime: 50 * 60 * 1000, // refetch before the 1-hour signed URL expires
-  });
-
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
@@ -313,14 +308,15 @@ export default function Landing() {
           </h2>
           <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
 
-          <video
-            className="w-full rounded-2xl border border-gray-200 shadow-xl bg-black"
-            style={{ aspectRatio: '16/9' }}
-            controls
-            playsInline
-            preload="metadata"
-            src={demoVideoData?.url}
-          />
+          <div className="relative w-full rounded-2xl overflow-hidden border border-gray-200 shadow-xl" style={{ aspectRatio: '16/9' }}>
+            <iframe
+              src="https://www.youtube.com/embed/h4M22L9E6pg"
+              title="Roster Demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full"
+            />
+          </div>
         </div>
       </section>
       {/* How It Works */}
