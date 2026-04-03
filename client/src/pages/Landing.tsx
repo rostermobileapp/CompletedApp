@@ -314,7 +314,7 @@ export default function Landing() {
               controls
               playsInline
             >
-              <source src="/demo.mp4" type="video/mp4" />
+              <source src="/demo-video" type="video/mp4" />
             </video>
           </div>
         </div>
