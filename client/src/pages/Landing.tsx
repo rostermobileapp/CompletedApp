@@ -1,6 +1,7 @@
 import { Calendar, Check, Play, UserPlus, Trophy, Star, Shield, Zap, Menu, X } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
+import demoVideoSrc from "@assets/20_SECONDS!_1775183744973.mp4";
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
@@ -308,23 +309,15 @@ export default function Landing() {
           </h2>
           <p className="text-gray-500 text-lg mb-10">Watch how teams go from chaos to organized in under 5 minutes.</p>
 
-          <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 aspect-video shadow-xl group cursor-pointer">
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-[#3c82f4] flex items-center justify-center shadow-lg shadow-blue-300/50 group-hover:scale-110 transition-transform">
-                <Play className="w-8 h-8 text-white ml-1" fill="white" />
-              </div>
-              <p className="text-gray-500 text-sm font-medium">Product Walkthrough — 90 seconds</p>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-br from-[#3c82f4]/5 via-transparent to-[#3c82f4]/5" />
-            <div
-              className="absolute inset-0 opacity-30"
-              style={{
-                backgroundImage: 'linear-gradient(rgba(60,130,244,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(60,130,244,0.15) 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-              }}
-            />
+          <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-black aspect-video shadow-xl">
+            <video
+              className="w-full h-full object-contain"
+              controls
+              playsInline
+            >
+              <source src={demoVideoSrc} type="video/mp4" />
+            </video>
           </div>
-          <p className="text-gray-400 text-xs mt-3">Video demo coming soon — sign up to get early access</p>
         </div>
       </section>
       {/* How It Works */}
