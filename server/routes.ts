@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated, supabase } from "./supabaseAuth";
 import { 
@@ -197,7 +198,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Demo video streaming route (public) — serves from object storage with range request support
   app.get('/demo-video', async (req, res) => {
     try {
-      const { objectStorageClient } = await import('./objectStorage');
       const bucket = objectStorageClient.bucket('replit-objstore-79978f98-4528-493b-b950-64f3b6ab9dbf');
       const file = bucket.file('public/demo.mp4');
       const [metadata] = await file.getMetadata();
