@@ -119,7 +119,11 @@ export default function Subscription() {
   const openStripeUrl = (url: string) => {
     const stripeWindow = window.open(url, '_system');
     if (!stripeWindow) {
-      window.location.href = url;
+      toast({
+        title: 'Unable to open browser',
+        description: 'Please open your default browser and visit the payment page manually.',
+        variant: 'destructive',
+      });
     }
     setPendingStripeUrl(null);
     setIsLoading(false);
