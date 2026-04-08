@@ -1,0 +1,24 @@
+Guideline 3.1.1 - Business - Payments - In-App Purchase
+Issue DescriptionWe noticed that the app includes or accesses paid digital content, services, or functionality by means other than In-App Purchase, which is not appropriate for the App Store. Specifically: - The subscription can be purchased in the app using payment mechanisms other than In-App Purchase. Apps on the United States storefront may link out to the default browser, using buttons, external links, or other calls to action, for payment mechanisms other than in-app purchase. To learn more, see the News post on Apple Developer. For storefronts where there are not alternative options for qualifying apps, the app must use in-app purchase.Next StepsThe paid digital content, services, or subscriptions included in or accessed by the app must be available for purchase in the app using In-App Purchase. If you have any additional information to provide regarding the digital content and services in the app and how the guidelines apply to them, please reply to this message in App Store Connect and let us know. If there is information you'd like us to consider in our review of future submissions, please feel free to include it in the App Review Information section of App Store Connect.Now what I want to do is make sure that when a user clicks to upgrade their subscription, it opens up the browser for stripe instead of the in-app broswer.  CAn you confirm that this method will adhere to their guideline here:  "Apps on the United States storefront may link out to the default browser, using buttons, external links, or other calls to action, for payment mechanisms other than in-app purchase."Show more3:17 PMYes — what you're describing is exactly what Apple is permitting in that quoted exception. Let me break down what's happening here and what you need to do.
+
+The legal backstory (relevant to your decision)
+This exception exists because of the Apple vs. Epic antitrust ruling. Apple was forced to allow US-based apps to link out to external payment processors. This is why that carve-out exists specifically for "Apps on the United States storefront."
+This is exactly the landscape you were researching a few months back — and Stripe is the right call to take advantage of it.
+
+What Apple is permitting vs. what they're rejecting
+MethodAllowed?Stripe checkout opening in default browser (Safari)✅ YesStripe checkout in an in-app browser/webview❌ NoStripe checkout with no disclosure to user❌ NoApple In-App Purchase✅ Always allowed
+The distinction Apple cares most about is default browser vs. in-app webview. You must open Safari (or whatever the user's default browser is) — not a webview inside your app. That's the line.
+
+What you need to implement
+On the technical side in your Replit code, when the upgrade button is tapped, you need:
+javascript// This is the RIGHT way - opens default browser
+window.open('https://your-stripe-checkout-url.com', '_system');
+
+// This is the WRONG way - opens in-app webview
+window.open('https://your-stripe-checkout-url.com', '_blank');
+The _system target is the key difference in a BuildNatively/Cordova-style app. It forces the link to the device's default browser rather than an internal webview.
+
+The disclosure requirement
+Apple also requires you to show a disclosure message before the user leaves the app. It doesn't have to be elaborate, but it needs to be there. Something like:
+"You're about to leave the app and visit an external website to complete your purchase. Apple is not responsible for the privacy or security of payments made on third-party sites."
+A simple modal/alert before the browser opens will satisfy this.
