@@ -137,6 +137,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
                 <p className="font-semibold text-gray-900 mb-3">Company</p>
                 <ul className="space-y-2 text-gray-500">
                   <li><Link href="/about" className="hover:text-gray-900 transition-colors">About</Link></li>
+                  <li><Link href="/support" className="hover:text-gray-900 transition-colors">Support</Link></li>
                   <li><Link href="/privacy-policy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link></li>
                   <li><Link href="/terms-of-service" className="hover:text-gray-900 transition-colors">Terms of Service</Link></li>
                 </ul>

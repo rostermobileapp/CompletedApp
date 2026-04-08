@@ -59,6 +59,7 @@ import CreateCalendarEvent from "@/pages/CreateCalendarEvent";
 import Privacy from "@/pages/Privacy";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
+import Support from "@/pages/Support";
 import StripeAdmin from "@/pages/StripeAdmin";
 import Tournaments from "@/pages/Tournaments";
 import TournamentsLanding from "@/pages/TournamentsLanding";
@@ -180,6 +181,7 @@ function Router() {
           <Route path="/login" component={Login} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/terms-of-service" component={TermsOfService} />
+          <Route path="/support" component={Support} />
           <Route path="/facilities" component={FacilityBrowse} />
           <Route path="/facilities/:id" component={FacilityDetail} />
           <Route component={Landing} />
@@ -275,6 +277,7 @@ function Router() {
               <Route path="/privacy" component={Privacy} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />
+              <Route path="/support" component={Support} />
               <Route path="/admin/stripe" component={StripeAdmin} />
               <Route component={Dashboard} />
             </Switch>
