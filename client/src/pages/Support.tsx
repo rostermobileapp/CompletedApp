@@ -153,24 +153,6 @@ export default function Support() {
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section className="py-16 px-6">
-        <div className="max-w-2xl mx-auto text-center bg-[#3c82f4] rounded-3xl p-12 shadow-xl shadow-blue-200">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-            Still have a question?
-          </h2>
-          <p className="text-blue-100 mb-6">
-            Send us an email and we'll get back to you within one business day.
-          </p>
-          <a
-            href="mailto:roster.mobile.app@gmail.com"
-            className="inline-flex items-center gap-2 bg-white text-[#3c82f4] font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition-colors"
-          >
-            <Mail className="w-4 h-4" />
-            roster.mobile.app@gmail.com
-          </a>
-        </div>
-      </section>
     </MarketingLayout>
   );
 }
