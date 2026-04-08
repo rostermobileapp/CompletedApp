@@ -96,7 +96,7 @@ export default function Support() {
       <section className="py-12 px-6">
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-5">
           <a
-            href="mailto:support@roster-app.com"
+            href="mailto:roster.mobile.app@gmail.com"
             className="flex flex-col items-center text-center gap-3 bg-white border border-gray-200 rounded-3xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all group"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#3c82f4]/10 flex items-center justify-center group-hover:bg-[#3c82f4]/20 transition-colors">
@@ -104,12 +104,12 @@ export default function Support() {
             </div>
             <div>
               <p className="font-semibold text-gray-900 mb-1">Email Support</p>
-              <p className="text-sm text-gray-500">support@roster-app.com</p>
+              <p className="text-sm text-gray-500">roster.mobile.app@gmail.com</p>
             </div>
           </a>
 
           <a
-            href="mailto:feedback@roster-app.com"
+            href="mailto:roster.mobile.app@gmail.com"
             className="flex flex-col items-center text-center gap-3 bg-white border border-gray-200 rounded-3xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all group"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#3c82f4]/10 flex items-center justify-center group-hover:bg-[#3c82f4]/20 transition-colors">
@@ -117,12 +117,12 @@ export default function Support() {
             </div>
             <div>
               <p className="font-semibold text-gray-900 mb-1">Share Feedback</p>
-              <p className="text-sm text-gray-500">feedback@roster-app.com</p>
+              <p className="text-sm text-gray-500">roster.mobile.app@gmail.com</p>
             </div>
           </a>
 
           <a
-            href="mailto:bugs@roster-app.com"
+            href="mailto:roster.mobile.app@gmail.com"
             className="flex flex-col items-center text-center gap-3 bg-white border border-gray-200 rounded-3xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all group"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#3c82f4]/10 flex items-center justify-center group-hover:bg-[#3c82f4]/20 transition-colors">
@@ -130,7 +130,7 @@ export default function Support() {
             </div>
             <div>
               <p className="font-semibold text-gray-900 mb-1">Report a Bug</p>
-              <p className="text-sm text-gray-500">bugs@roster-app.com</p>
+              <p className="text-sm text-gray-500">roster.mobile.app@gmail.com</p>
             </div>
           </a>
         </div>
@@ -163,11 +163,11 @@ export default function Support() {
             Send us an email and we'll get back to you within one business day.
           </p>
           <a
-            href="mailto:support@roster-app.com"
+            href="mailto:roster.mobile.app@gmail.com"
             className="inline-flex items-center gap-2 bg-white text-[#3c82f4] font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition-colors"
           >
             <Mail className="w-4 h-4" />
-            support@roster-app.com
+            roster.mobile.app@gmail.com
           </a>
         </div>
       </section>
