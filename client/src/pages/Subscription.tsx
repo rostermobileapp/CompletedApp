@@ -14,6 +14,7 @@ export default function Subscription() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -115,18 +116,21 @@ export default function Subscription() {
     }
   ];
 
+  const openStripeUrl = (url: string) => {
+    const stripeWindow = window.open(url, '_system');
+    if (!stripeWindow) {
+      window.location.href = url;
+    }
+    setPendingStripeUrl(null);
+    setIsLoading(false);
+  };
+
   const handleManageSubscription = async () => {
     setIsLoading(true);
     try {
       const response = await apiRequest('POST', '/api/stripe/create-portal-session');
       const data = await response.json() as { url: string };
-      
-      // Open billing portal in a new window/tab for better compatibility
-      const stripeWindow = window.open(data.url, '_blank');
-      if (!stripeWindow) {
-        // If popup was blocked, try direct navigation as fallback
-        window.location.href = data.url;
-      }
+      setPendingStripeUrl(data.url);
     } catch (error: any) {
       console.error('Error creating portal session:', error);
       
@@ -187,12 +191,7 @@ export default function Subscription() {
         throw new Error('No checkout URL received from server');
       }
       
-      // Open Stripe Checkout in a new window/tab for better compatibility
-      const stripeWindow = window.open(data.url, '_blank');
-      if (!stripeWindow) {
-        // If popup was blocked, try direct navigation as fallback
-        window.location.href = data.url;
-      }
+      setPendingStripeUrl(data.url);
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
       toast({
@@ -254,6 +253,23 @@ export default function Subscription() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
+      {/* Apple-required disclosure dialog before opening external payment link */}
+      <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>You're leaving the app</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're about to leave the app and visit an external website to complete your purchase. Apple is not responsible for the privacy or security of payments made on third-party sites.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingStripeUrl && openStripeUrl(pendingStripeUrl)}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
