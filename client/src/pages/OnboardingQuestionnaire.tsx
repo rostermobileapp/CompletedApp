@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
@@ -755,6 +756,13 @@ function DemoScreen({
 }
 
 function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () => void }) {
+  const { data: stripePrices } = useQuery<{
+    player_pro_monthly?: { amount: number | null; currency: string | null };
+  }>({ queryKey: ['/api/stripe/prices'] });
+
+  const proAmount = stripePrices?.player_pro_monthly?.amount;
+  const proDisplay = proAmount != null ? `$${proAmount % 1 === 0 ? proAmount : proAmount.toFixed(2)}` : '~$6';
+
   return (
     <div className="pt-8 pb-4">
       <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6" />
@@ -789,7 +797,7 @@ function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () 
               <p className="text-xs text-gray-500">For captains & active players</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-black text-[#3c82f4]">~$6</p>
+              <p className="text-2xl font-black text-[#3c82f4]">{proDisplay}</p>
               <p className="text-xs text-gray-400">/month</p>
             </div>
           </div>
