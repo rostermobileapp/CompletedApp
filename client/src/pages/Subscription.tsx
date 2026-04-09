@@ -1,4 +1,3 @@
-import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle, ShoppingBag, Store } from 'lucide-react';
@@ -15,8 +14,6 @@ import {
   getIosProducts,
   purchaseProduct,
   restorePurchases,
-  getActivePurchases,
-  transactionToRole,
   getAppAccountToken,
   PRODUCT_PLAYER_PRO,
   PRODUCT_COMMISSIONER,

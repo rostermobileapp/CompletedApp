@@ -135,7 +135,7 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 
 ### iOS IAP Dual Subscription Options (Apple compliance)
 - Uses `@capgo/native-purchases` (free, no vendor lock-in) for StoreKit 2 in-app purchases via Capacitor — no RevenueCat required
-- `client/src/hooks/useIosPlatform.ts` — detects iOS (via `window.Capacitor.getPlatform()`) and US region (via device locale/timezone)
+- `client/src/hooks/useIosPlatform.ts` — detects iOS (via `window.Capacitor.getPlatform()`); `isUsRegion` is always `false` on iOS because `@capgo/native-purchases` has no `getStorefront()` API — the safe/compliant default is to hide the Stripe external-link on all iOS devices (future: implement native `SKStorefront.countryCode` bridge to enable US-only Stripe button)
 - `client/src/lib/nativePurchases.ts` — capgo plugin wrapper (billing support check, get products, purchase, restore, active purchase query)
 - `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users, plus "Subscribe with Roster" (Stripe, US region only, Apple-compliant wording); web users see Stripe-only flow unchanged
 - `server/routes.ts` — `POST /api/iap/verify` validates receipts directly with Apple's verifyReceipt API (production + sandbox fallback), maps product IDs to roles, and updates user role in DB
