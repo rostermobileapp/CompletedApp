@@ -270,6 +270,10 @@ export default function OnboardingQuestionnaire() {
         {/* ── SOCIAL PROOF ─────────────────────────────── */}
         {screen === 'social_proof' && (
           <div className="pt-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Here's what they say.</h2>
+            </div>
+
             <div className="space-y-4 mb-8">
               {/* Real testimonial */}
               <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
