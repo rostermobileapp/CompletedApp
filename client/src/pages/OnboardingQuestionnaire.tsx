@@ -353,7 +353,7 @@ export default function OnboardingQuestionnaire() {
                       no_shows: { fix: "Real-time RSVP with attendance tracking.\nPush notifications give players active reminders.", stat: "Teams see 60% fewer game-day no-shows", icon: Calendar },
                       fees_awkward: { fix: "Built-in payment tracking with Venmo & CashApp links", stat: "Captains collect fees in days, not weeks", icon: DollarSign },
                       scattered_info: { fix: "One home for schedules, rosters, stats & chat", stat: "Players stop asking 'what time is the game?'", icon: Zap },
-                      subs_headache: { fix: "Automated sub request tool notifies your whole pool", stat: "Most captains find a sub in under 20 minutes", icon: Users },
+                      subs_headache: { fix: "Automated sub request tool notifies your whole pool", stat: "Most captains find a sub in under 5 minutes", icon: Users },
                       no_visibility: { fix: "Live RSVP dashboard shows who's in, who's out", stat: "Know your lineup 48 hours before every game", icon: Shield },
                     };
                     const sol = solutions[pain.value] || solutions.scattered_info;
