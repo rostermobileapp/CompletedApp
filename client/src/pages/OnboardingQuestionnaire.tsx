@@ -801,7 +801,7 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
           <div className="absolute top-0 right-0 bg-[#3c82f4] text-white text-xs font-bold px-3 py-1 rounded-bl-xl">Most popular</div>
           <div className="flex items-center justify-between mb-2 pr-20">
             <div>
-              <p className="font-bold text-[#3c82f4]">Player Pro</p>
+              <p className="text-[#3c82f4] text-[18px] font-black">Player Pro</p>
               <p className="text-xs text-gray-500">For captains & active players</p>
             </div>
             <div className="text-right">
