@@ -293,7 +293,7 @@ export default function OnboardingQuestionnaire() {
               </div>
 
               {/* Placeholder testimonials */}
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
                 <div className="flex gap-0.5 mb-3">
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
@@ -301,7 +301,7 @@ export default function OnboardingQuestionnaire() {
                   "The substitute player request system is the crown jewel of this app.  This feature alone makes Roster worth it if you are a Captain."
                 </p>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">J</div>
+                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">J</div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">James K.</p>
                     <p className="text-xs text-gray-400">Ohio</p>
@@ -309,7 +309,7 @@ export default function OnboardingQuestionnaire() {
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
                 <div className="flex gap-0.5 mb-3">
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
@@ -317,7 +317,7 @@ export default function OnboardingQuestionnaire() {
                   "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... Roster had us covered."
                 </p>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">J</div>
+                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">B</div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Brian W.</p>
                     <p className="text-xs text-gray-400">Ohio</p>
