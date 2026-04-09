@@ -160,7 +160,7 @@ export default function OnboardingQuestionnaire() {
               🏒 Built for recreational hockey
             </div>
             <h1 className="text-4xl font-black text-gray-900 leading-tight mb-4">
-              Run your team<br />
+              Your team<br />
               <span className="text-[#3c82f4]">without the chaos.</span>
             </h1>
             <p className="text-gray-500 text-lg mb-10 leading-relaxed">
