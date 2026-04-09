@@ -763,10 +763,14 @@ function DemoScreen({
 function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated: boolean; onSignUp: () => void; onSkip: () => void }) {
   const { data: stripePrices } = useQuery<{
     player_pro_monthly?: { amount: number | null; currency: string | null };
+    commissioner_monthly?: { amount: number | null; currency: string | null };
   }>({ queryKey: ['/api/stripe/prices'] });
 
   const proAmount = stripePrices?.player_pro_monthly?.amount;
   const proDisplay = proAmount != null ? `$${proAmount % 1 === 0 ? proAmount : proAmount.toFixed(2)}` : '~$6';
+
+  const commAmount = stripePrices?.commissioner_monthly?.amount;
+  const commDisplay = commAmount != null ? `$${commAmount % 1 === 0 ? commAmount : commAmount.toFixed(2)}` : '~$14';
 
   return (
     <div className="pt-8 pb-4">
@@ -810,6 +814,28 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
             {['Everything in Free', 'Roster & attendance tracking', 'Sub request tool', 'Fee & payment tracking', 'Polls & bulletins', 'Create team events'].map(f => (
               <div key={f} className="flex items-center gap-2 text-xs text-gray-700">
                 <Check className="w-3.5 h-3.5 text-[#3c82f4]" /> {f}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Commissioner */}
+        <div className="rounded-2xl border-2 border-gray-800 bg-gray-900 p-4 relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-gray-700 text-gray-200 text-xs font-bold px-3 py-1 rounded-bl-xl">For leagues</div>
+          <div className="flex items-center justify-between mb-2 pr-24">
+            <div>
+              <p className="font-bold text-white">Commissioner</p>
+              <p className="text-xs text-gray-400">Run a full league or tournament</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-white">{commDisplay}</p>
+              <p className="text-xs text-gray-500">/month</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {['Everything in Player Pro', 'A-Z League Management', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'Tournaments Mode', 'League Drafts'].map(f => (
+              <div key={f} className="flex items-center gap-2 text-xs text-gray-300">
+                <Check className="w-3.5 h-3.5 text-gray-400" /> {f}
               </div>
             ))}
           </div>
