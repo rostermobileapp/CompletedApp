@@ -149,7 +149,6 @@ export default function OnboardingQuestionnaire() {
           </div>
         </div>
       )}
-
       <div className="flex-1 px-5 pb-8">
 
         {/* ── WELCOME ─────────────────────────────────── */}
@@ -272,7 +271,7 @@ export default function OnboardingQuestionnaire() {
         {screen === 'social_proof' && (
           <div className="pt-6">
             <div className="text-center mb-8">
-              <p className="text-4xl font-black text-[#3c82f4] mb-2">1,200+</p>
+              <p className="text-4xl font-black text-[#3c82f4] mb-2">Current Users:</p>
               <h2 className="text-2xl font-black text-gray-900 mb-2">players already use Roster</h2>
               <p className="text-gray-500">Here's what they say.</p>
             </div>
