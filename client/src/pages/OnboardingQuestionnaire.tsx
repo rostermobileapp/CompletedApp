@@ -305,9 +305,9 @@ export default function OnboardingQuestionnaire() {
               </div>
               <div className="space-y-2">
                 {[
-                  { icon: Zap, label: "Sub request tool", detail: "Find a replacement in under 5 minutes" },
-                  { icon: DollarSign, label: "Fee tracking", detail: "Pay dues without the awkward chase" },
-                  { icon: Shield, label: "Polls & bulletins", detail: "Captain-level communication tools" },
+                  { icon: MessageSquare, label: "Unlock full messaging", detail: "DM any player on any team in your league" },
+                  { icon: BarChart2, label: "Unlock full stats", detail: "View stats and trends of any player or team" },
+                  { icon: Trophy, label: "Unlock the Wall", detail: "Post on the Wall for your league" },
                 ].map(({ icon: Icon, label, detail }) => (
                   <div key={label} className="bg-gray-50 rounded-2xl p-4 border border-gray-200 flex items-center gap-3 opacity-70">
                     <div className="bg-blue-50 p-2.5 rounded-xl flex-shrink-0">
