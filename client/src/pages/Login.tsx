@@ -20,6 +20,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
+  const [emailTaken, setEmailTaken] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,7 +49,12 @@ export default function Login() {
         });
         
         if (error) throw error;
-        
+
+        if (data.user && data.user.identities && data.user.identities.length === 0) {
+          setEmailTaken(true);
+          return;
+        }
+
         if (data.user && !data.session) {
           console.log('[Signup] User created but no session - showing verification modal for:', email);
           console.log('[Signup] Setting showVerification to true');
@@ -222,7 +228,7 @@ export default function Login() {
                       type="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); setEmailTaken(false); }}
                       required
                       className="min-h-[44px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500"
                       data-testid="input-email"
@@ -267,6 +273,19 @@ export default function Login() {
                     </div>
                   )}
                   
+                  {emailTaken && (
+                    <div className="rounded-xl bg-red-950/60 border border-red-500/40 px-4 py-3 text-sm">
+                      <p className="text-red-300 font-medium mb-2">An account with this email already exists.</p>
+                      <button
+                        type="button"
+                        onClick={() => { setEmailTaken(false); setIsSignUp(false); }}
+                        className="text-white font-bold underline underline-offset-2 hover:text-red-200 transition-colors"
+                      >
+                        Go to Log In →
+                      </button>
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full min-h-[48px] bg-transparent text-white font-semibold text-base rounded-xl hover:bg-transparent"
