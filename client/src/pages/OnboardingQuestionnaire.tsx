@@ -206,7 +206,7 @@ export default function OnboardingQuestionnaire() {
             </button>
             <button
               onClick={() => navigate('/login')}
-              className="mt-3 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              className="mt-3 w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors"
             >
               Already have an account? Log in
             </button>
