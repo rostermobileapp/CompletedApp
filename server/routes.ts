@@ -2487,6 +2487,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // iOS In-App Purchase verification via RevenueCat REST API
+  // Called after a successful StoreKit purchase to sync the role in our DB
+  app.post('/api/iap/verify', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rcProjectId = process.env.REVENUECAT_PROJECT_ID;
+      const rcSecretKey = process.env.REVENUECAT_SECRET_API_KEY;
+
+      if (!rcProjectId || !rcSecretKey) {
+        return res.status(503).json({ message: 'RevenueCat is not configured on this server' });
+      }
+
+      // Fetch customer info from RevenueCat REST API
+      const rcRes = await fetch(
+        `https://api.revenuecat.com/v2/projects/${rcProjectId}/customers/${encodeURIComponent(userId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${rcSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!rcRes.ok) {
+        const errText = await rcRes.text();
+        console.error('[IAP] RevenueCat customer fetch failed:', rcRes.status, errText);
+        return res.status(502).json({ message: 'Failed to verify purchase with RevenueCat' });
+      }
+
+      const customerData = await rcRes.json() as any;
+      const activeEntitlements: string[] = Object.keys(customerData?.entitlements?.active ?? {});
+
+      // Map entitlements to role — commissioner takes priority
+      let newRole: 'commissioner' | 'player_pro' | null = null;
+      if (activeEntitlements.includes('commissioner')) {
+        newRole = 'commissioner';
+      } else if (activeEntitlements.includes('player_pro')) {
+        newRole = 'player_pro';
+      }
+
+      if (!newRole) {
+        return res.status(200).json({ message: 'No active entitlements found', role: 'free_tier' });
+      }
+
+      // Update user role in DB using raw SQL (same approach as Stripe sync)
+      await db.execute(sql.raw(`
+        UPDATE users
+        SET role = '${newRole}'::user_role,
+            last_updated = NOW(),
+            updated_at = NOW()
+        WHERE id = '${userId}'
+      `));
+
+      // Sync role to Supabase user metadata
+      try {
+        await supabase.auth.admin.updateUserById(userId, {
+          user_metadata: { subscription_tier: newRole }
+        });
+      } catch (supabaseErr) {
+        console.warn('[IAP] Failed to sync Supabase metadata:', supabaseErr);
+      }
+
+      console.log(`[IAP] Verified IAP for user ${userId}: role set to ${newRole}`);
+      res.json({ message: 'IAP verified and role updated', role: newRole });
+    } catch (error: any) {
+      console.error('[IAP] Verification error:', error);
+      res.status(500).json({ message: 'IAP verification failed', error: error.message });
+    }
+  });
+
   // Supabase storage routes for profile images  
   app.post("/api/profile-images/upload", isAuthenticated, async (req: any, res) => {
     try {

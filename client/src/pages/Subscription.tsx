@@ -1,34 +1,62 @@
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle, ShoppingBag, Store } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useIosPlatform } from '@/hooks/useIosPlatform';
+import {
+  initializeRevenueCat,
+  getIosOfferings,
+  purchaseIosPackage,
+  restoreIosPurchases,
+  getActiveEntitlements,
+  entitlementToRole,
+  RC_PACKAGE_PLAYER_PRO,
+  RC_PACKAGE_COMMISSIONER,
+} from '@/lib/revenuecatCapacitor';
+import type { PurchasesPackage } from '@revenuecat/purchases-capacitor';
 
 export default function Subscription() {
+  const { user } = usePermissions();
   const { role } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
+  const [iosOfferings, setIosOfferings] = useState<any>(null);
+  const [rcInitialized, setRcInitialized] = useState(false);
+
+  const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
 
-  // Auto-sync subscription status on page load to ensure role is accurate
+  // Initialize RevenueCat on iOS
+  useEffect(() => {
+    if (!platformReady || !isIos || !user?.id) return;
+    initializeRevenueCat(user.id).then(() => {
+      setRcInitialized(true);
+      return getIosOfferings();
+    }).then((offering) => {
+      if (offering) setIosOfferings(offering);
+    }).catch((err) => {
+      console.warn('[Subscription] RevenueCat init error:', err);
+    });
+  }, [platformReady, isIos, user?.id]);
+
+  // Auto-sync subscription status on page load
   useEffect(() => {
     const syncSubscription = async () => {
       try {
         await apiRequest('POST', '/api/stripe/sync-subscription');
-        // Invalidate user query to refresh role
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       } catch (error) {
-        // Silent fail - sync is best effort
         console.log('Subscription sync check:', error);
       }
     };
@@ -43,7 +71,6 @@ export default function Subscription() {
     commissioner_yearly?: StripePriceEntry;
   };
 
-  // Fetch Stripe price IDs and live amounts from backend
   const { data: stripePrices, isLoading: pricesLoading } = useQuery<StripePricesResponse>({
     queryKey: ['/api/stripe/prices'],
   });
@@ -64,7 +91,7 @@ export default function Subscription() {
       description: "Basic features for casual players",
       features: [
         "Join Leagues / Teams",
-        "Scheduling", 
+        "Scheduling",
         "RSVP Function",
         "Team Only Stats"
       ],
@@ -116,6 +143,7 @@ export default function Subscription() {
     }
   ];
 
+  // --- Stripe helpers ---
   const openStripeUrl = (url: string) => {
     const stripeWindow = window.open(url, '_system');
     if (!stripeWindow) {
@@ -136,98 +164,106 @@ export default function Subscription() {
       const data = await response.json() as { url: string };
       setPendingStripeUrl(data.url);
     } catch (error: any) {
-      console.error('Error creating portal session:', error);
-      
-      // Extract the actual error message from the server response
       let errorMessage = 'Failed to open subscription management. Please try again.';
-      
       if (error.message) {
-        // Parse the error message which is in format "500: {...json...}"
         try {
           const match = error.message.match(/\d+:\s*(.+)/);
           if (match) {
-            const jsonStr = match[1];
-            const errorData = JSON.parse(jsonStr);
-            if (errorData.message) {
-              errorMessage = errorData.message;
-            }
+            const errorData = JSON.parse(match[1]);
+            if (errorData.message) errorMessage = errorData.message;
           }
-        } catch (parseError) {
-          // If parsing fails, use the original error message
+        } catch {
           errorMessage = error.message;
         }
       }
-      
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
       setIsLoading(false);
     }
   };
 
-  const handleUpgradePlan = async (tier: 'player_pro' | 'commissioner') => {
+  const handleStripeUpgrade = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {
-      // Get the correct price ID from the fetched Stripe prices
-      if (!stripePrices) {
-        throw new Error('Pricing information not available. Please try again.');
-      }
-
-      const priceEntry = tier === 'player_pro'
-        ? stripePrices.player_pro_monthly
-        : stripePrices.commissioner_monthly;
-
+      if (!stripePrices) throw new Error('Pricing information not available. Please try again.');
+      const priceEntry = tier === 'player_pro' ? stripePrices.player_pro_monthly : stripePrices.commissioner_monthly;
       const priceId = priceEntry?.id;
-
-      if (!priceId) {
-        throw new Error(`Price not configured for ${tier}. Please contact support.`);
-      }
-
-      const response = await apiRequest('POST', '/api/stripe/create-checkout-session', {
-        priceId,
-      });
-      
+      if (!priceId) throw new Error(`Price not configured for ${tier}. Please contact support.`);
+      const response = await apiRequest('POST', '/api/stripe/create-checkout-session', { priceId });
       const data = await response.json() as { url: string };
-      
-      if (!data.url) {
-        throw new Error('No checkout URL received from server');
-      }
-      
+      if (!data.url) throw new Error('No checkout URL received from server');
       setPendingStripeUrl(data.url);
     } catch (error: any) {
-      console.error('Error creating checkout session:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to start checkout. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
       setIsLoading(false);
     }
   };
 
+  // --- iOS IAP helpers ---
+  const getIosPackage = (tier: 'player_pro' | 'commissioner'): PurchasesPackage | null => {
+    if (!iosOfferings?.availablePackages) return null;
+    const key = tier === 'player_pro' ? RC_PACKAGE_PLAYER_PRO : RC_PACKAGE_COMMISSIONER;
+    return iosOfferings.availablePackages.find((p: PurchasesPackage) => p.identifier === key) ?? null;
+  };
+
+  const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
+    setIsLoading(true);
+    try {
+      const pkg = getIosPackage(tier);
+      if (!pkg) throw new Error('This plan is not available for in-app purchase right now. Please try again later.');
+      const customerInfo = await purchaseIosPackage(pkg);
+      const entitlements = getActiveEntitlements(customerInfo);
+      const newRole = entitlementToRole(entitlements);
+      if (newRole) {
+        const response = await apiRequest('POST', '/api/iap/verify', { rcAppUserId: user?.id });
+        if (!response.ok) throw new Error('Purchase completed but role sync failed. Please restart the app.');
+      }
+      toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      window.location.reload();
+    } catch (error: any) {
+      if (error?.code === 'USER_CANCELLED' || error?.message?.includes('cancel')) {
+        setIsLoading(false);
+        return;
+      }
+      toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
+      setIsLoading(false);
+    }
+  };
+
+  const handleIosRestore = async () => {
+    setIsLoading(true);
+    try {
+      const customerInfo = await restoreIosPurchases();
+      const entitlements = getActiveEntitlements(customerInfo);
+      const newRole = entitlementToRole(entitlements);
+      if (newRole) {
+        await apiRequest('POST', '/api/iap/verify', { rcAppUserId: user?.id });
+        toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
+        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+        window.location.reload();
+      } else {
+        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+      }
+    } catch (error: any) {
+      toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Sync (Stripe fallback for web) ---
   const handleSyncSubscription = async () => {
     setIsLoading(true);
     try {
       const response = await apiRequest('POST', '/api/stripe/sync-subscription');
       const data = await response.json() as { message: string; tier: string };
-      
       toast({
         title: 'Success',
         description: `Your subscription has been synced! You are now on the ${data.tier === 'commissioner' ? 'Commissioner' : 'Player Pro'} tier.`,
       });
-      
-      // Reload the page to update the UI
       window.location.reload();
     } catch (error: any) {
-      console.error('Error syncing subscription:', error);
-      const errorMessage = error.message || 'Failed to sync subscription. Please try again or contact support.';
-      toast({
-        title: 'Sync Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      toast({ title: 'Sync Failed', description: error.message || 'Failed to sync subscription. Please try again or contact support.', variant: 'destructive' });
       setIsLoading(false);
     }
   };
@@ -238,20 +274,13 @@ export default function Subscription() {
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: 'Subscription Cancelled',
-        description: 'Your subscription has been cancelled immediately. You have been moved to the Free Tier.',
-      });
+      toast({ title: 'Subscription Cancelled', description: 'Your subscription has been cancelled immediately. You have been moved to the Free Tier.' });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
     },
     onError: (error: any) => {
-      toast({
-        title: 'Cancellation Failed',
-        description: error.message || 'Failed to cancel subscription. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Cancellation Failed', description: error.message || 'Failed to cancel subscription. Please try again.', variant: 'destructive' });
     },
   });
 
@@ -274,14 +303,12 @@ export default function Subscription() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
-          <button 
-            onClick={() => {
-              setPageTransitionDirection('down');
-              navigate('/profile');
-            }}
+          <button
+            onClick={() => { setPageTransitionDirection('down'); navigate('/profile'); }}
             className="text-muted-foreground"
             data-testid="button-back"
           >
@@ -304,109 +331,118 @@ export default function Subscription() {
                 {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Pro' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-current-plan-price">
-                {isCommissioner
-                  ? `${commMonthlyDisplay}/month`
-                  : isPlayerPlus
-                  ? `${proMonthlyDisplay}/month`
-                  : 'Free forever'}
+                {isCommissioner ? `${commMonthlyDisplay}/month` : isPlayerPlus ? `${proMonthlyDisplay}/month` : 'Free forever'}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              isCommissioner ? 'bg-warning text-black' : 
-              isPlayerPlus ? 'bg-primary text-primary-foreground' : 
+              isCommissioner ? 'bg-warning text-black' :
+              isPlayerPlus ? 'bg-primary text-primary-foreground' :
               'bg-secondary text-secondary-foreground'
             }`}>
               Active
             </span>
           </div>
-          
-          {/* Manage Subscription Button for Paid Users */}
+
+          {/* Manage Subscription for Paid Users */}
           {!isFree && (
             <>
-              <button
-                onClick={handleManageSubscription}
-                disabled={isLoading || cancelSubscriptionMutation.isPending}
-                className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="button-manage-subscription"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    Manage Subscription via Stripe
-                    <ExternalLink className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+              {/* On iOS: subscriptions managed in Settings → Apple ID → Subscriptions */}
+              {isIos ? (
+                <p className="text-sm text-muted-foreground mt-4 text-center">
+                  Manage or cancel your App Store subscription in{' '}
+                  <strong>Settings → Apple ID → Subscriptions</strong>.
+                </p>
+              ) : (
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={isLoading || cancelSubscriptionMutation.isPending}
+                  className="w-full mt-4 bg-primary text-primary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="button-manage-subscription"
+                >
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Loading...</>
+                  ) : (
+                    <>Manage Subscription via Stripe<ExternalLink className="w-4 h-4" /></>
+                  )}
+                </button>
+              )}
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button
-                    disabled={isLoading || cancelSubscriptionMutation.isPending}
-                    className="w-full mt-3 border border-destructive text-destructive rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    data-testid="button-cancel-subscription"
-                  >
-                    {cancelSubscriptionMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Cancelling...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-4 h-4" />
-                        Cancel Subscription
-                      </>
-                    )}
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to cancel your subscription? This will:
-                      <br />• Take effect <strong>immediately</strong> — no waiting until the end of your billing period
-                      <br />• Downgrade your account to the Free Tier right away
-                      <br />• Remove access to all paid features
-                      <br /><br />This action cannot be undone. You would need to re-subscribe to regain access.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => cancelSubscriptionMutation.mutate()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              {/* Cancel — only available via Stripe (non-iOS) */}
+              {!isIos && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      disabled={isLoading || cancelSubscriptionMutation.isPending}
+                      className="w-full mt-3 border border-destructive text-destructive rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-destructive/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="button-cancel-subscription"
                     >
-                      Yes, Cancel Immediately
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      {cancelSubscriptionMutation.isPending ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" />Cancelling...</>
+                      ) : (
+                        <><XCircle className="w-4 h-4" />Cancel Subscription</>
+                      )}
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to cancel your subscription? This will:
+                        <br />• Take effect <strong>immediately</strong> — no waiting until the end of your billing period
+                        <br />• Downgrade your account to the Free Tier right away
+                        <br />• Remove access to all paid features
+                        <br /><br />This action cannot be undone. You would need to re-subscribe to regain access.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => cancelSubscriptionMutation.mutate()}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Yes, Cancel Immediately
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </>
           )}
 
-          {/* Sync Subscription Button for Free Users who might have paid in Stripe */}
+          {/* Sync / Restore */}
           {isFree && (
-            <button
-              onClick={handleSyncSubscription}
-              disabled={isLoading}
-              className="w-full mt-4 bg-secondary text-secondary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="button-sync-subscription"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4" />
-                  Sync Subscription from Stripe
-                </>
+            <div className="flex flex-col gap-2 mt-4">
+              {/* Web: Stripe sync */}
+              {!isIos && (
+                <button
+                  onClick={handleSyncSubscription}
+                  disabled={isLoading}
+                  className="w-full bg-secondary text-secondary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="button-sync-subscription"
+                >
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Syncing...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" />Sync Subscription from Stripe</>
+                  )}
+                </button>
               )}
-            </button>
+              {/* iOS: Restore purchases */}
+              {isIos && (
+                <button
+                  onClick={handleIosRestore}
+                  disabled={isLoading}
+                  className="w-full bg-secondary text-secondary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="button-restore-purchases"
+                >
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Restoring...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" />Restore Purchases</>
+                  )}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -416,11 +452,9 @@ export default function Subscription() {
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
         <div className="space-y-4">
           {subscriptionPlans.map((plan, index) => (
-            <div 
+            <div
               key={plan.name}
-              className={`bg-card rounded-xl border p-6 ${
-                plan.highlight ? 'border-primary' : 'border-border'
-              }`}
+              className={`bg-card rounded-xl border p-6 ${plan.highlight ? 'border-primary' : 'border-border'}`}
               data-testid={`plan-${plan.name.toLowerCase().replace(' ', '-')}`}
             >
               {plan.highlight && (
@@ -429,7 +463,7 @@ export default function Subscription() {
                   <span className="text-primary text-sm font-medium">Recommended</span>
                 </div>
               )}
-              
+
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold" data-testid={`text-plan-name-${index}`}>{plan.name}</h3>
@@ -450,39 +484,72 @@ export default function Subscription() {
                 ))}
               </div>
 
-              <button
-                onClick={() => {
-                  if (plan.current) return;
-                  
-                  // Use button text to determine action:
-                  // "Upgrade Plan" -> Checkout
-                  // "Manage Subscription" -> Portal
-                  if (plan.buttonText === "Upgrade Plan" && plan.tier !== 'free_tier') {
-                    handleUpgradePlan(plan.tier);
-                  } else {
-                    handleManageSubscription();
-                  }
-                }}
-                disabled={plan.buttonDisabled || isLoading || pricesLoading}
-                className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
-                  plan.current
-                    ? 'bg-secondary text-secondary-foreground cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50'
-                }`}
-                data-testid={`button-${plan.tier}`}
-              >
-                {(isLoading || pricesLoading) && !plan.current ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    {plan.buttonText}
-                    {!plan.current && <ExternalLink className="w-4 h-4" />}
-                  </>
-                )}
-              </button>
+              {plan.current ? (
+                <button
+                  disabled
+                  className="w-full py-3 rounded-lg font-semibold bg-secondary text-secondary-foreground cursor-not-allowed"
+                  data-testid={`button-${plan.tier}`}
+                >
+                  Current Plan
+                </button>
+              ) : plan.tier === 'free_tier' ? (
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                  data-testid={`button-${plan.tier}`}
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Manage Subscription
+                </button>
+              ) : isIos ? (
+                /* iOS: show IAP button + optional Stripe button for US */
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
+                    disabled={isLoading || !rcInitialized}
+                    className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                    data-testid={`button-iap-${plan.tier}`}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Store className="w-4 h-4" />
+                    )}
+                    Subscribe via App Store
+                  </button>
+
+                  {isUsRegion && (
+                    <button
+                      onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
+                      disabled={isLoading || pricesLoading}
+                      className="w-full py-3 rounded-lg font-semibold border border-primary text-primary hover:bg-primary/10 disabled:opacity-50 flex items-center justify-center gap-2"
+                      data-testid={`button-stripe-${plan.tier}`}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <ShoppingBag className="w-4 h-4" />
+                      )}
+                      Subscribe with Roster
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* Web / non-iOS: Stripe only */
+                <button
+                  onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
+                  disabled={isLoading || pricesLoading}
+                  className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                  data-testid={`button-${plan.tier}`}
+                >
+                  {(isLoading || pricesLoading) ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Loading...</>
+                  ) : (
+                    <>{plan.buttonText}<ExternalLink className="w-4 h-4" /></>
+                  )}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -494,9 +561,15 @@ export default function Subscription() {
           <p className="text-sm text-muted-foreground">
             * Features coming soon
           </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            All subscription changes are managed securely through Stripe. You can upgrade, downgrade, or cancel your subscription at any time.
-          </p>
+          {isIos ? (
+            <p className="text-sm text-muted-foreground mt-2">
+              In-app purchases are processed securely through the App Store. To manage or cancel, go to <strong>Settings → Apple ID → Subscriptions</strong>.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">
+              All subscription changes are managed securely through Stripe. You can upgrade, downgrade, or cancel your subscription at any time.
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -132,3 +132,19 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 - Progress indicator with step counter and segmented bar
 - Users who completed onboarding are never shown the flow again (checked via `onboardingCompleted` flag)
 - App.tsx intercepts authenticated users with `onboardingCompleted=false` and renders the Onboarding page
+
+### iOS IAP Dual Subscription Options (Apple compliance)
+- Added RevenueCat Capacitor plugin (`@revenuecat/purchases-capacitor`) for iOS in-app purchases via StoreKit
+- `client/src/hooks/useIosPlatform.ts` — detects iOS (via `window.Capacitor.getPlatform()`) and US region (via device locale/timezone)
+- `client/src/lib/revenuecatCapacitor.ts` — client-side RevenueCat wrapper (configure, purchase, restore, get customer info)
+- `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users, plus "Subscribe with Roster" (Stripe) only for US-region iOS users; web users continue to see the Stripe-only flow unchanged
+- `server/routes.ts` — added `POST /api/iap/verify` endpoint: calls RevenueCat REST API to confirm active entitlements and updates user role in DB (same raw SQL approach as Stripe sync)
+- `scripts/seedRevenueCat.ts` — one-time setup script to create RevenueCat project, apps, products, entitlements, and offerings for both Player Pro and Commissioner tiers
+- **RevenueCat credentials NOT yet configured** — the Replit integration was not connected. To activate:
+  1. Get a RevenueCat account and create a project manually, OR run `npx tsx scripts/seedRevenueCat.ts` after setting `REVENUECAT_SECRET_API_KEY`
+  2. Set `VITE_REVENUECAT_IOS_PUBLIC_KEY` = iOS public API key from RevenueCat
+  3. Set `REVENUECAT_PROJECT_ID` = RevenueCat project ID
+  4. Set `REVENUECAT_SECRET_API_KEY` = RevenueCat secret API key (for backend verification)
+  5. In App Store Connect, create product IDs: `com.rosterapp.player_pro_monthly` ($6.49/mo) and `com.rosterapp.commissioner_monthly` ($12.00/mo)
+  6. Sync the Capacitor native plugin into the iOS Xcode project (`npx cap sync ios`)
+- Subscription button copy changed from any "directly" phrasing to "Subscribe with Roster" (Apple-safe per EP v. Apple compliance analysis)
