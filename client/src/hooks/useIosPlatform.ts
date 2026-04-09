@@ -43,7 +43,8 @@ export function useIosPlatform(): IosPlatformInfo {
 
   useEffect(() => {
     const platform = getCapacitorPlatform();
-    const isIos = platform === 'ios';
+    const previewIos = new URLSearchParams(window.location.search).get('ios') === '1';
+    const isIos = platform === 'ios' || previewIos;
     // Always false on iOS — see comment on isUsRegion above.
     // Web non-iOS does not show this path at all (web uses Stripe directly).
     const isUsRegion = false;
