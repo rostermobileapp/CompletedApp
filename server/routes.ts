@@ -2492,78 +2492,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/iap/verify', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { receipt, jwsRepresentation, transactionId, productId, restore } = req.body;
+      const { receipt } = req.body;
 
-      if (!receipt && !jwsRepresentation) {
-        return res.status(400).json({ message: 'Missing receipt or JWS representation' });
+      // receipt is required — we never trust client-supplied productId for role assignment
+      if (!receipt || typeof receipt !== 'string' || receipt.trim().length === 0) {
+        return res.status(400).json({ message: 'Missing receipt' });
       }
 
-      // Product ID → role mapping
+      // Product ID → role mapping (server-side truth only)
       const PRODUCT_ROLES: Record<string, 'commissioner' | 'player_pro'> = {
         'com.rosterapp.commissioner_monthly': 'commissioner',
         'com.rosterapp.player_pro_monthly': 'player_pro',
       };
 
-      let newRole: 'commissioner' | 'player_pro' | null = null;
+      // Validate receipt with Apple (try production first, fall back to sandbox)
+      const validateWithApple = async (url: string, receiptData: string) => {
+        const appleRes = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'receipt-data': receiptData,
+            password: process.env.APPLE_SHARED_SECRET ?? '',
+          }),
+        });
+        return appleRes.json() as Promise<any>;
+      };
 
-      // If productId is provided and maps to a role, use it directly after Apple validation
-      if (productId && PRODUCT_ROLES[productId]) {
-        newRole = PRODUCT_ROLES[productId];
+      let appleData = await validateWithApple('https://buy.itunes.apple.com/verifyReceipt', receipt);
+
+      // Status 21007 means sandbox receipt sent to production — retry with sandbox
+      if (appleData.status === 21007) {
+        appleData = await validateWithApple('https://sandbox.itunes.apple.com/verifyReceipt', receipt);
       }
 
-      // Validate receipt with Apple (try production first, fall back to sandbox)
-      if (receipt) {
-        const validateWithApple = async (url: string, receiptData: string) => {
-          const appleRes = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              'receipt-data': receiptData,
-              password: process.env.APPLE_SHARED_SECRET ?? '',
-            }),
-          });
-          return appleRes.json() as Promise<any>;
-        };
+      if (appleData.status !== 0) {
+        console.warn('[IAP] Apple receipt validation failed, status:', appleData.status);
+        return res.status(402).json({ message: 'Apple could not verify this receipt', appleStatus: appleData.status });
+      }
 
-        let appleData = await validateWithApple('https://buy.itunes.apple.com/verifyReceipt', receipt);
+      // Extract role from Apple's authoritative response only — never from client-supplied data
+      const latestReceiptInfo: any[] = appleData.latest_receipt_info ?? [];
+      const now = Date.now();
+      const activeReceipts = latestReceiptInfo.filter((r: any) => {
+        const expiresMs = parseInt(r.expires_date_ms ?? '0', 10);
+        return expiresMs > now;
+      });
 
-        // Status 21007 means sandbox receipt sent to production — retry with sandbox
-        if (appleData.status === 21007) {
-          appleData = await validateWithApple('https://sandbox.itunes.apple.com/verifyReceipt', receipt);
-        }
+      // Sort by expiry descending to get the most recent active subscription
+      activeReceipts.sort((a: any, b: any) =>
+        parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10)
+      );
 
-        if (appleData.status !== 0) {
-          console.warn('[IAP] Apple receipt validation failed, status:', appleData.status);
-          // For restore flows, still allow if we have a productId we trust
-          if (!restore || !newRole) {
-            return res.status(402).json({ message: 'Apple could not verify this receipt', appleStatus: appleData.status });
-          }
-        } else {
-          // Extract latest active subscription from receipt
-          const latestReceiptInfo: any[] = appleData.latest_receipt_info ?? [];
-          const now = Date.now();
-          const activeReceipts = latestReceiptInfo.filter((r: any) => {
-            const expiresMs = parseInt(r.expires_date_ms ?? '0', 10);
-            return expiresMs > now;
-          });
-
-          if (activeReceipts.length > 0) {
-            // Sort by expiry descending to get the latest
-            activeReceipts.sort((a: any, b: any) =>
-              parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10)
-            );
-            const activeProduct = activeReceipts[0].product_id;
-            if (PRODUCT_ROLES[activeProduct]) {
-              newRole = PRODUCT_ROLES[activeProduct];
-            }
-          } else if (!restore) {
-            return res.status(402).json({ message: 'No active subscription found in receipt', role: 'free_tier' });
-          }
-        }
+      // commissioner takes priority if present in any active subscription
+      let newRole: 'commissioner' | 'player_pro' | null = null;
+      for (const r of activeReceipts) {
+        const mapped = PRODUCT_ROLES[r.product_id];
+        if (mapped === 'commissioner') { newRole = 'commissioner'; break; }
+        if (mapped === 'player_pro' && newRole !== 'commissioner') newRole = 'player_pro';
       }
 
       if (!newRole) {
-        return res.status(200).json({ message: 'No active entitlements found', role: 'free_tier' });
+        return res.status(200).json({ message: 'No active subscription found in receipt', role: 'free_tier' });
       }
 
       // Update user role in DB (same raw SQL approach as Stripe sync)

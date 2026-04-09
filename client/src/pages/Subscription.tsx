@@ -213,12 +213,13 @@ export default function Subscription() {
       const productId = tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER;
       const transaction = await purchaseProduct(productId);
 
-      // Send receipt to backend for verification and role update
+      if (!transaction.receipt) {
+        throw new Error('No receipt returned from App Store. Please try again.');
+      }
+
+      // Send only the Apple receipt to backend — role is determined server-side from Apple's response
       const response = await apiRequest('POST', '/api/iap/verify', {
         receipt: transaction.receipt,
-        jwsRepresentation: transaction.jwsRepresentation,
-        transactionId: transaction.transactionId,
-        productId: transaction.productIdentifier,
       });
 
       if (!response.ok) throw new Error('Purchase completed but role sync failed. Please restart the app.');
@@ -250,14 +251,16 @@ export default function Subscription() {
         return;
       }
 
-      // Send the first valid receipt to backend for verification
-      const latest = purchases[0];
+      // Find a purchase with a receipt and send it to backend for Apple validation
+      const withReceipt = purchases.find((p) => p.receipt);
+      if (!withReceipt?.receipt) {
+        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        setIsLoading(false);
+        return;
+      }
+
       const response = await apiRequest('POST', '/api/iap/verify', {
-        receipt: latest.receipt,
-        jwsRepresentation: latest.jwsRepresentation,
-        transactionId: latest.transactionId,
-        productId: latest.productIdentifier,
-        restore: true,
+        receipt: withReceipt.receipt,
       });
 
       if (response.ok) {
