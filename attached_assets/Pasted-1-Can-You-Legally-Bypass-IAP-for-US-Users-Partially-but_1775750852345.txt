@@ -1,0 +1,30 @@
+1. Can You Legally Bypass IAP for US Users?
+Partially — but not entirely. The ruling and guideline 3.1.3 work together like this:
+
+US users can be directed to an external payment link (Stripe) — you're doing this correctly
+BUT Apple's current enforcement position (as noted in their rejection message) is that you must also offer IAP in addition to the external link, not instead of it
+The only exception right now is "reader apps" (Spotify, Netflix, Kindle-type apps that let users access content purchased elsewhere). A hockey league management app almost certainly doesn't qualify as a reader app under Apple's definition
+
+The guideline 3.1.1(a) they cite says apps "may link out" — the word "may" means it's permitted in addition to IAP, not as a replacement. The RevenueCat analysis from May 2025 confirmed exactly this: most apps that passed review without IAP during the initial chaos after the ruling were expected to get rejected on their next update.
+Bottom line: You need to implement StoreKit IAP and keep the Stripe external link. Users get both options, Apple gets their cut on the IAP path, and users who choose the Stripe path = no Apple fee.
+
+2. Canada: Do You Need StoreKit?
+Yes. The external link exemption is currently US storefront only. The Epic v. Apple ruling was a US federal court order and only compelled Apple to change its rules for the US App Store. Canada still falls under Apple's traditional rules — IAP is mandatory for digital subscriptions sold there.
+Your options for Canada:
+
+Implement IAP and it covers Canada (and every other non-US market)
+Or restrict the app to US only, but that's probably not what you want
+
+
+How to Proceed
+The path forward is clear: implement StoreKit IAP alongside your existing Stripe flow. Here's the game plan:
+What to build:
+
+IAP products in App Store Connect matching your tiers ($6.49/mo Player Pro, $12/mo Commissioner)
+StoreKit purchase flow in your app for each tier
+On the subscription management screen, offer both buttons — "Subscribe via App Store" (IAP) and "Subscribe via Stripe" (external link, US only)
+For non-US users, show only the IAP option
+
+What to reply to Apple:
+Tell them you're adding IAP as an additional purchase option alongside the external link per guideline 3.1.1(a), and ask for a brief extension or resubmission window. Keep it short and factual.
+The silver lining: US users who convert through Stripe still save you the 15–30% Apple cut. You're not losing the Stripe flow — you're just adding IAP as the parallel path to satisfy Apple and serve non-US markets.
