@@ -2492,7 +2492,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/iap/verify', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { receipt, appAccountToken } = req.body;
+      const { receipt } = req.body;
+      // Note: any client-supplied appAccountToken is intentionally ignored;
+      // only Apple's receipt payload is authoritative for account binding.
 
       // receipt is required — we never trust client-supplied productId for role assignment
       if (!receipt || typeof receipt !== 'string' || receipt.trim().length === 0) {
@@ -2543,39 +2545,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10)
       );
 
-      // Verify appAccountToken binding using Apple's authoritative receipt data:
-      // - Compute expected token server-side (same UUID v5 derivation as client)
-      // - Also check Apple's returned app_account_token in latest_receipt_info
-      // This ensures the receipt was purchased by this exact app user.
+      // Enforce receipt-to-account binding via Apple's authoritative app_account_token.
+      // This field is set by the client during purchaseProduct() as a UUID v5 derived
+      // from userId, and Apple cryptographically includes it in the signed receipt.
+      // We verify it here using only Apple's receipt data — client-supplied values
+      // are never treated as authorization evidence.
       {
         const { v5: uuidv5 } = await import('uuid');
         const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
         const expectedToken = uuidv5(userId, APP_NAMESPACE).toLowerCase();
 
-        // Extract Apple's app_account_token from active receipt entries
+        // Extract app_account_token from Apple's receipt response (authoritative source)
         const appleTokens = activeReceipts
           .map((r: any) => (r.app_account_token ?? '').toLowerCase())
           .filter(Boolean);
 
         if (appleTokens.length > 0) {
-          // Apple has a token in the receipt — verify it matches this user
-          const tokenMatchesApple = appleTokens.includes(expectedToken);
-          if (!tokenMatchesApple) {
-            console.warn('[IAP] Apple app_account_token mismatch — receipt replay attempt blocked', { userId });
+          // Apple has a token — it MUST match this user; reject on any mismatch
+          if (!appleTokens.includes(expectedToken)) {
+            console.warn('[IAP] Apple app_account_token mismatch — receipt replay blocked', { userId });
             return res.status(403).json({ message: 'Purchase does not belong to this account' });
           }
-        } else if (appAccountToken && typeof appAccountToken === 'string') {
-          // Apple receipt has no token (older purchase without appAccountToken),
-          // fall back to verifying client-supplied token matches expected
-          if (appAccountToken.toLowerCase() !== expectedToken) {
-            console.warn('[IAP] appAccountToken mismatch — possible receipt replay', { userId });
-            return res.status(403).json({ message: 'Purchase does not belong to this account' });
-          }
-        }
-        // If neither Apple nor client provides a token, allow (backwards-compatible
-        // for receipts predating the appAccountToken feature) — log for monitoring
-        if (appleTokens.length === 0 && !appAccountToken) {
-          console.log('[IAP] No appAccountToken in receipt or request — unbound purchase accepted', { userId });
+        } else {
+          // Apple receipt has no app_account_token.
+          // This can happen for purchases made before appAccountToken was implemented,
+          // or for sandbox test transactions without a token set.
+          // We reject to enforce binding — new purchases always include this token.
+          console.warn('[IAP] No app_account_token in Apple receipt — binding cannot be verified', { userId });
+          return res.status(403).json({ message: 'Receipt cannot be bound to an account — please re-purchase or contact support' });
         }
       }
 

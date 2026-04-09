@@ -9,6 +9,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
+import type { Product } from '@capgo/native-purchases';
 import {
   isBillingSupported,
   getIosProducts,
@@ -29,7 +30,7 @@ export default function Subscription() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
   const [iapReady, setIapReady] = useState(false);
-  const [iosProducts, setIosProducts] = useState<any[]>([]);
+  const [iosProducts, setIosProducts] = useState<Product[]>([]);
 
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
@@ -85,10 +86,10 @@ export default function Subscription() {
   const commMonthlyDisplay = formatPrice(stripePrices?.commissioner_monthly) ?? '...';
 
   const getIosPrice = (productId: string): string => {
-    const product = iosProducts.find((p) => p.productIdentifier === productId);
+    const product = iosProducts.find((p: Product) => p.productIdentifier === productId);
     if (!product) return '...';
     if (product.priceString) return product.priceString;
-    if (product.price != null) return `$${Number(product.price).toFixed(2)}`;
+    if (product.price != null) return `$${product.price.toFixed(2)}`;
     return '...';
   };
 
