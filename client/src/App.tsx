@@ -211,6 +211,11 @@ function Router() {
     return <Onboarding />;
   }
 
+  // Render get-started questionnaire without the app shell (no nav bar, no slide menus)
+  if (location === '/get-started') {
+    return <OnboardingQuestionnaire />;
+  }
+
   return (
     <PermissionProvider>
       <SlideUpOverlayProvider>
@@ -222,7 +227,6 @@ function Router() {
         <SwipeableMainScreens>
           <PageTransition>
               <Switch>
-              <Route path="/get-started" component={OnboardingQuestionnaire} />
               <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
               <Route path="/league-search" component={LeagueSearch} />
               <Route path="/team-search" component={TeamSearch} />
