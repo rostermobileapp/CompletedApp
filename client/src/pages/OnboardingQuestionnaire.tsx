@@ -73,7 +73,6 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 export default function OnboardingQuestionnaire() {
   const [, navigate] = useLocation();
   const [screen, setScreen] = useState<Screen>('welcome');
-  const [stepIndex, setStepIndex] = useState(0);
   const [state, setState] = useState<QuestionnaireState>({
     goal: '',
     pains: [],
@@ -104,7 +103,6 @@ export default function OnboardingQuestionnaire() {
 
   function goTo(s: Screen) {
     setScreen(s);
-    setStepIndex(SCREEN_ORDER.indexOf(s));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
