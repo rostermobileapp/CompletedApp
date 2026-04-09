@@ -7,8 +7,7 @@ import { ObjectUploader } from '@/components/ObjectUploader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, Camera, Check, Users, Shield, Trophy, Calendar } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check } from 'lucide-react';
 import rosterLogo from '@assets/Untitled_design_(42)_1771448459349.png';
 
 const TIMEZONE_OPTIONS = [
@@ -40,13 +39,7 @@ const COMPETITIVE_LEVELS = [
   { value: 'Pro', label: 'Pro' },
 ];
 
-const USE_CASE_OPTIONS = [
-  { value: 'join_team', label: 'Join a Team/League', icon: Users, description: 'Find and join existing teams in your area' },
-  { value: 'manage_team', label: 'Create & Manage a Team', icon: Shield, description: 'Start your own team and invite players' },
-  { value: 'manage_league', label: 'Create & Manage a League', icon: Trophy, description: 'Organize leagues, schedule games, and manage teams' },
-];
-
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 
 interface OnboardingData {
   firstName: string;
@@ -59,7 +52,6 @@ interface OnboardingData {
   cashappUsername: string;
   city: string;
   competitiveLevel: string;
-  rosterUseCase: string;
 }
 
 export default function Onboarding() {
@@ -78,7 +70,6 @@ export default function Onboarding() {
     cashappUsername: '',
     city: '',
     competitiveLevel: '',
-    rosterUseCase: '',
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -103,9 +94,6 @@ export default function Onboarding() {
     }
     if (currentStep === 2) {
       return formData.timezone !== '' && formData.competitiveLevel !== '';
-    }
-    if (currentStep === 3) {
-      return formData.rosterUseCase !== '';
     }
     return true;
   };
@@ -153,13 +141,12 @@ export default function Onboarding() {
         cashappUsername: formData.cashappUsername || null,
         city: formData.city || null,
         competitiveLevel: formData.competitiveLevel,
-        rosterUseCase: formData.rosterUseCase,
         onboardingCompleted: true,
-        onboardingProgress: { step: 4, completed: true },
+        onboardingProgress: { step: 3, completed: true },
       });
       queryClient.setQueryData(['/api/user'], (old: any) => ({ ...(old || {}), onboardingCompleted: true }));
       toast({ title: 'Welcome to Roster!', description: 'Your profile has been set up successfully.' });
-      navigate('/');
+      navigate('/get-started');
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to complete onboarding. Please try again.', variant: 'destructive' });
     }
@@ -213,13 +200,7 @@ export default function Onboarding() {
             updateField={updateField}
           />
         )}
-        {currentStep === 3 && (
-          <StepUseCase
-            formData={formData}
-            updateField={updateField}
-          />
-        )}
-        {currentStep === 4 && <StepAbout />}
+        {currentStep === 3 && <StepAbout />}
       </div>
 
       <div className="px-6 pb-8 pt-4 border-t border-zinc-800">
@@ -442,60 +423,6 @@ function StepAdditionalInfo({
             className="mt-1.5 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600 h-12"
           />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function StepUseCase({
-  formData,
-  updateField,
-}: {
-  formData: OnboardingData;
-  updateField: (field: keyof OnboardingData, value: string) => void;
-}) {
-  return (
-    <div className="space-y-6 pt-4">
-      <div>
-        <h1 className="text-2xl font-bold">How do you plan to use Roster?</h1>
-        <p className="text-zinc-400 mt-1">Select the option that best describes you</p>
-      </div>
-
-      <div className="space-y-3">
-        {USE_CASE_OPTIONS.map((option) => {
-          const isSelected = formData.rosterUseCase === option.value;
-          const Icon = option.icon;
-          return (
-            <button
-              key={option.value}
-              onClick={() => updateField('rosterUseCase', option.value)}
-              className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 ${
-                isSelected
-                  ? 'border-white bg-white/10'
-                  : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  isSelected ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400'
-                }`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className={`font-semibold text-base ${isSelected ? 'text-white' : 'text-zinc-200'}`}>
-                    {option.label}
-                  </h3>
-                  <p className="text-sm text-zinc-500 mt-0.5">{option.description}</p>
-                </div>
-                {isSelected && (
-                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0 mt-1">
-                    <Check className="w-4 h-4 text-black" />
-                  </div>
-                )}
-              </div>
-            </button>
-          );
-        })}
       </div>
     </div>
   );

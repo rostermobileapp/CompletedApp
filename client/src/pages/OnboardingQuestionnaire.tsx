@@ -83,6 +83,8 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 
 export default function OnboardingQuestionnaire() {
   const [, navigate] = useLocation();
+  const { data: userData } = useQuery<{ id?: string }>({ queryKey: ['/api/user'] });
+  const isAuthenticated = !!userData?.id;
   const [screen, setScreen] = useState<Screen>('welcome');
   const [state, setState] = useState<QuestionnaireState>({
     goal: '',
@@ -205,12 +207,14 @@ export default function OnboardingQuestionnaire() {
             >
               Get Started — It's Free
             </button>
-            <button
-              onClick={() => navigate('/login')}
-              className="mt-3 w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors"
-            >
-              Already have an account? Log in
-            </button>
+            {!isAuthenticated && (
+              <button
+                onClick={() => navigate('/login')}
+                className="mt-3 w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors"
+              >
+                Already have an account? Log in
+              </button>
+            )}
           </div>
         )}
 
@@ -616,7 +620,8 @@ export default function OnboardingQuestionnaire() {
         {/* ── PAYWALL ──────────────────────────────────── */}
         {screen === 'paywall' && (
           <PaywallScreen
-            onSignUp={() => navigate('/login')}
+            isAuthenticated={isAuthenticated}
+            onSignUp={() => navigate(isAuthenticated ? '/' : '/login')}
             onSkip={() => navigate('/login')}
           />
         )}
@@ -755,7 +760,7 @@ function DemoScreen({
   );
 }
 
-function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () => void }) {
+function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated: boolean; onSignUp: () => void; onSkip: () => void }) {
   const { data: stripePrices } = useQuery<{
     player_pro_monthly?: { amount: number | null; currency: string | null };
   }>({ queryKey: ['/api/stripe/prices'] });
@@ -819,7 +824,7 @@ function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () 
         onClick={onSignUp}
         className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors shadow-lg shadow-blue-200"
       >
-        Create My Free Account
+        {isAuthenticated ? 'Go to my dashboard →' : 'Create My Free Account'}
       </button>
     </div>
   );
