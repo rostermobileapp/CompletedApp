@@ -271,7 +271,6 @@ export default function OnboardingQuestionnaire() {
         {screen === 'social_proof' && (
           <div className="pt-6">
             <div className="text-center mb-8">
-              <p className="text-4xl font-black text-[#3c82f4] mb-2">Current Users:</p>
               <h2 className="text-2xl font-black text-gray-900 mb-2">Here's what they say.</h2>
             </div>
 
