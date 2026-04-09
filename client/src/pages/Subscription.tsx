@@ -559,7 +559,7 @@ export default function Subscription() {
                       ) : (
                         <span className="flex items-center gap-2">
                           <span>Subscribe via</span>
-                          <img src={rosterLogo} alt="Roster" className="h-5 object-contain" />
+                          <img src={rosterLogo} alt="Roster" className="h-6 object-contain" />
                         </span>
                       )}
                     </button>
