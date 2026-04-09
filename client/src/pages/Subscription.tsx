@@ -29,7 +29,7 @@ export default function Subscription() {
   const [iapReady, setIapReady] = useState(false);
   const [iosProducts, setIosProducts] = useState<Product[]>([]);
 
-  const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
+  const { isIos, isReady: platformReady } = useIosPlatform();
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -544,7 +544,7 @@ export default function Subscription() {
                   </button>
                 )
               ) : isIos ? (
-                /* iOS: show IAP button + optional Stripe button for US */
+                /* iOS: show both IAP and Stripe buttons */
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
@@ -560,21 +560,19 @@ export default function Subscription() {
                     Subscribe via App Store
                   </button>
 
-                  {isUsRegion && (
-                    <button
-                      onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
-                      disabled={isLoading || pricesLoading}
-                      className="w-full py-3 rounded-lg font-semibold border border-primary text-primary hover:bg-primary/10 disabled:opacity-50 flex items-center justify-center gap-2"
-                      data-testid={`button-stripe-${plan.tier}`}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <ShoppingBag className="w-4 h-4" />
-                      )}
-                      Subscribe with Roster
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
+                    disabled={isLoading || pricesLoading}
+                    className="w-full py-3 rounded-lg font-semibold border border-primary text-primary hover:bg-primary/10 disabled:opacity-50 flex items-center justify-center gap-2"
+                    data-testid={`button-stripe-${plan.tier}`}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ShoppingBag className="w-4 h-4" />
+                    )}
+                    Subscribe with Roster
+                  </button>
                 </div>
               ) : (
                 /* Web / non-iOS: Stripe only */
