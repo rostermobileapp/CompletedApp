@@ -115,6 +115,12 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
   - Comment input for Player Pro or Commissioner tier users
   - Comment counts are included in announcement list API responses
 
+### Claude Code Skill: App Onboarding Questionnaire
+- Added `github:adamlyttleapps/claude-skill-app-onboarding-questionnaire` as a project-level Claude Code skill dependency in `.claude/settings.json`
+- The full skill definition is installed at `.local/skills/app-onboarding-questionnaire/SKILL.md` (force-tracked in git since `.local/` is system-gitignored)
+- When invoked, the skill analyzes the codebase and guides creation of a high-converting multi-screen onboarding flow (up to 14 screens following Noom/Duolingo conversion psychology)
+- Note: `.local/` is excluded by `/etc/.gitignore`; to reinstall the skill in a fresh environment, run: `curl -s https://raw.githubusercontent.com/adamlyttleapps/claude-skill-app-onboarding-questionnaire/main/SKILL.md -o .local/skills/app-onboarding-questionnaire/SKILL.md`
+
 ### Multi-Step Onboarding Flow
 - Added a 4-screen onboarding flow for new users after account creation
 - Screen 1: Basic info (first name, last name, phone, DOB, profile photo upload)
