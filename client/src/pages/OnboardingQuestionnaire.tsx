@@ -759,11 +759,6 @@ function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () 
     <div className="pt-8 pb-4">
       <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6" />
 
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-black text-gray-900 mb-2">Your team is set up.</h2>
-        <p className="text-gray-500">Create a free account to keep it and get full access.</p>
-      </div>
-
       {/* Plans */}
       <div className="space-y-3 mb-6">
 
