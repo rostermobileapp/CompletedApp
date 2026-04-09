@@ -529,15 +529,22 @@ export default function Subscription() {
                   Current Plan
                 </button>
               ) : plan.tier === 'free_tier' ? (
-                <button
-                  onClick={handleManageSubscription}
-                  disabled={isLoading}
-                  className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
-                  data-testid={`button-${plan.tier}`}
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Manage Subscription
-                </button>
+                /* Paid user viewing Free Tier card — manage via platform-appropriate path */
+                isIos ? (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    Manage via <strong>Settings → Apple ID → Subscriptions</strong>
+                  </p>
+                ) : (
+                  <button
+                    onClick={handleManageSubscription}
+                    disabled={isLoading}
+                    className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                    data-testid={`button-${plan.tier}`}
+                  >
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Manage Subscription
+                  </button>
+                )
               ) : isIos ? (
                 /* iOS: show IAP button + optional Stripe button for US */
                 <div className="flex flex-col gap-2">

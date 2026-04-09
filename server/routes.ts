@@ -2543,15 +2543,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10)
       );
 
-      // Verify appAccountToken binding when present: compute expected token server-side
-      // using same UUID v5 derivation as the client to ensure receipt belongs to this user
-      if (appAccountToken && typeof appAccountToken === 'string') {
+      // Verify appAccountToken binding using Apple's authoritative receipt data:
+      // - Compute expected token server-side (same UUID v5 derivation as client)
+      // - Also check Apple's returned app_account_token in latest_receipt_info
+      // This ensures the receipt was purchased by this exact app user.
+      {
         const { v5: uuidv5 } = await import('uuid');
         const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-        const expectedToken = uuidv5(userId, APP_NAMESPACE);
-        if (appAccountToken.toLowerCase() !== expectedToken.toLowerCase()) {
-          console.warn('[IAP] appAccountToken mismatch — possible receipt replay attempt', { userId });
-          return res.status(403).json({ message: 'Purchase does not belong to this account' });
+        const expectedToken = uuidv5(userId, APP_NAMESPACE).toLowerCase();
+
+        // Extract Apple's app_account_token from active receipt entries
+        const appleTokens = activeReceipts
+          .map((r: any) => (r.app_account_token ?? '').toLowerCase())
+          .filter(Boolean);
+
+        if (appleTokens.length > 0) {
+          // Apple has a token in the receipt — verify it matches this user
+          const tokenMatchesApple = appleTokens.includes(expectedToken);
+          if (!tokenMatchesApple) {
+            console.warn('[IAP] Apple app_account_token mismatch — receipt replay attempt blocked', { userId });
+            return res.status(403).json({ message: 'Purchase does not belong to this account' });
+          }
+        } else if (appAccountToken && typeof appAccountToken === 'string') {
+          // Apple receipt has no token (older purchase without appAccountToken),
+          // fall back to verifying client-supplied token matches expected
+          if (appAccountToken.toLowerCase() !== expectedToken) {
+            console.warn('[IAP] appAccountToken mismatch — possible receipt replay', { userId });
+            return res.status(403).json({ message: 'Purchase does not belong to this account' });
+          }
+        }
+        // If neither Apple nor client provides a token, allow (backwards-compatible
+        // for receipts predating the appAccountToken feature) — log for monitoring
+        if (appleTokens.length === 0 && !appAccountToken) {
+          console.log('[IAP] No appAccountToken in receipt or request — unbound purchase accepted', { userId });
         }
       }
 
