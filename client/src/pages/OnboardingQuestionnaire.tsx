@@ -165,7 +165,7 @@ export default function OnboardingQuestionnaire() {
         {/* ── WELCOME ─────────────────────────────────── */}
         {screen === 'welcome' && (
           <div className="flex flex-col items-center text-center pt-12 pb-4">
-            <img src={rosterLightLogo} alt="Roster" className="h-12 object-contain mb-8" />
+            <img src={rosterLightLogo} alt="Roster" className="h-[72px] object-contain mb-8" />
             <div className="inline-flex items-center gap-2 bg-blue-50 text-[#3c82f4] text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
               🏒 Built for recreational hockey
             </div>
