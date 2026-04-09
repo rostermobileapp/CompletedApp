@@ -820,7 +820,7 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
 
         {/* Commissioner */}
         <div className="rounded-2xl border-2 border-gray-800 p-4 relative overflow-hidden bg-[#3c82f4]">
-          <div className="absolute top-0 right-0 bg-gray-700 text-gray-200 text-xs font-bold px-3 py-1 rounded-bl-xl">For leagues</div>
+          <div className="absolute top-0 right-0 bg-gray-700 text-[#ffffff] text-xs font-bold px-3 py-1 rounded-bl-xl">For leagues</div>
           <div className="flex items-center justify-between mb-2 pr-24">
             <div>
               <p className="font-bold text-white">Commissioner</p>
@@ -828,13 +828,13 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
             </div>
             <div className="text-right">
               <p className="text-2xl font-black text-white">{commDisplay}</p>
-              <p className="text-xs text-gray-500">/month</p>
+              <p className="text-xs text-[#ffffff]">/month</p>
             </div>
           </div>
           <div className="space-y-1">
             {['Everything in Player Pro', 'A-Z League Management', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'Tournaments Mode', 'League Drafts'].map(f => (
               <div key={f} className="flex items-center gap-2 text-xs text-[#ffffff]">
-                <Check className="w-3.5 h-3.5 text-gray-400" /> {f}
+                <Check className="w-3.5 h-3.5 text-[#ffffff]" /> {f}
               </div>
             ))}
           </div>
