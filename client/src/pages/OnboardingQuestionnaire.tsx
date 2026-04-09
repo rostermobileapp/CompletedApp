@@ -350,7 +350,7 @@ export default function OnboardingQuestionnaire() {
                 ? selectedPains.slice(0, 4).map(pain => {
                     const solutions: Record<string, { fix: string; stat: string; icon: typeof Calendar }> = {
                       group_texts: { fix: "One app for everything — schedule, RSVP, chat", stat: "Players respond 4x faster in-app vs group text", icon: MessageSquare },
-                      no_shows: { fix: "Real-time RSVP with attendance tracking", stat: "Teams see 60% fewer game-day no-shows", icon: Calendar },
+                      no_shows: { fix: "Real-time RSVP with attendance tracking.\nPush notifications give players active reminders.", stat: "Teams see 60% fewer game-day no-shows", icon: Calendar },
                       fees_awkward: { fix: "Built-in payment tracking with Venmo & CashApp links", stat: "Captains collect fees in days, not weeks", icon: DollarSign },
                       scattered_info: { fix: "One home for schedules, rosters, stats & chat", stat: "Players stop asking 'what time is the game?'", icon: Zap },
                       subs_headache: { fix: "Automated sub request tool notifies your whole pool", stat: "Most captains find a sub in under 20 minutes", icon: Users },
@@ -366,7 +366,7 @@ export default function OnboardingQuestionnaire() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-400 mb-0.5 line-through">{pain.label}</p>
-                            <p className="font-bold text-gray-900 text-sm">{sol.fix}</p>
+                            <p className="font-bold text-gray-900 text-sm whitespace-pre-line">{sol.fix}</p>
                             <p className="text-xs text-[#3c82f4] font-medium mt-1">{sol.stat}</p>
                           </div>
                         </div>
