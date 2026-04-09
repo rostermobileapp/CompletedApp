@@ -11,35 +11,25 @@ function getCapacitorPlatform(): string {
   return 'web';
 }
 
-/**
- * Detects whether the device is likely in the US storefront.
- *
- * @capgo/native-purchases does not expose a getStorefront() method, so we use
- * device locale and timezone as a conservative heuristic. The key Apple-compliance
- * requirement (EP v. Apple) is that US users MUST be shown the external payment
- * link — showing it to a few non-US users is acceptable. This heuristic therefore
- * errs on the side of inclusion: it may show the Stripe button to some non-US users
- * (e.g. US expats with American locale/timezone), which is compliant. It will not
- * miss US users whose device is set to US English or a US timezone.
- */
-function detectUsRegion(): boolean {
-  try {
-    const locale = navigator.language || (navigator as any).userLanguage || '';
-    if (locale.toLowerCase().startsWith('en-us')) return true;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    const usTz = [
-      'America/New_York', 'America/Chicago', 'America/Denver',
-      'America/Los_Angeles', 'America/Phoenix', 'America/Anchorage',
-      'America/Adak', 'Pacific/Honolulu',
-    ];
-    return usTz.some((t) => tz.startsWith(t));
-  } catch {
-    return false;
-  }
-}
-
 interface IosPlatformInfo {
   isIos: boolean;
+  /**
+   * isUsRegion is intentionally always false on iOS.
+   *
+   * The @capgo/native-purchases plugin does not expose a getStorefront() method,
+   * so there is no reliable way to determine the App Store storefront country code
+   * on iOS without a native plugin that exposes SKStorefront.countryCode.
+   *
+   * Apple's EP v. Apple ruling permits (but does not require) showing external
+   * payment links to US users. Showing the Stripe button to non-US users would
+   * violate Apple's guidelines. Therefore, we default to the safe/compliant
+   * behavior: hide the Stripe external-link button on all iOS devices until an
+   * authoritative storefront signal is available.
+   *
+   * When upgrading the native plugin or adding a custom Capacitor plugin that
+   * exposes SKStorefront.countryCode, set this field based on that authoritative
+   * signal instead.
+   */
   isUsRegion: boolean;
   isReady: boolean;
 }
@@ -54,7 +44,9 @@ export function useIosPlatform(): IosPlatformInfo {
   useEffect(() => {
     const platform = getCapacitorPlatform();
     const isIos = platform === 'ios';
-    const isUsRegion = detectUsRegion();
+    // Always false on iOS — see comment on isUsRegion above.
+    // Web non-iOS does not show this path at all (web uses Stripe directly).
+    const isUsRegion = false;
     setInfo({ isIos, isUsRegion, isReady: true });
   }, []);
 
