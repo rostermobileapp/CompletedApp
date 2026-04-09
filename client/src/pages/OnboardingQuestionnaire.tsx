@@ -287,7 +287,7 @@ export default function OnboardingQuestionnaire() {
                   <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">S</div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Scott C.</p>
-                    <p className="text-xs text-gray-400">League player · Hockey</p>
+                    <p className="text-xs text-gray-400">Colorado</p>
                   </div>
                 </div>
               </div>
