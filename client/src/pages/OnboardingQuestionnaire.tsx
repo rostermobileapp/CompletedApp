@@ -9,6 +9,7 @@ type Screen =
   | 'welcome'
   | 'goal'
   | 'pain'
+  | 'join_play_features'
   | 'social_proof'
   | 'solution'
   | 'preferences'
@@ -82,9 +83,9 @@ export default function OnboardingQuestionnaire() {
   const [processingDone, setProcessingDone] = useState(false);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const SCREEN_ORDER: Screen[] = [
-    'welcome', 'goal', 'pain', 'social_proof', 'solution', 'preferences', 'processing', 'demo', 'paywall'
-  ];
+  const SCREEN_ORDER: Screen[] = state.goal === 'join_play'
+    ? ['welcome', 'goal', 'join_play_features', 'social_proof', 'solution', 'preferences', 'processing', 'demo', 'paywall']
+    : ['welcome', 'goal', 'pain', 'social_proof', 'solution', 'preferences', 'processing', 'demo', 'paywall'];
 
   const currentStep = SCREEN_ORDER.indexOf(screen) + 1;
 
@@ -213,7 +214,7 @@ export default function OnboardingQuestionnaire() {
                   key={g.value}
                   onClick={() => {
                     setState(prev => ({ ...prev, goal: g.value }));
-                    setTimeout(() => goTo('pain'), 200);
+                    setTimeout(() => goTo(g.value === 'join_play' ? 'join_play_features' : 'pain'), 200);
                   }}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
                     state.goal === g.value
@@ -263,6 +264,72 @@ export default function OnboardingQuestionnaire() {
               className="mt-6 w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#3c82f4]/90 transition-colors"
             >
               Continue
+            </button>
+          </div>
+        )}
+
+        {/* ── JOIN PLAY FEATURES ───────────────────────── */}
+        {screen === 'join_play_features' && (
+          <div className="pt-6">
+            <h2 className="text-2xl font-black text-gray-900 mb-1">Here's what's waiting for you</h2>
+            <p className="text-gray-500 mb-6">Start free. Upgrade when you're ready.</p>
+
+            {/* Free tier */}
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-green-600 bg-green-50 px-2.5 py-1 rounded-full">Included Free</span>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { icon: Calendar, label: "Game schedule & RSVPs", detail: "See every game, RSVP in one tap" },
+                  { icon: MessageSquare, label: "Team chat", detail: "All team comms in one place" },
+                  { icon: BarChart2, label: "Stats & standings", detail: "Track your season performance" },
+                  { icon: Users, label: "Roster", detail: "Know your teammates" },
+                ].map(({ icon: Icon, label, detail }) => (
+                  <div key={label} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-3">
+                    <div className="bg-green-50 p-2.5 rounded-xl flex-shrink-0">
+                      <Icon className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-sm">{label}</p>
+                      <p className="text-xs text-gray-400">{detail}</p>
+                    </div>
+                    <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Player Pro tease */}
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#3c82f4] bg-blue-50 px-2.5 py-1 rounded-full">Player Pro — Unlock More</span>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { icon: Zap, label: "Sub request tool", detail: "Find a replacement in under 5 minutes" },
+                  { icon: DollarSign, label: "Fee tracking", detail: "Pay dues without the awkward chase" },
+                  { icon: Shield, label: "Polls & bulletins", detail: "Captain-level communication tools" },
+                ].map(({ icon: Icon, label, detail }) => (
+                  <div key={label} className="bg-gray-50 rounded-2xl p-4 border border-gray-200 flex items-center gap-3 opacity-70">
+                    <div className="bg-blue-50 p-2.5 rounded-xl flex-shrink-0">
+                      <Icon className="w-5 h-5 text-[#3c82f4]" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-700 text-sm">{label}</p>
+                      <p className="text-xs text-gray-400">{detail}</p>
+                    </div>
+                    <span className="text-xs font-bold text-[#3c82f4] bg-blue-50 border border-[#3c82f4]/20 px-2 py-0.5 rounded-full flex-shrink-0">Pro</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => goTo('social_proof')}
+              className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
+            >
+              Looks good — let's go →
             </button>
           </div>
         )}
