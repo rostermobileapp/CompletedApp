@@ -320,7 +320,7 @@ export default function OnboardingQuestionnaire() {
                   <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">J</div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Brian W.</p>
-                    <p className="text-xs text-gray-400">Team captain · Wednesday night hockey</p>
+                    <p className="text-xs text-gray-400">Ohio</p>
                   </div>
                 </div>
               </div>
