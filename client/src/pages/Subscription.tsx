@@ -10,16 +10,15 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
 import {
-  initializeRevenueCat,
-  getIosOfferings,
-  purchaseIosPackage,
-  restoreIosPurchases,
-  getActiveEntitlements,
-  entitlementToRole,
-  RC_PACKAGE_PLAYER_PRO,
-  RC_PACKAGE_COMMISSIONER,
-} from '@/lib/revenuecatCapacitor';
-import type { PurchasesPackage } from '@revenuecat/purchases-capacitor';
+  isBillingSupported,
+  getIosProducts,
+  purchaseProduct,
+  restorePurchases,
+  getActivePurchases,
+  transactionToRole,
+  PRODUCT_PLAYER_PRO,
+  PRODUCT_COMMISSIONER,
+} from '@/lib/nativePurchases';
 
 export default function Subscription() {
   const { user } = usePermissions();
@@ -28,8 +27,8 @@ export default function Subscription() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
-  const [iosOfferings, setIosOfferings] = useState<any>(null);
-  const [rcInitialized, setRcInitialized] = useState(false);
+  const [iapReady, setIapReady] = useState(false);
+  const [iosProducts, setIosProducts] = useState<any[]>([]);
 
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
@@ -37,18 +36,19 @@ export default function Subscription() {
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
 
-  // Initialize RevenueCat on iOS
+  // Initialize IAP on iOS
   useEffect(() => {
-    if (!platformReady || !isIos || !user?.id) return;
-    initializeRevenueCat(user.id).then(() => {
-      setRcInitialized(true);
-      return getIosOfferings();
-    }).then((offering) => {
-      if (offering) setIosOfferings(offering);
+    if (!platformReady || !isIos) return;
+    isBillingSupported().then((supported) => {
+      if (!supported) return;
+      setIapReady(true);
+      return getIosProducts();
+    }).then((products) => {
+      if (products) setIosProducts(products);
     }).catch((err) => {
-      console.warn('[Subscription] RevenueCat init error:', err);
+      console.warn('[Subscription] IAP init error:', err);
     });
-  }, [platformReady, isIos, user?.id]);
+  }, [platformReady, isIos]);
 
   // Auto-sync subscription status on page load
   useEffect(() => {
@@ -83,6 +83,14 @@ export default function Subscription() {
   const proMonthlyDisplay = formatPrice(stripePrices?.player_pro_monthly) ?? '...';
   const commMonthlyDisplay = formatPrice(stripePrices?.commissioner_monthly) ?? '...';
 
+  const getIosPrice = (productId: string): string => {
+    const product = iosProducts.find((p) => p.productIdentifier === productId);
+    if (!product) return '...';
+    if (product.priceString) return product.priceString;
+    if (product.price != null) return `$${Number(product.price).toFixed(2)}`;
+    return '...';
+  };
+
   const subscriptionPlans = [
     {
       name: "Free Tier",
@@ -102,7 +110,7 @@ export default function Subscription() {
     },
     {
       name: "Player Pro",
-      price: proMonthlyDisplay,
+      price: isIos ? getIosPrice(PRODUCT_PLAYER_PRO) : proMonthlyDisplay,
       period: "month",
       description: "Enhanced features for serious players",
       features: [
@@ -123,7 +131,7 @@ export default function Subscription() {
     },
     {
       name: "Commissioner",
-      price: commMonthlyDisplay,
+      price: isIos ? getIosPrice(PRODUCT_COMMISSIONER) : commMonthlyDisplay,
       period: "month",
       description: "Full league management capabilities",
       features: [
@@ -199,29 +207,31 @@ export default function Subscription() {
   };
 
   // --- iOS IAP helpers ---
-  const getIosPackage = (tier: 'player_pro' | 'commissioner'): PurchasesPackage | null => {
-    if (!iosOfferings?.availablePackages) return null;
-    const key = tier === 'player_pro' ? RC_PACKAGE_PLAYER_PRO : RC_PACKAGE_COMMISSIONER;
-    return iosOfferings.availablePackages.find((p: PurchasesPackage) => p.identifier === key) ?? null;
-  };
-
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {
-      const pkg = getIosPackage(tier);
-      if (!pkg) throw new Error('This plan is not available for in-app purchase right now. Please try again later.');
-      const customerInfo = await purchaseIosPackage(pkg);
-      const entitlements = getActiveEntitlements(customerInfo);
-      const newRole = entitlementToRole(entitlements);
-      if (newRole) {
-        const response = await apiRequest('POST', '/api/iap/verify', { rcAppUserId: user?.id });
-        if (!response.ok) throw new Error('Purchase completed but role sync failed. Please restart the app.');
-      }
+      const productId = tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER;
+      const transaction = await purchaseProduct(productId);
+
+      // Send receipt to backend for verification and role update
+      const response = await apiRequest('POST', '/api/iap/verify', {
+        receipt: transaction.receipt,
+        jwsRepresentation: transaction.jwsRepresentation,
+        transactionId: transaction.transactionId,
+        productId: transaction.productIdentifier,
+      });
+
+      if (!response.ok) throw new Error('Purchase completed but role sync failed. Please restart the app.');
+
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
     } catch (error: any) {
-      if (error?.code === 'USER_CANCELLED' || error?.message?.includes('cancel')) {
+      if (
+        error?.code === 'PURCHASE_CANCELLED' ||
+        error?.message?.toLowerCase().includes('cancel') ||
+        error?.message?.toLowerCase().includes('cancelled')
+      ) {
         setIsLoading(false);
         return;
       }
@@ -233,16 +243,29 @@ export default function Subscription() {
   const handleIosRestore = async () => {
     setIsLoading(true);
     try {
-      const customerInfo = await restoreIosPurchases();
-      const entitlements = getActiveEntitlements(customerInfo);
-      const newRole = entitlementToRole(entitlements);
-      if (newRole) {
-        await apiRequest('POST', '/api/iap/verify', { rcAppUserId: user?.id });
+      const purchases = await restorePurchases();
+      if (!purchases.length) {
+        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        setIsLoading(false);
+        return;
+      }
+
+      // Send the first valid receipt to backend for verification
+      const latest = purchases[0];
+      const response = await apiRequest('POST', '/api/iap/verify', {
+        receipt: latest.receipt,
+        jwsRepresentation: latest.jwsRepresentation,
+        transactionId: latest.transactionId,
+        productId: latest.productIdentifier,
+        restore: true,
+      });
+
+      if (response.ok) {
         toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
         window.location.reload();
       } else {
-        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        toast({ title: 'No active subscription', description: 'No active subscription was found to restore.' });
       }
     } catch (error: any) {
       toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
@@ -331,7 +354,11 @@ export default function Subscription() {
                 {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Pro' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-current-plan-price">
-                {isCommissioner ? `${commMonthlyDisplay}/month` : isPlayerPlus ? `${proMonthlyDisplay}/month` : 'Free forever'}
+                {isCommissioner
+                  ? (isIos ? `${getIosPrice(PRODUCT_COMMISSIONER)}/month` : `${commMonthlyDisplay}/month`)
+                  : isPlayerPlus
+                  ? (isIos ? `${getIosPrice(PRODUCT_PLAYER_PRO)}/month` : `${proMonthlyDisplay}/month`)
+                  : 'Free forever'}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -507,7 +534,7 @@ export default function Subscription() {
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                    disabled={isLoading || !rcInitialized}
+                    disabled={isLoading || !iapReady}
                     className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
                     data-testid={`button-iap-${plan.tier}`}
                   >
@@ -557,20 +584,16 @@ export default function Subscription() {
 
       {/* Information Notice */}
       <div className="px-6 mt-6">
-        <div className="bg-muted/50 rounded-lg p-4 border border-border">
-          <p className="text-sm text-muted-foreground">
-            * Features coming soon
+        <p className="text-xs text-muted-foreground text-center">
+          {isIos
+            ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
+            : 'Subscriptions are billed monthly. Cancel anytime through your account settings.'}
+        </p>
+        {isIos && (
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            * indicates features coming soon
           </p>
-          {isIos ? (
-            <p className="text-sm text-muted-foreground mt-2">
-              In-app purchases are processed securely through the App Store. To manage or cancel, go to <strong>Settings → Apple ID → Subscriptions</strong>.
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-2">
-              All subscription changes are managed securely through Stripe. You can upgrade, downgrade, or cancel your subscription at any time.
-            </p>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
