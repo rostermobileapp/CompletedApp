@@ -557,7 +557,10 @@ export default function Subscription() {
                       {(isLoading || pricesLoading) ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <img src={rosterLogo} alt="Roster" className="h-5 object-contain" />
+                        <span className="flex items-center gap-2">
+                          <span>Subscribe via</span>
+                          <img src={rosterLogo} alt="Roster" className="h-5 object-contain" />
+                        </span>
                       )}
                     </button>
                   )}
