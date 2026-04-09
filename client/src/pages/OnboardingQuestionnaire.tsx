@@ -783,7 +783,7 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-gray-900 text-[18px] font-black">Free</p>
-              <p className="text-xs text-gray-400">Great for players on a team</p>
+              <p className="text-xs text-gray-400">Great for casual players</p>
             </div>
             <p className="text-2xl font-black text-gray-900">$0</p>
           </div>
