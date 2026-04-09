@@ -1,6 +1,7 @@
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle, ShoppingBag, Store } from 'lucide-react';
+import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import rosterLogo from '@assets/Roster-10_1775764992636.png';
 import { useLocation } from 'wouter';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -544,37 +545,35 @@ export default function Subscription() {
                   </button>
                 )
               ) : isIos ? (
-                /* iOS: show both IAP and Stripe buttons */
+                /* iOS: Roster (Stripe) on top dominant, App Store below outlined */
                 <div className="flex flex-col gap-2">
+                  {isUsRegion && (
+                    <button
+                      onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
+                      disabled={isLoading || pricesLoading}
+                      className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
+                      data-testid={`button-stripe-${plan.tier}`}
+                    >
+                      {(isLoading || pricesLoading) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <img src={rosterLogo} alt="Roster" className="h-5 object-contain" />
+                      )}
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
                     disabled={isLoading || !iapReady}
-                    className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
                     data-testid={`button-iap-${plan.tier}`}
                   >
                     {isLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Store className="w-4 h-4" />
+                      'Subscribe via App Store'
                     )}
-                    Subscribe via App Store
                   </button>
-
-                  {isUsRegion && (
-                    <button
-                      onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
-                      disabled={isLoading || pricesLoading}
-                      className="w-full py-3 rounded-lg font-semibold border border-primary text-primary hover:bg-primary/10 disabled:opacity-50 flex items-center justify-center gap-2"
-                      data-testid={`button-stripe-${plan.tier}`}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <ShoppingBag className="w-4 h-4" />
-                      )}
-                      Subscribe with Roster
-                    </button>
-                  )}
                 </div>
               ) : (
                 /* Web / non-iOS: Stripe only */
