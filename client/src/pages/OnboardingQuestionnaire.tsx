@@ -272,8 +272,7 @@ export default function OnboardingQuestionnaire() {
           <div className="pt-6">
             <div className="text-center mb-8">
               <p className="text-4xl font-black text-[#3c82f4] mb-2">Current Users:</p>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">players already use Roster</h2>
-              <p className="text-gray-500">Here's what they say.</p>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Here's what they say.</h2>
             </div>
 
             <div className="space-y-4 mb-8">
