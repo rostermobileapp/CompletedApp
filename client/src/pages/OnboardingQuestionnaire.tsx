@@ -681,12 +681,6 @@ function DemoScreen({
               <p className="text-xs text-gray-500 font-medium">No reply</p>
             </div>
           </div>
-          {noCount > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-center gap-2">
-              <span className="text-yellow-600 text-sm">⚡</span>
-              <p className="text-xs text-yellow-800 font-medium">Sub request sent to {noCount * 3} available players</p>
-            </div>
-          )}
         </div>
 
         <p className="text-sm text-center text-gray-400 mb-5">This is exactly what your dashboard looks like — live, for every game.</p>
