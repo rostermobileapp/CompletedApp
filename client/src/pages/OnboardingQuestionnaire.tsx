@@ -298,7 +298,7 @@ export default function OnboardingQuestionnaire() {
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
                 <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "Finally an app that does everything. RSVPs, payments, messaging — no more jumping between 4 different apps."
+                  "The substitute player request system is the crown jewel of this app.  This feature alone makes Roster worth it if you are a Captain."
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">M</div>
