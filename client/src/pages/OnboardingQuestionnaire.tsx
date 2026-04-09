@@ -775,7 +775,6 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
   return (
     <div className="pt-8 pb-4">
       <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6" />
-
       {/* Plans */}
       <div className="space-y-3 mb-6">
 
@@ -820,7 +819,7 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
         </div>
 
         {/* Commissioner */}
-        <div className="rounded-2xl border-2 border-gray-800 bg-gray-900 p-4 relative overflow-hidden">
+        <div className="rounded-2xl border-2 border-gray-800 p-4 relative overflow-hidden bg-[#3c82f4]">
           <div className="absolute top-0 right-0 bg-gray-700 text-gray-200 text-xs font-bold px-3 py-1 rounded-bl-xl">For leagues</div>
           <div className="flex items-center justify-between mb-2 pr-24">
             <div>
@@ -841,11 +840,9 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
           </div>
         </div>
       </div>
-
       <p className="text-center text-xs text-gray-400 mb-5">
         Free to start. Visit the Subscriptions in your Profile page to upgrade for the full range of features.
       </p>
-
       <button
         onClick={onSignUp}
         className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors shadow-lg shadow-blue-200"
