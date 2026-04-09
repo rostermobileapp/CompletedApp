@@ -1,8 +1,21 @@
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import type { Transaction } from '@capgo/native-purchases';
+import { v5 as uuidv5 } from 'uuid';
 
 export const PRODUCT_PLAYER_PRO = 'com.rosterapp.player_pro_monthly';
 export const PRODUCT_COMMISSIONER = 'com.rosterapp.commissioner_monthly';
+
+// Stable namespace UUID for generating deterministic appAccountTokens
+const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+/**
+ * Returns a deterministic UUID derived from the user ID.
+ * This is sent as appAccountToken when purchasing so Apple cryptographically
+ * links the transaction to this app user, enabling server-side binding checks.
+ */
+export function getAppAccountToken(userId: string): string {
+  return uuidv5(userId, APP_NAMESPACE);
+}
 
 let billingChecked = false;
 let billingSupported = false;
@@ -32,10 +45,11 @@ export async function getIosProducts() {
   }
 }
 
-export async function purchaseProduct(productIdentifier: string): Promise<Transaction> {
+export async function purchaseProduct(productIdentifier: string, appAccountToken?: string): Promise<Transaction> {
   return await NativePurchases.purchaseProduct({
     productIdentifier,
     productType: PURCHASE_TYPE.SUBS,
+    appAccountToken,
   });
 }
 

@@ -2492,7 +2492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/iap/verify', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { receipt } = req.body;
+      const { receipt, appAccountToken } = req.body;
 
       // receipt is required — we never trust client-supplied productId for role assignment
       if (!receipt || typeof receipt !== 'string' || receipt.trim().length === 0) {
@@ -2542,6 +2542,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       activeReceipts.sort((a: any, b: any) =>
         parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10)
       );
+
+      // Verify appAccountToken binding when present: compute expected token server-side
+      // using same UUID v5 derivation as the client to ensure receipt belongs to this user
+      if (appAccountToken && typeof appAccountToken === 'string') {
+        const { v5: uuidv5 } = await import('uuid');
+        const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+        const expectedToken = uuidv5(userId, APP_NAMESPACE);
+        if (appAccountToken.toLowerCase() !== expectedToken.toLowerCase()) {
+          console.warn('[IAP] appAccountToken mismatch — possible receipt replay attempt', { userId });
+          return res.status(403).json({ message: 'Purchase does not belong to this account' });
+        }
+      }
 
       // commissioner takes priority if present in any active subscription
       let newRole: 'commissioner' | 'player_pro' | null = null;

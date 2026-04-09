@@ -16,6 +16,7 @@ import {
   restorePurchases,
   getActivePurchases,
   transactionToRole,
+  getAppAccountToken,
   PRODUCT_PLAYER_PRO,
   PRODUCT_COMMISSIONER,
 } from '@/lib/nativePurchases';
@@ -211,15 +212,18 @@ export default function Subscription() {
     setIsLoading(true);
     try {
       const productId = tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER;
-      const transaction = await purchaseProduct(productId);
+      const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
+      const transaction = await purchaseProduct(productId, appAccountToken);
 
       if (!transaction.receipt) {
         throw new Error('No receipt returned from App Store. Please try again.');
       }
 
-      // Send only the Apple receipt to backend — role is determined server-side from Apple's response
+      // Send receipt + appAccountToken to backend — role is determined server-side from Apple's response
+      // appAccountToken lets the server verify the purchase belongs to this user
       const response = await apiRequest('POST', '/api/iap/verify', {
         receipt: transaction.receipt,
+        appAccountToken,
       });
 
       if (!response.ok) throw new Error('Purchase completed but role sync failed. Please restart the app.');
@@ -263,7 +267,9 @@ export default function Subscription() {
         receipt: withReceipt.receipt,
       });
 
-      if (response.ok) {
+      const data = await response.json() as { role?: string; message?: string };
+
+      if (response.ok && data.role && data.role !== 'free_tier') {
         toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
         window.location.reload();
