@@ -301,9 +301,9 @@ export default function OnboardingQuestionnaire() {
                   "The substitute player request system is the crown jewel of this app.  This feature alone makes Roster worth it if you are a Captain."
                 </p>
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">M</div>
+                  <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">J</div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Mike T.</p>
+                    <p className="text-sm font-semibold text-gray-900">James K.</p>
                     <p className="text-xs text-gray-400">Team captain · Recreational hockey</p>
                   </div>
                 </div>
