@@ -222,6 +222,7 @@ function Router() {
         <SwipeableMainScreens>
           <PageTransition>
               <Switch>
+              <Route path="/get-started" component={OnboardingQuestionnaire} />
               <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
               <Route path="/league-search" component={LeagueSearch} />
               <Route path="/team-search" component={TeamSearch} />
