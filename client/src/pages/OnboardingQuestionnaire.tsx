@@ -812,9 +812,7 @@ function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () 
       </div>
 
       <p className="text-center text-xs text-gray-400 mb-5">
-        Free to start. No credit card required. Cancel anytime.
-        <br />
-        Paid plans open in browser — not charged in-app.
+        Free to start. Visit the Subscriptions in your Profile page to upgrade for the full range of features.
       </p>
 
       <button
