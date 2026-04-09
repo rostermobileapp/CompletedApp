@@ -823,7 +823,7 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
           <div className="absolute top-0 right-0 bg-gray-700 text-[#ffffff] text-xs font-bold px-3 py-1 rounded-bl-xl">For leagues</div>
           <div className="flex items-center justify-between mb-2 pr-24">
             <div>
-              <p className="font-bold text-white">Commissioner</p>
+              <p className="text-white font-black text-[18px]">Commissioner</p>
               <p className="text-xs text-[#ffffff]">Run a full league or tournament</p>
             </div>
             <div className="text-right">
