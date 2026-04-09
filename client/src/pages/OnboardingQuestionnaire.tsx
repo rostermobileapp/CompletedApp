@@ -833,7 +833,7 @@ function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated:
           </div>
           <div className="space-y-1">
             {['Everything in Player Pro', 'A-Z League Management', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'Tournaments Mode', 'League Drafts'].map(f => (
-              <div key={f} className="flex items-center gap-2 text-xs text-gray-300">
+              <div key={f} className="flex items-center gap-2 text-xs text-[#ffffff]">
                 <Check className="w-3.5 h-3.5 text-gray-400" /> {f}
               </div>
             ))}
