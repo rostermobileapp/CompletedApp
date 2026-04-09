@@ -3361,6 +3361,22 @@ export const insertWaitlistSignupSchema = createInsertSchema(waitlistSignups).om
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type InsertWaitlistSignup = z.infer<typeof insertWaitlistSignupSchema>;
 
+// Onboarding sport poll responses
+export const onboardingSportPoll = pgTable("onboarding_sport_poll", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sports: text("sports").array().notNull(),
+  otherSportText: varchar("other_sport_text"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOnboardingSportPollSchema = createInsertSchema(onboardingSportPoll).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type OnboardingSportPoll = typeof onboardingSportPoll.$inferSelect;
+export type InsertOnboardingSportPoll = z.infer<typeof insertOnboardingSportPollSchema>;
+
 // Event type enum for unified reminders
 export const eventTypeEnum = pgEnum("event_type", ["game", "scrimmage"]);
 

@@ -22,6 +22,8 @@ interface QuestionnaireState {
   pains: string[];
   sport: string;
   features: string[];
+  otherSports: string[];
+  otherSportCustom: string;
 }
 
 const GOALS = [
@@ -48,6 +50,14 @@ const SPORTS = [
   { value: 'basketball', label: "Basketball", emoji: '🏀' },
   { value: 'baseball', label: "Baseball", emoji: '⚾' },
   { value: 'other', label: "Another sport", emoji: '🏅' },
+];
+
+const SPORTS_POLL = [
+  { value: 'soccer', label: "Soccer", emoji: '⚽' },
+  { value: 'basketball', label: "Basketball", emoji: '🏀' },
+  { value: 'baseball', label: "Baseball", emoji: '⚾' },
+  { value: 'other', label: "Another sport", emoji: '🏅' },
+  { value: 'none', label: "None", emoji: '🚫' },
 ];
 
 const FEATURES = [
@@ -78,6 +88,8 @@ export default function OnboardingQuestionnaire() {
     pains: [],
     sport: '',
     features: [],
+    otherSports: [],
+    otherSportCustom: '',
   });
   const [processingDone, setProcessingDone] = useState(false);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -495,28 +507,66 @@ export default function OnboardingQuestionnaire() {
               })}
             </div>
 
-            <div className="mb-4">
-              <p className="text-sm font-semibold text-gray-700 mb-3">What sport do you play?</p>
+            <div className="mb-6">
+              <p className="text-sm font-semibold text-gray-700 mb-1">What other sports would you consider using Roster for?</p>
+              <p className="text-xs text-gray-400 mb-3">Select all that apply.</p>
               <div className="grid grid-cols-3 gap-2">
-                {SPORTS.map(s => (
-                  <button
-                    key={s.value}
-                    onClick={() => setState(prev => ({ ...prev, sport: s.value }))}
-                    className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-                      state.sport === s.value
-                        ? 'border-[#3c82f4] bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-xl">{s.emoji}</span>
-                    <span className={`text-xs font-semibold ${state.sport === s.value ? 'text-[#3c82f4]' : 'text-gray-700'}`}>{s.label}</span>
-                  </button>
-                ))}
+                {SPORTS_POLL.map(s => {
+                  const selected = state.otherSports.includes(s.value);
+                  return (
+                    <button
+                      key={s.value}
+                      onClick={() => {
+                        setState(prev => {
+                          if (prev.otherSports.includes(s.value)) {
+                            const next = prev.otherSports.filter(v => v !== s.value);
+                            return { ...prev, otherSports: next, otherSportCustom: s.value === 'other' ? '' : prev.otherSportCustom };
+                          }
+                          if (s.value === 'none') {
+                            return { ...prev, otherSports: ['none'], otherSportCustom: '' };
+                          }
+                          const next = [...prev.otherSports.filter(v => v !== 'none'), s.value];
+                          return { ...prev, otherSports: next };
+                        });
+                      }}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                        selected ? 'border-[#3c82f4] bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-xl">{s.emoji}</span>
+                      <span className={`text-xs font-semibold text-center leading-tight ${selected ? 'text-[#3c82f4]' : 'text-gray-700'}`}>{s.label}</span>
+                    </button>
+                  );
+                })}
               </div>
+              {state.otherSports.includes('other') && (
+                <input
+                  type="text"
+                  value={state.otherSportCustom}
+                  onChange={e => setState(prev => ({ ...prev, otherSportCustom: e.target.value }))}
+                  placeholder="Which sport?"
+                  className="mt-3 w-full px-4 py-2.5 rounded-xl border-2 border-[#3c82f4] bg-blue-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+                  autoFocus
+                />
+              )}
             </div>
 
             <button
-              onClick={() => goTo('processing')}
+              onClick={async () => {
+                if (state.otherSports.length > 0) {
+                  try {
+                    await fetch('/api/onboarding-sport-poll', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sports: state.otherSports,
+                        otherSportText: state.otherSports.includes('other') ? state.otherSportCustom || null : null,
+                      }),
+                    });
+                  } catch (_) {}
+                }
+                goTo('processing');
+              }}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Build my Roster →

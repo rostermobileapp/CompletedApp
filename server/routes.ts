@@ -16,7 +16,7 @@ import {
   roleHierarchy
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
@@ -329,6 +329,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error adding to waitlist:", error?.message || error);
       res.status(500).json({ message: "Failed to join waitlist" });
+    }
+  });
+
+  // Onboarding sport poll (no auth required — pre-signup data collection)
+  app.post('/api/onboarding-sport-poll', async (req, res) => {
+    try {
+      const data = insertOnboardingSportPollSchema.parse(req.body);
+      await db.insert(onboardingSportPoll).values(data);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error saving sport poll response:", error);
+      res.status(500).json({ message: "Failed to save poll response" });
     }
   });
 
