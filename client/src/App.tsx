@@ -75,6 +75,7 @@ import MediaGalleryPage from "@/pages/MediaGallery";
 import TeamView from "@/pages/TeamView";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
+import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function LoadingScreen() {
@@ -179,6 +180,7 @@ function Router() {
           <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
           <Route path="/waitlist" component={Waitlist} />
           <Route path="/login" component={Login} />
+          <Route path="/get-started" component={OnboardingQuestionnaire} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/terms-of-service" component={TermsOfService} />
           <Route path="/support" component={Support} />

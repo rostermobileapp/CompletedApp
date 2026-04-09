@@ -152,18 +152,17 @@ export default function Landing() {
           />
           <div className="flex items-center gap-3">
             <button
-              onClick={handleLoginClick}
-              className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
-              title="Come back May 1st"
+              onClick={() => setLocation('/login')}
+              className="hidden md:block text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors"
             >
               Log In
             </button>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-xs sm:text-sm"
               data-testid="button-join-waitlist-header"
             >
-              Join Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -223,16 +222,15 @@ export default function Landing() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
                 data-testid="button-join-waitlist"
               >
-                Join the Waitlist
+                Get Started — It's Free
               </button>
               <button
-                onClick={handleLoginClick}
-                className="px-8 py-4 rounded-full border border-gray-300 text-gray-400 cursor-not-allowed font-semibold text-lg"
-                title="Come back May 1st"
+                onClick={() => setLocation('/login')}
+                className="px-8 py-4 rounded-full border border-gray-300 text-gray-700 hover:border-gray-400 font-semibold text-lg transition-colors"
               >
                 Log In
               </button>
@@ -549,11 +547,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="w-full py-3 px-6 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors font-semibold text-gray-900"
                 data-testid="button-pricing-free"
               >
-                Join the Waitlist
+                Get Started Free
               </button>
             </div>
 
@@ -577,11 +575,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="w-full py-3 px-6 rounded-full bg-white hover:bg-blue-50 transition-colors font-semibold text-[#3c82f4]"
                 data-testid="button-pricing-player-pro"
               >
-                Join the Waitlist
+                Get Started Free
               </button>
             </div>
 
@@ -602,11 +600,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-200 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold text-gray-900"
                 data-testid="button-pricing-commissioner"
               >
-                Join the Waitlist
+                Get Started Free
               </button>
             </div>
           </div>
@@ -625,14 +623,14 @@ export default function Landing() {
             <br />
             <span className="text-[#3c82f4]">best season yet?</span>
           </h2>
-          <p className="text-gray-500 text-xl mb-3">We launch <span className="text-gray-900 font-semibold">May 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
+          <p className="text-gray-500 text-xl mb-3">Free to start. No credit card required. No ads on any plan — ever.</p>
           <p className="text-gray-400 text-sm mb-8">No credit card required · No ads on any plan</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
-              Join the Waitlist
+              Get Started — It's Free
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
