@@ -314,7 +314,7 @@ export default function OnboardingQuestionnaire() {
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
                 </div>
                 <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "The sub request tool alone is worth it. Used to spend 2 hours texting people before a game."
+                  "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... Roster had us covered."
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-gray-300 text-white flex items-center justify-center text-sm font-bold">J</div>
