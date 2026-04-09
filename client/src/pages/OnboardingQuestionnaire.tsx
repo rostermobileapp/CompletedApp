@@ -811,15 +811,9 @@ function PaywallScreen({ onSignUp, onSkip }: { onSignUp: () => void; onSkip: () 
 
       <button
         onClick={onSignUp}
-        className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors shadow-lg shadow-blue-200 mb-3"
+        className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors shadow-lg shadow-blue-200"
       >
         Create My Free Account
-      </button>
-      <button
-        onClick={onSkip}
-        className="w-full py-3 rounded-2xl border border-gray-200 text-gray-500 font-semibold text-sm hover:bg-gray-50 transition-colors"
-      >
-        Maybe later — just sign in
       </button>
     </div>
   );
