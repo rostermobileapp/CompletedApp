@@ -3,7 +3,7 @@ import { MarketingLayout } from '@/components/MarketingLayout';
 import { useLocation } from 'wouter';
 import { Users, MessageSquare, CheckCircle } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import founderPhoto from '@assets/PXL_20210123_194151447.MP_1773953996231.jpg';
+import founderPhoto from '@assets/Screen_Shot_2021-03-01_at_9.39.25_PM_1775833611823.png';
 
 export default function About() {
   const [, setLocation] = useLocation();
@@ -29,8 +29,7 @@ export default function About() {
                 <img
                   src={founderPhoto}
                   alt="Tobin K., Roster founder, on the ice"
-                  className="absolute w-full object-cover object-center"
-                  style={{ height: '117.65%', top: '-11.76%', left: 0 }}
+                  className="w-full h-full object-cover object-center"
                 />
               </div>
             </div>
