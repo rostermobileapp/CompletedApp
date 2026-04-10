@@ -22,12 +22,16 @@ export default function About() {
           <div className="flex flex-col md:flex-row items-center md:items-start gap-12">
             {/* Founder photo */}
             <div className="flex-shrink-0 w-72 md:w-80">
-              <img
-                src={founderPhoto}
-                alt="Tobin K., Roster founder, on the ice"
-                className="w-full h-auto"
+              <div
                 onClick={() => setPhotoModalOpen(true)}
-              />
+                className="rounded-3xl overflow-hidden shadow-2xl shadow-blue-300 cursor-pointer"
+              >
+                <img
+                  src={founderPhoto}
+                  alt="Tobin K., Roster founder, on the ice"
+                  className="w-full h-auto"
+                />
+              </div>
             </div>
 
             {/* Intro copy and quote/stats */}
