@@ -137,7 +137,7 @@ export default function About() {
       </section>
       {/* Photo expansion modal */}
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
-        <DialogContent className="max-w-2xl w-full p-0 border-0">
+        <DialogContent className="w-[85vw] max-w-xs sm:max-w-sm md:max-w-md p-0 border-0 shadow-2xl shadow-black/40 top-[58%]">
           <img
             src={easterEggPhoto}
             alt="Tobin K., Roster founder, on the ice"
