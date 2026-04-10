@@ -1,10 +1,10 @@
 {
-  "name": "CrewTrack",
-  "short_name": "CrewTrack",
+  "name": "Roster",
+  "short_name": "Roster",
   "display": "standalone",
   "start_url": "/",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#2563eb",
   "icons": [
     {
       "src": "/icon-192.png",
