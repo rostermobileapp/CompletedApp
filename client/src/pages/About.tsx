@@ -4,6 +4,7 @@ import { useLocation } from 'wouter';
 import { Users, MessageSquare, CheckCircle } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import founderPhoto from '@assets/Screen_Shot_2021-03-01_at_9.39.25_PM_1775833611823.png';
+import easterEggPhoto from '@assets/signal-2023-01-09-11-40-34-849_1775833978403.jpg';
 
 export default function About() {
   const [, setLocation] = useLocation();
@@ -138,7 +139,7 @@ export default function About() {
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
         <DialogContent className="max-w-2xl w-full p-0 border-0">
           <img
-            src={founderPhoto}
+            src={easterEggPhoto}
             alt="Tobin K., Roster founder, on the ice"
             className="w-full h-auto rounded-lg"
           />
