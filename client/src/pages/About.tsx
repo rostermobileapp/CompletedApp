@@ -29,7 +29,8 @@ export default function About() {
                 <img
                   src={founderPhoto}
                   alt="Tobin K., Roster founder, on the ice"
-                  className="w-full h-full object-cover object-center"
+                  className="absolute w-full object-cover object-center"
+                  style={{ height: '117.65%', top: '-11.76%', left: 0 }}
                 />
               </div>
             </div>
