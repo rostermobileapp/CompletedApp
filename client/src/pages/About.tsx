@@ -20,18 +20,14 @@ export default function About() {
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-12">
-            {/* Founder photo — 9:16 portrait */}
+            {/* Founder photo */}
             <div className="flex-shrink-0 w-72 md:w-80">
-              <div 
+              <img
+                src={founderPhoto}
+                alt="Tobin K., Roster founder, on the ice"
+                className="w-full h-auto"
                 onClick={() => setPhotoModalOpen(true)}
-                className="relative aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl shadow-blue-300 cursor-pointer transition-shadow"
-              >
-                <img
-                  src={founderPhoto}
-                  alt="Tobin K., Roster founder, on the ice"
-                  className="w-full h-full object-cover object-center"
-                />
-              </div>
+              />
             </div>
 
             {/* Intro copy and quote/stats */}
