@@ -1,7 +1,13 @@
 import { Link } from 'wouter';
 import { ArrowLeft } from 'lucide-react';
+import { useSeo } from '@/hooks/useSeo';
 
 export default function TermsOfService() {
+  useSeo({
+    title: 'Terms of Service | Roster',
+    description: 'Review the Roster Terms of Service. These terms govern your use of the Roster sports team management platform.',
+  });
+
   return (
     <div className="min-h-screen bg-black text-white" data-testid="terms-of-service-page">
       <div className="max-w-4xl mx-auto px-6 py-12">

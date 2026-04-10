@@ -9,11 +9,14 @@ interface MarketingLayoutProps {
   description: string;
   ogTitle?: string;
   ogDescription?: string;
+  canonical?: string;
   children: ReactNode;
 }
 
-export function MarketingLayout({ title, description, ogTitle, ogDescription, children }: MarketingLayoutProps) {
-  const [, setLocation] = useLocation();
+const OG_IMAGE = '/roster-logo.png';
+
+export function MarketingLayout({ title, description, ogTitle, ogDescription, canonical, children }: MarketingLayoutProps) {
+  const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Always scroll to top when this component mounts
@@ -24,6 +27,11 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
 
   useEffect(() => {
     document.title = title;
+
+    const resolvedCanonical = canonical ?? (window.location.origin + location);
+    const resolvedOgTitle = ogTitle ?? title;
+    const resolvedOgDesc = ogDescription ?? description;
+    const ogImageUrl = window.location.origin + OG_IMAGE;
 
     const setMeta = (name: string, content: string, property = false) => {
       const attr = property ? 'property' : 'name';
@@ -36,13 +44,27 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
       el.setAttribute('content', content);
     };
 
+    const setCanonical = (href: string) => {
+      let el = document.querySelector('link[rel="canonical"]');
+      if (!el) {
+        el = document.createElement('link');
+        el.setAttribute('rel', 'canonical');
+        document.head.appendChild(el);
+      }
+      el.setAttribute('href', href);
+    };
+
     setMeta('description', description);
-    setMeta('og:title', ogTitle ?? title, true);
-    setMeta('og:description', ogDescription ?? description, true);
+    setMeta('og:title', resolvedOgTitle, true);
+    setMeta('og:description', resolvedOgDesc, true);
     setMeta('og:type', 'website', true);
+    setMeta('og:image', ogImageUrl, true);
+    setMeta('og:url', resolvedCanonical, true);
     setMeta('twitter:card', 'summary_large_image');
-    setMeta('twitter:title', ogTitle ?? title);
-    setMeta('twitter:description', ogDescription ?? description);
+    setMeta('twitter:title', resolvedOgTitle);
+    setMeta('twitter:description', resolvedOgDesc);
+    setMeta('twitter:image', ogImageUrl);
+    setCanonical(resolvedCanonical);
 
     return () => {
       document.title = 'Roster — Hockey Team Management App';
@@ -54,10 +76,15 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ch
       clearMeta('description');
       clearMeta('og:title', true);
       clearMeta('og:description', true);
+      clearMeta('og:image', true);
+      clearMeta('og:url', true);
       clearMeta('twitter:title');
       clearMeta('twitter:description');
+      clearMeta('twitter:image');
+      const canonicalEl = document.querySelector('link[rel="canonical"]');
+      if (canonicalEl) canonicalEl.setAttribute('href', '');
     };
-  }, [title, description, ogTitle, ogDescription]);
+  }, [title, description, ogTitle, ogDescription, canonical, location]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900">

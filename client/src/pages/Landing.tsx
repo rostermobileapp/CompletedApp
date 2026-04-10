@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
+import { useSeo } from '@/hooks/useSeo';
 
 function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: string }) {
   const [displayValue, setDisplayValue] = useState(0);
@@ -103,6 +104,13 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const [loginMessageVisible, setLoginMessageVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useSeo({
+    title: 'Roster — Hockey Team Management App',
+    description: 'Roster is the all-in-one hockey team management app. Scheduling, RSVP reminders, player substitutions, stats, standings, and in-app payments — no ads, ever. Free to start.',
+    ogTitle: 'Roster — Hockey Team Management App',
+    ogDescription: 'Scheduling, RSVP, rosters, stats, and payments in one ad-free app. Built for hockey players, by hockey players.',
+  });
 
   const { data: userCountData } = useQuery<{ count: number }>({
     queryKey: ['/api/user-count'],

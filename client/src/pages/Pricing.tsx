@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
+import { useSeo } from '@/hooks/useSeo';
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 
 const featureRows = [
@@ -73,6 +74,13 @@ type StripePricesResponse = {
 export default function Pricing() {
   const [, setLocation] = useLocation();
   const [annual, setAnnual] = useState(false);
+
+  useSeo({
+    title: 'Pricing | Roster — Free, Pro & Commissioner Plans',
+    description: 'Roster is free to start. Upgrade to Player Pro for sub requests and payment tracking, or Commissioner for full league management. No ads on any plan.',
+    ogTitle: 'Roster Pricing — Free, Pro & Commissioner Plans',
+    ogDescription: 'Start free. Upgrade when you need more. No ads on any plan.',
+  });
 
   const { data: stripePrices } = useQuery<StripePricesResponse>({
     queryKey: ['/api/stripe/prices'],

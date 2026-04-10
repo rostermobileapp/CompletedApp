@@ -1,7 +1,13 @@
 import { Link } from 'wouter';
 import { ArrowLeft } from 'lucide-react';
+import { useSeo } from '@/hooks/useSeo';
 
 export default function PrivacyPolicy() {
+  useSeo({
+    title: 'Privacy Policy | Roster',
+    description: 'Read the Roster Privacy Policy. Learn how we collect, use, and protect your data when you use the Roster sports team management app.',
+  });
+
   return (
     <div className="min-h-screen bg-black text-white" data-testid="privacy-policy-page">
       <div className="max-w-4xl mx-auto px-6 py-12">
