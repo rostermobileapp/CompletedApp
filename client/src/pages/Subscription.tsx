@@ -29,6 +29,7 @@ export default function Subscription() {
   const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
   const [iapReady, setIapReady] = useState(false);
   const [iosProducts, setIosProducts] = useState<Product[]>([]);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
@@ -82,6 +83,8 @@ export default function Subscription() {
 
   const proMonthlyDisplay = formatPrice(stripePrices?.player_pro_monthly) ?? '...';
   const commMonthlyDisplay = formatPrice(stripePrices?.commissioner_monthly) ?? '...';
+  const proYearlyDisplay = formatPrice(stripePrices?.player_pro_yearly) ?? '...';
+  const commYearlyDisplay = formatPrice(stripePrices?.commissioner_yearly) ?? '...';
 
   const getIosPrice = (productId: string): string => {
     const product = iosProducts.find((p: Product) => p.productIdentifier === productId);
@@ -89,6 +92,13 @@ export default function Subscription() {
     if (product.priceString) return product.priceString;
     if (product.price != null) return `$${product.price.toFixed(2)}`;
     return '...';
+  };
+
+  const getStripePrice = (tier: 'player_pro' | 'commissioner') => {
+    if (billingPeriod === 'yearly') {
+      return tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay;
+    }
+    return tier === 'player_pro' ? proMonthlyDisplay : commMonthlyDisplay;
   };
 
   const subscriptionPlans = [
@@ -110,8 +120,8 @@ export default function Subscription() {
     },
     {
       name: "Player Pro",
-      price: isIos ? getIosPrice(PRODUCT_PLAYER_PRO) : proMonthlyDisplay,
-      period: "month",
+      price: isIos ? getIosPrice(PRODUCT_PLAYER_PRO) : getStripePrice('player_pro'),
+      period: isIos ? "month" : (billingPeriod === 'yearly' ? 'year' : 'month'),
       description: "Enhanced features for serious players",
       features: [
         "FREE +",
@@ -131,8 +141,8 @@ export default function Subscription() {
     },
     {
       name: "Commissioner",
-      price: isIos ? getIosPrice(PRODUCT_COMMISSIONER) : commMonthlyDisplay,
-      period: "month",
+      price: isIos ? getIosPrice(PRODUCT_COMMISSIONER) : getStripePrice('commissioner'),
+      period: isIos ? "month" : (billingPeriod === 'yearly' ? 'year' : 'month'),
       description: "Full league management capabilities",
       features: [
         "FREE & PLAYER PRO +",
@@ -165,12 +175,20 @@ export default function Subscription() {
     setIsLoading(false);
   };
 
+  const routeStripeUrl = (url: string) => {
+    if (isIos) {
+      setPendingStripeUrl(url);
+    } else {
+      openStripeUrl(url);
+    }
+  };
+
   const handleManageSubscription = async () => {
     setIsLoading(true);
     try {
       const response = await apiRequest('POST', '/api/stripe/create-portal-session');
       const data = await response.json() as { url: string };
-      setPendingStripeUrl(data.url);
+      routeStripeUrl(data.url);
     } catch (error: any) {
       let errorMessage = 'Failed to open subscription management. Please try again.';
       if (error.message) {
@@ -193,13 +211,18 @@ export default function Subscription() {
     setIsLoading(true);
     try {
       if (!stripePrices) throw new Error('Pricing information not available. Please try again.');
-      const priceEntry = tier === 'player_pro' ? stripePrices.player_pro_monthly : stripePrices.commissioner_monthly;
+      let priceEntry: StripePriceEntry | undefined;
+      if (billingPeriod === 'yearly') {
+        priceEntry = tier === 'player_pro' ? stripePrices.player_pro_yearly : stripePrices.commissioner_yearly;
+      } else {
+        priceEntry = tier === 'player_pro' ? stripePrices.player_pro_monthly : stripePrices.commissioner_monthly;
+      }
       const priceId = priceEntry?.id;
-      if (!priceId) throw new Error(`Price not configured for ${tier}. Please contact support.`);
+      if (!priceId) throw new Error(`Price not configured for ${tier} (${billingPeriod}). Please contact support.`);
       const response = await apiRequest('POST', '/api/stripe/create-checkout-session', { priceId });
       const data = await response.json() as { url: string };
       if (!data.url) throw new Error('No checkout URL received from server');
-      setPendingStripeUrl(data.url);
+      routeStripeUrl(data.url);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
       setIsLoading(false);
@@ -317,23 +340,25 @@ export default function Subscription() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
-      {/* Apple-required disclosure dialog before opening external payment link */}
-      <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>You're leaving the app</AlertDialogTitle>
-            <AlertDialogDescription>
-              You're about to leave the app and visit an external website to complete your purchase. Apple is not responsible for the privacy or security of payments made on third-party sites.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => pendingStripeUrl && openStripeUrl(pendingStripeUrl)}>
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Apple-required disclosure dialog before opening external payment link — iOS only */}
+      {isIos && (
+        <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>You're leaving the app</AlertDialogTitle>
+              <AlertDialogDescription>
+                You're about to leave the app and visit an external website to complete your purchase. Apple is not responsible for the privacy or security of payments made on third-party sites.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => pendingStripeUrl && openStripeUrl(pendingStripeUrl)}>
+                Continue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       {/* Header */}
       <div className="p-6 pt-12">
@@ -485,6 +510,35 @@ export default function Subscription() {
       {/* Available Plans */}
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
+
+        {/* Monthly / Yearly billing toggle (non-iOS only — iOS uses App Store pricing) */}
+        {!isIos && (
+          <div className="flex items-center justify-center mb-5">
+            <div className="flex bg-secondary rounded-lg p-1">
+              <button
+                onClick={() => setBillingPeriod('monthly')}
+                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                  billingPeriod === 'monthly'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingPeriod('yearly')}
+                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                  billingPeriod === 'yearly'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Yearly
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           {subscriptionPlans.map((plan, index) => (
             <div
@@ -540,7 +594,9 @@ export default function Subscription() {
                     className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
                     data-testid={`button-${plan.tier}`}
                   >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : null}
                     Manage Subscription
                   </button>
                 )
@@ -603,12 +659,32 @@ export default function Subscription() {
         <p className="text-xs text-muted-foreground text-center">
           {isIos
             ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
+            : billingPeriod === 'yearly'
+            ? 'Subscriptions are billed annually. Cancel anytime through your account settings.'
             : 'Subscriptions are billed monthly. Cancel anytime through your account settings.'}
         </p>
         {isIos && (
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            * indicates features coming soon
-          </p>
+          <>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              * indicates features coming soon
+            </p>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              By subscribing, you agree to Apple's{' '}
+              <a
+                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-primary"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/', '_system');
+                }}
+              >
+                Terms of Use (EULA)
+              </a>
+              .
+            </p>
+          </>
         )}
       </div>
     </div>
