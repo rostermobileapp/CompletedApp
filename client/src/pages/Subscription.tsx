@@ -604,20 +604,18 @@ export default function Subscription() {
                     </button>
                   )}
 
-                  {billingPeriod === 'monthly' && (
-                    <button
-                      onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                      disabled={isLoading || !iapReady}
-                      className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
-                      data-testid={`button-iap-${plan.tier}`}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        'Subscribe via App Store'
-                      )}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
+                    disabled={isLoading || !iapReady}
+                    className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
+                    data-testid={`button-iap-${plan.tier}`}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Subscribe via App Store'
+                    )}
+                  </button>
                 </div>
               ) : (
                 /* Web / non-iOS: Stripe only */
