@@ -344,7 +344,6 @@ export default function Subscription() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
@@ -358,7 +357,6 @@ export default function Subscription() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Manage Subscription</h1>
         </div>
       </div>
-
       {/* Current Status */}
       <div className="px-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6">
@@ -491,7 +489,6 @@ export default function Subscription() {
           )}
         </div>
       </div>
-
       {/* Available Plans */}
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
@@ -566,26 +563,20 @@ export default function Subscription() {
                 </button>
               ) : plan.tier === 'free_tier' ? (
                 /* Paid user viewing Free Tier card — manage via platform-appropriate path */
-                isIos ? (
-                  <p className="text-sm text-muted-foreground text-center py-2">
-                    Manage via <strong>Settings → Apple ID → Subscriptions</strong>
-                  </p>
-                ) : (
-                  <button
-                    onClick={handleManageSubscription}
-                    disabled={isLoading}
-                    className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
-                    data-testid={`button-${plan.tier}`}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : null}
-                    Manage Subscription
-                  </button>
-                )
+                (isIos ? (<p className="text-sm text-muted-foreground text-center py-2">Manage via <strong>Settings → Apple ID → Subscriptions</strong>
+                </p>) : (<button
+                  onClick={handleManageSubscription}
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                  data-testid={`button-${plan.tier}`}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : null}Manage Subscription
+                                    </button>))
               ) : isIos ? (
                 /* iOS: Roster (Stripe) on top dominant, App Store below outlined */
-                <div className="flex flex-col gap-2">
+                (<div className="flex flex-col gap-2">
                   {isUsRegion && (
                     <button
                       onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
@@ -603,7 +594,6 @@ export default function Subscription() {
                       )}
                     </button>
                   )}
-
                   <button
                     onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
                     disabled={isLoading || !iapReady}
@@ -616,10 +606,10 @@ export default function Subscription() {
                       'Subscribe via App Store'
                     )}
                   </button>
-                </div>
+                </div>)
               ) : (
                 /* Web / non-iOS: Stripe only */
-                <button
+                (<button
                   onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
                   disabled={isLoading || pricesLoading}
                   className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
@@ -630,15 +620,14 @@ export default function Subscription() {
                   ) : (
                     <>{plan.buttonText}<ExternalLink className="w-4 h-4" /></>
                   )}
-                </button>
+                </button>)
               )}
             </div>
           ))}
         </div>
       </div>
-
       {/* Information Notice */}
-      <div className="px-6 mt-6">
+      <div className="px-6 mt-[0px]">
         <p className="text-xs text-muted-foreground text-center">
           {isIos
             ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
