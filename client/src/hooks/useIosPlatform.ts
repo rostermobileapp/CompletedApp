@@ -1,5 +1,23 @@
 import { useState, useEffect } from 'react';
 
+/**
+ * Returns true when running inside the Natively iOS native app shell.
+ * Natively sets a custom user-agent containing "Natively/iOS" for iOS builds.
+ * This is a synchronous, reliable check — the UA is set by the native layer
+ * before any JavaScript runs.
+ */
+function isNativelyIosApp(): boolean {
+  return navigator.userAgent.includes('Natively/iOS');
+}
+
+/**
+ * Returns true when running inside the Natively Android native app shell.
+ * Natively sets a custom user-agent containing "Natively/Android" for Android builds.
+ */
+function isNativelyAndroidApp(): boolean {
+  return navigator.userAgent.includes('Natively/Android');
+}
+
 function getCapacitorPlatform(): string {
   try {
     const cap = (window as any).Capacitor;
@@ -39,119 +57,39 @@ interface IosPlatformInfo {
 }
 
 /**
- * Detects the native platform (iOS / Android / web), accounting for both Capacitor
- * and Natively-wrapped apps.
+ * Detects the native platform (iOS / Android / web).
  *
- * Detection priority:
- *   1. ?ios=1 query param  → always iOS (dev preview)
- *   2. window.Capacitor     → use getPlatform() directly (synchronous)
- *   3. Natively bridge      → window.natively + iOS/Android user-agent
- *      - If the iOS user-agent is detected we wait up to 2 s for window.natively to
- *        appear (the bridge arrives async after page load on real devices). We listen
- *        for the nativelyReady event AND poll at 100ms intervals so we catch the
- *        bridge no matter which signal arrives first.
- *      - If neither arrives within 2 s the device is treated as non-native (plain
- *        Safari or a desktop browser).
+ * Detection order:
+ *   1. ?ios=1 query param            → iOS (dev preview only)
+ *   2. Natively iOS user-agent        → iOS native app  ("Natively/iOS" in UA)
+ *   3. Natively Android user-agent    → Android native app ("Natively/Android" in UA)
+ *   4. Capacitor getPlatform()        → Capacitor-based native app
+ *   5. Fallback                       → web / Safari (not a native app)
+ *
+ * The Natively user-agent check is synchronous and does not require waiting for
+ * any bridge events, because the native shell sets the UA before JavaScript runs.
  */
 export function useIosPlatform(): IosPlatformInfo {
-  const [info, setInfo] = useState<IosPlatformInfo>({
-    isIos: false,
-    isAndroid: false,
-    isUsRegion: false,
-    isReady: false,
-  });
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+  const [info, setInfo] = useState<IosPlatformInfo>(() => {
+    const params = new URLSearchParams(
+      typeof window !== 'undefined' ? window.location.search : ''
+    );
     const previewIos = params.get('ios') === '1';
+    const nativelyIos = isNativelyIosApp();
+    const nativelyAndroid = isNativelyAndroidApp();
+    const capacitorPlatform = getCapacitorPlatform();
+
+    const isIos = previewIos || nativelyIos || capacitorPlatform === 'ios';
+    const isAndroid = nativelyAndroid || capacitorPlatform === 'android';
     const isUsRegion = detectUsRegion();
 
-    // 1. Dev-preview override
-    if (previewIos) {
-      setInfo({ isIos: true, isAndroid: false, isUsRegion, isReady: true });
-      return;
-    }
+    return { isIos, isAndroid, isUsRegion, isReady: true };
+  });
 
-    // 2. Capacitor (resolves synchronously)
-    const capacitorPlatform = getCapacitorPlatform();
-    if (capacitorPlatform === 'ios') {
-      setInfo({ isIos: true, isAndroid: false, isUsRegion, isReady: true });
-      return;
-    }
-    if (capacitorPlatform === 'android') {
-      setInfo({ isIos: false, isAndroid: true, isUsRegion, isReady: true });
-      return;
-    }
-
-    // 3. Natively bridge detection
-    const isIosUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isAndroidUA = /Android/i.test(navigator.userAgent);
-
-    const hasNativelyBridge = () => typeof (window as any).natively !== 'undefined';
-
-    if (!isIosUA && !isAndroidUA) {
-      // Desktop or unknown — no native bridge expected
-      setInfo({ isIos: false, isAndroid: false, isUsRegion, isReady: true });
-      return;
-    }
-
-    if (!isIosUA && isAndroidUA) {
-      // Android device — check if bridge is present now; if not, wait briefly
-      if (hasNativelyBridge()) {
-        setInfo({ isIos: false, isAndroid: true, isUsRegion, isReady: true });
-        return;
-      }
-      // Fall through to the async wait below (reuse same logic, just isIosUA=false)
-    }
-
-    // iOS (or Android without bridge yet): wait for window.natively to appear.
-    // The Natively bridge is injected asynchronously after the WebView loads.
-    // We listen for nativelyReady AND poll every 100 ms as a belt-and-suspenders
-    // approach — whichever signal arrives first wins.
-    let settled = false;
-
-    const settle = (nativelyPresent: boolean) => {
-      if (settled) return;
-      settled = true;
-      const resolvedIsIos = isIosUA && nativelyPresent;
-      const resolvedIsAndroid = isAndroidUA && nativelyPresent && !resolvedIsIos;
-      setInfo({
-        isIos: resolvedIsIos,
-        isAndroid: resolvedIsAndroid,
-        isUsRegion,
-        isReady: true,
-      });
-    };
-
-    // Check immediately — bridge may already be present
-    if (hasNativelyBridge()) {
-      settle(true);
-      return;
-    }
-
-    // Listen for nativelyReady event
-    const handleNativelyReady = () => settle(true);
-    window.addEventListener('nativelyReady', handleNativelyReady);
-
-    // Poll in case event fired before our listener was attached
-    const poll = setInterval(() => {
-      if (hasNativelyBridge()) {
-        clearInterval(poll);
-        settle(true);
-      }
-    }, 100);
-
-    // Safety timeout: if nothing arrives in 2 s, treat as non-native (plain browser)
-    const timeout = setTimeout(() => {
-      clearInterval(poll);
-      settle(false);
-    }, 2000);
-
-    return () => {
-      window.removeEventListener('nativelyReady', handleNativelyReady);
-      clearInterval(poll);
-      clearTimeout(timeout);
-    };
+  // Log on mount so developers can see what was detected (useful for debugging on device)
+  useEffect(() => {
+    console.log('[Platform] UA:', navigator.userAgent);
+    console.log('[Platform] isIos:', info.isIos, '| isAndroid:', info.isAndroid);
   }, []);
 
   return info;
