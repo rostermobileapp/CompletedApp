@@ -9,10 +9,8 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
-import type { Product } from '@capgo/native-purchases';
 import {
   isBillingSupported,
-  getIosProducts,
   purchaseProduct,
   restorePurchases,
   getAppAccountToken,
@@ -28,7 +26,6 @@ export default function Subscription() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
   const [iapReady, setIapReady] = useState(false);
-  const [iosProducts, setIosProducts] = useState<Product[]>([]);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
@@ -37,15 +34,11 @@ export default function Subscription() {
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
 
-  // Initialize IAP on iOS
+  // Initialize IAP on iOS — just check if billing is supported to enable the App Store button
   useEffect(() => {
     if (!platformReady || !isIos) return;
     isBillingSupported().then((supported) => {
-      if (!supported) return;
-      setIapReady(true);
-      return getIosProducts();
-    }).then((products) => {
-      if (products) setIosProducts(products);
+      if (supported) setIapReady(true);
     }).catch((err) => {
       console.warn('[Subscription] IAP init error:', err);
     });
@@ -86,14 +79,6 @@ export default function Subscription() {
   const proYearlyDisplay = formatPrice(stripePrices?.player_pro_yearly) ?? '...';
   const commYearlyDisplay = formatPrice(stripePrices?.commissioner_yearly) ?? '...';
 
-  const getIosPrice = (productId: string): string => {
-    const product = iosProducts.find((p: Product) => p.productIdentifier === productId);
-    if (!product) return '...';
-    if (product.priceString) return product.priceString;
-    if (product.price != null) return `$${product.price.toFixed(2)}`;
-    return '...';
-  };
-
   const getStripePrice = (tier: 'player_pro' | 'commissioner') => {
     if (billingPeriod === 'yearly') {
       return tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay;
@@ -120,8 +105,8 @@ export default function Subscription() {
     },
     {
       name: "Player Pro",
-      price: isIos ? getIosPrice(PRODUCT_PLAYER_PRO) : getStripePrice('player_pro'),
-      period: isIos ? "month" : (billingPeriod === 'yearly' ? 'year' : 'month'),
+      price: getStripePrice('player_pro'),
+      period: billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Enhanced features for serious players",
       features: [
         "FREE +",
@@ -141,8 +126,8 @@ export default function Subscription() {
     },
     {
       name: "Commissioner",
-      price: isIos ? getIosPrice(PRODUCT_COMMISSIONER) : getStripePrice('commissioner'),
-      period: isIos ? "month" : (billingPeriod === 'yearly' ? 'year' : 'month'),
+      price: getStripePrice('commissioner'),
+      period: billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Full league management capabilities",
       features: [
         "FREE & PLAYER PRO +",
@@ -388,9 +373,9 @@ export default function Subscription() {
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-current-plan-price">
                 {isCommissioner
-                  ? (isIos ? `${getIosPrice(PRODUCT_COMMISSIONER)}/month` : `${commMonthlyDisplay}/month`)
+                  ? `${commMonthlyDisplay}/month`
                   : isPlayerPlus
-                  ? (isIos ? `${getIosPrice(PRODUCT_PLAYER_PRO)}/month` : `${proMonthlyDisplay}/month`)
+                  ? `${proMonthlyDisplay}/month`
                   : 'Free forever'}
               </p>
             </div>
@@ -511,33 +496,31 @@ export default function Subscription() {
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
 
-        {/* Monthly / Yearly billing toggle (non-iOS only — iOS uses App Store pricing) */}
-        {!isIos && (
-          <div className="flex items-center justify-center mb-5">
-            <div className="flex bg-secondary rounded-lg p-1">
-              <button
-                onClick={() => setBillingPeriod('monthly')}
-                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                  billingPeriod === 'monthly'
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingPeriod('yearly')}
-                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                  billingPeriod === 'yearly'
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Yearly
-              </button>
-            </div>
+        {/* Monthly / Yearly billing toggle */}
+        <div className="flex items-center justify-center mb-5">
+          <div className="flex bg-secondary rounded-lg p-1">
+            <button
+              onClick={() => setBillingPeriod('monthly')}
+              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                billingPeriod === 'monthly'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingPeriod('yearly')}
+              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                billingPeriod === 'yearly'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Yearly
+            </button>
           </div>
-        )}
+        </div>
 
         <div className="space-y-4">
           {subscriptionPlans.map((plan, index) => (
@@ -621,18 +604,20 @@ export default function Subscription() {
                     </button>
                   )}
 
-                  <button
-                    onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                    disabled={isLoading || !iapReady}
-                    className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
-                    data-testid={`button-iap-${plan.tier}`}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Subscribe via App Store'
-                    )}
-                  </button>
+                  {billingPeriod === 'monthly' && (
+                    <button
+                      onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
+                      disabled={isLoading || !iapReady}
+                      className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
+                      data-testid={`button-iap-${plan.tier}`}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        'Subscribe via App Store'
+                      )}
+                    </button>
+                  )}
                 </div>
               ) : (
                 /* Web / non-iOS: Stripe only */
