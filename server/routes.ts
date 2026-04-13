@@ -17604,8 +17604,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique tournament ID
       const uniqueTournamentId = await generateUniqueTournamentId();
       
+      // Parse string dates to Date objects before Zod validation (form sends YYYY-MM-DD strings)
+      const rawBody = { ...req.body };
+      if (rawBody.accessStartDate && typeof rawBody.accessStartDate === 'string') {
+        rawBody.accessStartDate = new Date(rawBody.accessStartDate);
+      }
+      if (rawBody.accessEndDate && typeof rawBody.accessEndDate === 'string') {
+        rawBody.accessEndDate = new Date(rawBody.accessEndDate);
+      }
+
       const validatedData = insertTournamentSchema.parse({
-        ...req.body,
+        ...rawBody,
         createdBy: userId,
         uniqueTournamentId,
         paymentStatus: 'unpaid',
@@ -17848,18 +17857,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          // Calculate access windows based on match dates
+          // Calculate access windows based on match dates (only backfill if creator hasn't set dates)
           const accessWindows = calculateAccessWindows(bracketResult.matches);
           
           // Calculate payment amount based on team count
           const paymentAmount = await calculateTournamentPayment(id);
+
+          // Fetch current tournament to check if creator has already set access dates
+          const [currentTournament] = await db
+            .select({ accessStartDate: tournaments.accessStartDate, accessEndDate: tournaments.accessEndDate })
+            .from(tournaments)
+            .where(eq(tournaments.id, id));
           
           // Update tournament with access windows and payment amount
           await db
             .update(tournaments)
             .set({
-              accessStartDate: accessWindows.accessStartDate,
-              accessEndDate: accessWindows.accessEndDate,
+              // Only use auto-calculated dates if creator hasn't already set them
+              accessStartDate: currentTournament?.accessStartDate ?? accessWindows.accessStartDate,
+              accessEndDate: currentTournament?.accessEndDate ?? accessWindows.accessEndDate,
               paymentAmount,
               updatedAt: new Date()
             })

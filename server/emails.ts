@@ -658,6 +658,7 @@ Visit: ${appUrl}
 interface TournamentAccessOpenData {
   tournamentId: string;
   tournamentName: string;
+  accessStartDate: Date | null;
   accessEndDate: Date | null;
   uniqueTournamentId: string;
 }
@@ -674,6 +675,9 @@ export async function sendTournamentAccessOpenEmail(
       : 'https://rosters.replit.app';
     const searchUrl = `${appUrl}/tournament-search`;
 
+    const startDateStr = data.accessStartDate
+      ? format(data.accessStartDate, 'MMMM d, yyyy')
+      : null;
     const endDateStr = data.accessEndDate
       ? format(data.accessEndDate, 'MMMM d, yyyy')
       : null;
@@ -706,10 +710,11 @@ export async function sendTournamentAccessOpenEmail(
                         <p style="margin: 0 0 8px 0; font-size: 14px; color: #666666;">Your Tournament ID</p>
                         <p style="margin: 0; font-size: 32px; font-weight: bold; font-family: monospace; color: #333333; letter-spacing: 4px;">${data.uniqueTournamentId}</p>
                       </div>
-                      ${endDateStr ? `
-                      <p style="margin: 0 0 20px 0; font-size: 14px; color: #666666;">
-                        Registration closes on <strong>${endDateStr}</strong>.
-                      </p>
+                      ${(startDateStr || endDateStr) ? `
+                      <div style="background-color: #f0f4ff; border-radius: 4px; padding: 16px; margin: 16px 0;">
+                        ${startDateStr ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #666666;"><strong>Opens:</strong> ${startDateStr}</p>` : ''}
+                        ${endDateStr ? `<p style="margin: 0; font-size: 14px; color: #666666;"><strong>Closes:</strong> ${endDateStr}</p>` : ''}
+                      </div>
                       ` : ''}
                       <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
                         <tr>
@@ -745,7 +750,7 @@ Tournament Registration is Now Open!
 ${data.tournamentName} registration is now open.
 
 Your Tournament ID: ${data.uniqueTournamentId}
-${endDateStr ? `Registration closes: ${endDateStr}\n` : ''}
+${startDateStr ? `Registration opens: ${startDateStr}\n` : ''}${endDateStr ? `Registration closes: ${endDateStr}\n` : ''}
 Join the tournament at: ${searchUrl}
 
 Enter the tournament ID on the Find a Tournament page to register your spot.

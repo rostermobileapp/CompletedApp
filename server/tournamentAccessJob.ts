@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { tournaments, tournamentParticipants, users } from "@shared/schema";
-import { and, eq, isNotNull, isNull, lte, gte, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte, gte, ne } from "drizzle-orm";
 import { addHours } from "date-fns";
 import { sendTournamentAccessOpenEmail } from "./emails";
 import { sendPushNotificationToUser } from "./oneSignalNotifications";
@@ -8,7 +8,7 @@ import { sendPushNotificationToUser } from "./oneSignalNotifications";
 const JOB_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
-  // ---- 1. Window-open email: paid tournaments whose access window just opened and invites not yet sent ----
+  // ---- 1. Window-open email: paid, non-draft tournaments whose access window just opened and invites not yet sent ----
   try {
     const openWindowTournaments = await db
       .select()
@@ -16,6 +16,7 @@ async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
       .where(
         and(
           eq(tournaments.paymentStatus, 'paid'),
+          ne(tournaments.status, 'draft'),
           isNotNull(tournaments.accessStartDate),
           lte(tournaments.accessStartDate, now),
           isNull(tournaments.accessInvitesSentAt)
@@ -27,7 +28,7 @@ async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
 
       console.log(`[TournamentAccessJob] Sending window-open emails for tournament ${tournament.id} (${tournament.name})`);
 
-      // Get all approved participants to email
+      // Get all participants who have an email — any status
       const participants = await db
         .select({
           userId: tournamentParticipants.userId,
@@ -35,12 +36,7 @@ async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
         })
         .from(tournamentParticipants)
         .innerJoin(users, eq(tournamentParticipants.userId, users.id))
-        .where(
-          and(
-            eq(tournamentParticipants.tournamentId, tournament.id),
-            eq(tournamentParticipants.status, 'approved')
-          )
-        );
+        .where(eq(tournamentParticipants.tournamentId, tournament.id));
 
       let emailsSent = 0;
       for (const participant of participants) {
@@ -49,6 +45,7 @@ async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
           await sendTournamentAccessOpenEmail(participant.email, {
             tournamentId: tournament.id,
             tournamentName: tournament.name,
+            accessStartDate: tournament.accessStartDate,
             accessEndDate: tournament.accessEndDate,
             uniqueTournamentId: tournament.uniqueTournamentId,
           });
@@ -80,6 +77,7 @@ async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
       .where(
         and(
           eq(tournaments.paymentStatus, 'paid'),
+          ne(tournaments.status, 'draft'),
           isNotNull(tournaments.accessEndDate),
           gte(tournaments.accessEndDate, now),
           lte(tournaments.accessEndDate, in24h),
