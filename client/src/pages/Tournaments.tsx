@@ -7,15 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { useIosPlatform } from "@/hooks/useIosPlatform";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Tournament } from "@shared/schema";
 
 export default function Tournaments() {
   const [, params] = useRoute("/leagues/:leagueId/tournaments");
   const [, navigate] = useLocation();
   const leagueId = params?.leagueId;
-  const { isIos, isAndroid } = useIosPlatform();
-  const isMobile = isIos || isAndroid;
+  const isMobile = useIsMobile();
   const [showMobileDialog, setShowMobileDialog] = useState(false);
 
   const { data: tournaments, isLoading } = useQuery<Tournament[]>({

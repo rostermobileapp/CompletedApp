@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useIosPlatform } from '@/hooks/useIosPlatform';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 type Tournament = {
   id: string;
@@ -22,8 +22,7 @@ type Tournament = {
 
 export default function TournamentsLanding() {
   const [, navigate] = useLocation();
-  const { isIos, isAndroid } = useIosPlatform();
-  const isMobile = isIos || isAndroid;
+  const isMobile = useIsMobile();
   const [showMobileDialog, setShowMobileDialog] = useState(false);
 
   const { data: tournaments, isLoading } = useQuery<Tournament[]>({
