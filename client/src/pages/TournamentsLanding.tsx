@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Trophy, ArrowRight, Plus } from 'lucide-react';
@@ -5,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { useIosPlatform } from '@/hooks/useIosPlatform';
 
 type Tournament = {
   id: string;
@@ -19,11 +22,21 @@ type Tournament = {
 
 export default function TournamentsLanding() {
   const [, navigate] = useLocation();
+  const { isIos, isAndroid } = useIosPlatform();
+  const isMobile = isIos || isAndroid;
+  const [showMobileDialog, setShowMobileDialog] = useState(false);
 
-  // Fetch all tournaments for the user
   const { data: tournaments, isLoading } = useQuery<Tournament[]>({
     queryKey: ['/api/tournaments/all'],
   });
+
+  function handleCreateTournament() {
+    if (isMobile) {
+      setShowMobileDialog(true);
+    } else {
+      navigate('/tournaments/create');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -58,7 +71,7 @@ export default function TournamentsLanding() {
         {/* Create Tournament Button */}
         <div className="mb-6">
           <Button
-            onClick={() => navigate('/tournaments/create')}
+            onClick={handleCreateTournament}
             data-testid="create-tournament-btn"
             size="lg"
           >
@@ -122,6 +135,20 @@ export default function TournamentsLanding() {
           </div>
         )}
       </div>
+
+      <Dialog open={showMobileDialog} onOpenChange={setShowMobileDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desktop Required</DialogTitle>
+            <DialogDescription>
+              Due to the complexity of tournament setup, you must create a tournament on a desktop browser. Login at Roster-App.com to get started.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowMobileDialog(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

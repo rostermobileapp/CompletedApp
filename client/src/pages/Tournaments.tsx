@@ -1,21 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 import { useState } from "react";
 import { Plus, Trophy, Calendar, Users, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useIosPlatform } from "@/hooks/useIosPlatform";
 import type { Tournament } from "@shared/schema";
 
 export default function Tournaments() {
   const [, params] = useRoute("/leagues/:leagueId/tournaments");
+  const [, navigate] = useLocation();
   const leagueId = params?.leagueId;
+  const { isIos, isAndroid } = useIosPlatform();
+  const isMobile = isIos || isAndroid;
+  const [showMobileDialog, setShowMobileDialog] = useState(false);
 
   const { data: tournaments, isLoading } = useQuery<Tournament[]>({
     queryKey: ['/api/leagues', leagueId, 'tournaments'],
     enabled: !!leagueId
   });
+
+  function handleCreateTournament() {
+    if (isMobile) {
+      setShowMobileDialog(true);
+    } else {
+      navigate('/tournaments/create');
+    }
+  }
 
   const getStatusBadge = (status: Tournament['status']) => {
     const variants: Record<Tournament['status'], { variant: 'default' | 'secondary' | 'destructive' | 'outline', text: string }> = {
@@ -72,12 +86,15 @@ export default function Tournaments() {
                 Create and manage playoffs and standalone tournaments
               </p>
             </div>
-            <Link href="/tournaments/create">
-              <Button size="lg" className="w-full md:w-auto" data-testid="button-create-tournament">
-                <Plus className="h-5 w-5 mr-2" />
-                Create Tournament
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              className="w-full md:w-auto"
+              data-testid="button-create-tournament"
+              onClick={handleCreateTournament}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create Tournament
+            </Button>
           </div>
         </div>
       </div>
@@ -92,12 +109,13 @@ export default function Tournaments() {
               <p className="text-muted-foreground mb-6 max-w-md">
                 Create your first tournament to organize playoffs or a standalone competition
               </p>
-              <Link href="/tournaments/create">
-                <Button data-testid="button-create-first-tournament">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Create Your First Tournament
-                </Button>
-              </Link>
+              <Button
+                data-testid="button-create-first-tournament"
+                onClick={handleCreateTournament}
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Create Your First Tournament
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -158,6 +176,20 @@ export default function Tournaments() {
           </div>
         )}
       </div>
+
+      <Dialog open={showMobileDialog} onOpenChange={setShowMobileDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desktop Required</DialogTitle>
+            <DialogDescription>
+              Due to the complexity of tournament setup, you must create a tournament on a desktop browser. Login at Roster-App.com to get started.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowMobileDialog(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
