@@ -500,7 +500,7 @@ export default function Subscription() {
               onClick={() => setBillingPeriod('monthly')}
               className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                 billingPeriod === 'monthly'
-                  ? 'bg-card text-foreground shadow-sm'
+                  ? 'bg-[#3c83f6] text-white'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -510,7 +510,7 @@ export default function Subscription() {
               onClick={() => setBillingPeriod('yearly')}
               className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                 billingPeriod === 'yearly'
-                  ? 'bg-card text-foreground shadow-sm'
+                  ? 'bg-[#3c83f6] text-white'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
