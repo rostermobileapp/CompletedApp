@@ -18165,6 +18165,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         advancesToMatchId: null // Clear temporarily
       }));
       
+      if (matchesWithoutAdvances.length === 0) {
+        // Safety guard: no matches were generated (e.g. empty bracket config)
+        return res.json({ teams: insertedTeams, matches: [], rounds: bracketResult.rounds });
+      }
+
       const insertedMatches = await db
         .insert(tournamentMatches)
         .values(matchesWithoutAdvances)
@@ -18211,7 +18216,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       console.error("Error generating bracket:", error);
-      res.status(500).json({ message: "Failed to generate bracket" });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: `Failed to generate bracket: ${errMsg}` });
     }
   });
 

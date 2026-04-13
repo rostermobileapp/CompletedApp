@@ -272,19 +272,26 @@ export function generateSingleElimination(
   interface BracketNode {
     team: TournamentTeam | null;
     matchNumber: number | null;
+    /** True if this slot represents a real team position (even if TBD for standalone) vs a pure bye slot */
+    isRealSlot: boolean;
   }
 
   let currentLevel: BracketNode[] = slotTeams.map((team, idx) => {
+    const seed = seedSlots[idx];
+    const isRealSlot = seed <= effectiveTeamCount;
+
     // If this slot is the play-in winner (null team with a play-in match available), mark it as coming from play-in
-    if (needsPlayIn && team === null && playInMatchNum !== null) {
+    if (needsPlayIn && team === null && playInMatchNum !== null && isRealSlot) {
       return {
         team: null,
-        matchNumber: playInMatchNum
+        matchNumber: playInMatchNum,
+        isRealSlot: true
       };
     }
     return {
       team,
-      matchNumber: null
+      matchNumber: null,
+      isRealSlot
     };
   });
 
@@ -318,15 +325,15 @@ export function generateSingleElimination(
       const hasContent2 = node2.team || node2.matchNumber !== null;
       
       // Bye logic: only true bye if one has DIRECT team (not from match) and other is completely empty
-      const isTrueBye = !!((node1.team && !hasContent2) || (node2.team && !hasContent1));
-      const byeWinner = node1.team && !hasContent2 ? node1.team :
-                        node2.team && !hasContent1 ? node2.team : null;
+      const isTrueBye = !!((node1.team && !hasContent2 && !node2.isRealSlot) || (node2.team && !hasContent1 && !node1.isRealSlot));
+      const byeWinner = node1.team && !hasContent2 && !node2.isRealSlot ? node1.team :
+                        node2.team && !hasContent1 && !node1.isRealSlot ? node2.team : null;
       
-      if (!hasContent1 && !hasContent2) {
-        // Both empty - skip
-        nextLevel.push({ team: null, matchNumber: null });
+      if (!hasContent1 && !hasContent2 && !node1.isRealSlot && !node2.isRealSlot) {
+        // Both are pure bye slots (no real team will ever play here) - skip
+        nextLevel.push({ team: null, matchNumber: null, isRealSlot: false });
       } else {
-        // Create match
+        // Create match (either has real content, or at least one slot is a real team position)
         const matchNumber = matchCounter++;
         
         allMatches.push({
@@ -345,7 +352,8 @@ export function generateSingleElimination(
         // Winner advances to next level
         nextLevel.push({
           team: isTrueBye ? byeWinner : null,
-          matchNumber
+          matchNumber,
+          isRealSlot: true
         });
       }
     }
