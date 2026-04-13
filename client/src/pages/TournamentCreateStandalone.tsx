@@ -40,6 +40,33 @@ const formSchema = z.object({
   message: "Please select a league and season for playoff tournaments",
   path: ["leagueId"]
 }).refine((data) => {
+  // Standalone tournaments require access start date
+  if (data.type === "standalone") {
+    return !!data.accessStartDate;
+  }
+  return true;
+}, {
+  message: "Access window start date is required for standalone tournaments",
+  path: ["accessStartDate"]
+}).refine((data) => {
+  // Standalone tournaments require access end date
+  if (data.type === "standalone") {
+    return !!data.accessEndDate;
+  }
+  return true;
+}, {
+  message: "Access window end date is required for standalone tournaments",
+  path: ["accessEndDate"]
+}).refine((data) => {
+  // End date must be after start date when both are provided
+  if (data.accessStartDate && data.accessEndDate) {
+    return new Date(data.accessEndDate) > new Date(data.accessStartDate);
+  }
+  return true;
+}, {
+  message: "Access end date must be after start date",
+  path: ["accessEndDate"]
+}).refine((data) => {
   // Validate teams based on type
   if (data.type === "season_playoff") {
     // For season playoffs, need teamIds with min 3
@@ -710,16 +737,21 @@ export default function TournamentCreateStandalone() {
                       name="accessStartDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Access Window Start (Optional)</FormLabel>
+                          <FormLabel>
+                            Access Window Start
+                            {watchedType === "standalone" && <span className="text-destructive ml-1">*</span>}
+                          </FormLabel>
                           <FormControl>
                             <Input
-                              type="date"
+                              type="datetime-local"
                               {...field}
                               data-testid="input-access-start-date"
                             />
                           </FormControl>
                           <FormDescription>
-                            When players can start joining
+                            {watchedType === "standalone"
+                              ? "Required: when players can start joining"
+                              : "When players can start joining (optional)"}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -730,16 +762,21 @@ export default function TournamentCreateStandalone() {
                       name="accessEndDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Access Window End (Optional)</FormLabel>
+                          <FormLabel>
+                            Access Window End
+                            {watchedType === "standalone" && <span className="text-destructive ml-1">*</span>}
+                          </FormLabel>
                           <FormControl>
                             <Input
-                              type="date"
+                              type="datetime-local"
                               {...field}
                               data-testid="input-access-end-date"
                             />
                           </FormControl>
                           <FormDescription>
-                            When player access closes
+                            {watchedType === "standalone"
+                              ? "Required: when player registration closes"
+                              : "When player access closes (optional)"}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>

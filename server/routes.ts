@@ -17604,13 +17604,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique tournament ID
       const uniqueTournamentId = await generateUniqueTournamentId();
       
-      // Parse string dates to Date objects before Zod validation (form sends YYYY-MM-DD strings)
+      // Parse string dates to Date objects before Zod validation (form sends datetime-local strings)
       const rawBody = { ...req.body };
       if (rawBody.accessStartDate && typeof rawBody.accessStartDate === 'string') {
         rawBody.accessStartDate = new Date(rawBody.accessStartDate);
+      } else if (!rawBody.accessStartDate) {
+        rawBody.accessStartDate = null;
       }
       if (rawBody.accessEndDate && typeof rawBody.accessEndDate === 'string') {
         rawBody.accessEndDate = new Date(rawBody.accessEndDate);
+      } else if (!rawBody.accessEndDate) {
+        rawBody.accessEndDate = null;
+      }
+
+      // Enforce access window required for standalone tournaments
+      if (rawBody.type === 'standalone') {
+        if (!rawBody.accessStartDate || !rawBody.accessEndDate) {
+          return res.status(400).json({ message: "Standalone tournaments require both an access window start and end date" });
+        }
+        if (rawBody.accessEndDate <= rawBody.accessStartDate) {
+          return res.status(400).json({ message: "Access window end date must be after start date" });
+        }
       }
 
       const validatedData = insertTournamentSchema.parse({

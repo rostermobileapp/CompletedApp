@@ -287,7 +287,7 @@ export default function TournamentSearch() {
                 <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10">
                   <p className="text-sm text-amber-600 dark:text-amber-400">
                     {!windowOpen
-                      ? `Registration opens on ${format(new Date(tournament.accessStartDate!), 'MMM d, yyyy')}.`
+                      ? `Joins open on ${format(new Date(tournament.accessStartDate!), 'MMM d, yyyy')}.`
                       : `Registration for this tournament has closed.`}
                   </p>
                 </div>
