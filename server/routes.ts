@@ -17559,8 +17559,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(eq(tournamentTeams.tournamentId, tournamentId));
     
     const count = Number(teamCount[0]?.count || 0);
-    // $10 per team = 1000 cents (stored as cents for frontend display)
-    return count * 1000;
+    // $5 per team = 500 cents (stored as cents for frontend display)
+    return count * 500;
   }
 
   // Create tournament
@@ -18167,6 +18167,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (matchesWithoutAdvances.length === 0) {
         // Safety guard: no matches were generated (e.g. empty bracket config)
+        const safePayment = await calculateTournamentPayment(tournamentId);
+        await db.update(tournaments).set({ paymentAmount: safePayment, numTeams: insertedTeams.length, updatedAt: new Date() }).where(eq(tournaments.id, tournamentId));
         return res.json({ teams: insertedTeams, matches: [], rounds: bracketResult.rounds });
       }
 
@@ -18198,10 +18200,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // DEBUG: Log bracket statistics
-      const winnersMatches = insertedMatches.filter(m => m.bracketType === 'winners');
-      const losersMatches = insertedMatches.filter(m => m.bracketType === 'losers');
-      const grandFinalMatches = insertedMatches.filter(m => m.bracketType === 'grand_final');
+      // Calculate and update payment amount and numTeams on the tournament
+      const paymentAmount = await calculateTournamentPayment(tournamentId);
+      await db
+        .update(tournaments)
+        .set({
+          paymentAmount,
+          numTeams: insertedTeams.length,
+          updatedAt: new Date()
+        })
+        .where(eq(tournaments.id, tournamentId));
 
       res.json({ 
         teams: insertedTeams, 
@@ -19132,7 +19140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(tournamentTeams.tournamentId, tournamentId));
         
         const teamCount = Number(totalTeams[0]?.count || 0);
-        const paymentAmount = teamCount * 1000; // $10 per team = 1000 cents
+        const paymentAmount = teamCount * 500; // $5 per team = 500 cents
         
         await db
           .update(tournaments)
