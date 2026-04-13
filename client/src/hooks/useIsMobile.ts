@@ -1,19 +1,13 @@
-/**
- * Detects whether the user is on a mobile device (iOS or Android),
- * covering both native app shells and standard mobile browsers.
- *
- * Detection uses:
- *   1. Natively/Capacitor UA strings (native app shells)
- *   2. Standard iOS/Android UA strings (Safari, Chrome, etc.)
- *   3. Screen width fallback (< 768px)
- */
-export function useIsMobile(): boolean {
+import { useState, useEffect } from 'react';
+
+const MOBILE_BREAKPOINT = 768;
+
+function detectMobileUA(): boolean {
   if (typeof window === 'undefined') return false;
 
   const ua = navigator.userAgent;
 
-  const nativelyIos = ua.includes('Natively/iOS');
-  const nativelyAndroid = ua.includes('Natively/Android');
+  if (ua.includes('Natively/iOS') || ua.includes('Natively/Android')) return true;
 
   try {
     const cap = (window as any).Capacitor;
@@ -24,12 +18,36 @@ export function useIsMobile(): boolean {
   } catch {
   }
 
-  if (nativelyIos || nativelyAndroid) return true;
+  if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
 
-  const iosDevice = /iPhone|iPad|iPod/i.test(ua);
-  const androidDevice = /Android/i.test(ua);
+  return false;
+}
 
-  if (iosDevice || androidDevice) return true;
+/**
+ * Detects whether the user is on a mobile device (iOS or Android),
+ * covering both native app shells and standard mobile browsers.
+ *
+ * Detection uses (in order):
+ *   1. Natively/Capacitor UA strings (native app shells)
+ *   2. Standard iOS/Android UA strings (Safari, Chrome, etc.)
+ *   3. Reactive screen width fallback (< 768px via matchMedia)
+ */
+export function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    if (detectMobileUA()) return true;
+    return window.innerWidth < MOBILE_BREAKPOINT;
+  });
 
-  return window.innerWidth < 768;
+  useEffect(() => {
+    if (detectMobileUA()) return;
+
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const onChange = () => setIsMobile(mql.matches);
+    mql.addEventListener('change', onChange);
+    setIsMobile(mql.matches);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
 }
