@@ -24,6 +24,8 @@ const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
+  accessStartDate: z.string().optional(),
+  accessEndDate: z.string().optional(),
   teams: z.array(z.object({
     name: z.string().min(1, "Team name is required")
   })).optional(),
@@ -75,6 +77,8 @@ export default function TournamentCreateStandalone() {
       name: "",
       format: "single_elimination",
       description: "",
+      accessStartDate: "",
+      accessEndDate: "",
       teams: [],
       teamIds: []
     }
@@ -120,6 +124,8 @@ export default function TournamentCreateStandalone() {
         format: data.format,
         numTeams: numTeams,
         description: data.description || null,
+        accessStartDate: data.accessStartDate || null,
+        accessEndDate: data.accessEndDate || null,
         settings: {
           bracketType: "seeded",
           showSeedNumbers: true,
@@ -697,6 +703,49 @@ export default function TournamentCreateStandalone() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="accessStartDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Access Window Start (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              data-testid="input-access-start-date"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            When players can start joining
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="accessEndDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Access Window End (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              data-testid="input-access-end-date"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            When player access closes
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             )}

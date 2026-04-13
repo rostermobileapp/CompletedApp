@@ -79,6 +79,7 @@ import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail } from "./emails";
 import { startEventReminderJob } from "./eventReminderJob";
+import { startTournamentAccessJob } from "./tournamentAccessJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
 import { sendTeamEventPushNotification } from "./oneSignalNotifications";
@@ -19756,6 +19757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Start the scrimmage invitation job (for recurring scrimmage invites)
   startScrimmageInviteJob();
+
+  // Start the tournament access window job (emails on open, push 24h before close)
+  startTournamentAccessJob();
 
   // IMPORTANT: Catch-all for unmatched API routes - must return JSON 404 instead of HTML
   // This prevents the static file handler from serving index.html for API routes

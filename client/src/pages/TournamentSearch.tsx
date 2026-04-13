@@ -121,7 +121,11 @@ export default function TournamentSearch() {
     }
   };
 
-  const canJoin = tournament && !participant && tournament.paymentStatus === 'paid';
+  const now = new Date();
+  const windowOpen = !tournament?.accessStartDate || new Date(tournament.accessStartDate) <= now;
+  const windowNotClosed = !tournament?.accessEndDate || new Date(tournament.accessEndDate) >= now;
+  const windowActive = windowOpen && windowNotClosed;
+  const canJoin = tournament && !participant && tournament.paymentStatus === 'paid' && windowActive;
   const canView = participant?.status === 'approved';
 
   return (
@@ -273,7 +277,18 @@ export default function TournamentSearch() {
               {tournament.paymentStatus !== 'paid' && !participant && (
                 <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10">
                   <p className="text-sm text-amber-600 dark:text-amber-400">
-                    This tournament is not yet available for players to join. The commissioner needs to complete payment first.
+                    This tournament is not yet open for registration.
+                  </p>
+                </div>
+              )}
+
+              {/* Access Window Warning */}
+              {tournament.paymentStatus === 'paid' && !participant && !windowActive && (
+                <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10">
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    {!windowOpen
+                      ? `Registration opens on ${format(new Date(tournament.accessStartDate!), 'MMM d, yyyy')}.`
+                      : `Registration for this tournament has closed.`}
                   </p>
                 </div>
               )}

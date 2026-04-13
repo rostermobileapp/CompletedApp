@@ -654,3 +654,118 @@ Visit: ${appUrl}
     throw error;
   }
 }
+
+interface TournamentAccessOpenData {
+  tournamentId: string;
+  tournamentName: string;
+  accessEndDate: Date | null;
+  uniqueTournamentId: string;
+}
+
+export async function sendTournamentAccessOpenEmail(
+  recipientEmail: string,
+  data: TournamentAccessOpenData
+): Promise<void> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+
+    const appUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : 'https://rosters.replit.app';
+    const searchUrl = `${appUrl}/tournament-search`;
+
+    const endDateStr = data.accessEndDate
+      ? format(data.accessEndDate, 'MMMM d, yyyy')
+      : null;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Tournament Registration Now Open</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Registration is Open!</h1>
+                      <p style="margin: 10px 0 0 0; color: #e0e0ff; font-size: 16px;">${data.tournamentName}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
+                        The registration window for <strong>${data.tournamentName}</strong> is now open. Use the tournament ID below to find and join the tournament.
+                      </p>
+                      <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: center;">
+                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #666666;">Your Tournament ID</p>
+                        <p style="margin: 0; font-size: 32px; font-weight: bold; font-family: monospace; color: #333333; letter-spacing: 4px;">${data.uniqueTournamentId}</p>
+                      </div>
+                      ${endDateStr ? `
+                      <p style="margin: 0 0 20px 0; font-size: 14px; color: #666666;">
+                        Registration closes on <strong>${endDateStr}</strong>.
+                      </p>
+                      ` : ''}
+                      <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
+                        <tr>
+                          <td align="center">
+                            <a href="${searchUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">Join the Tournament</a>
+                          </td>
+                        </tr>
+                      </table>
+                      <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 20px; color: #666666;">
+                        Enter the tournament ID on the Find a Tournament page to register your spot.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
+                        This notification was sent through <strong>Rosters</strong> - Your sports team management platform<br>
+                        <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit Rosters</a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const textContent = `
+Tournament Registration is Now Open!
+
+${data.tournamentName} registration is now open.
+
+Your Tournament ID: ${data.uniqueTournamentId}
+${endDateStr ? `Registration closes: ${endDateStr}\n` : ''}
+Join the tournament at: ${searchUrl}
+
+Enter the tournament ID on the Find a Tournament page to register your spot.
+
+---
+This notification was sent through Rosters - Your sports team management platform
+Visit: ${appUrl}
+    `.trim();
+
+    await client.emails.send({
+      from: fromEmail,
+      to: recipientEmail,
+      subject: `🏆 Registration Open: ${data.tournamentName}`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    console.log(`✅ Sent tournament access open email to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send tournament access open email to ${recipientEmail}:`, error);
+    throw error;
+  }
+}

@@ -533,6 +533,8 @@ export const tournaments = pgTable("tournaments", {
   paidTeamCount: integer("paid_team_count").default(0).notNull(), // number of teams paid for
   accessStartDate: timestamp("access_start_date"), // 30 days before first match
   accessEndDate: timestamp("access_end_date"), // 7 days after last match
+  accessInvitesSentAt: timestamp("access_invites_sent_at"), // when window-open emails were sent
+  accessClosingReminderSentAt: timestamp("access_closing_reminder_sent_at"), // when 24h-close push was sent
   stripePaymentIntentId: varchar("stripe_payment_intent_id"),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id"),
   // League visibility fields
