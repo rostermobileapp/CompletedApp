@@ -19,6 +19,7 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
     if (isPaidUser) return null;
     
     if (location.startsWith('/messages')) return null;
+    if (location.startsWith('/subscription')) return null;
     
     return (
       <div 
