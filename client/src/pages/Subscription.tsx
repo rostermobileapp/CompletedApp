@@ -12,6 +12,7 @@ import { useIosPlatform } from '@/hooks/useIosPlatform';
 import type { Transaction } from '@capgo/native-purchases';
 import {
   isBillingSupported,
+  getIosProducts,
   purchaseProduct,
   restorePurchases,
   getAppAccountToken,
@@ -28,6 +29,7 @@ export default function Subscription() {
   const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
   const [iapReady, setIapReady] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const [iosProductPrices, setIosProductPrices] = useState<Record<string, string>>({});
 
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
@@ -35,11 +37,18 @@ export default function Subscription() {
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
 
-  // Initialize IAP on iOS — just check if billing is supported to enable the App Store button
+  // Initialize IAP on iOS — check billing support then fetch real App Store prices
   useEffect(() => {
     if (!platformReady || !isIos) return;
-    isBillingSupported().then((supported) => {
-      if (supported) setIapReady(true);
+    isBillingSupported().then(async (supported) => {
+      if (!supported) return;
+      setIapReady(true);
+      const products = await getIosProducts();
+      const priceMap: Record<string, string> = {};
+      for (const p of products) {
+        priceMap[p.identifier] = p.priceString;
+      }
+      setIosProductPrices(priceMap);
     }).catch((err) => {
       console.warn('[Subscription] IAP init error:', err);
     });
@@ -80,7 +89,13 @@ export default function Subscription() {
   const proYearlyDisplay = formatPrice(stripePrices?.player_pro_yearly) ?? '...';
   const commYearlyDisplay = formatPrice(stripePrices?.commissioner_yearly) ?? '...';
 
-  const getStripePrice = (tier: 'player_pro' | 'commissioner') => {
+  // For iOS users, return the price fetched from the App Store (localised + tax-inclusive).
+  // For web/Android users, return the Stripe price for the selected billing period.
+  const getPriceDisplay = (tier: 'player_pro' | 'commissioner') => {
+    if (isIos) {
+      const productId = tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER;
+      return iosProductPrices[productId] ?? '...';
+    }
     if (billingPeriod === 'yearly') {
       return tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay;
     }
@@ -106,8 +121,8 @@ export default function Subscription() {
     },
     {
       name: "Player Pro",
-      price: getStripePrice('player_pro'),
-      period: billingPeriod === 'yearly' ? 'year' : 'month',
+      price: getPriceDisplay('player_pro'),
+      period: isIos ? 'month' : billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Enhanced features for serious players",
       features: [
         "FREE +",
@@ -127,8 +142,8 @@ export default function Subscription() {
     },
     {
       name: "Commissioner",
-      price: getStripePrice('commissioner'),
-      period: billingPeriod === 'yearly' ? 'year' : 'month',
+      price: getPriceDisplay('commissioner'),
+      period: isIos ? 'month' : billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Full league management capabilities",
       features: [
         "FREE & PLAYER PRO +",
@@ -383,9 +398,9 @@ export default function Subscription() {
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-current-plan-price">
                 {isCommissioner
-                  ? `${commMonthlyDisplay}/month`
+                  ? `${isIos ? (iosProductPrices[PRODUCT_COMMISSIONER] ?? commMonthlyDisplay) : commMonthlyDisplay}/month`
                   : isPlayerPlus
-                  ? `${proMonthlyDisplay}/month`
+                  ? `${isIos ? (iosProductPrices[PRODUCT_PLAYER_PRO] ?? proMonthlyDisplay) : proMonthlyDisplay}/month`
                   : 'Free forever'}
               </p>
             </div>
@@ -505,31 +520,33 @@ export default function Subscription() {
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
 
-        {/* Monthly / Yearly billing toggle */}
-        <div className="flex items-center justify-center mb-5">
-          <div className="flex bg-secondary rounded-lg p-1">
-            <button
-              onClick={() => setBillingPeriod('monthly')}
-              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                billingPeriod === 'monthly'
-                  ? 'bg-[#3c83f6] text-white'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingPeriod('yearly')}
-              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                billingPeriod === 'yearly'
-                  ? 'bg-[#3c83f6] text-white'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Yearly
-            </button>
+        {/* Monthly / Yearly billing toggle — hidden on iOS (Apple only offers monthly) */}
+        {!isIos && (
+          <div className="flex items-center justify-center mb-5">
+            <div className="flex bg-secondary rounded-lg p-1">
+              <button
+                onClick={() => setBillingPeriod('monthly')}
+                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                  billingPeriod === 'monthly'
+                    ? 'bg-[#3c83f6] text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingPeriod('yearly')}
+                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                  billingPeriod === 'yearly'
+                    ? 'bg-[#3c83f6] text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Yearly
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-4">
           {subscriptionPlans.map((plan, index) => (
