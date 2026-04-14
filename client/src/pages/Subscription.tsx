@@ -9,6 +9,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
+import type { Transaction } from '@capgo/native-purchases';
 import {
   isBillingSupported,
   purchaseProduct,
@@ -224,8 +225,8 @@ export default function Subscription() {
 
       // Build the verification payload, preferring StoreKit 2 JWS > transactionId > legacy receipt
       const verifyPayload: Record<string, string> = {};
-      if ((transaction as any).jwsRepresentation) {
-        verifyPayload.jws = (transaction as any).jwsRepresentation;
+      if (transaction.jwsRepresentation) {
+        verifyPayload.jws = transaction.jwsRepresentation;
       } else if (transaction.transactionId) {
         verifyPayload.transactionId = transaction.transactionId;
       } else if (transaction.receipt) {
@@ -271,9 +272,9 @@ export default function Subscription() {
 
       // Prefer JWS > transactionId > receipt for restore verification too
       let verifyPayload: Record<string, string> | null = null;
-      for (const p of purchases) {
-        if ((p as any).jwsRepresentation) {
-          verifyPayload = { jws: (p as any).jwsRepresentation };
+      for (const p of purchases as Transaction[]) {
+        if (p.jwsRepresentation) {
+          verifyPayload = { jws: p.jwsRepresentation };
           break;
         } else if (p.transactionId) {
           verifyPayload = { transactionId: p.transactionId };

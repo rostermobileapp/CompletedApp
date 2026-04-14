@@ -2535,17 +2535,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     newRole: 'commissioner' | 'player_pro',
     originalTransactionId?: string,
   ) => {
-    const iapCol = originalTransactionId
-      ? `, iap_original_transaction_id = '${originalTransactionId}'`
-      : '';
-    await db.execute(sql.raw(`
-      UPDATE users
-      SET role = '${newRole}'::user_role,
-          last_updated = NOW(),
-          updated_at = NOW()
-          ${iapCol}
-      WHERE id = '${userId}'
-    `));
+    await db
+      .update(users)
+      .set({
+        role: newRole,
+        lastUpdated: new Date(),
+        updatedAt: new Date(),
+        ...(originalTransactionId ? { iapOriginalTransactionId: originalTransactionId } : {}),
+      })
+      .where(eq(users.id, userId));
 
     try {
       await supabase.auth.admin.updateUserById(userId, {
@@ -2724,9 +2722,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { decodeAppleJWSPayload } = await import('./appleIap');
 
-      // Decode the outer notification envelope
-      const notification = await decodeAppleJWSPayload(signedPayload) as import('./appleIap').AppleNotificationPayload;
-      const { notificationType, subtype, data } = notification;
+      // Decode the outer notification envelope (verified against Apple Root CA G3)
+      const notifRaw = await decodeAppleJWSPayload(signedPayload);
+      const notificationType = notifRaw.notificationType as string;
+      const subtype = notifRaw.subtype as string | undefined;
+      const data = notifRaw.data as {
+        environment: string;
+        signedTransactionInfo?: string;
+        signedRenewalInfo?: string;
+      } | undefined;
 
       console.log(`[IAP/Notify] ${notificationType}${subtype ? '/' + subtype : ''} (${data?.environment})`);
 
@@ -2735,29 +2739,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ message: 'Notification acknowledged (no transaction)' });
       }
 
-      // Decode the signed transaction payload
-      const tx = await decodeAppleJWSPayload(data.signedTransactionInfo) as import('./appleIap').AppleTransactionPayload;
-      const { productId, originalTransactionId, appAccountToken, expiresDate } = tx;
+      // Decode the signed transaction payload (also verified against Apple Root CA G3)
+      const txRaw = await decodeAppleJWSPayload(data.signedTransactionInfo);
+      const productId = txRaw.productId as string;
+      const originalTransactionId = txRaw.originalTransactionId as string | undefined;
+      const expiresDate = txRaw.expiresDate as number | undefined;
 
       // Find the user by iap_original_transaction_id (stored when they first subscribed)
-      let userId: string | null = null;
+      let notifUserId: string | null = null;
       if (originalTransactionId) {
-        const rows = await db.execute(sql.raw(
-          `SELECT id FROM users WHERE iap_original_transaction_id = '${originalTransactionId}' LIMIT 1`
-        )) as any;
-        userId = rows.rows?.[0]?.id ?? null;
+        const rows = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.iapOriginalTransactionId, originalTransactionId))
+          .limit(1);
+        notifUserId = rows[0]?.id ?? null;
       }
 
-      // Fall back: derive userId from appAccountToken (UUID v5 — cannot reverse directly;
-      // we'd need to brute-force all users, so we only do this if originalTransactionId lookup fails)
-      if (!userId && appAccountToken) {
-        // We can't reverse uuidv5, so log and skip — the next verify call will store the ID
-        console.warn('[IAP/Notify] Could not find user for originalTransactionId:', originalTransactionId,
-          '— they may not have purchased through this server yet');
-      }
-
-      if (!userId) {
-        console.warn('[IAP/Notify] No user found for notification, skipping role update');
+      if (!notifUserId) {
+        // User hasn't subscribed through this server yet — they will be updated on next app open
+        console.warn('[IAP/Notify] No user found for originalTransactionId:', originalTransactionId);
         return res.status(200).json({ message: 'Notification acknowledged (user not found)' });
       }
 
@@ -2785,35 +2786,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         const newRole = IAP_PRODUCT_ROLES[productId];
         if (newRole) {
-          await applyIapRole(userId, newRole, originalTransactionId);
-          console.log(`[IAP/Notify] ${notificationType} → role set to ${newRole} for user ${userId}`);
+          await applyIapRole(notifUserId, newRole, originalTransactionId);
+          console.log(`[IAP/Notify] ${notificationType} → role set to ${newRole} for user ${notifUserId}`);
         }
 
       } else if (REVOKE_TYPES.has(notificationType)) {
         // Subscription ended — downgrade to free_tier
-        await db.execute(sql.raw(`
-          UPDATE users
-          SET role = 'free_tier'::user_role,
-              last_updated = NOW(),
-              updated_at = NOW()
-          WHERE id = '${userId}'
-        `));
+        await db
+          .update(users)
+          .set({ role: 'free_tier', lastUpdated: new Date(), updatedAt: new Date() })
+          .where(eq(users.id, notifUserId));
+
         try {
-          await supabase.auth.admin.updateUserById(userId, {
+          await supabase.auth.admin.updateUserById(notifUserId, {
             user_metadata: { subscription_tier: 'free_tier' },
           });
         } catch (e) {
           console.warn('[IAP/Notify] Supabase metadata sync failed on revoke:', e);
         }
-        console.log(`[IAP/Notify] ${notificationType} → role reset to free_tier for user ${userId}`);
+        console.log(`[IAP/Notify] ${notificationType} → role reset to free_tier for user ${notifUserId}`);
 
       } else {
         console.log(`[IAP/Notify] Unhandled notification type: ${notificationType} — acknowledged`);
       }
 
       res.status(200).json({ message: 'Notification processed' });
-    } catch (error: any) {
-      console.error('[IAP/Notify] Error processing notification:', error);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[IAP/Notify] Error processing notification:', message);
       // Always return 200 to Apple — non-200 triggers retries
       res.status(200).json({ message: 'Notification acknowledged (internal error)' });
     }
