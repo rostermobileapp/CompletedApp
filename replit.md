@@ -137,8 +137,8 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 - Uses `@capgo/native-purchases` for StoreKit 2 in-app purchases via Capacitor — no RevenueCat required
 - `server/appleIap.ts` — Apple App Store Server API utilities: JWT generation (ES256), JWS payload decoding via x5c cert chain, transaction lookup by ID, and subscription status retrieval
 - `client/src/lib/nativePurchases.ts` — capgo plugin wrapper (billing support check, get products, purchase, restore)
-- `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users; sends StoreKit 2 JWS → transactionId → receipt (in priority order) to backend
-- `server/routes.ts` — `POST /api/iap/verify` accepts JWS (StoreKit 2), transactionId (App Store Server API lookup), or legacy receipt; `POST /api/iap/notifications` is an App Store Server Notifications v2 webhook
+- `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users; sends StoreKit 2 JWS (preferred) or transactionId to backend for verification
+- `server/routes.ts` — `POST /api/iap/verify` accepts JWS (StoreKit 2, verified against Apple Root CA G3 + bundleId) or transactionId (App Store Server API lookup with JWT); legacy verifyReceipt removed. `POST /api/iap/notifications` is an App Store Server Notifications v2 webhook
 - Product IDs: `com.rosterapp.player_pro_monthly` → Player Pro, `com.rosterapp.commissioner_monthly` → Commissioner
 - **Environment variables required:**
   - `APPLE_IAP_KEY_ID` — Key ID from App Store Connect (e.g. `UJJ4YAG7D3`)
