@@ -246,6 +246,8 @@ export const users = pgTable("users", {
   // Stripe subscription fields
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  // Apple IAP fields
+  iapOriginalTransactionId: varchar("iap_original_transaction_id"),
   // Payment method fields for receiving payments
   venmoUsername: varchar("venmo_username"),
   cashappUsername: varchar("cashapp_username"),

@@ -133,15 +133,19 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 - Users who completed onboarding are never shown the flow again (checked via `onboardingCompleted` flag)
 - App.tsx intercepts authenticated users with `onboardingCompleted=false` and renders the Onboarding page
 
-### iOS IAP Dual Subscription Options (Apple compliance)
-- Uses `@capgo/native-purchases` (free, no vendor lock-in) for StoreKit 2 in-app purchases via Capacitor — no RevenueCat required
-- `client/src/hooks/useIosPlatform.ts` — detects iOS (via `window.Capacitor.getPlatform()`); `isUsRegion` is always `false` on iOS because `@capgo/native-purchases` has no `getStorefront()` API — the safe/compliant default is to hide the Stripe external-link on all iOS devices (future: implement native `SKStorefront.countryCode` bridge to enable US-only Stripe button)
-- `client/src/lib/nativePurchases.ts` — capgo plugin wrapper (billing support check, get products, purchase, restore, active purchase query)
-- `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users, plus "Subscribe with Roster" (Stripe, US region only, Apple-compliant wording); web users see Stripe-only flow unchanged
-- `server/routes.ts` — `POST /api/iap/verify` validates receipts directly with Apple's verifyReceipt API (production + sandbox fallback), maps product IDs to roles, and updates user role in DB
+### iOS IAP — Apple App Store Server API (StoreKit 2)
+- Uses `@capgo/native-purchases` for StoreKit 2 in-app purchases via Capacitor — no RevenueCat required
+- `server/appleIap.ts` — Apple App Store Server API utilities: JWT generation (ES256), JWS payload decoding via x5c cert chain, transaction lookup by ID, and subscription status retrieval
+- `client/src/lib/nativePurchases.ts` — capgo plugin wrapper (billing support check, get products, purchase, restore)
+- `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users; sends StoreKit 2 JWS → transactionId → receipt (in priority order) to backend
+- `server/routes.ts` — `POST /api/iap/verify` accepts JWS (StoreKit 2), transactionId (App Store Server API lookup), or legacy receipt; `POST /api/iap/notifications` is an App Store Server Notifications v2 webhook
 - Product IDs: `com.rosterapp.player_pro_monthly` → Player Pro, `com.rosterapp.commissioner_monthly` → Commissioner
+- **Environment variables required:**
+  - `APPLE_IAP_KEY_ID` — Key ID from App Store Connect (e.g. `UJJ4YAG7D3`)
+  - `APPLE_IAP_ISSUER_ID` — Issuer ID from App Store Connect Users & Access → Integrations
+  - `APPLE_IAP_PRIVATE_KEY` — Full PEM content of the `.p8` private key file
 - **To activate on iOS:**
   1. Create product IDs in App Store Connect (Subscription Groups): `com.rosterapp.player_pro_monthly` and `com.rosterapp.commissioner_monthly`
-  2. (Optional) Set `APPLE_SHARED_SECRET` env var = your App Store Connect shared secret for auto-renewable subscriptions (improves receipt validation security)
+  2. Register webhook URL in App Store Connect → General → App Information → App Store Server Notifications: `https://<your-domain>/api/iap/notifications` (both Production and Sandbox)
   3. Run `npx cap sync ios` in the Xcode project to install the native plugin
-- Subscription button copy: "Subscribe via App Store" (IAP) and "Subscribe with Roster" (Stripe, US only) — Apple-compliant per EP v. Apple ruling
+- Subscription button copy: "Subscribe via App Store" (IAP) — Apple-compliant per EP v. Apple ruling

@@ -222,18 +222,25 @@ export default function Subscription() {
       const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
       const transaction = await purchaseProduct(productId, appAccountToken);
 
-      if (!transaction.receipt) {
-        throw new Error('No receipt returned from App Store. Please try again.');
+      // Build the verification payload, preferring StoreKit 2 JWS > transactionId > legacy receipt
+      const verifyPayload: Record<string, string> = {};
+      if ((transaction as any).jwsRepresentation) {
+        verifyPayload.jws = (transaction as any).jwsRepresentation;
+      } else if (transaction.transactionId) {
+        verifyPayload.transactionId = transaction.transactionId;
+      } else if (transaction.receipt) {
+        verifyPayload.receipt = transaction.receipt;
+      } else {
+        throw new Error('No verifiable data returned from App Store. Please try again.');
       }
+      if (appAccountToken) verifyPayload.appAccountToken = appAccountToken;
 
-      // Send receipt + appAccountToken to backend — role is determined server-side from Apple's response
-      // appAccountToken lets the server verify the purchase belongs to this user
-      const response = await apiRequest('POST', '/api/iap/verify', {
-        receipt: transaction.receipt,
-        appAccountToken,
-      });
+      const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
 
-      if (!response.ok) throw new Error('Purchase completed but role sync failed. Please restart the app.');
+      if (!response.ok) {
+        const data = await response.json() as { message?: string };
+        throw new Error(data.message || 'Purchase completed but role sync failed. Please restart the app.');
+      }
 
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
@@ -262,18 +269,28 @@ export default function Subscription() {
         return;
       }
 
-      // Find a purchase with a receipt and send it to backend for Apple validation
-      const withReceipt = purchases.find((p) => p.receipt);
-      if (!withReceipt?.receipt) {
+      // Prefer JWS > transactionId > receipt for restore verification too
+      let verifyPayload: Record<string, string> | null = null;
+      for (const p of purchases) {
+        if ((p as any).jwsRepresentation) {
+          verifyPayload = { jws: (p as any).jwsRepresentation };
+          break;
+        } else if (p.transactionId) {
+          verifyPayload = { transactionId: p.transactionId };
+          break;
+        } else if (p.receipt) {
+          verifyPayload = { receipt: p.receipt };
+          break;
+        }
+      }
+
+      if (!verifyPayload) {
         toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
       }
 
-      const response = await apiRequest('POST', '/api/iap/verify', {
-        receipt: withReceipt.receipt,
-      });
-
+      const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
       const data = await response.json() as { role?: string; message?: string };
 
       if (response.ok && data.role && data.role !== 'free_tier') {

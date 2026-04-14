@@ -2488,130 +2488,334 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // iOS In-App Purchase verification via Apple's verifyReceipt API
-  // Called after a successful StoreKit purchase to sync the role in our DB
+  // ─── Apple App Store Server API helpers ────────────────────────────────────
+  // Product ID → subscription role mapping (server-side truth only — never trust client)
+  const IAP_PRODUCT_ROLES: Record<string, 'commissioner' | 'player_pro'> = {
+    'com.rosterapp.commissioner_monthly': 'commissioner',
+    'com.rosterapp.player_pro_monthly': 'player_pro',
+  };
+
+  // Stable namespace used to derive deterministic appAccountTokens from userIds
+  const IAP_APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+  /**
+   * Validate an Apple JWS transaction payload against this user.
+   * Returns the decoded payload if valid, or throws.
+   */
+  const validateAppleTransaction = async (
+    jws: string,
+    userId: string,
+  ): Promise<import('./appleIap').AppleTransactionPayload> => {
+    const { decodeAppleJWSPayload } = await import('./appleIap');
+    const { v5: uuidv5 } = await import('uuid');
+
+    const tx = await decodeAppleJWSPayload(jws) as import('./appleIap').AppleTransactionPayload;
+    const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
+
+    if (tx.appAccountToken) {
+      if (tx.appAccountToken.toLowerCase() !== expectedToken) {
+        console.warn('[IAP] appAccountToken mismatch — possible replay attack', { userId });
+        throw Object.assign(new Error('Purchase does not belong to this account'), { status: 403 });
+      }
+    } else {
+      // No appAccountToken: reject — all new purchases must include it
+      console.warn('[IAP] No appAccountToken in transaction — binding cannot be verified', { userId });
+      throw Object.assign(new Error('Receipt cannot be bound to an account — please re-purchase or contact support'), { status: 403 });
+    }
+
+    return tx;
+  };
+
+  /**
+   * Update the user's role in the DB and sync to Supabase.
+   * Also stores the IAP originalTransactionId for webhook lookups.
+   */
+  const applyIapRole = async (
+    userId: string,
+    newRole: 'commissioner' | 'player_pro',
+    originalTransactionId?: string,
+  ) => {
+    const iapCol = originalTransactionId
+      ? `, iap_original_transaction_id = '${originalTransactionId}'`
+      : '';
+    await db.execute(sql.raw(`
+      UPDATE users
+      SET role = '${newRole}'::user_role,
+          last_updated = NOW(),
+          updated_at = NOW()
+          ${iapCol}
+      WHERE id = '${userId}'
+    `));
+
+    try {
+      await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: { subscription_tier: newRole },
+      });
+    } catch (supabaseErr) {
+      console.warn('[IAP] Failed to sync Supabase metadata:', supabaseErr);
+    }
+  };
+
+  // ─── POST /api/iap/verify ──────────────────────────────────────────────────
+  // Called by the iOS client after a successful StoreKit purchase.
+  //
+  // Accepts (in priority order):
+  //   1. jws            — StoreKit 2 JWS-signed transaction (preferred, verified
+  //                       against Apple's x5c cert chain embedded in the JWS header)
+  //   2. transactionId  — Numeric transaction ID; looked up via App Store Server API
+  //                       using a server-generated JWT (requires APPLE_IAP_* env vars)
+  //   3. receipt        — Legacy base64 StoreKit 1 receipt; validated via verifyReceipt
+  //                       (kept for backward compatibility; deprecated by Apple)
   app.post('/api/iap/verify', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { receipt } = req.body;
-      // Note: any client-supplied appAccountToken is intentionally ignored;
-      // only Apple's receipt payload is authoritative for account binding.
+      const { jws, transactionId, receipt } = req.body;
 
-      // receipt is required — we never trust client-supplied productId for role assignment
-      if (!receipt || typeof receipt !== 'string' || receipt.trim().length === 0) {
-        return res.status(400).json({ message: 'Missing receipt' });
+      // ── Path 1: StoreKit 2 JWS transaction ──────────────────────────────
+      if (jws && typeof jws === 'string' && jws.trim()) {
+        const tx = await validateAppleTransaction(jws, userId);
+        const now = Date.now();
+
+        if (tx.revocationDate) {
+          return res.status(402).json({ message: 'Transaction has been revoked' });
+        }
+        if (tx.expiresDate && tx.expiresDate < now) {
+          return res.status(402).json({ message: 'Subscription has expired' });
+        }
+
+        const newRole = IAP_PRODUCT_ROLES[tx.productId] ?? null;
+        if (!newRole) {
+          return res.status(400).json({ message: `Unrecognised product: ${tx.productId}` });
+        }
+
+        await applyIapRole(userId, newRole, tx.originalTransactionId);
+        console.log(`[IAP] JWS verified for user ${userId}: role → ${newRole} (${tx.environment})`);
+        return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
-      // Product ID → role mapping (server-side truth only)
-      const PRODUCT_ROLES: Record<string, 'commissioner' | 'player_pro'> = {
-        'com.rosterapp.commissioner_monthly': 'commissioner',
-        'com.rosterapp.player_pro_monthly': 'player_pro',
-      };
+      // ── Path 2: Transaction ID → App Store Server API ───────────────────
+      if (transactionId && typeof transactionId === 'string' && transactionId.trim()) {
+        const { lookupTransactionById, isAppleIapConfigured } = await import('./appleIap');
 
-      // Validate receipt with Apple (try production first, fall back to sandbox)
-      const validateWithApple = async (url: string, receiptData: string) => {
-        const appleRes = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            'receipt-data': receiptData,
-            password: process.env.APPLE_SHARED_SECRET ?? '',
-          }),
-        });
-        return appleRes.json() as Promise<any>;
-      };
+        if (!isAppleIapConfigured()) {
+          return res.status(503).json({ message: 'Apple IAP API not configured on server' });
+        }
 
-      let appleData = await validateWithApple('https://buy.itunes.apple.com/verifyReceipt', receipt);
+        const { payload: tx } = await lookupTransactionById(transactionId);
+        const now = Date.now();
 
-      // Status 21007 means sandbox receipt sent to production — retry with sandbox
-      if (appleData.status === 21007) {
-        appleData = await validateWithApple('https://sandbox.itunes.apple.com/verifyReceipt', receipt);
-      }
+        if (tx.revocationDate) {
+          return res.status(402).json({ message: 'Transaction has been revoked' });
+        }
+        if (tx.expiresDate && tx.expiresDate < now) {
+          return res.status(402).json({ message: 'Subscription has expired' });
+        }
 
-      if (appleData.status !== 0) {
-        console.warn('[IAP] Apple receipt validation failed, status:', appleData.status);
-        return res.status(402).json({ message: 'Apple could not verify this receipt', appleStatus: appleData.status });
-      }
-
-      // Extract role from Apple's authoritative response only — never from client-supplied data
-      const latestReceiptInfo: any[] = appleData.latest_receipt_info ?? [];
-      const now = Date.now();
-      const activeReceipts = latestReceiptInfo.filter((r: any) => {
-        const expiresMs = parseInt(r.expires_date_ms ?? '0', 10);
-        return expiresMs > now;
-      });
-
-      // Sort by expiry descending to get the most recent active subscription
-      activeReceipts.sort((a: any, b: any) =>
-        parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10)
-      );
-
-      // Enforce receipt-to-account binding via Apple's authoritative app_account_token.
-      // This field is set by the client during purchaseProduct() as a UUID v5 derived
-      // from userId, and Apple cryptographically includes it in the signed receipt.
-      // We verify it here using only Apple's receipt data — client-supplied values
-      // are never treated as authorization evidence.
-      {
+        // Verify account binding using the payload's appAccountToken
         const { v5: uuidv5 } = await import('uuid');
-        const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-        const expectedToken = uuidv5(userId, APP_NAMESPACE).toLowerCase();
+        const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
+        if (tx.appAccountToken) {
+          if (tx.appAccountToken.toLowerCase() !== expectedToken) {
+            console.warn('[IAP] appAccountToken mismatch (transactionId path)', { userId });
+            return res.status(403).json({ message: 'Purchase does not belong to this account' });
+          }
+        } else {
+          console.warn('[IAP] No appAccountToken in Apple response (transactionId path)', { userId });
+          return res.status(403).json({ message: 'Receipt cannot be bound to an account' });
+        }
 
-        // Extract app_account_token from Apple's receipt response (authoritative source)
+        const newRole = IAP_PRODUCT_ROLES[tx.productId] ?? null;
+        if (!newRole) {
+          return res.status(400).json({ message: `Unrecognised product: ${tx.productId}` });
+        }
+
+        await applyIapRole(userId, newRole, tx.originalTransactionId);
+        console.log(`[IAP] Transaction ID verified for user ${userId}: role → ${newRole}`);
+        return res.json({ message: 'IAP verified and role updated', role: newRole });
+      }
+
+      // ── Path 3: Legacy verifyReceipt fallback ───────────────────────────
+      if (receipt && typeof receipt === 'string' && receipt.trim()) {
+        const validateWithApple = async (url: string, receiptData: string) => {
+          const appleRes = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              'receipt-data': receiptData,
+              password: process.env.APPLE_SHARED_SECRET ?? '',
+            }),
+          });
+          return appleRes.json() as Promise<any>;
+        };
+
+        let appleData = await validateWithApple('https://buy.itunes.apple.com/verifyReceipt', receipt);
+        if (appleData.status === 21007) {
+          appleData = await validateWithApple('https://sandbox.itunes.apple.com/verifyReceipt', receipt);
+        }
+
+        if (appleData.status !== 0) {
+          console.warn('[IAP] Legacy verifyReceipt failed, status:', appleData.status);
+          return res.status(402).json({ message: 'Apple could not verify this receipt', appleStatus: appleData.status });
+        }
+
+        const latestReceiptInfo: any[] = appleData.latest_receipt_info ?? [];
+        const now = Date.now();
+        const activeReceipts = latestReceiptInfo
+          .filter((r: any) => parseInt(r.expires_date_ms ?? '0', 10) > now)
+          .sort((a: any, b: any) => parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10));
+
+        // Enforce account binding via app_account_token in Apple's receipt
+        const { v5: uuidv5 } = await import('uuid');
+        const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
         const appleTokens = activeReceipts
           .map((r: any) => (r.app_account_token ?? '').toLowerCase())
           .filter(Boolean);
 
         if (appleTokens.length > 0) {
-          // Apple has a token — it MUST match this user; reject on any mismatch
           if (!appleTokens.includes(expectedToken)) {
-            console.warn('[IAP] Apple app_account_token mismatch — receipt replay blocked', { userId });
+            console.warn('[IAP] app_account_token mismatch (legacy path)', { userId });
             return res.status(403).json({ message: 'Purchase does not belong to this account' });
           }
         } else {
-          // Apple receipt has no app_account_token.
-          // This can happen for purchases made before appAccountToken was implemented,
-          // or for sandbox test transactions without a token set.
-          // We reject to enforce binding — new purchases always include this token.
-          console.warn('[IAP] No app_account_token in Apple receipt — binding cannot be verified', { userId });
+          console.warn('[IAP] No app_account_token in legacy receipt', { userId });
           return res.status(403).json({ message: 'Receipt cannot be bound to an account — please re-purchase or contact support' });
         }
+
+        let newRole: 'commissioner' | 'player_pro' | null = null;
+        for (const r of activeReceipts) {
+          const mapped = IAP_PRODUCT_ROLES[r.product_id];
+          if (mapped === 'commissioner') { newRole = 'commissioner'; break; }
+          if (mapped === 'player_pro' && newRole !== 'commissioner') newRole = 'player_pro';
+        }
+
+        if (!newRole) {
+          return res.status(200).json({ message: 'No active subscription found in receipt', role: 'free_tier' });
+        }
+
+        const originalTxId = activeReceipts[0]?.original_transaction_id;
+        await applyIapRole(userId, newRole, originalTxId);
+        console.log(`[IAP] Legacy receipt verified for user ${userId}: role → ${newRole}`);
+        return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
-      // commissioner takes priority if present in any active subscription
-      let newRole: 'commissioner' | 'player_pro' | null = null;
-      for (const r of activeReceipts) {
-        const mapped = PRODUCT_ROLES[r.product_id];
-        if (mapped === 'commissioner') { newRole = 'commissioner'; break; }
-        if (mapped === 'player_pro' && newRole !== 'commissioner') newRole = 'player_pro';
-      }
+      return res.status(400).json({ message: 'Missing jws, transactionId, or receipt' });
 
-      if (!newRole) {
-        return res.status(200).json({ message: 'No active subscription found in receipt', role: 'free_tier' });
-      }
-
-      // Update user role in DB (same raw SQL approach as Stripe sync)
-      await db.execute(sql.raw(`
-        UPDATE users
-        SET role = '${newRole}'::user_role,
-            last_updated = NOW(),
-            updated_at = NOW()
-        WHERE id = '${userId}'
-      `));
-
-      // Sync role to Supabase user metadata
-      try {
-        await supabase.auth.admin.updateUserById(userId, {
-          user_metadata: { subscription_tier: newRole }
-        });
-      } catch (supabaseErr) {
-        console.warn('[IAP] Failed to sync Supabase metadata:', supabaseErr);
-      }
-
-      console.log(`[IAP] Verified IAP for user ${userId}: role set to ${newRole}`);
-      res.json({ message: 'IAP verified and role updated', role: newRole });
     } catch (error: any) {
       console.error('[IAP] Verification error:', error);
-      res.status(500).json({ message: 'IAP verification failed', error: error.message });
+      const status = typeof error.status === 'number' ? error.status : 500;
+      res.status(status).json({ message: error.message || 'IAP verification failed' });
+    }
+  });
+
+  // ─── POST /api/iap/notifications ──────────────────────────────────────────
+  // App Store Server Notifications v2 webhook.
+  // Register this URL in App Store Connect → General → App Information →
+  // App Store Server Notifications (both Production and Sandbox).
+  //
+  // Apple sends a JSON body: { "signedPayload": "<JWS>" }
+  // The JWS contains the notification type and signed transaction/renewal info.
+  app.post('/api/iap/notifications', async (req, res) => {
+    try {
+      const { signedPayload } = req.body as { signedPayload?: string };
+
+      if (!signedPayload || typeof signedPayload !== 'string') {
+        return res.status(400).json({ message: 'Missing signedPayload' });
+      }
+
+      const { decodeAppleJWSPayload } = await import('./appleIap');
+
+      // Decode the outer notification envelope
+      const notification = await decodeAppleJWSPayload(signedPayload) as import('./appleIap').AppleNotificationPayload;
+      const { notificationType, subtype, data } = notification;
+
+      console.log(`[IAP/Notify] ${notificationType}${subtype ? '/' + subtype : ''} (${data?.environment})`);
+
+      if (!data?.signedTransactionInfo) {
+        // Some notification types (e.g. CONSUMPTION_REQUEST) have no transaction
+        return res.status(200).json({ message: 'Notification acknowledged (no transaction)' });
+      }
+
+      // Decode the signed transaction payload
+      const tx = await decodeAppleJWSPayload(data.signedTransactionInfo) as import('./appleIap').AppleTransactionPayload;
+      const { productId, originalTransactionId, appAccountToken, expiresDate } = tx;
+
+      // Find the user by iap_original_transaction_id (stored when they first subscribed)
+      let userId: string | null = null;
+      if (originalTransactionId) {
+        const rows = await db.execute(sql.raw(
+          `SELECT id FROM users WHERE iap_original_transaction_id = '${originalTransactionId}' LIMIT 1`
+        )) as any;
+        userId = rows.rows?.[0]?.id ?? null;
+      }
+
+      // Fall back: derive userId from appAccountToken (UUID v5 — cannot reverse directly;
+      // we'd need to brute-force all users, so we only do this if originalTransactionId lookup fails)
+      if (!userId && appAccountToken) {
+        // We can't reverse uuidv5, so log and skip — the next verify call will store the ID
+        console.warn('[IAP/Notify] Could not find user for originalTransactionId:', originalTransactionId,
+          '— they may not have purchased through this server yet');
+      }
+
+      if (!userId) {
+        console.warn('[IAP/Notify] No user found for notification, skipping role update');
+        return res.status(200).json({ message: 'Notification acknowledged (user not found)' });
+      }
+
+      // Determine what to do based on notification type
+      const GRANT_TYPES = new Set([
+        'SUBSCRIBED',
+        'DID_RENEW',
+        'OFFER_REDEEMED',
+        'DID_CHANGE_RENEWAL_STATUS',
+      ]);
+      const REVOKE_TYPES = new Set([
+        'EXPIRED',
+        'REFUND',
+        'REVOKE',
+        'GRACE_PERIOD_EXPIRED',
+      ]);
+
+      const now = Date.now();
+
+      if (GRANT_TYPES.has(notificationType)) {
+        // Subscription is (or becomes) active
+        if (expiresDate && expiresDate < now) {
+          console.log(`[IAP/Notify] ${notificationType} but subscription already expired — skipping`);
+          return res.status(200).json({ message: 'Already expired' });
+        }
+        const newRole = IAP_PRODUCT_ROLES[productId];
+        if (newRole) {
+          await applyIapRole(userId, newRole, originalTransactionId);
+          console.log(`[IAP/Notify] ${notificationType} → role set to ${newRole} for user ${userId}`);
+        }
+
+      } else if (REVOKE_TYPES.has(notificationType)) {
+        // Subscription ended — downgrade to free_tier
+        await db.execute(sql.raw(`
+          UPDATE users
+          SET role = 'free_tier'::user_role,
+              last_updated = NOW(),
+              updated_at = NOW()
+          WHERE id = '${userId}'
+        `));
+        try {
+          await supabase.auth.admin.updateUserById(userId, {
+            user_metadata: { subscription_tier: 'free_tier' },
+          });
+        } catch (e) {
+          console.warn('[IAP/Notify] Supabase metadata sync failed on revoke:', e);
+        }
+        console.log(`[IAP/Notify] ${notificationType} → role reset to free_tier for user ${userId}`);
+
+      } else {
+        console.log(`[IAP/Notify] Unhandled notification type: ${notificationType} — acknowledged`);
+      }
+
+      res.status(200).json({ message: 'Notification processed' });
+    } catch (error: any) {
+      console.error('[IAP/Notify] Error processing notification:', error);
+      // Always return 200 to Apple — non-200 triggers retries
+      res.status(200).json({ message: 'Notification acknowledged (internal error)' });
     }
   });
 

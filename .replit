@@ -40,3 +40,16 @@ integrations = ["javascript_websocket:1.0.0", "javascript_object_storage:1.0.0",
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+APPLE_IAP_KEY_ID = "UJJ4YAG7D3"
+APPLE_IAP_ISSUER_ID = "b9b2d270-05a4-4fa9-8d48-658bdccb2859"
+APPLE_IAP_PRIVATE_KEY = """
+-----BEGIN PRIVATE KEY-----
+  MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgvbDoREpLJMa72o9g
+  /sjMw7y23KxEsyZ/5guYbCju1XWgCgYIKoZIzj0DAQehRANCAARMIBjjnKR9FyVz
+  qE0we5p/5RYfDczSlXJvg+Nh17VAEpiH3PYc8P9q400MEaDwlJaO2e+pplzw06Ao
+  cEHabbXs
+  -----END PRIVATE KEY-----"""
