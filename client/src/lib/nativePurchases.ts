@@ -4,6 +4,8 @@ import { v5 as uuidv5 } from 'uuid';
 
 export const PRODUCT_PLAYER_PRO = 'com.rosterapp.player_pro_monthly';
 export const PRODUCT_COMMISSIONER = 'com.rosterapp.commissioner_monthly';
+export const PRODUCT_PLAYER_PRO_YEARLY = 'com.rosterapp.player_pro_yearly';
+export const PRODUCT_COMMISSIONER_YEARLY = 'com.rosterapp.commissioner_yearly';
 
 // Stable namespace UUID for generating deterministic appAccountTokens
 const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -35,7 +37,12 @@ export async function isBillingSupported(): Promise<boolean> {
 export async function getIosProducts() {
   try {
     const { products } = await NativePurchases.getProducts({
-      productIdentifiers: [PRODUCT_PLAYER_PRO, PRODUCT_COMMISSIONER],
+      productIdentifiers: [
+        PRODUCT_PLAYER_PRO,
+        PRODUCT_COMMISSIONER,
+        PRODUCT_PLAYER_PRO_YEARLY,
+        PRODUCT_COMMISSIONER_YEARLY,
+      ],
       productType: PURCHASE_TYPE.SUBS,
     });
     return products;

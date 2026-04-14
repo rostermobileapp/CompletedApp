@@ -18,6 +18,8 @@ import {
   getAppAccountToken,
   PRODUCT_PLAYER_PRO,
   PRODUCT_COMMISSIONER,
+  PRODUCT_PLAYER_PRO_YEARLY,
+  PRODUCT_COMMISSIONER_YEARLY,
 } from '@/lib/nativePurchases';
 
 export default function Subscription() {
@@ -89,11 +91,13 @@ export default function Subscription() {
   const proYearlyDisplay = formatPrice(stripePrices?.player_pro_yearly) ?? '...';
   const commYearlyDisplay = formatPrice(stripePrices?.commissioner_yearly) ?? '...';
 
-  // For iOS users, return the price fetched from the App Store (localised + tax-inclusive).
-  // For web/Android users, return the Stripe price for the selected billing period.
+  // For iOS users, return the price fetched from the App Store (localised + tax-inclusive)
+  // for the selected billing period. For web/Android, return the Stripe price.
   const getPriceDisplay = (tier: 'player_pro' | 'commissioner') => {
     if (isIos) {
-      const productId = tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER;
+      const productId = billingPeriod === 'yearly'
+        ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
+        : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
       return iosProductPrices[productId] ?? '...';
     }
     if (billingPeriod === 'yearly') {
@@ -122,7 +126,7 @@ export default function Subscription() {
     {
       name: "Player Pro",
       price: getPriceDisplay('player_pro'),
-      period: isIos ? 'month' : billingPeriod === 'yearly' ? 'year' : 'month',
+      period: billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Enhanced features for serious players",
       features: [
         "FREE +",
@@ -143,7 +147,7 @@ export default function Subscription() {
     {
       name: "Commissioner",
       price: getPriceDisplay('commissioner'),
-      period: isIos ? 'month' : billingPeriod === 'yearly' ? 'year' : 'month',
+      period: billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Full league management capabilities",
       features: [
         "FREE & PLAYER PRO +",
@@ -234,7 +238,9 @@ export default function Subscription() {
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {
-      const productId = tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER;
+      const productId = billingPeriod === 'yearly'
+        ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
+        : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
       const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
       const transaction = await purchaseProduct(productId, appAccountToken);
 
@@ -520,33 +526,31 @@ export default function Subscription() {
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
 
-        {/* Monthly / Yearly billing toggle — hidden on iOS (Apple only offers monthly) */}
-        {!isIos && (
-          <div className="flex items-center justify-center mb-5">
-            <div className="flex bg-secondary rounded-lg p-1">
-              <button
-                onClick={() => setBillingPeriod('monthly')}
-                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                  billingPeriod === 'monthly'
-                    ? 'bg-[#3c83f6] text-white'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingPeriod('yearly')}
-                className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                  billingPeriod === 'yearly'
-                    ? 'bg-[#3c83f6] text-white'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Yearly
-              </button>
-            </div>
+        {/* Monthly / Yearly billing toggle */}
+        <div className="flex items-center justify-center mb-5">
+          <div className="flex bg-secondary rounded-lg p-1">
+            <button
+              onClick={() => setBillingPeriod('monthly')}
+              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                billingPeriod === 'monthly'
+                  ? 'bg-[#3c83f6] text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingPeriod('yearly')}
+              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                billingPeriod === 'yearly'
+                  ? 'bg-[#3c83f6] text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Yearly
+            </button>
           </div>
-        )}
+        </div>
 
         <div className="space-y-4">
           {subscriptionPlans.map((plan, index) => (

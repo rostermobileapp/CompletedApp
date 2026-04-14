@@ -2493,6 +2493,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const IAP_PRODUCT_ROLES: Record<string, 'commissioner' | 'player_pro'> = {
     'com.rosterapp.commissioner_monthly': 'commissioner',
     'com.rosterapp.player_pro_monthly': 'player_pro',
+    'com.rosterapp.commissioner_yearly': 'commissioner',
+    'com.rosterapp.player_pro_yearly': 'player_pro',
   };
 
   // Stable namespace used to derive deterministic appAccountTokens from userIds
