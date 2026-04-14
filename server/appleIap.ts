@@ -104,7 +104,7 @@ export async function generateAppleJWT(): Promise<string> {
 
   const privateKey = await importPKCS8(privateKeyPem, 'ES256');
 
-  const token = await new SignJWT({})
+  const token = await new SignJWT({ bid: BUNDLE_ID })
     .setProtectedHeader({ alg: 'ES256', kid: keyId })
     .setIssuer(issuerId)
     .setAudience('appstoreconnect-v1')
@@ -168,8 +168,17 @@ async function validateAppleCertChain(x5c: string[]): Promise<void> {
  * - Verifies the full x5c certificate chain against Apple Root CA G3
  * - Verifies the JWS signature against the leaf cert's public key
  * - Rejects any payload whose certificate chain does not originate from Apple
+ * - Rejects payloads with a bundleId that does not match BUNDLE_ID (com.rosterapp)
+ *
+ * @param jws - The compact JWS string to decode
+ * @param skipBundleCheck - Set true only for the outermost notification envelope,
+ *   which does not contain a bundleId field. All inner transaction/renewal payloads
+ *   must always be verified with bundle enforcement (default: false).
  */
-export async function decodeAppleJWSPayload(jws: string): Promise<Record<string, unknown>> {
+export async function decodeAppleJWSPayload(
+  jws: string,
+  skipBundleCheck = false,
+): Promise<Record<string, unknown>> {
   const header = decodeProtectedHeader(jws) as Record<string, unknown>;
   const x5c = header.x5c as string[] | undefined;
 
@@ -185,7 +194,19 @@ export async function decodeAppleJWSPayload(jws: string): Promise<Record<string,
   const leafPublicKey = await importX509(leafCertPem, 'ES256');
 
   const { payload } = await compactVerify(jws, leafPublicKey);
-  return JSON.parse(new TextDecoder().decode(payload)) as Record<string, unknown>;
+  const decoded = JSON.parse(new TextDecoder().decode(payload)) as Record<string, unknown>;
+
+  // Step 3: enforce bundle ID binding to prevent accepting transactions from other apps
+  if (!skipBundleCheck) {
+    const bundleId = decoded.bundleId as string | undefined;
+    if (!bundleId || bundleId !== BUNDLE_ID) {
+      throw new Error(
+        `Apple JWS bundleId mismatch: expected ${BUNDLE_ID}, got ${bundleId ?? '(none)'}`,
+      );
+    }
+  }
+
+  return decoded;
 }
 
 /**

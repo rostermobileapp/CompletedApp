@@ -223,18 +223,15 @@ export default function Subscription() {
       const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
       const transaction = await purchaseProduct(productId, appAccountToken);
 
-      // Build the verification payload, preferring StoreKit 2 JWS > transactionId > legacy receipt
+      // Build the verification payload, preferring StoreKit 2 JWS > transactionId
       const verifyPayload: Record<string, string> = {};
       if (transaction.jwsRepresentation) {
         verifyPayload.jws = transaction.jwsRepresentation;
       } else if (transaction.transactionId) {
         verifyPayload.transactionId = transaction.transactionId;
-      } else if (transaction.receipt) {
-        verifyPayload.receipt = transaction.receipt;
       } else {
         throw new Error('No verifiable data returned from App Store. Please try again.');
       }
-      if (appAccountToken) verifyPayload.appAccountToken = appAccountToken;
 
       const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
 
@@ -270,7 +267,7 @@ export default function Subscription() {
         return;
       }
 
-      // Prefer JWS > transactionId > receipt for restore verification too
+      // Prefer JWS > transactionId for restore verification
       let verifyPayload: Record<string, string> | null = null;
       for (const p of purchases as Transaction[]) {
         if (p.jwsRepresentation) {
@@ -278,9 +275,6 @@ export default function Subscription() {
           break;
         } else if (p.transactionId) {
           verifyPayload = { transactionId: p.transactionId };
-          break;
-        } else if (p.receipt) {
-          verifyPayload = { receipt: p.receipt };
           break;
         }
       }

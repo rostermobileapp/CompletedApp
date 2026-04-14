@@ -2559,15 +2559,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //
   // Accepts (in priority order):
   //   1. jws            — StoreKit 2 JWS-signed transaction (preferred, verified
-  //                       against Apple's x5c cert chain embedded in the JWS header)
+  //                       against Apple's x5c cert chain + bundleId check)
   //   2. transactionId  — Numeric transaction ID; looked up via App Store Server API
   //                       using a server-generated JWT (requires APPLE_IAP_* env vars)
-  //   3. receipt        — Legacy base64 StoreKit 1 receipt; validated via verifyReceipt
-  //                       (kept for backward compatibility; deprecated by Apple)
   app.post('/api/iap/verify', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { jws, transactionId, receipt } = req.body;
+      const { jws, transactionId } = req.body;
 
       // ── Path 1: StoreKit 2 JWS transaction ──────────────────────────────
       if (jws && typeof jws === 'string' && jws.trim()) {
@@ -2632,71 +2630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
-      // ── Path 3: Legacy verifyReceipt fallback ───────────────────────────
-      if (receipt && typeof receipt === 'string' && receipt.trim()) {
-        const validateWithApple = async (url: string, receiptData: string) => {
-          const appleRes = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              'receipt-data': receiptData,
-              password: process.env.APPLE_SHARED_SECRET ?? '',
-            }),
-          });
-          return appleRes.json() as Promise<any>;
-        };
-
-        let appleData = await validateWithApple('https://buy.itunes.apple.com/verifyReceipt', receipt);
-        if (appleData.status === 21007) {
-          appleData = await validateWithApple('https://sandbox.itunes.apple.com/verifyReceipt', receipt);
-        }
-
-        if (appleData.status !== 0) {
-          console.warn('[IAP] Legacy verifyReceipt failed, status:', appleData.status);
-          return res.status(402).json({ message: 'Apple could not verify this receipt', appleStatus: appleData.status });
-        }
-
-        const latestReceiptInfo: any[] = appleData.latest_receipt_info ?? [];
-        const now = Date.now();
-        const activeReceipts = latestReceiptInfo
-          .filter((r: any) => parseInt(r.expires_date_ms ?? '0', 10) > now)
-          .sort((a: any, b: any) => parseInt(b.expires_date_ms, 10) - parseInt(a.expires_date_ms, 10));
-
-        // Enforce account binding via app_account_token in Apple's receipt
-        const { v5: uuidv5 } = await import('uuid');
-        const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
-        const appleTokens = activeReceipts
-          .map((r: any) => (r.app_account_token ?? '').toLowerCase())
-          .filter(Boolean);
-
-        if (appleTokens.length > 0) {
-          if (!appleTokens.includes(expectedToken)) {
-            console.warn('[IAP] app_account_token mismatch (legacy path)', { userId });
-            return res.status(403).json({ message: 'Purchase does not belong to this account' });
-          }
-        } else {
-          console.warn('[IAP] No app_account_token in legacy receipt', { userId });
-          return res.status(403).json({ message: 'Receipt cannot be bound to an account — please re-purchase or contact support' });
-        }
-
-        let newRole: 'commissioner' | 'player_pro' | null = null;
-        for (const r of activeReceipts) {
-          const mapped = IAP_PRODUCT_ROLES[r.product_id];
-          if (mapped === 'commissioner') { newRole = 'commissioner'; break; }
-          if (mapped === 'player_pro' && newRole !== 'commissioner') newRole = 'player_pro';
-        }
-
-        if (!newRole) {
-          return res.status(200).json({ message: 'No active subscription found in receipt', role: 'free_tier' });
-        }
-
-        const originalTxId = activeReceipts[0]?.original_transaction_id;
-        await applyIapRole(userId, newRole, originalTxId);
-        console.log(`[IAP] Legacy receipt verified for user ${userId}: role → ${newRole}`);
-        return res.json({ message: 'IAP verified and role updated', role: newRole });
-      }
-
-      return res.status(400).json({ message: 'Missing jws, transactionId, or receipt' });
+      return res.status(400).json({ message: 'Missing jws or transactionId' });
 
     } catch (error: any) {
       console.error('[IAP] Verification error:', error);
@@ -2722,8 +2656,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { decodeAppleJWSPayload } = await import('./appleIap');
 
-      // Decode the outer notification envelope (verified against Apple Root CA G3)
-      const notifRaw = await decodeAppleJWSPayload(signedPayload);
+      // Decode the outer notification envelope (verified against Apple Root CA G3).
+      // The outer envelope does not carry a bundleId field, so skipBundleCheck=true.
+      const notifRaw = await decodeAppleJWSPayload(signedPayload, true);
       const notificationType = notifRaw.notificationType as string;
       const subtype = notifRaw.subtype as string | undefined;
       const data = notifRaw.data as {
@@ -2739,7 +2674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ message: 'Notification acknowledged (no transaction)' });
       }
 
-      // Decode the signed transaction payload (also verified against Apple Root CA G3)
+      // Decode the signed transaction payload — bundleId is enforced here (skipBundleCheck defaults to false)
       const txRaw = await decodeAppleJWSPayload(data.signedTransactionInfo);
       const productId = txRaw.productId as string;
       const originalTransactionId = txRaw.originalTransactionId as string | undefined;
