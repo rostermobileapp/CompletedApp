@@ -100,7 +100,11 @@ export async function generateAppleJWT(): Promise<string> {
 
   const keyId = process.env.APPLE_IAP_KEY_ID!;
   const issuerId = process.env.APPLE_IAP_ISSUER_ID!;
-  const privateKeyPem = process.env.APPLE_IAP_PRIVATE_KEY!;
+
+  // Env vars often store multi-line PEM keys with literal \n instead of real newlines.
+  // Normalize both forms so importPKCS8 can parse it correctly.
+  const rawKey = process.env.APPLE_IAP_PRIVATE_KEY!;
+  const privateKeyPem = rawKey.replace(/\\n/g, '\n');
 
   const privateKey = await importPKCS8(privateKeyPem, 'ES256');
 
