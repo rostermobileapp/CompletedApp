@@ -2641,6 +2641,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── POST /api/iap/verify-rc ──────────────────────────────────────────────
+  // Called by the iOS client (Natively + RevenueCat) after a successful purchase.
+  // Queries RevenueCat's REST API to confirm the subscription is active, then
+  // grants the appropriate role.
+  //
+  // Body: { rcAppUserId: string, productIdentifier: string }
+  //   rcAppUserId       — RevenueCat app user ID (set via purchases.login(userId))
+  //   productIdentifier — The Apple product ID that was purchased
+  //
+  // Requires env var: REVENUECAT_SECRET_API_KEY
+  app.post('/api/iap/verify-rc', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub as string;
+      const { rcAppUserId, productIdentifier } = req.body as {
+        rcAppUserId?: string;
+        productIdentifier?: string;
+      };
+
+      if (!rcAppUserId || typeof rcAppUserId !== 'string') {
+        return res.status(400).json({ message: 'Missing rcAppUserId' });
+      }
+      if (!productIdentifier || typeof productIdentifier !== 'string') {
+        return res.status(400).json({ message: 'Missing productIdentifier' });
+      }
+
+      // Security: the RevenueCat user ID must be the authenticated user's ID.
+      // We call purchases.login(userId) before purchasing, so rcAppUserId === userId.
+      if (rcAppUserId !== userId) {
+        console.warn('[IAP/RC] rcAppUserId mismatch', { rcAppUserId, userId });
+        return res.status(403).json({ message: 'Purchase does not belong to this account' });
+      }
+
+      const rcApiKey = process.env.REVENUECAT_SECRET_API_KEY;
+      if (!rcApiKey) {
+        console.error('[IAP/RC] REVENUECAT_SECRET_API_KEY not set');
+        return res.status(503).json({ message: 'RevenueCat API not configured on server' });
+      }
+
+      // Query RevenueCat subscriber endpoint
+      const rcUrl = `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(rcAppUserId)}`;
+      const rcResponse = await fetch(rcUrl, {
+        headers: {
+          Authorization: `Bearer ${rcApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!rcResponse.ok) {
+        const errText = await rcResponse.text();
+        console.error('[IAP/RC] RevenueCat API error:', rcResponse.status, errText);
+        return res.status(502).json({ message: 'Could not verify subscription with RevenueCat' });
+      }
+
+      const rcData = await rcResponse.json() as {
+        subscriber?: {
+          subscriptions?: Record<string, { expires_date: string | null; unsubscribe_detected_at: string | null; billing_issues_detected_at: string | null }>;
+          entitlements?: Record<string, { expires_date: string | null; product_identifier: string }>;
+        };
+      };
+
+      const subscriber = rcData.subscriber;
+      if (!subscriber) {
+        return res.status(404).json({ message: 'Subscriber not found in RevenueCat' });
+      }
+
+      // Check the specific product's subscription status
+      const subscriptions = subscriber.subscriptions ?? {};
+      const sub = subscriptions[productIdentifier];
+
+      if (sub) {
+        const now = new Date();
+        const expiresDate = sub.expires_date ? new Date(sub.expires_date) : null;
+        const isActive = !sub.unsubscribe_detected_at && (expiresDate === null || expiresDate > now);
+
+        if (!isActive) {
+          return res.status(402).json({ message: 'Subscription has expired or been cancelled' });
+        }
+      } else {
+        // If specific product not found, check any active entitlement that covers this product
+        const entitlements = subscriber.entitlements ?? {};
+        const now = new Date();
+        const activeEntitlement = Object.values(entitlements).find((e) => {
+          const expires = e.expires_date ? new Date(e.expires_date) : null;
+          return (expires === null || expires > now) && e.product_identifier === productIdentifier;
+        });
+
+        if (!activeEntitlement) {
+          return res.status(402).json({ message: 'No active subscription found for this product' });
+        }
+      }
+
+      const newRole = IAP_PRODUCT_ROLES[productIdentifier] ?? null;
+      if (!newRole) {
+        return res.status(400).json({ message: `Unrecognised product: ${productIdentifier}` });
+      }
+
+      await applyIapRole(userId, newRole, `rc:${rcAppUserId}:${productIdentifier}`);
+      console.log(`[IAP/RC] RevenueCat verified for user ${userId}: role → ${newRole} (${productIdentifier})`);
+      return res.json({ message: 'Subscription verified and role updated', role: newRole });
+
+    } catch (error: any) {
+      console.error('[IAP/RC] Verification error:', error);
+      const status = typeof error.status === 'number' ? error.status : 500;
+      res.status(status).json({ message: error.message || 'RevenueCat verification failed' });
+    }
+  });
+
   // ─── POST /api/iap/notifications ──────────────────────────────────────────
   // App Store Server Notifications v2 webhook.
   // Register this URL in App Store Connect → General → App Information →
