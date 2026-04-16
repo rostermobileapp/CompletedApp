@@ -21,6 +21,8 @@ import {
   PRODUCT_PLAYER_PRO_YEARLY,
   PRODUCT_COMMISSIONER_YEARLY,
 } from '@/lib/nativePurchases';
+import { debugLog, DEBUG_MODE } from '@/lib/debugLogger';
+import DebugPanel from '@/components/DebugPanel';
 
 export default function Subscription() {
   const { user } = usePermissions();
@@ -42,10 +44,23 @@ export default function Subscription() {
   // Initialize IAP on iOS — check billing support then fetch real App Store prices
   useEffect(() => {
     if (!platformReady || !isIos) return;
+    debugLog(`IAP init — platformReady:${platformReady} isIos:${isIos}`, 'info');
+    debugLog('Calling isBillingSupported()…', 'info');
     isBillingSupported().then(async (supported) => {
-      if (!supported) return;
+      debugLog(`isBillingSupported → ${supported}`, supported ? 'success' : 'warning');
+      if (!supported) {
+        debugLog('StoreKit not available on this device/environment', 'warning');
+        return;
+      }
       setIapReady(true);
+      debugLog('IAP ready — fetching products…', 'info');
       const products = await getIosProducts();
+      if (products.length === 0) {
+        debugLog('getProducts() returned 0 products — check App Store Connect product IDs', 'warning');
+      } else {
+        debugLog(`getProducts() returned ${products.length} product(s)`, 'success');
+        products.forEach((p) => debugLog(`  Product: ${p.identifier} → ${p.priceString}`, 'info'));
+      }
       const priceMap: Record<string, string> = {};
       for (const p of products) {
         priceMap[p.identifier] = p.priceString;
@@ -53,6 +68,7 @@ export default function Subscription() {
       setIosProductPrices(priceMap);
     }).catch((err) => {
       console.warn('[Subscription] IAP init error:', err);
+      debugLog(`IAP init error: ${err?.message ?? String(err)}`, 'error');
     });
   }, [platformReady, isIos]);
 
@@ -236,24 +252,31 @@ export default function Subscription() {
 
   // --- iOS IAP helpers ---
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
+    debugLog(`Subscribe via App Store tapped — tier:${tier} period:${billingPeriod} iapReady:${iapReady}`, 'info');
     setIsLoading(true);
     try {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
+      debugLog(`Initiating purchaseProduct(${productId})…`, 'info');
       const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
+      if (appAccountToken) debugLog(`appAccountToken: ${appAccountToken}`, 'info');
       const transaction = await purchaseProduct(productId, appAccountToken);
+      debugLog(`purchaseProduct() resolved — txId:${transaction.transactionId ?? 'none'} hasJws:${!!transaction.jwsRepresentation}`, 'success');
 
       // Build the verification payload, preferring StoreKit 2 JWS > transactionId
       const verifyPayload: Record<string, string> = {};
       if (transaction.jwsRepresentation) {
         verifyPayload.jws = transaction.jwsRepresentation;
+        debugLog('Using JWS representation for verification', 'info');
       } else if (transaction.transactionId) {
         verifyPayload.transactionId = transaction.transactionId;
+        debugLog(`Using transactionId for verification: ${transaction.transactionId}`, 'info');
       } else {
         throw new Error('No verifiable data returned from App Store. Please try again.');
       }
 
+      debugLog('Sending /api/iap/verify…', 'info');
       const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
 
       if (!response.ok) {
@@ -261,6 +284,7 @@ export default function Subscription() {
         throw new Error(data.message || 'Purchase completed but role sync failed. Please restart the app.');
       }
 
+      debugLog('Verification succeeded — subscription active!', 'success');
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
@@ -270,9 +294,11 @@ export default function Subscription() {
         error?.message?.toLowerCase().includes('cancel') ||
         error?.message?.toLowerCase().includes('cancelled')
       ) {
+        debugLog(`Purchase cancelled by user`, 'warning');
         setIsLoading(false);
         return;
       }
+      debugLog(`Purchase failed — code:${error?.code ?? 'none'} msg:${error?.message ?? String(error)}`, 'error');
       toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
       setIsLoading(false);
     }
@@ -358,6 +384,7 @@ export default function Subscription() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
+      <DebugPanel />
       {/* Apple-required disclosure dialog before opening external payment link — iOS only */}
       {isIos && (
         <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
@@ -629,7 +656,7 @@ export default function Subscription() {
                   )}
                   <button
                     onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                    disabled={isLoading || !iapReady}
+                    disabled={isLoading || (!iapReady && !DEBUG_MODE)}
                     className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
                     data-testid={`button-iap-${plan.tier}`}
                   >
