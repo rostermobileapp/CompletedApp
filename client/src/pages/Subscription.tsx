@@ -305,10 +305,15 @@ export default function Subscription() {
   };
 
   const handleIosRestore = async () => {
+    debugLog('Restore Purchases tapped', 'info');
     setIsLoading(true);
     try {
+      debugLog('Calling restorePurchases()…', 'info');
       const purchases = await restorePurchases();
+      debugLog(`restorePurchases() returned ${purchases.length} item(s)`, purchases.length > 0 ? 'success' : 'warning');
+
       if (!purchases.length) {
+        debugLog('No purchases returned — nothing to restore', 'warning');
         toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
@@ -317,32 +322,40 @@ export default function Subscription() {
       // Prefer JWS > transactionId for restore verification
       let verifyPayload: Record<string, string> | null = null;
       for (const p of purchases as Transaction[]) {
+        debugLog(`  Purchase: ${p.productIdentifier ?? 'unknown'} txId:${p.transactionId ?? 'none'} hasJws:${!!p.jwsRepresentation}`, 'info');
         if (p.jwsRepresentation) {
           verifyPayload = { jws: p.jwsRepresentation };
+          debugLog('Using JWS for restore verification', 'info');
           break;
         } else if (p.transactionId) {
           verifyPayload = { transactionId: p.transactionId };
+          debugLog(`Using transactionId for restore: ${p.transactionId}`, 'info');
           break;
         }
       }
 
       if (!verifyPayload) {
+        debugLog('Purchases have no jws or transactionId — cannot verify', 'error');
         toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
       }
 
+      debugLog('Sending /api/iap/verify for restore…', 'info');
       const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
       const data = await response.json() as { role?: string; message?: string };
 
       if (response.ok && data.role && data.role !== 'free_tier') {
+        debugLog(`Restore verified — role: ${data.role}`, 'success');
         toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
         window.location.reload();
       } else {
+        debugLog(`Restore verify response: ok=${response.ok} role=${data.role ?? 'none'} msg=${data.message ?? ''}`, 'warning');
         toast({ title: 'No active subscription', description: 'No active subscription was found to restore.' });
       }
     } catch (error: any) {
+      debugLog(`Restore failed — ${error?.message ?? String(error)}`, 'error');
       toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
     } finally {
       setIsLoading(false);

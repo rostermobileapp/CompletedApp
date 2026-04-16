@@ -53,18 +53,25 @@ export async function getIosProducts() {
 }
 
 export async function purchaseProduct(productIdentifier: string, appAccountToken?: string): Promise<Transaction> {
-  return await NativePurchases.purchaseProduct({
+  const result = await NativePurchases.purchaseProduct({
     productIdentifier,
     productType: PURCHASE_TYPE.SUBS,
     appAccountToken,
   });
+  if (!result) {
+    throw new Error('No transaction returned from App Store. Please try again.');
+  }
+  return result;
 }
 
 export async function restorePurchases(): Promise<Transaction[]> {
-  const { purchases } = await NativePurchases.restorePurchases({
+  const result = await NativePurchases.restorePurchases({
     productType: PURCHASE_TYPE.SUBS,
   });
-  return purchases;
+  if (result == null) {
+    throw new Error('App Store restore returned no data. Please try again.');
+  }
+  return result.purchases ?? [];
 }
 
 export async function getActivePurchases(): Promise<Transaction[]> {
