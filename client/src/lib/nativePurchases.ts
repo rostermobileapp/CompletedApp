@@ -98,7 +98,6 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
     try {
       const instance = new NativelyPurchases();
       const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
-      console.log(`[IAP] packagePrice(${id}) raw:`, JSON.stringify(data));
       const priceString = formatPrice(data);
       if (priceString) {
         results.push({ identifier: id, priceString });
@@ -136,9 +135,6 @@ export async function purchaseProduct(
   _appAccountToken?: string
 ): Promise<NativelyTransaction> {
   const data = await toPromise<any>((cb) => np.purchasePackage(packageId, cb));
-
-  // Always log the raw payload so the debug panel captures the exact shape
-  console.log('[IAP] purchasePackage raw response:', JSON.stringify(data));
 
   if (!data) {
     throw new Error('No response from App Store. Please try again.');
@@ -184,8 +180,6 @@ export async function purchaseProduct(
  */
 export async function restorePurchases(): Promise<NativelyTransaction[]> {
   const data = await toPromise<any>((cb) => np.restore(cb));
-
-  console.log('[IAP] restore raw response:', JSON.stringify(data));
 
   if (data == null) {
     throw new Error('App Store restore returned no data. Please try again.');

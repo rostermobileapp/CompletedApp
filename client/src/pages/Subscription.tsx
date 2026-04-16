@@ -21,8 +21,6 @@ import {
   PRODUCT_COMMISSIONER_YEARLY,
   type NativelyTransaction,
 } from '@/lib/nativePurchases';
-import { debugLog, DEBUG_MODE } from '@/lib/debugLogger';
-import DebugPanel from '@/components/DebugPanel';
 
 export default function Subscription() {
   const { user } = usePermissions();
@@ -44,23 +42,10 @@ export default function Subscription() {
   // Initialize IAP on iOS — check billing support then fetch real App Store prices
   useEffect(() => {
     if (!platformReady || !isIos) return;
-    debugLog(`IAP init — platformReady:${platformReady} isIos:${isIos}`, 'info');
-    debugLog('Calling isBillingSupported()…', 'info');
     isBillingSupported().then(async (supported) => {
-      debugLog(`isBillingSupported → ${supported}`, supported ? 'success' : 'warning');
-      if (!supported) {
-        debugLog('StoreKit not available on this device/environment', 'warning');
-        return;
-      }
+      if (!supported) return;
       setIapReady(true);
-      debugLog('IAP ready — fetching products…', 'info');
       const products = await getIosProducts();
-      if (products.length === 0) {
-        debugLog('getProducts() returned 0 products — check App Store Connect product IDs', 'warning');
-      } else {
-        debugLog(`getProducts() returned ${products.length} product(s)`, 'success');
-        products.forEach((p) => debugLog(`  Product: ${p.identifier} → ${p.priceString}`, 'info'));
-      }
       const priceMap: Record<string, string> = {};
       for (const p of products) {
         priceMap[p.identifier] = p.priceString;
@@ -68,7 +53,6 @@ export default function Subscription() {
       setIosProductPrices(priceMap);
     }).catch((err) => {
       console.warn('[Subscription] IAP init error:', err);
-      debugLog(`IAP init error: ${err?.message ?? String(err)}`, 'error');
     });
   }, [platformReady, isIos]);
 
@@ -252,32 +236,24 @@ export default function Subscription() {
 
   // --- iOS IAP helpers ---
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
-    debugLog(`Subscribe via App Store tapped — tier:${tier} period:${billingPeriod} iapReady:${iapReady}`, 'info');
     setIsLoading(true);
     try {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
-      debugLog(`Initiating purchaseProduct(${productId})…`, 'info');
       const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
-      if (appAccountToken) debugLog(`appAccountToken: ${appAccountToken}`, 'info');
       const transaction = await purchaseProduct(productId, appAccountToken);
-      debugLog(`purchaseProduct() resolved — txId:${transaction.transactionId ?? 'none'} hasJws:${!!transaction.jwsRepresentation}`, 'success');
-      debugLog(`raw: ${JSON.stringify(transaction.raw).slice(0, 200)}`, 'info');
 
       // Build the verification payload, preferring StoreKit 2 JWS > transactionId
       const verifyPayload: Record<string, string> = {};
       if (transaction.jwsRepresentation) {
         verifyPayload.jws = transaction.jwsRepresentation;
-        debugLog('Using JWS representation for verification', 'info');
       } else if (transaction.transactionId) {
         verifyPayload.transactionId = transaction.transactionId;
-        debugLog(`Using transactionId for verification: ${transaction.transactionId}`, 'info');
       } else {
         throw new Error('No verifiable data returned from App Store. Please try again.');
       }
 
-      debugLog('Sending /api/iap/verify…', 'info');
       const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
 
       if (!response.ok) {
@@ -285,7 +261,6 @@ export default function Subscription() {
         throw new Error(data.message || 'Purchase completed but role sync failed. Please restart the app.');
       }
 
-      debugLog('Verification succeeded — subscription active!', 'success');
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
@@ -295,26 +270,20 @@ export default function Subscription() {
         error?.message?.toLowerCase().includes('cancel') ||
         error?.message?.toLowerCase().includes('cancelled')
       ) {
-        debugLog(`Purchase cancelled by user`, 'warning');
         setIsLoading(false);
         return;
       }
-      debugLog(`Purchase failed — code:${error?.code ?? 'none'} msg:${error?.message ?? String(error)}`, 'error');
       toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
       setIsLoading(false);
     }
   };
 
   const handleIosRestore = async () => {
-    debugLog('Restore Purchases tapped', 'info');
     setIsLoading(true);
     try {
-      debugLog('Calling restorePurchases()…', 'info');
       const purchases = await restorePurchases();
-      debugLog(`restorePurchases() returned ${purchases.length} item(s)`, purchases.length > 0 ? 'success' : 'warning');
 
       if (!purchases.length) {
-        debugLog('No purchases returned — nothing to restore', 'warning');
         toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
@@ -323,40 +292,32 @@ export default function Subscription() {
       // Prefer JWS > transactionId for restore verification
       let verifyPayload: Record<string, string> | null = null;
       for (const p of purchases as NativelyTransaction[]) {
-        debugLog(`  Purchase: ${p.productIdentifier ?? 'unknown'} txId:${p.transactionId ?? 'none'} hasJws:${!!p.jwsRepresentation}`, 'info');
         if (p.jwsRepresentation) {
           verifyPayload = { jws: p.jwsRepresentation };
-          debugLog('Using JWS for restore verification', 'info');
           break;
         } else if (p.transactionId) {
           verifyPayload = { transactionId: p.transactionId };
-          debugLog(`Using transactionId for restore: ${p.transactionId}`, 'info');
           break;
         }
       }
 
       if (!verifyPayload) {
-        debugLog('Purchases have no jws or transactionId — cannot verify', 'error');
         toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
       }
 
-      debugLog('Sending /api/iap/verify for restore…', 'info');
       const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
       const data = await response.json() as { role?: string; message?: string };
 
       if (response.ok && data.role && data.role !== 'free_tier') {
-        debugLog(`Restore verified — role: ${data.role}`, 'success');
         toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
         window.location.reload();
       } else {
-        debugLog(`Restore verify response: ok=${response.ok} role=${data.role ?? 'none'} msg=${data.message ?? ''}`, 'warning');
         toast({ title: 'No active subscription', description: 'No active subscription was found to restore.' });
       }
     } catch (error: any) {
-      debugLog(`Restore failed — ${error?.message ?? String(error)}`, 'error');
       toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
@@ -398,7 +359,6 @@ export default function Subscription() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
-      <DebugPanel />
       {/* Apple-required disclosure dialog before opening external payment link — iOS only */}
       {isIos && (
         <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
@@ -670,7 +630,7 @@ export default function Subscription() {
                   )}
                   <button
                     onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                    disabled={isLoading || (!iapReady && !DEBUG_MODE)}
+                    disabled={isLoading || !iapReady}
                     className="w-full py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
                     data-testid={`button-iap-${plan.tier}`}
                   >
