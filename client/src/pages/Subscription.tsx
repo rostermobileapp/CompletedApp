@@ -9,6 +9,8 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
+import { debugLog } from '@/lib/debugLogger';
+import DebugPanel from '@/components/DebugPanel';
 import type { Transaction } from '@capgo/native-purchases';
 import {
   isBillingSupported,
@@ -45,13 +47,21 @@ export default function Subscription() {
     isBillingSupported().then(async (supported) => {
       if (!supported) return;
       setIapReady(true);
+      debugLog('Product fetch initiated', 'info');
       const products = await getIosProducts();
+      if (!products.length) {
+        debugLog('Product fetch returned: empty (no products)', 'warning');
+      } else {
+        const summary = products.map((p) => `${p.identifier} @ ${p.priceString}`).join(', ');
+        debugLog(`Product fetch returned: ${summary}`, 'success');
+      }
       const priceMap: Record<string, string> = {};
       for (const p of products) {
         priceMap[p.identifier] = p.priceString;
       }
       setIosProductPrices(priceMap);
     }).catch((err) => {
+      debugLog(`IAP init error: ${err?.message ?? err}`, 'error');
       console.warn('[Subscription] IAP init error:', err);
     });
   }, [platformReady, isIos]);
@@ -236,12 +246,14 @@ export default function Subscription() {
 
   // --- iOS IAP helpers ---
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
+    debugLog(`Subscribe button tapped: tier=${tier}, period=${billingPeriod}`, 'info');
     setIsLoading(true);
     try {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
       const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
+      debugLog(`Purchase flow initiated: productId=${productId}`, 'info');
       const transaction = await purchaseProduct(productId, appAccountToken);
 
       // Build the verification payload, preferring StoreKit 2 JWS > transactionId
@@ -261,6 +273,7 @@ export default function Subscription() {
         throw new Error(data.message || 'Purchase completed but role sync failed. Please restart the app.');
       }
 
+      debugLog(`Purchase success: productId=${productId}`, 'success');
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
@@ -270,9 +283,12 @@ export default function Subscription() {
         error?.message?.toLowerCase().includes('cancel') ||
         error?.message?.toLowerCase().includes('cancelled')
       ) {
+        debugLog('Purchase cancelled by user', 'warning');
         setIsLoading(false);
         return;
       }
+      const code = error?.code ?? 'unknown';
+      debugLog(`Purchase failed: [${code}] ${error?.message ?? 'Unknown error'}`, 'error');
       toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
       setIsLoading(false);
     }
@@ -357,6 +373,7 @@ export default function Subscription() {
   });
 
   return (
+    <>
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
       {/* Apple-required disclosure dialog before opening external payment link — iOS only */}
       {isIos && (
@@ -693,5 +710,7 @@ export default function Subscription() {
         )}
       </div>
     </div>
+    <DebugPanel />
+    </>
   );
 }
