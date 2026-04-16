@@ -21,15 +21,22 @@ export function getAppAccountToken(userId: string): string {
 const np = new NativelyPurchases();
 
 /**
- * Wrap a Natively callback into a Promise.
+ * Wrap a Natively callback into a Promise with a timeout.
  * Always resolves with the raw callback data so callers can inspect `status`.
- * Rejects only on synchronous throw (e.g. bridge not initialised).
+ * Rejects on timeout (bridge not responding) or synchronous throw.
  */
-function toPromise<T>(fn: (cb: (data: T) => void) => void): Promise<T> {
+function toPromise<T>(fn: (cb: (data: T) => void) => void, timeoutMs = 15000): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`NATIVELY_TIMEOUT: Native bridge did not respond within ${timeoutMs / 1000}s`));
+    }, timeoutMs);
     try {
-      fn((data: T) => resolve(data));
+      fn((data: T) => {
+        clearTimeout(timer);
+        resolve(data);
+      });
     } catch (err) {
+      clearTimeout(timer);
       reject(err);
     }
   });
