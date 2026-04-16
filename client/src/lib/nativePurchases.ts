@@ -1,5 +1,4 @@
-import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
-import type { Transaction } from '@capgo/native-purchases';
+import { NativelyPurchases } from 'natively';
 import { v5 as uuidv5 } from 'uuid';
 
 export const PRODUCT_PLAYER_PRO = 'com.rosterapp.player_pro_monthly';
@@ -7,92 +6,155 @@ export const PRODUCT_COMMISSIONER = 'com.rosterapp.commissioner_monthly';
 export const PRODUCT_PLAYER_PRO_YEARLY = 'com.rosterapp.player_pro_yearly';
 export const PRODUCT_COMMISSIONER_YEARLY = 'com.rosterapp.commissioner_yearly';
 
-// Stable namespace UUID for generating deterministic appAccountTokens
 const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
-/**
- * Returns a deterministic UUID derived from the user ID.
- * This is sent as appAccountToken when purchasing so Apple cryptographically
- * links the transaction to this app user, enabling server-side binding checks.
- */
 export function getAppAccountToken(userId: string): string {
   return uuidv5(userId, APP_NAMESPACE);
 }
 
-let billingChecked = false;
-let billingSupported = false;
+/**
+ * Singleton NativelyPurchases instance.
+ * window.$agent (injected by the Natively native bridge) must be present
+ * before any method is called — it is always present in the native app.
+ */
+const np = new NativelyPurchases();
 
+/**
+ * Wraps a Natively callback-style call in a Promise.
+ * Rejects if the callback data contains an `error` field or if the
+ * underlying trigger throws synchronously.
+ */
+function toPromise<T>(fn: (cb: (data: T) => void) => void): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    try {
+      fn((data: any) => {
+        if (data?.error) {
+          reject(new Error(String(data.error)));
+        } else {
+          resolve(data as T);
+        }
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Returns true when running inside the Natively native shell.
+ * window.$agent is injected exclusively by the Natively bridge —
+ * it is never present in a browser or the Replit dev preview.
+ */
 export async function isBillingSupported(): Promise<boolean> {
-  if (billingChecked) return billingSupported;
-  try {
-    const result = await NativePurchases.isBillingSupported();
-    billingSupported = result.isBillingSupported;
-  } catch {
-    billingSupported = false;
-  }
-  billingChecked = true;
-  return billingSupported;
+  const ua = navigator.userAgent;
+  return (
+    typeof (window as any).$agent !== 'undefined' ||
+    ua.includes('Natively/iOS') ||
+    ua.includes('Natively/iPadOS')
+  );
 }
 
-export async function getIosProducts() {
-  try {
-    const { products } = await NativePurchases.getProducts({
-      productIdentifiers: [
-        PRODUCT_PLAYER_PRO,
-        PRODUCT_COMMISSIONER,
-        PRODUCT_PLAYER_PRO_YEARLY,
-        PRODUCT_COMMISSIONER_YEARLY,
-      ],
-      productType: PURCHASE_TYPE.SUBS,
-    });
-    return products;
-  } catch (err) {
-    console.warn('[IAP] getProducts() failed:', err);
-    return [];
-  }
+export interface NativelyProductPrice {
+  identifier: string;
+  priceString: string;
 }
 
-export async function purchaseProduct(productIdentifier: string, appAccountToken?: string): Promise<Transaction> {
-  const result = await NativePurchases.purchaseProduct({
-    productIdentifier,
-    productType: PURCHASE_TYPE.SUBS,
-    appAccountToken,
-  });
-  if (!result) {
-    throw new Error('No transaction returned from App Store. Please try again.');
-  }
-  return result;
+/**
+ * Fetch the localised price for each subscription product from the App Store
+ * via the Natively bridge.
+ */
+export async function getIosProducts(): Promise<NativelyProductPrice[]> {
+  const ids = [
+    PRODUCT_PLAYER_PRO,
+    PRODUCT_COMMISSIONER,
+    PRODUCT_PLAYER_PRO_YEARLY,
+    PRODUCT_COMMISSIONER_YEARLY,
+  ];
+
+  const results = await Promise.allSettled(
+    ids.map((id) =>
+      toPromise<any>((cb) => np.packagePrice(id, cb)).then((data) => ({
+        identifier: id,
+        priceString: data?.price ?? data?.priceString ?? '',
+      }))
+    )
+  );
+
+  return results
+    .filter((r): r is PromiseFulfilledResult<NativelyProductPrice> => r.status === 'fulfilled')
+    .map((r) => r.value);
 }
 
-export async function restorePurchases(): Promise<Transaction[]> {
-  const result = await NativePurchases.restorePurchases({
-    productType: PURCHASE_TYPE.SUBS,
-  });
-  if (result == null) {
+export interface NativelyTransaction {
+  /** The Apple product ID that was purchased */
+  productIdentifier: string;
+  /**
+   * JWS-signed transaction from StoreKit 2 — present when the Natively
+   * bridge returns it. Pass this to /api/iap/verify as `jws`.
+   */
+  jwsRepresentation?: string;
+  /** Legacy StoreKit 1 transaction ID */
+  transactionId?: string;
+  /** Raw callback payload for debugging */
+  raw?: any;
+}
+
+/**
+ * Purchase a subscription via the Natively StoreKit bridge.
+ *
+ * Natively's `purchasePackage` maps packageId → Apple product ID directly
+ * (no RevenueCat is involved). The callback receives the completed transaction.
+ */
+export async function purchaseProduct(
+  packageId: string,
+  _appAccountToken?: string
+): Promise<NativelyTransaction> {
+  const data = await toPromise<any>((cb) => np.purchasePackage(packageId, cb));
+
+  // Log the raw shape for debugging on real devices
+  console.log('[IAP] purchasePackage raw response:', JSON.stringify(data));
+
+  if (!data) {
+    throw new Error('No response from App Store. Please try again.');
+  }
+
+  if (
+    data.cancelled === true ||
+    data.userCancelled === true ||
+    (typeof data.error === 'string' && data.error.toLowerCase().includes('cancel'))
+  ) {
+    const err: any = new Error('Purchase cancelled');
+    err.code = 'PURCHASE_CANCELLED';
+    throw err;
+  }
+
+  return {
+    productIdentifier: packageId,
+    jwsRepresentation: data.jwsRepresentation ?? data.jws ?? undefined,
+    transactionId: data.transactionId ?? data.transaction_id ?? undefined,
+    raw: data,
+  };
+}
+
+/**
+ * Restore previous purchases via the Natively StoreKit bridge.
+ * Returns an array of active transactions (may be empty).
+ */
+export async function restorePurchases(): Promise<NativelyTransaction[]> {
+  const data = await toPromise<any>((cb) => np.restore(cb));
+
+  if (data == null) {
     throw new Error('App Store restore returned no data. Please try again.');
   }
-  return result.purchases ?? [];
-}
 
-export async function getActivePurchases(): Promise<Transaction[]> {
-  try {
-    const { purchases } = await NativePurchases.getPurchases({
-      productType: PURCHASE_TYPE.SUBS,
-    });
-    return purchases.filter((p) => {
-      if (p.isActive === false) return false;
-      if (p.expirationDate && new Date(p.expirationDate) < new Date()) return false;
-      return true;
-    });
-  } catch (err) {
-    console.warn('[IAP] getPurchases() failed:', err);
-    return [];
-  }
-}
+  console.log('[IAP] restore raw response:', JSON.stringify(data));
 
-export function transactionToRole(transactions: Transaction[]): 'commissioner' | 'player_pro' | null {
-  const ids = transactions.map((t) => t.productIdentifier);
-  if (ids.includes(PRODUCT_COMMISSIONER)) return 'commissioner';
-  if (ids.includes(PRODUCT_PLAYER_PRO)) return 'player_pro';
-  return null;
+  const items: any[] = data.purchases ?? data.transactions ?? (Array.isArray(data) ? data : []);
+
+  return items.map((item: any) => ({
+    productIdentifier: item.productIdentifier ?? item.product_id ?? '',
+    jwsRepresentation: item.jwsRepresentation ?? item.jws ?? undefined,
+    transactionId: item.transactionId ?? item.transaction_id ?? undefined,
+    raw: item,
+  }));
 }

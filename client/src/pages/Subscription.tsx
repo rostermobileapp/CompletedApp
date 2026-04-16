@@ -9,7 +9,6 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
-import type { Transaction } from '@capgo/native-purchases';
 import {
   isBillingSupported,
   getIosProducts,
@@ -20,6 +19,7 @@ import {
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO_YEARLY,
   PRODUCT_COMMISSIONER_YEARLY,
+  type NativelyTransaction,
 } from '@/lib/nativePurchases';
 import { debugLog, DEBUG_MODE } from '@/lib/debugLogger';
 import DebugPanel from '@/components/DebugPanel';
@@ -321,7 +321,7 @@ export default function Subscription() {
 
       // Prefer JWS > transactionId for restore verification
       let verifyPayload: Record<string, string> | null = null;
-      for (const p of purchases as Transaction[]) {
+      for (const p of purchases as NativelyTransaction[]) {
         debugLog(`  Purchase: ${p.productIdentifier ?? 'unknown'} txId:${p.transactionId ?? 'none'} hasJws:${!!p.jwsRepresentation}`, 'info');
         if (p.jwsRepresentation) {
           verifyPayload = { jws: p.jwsRepresentation };
