@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 
 /**
- * Returns true when running inside the Natively iOS native app shell.
- * Natively sets a custom user-agent containing "Natively/iOS" for iOS builds.
- * This is a synchronous, reliable check — the UA is set by the native layer
- * before any JavaScript runs.
+ * Returns true when running inside the Natively iOS/iPadOS native app shell.
+ *
+ * Detection order (all synchronous):
+ *   1. UA includes "Natively/iOS"      — iPhone builds
+ *   2. UA includes "Natively/iPadOS"   — iPad builds (Natively may use iPadOS variant)
+ *   3. window.natively bridge present + UA includes "iPad" or "iPhone"
+ *      — catches any Natively build where the UA variant doesn't exactly match,
+ *        while safely ignoring regular Safari on iPad (no window.natively there)
  */
 function isNativelyIosApp(): boolean {
-  return navigator.userAgent.includes('Natively/iOS');
+  const ua = navigator.userAgent;
+  if (ua.includes('Natively/iOS') || ua.includes('Natively/iPadOS')) return true;
+  // Fallback: Natively bridge is injected AND device is an Apple mobile device
+  if ((window as any).natively && (ua.includes('iPad') || ua.includes('iPhone'))) return true;
+  return false;
 }
 
 /**
@@ -88,8 +96,10 @@ export function useIosPlatform(): IosPlatformInfo {
 
   // Log on mount so developers can see what was detected (useful for debugging on device)
   useEffect(() => {
-    console.log('[Platform] UA:', navigator.userAgent);
-    console.log('[Platform] isIos:', info.isIos, '| isAndroid:', info.isAndroid);
+    const ua = navigator.userAgent;
+    console.log('[Platform] UA:', ua);
+    console.log('[Platform] window.natively:', !!(window as any).natively);
+    console.log('[Platform] isIos:', info.isIos, '| isAndroid:', info.isAndroid, '| isUsRegion:', info.isUsRegion);
   }, []);
 
   return info;
