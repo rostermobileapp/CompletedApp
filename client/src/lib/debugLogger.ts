@@ -12,8 +12,26 @@ export interface LogEntry {
 const MAX_ENTRIES = 50;
 const STORAGE_KEY = 'roster_debug_logs';
 
-let logStore: LogEntry[] = [];
-let idCounter = 0;
+function loadFromStorage(): LogEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (e) =>
+        typeof e.id === 'number' &&
+        typeof e.timestamp === 'string' &&
+        typeof e.message === 'string' &&
+        typeof e.type === 'string',
+    ).slice(-MAX_ENTRIES) as LogEntry[];
+  } catch {
+    return [];
+  }
+}
+
+let logStore: LogEntry[] = loadFromStorage();
+let idCounter: number = logStore.length > 0 ? Math.max(...logStore.map((e) => e.id)) : 0;
 type Listener = () => void;
 const listeners: Listener[] = [];
 
