@@ -18,6 +18,7 @@ const TYPE_COLORS: Record<string, string> = {
 export default function DebugPanel() {
   const [entries, setEntries] = useState<LogEntry[]>(() => getLogStore());
   const [minimized, setMinimized] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +36,7 @@ export default function DebugPanel() {
     }
   }, [entries, minimized]);
 
-  if (!DEBUG_MODE) return null;
+  if (!DEBUG_MODE || dismissed) return null;
 
   const visible = entries.slice(-10);
 
@@ -82,9 +83,9 @@ export default function DebugPanel() {
             {minimized ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
           <button
-            onClick={() => setMinimized(true)}
+            onClick={() => setDismissed(true)}
             className="text-white/70 hover:text-white transition-colors"
-            title="Close"
+            title="Hide panel"
           >
             <X size={15} />
           </button>
