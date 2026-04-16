@@ -9,6 +9,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
+import type { Transaction } from '@capgo/native-purchases';
 import {
   isBillingSupported,
   getIosProducts,
@@ -19,7 +20,6 @@ import {
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO_YEARLY,
   PRODUCT_COMMISSIONER_YEARLY,
-  type NativelyTransaction,
 } from '@/lib/nativePurchases';
 import { debugLog, DEBUG_MODE } from '@/lib/debugLogger';
 import DebugPanel from '@/components/DebugPanel';
@@ -259,23 +259,25 @@ export default function Subscription() {
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
       debugLog(`Initiating purchaseProduct(${productId})…`, 'info');
-      // Pass the raw user ID so RevenueCat ties this transaction to the user's account
-      const userId = user?.id;
-      if (userId) debugLog(`RC login userId: ${userId}`, 'info');
-      const transaction = await purchaseProduct(productId, userId);
-      debugLog(`purchaseProduct() resolved — rcAppUserId:${transaction.rcAppUserId ?? 'none'} productId:${transaction.productIdentifier}`, 'success');
+      const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
+      if (appAccountToken) debugLog(`appAccountToken: ${appAccountToken}`, 'info');
+      const transaction = await purchaseProduct(productId, appAccountToken);
+      debugLog(`purchaseProduct() resolved — txId:${transaction.transactionId ?? 'none'} hasJws:${!!transaction.jwsRepresentation}`, 'success');
 
-      if (!transaction.rcAppUserId && !userId) {
-        throw new Error('No user identity returned from App Store. Please try again.');
+      // Build the verification payload, preferring StoreKit 2 JWS > transactionId
+      const verifyPayload: Record<string, string> = {};
+      if (transaction.jwsRepresentation) {
+        verifyPayload.jws = transaction.jwsRepresentation;
+        debugLog('Using JWS representation for verification', 'info');
+      } else if (transaction.transactionId) {
+        verifyPayload.transactionId = transaction.transactionId;
+        debugLog(`Using transactionId for verification: ${transaction.transactionId}`, 'info');
+      } else {
+        throw new Error('No verifiable data returned from App Store. Please try again.');
       }
 
-      const verifyPayload = {
-        rcAppUserId: transaction.rcAppUserId ?? userId,
-        productIdentifier: transaction.productIdentifier,
-      };
-
-      debugLog(`Sending /api/iap/verify-rc… rcAppUserId:${verifyPayload.rcAppUserId}`, 'info');
-      const response = await apiRequest('POST', '/api/iap/verify-rc', verifyPayload);
+      debugLog('Sending /api/iap/verify…', 'info');
+      const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
 
       if (!response.ok) {
         const data = await response.json() as { message?: string };
@@ -307,35 +309,40 @@ export default function Subscription() {
     setIsLoading(true);
     try {
       debugLog('Calling restorePurchases()…', 'info');
-      const userId = user?.id;
-      const purchased = await restorePurchases(userId);
-      debugLog(`restorePurchases() returned ${purchased.length} item(s)`, purchased.length > 0 ? 'success' : 'warning');
+      const purchases = await restorePurchases();
+      debugLog(`restorePurchases() returned ${purchases.length} item(s)`, purchases.length > 0 ? 'success' : 'warning');
 
-      if (!purchased.length) {
+      if (!purchases.length) {
         debugLog('No purchases returned — nothing to restore', 'warning');
         toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
       }
 
-      // Use the first purchase to verify
-      const first: NativelyTransaction = purchased[0];
-      debugLog(`  Restore item: ${first.productIdentifier} rcAppUserId:${first.rcAppUserId ?? 'none'}`, 'info');
+      // Prefer JWS > transactionId for restore verification
+      let verifyPayload: Record<string, string> | null = null;
+      for (const p of purchases as Transaction[]) {
+        debugLog(`  Purchase: ${p.productIdentifier ?? 'unknown'} txId:${p.transactionId ?? 'none'} hasJws:${!!p.jwsRepresentation}`, 'info');
+        if (p.jwsRepresentation) {
+          verifyPayload = { jws: p.jwsRepresentation };
+          debugLog('Using JWS for restore verification', 'info');
+          break;
+        } else if (p.transactionId) {
+          verifyPayload = { transactionId: p.transactionId };
+          debugLog(`Using transactionId for restore: ${p.transactionId}`, 'info');
+          break;
+        }
+      }
 
-      const verifyPayload = {
-        rcAppUserId: first.rcAppUserId ?? userId,
-        productIdentifier: first.productIdentifier,
-      };
-
-      if (!verifyPayload.rcAppUserId) {
-        debugLog('No RC user ID available for restore verification', 'error');
-        toast({ title: 'No active subscription', description: 'No active subscription was found to restore.' });
+      if (!verifyPayload) {
+        debugLog('Purchases have no jws or transactionId — cannot verify', 'error');
+        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
         setIsLoading(false);
         return;
       }
 
-      debugLog(`Sending /api/iap/verify-rc for restore… rcAppUserId:${verifyPayload.rcAppUserId}`, 'info');
-      const response = await apiRequest('POST', '/api/iap/verify-rc', verifyPayload);
+      debugLog('Sending /api/iap/verify for restore…', 'info');
+      const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
       const data = await response.json() as { role?: string; message?: string };
 
       if (response.ok && data.role && data.role !== 'free_tier') {
