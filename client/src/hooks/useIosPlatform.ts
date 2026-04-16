@@ -4,17 +4,26 @@ import { useState, useEffect } from 'react';
  * Returns true when running inside the Natively iOS/iPadOS native app shell.
  *
  * Detection order (all synchronous):
- *   1. UA includes "Natively/iOS"      — iPhone builds
- *   2. UA includes "Natively/iPadOS"   — iPad builds (Natively may use iPadOS variant)
- *   3. window.natively bridge present + UA includes "iPad" or "iPhone"
- *      — catches any Natively build where the UA variant doesn't exactly match,
- *        while safely ignoring regular Safari on iPad (no window.natively there)
+ *   1. UA includes "Natively/iOS"      — standard iPhone build UA
+ *   2. UA includes "Natively/iPadOS"   — possible iPad-specific Natively UA variant
+ *   3. window.$agent is defined + not Android
+ *      — Natively injects the $agent global into EVERY native build (iOS and Android).
+ *        It is NOT present in any browser (including the Replit preview or Safari on iPad),
+ *        so this reliably identifies any Natively iOS/iPadOS native context, including iPads
+ *        in desktop mode where the user agent no longer contains "iPad" or "Natively/iOS".
+ *
+ * Why $agent and not window.natively?
+ *   window.natively is also available as an NPM module in the browser/preview environment,
+ *   so it cannot distinguish a native app from a web browser. $agent is only injected by
+ *   the Natively native bridge — it does not exist in any non-native context.
  */
 function isNativelyIosApp(): boolean {
   const ua = navigator.userAgent;
+  // Check 1 & 2: explicit Natively UA strings
   if (ua.includes('Natively/iOS') || ua.includes('Natively/iPadOS')) return true;
-  // Fallback: Natively bridge is injected AND device is an Apple mobile device
-  if ((window as any).natively && (ua.includes('iPad') || ua.includes('iPhone'))) return true;
+  // Check 3: $agent is the native bridge marker used by the Natively SDK itself
+  // (see NativelyInfo.browserInfo → isNativeApp). If it's defined and not Android → iOS.
+  if (typeof (window as any).$agent !== 'undefined' && !ua.includes('Natively/Android')) return true;
   return false;
 }
 
@@ -98,6 +107,7 @@ export function useIosPlatform(): IosPlatformInfo {
   useEffect(() => {
     const ua = navigator.userAgent;
     console.log('[Platform] UA:', ua);
+    console.log('[Platform] $agent defined:', typeof (window as any).$agent !== 'undefined');
     console.log('[Platform] window.natively:', !!(window as any).natively);
     console.log('[Platform] isIos:', info.isIos, '| isAndroid:', info.isAndroid, '| isUsRegion:', info.isUsRegion);
   }, []);
