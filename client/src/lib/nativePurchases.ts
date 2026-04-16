@@ -62,7 +62,9 @@ export interface NativelyProductPrice {
 
 /**
  * Fetch the localised App Store price for each subscription product.
- * Logs the raw Natively response for debugging.
+ * Called sequentially — each call gets its own NativelyPurchases instance
+ * so the native bridge assigns a unique ID to each and fires all callbacks.
+ * Parallel calls sharing one instance cause only the last callback to fire.
  */
 export async function getIosProducts(): Promise<NativelyProductPrice[]> {
   const ids = [
@@ -72,20 +74,23 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
     PRODUCT_COMMISSIONER_YEARLY,
   ];
 
-  const results = await Promise.allSettled(
-    ids.map(async (id) => {
-      const data = await toPromise<any>((cb) => np.packagePrice(id, cb));
-      console.log(`[IAP] packagePrice(${id}) raw:`, JSON.stringify(data));
-      return {
-        identifier: id,
-        priceString: data?.price ?? data?.priceString ?? '',
-      };
-    })
-  );
+  const results: NativelyProductPrice[] = [];
 
-  return results
-    .filter((r): r is PromiseFulfilledResult<NativelyProductPrice> => r.status === 'fulfilled')
-    .map((r) => r.value);
+  for (const id of ids) {
+    try {
+      const instance = new NativelyPurchases();
+      const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
+      console.log(`[IAP] packagePrice(${id}) raw:`, JSON.stringify(data));
+      const priceString = data?.price ?? data?.priceString ?? '';
+      if (priceString) {
+        results.push({ identifier: id, priceString });
+      }
+    } catch (err: any) {
+      console.warn(`[IAP] packagePrice(${id}) failed:`, err?.message ?? err);
+    }
+  }
+
+  return results;
 }
 
 export interface NativelyTransaction {
