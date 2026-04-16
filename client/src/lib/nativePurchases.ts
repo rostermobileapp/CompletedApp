@@ -1,10 +1,11 @@
 import { NativelyPurchases } from 'natively';
 import { v5 as uuidv5 } from 'uuid';
 
-export const PRODUCT_PLAYER_PRO = 'com.rosterapp.player_pro_monthly';
-export const PRODUCT_COMMISSIONER = 'com.rosterapp.commissioner_monthly';
-export const PRODUCT_PLAYER_PRO_YEARLY = 'com.rosterapp.player_pro_yearly';
-export const PRODUCT_COMMISSIONER_YEARLY = 'com.rosterapp.commissioner_yearly';
+// RevenueCat package identifiers (used by NativelyPurchases bridge)
+export const PRODUCT_PLAYER_PRO = 'player_pro_monthly';
+export const PRODUCT_COMMISSIONER = 'commissioner_monthly';
+export const PRODUCT_PLAYER_PRO_YEARLY = 'player_pro_yearly';
+export const PRODUCT_COMMISSIONER_YEARLY = 'commissioner_yearly';
 
 const APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
