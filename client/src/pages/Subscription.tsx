@@ -263,6 +263,7 @@ export default function Subscription() {
       if (appAccountToken) debugLog(`appAccountToken: ${appAccountToken}`, 'info');
       const transaction = await purchaseProduct(productId, appAccountToken);
       debugLog(`purchaseProduct() resolved — txId:${transaction.transactionId ?? 'none'} hasJws:${!!transaction.jwsRepresentation}`, 'success');
+      debugLog(`raw: ${JSON.stringify(transaction.raw).slice(0, 200)}`, 'info');
 
       // Build the verification payload, preferring StoreKit 2 JWS > transactionId
       const verifyPayload: Record<string, string> = {};

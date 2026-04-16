@@ -133,19 +133,19 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
 - Users who completed onboarding are never shown the flow again (checked via `onboardingCompleted` flag)
 - App.tsx intercepts authenticated users with `onboardingCompleted=false` and renders the Onboarding page
 
-### iOS IAP — Apple App Store Server API (StoreKit 2)
-- Uses `@capgo/native-purchases` for StoreKit 2 in-app purchases via Capacitor — no RevenueCat required
-- `server/appleIap.ts` — Apple App Store Server API utilities: JWT generation (ES256), JWS payload decoding via x5c cert chain, transaction lookup by ID, and subscription status retrieval
-- `client/src/lib/nativePurchases.ts` — capgo plugin wrapper (billing support check, get products, purchase, restore)
-- `client/src/pages/Subscription.tsx` — iOS-aware UI: shows "Subscribe via App Store" (IAP) for all iOS users; sends StoreKit 2 JWS (preferred) or transactionId to backend for verification
-- `server/routes.ts` — `POST /api/iap/verify` accepts JWS (StoreKit 2, verified against Apple Root CA G3 + bundleId) or transactionId (App Store Server API lookup with JWT); legacy verifyReceipt removed. `POST /api/iap/notifications` is an App Store Server Notifications v2 webhook
-- Product IDs: `com.rosterapp.player_pro_monthly` → Player Pro, `com.rosterapp.commissioner_monthly` → Commissioner
-- **Environment variables required:**
-  - `APPLE_IAP_KEY_ID` — Key ID from App Store Connect (e.g. `UJJ4YAG7D3`)
+### iOS IAP — Natively SDK + Apple App Store Server API (StoreKit 2)
+- The iOS app is wrapped with **Natively** (not Capacitor). `@capgo/native-purchases` (a Capacitor plugin) does NOT work in Natively — it falls back to a web mock.
+- Uses `NativelyPurchases` from the `natively` npm package for StoreKit purchases. This class triggers the native IAP bridge via `window.$agent` (injected by the Natively shell).
+- No RevenueCat is used or required.
+- `client/src/lib/nativePurchases.ts` — Natively bridge wrapper: `isBillingSupported` (detects `window.$agent`), `getIosProducts` (prices via `packagePrice`), `purchaseProduct` (triggers `purchasePackage`), `restorePurchases` (triggers `restore`)
+- Natively callback shape: `{ status: 'SUCCESS'|'FAILED', transactionId, error, jwsRepresentation? }`
+- `server/appleIap.ts` — Apple App Store Server API utilities: JWT generation (ES256), JWS payload decoding via x5c cert chain, transaction lookup by ID. `APPLE_IAP_PRIVATE_KEY` is normalised from literal `\n` to real newlines before `importPKCS8`.
+- `client/src/pages/Subscription.tsx` — iOS-aware UI: detects Natively via UA / `window.$agent`; sends StoreKit 2 JWS (preferred) or transactionId to backend for verification
+- `server/routes.ts` — `POST /api/iap/verify` accepts JWS (StoreKit 2, verified against Apple Root CA G3 + bundleId) or transactionId (App Store Server API lookup with JWT). `POST /api/iap/notifications` is an App Store Server Notifications v2 webhook.
+- Product IDs: `com.rosterapp.player_pro_monthly` → Player Pro, `com.rosterapp.commissioner_monthly` → Commissioner, `com.rosterapp.player_pro_yearly` → Player Pro Yearly, `com.rosterapp.commissioner_yearly` → Commissioner Yearly
+- **Environment variables required (Replit Secrets — global, available in dev + prod):**
+  - `APPLE_IAP_KEY_ID` — Key ID from App Store Connect
   - `APPLE_IAP_ISSUER_ID` — Issuer ID from App Store Connect Users & Access → Integrations
   - `APPLE_IAP_PRIVATE_KEY` — Full PEM content of the `.p8` private key file
-- **To activate on iOS:**
-  1. Create product IDs in App Store Connect (Subscription Groups): `com.rosterapp.player_pro_monthly` and `com.rosterapp.commissioner_monthly`
-  2. Register webhook URL in App Store Connect → General → App Information → App Store Server Notifications: `https://<your-domain>/api/iap/notifications` (both Production and Sandbox)
-  3. Run `npx cap sync ios` in the Xcode project to install the native plugin
+- **Debug:** `client/src/lib/debugLogger.ts` + `client/src/components/DebugPanel.tsx` — floating overlay (enabled when `DEBUG_MODE = true`) showing IAP log entries. Raw Natively callback payloads are logged via `console.log('[IAP] purchasePackage raw response:', ...)`.
 - Subscription button copy: "Subscribe via App Store" (IAP) — Apple-compliant per EP v. Apple ruling
