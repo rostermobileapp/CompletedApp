@@ -61,6 +61,24 @@ export interface NativelyProductPrice {
 }
 
 /**
+ * Convert a raw Natively price payload to a clean display string.
+ * Natively returns price as a float (e.g. 124.990000000000001), so we
+ * round to 2 decimal places and prepend the currency symbol if needed.
+ */
+function formatPrice(data: any): string {
+  // Prefer a pre-formatted string from the bridge
+  if (data?.priceString && typeof data.priceString === 'string' && data.priceString.trim()) {
+    return data.priceString.trim();
+  }
+  const raw = data?.price;
+  if (raw == null) return '';
+  if (typeof raw === 'number') {
+    return `$${raw.toFixed(2)}`;
+  }
+  return String(raw).trim();
+}
+
+/**
  * Fetch the localised App Store price for each subscription product.
  * Called sequentially — each call gets its own NativelyPurchases instance
  * so the native bridge assigns a unique ID to each and fires all callbacks.
@@ -81,7 +99,7 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
       const instance = new NativelyPurchases();
       const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
       console.log(`[IAP] packagePrice(${id}) raw:`, JSON.stringify(data));
-      const priceString = data?.price ?? data?.priceString ?? '';
+      const priceString = formatPrice(data);
       if (priceString) {
         results.push({ identifier: id, priceString });
       }
