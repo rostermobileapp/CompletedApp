@@ -1,4 +1,5 @@
 import { useEffect, ReactNode, useState } from 'react';
+import { useIsIosDevice } from '@/hooks/useIosPlatform';
 import { Link, useLocation } from 'wouter';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { Menu, X } from 'lucide-react';
@@ -18,6 +19,7 @@ const OG_IMAGE = '/roster-logo.png';
 export function MarketingLayout({ title, description, ogTitle, ogDescription, canonical, children }: MarketingLayoutProps) {
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isIos = useIsIosDevice();
 
   // Always scroll to top when this component mounts
   useEffect(() => {
@@ -176,10 +178,12 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
                     <SiAppstore className="w-4 h-4" />
                     App Store
                   </a>
-                  <a href="https://play.google.com/store/search?q=roster+team+management&c=apps" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
-                    <SiGoogleplay className="w-4 h-4" />
-                    Google Play
-                  </a>
+                  {!isIos && (
+                    <a href="https://play.google.com/store/search?q=roster+team+management&c=apps" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
+                      <SiGoogleplay className="w-4 h-4" />
+                      Google Play
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

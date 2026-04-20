@@ -4,6 +4,7 @@ import { useLocation, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { useSeo } from '@/hooks/useSeo';
+import { useIsIosDevice } from '@/hooks/useIosPlatform';
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 
 const featureRows = [
@@ -74,6 +75,7 @@ type StripePricesResponse = {
 export default function Pricing() {
   const [, setLocation] = useLocation();
   const [annual, setAnnual] = useState(false);
+  const isIos = useIsIosDevice();
 
   useSeo({
     title: 'Pricing | Roster — Free, Pro & Commissioner Plans',
@@ -382,18 +384,20 @@ export default function Pricing() {
                 <div className="text-sm font-semibold text-white leading-tight">App Store</div>
               </div>
             </a>
-            <a
-              href="https://play.google.com/store/search?q=roster+team+management&c=apps"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"
-            >
-              <SiGoogleplay className="w-5 h-5 text-white" />
-              <div className="text-left">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Get it on</div>
-                <div className="text-sm font-semibold text-white leading-tight">Google Play</div>
-              </div>
-            </a>
+            {!isIos && (
+              <a
+                href="https://play.google.com/store/search?q=roster+team+management&c=apps"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"
+              >
+                <SiGoogleplay className="w-5 h-5 text-white" />
+                <div className="text-left">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">Get it on</div>
+                  <div className="text-sm font-semibold text-white leading-tight">Google Play</div>
+                </div>
+              </a>
+            )}
           </div>
         </div>
       </section>

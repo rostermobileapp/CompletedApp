@@ -86,6 +86,19 @@ interface IosPlatformInfo {
  * The Natively user-agent check is synchronous and does not require waiting for
  * any bridge events, because the native shell sets the UA before JavaScript runs.
  */
+/**
+ * Returns true when the visitor is on any iOS device (iPhone, iPad, iPod),
+ * whether in a native app shell or a regular browser like Safari.
+ * This is used to hide Google Play references per Apple's review guidelines.
+ */
+export function useIsIosDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('ios') === '1') return true;
+  return /iPad|iPhone|iPod/.test(ua) || isNativelyIosApp();
+}
+
 export function useIosPlatform(): IosPlatformInfo {
   const [info, setInfo] = useState<IosPlatformInfo>(() => {
     const params = new URLSearchParams(
