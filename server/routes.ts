@@ -440,17 +440,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (zipCode !== undefined) {
         profileData.zipCode = zipCode;
+        // Always start by clearing coordinates — only set them if geocoding succeeds
+        profileData.lat = null;
+        profileData.lng = null;
         // Geocode the zip code using zippopotam.us (free, no key required)
         if (zipCode && zipCode.trim()) {
           try {
-            const cleanZip = zipCode.trim().toUpperCase();
-            // Try US first, then Canada
+            // Normalize: remove spaces for Canadian codes like "T2P 3C8" → "T2P3C8"
+            const cleanZip = zipCode.trim().replace(/\s+/g, '').toUpperCase();
             let geoData: any = null;
             const usRes = await fetch(`https://api.zippopotam.us/us/${cleanZip}`);
             if (usRes.ok) {
               geoData = await usRes.json();
             } else {
-              // Try Canadian postal code (first 3 chars = FSA)
+              // Try Canadian postal code
               const caRes = await fetch(`https://api.zippopotam.us/ca/${cleanZip}`);
               if (caRes.ok) geoData = await caRes.json();
             }
@@ -458,13 +461,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               profileData.lat = geoData.places[0].latitude;
               profileData.lng = geoData.places[0].longitude;
             }
+            // If neither API returned data, lat/lng remain null (stale data cleared above)
           } catch (geoErr) {
             console.error("Zip geocoding failed (non-fatal):", geoErr);
+            // lat/lng already set to null above, so stale coordinates are cleared
           }
-        } else {
-          // Clear coordinates when zip code is cleared
-          profileData.lat = null;
-          profileData.lng = null;
         }
       }
 
