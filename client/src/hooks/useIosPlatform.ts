@@ -90,13 +90,24 @@ interface IosPlatformInfo {
  * Returns true when the visitor is on any iOS device (iPhone, iPad, iPod),
  * whether in a native app shell or a regular browser like Safari.
  * This is used to hide Google Play references per Apple's review guidelines.
+ *
+ * Handles the iPadOS desktop-mode case where the UA reads "Macintosh" instead
+ * of "iPad" — detected via navigator.platform + maxTouchPoints heuristic.
  */
 export function useIsIosDevice(): boolean {
   if (typeof window === 'undefined') return false;
   const ua = navigator.userAgent;
   const params = new URLSearchParams(window.location.search);
   if (params.get('ios') === '1') return true;
-  return /iPad|iPhone|iPod/.test(ua) || isNativelyIosApp();
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  if (isNativelyIosApp()) return true;
+  // iPadOS 13+ in desktop mode reports a Mac UA; detect via touch support
+  if (
+    typeof navigator.maxTouchPoints === 'number' &&
+    navigator.maxTouchPoints > 1 &&
+    /Macintosh/.test(ua)
+  ) return true;
+  return false;
 }
 
 export function useIosPlatform(): IosPlatformInfo {
