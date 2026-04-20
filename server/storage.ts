@@ -10980,7 +10980,7 @@ export class DatabaseStorage implements IStorage {
 
     // Fetch users who have a city but are missing lat or lng
     const cityRows = await db
-      .select({ city: users.city })
+      .select({ id: users.id, city: users.city })
       .from(users)
       .where(
         and(
@@ -10991,7 +10991,7 @@ export class DatabaseStorage implements IStorage {
 
     // Filter to non-empty city values
     const cityRowsFiltered = cityRows.filter(
-      (r): r is { city: string } => !!r.city && r.city.trim().length > 0
+      (r): r is { id: string; city: string } => !!r.city && r.city.trim().length > 0
     );
 
     // Deduplicate cities for geocoding API calls
@@ -11021,6 +11021,30 @@ export class DatabaseStorage implements IStorage {
           }
         } catch {
           // Non-fatal: skip this city
+        }
+      })
+    );
+
+    // Persist geocoded coordinates back to the database for all city-only users
+    // Group user IDs by city so we can do one update per unique city
+    const cityToUserIds = new Map<string, string[]>();
+    for (const row of cityRowsFiltered) {
+      const existing = cityToUserIds.get(row.city) ?? [];
+      existing.push(row.id);
+      cityToUserIds.set(row.city, existing);
+    }
+
+    await Promise.allSettled(
+      [...cityToUserIds.entries()].map(async ([city, ids]) => {
+        const point = cityGeoCache.get(city);
+        if (!point) return;
+        try {
+          await db
+            .update(users)
+            .set({ lat: point.lat, lng: point.lng })
+            .where(inArray(users.id, ids));
+        } catch {
+          // Non-fatal: coordinates will still be returned from cache this request
         }
       })
     );
