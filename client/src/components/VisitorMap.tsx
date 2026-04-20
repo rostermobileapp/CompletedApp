@@ -3,33 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import AnimatedCounter from "@/components/AnimatedCounter";
 
 interface VisitorLocationsResponse {
   locations: { lat: string; lng: string }[];
   total: number;
 }
 
-function AnimatedVisitorCounter({ value }: { value: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!ref.current || value === 0) return;
-    const duration = 1500;
-    const start = performance.now();
-    const step = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      if (ref.current) ref.current.textContent = Math.floor(eased * value).toLocaleString();
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [value]);
-  return <span ref={ref}>{value > 0 ? value.toLocaleString() : "0"}</span>;
-}
-
 export default function VisitorMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
-  const heatLayerRef = useRef<any>(null);
+  const heatLayerRef = useRef<L.HeatLayer | null>(null);
 
   const { data } = useQuery<VisitorLocationsResponse>({
     queryKey: ["/api/visitor-locations"],
@@ -48,29 +32,23 @@ export default function VisitorMap() {
       center: [49.0, -97.0],
       zoom: 3,
       minZoom: 3,
-      maxZoom: 6,
+      maxZoom: 7,
       maxBounds: northAmericaBounds,
       maxBoundsViscosity: 1.0,
-      zoomControl: false,
+      zoomControl: true,
       attributionControl: false,
-      scrollWheelZoom: false,
-      dragging: false,
-      touchZoom: false,
-      doubleClickZoom: false,
-      boxZoom: false,
-      keyboard: false,
     });
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
       attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       subdomains: "abcd",
-      maxZoom: 6,
+      maxZoom: 7,
     }).addTo(map);
 
-    const heat = (L as any).heatLayer([], {
+    const heat = L.heatLayer([], {
       radius: 28,
       blur: 20,
-      maxZoom: 6,
+      maxZoom: 7,
       max: 1.0,
       minOpacity: 0.4,
       gradient: {
@@ -88,6 +66,7 @@ export default function VisitorMap() {
     return () => {
       map.remove();
       leafletMap.current = null;
+      heatLayerRef.current = null;
     };
   }, []);
 
@@ -114,7 +93,7 @@ export default function VisitorMap() {
           </h2>
           <p className="text-gray-500 text-sm">
             <span className="font-semibold text-[#3c82f4]">
-              <AnimatedVisitorCounter value={total} />
+              <AnimatedCounter value={total} />
             </span>{" "}
             {total === 1 ? "visitor" : "visitors"} from the US and Canada
           </p>
