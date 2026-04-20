@@ -674,6 +674,9 @@ export interface IStorage {
 // Helper function to generate unique 6-character alphanumeric display ID
 const generateDisplayId = customAlphabet('0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz', 6);
 
+// In-memory cache for city geocoding results (city name → lat/lng)
+const cityGeoCache = new Map<string, { lat: string; lng: string }>();
+
 export class DatabaseStorage implements IStorage {
   // Generate a unique display ID for a user
   async generateUniqueDisplayId(): Promise<string> {
@@ -10966,13 +10969,70 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsersWithCoordinates(): Promise<{ lat: string; lng: string }[]> {
-    const rows = await db
+    // Fetch users who already have both coordinates
+    const coordRows = await db
       .select({ lat: users.lat, lng: users.lng })
       .from(users)
       .where(and(isNotNull(users.lat), isNotNull(users.lng)));
-    return rows
+    const coordPoints = coordRows
       .filter((r) => r.lat !== null && r.lng !== null)
       .map((r) => ({ lat: r.lat as string, lng: r.lng as string }));
+
+    // Fetch users who have a city but are missing lat or lng
+    const cityRows = await db
+      .select({ city: users.city })
+      .from(users)
+      .where(
+        and(
+          isNotNull(users.city),
+          or(isNull(users.lat), isNull(users.lng))
+        )
+      );
+
+    // Filter to non-empty city values
+    const cityRowsFiltered = cityRows.filter(
+      (r): r is { city: string } => !!r.city && r.city.trim().length > 0
+    );
+
+    // Deduplicate cities for geocoding API calls
+    const uniqueCities = [...new Set(cityRowsFiltered.map((r) => r.city))];
+
+    // Geocode unique cities in parallel (with per-city timeout)
+    await Promise.allSettled(
+      uniqueCities.map(async (city) => {
+        if (cityGeoCache.has(city)) return;
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 4000);
+          try {
+            const res = await fetch(url, {
+              headers: { 'User-Agent': 'SportsLeagueApp/1.0' },
+              signal: controller.signal,
+            });
+            if (res.ok) {
+              const data = await res.json() as { lat: string; lon: string }[];
+              if (data.length > 0) {
+                cityGeoCache.set(city, { lat: data[0].lat, lng: data[0].lon });
+              }
+            }
+          } finally {
+            clearTimeout(timer);
+          }
+        } catch {
+          // Non-fatal: skip this city
+        }
+      })
+    );
+
+    // Map each city-row user to its geocoded point (preserving per-user density)
+    const cityPoints: { lat: string; lng: string }[] = [];
+    for (const row of cityRowsFiltered) {
+      const point = cityGeoCache.get(row.city);
+      if (point) cityPoints.push(point);
+    }
+
+    return [...coordPoints, ...cityPoints];
   }
 }
 
