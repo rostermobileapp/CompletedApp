@@ -77,7 +77,8 @@ app.use((req, res, next) => {
 
   // Pre-warm the city geo cache from existing DB records so the first heatmap
   // request after a cold restart requires no external geocoding API calls.
-  warmCityGeoCache().catch(() => { /* non-fatal, logged inside */ });
+  // Awaited before listen() to guarantee cache readiness before traffic arrives.
+  await warmCityGeoCache();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
