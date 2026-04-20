@@ -6,6 +6,7 @@ import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { useSeo } from '@/hooks/useSeo';
+import VisitorMap from '@/components/VisitorMap';
 
 function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: string }) {
   const [displayValue, setDisplayValue] = useState(0);
@@ -121,6 +122,38 @@ export default function Landing() {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    async function recordVisit() {
+      try {
+        const resp = await fetch('https://ipapi.co/json/');
+        if (!resp.ok) return;
+        const geo = await resp.json();
+        const country = geo.country_code as string;
+        if (country !== 'US' && country !== 'CA') return;
+        const ip: string = geo.ip;
+        const encoder = new TextEncoder();
+        const data = encoder.encode(ip);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const ipHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        await fetch('/api/visitor-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ipHash,
+            lat: geo.latitude,
+            lng: geo.longitude,
+            city: geo.city || null,
+            country,
+          }),
+        });
+      } catch {
+        // silently ignore any errors
+      }
+    }
+    recordVisit();
   }, []);
 
   const userCount = userCountData?.count ?? 0;
@@ -385,6 +418,8 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      {/* Visitor Heatmap */}
+      <VisitorMap />
       {/* Features Section - Comparison Table */}
       <section className="py-24 px-6 bg-white" id="features">
         <div className="max-w-7xl mx-auto">

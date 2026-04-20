@@ -284,6 +284,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Visitor location heatmap endpoints (public)
+  app.post('/api/visitor-location', async (req, res) => {
+    try {
+      const { ipHash, lat, lng, city, country } = req.body;
+      if (!ipHash || lat === undefined || lng === undefined || !country) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      if (country !== 'US' && country !== 'CA') {
+        return res.status(200).json({ skipped: true });
+      }
+      const alreadyVisited = await storage.hasRecentVisit(ipHash, 24 * 60 * 60 * 1000);
+      if (!alreadyVisited) {
+        await storage.recordVisitorLocation({ ipHash, lat: String(lat), lng: String(lng), city: city || null, country });
+      }
+      res.json({ recorded: !alreadyVisited });
+    } catch (error) {
+      console.error("Error recording visitor location:", error);
+      res.status(500).json({ message: "Failed to record visitor location" });
+    }
+  });
+
+  app.get('/api/visitor-locations', async (req, res) => {
+    try {
+      const [locations, total] = await Promise.all([
+        storage.getVisitorLocations(),
+        storage.getVisitorLocationCount(),
+      ]);
+      res.json({ locations, total });
+    } catch (error) {
+      console.error("Error fetching visitor locations:", error);
+      res.status(500).json({ message: "Failed to fetch visitor locations" });
+    }
+  });
+
   // Waitlist signup (public)
   app.post('/api/waitlist', async (req, res) => {
     try {

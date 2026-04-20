@@ -33,6 +33,24 @@ export const visitorCount = pgTable("visitor_count", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Visitor locations table — hashed IPs only, US/CA only
+export const visitorLocations = pgTable("visitor_locations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  ipHash: text("ip_hash").notNull(),
+  lat: decimal("lat", { precision: 9, scale: 6 }).notNull(),
+  lng: decimal("lng", { precision: 9, scale: 6 }).notNull(),
+  city: text("city"),
+  country: text("country").notNull(),
+  visitedAt: timestamp("visited_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_visitor_locations_ip_hash").on(table.ipHash),
+  index("idx_visitor_locations_visited_at").on(table.visitedAt),
+]);
+
+export const insertVisitorLocationSchema = createInsertSchema(visitorLocations).omit({ id: true, visitedAt: true });
+export type InsertVisitorLocation = z.infer<typeof insertVisitorLocationSchema>;
+export type VisitorLocation = typeof visitorLocations.$inferSelect;
+
 // User registration count - monotonically increasing, never decreases
 export const userRegistrationCount = pgTable("user_registration_count", {
   id: integer("id").primaryKey().default(1),

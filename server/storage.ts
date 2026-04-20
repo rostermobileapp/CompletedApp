@@ -74,6 +74,9 @@ import {
   // Notifications
   userNotifications,
   notificationPreferences,
+  visitorLocations,
+  type VisitorLocation,
+  type InsertVisitorLocation,
   type User,
   type UpsertUser,
   type UserNotification,
@@ -658,6 +661,12 @@ export interface IStorage {
   removeLeaguePhotoTag(photoId: string, userId: string): Promise<void>;
   getLeaguePhotosByTaggedUser(leagueId: string, userId: string): Promise<LeaguePhoto[]>;
   getAllLeaguePhotoTags(leagueId: string): Promise<Record<string, string[]>>;
+
+  // Visitor location operations
+  recordVisitorLocation(data: InsertVisitorLocation): Promise<void>;
+  getVisitorLocations(): Promise<{ lat: string; lng: string }[]>;
+  getVisitorLocationCount(): Promise<number>;
+  hasRecentVisit(ipHash: string, withinMs: number): Promise<boolean>;
 }
 
 // Helper function to generate unique 6-character alphanumeric display ID
@@ -10905,6 +10914,34 @@ export class DatabaseStorage implements IStorage {
       tagsMap[tag.photoId].push(tag.userId);
     }
     return tagsMap;
+  }
+
+  async recordVisitorLocation(data: InsertVisitorLocation): Promise<void> {
+    await db.insert(visitorLocations).values(data);
+  }
+
+  async getVisitorLocations(): Promise<{ lat: string; lng: string }[]> {
+    const rows = await db
+      .select({ lat: visitorLocations.lat, lng: visitorLocations.lng })
+      .from(visitorLocations);
+    return rows;
+  }
+
+  async getVisitorLocationCount(): Promise<number> {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(visitorLocations);
+    return row?.count ?? 0;
+  }
+
+  async hasRecentVisit(ipHash: string, withinMs: number): Promise<boolean> {
+    const since = new Date(Date.now() - withinMs);
+    const [row] = await db
+      .select({ id: visitorLocations.id })
+      .from(visitorLocations)
+      .where(and(eq(visitorLocations.ipHash, ipHash), gte(visitorLocations.visitedAt, since)))
+      .limit(1);
+    return !!row;
   }
 }
 
