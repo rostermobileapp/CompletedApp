@@ -321,11 +321,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visitor-locations', async (req, res) => {
     try {
-      const [locations, total] = await Promise.all([
+      const [locations, total, cities] = await Promise.all([
         storage.getVisitorLocations(),
         storage.getVisitorLocationCount(),
+        storage.getCityVisitorCounts(20),
       ]);
-      res.json({ locations, total });
+      res.json({ locations, total, cities });
     } catch (error) {
       console.error("Error fetching visitor locations:", error);
       res.status(500).json({ message: "Failed to fetch visitor locations" });

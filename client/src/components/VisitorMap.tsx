@@ -5,9 +5,16 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import AnimatedCounter from "@/components/AnimatedCounter";
 
+interface CityCount {
+  city: string;
+  country: string;
+  count: number;
+}
+
 interface VisitorLocationsResponse {
   locations: { lat: string; lng: string }[];
   total: number;
+  cities?: CityCount[];
 }
 
 export default function VisitorMap() {
@@ -82,6 +89,7 @@ export default function VisitorMap() {
   }, [data]);
 
   const total = data?.total ?? 0;
+  const cities = data?.cities ?? [];
 
   return (
     <section className="py-16 px-6 bg-white border-b border-gray-100">
@@ -107,6 +115,25 @@ export default function VisitorMap() {
         <p className="text-center text-xs text-gray-400 mt-2">
           Locations are approximate. No personal data is stored.
         </p>
+
+        {cities.length > 0 && (
+          <div className="mt-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 text-center">
+              Visitors by city
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {cities.map((c) => (
+                <span
+                  key={`${c.city}-${c.country}`}
+                  className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1 rounded-full border border-blue-100"
+                >
+                  {c.city}, {c.country}
+                  <span className="text-blue-400 font-normal">· {c.count}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -666,6 +666,7 @@ export interface IStorage {
   recordVisitorLocation(data: InsertVisitorLocation): Promise<void>;
   getVisitorLocations(): Promise<{ lat: string; lng: string }[]>;
   getVisitorLocationCount(): Promise<number>;
+  getCityVisitorCounts(limit?: number): Promise<{ city: string; country: string; count: number }[]>;
   hasRecentVisit(ipHash: string, withinMs: number): Promise<boolean>;
 }
 
@@ -10932,6 +10933,25 @@ export class DatabaseStorage implements IStorage {
       .select({ count: sql<number>`count(*)::int` })
       .from(visitorLocations);
     return row?.count ?? 0;
+  }
+
+  async getCityVisitorCounts(limit = 20): Promise<{ city: string; country: string; count: number }[]> {
+    const rows = await db
+      .select({
+        city: visitorLocations.city,
+        country: visitorLocations.country,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(visitorLocations)
+      .where(isNotNull(visitorLocations.city))
+      .groupBy(visitorLocations.city, visitorLocations.country)
+      .orderBy(sql`count(*) desc`)
+      .limit(limit);
+    return rows.filter((r) => r.city !== null).map((r) => ({
+      city: r.city as string,
+      country: r.country,
+      count: r.count,
+    }));
   }
 
   async hasRecentVisit(ipHash: string, withinMs: number): Promise<boolean> {
