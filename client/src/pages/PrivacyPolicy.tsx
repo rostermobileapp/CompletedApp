@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
         </Link>
 
         <h1 className="text-4xl font-bold mb-4" data-testid="text-title">Privacy Policy</h1>
-        <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: 12/1/2025</p>
+        <p className="text-gray-400 mb-8" data-testid="text-last-updated">Last Updated: 4/20/2026</p>
 
         <div className="prose prose-invert prose-lg max-w-none space-y-8">
           <section data-testid="section-introduction">
@@ -48,7 +48,7 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2 mb-6">
               <li>Device information (device type, operating system, unique device identifiers)</li>
-              <li>Log data (IP address, browser type, pages visited, time and date of visit)</li>
+              <li>Log data (browser type, pages visited, time and date of visit; see "Visitor Location Tracking" below for how IP addresses are handled)</li>
               <li>Location data (with your consent)</li>
               <li>App usage patterns and preferences</li>
             </ul>
@@ -56,6 +56,22 @@ export default function PrivacyPolicy() {
             <h3 className="text-xl font-medium mb-3">Cookies and Tracking Technologies</h3>
             <p className="text-gray-300 leading-relaxed">
               We use cookies, web beacons, and similar tracking technologies to collect information about your browsing activities. You can control cookies through your browser settings, but disabling cookies may limit your use of certain features.
+            </p>
+          </section>
+
+          <section data-testid="section-visitor-location">
+            <h2 className="text-2xl font-semibold mb-4">Visitor Location Tracking</h2>
+            <p className="text-gray-300 leading-relaxed mb-4">
+              When you visit our landing page, we collect your approximate location (city and country) to power the "Roster is growing across North America" heatmap. This applies to visitors located in the United States and Canada.
+            </p>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><strong>What we collect:</strong> Approximate city and country derived from your IP address at the time of your visit.</li>
+              <li><strong>How we handle your IP address:</strong> Your raw IP address is never stored. We immediately convert it into an irreversible cryptographic hash — it cannot be used to recover your original IP address.</li>
+              <li><strong>How we use this data:</strong> The approximate location data is used solely to display the visitor heatmap on our homepage. It is not used for advertising, profiling, or any other purpose.</li>
+              <li><strong>Who can see it:</strong> The heatmap shows aggregated, approximate geographic clusters — no individual visitor's precise location is ever displayed or shared.</li>
+            </ul>
+            <p className="text-gray-300 leading-relaxed">
+              If you have questions or wish to request deletion of any location data associated with your visit, please contact us at contact@roster-app.com.
             </p>
           </section>
 
