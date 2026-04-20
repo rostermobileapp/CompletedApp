@@ -41,7 +41,7 @@ export default function VisitorMap() {
       center: [49.0, -97.0],
       zoom: 3,
       minZoom: 3,
-      maxZoom: 7,
+      maxZoom: 12,
       maxBounds: northAmericaBounds,
       maxBoundsViscosity: 1.0,
       zoomControl: true,
@@ -51,13 +51,13 @@ export default function VisitorMap() {
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
       attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       subdomains: "abcd",
-      maxZoom: 7,
+      maxZoom: 19,
     }).addTo(map);
 
     const heat = L.heatLayer([], {
       radius: 10,
       blur: 6,
-      maxZoom: 7,
+      maxZoom: 12,
       max: 1.0,
       minOpacity: 0.4,
       gradient: {
