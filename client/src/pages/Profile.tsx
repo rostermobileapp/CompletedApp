@@ -47,8 +47,8 @@ const profileSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  phoneNumber: z.string().optional(),
   city: z.string().optional(),
+  zipCode: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie']).optional(),
   timezone: z.string().optional(),
 });
@@ -91,8 +91,8 @@ export default function Profile() {
       firstName: (user as any)?.firstName || '',
       lastName: (user as any)?.lastName || '',
       dateOfBirth: (user as any)?.dateOfBirth || '',
-      phoneNumber: (user as any)?.phoneNumber || '',
       city: (user as any)?.city || '',
+      zipCode: (user as any)?.zipCode || '',
       playerType: (user as any)?.playerType || undefined,
       timezone: (user as any)?.timezone || 'America/New_York',
     },
@@ -532,23 +532,22 @@ export default function Profile() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">Phone Number</label>
-                <input
-                  {...form.register('phoneNumber')}
-                  type="tel"
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="(555) 123-4567"
-                  data-testid="input-phone"
-                />
-              </div>
-              
-              <div>
                 <label className="block text-sm font-medium mb-1">City</label>
                 <input
                   {...form.register('city')}
                   className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Your city of residence"
                   data-testid="input-city"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Zip Code</label>
+                <input
+                  {...form.register('zipCode')}
+                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="e.g. 80203 or T2P"
+                  data-testid="input-zip-code"
                 />
               </div>
               
@@ -625,22 +624,12 @@ export default function Profile() {
                 <span>{(user as any)?.dateOfBirth || 'Not specified'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Phone:</span>
-                <span>
-                  {(() => {
-                    const phone = (user as any)?.phoneNumber;
-                    if (!phone) return 'Not specified';
-                    const cleaned = phone.replace(/\D/g, '');
-                    if (cleaned.length === 10) {
-                      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-                    }
-                    return phone;
-                  })()}
-                </span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-muted-foreground">City:</span>
                 <span>{(user as any)?.city || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Zip Code:</span>
+                <span>{(user as any)?.zipCode || 'Not specified'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Player Type:</span>

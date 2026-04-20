@@ -321,11 +321,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visitor-locations', async (req, res) => {
     try {
-      const [locations, total, cities] = await Promise.all([
+      const [ipLocations, userLocations, total, cities] = await Promise.all([
         storage.getVisitorLocations(),
+        storage.getUsersWithCoordinates(),
         storage.getVisitorLocationCount(),
         storage.getCityVisitorCounts(20),
       ]);
+      const locations = [...ipLocations, ...userLocations];
       res.json({ locations, total, cities });
     } catch (error) {
       console.error("Error fetching visitor locations:", error);
@@ -421,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/auth/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType, email, timezone } = req.body;
+      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType, email, timezone, zipCode } = req.body;
       
       const profileData: any = {};
       if (firstName !== undefined) profileData.firstName = firstName;
@@ -434,7 +436,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (email !== undefined) profileData.email = email;
       if (timezone !== undefined) {
         profileData.timezone = timezone;
-        profileData.timezoneManuallySet = true; // Mark as manually set when user changes it
+        profileData.timezoneManuallySet = true;
+      }
+      if (zipCode !== undefined) {
+        profileData.zipCode = zipCode;
+        // Geocode the zip code using zippopotam.us (free, no key required)
+        if (zipCode && zipCode.trim()) {
+          try {
+            const cleanZip = zipCode.trim().toUpperCase();
+            // Try US first, then Canada
+            let geoData: any = null;
+            const usRes = await fetch(`https://api.zippopotam.us/us/${cleanZip}`);
+            if (usRes.ok) {
+              geoData = await usRes.json();
+            } else {
+              // Try Canadian postal code (first 3 chars = FSA)
+              const caRes = await fetch(`https://api.zippopotam.us/ca/${cleanZip}`);
+              if (caRes.ok) geoData = await caRes.json();
+            }
+            if (geoData && geoData.places && geoData.places.length > 0) {
+              profileData.lat = geoData.places[0].latitude;
+              profileData.lng = geoData.places[0].longitude;
+            }
+          } catch (geoErr) {
+            console.error("Zip geocoding failed (non-fatal):", geoErr);
+          }
+        } else {
+          // Clear coordinates when zip code is cleared
+          profileData.lat = null;
+          profileData.lng = null;
+        }
       }
 
       const user = await storage.updateUserProfile(userId, profileData);

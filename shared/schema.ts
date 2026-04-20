@@ -254,6 +254,9 @@ export const users = pgTable("users", {
   dateOfBirth: varchar("date_of_birth"),
   phoneNumber: varchar("phone_number"),
   city: varchar("city"),
+  zipCode: varchar("zip_code"),
+  lat: decimal("lat", { precision: 9, scale: 6 }),
+  lng: decimal("lng", { precision: 9, scale: 6 }),
   primarySport: sportEnum("primary_sport"),
   playerType: playerTypeEnum("player_type"),
   // Permission system fields

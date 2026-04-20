@@ -254,7 +254,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
+  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
@@ -668,6 +668,7 @@ export interface IStorage {
   getVisitorLocationCount(): Promise<number>;
   getCityVisitorCounts(limit?: number): Promise<{ city: string; country: string; count: number }[]>;
   hasRecentVisit(ipHash: string, withinMs: number): Promise<boolean>;
+  getUsersWithCoordinates(): Promise<{ lat: string; lng: string }[]>;
 }
 
 // Helper function to generate unique 6-character alphanumeric display ID
@@ -1015,7 +1016,7 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User> {
+  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User> {
     const [user] = await db
       .update(users)
       .set({
@@ -10962,6 +10963,16 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(visitorLocations.ipHash, ipHash), gte(visitorLocations.visitedAt, since)))
       .limit(1);
     return !!row;
+  }
+
+  async getUsersWithCoordinates(): Promise<{ lat: string; lng: string }[]> {
+    const rows = await db
+      .select({ lat: users.lat, lng: users.lng })
+      .from(users)
+      .where(and(isNotNull(users.lat), isNotNull(users.lng)));
+    return rows
+      .filter((r) => r.lat !== null && r.lng !== null)
+      .map((r) => ({ lat: r.lat as string, lng: r.lng as string }));
   }
 }
 
