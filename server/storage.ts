@@ -1049,6 +1049,9 @@ export class DatabaseStorage implements IStorage {
 
 
   async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User> {
+    if (profileData.city !== undefined && profileData.city === '') {
+      profileData = { ...profileData, city: null };
+    }
     const [user] = await db
       .update(users)
       .set({
@@ -1136,6 +1139,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserOnboarding(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'phoneNumber' | 'dateOfBirth' | 'city' | 'playerType' | 'profileImageUrl' | 'venmoUsername' | 'cashappUsername' | 'timezone' | 'competitiveLevel' | 'rosterUseCase' | 'selectedFacilityId' | 'onboardingProgress' | 'onboardingCompleted' | 'role'>>): Promise<User> {
+    if (data.city !== undefined && data.city === '') {
+      data = { ...data, city: null };
+    }
     const [user] = await db
       .update(users)
       .set({
