@@ -53,8 +53,8 @@ export default function VisitorMap() {
     }).addTo(map);
 
     const heat = L.heatLayer([], {
-      radius: 28,
-      blur: 20,
+      radius: 14,
+      blur: 10,
       maxZoom: 7,
       max: 1.0,
       minOpacity: 0.4,
