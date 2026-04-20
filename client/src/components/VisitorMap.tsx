@@ -93,8 +93,9 @@ export default function VisitorMap() {
     <section className="py-16 px-6 bg-white border-b border-gray-100">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
-            Roster is growing across{" "}
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 flex items-center justify-center gap-2 flex-wrap">
+            <img src="/roster-logo.png" alt="Roster" className="h-7 md:h-9 inline-block" />
+            <span>is growing across</span>{" "}
             <span className="text-[#3c82f4]">North America</span>
           </h2>
         </div>
