@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
-import AnimatedCounter from "@/components/AnimatedCounter";
 
 interface CityCount {
   city: string;
@@ -90,8 +89,6 @@ export default function VisitorMap() {
     heatLayerRef.current.redraw();
   }, [data]);
 
-  const total = data?.total ?? 0;
-
   return (
     <section className="py-16 px-6 bg-white border-b border-gray-100">
       <div className="max-w-5xl mx-auto">
@@ -100,12 +97,6 @@ export default function VisitorMap() {
             Roster is growing across{" "}
             <span className="text-[#3c82f4]">North America</span>
           </h2>
-          <p className="text-gray-500 text-sm">
-            <span className="font-semibold text-[#3c82f4]">
-              <AnimatedCounter value={total} />
-            </span>{" "}
-            {total === 1 ? "visitor" : "visitors"} from the US and Canada
-          </p>
         </div>
         <div
           className="rounded-2xl overflow-hidden border border-blue-100 shadow-sm"
