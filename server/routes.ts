@@ -161,6 +161,17 @@ async function checkScorekeeperPermission(userId: string, game: { leagueId?: str
 }
 
 
+// Short-lived server-side cache for GET /api/visitor-locations.
+// Avoids running 4 DB queries on every page load while keeping heatmap data
+// fresh within 60 seconds. Invalidated immediately when a new visitor is recorded.
+const VISITOR_CACHE_TTL_MS = 60_000;
+type VisitorLocationsPayload = {
+  locations: { lat: string; lng: string }[];
+  total: number;
+  cities: { city: string; country: string; count: number }[];
+};
+let visitorLocationsCache: { data: VisitorLocationsPayload; timestamp: number } | null = null;
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -311,6 +322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const alreadyVisited = await storage.hasRecentVisit(ipHash, 24 * 60 * 60 * 1000);
       if (!alreadyVisited) {
         await storage.recordVisitorLocation({ ipHash, lat: String(latNum), lng: String(lngNum), city: typeof city === 'string' ? city.slice(0, 100) : null, country });
+        // Invalidate the heatmap cache so the new visitor appears on the next GET
+        visitorLocationsCache = null;
       }
       res.json({ recorded: !alreadyVisited });
     } catch (error) {
@@ -321,6 +334,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visitor-locations', async (req, res) => {
     try {
+      const now = Date.now();
+      if (visitorLocationsCache && now - visitorLocationsCache.timestamp < VISITOR_CACHE_TTL_MS) {
+        return res.json(visitorLocationsCache.data);
+      }
       const [ipLocations, userLocations, total, cities] = await Promise.all([
         storage.getVisitorLocations(),
         storage.getUsersWithCoordinates(),
@@ -328,6 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getCityVisitorCounts(20),
       ]);
       const locations = [...ipLocations, ...userLocations];
+      visitorLocationsCache = { data: { locations, total, cities }, timestamp: now };
       res.json({ locations, total, cities });
     } catch (error) {
       console.error("Error fetching visitor locations:", error);
