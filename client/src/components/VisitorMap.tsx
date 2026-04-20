@@ -24,6 +24,8 @@ export default function VisitorMap() {
 
   const { data } = useQuery<VisitorLocationsResponse>({
     queryKey: ["/api/visitor-locations"],
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: false,
   });
 
