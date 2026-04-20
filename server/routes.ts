@@ -291,12 +291,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!ipHash || lat === undefined || lng === undefined || !country) {
         return res.status(400).json({ message: "Missing required fields" });
       }
+      // Validate ipHash is a 64-char hex SHA-256 string
+      if (typeof ipHash !== 'string' || !/^[0-9a-f]{64}$/.test(ipHash)) {
+        return res.status(400).json({ message: "Invalid ipHash format" });
+      }
+      // Validate numeric coordinates
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      if (isNaN(latNum) || isNaN(lngNum) || latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+        return res.status(400).json({ message: "Invalid coordinates" });
+      }
+      // Validate within US/Canada geographic bounding box
+      if (latNum < 24 || latNum > 84 || lngNum < -170 || lngNum > -52) {
+        return res.status(400).json({ message: "Coordinates outside supported region" });
+      }
       if (country !== 'US' && country !== 'CA') {
         return res.status(200).json({ skipped: true });
       }
       const alreadyVisited = await storage.hasRecentVisit(ipHash, 24 * 60 * 60 * 1000);
       if (!alreadyVisited) {
-        await storage.recordVisitorLocation({ ipHash, lat: String(lat), lng: String(lng), city: city || null, country });
+        await storage.recordVisitorLocation({ ipHash, lat: String(latNum), lng: String(lngNum), city: typeof city === 'string' ? city.slice(0, 100) : null, country });
       }
       res.json({ recorded: !alreadyVisited });
     } catch (error) {
