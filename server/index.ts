@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { warmCityGeoCache } from "./storage";
 
 const app = express();
 
@@ -73,6 +74,10 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  // Pre-warm the city geo cache from existing DB records so the first heatmap
+  // request after a cold restart requires no external geocoding API calls.
+  warmCityGeoCache().catch(() => { /* non-fatal, logged inside */ });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

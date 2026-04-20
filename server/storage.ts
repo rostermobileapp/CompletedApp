@@ -674,8 +674,37 @@ export interface IStorage {
 // Helper function to generate unique 6-character alphanumeric display ID
 const generateDisplayId = customAlphabet('0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz', 6);
 
-// In-memory cache for city geocoding results (city name → lat/lng)
+// In-memory cache for city geocoding results (city name → lat/lng).
+// Pre-warmed on startup from DB records via warmCityGeoCache(); subsequently
+// populated at request time for any cities not yet in the DB.
 const cityGeoCache = new Map<string, { lat: string; lng: string }>();
+
+/**
+ * Pre-populate cityGeoCache from existing user rows that already have
+ * lat, lng, and city stored in the database.  Call once at server startup
+ * so the first heatmap request after a cold restart hits zero external
+ * geocoding API calls for already-known cities.
+ */
+export async function warmCityGeoCache(): Promise<void> {
+  try {
+    const rows = await db
+      .select({ city: users.city, lat: users.lat, lng: users.lng })
+      .from(users)
+      .where(and(isNotNull(users.city), isNotNull(users.lat), isNotNull(users.lng)));
+
+    let count = 0;
+    for (const row of rows) {
+      if (row.city && row.city.trim() && row.lat && row.lng && !cityGeoCache.has(row.city)) {
+        cityGeoCache.set(row.city, { lat: row.lat as string, lng: row.lng as string });
+        count++;
+      }
+    }
+    console.log(`City geo cache warmed: ${count} cities loaded from DB`);
+  } catch (err) {
+    // Non-fatal: cache stays empty; geocoding will populate it on first request
+    console.error(`City geo cache warm-up failed (non-fatal): ${String(err)}`);
+  }
+}
 
 export class DatabaseStorage implements IStorage {
   // Generate a unique display ID for a user
