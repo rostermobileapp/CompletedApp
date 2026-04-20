@@ -445,19 +445,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         profileData.lng = null;
         // Geocode the zip code using zippopotam.us (free, no key required)
         if (zipCode && zipCode.trim()) {
+          type ZippopotamPlace = { latitude: string; longitude: string };
+          type ZippopotamResponse = { places?: ZippopotamPlace[] };
           try {
             // Normalize: remove spaces for Canadian codes like "T2P 3C8" → "T2P3C8"
             const cleanZip = zipCode.trim().replace(/\s+/g, '').toUpperCase();
-            let geoData: any = null;
+            let geoData: ZippopotamResponse | null = null;
             const usRes = await fetch(`https://api.zippopotam.us/us/${cleanZip}`);
             if (usRes.ok) {
-              geoData = await usRes.json();
+              geoData = (await usRes.json()) as ZippopotamResponse;
             } else {
               // Try Canadian postal code
               const caRes = await fetch(`https://api.zippopotam.us/ca/${cleanZip}`);
-              if (caRes.ok) geoData = await caRes.json();
+              if (caRes.ok) geoData = (await caRes.json()) as ZippopotamResponse;
             }
-            if (geoData && geoData.places && geoData.places.length > 0) {
+            if (geoData?.places && geoData.places.length > 0) {
               profileData.lat = geoData.places[0].latitude;
               profileData.lng = geoData.places[0].longitude;
             }
