@@ -873,6 +873,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (userData.city !== undefined && userData.city === '') {
+      userData = { ...userData, city: null };
+    }
     try {
       // Check if this is a genuinely new user (not seen before by ID or email)
       const existingById = userData.id ? await this.getUser(userData.id) : undefined;
