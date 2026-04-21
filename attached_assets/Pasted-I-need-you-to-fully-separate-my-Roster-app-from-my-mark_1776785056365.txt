@@ -1,0 +1,27 @@
+I need you to fully separate my Roster app from my marketing website homepage so that the mobile app build (via BuildNatively) only wraps the app itself — not the homepage or any public-facing marketing pages.
+
+Here's the problem:
+BuildNatively wraps whatever URL I give it. Right now it's picking up the homepage, which contains references to things Apple doesn't allow in App Store builds (competitor comparisons, non-Apple payment references, web-only content, etc.). Apple is rejecting the build because of this.
+
+Here's what I need you to do:
+
+1. IDENTIFY the entry point URL that BuildNatively is currently using and confirm what it's loading.
+
+2. CREATE a dedicated app entry point — a separate route (e.g. /app or /dashboard) that serves only the authenticated app shell. This route should:
+   - Have no reference to marketing content, competitor names, or external payment processors
+   - Load only the core app UI (schedule, roster, team management, etc.)
+   - Redirect unauthenticated users to a clean /login page (also app-only, no marketing)
+
+3. ENSURE the homepage (and any marketing pages) are completely unreachable from within the BuildNatively wrapper. The wrapper URL should point exclusively to /app or the login entry point.
+
+4. AUDIT the app-side pages for any content that would violate Apple App Store Review Guidelines, specifically:
+   - References to non-Apple payment methods or external billing
+   - Links or references to competitors
+   - Calls to action that route outside the app
+   Flag anything you find and either remove it or gate it so it only appears in the web version.
+
+5. UPDATE my BuildNatively config (or document exactly what the wrapper URL should be changed to) so the iOS build wraps only the clean app entry point.
+
+The marketing homepage should still exist and work normally on the web — this is purely about what BuildNatively wraps for the App Store submission.
+
+Let me know if you need to see my current routing file, BuildNatively config, or any specific page components before starting.
