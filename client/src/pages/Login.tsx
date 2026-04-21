@@ -67,7 +67,7 @@ export default function Login() {
             title: 'Welcome!',
             description: 'Your account has been created.',
           });
-          setLocation('/');
+          setLocation('/app');
         } else {
           console.log('[Signup] No user or session returned');
           toast({
@@ -88,7 +88,7 @@ export default function Login() {
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
         });
-        setLocation('/');
+        setLocation('/app');
       }
     } catch (error: any) {
       toast({
@@ -121,7 +121,7 @@ export default function Login() {
       title: 'Welcome!',
       description: 'Your account is now active. You are signed in.',
     });
-    setLocation('/');
+    setLocation('/app');
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
