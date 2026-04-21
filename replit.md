@@ -149,3 +149,11 @@ The `/mobile` folder contains a native Expo React Native app that provides push 
   - `APPLE_IAP_PRIVATE_KEY` — Full PEM content of the `.p8` private key file
 - **Debug:** `client/src/lib/debugLogger.ts` + `client/src/components/DebugPanel.tsx` — floating overlay (enabled when `DEBUG_MODE = true`) showing IAP log entries. Raw Natively callback payloads are logged via `console.log('[IAP] purchasePackage raw response:', ...)`.
 - Subscription button copy: "Subscribe via App Store" (IAP) — Apple-compliant per EP v. Apple ruling
+
+### BuildNatively App Entry Point
+- **BuildNatively wrapper URL must be set to `/app`** (e.g. `https://yourdomain.replit.app/app`)
+- The `/app` route is a clean, marketing-free entry point for the iOS native wrapper:
+  - Unauthenticated visitors at `/app` are shown the Login page (no marketing content, no competitor references)
+  - Authenticated + onboarded users land directly on the Dashboard/app shell
+  - Authenticated users who haven't completed onboarding are routed to the Onboarding flow
+- Marketing pages (`/`, `/pricing`, `/about`, sport and segment landing pages) remain intact for web but are **not reachable from within the authenticated app shell**, preventing Apple review rejections due to competitor comparisons or non-App-Store payment references on those pages
