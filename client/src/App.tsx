@@ -78,6 +78,12 @@ import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
+function RedirectToLogin() {
+  const [, setLocation] = useLocation();
+  useEffect(() => { setLocation('/login'); }, [setLocation]);
+  return null;
+}
+
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-black" data-testid="loading-app">
@@ -178,7 +184,7 @@ function Router() {
           <Route path="/for-youth-teams">{() => <SegmentLanding segment="for-youth-teams" />}</Route>
           <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
           <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
-          <Route path="/app" component={Login} />
+          <Route path="/app" component={RedirectToLogin} />
           <Route path="/waitlist" component={Waitlist} />
           <Route path="/login" component={Login} />
           <Route path="/get-started" component={OnboardingQuestionnaire} />
