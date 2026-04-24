@@ -191,18 +191,6 @@ export default function Landing() {
           style={{ transform: `translateY(${scrollY * 0.4}px)` }}
         />
         <div className="max-w-6xl mx-auto relative z-10">
-          {/* Trust badge */}
-          {userCount > 0 && (
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-2">
-                <div className="w-2 h-2 rounded-full bg-[#3c82f4] animate-pulse" />
-                <span className="text-sm font-medium text-[#3c82f4] flex items-center gap-1">
-                  <AnimatedCounter value={userCount} /> players already using <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Hero headline */}
           <div className="text-center mb-10">
             <h1
