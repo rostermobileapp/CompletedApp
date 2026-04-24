@@ -3,7 +3,6 @@ import appPreviewImage from "@assets/previewed_1768341988878.png";
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { useSeo } from '@/hooks/useSeo';
 import { useIsIosDevice } from '@/hooks/useIosPlatform';
@@ -69,11 +68,6 @@ export default function Landing() {
     ogDescription: 'Scheduling, RSVP, rosters, stats, and payments in one ad-free app. Built for hockey players, by hockey players.',
   });
 
-  const { data: userCountData } = useQuery<{ count: number }>({
-    queryKey: ['/api/user-count'],
-    refetchInterval: 30000,
-  });
-
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
@@ -111,8 +105,6 @@ export default function Landing() {
     }
     recordVisit();
   }, []);
-
-  const userCount = userCountData?.count ?? 0;
 
   const handleLoginClick = () => {
     setLoginMessageVisible(true);
@@ -339,13 +331,7 @@ export default function Landing() {
       {/* Social Proof Stats Bar */}
       <section className="py-14 px-6 border-y border-gray-100 bg-blue-50/40">
         <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">
-                {userCount > 0 ? <AnimatedCounter value={userCount} suffix="+" /> : '1,000+'}
-              </div>
-              <div className="text-gray-500 text-sm font-medium">Players Registered</div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             <div>
               <div className="text-4xl md:text-5xl font-black text-[#3c82f4] mb-1">🏒</div>
               <div className="text-gray-500 text-sm font-medium">Built for Hockey</div>
