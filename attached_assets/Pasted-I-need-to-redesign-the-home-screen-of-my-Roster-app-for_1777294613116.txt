@@ -1,0 +1,93 @@
+I need to redesign the home screen of my Roster app for DESKTOP BROWSER 
+USERS ONLY. This change must NOT affect the iOS or Android apps that 
+ship through the App Store and Google Play Store.
+
+=== CRITICAL CONSTRAINTS — READ FIRST ===
+
+1. The iOS and Android native app builds must render EXACTLY AS THEY DO 
+   TODAY. Zero visual or behavioral changes on those platforms.
+
+2. Mobile browsers (users visiting the site on their phone's Safari or 
+   Chrome) must ALSO continue to see the existing layout — not the new 
+   desktop layout.
+
+3. Only users on a DESKTOP BROWSER (laptop or desktop computer, viewport 
+   width 1024px or greater) should see the new premium home screen.
+
+=== PLATFORM DETECTION REQUIREMENTS ===
+
+Use a two-condition check to gate the new layout:
+
+  Condition A: Platform.OS === 'web'  
+  Condition B: Viewport width >= 1024px (use useWindowDimensions or a 
+              media query — must respond to live resize, not just 
+              initial load)
+
+BOTH conditions must be true to render the new desktop layout. If 
+either fails, render the existing home screen unchanged.
+
+Do NOT rely on user-agent string sniffing — it's unreliable and breaks 
+on tablets and unusual browsers. Use Platform.OS + viewport width only.
+
+=== IMPLEMENTATION APPROACH ===
+
+Create a new component (suggested name: HomeScreenDesktop) in a separate 
+file. Do not modify the existing home screen component's internal logic. 
+At the top of the current home screen's render, add a conditional that 
+returns the new desktop component when both gating conditions are met, 
+otherwise falls through to the existing return statement.
+
+This isolation is intentional: it means a regression in the desktop 
+layout cannot affect the mobile apps, and the existing mobile layout 
+code stays untouched.
+
+=== NEW DESKTOP LAYOUT SPEC ===
+
+The redesign should take inspiration from BenchApp's desktop home screen. 
+Specifically:
+
+[PASTE YOUR ANNOTATED NOTES HERE — describe each section of BenchApp's 
+layout you want to mirror, what you want to change, and what content from 
+Roster goes in each section. Be specific about:
+- Top navigation / header structure
+- Main content panels and their arrangement (grid? sidebar + main?)
+- What data each panel shows (next game, roster, RSVPs, league standings, etc.)
+- Color palette and typography direction (premium feel — what does that 
+  mean for Roster specifically?)
+- Any hover states, transitions, or interactive elements]
+
+=== STYLING NOTES ===
+
+Premium desktop feel means:
+- Generous whitespace and padding (don't cram content)
+- Larger, more confident typography for headers
+- Multi-column layout that uses horizontal space (mobile is single-column; 
+  desktop should NOT be)
+- Subtle shadows, refined borders, and considered hover states
+- Maximum content width around 1280–1440px, centered, so it doesn't 
+  stretch awkwardly on ultra-wide monitors
+
+=== TESTING CHECKLIST — VERIFY BEFORE MARKING COMPLETE ===
+
+1. Open the app in a desktop browser at 1440px wide → new layout shows
+2. Resize that same browser down to 800px wide → new layout disappears, 
+   existing mobile-style layout returns (live, without refresh)
+3. Open the app in a mobile browser (or Chrome DevTools mobile emulation) 
+   → existing layout shows, new layout never appears
+4. Build and run the iOS app in simulator → existing layout shows, no 
+   trace of the new desktop layout
+5. Build and run the Android app on an emulator or device → existing 
+   layout shows, no trace of the new desktop layout
+
+Do not consider this task complete until all five test cases pass.
+
+=== DO NOT ===
+
+- Do not change app.json, eas.json, or any native build configuration
+- Do not modify any files in /ios or /android directories
+- Do not change the existing home screen component's logic, state, or 
+  data fetching — only add a conditional render at the top
+- Do not introduce any new dependencies that require a native rebuild 
+  (web-only libraries are fine; anything requiring pod install or 
+  gradle changes is not)
+- Do not use user-agent sniffing for platform detection
