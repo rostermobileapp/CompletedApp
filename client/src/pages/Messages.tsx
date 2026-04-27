@@ -2525,7 +2525,7 @@ export default function Messages() {
         <div 
           ref={inputContainerRef}
           className="bg-background border-t border-border p-4"
-          style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }}
+          style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : isDesktopWeb ? '0px' : '64px' }}
           data-testid="message-input-container"
         >
           {/* File previews */}
