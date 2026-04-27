@@ -126,11 +126,11 @@ export function DesktopMenuColumn() {
   return (
     <>
       <aside
-        className="flex flex-col h-full w-full bg-background"
+        className="flex flex-col h-full w-full bg-[#f5f5f5cc]"
         data-testid="desktop-menu-column"
       >
         <div className="px-5 pt-6 pb-3 flex items-center">
-          <h2 className="text-2xl font-bold tracking-tight">Menu</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-900">Menu</h2>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-6 flex flex-col gap-2">
           {menuItems.map((item) => {
@@ -140,7 +140,7 @@ export function DesktopMenuColumn() {
                 key={item.path}
                 onClick={() => handleNavigate(item.path, item.locked)}
                 disabled={isLoading}
-                className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${
+                className={`w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg p-3 flex items-center justify-between transition-all hover:bg-white/90 dark:hover:bg-black/80 hover:border-primary/50 ${
                   showLock ? 'opacity-50' : ''
                 } ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
                 data-testid={`desktop-menu-item-${item.path.replace(/\//g, '-')}`}
@@ -149,12 +149,12 @@ export function DesktopMenuColumn() {
                   <div className={`p-2.5 rounded-xl flex-shrink-0 ${item.bgColor}`}>
                     <item.icon className={`w-5 h-5 ${item.iconColor}`} />
                   </div>
-                  <span className="text-sm font-semibold text-left text-foreground truncate">
+                  <span className="text-sm font-semibold text-left text-gray-900 dark:text-white truncate">
                     {item.label}
                   </span>
                 </div>
                 {showLock && (
-                  <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0 ml-2" />
+                  <Lock className="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2" />
                 )}
               </button>
             );
