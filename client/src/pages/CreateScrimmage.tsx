@@ -711,7 +711,7 @@ export default function CreateScrimmage() {
                     <Clock className="w-4 h-4 text-muted-foreground" />
                   </button>
                   {showTimePicker && (
-                    <div className="absolute z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg min-w-[280px]">
+                    <div className="absolute right-0 z-[9999] mt-1 bg-white dark:bg-zinc-800 border border-border rounded-lg shadow-lg min-w-[280px] max-w-[calc(100vw-1rem)]">
                       <div className="p-4">
                         <div className="flex items-start justify-center gap-3">
                           <div className="flex flex-col items-center">
