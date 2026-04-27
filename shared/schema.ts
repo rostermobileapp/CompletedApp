@@ -487,6 +487,7 @@ export const games = pgTable("games", {
   awayBeverageDutyUserId: varchar("away_beverage_duty_user_id").references(() => users.id, { onDelete: 'cascade' }),
   awayBeverageDutyClaimedAt: timestamp("away_beverage_duty_claimed_at"),
   resultType: gameResultTypeEnum("result_type").default("regulation"),
+  color: text("color"), // Optional color for calendar display (e.g. "#ef4444")
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -725,6 +726,7 @@ export const personalReminders = pgTable("personal_reminders", {
   scheduledAt: timestamp("scheduled_at", { mode: 'string' }).notNull(),
   isCompleted: boolean("is_completed").default(false).notNull(),
   notificationSentAt: timestamp("notification_sent_at"),
+  color: text("color"), // Optional color for calendar display (e.g. "#ef4444")
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -1352,6 +1354,7 @@ export const teamEvents = pgTable("team_events", {
   // Additional details
   notes: text("notes"),
   maxParticipants: integer("max_participants"),
+  color: text("color"), // Optional color for calendar display (e.g. "#ef4444")
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

@@ -16690,6 +16690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           location: teamEvents.location,
           opponentName: teamEvents.opponentName,
           isInternalScrimmage: teamEvents.isInternalScrimmage,
+          color: teamEvents.color,
           teamName: teams.name,
         })
         .from(teamEvents)

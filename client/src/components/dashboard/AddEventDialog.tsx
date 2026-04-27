@@ -34,10 +34,25 @@ interface UserTeam {
   league?: { name: string } | null;
 }
 
+// Calendar color palette shared with the Scrimmage Schedule screen so events
+// styled here match the swatches in CreateScrimmage.
+const EVENT_COLORS = [
+  { value: '#ef4444', label: 'Red' },
+  { value: '#f97316', label: 'Orange' },
+  { value: '#eab308', label: 'Yellow' },
+  { value: '#22c55e', label: 'Green' },
+  { value: '#3b82f6', label: 'Blue' },
+  { value: '#8b5cf6', label: 'Purple' },
+  { value: '#ec4899', label: 'Pink' },
+  { value: '#14b8a6', label: 'Teal' },
+];
+const DEFAULT_EVENT_COLOR = EVENT_COLORS[4].value; // Blue
+
 const personalReminderSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   scheduledAt: z.string().min(1, 'Date and time are required'),
+  color: z.string().optional(),
 });
 
 const teamGameSchema = z.object({
@@ -46,6 +61,7 @@ const teamGameSchema = z.object({
   scheduledAt: z.string().min(1, 'Date and time are required'),
   venue: z.string().optional(),
   notes: z.string().optional(),
+  color: z.string().optional(),
 });
 
 const generalEventSchema = z.object({
@@ -55,6 +71,7 @@ const generalEventSchema = z.object({
   scheduledAt: z.string().min(1, 'Date and time are required'),
   endTime: z.string().optional(),
   location: z.string().optional(),
+  color: z.string().optional(),
 });
 
 const scrimmageEventSchema = z.object({
@@ -66,7 +83,48 @@ const scrimmageEventSchema = z.object({
   isInternalScrimmage: z.boolean().default(true),
   opponentName: z.string().optional(),
   notes: z.string().optional(),
+  color: z.string().optional(),
 });
+
+interface CalendarColorPickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  testIdPrefix: string;
+}
+
+/**
+ * Inline calendar color picker shared by all four event-creation forms in the
+ * AddEventDialog. Mirrors the swatch UI used on the Scrimmage Schedule screen.
+ */
+function CalendarColorPicker({ value, onChange, testIdPrefix }: CalendarColorPickerProps) {
+  return (
+    <div data-testid={`${testIdPrefix}-color-picker`}>
+      <label className="text-sm font-medium leading-none">Calendar Color</label>
+      <p className="text-xs text-muted-foreground mt-1 mb-2">
+        Choose a color to identify this event on the calendar
+      </p>
+      <div className="flex gap-2 flex-wrap">
+        {EVENT_COLORS.map((color) => (
+          <button
+            key={color.value}
+            type="button"
+            title={color.label}
+            onClick={() => onChange(color.value)}
+            className="w-8 h-8 rounded-full border-2 transition-all"
+            style={{
+              backgroundColor: color.value,
+              borderColor: value === color.value ? 'white' : 'transparent',
+              boxShadow: value === color.value ? `0 0 0 2px ${color.value}` : 'none',
+            }}
+            data-testid={`${testIdPrefix}-color-swatch-${color.label.toLowerCase()}`}
+            aria-label={color.label}
+            aria-pressed={value === color.value}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface AddEventDialogProps {
   open: boolean;
@@ -121,7 +179,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
 
   const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
     resolver: zodResolver(personalReminderSchema),
-    defaultValues: { title: '', description: '', scheduledAt: '' },
+    defaultValues: { title: '', description: '', scheduledAt: '', color: DEFAULT_EVENT_COLOR },
   });
 
   const gameForm = useForm<z.infer<typeof teamGameSchema>>({
@@ -132,6 +190,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
       scheduledAt: '',
       venue: '',
       notes: '',
+      color: DEFAULT_EVENT_COLOR,
     },
   });
 
@@ -144,6 +203,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
       scheduledAt: '',
       endTime: '',
       location: '',
+      color: DEFAULT_EVENT_COLOR,
     },
   });
 
@@ -158,6 +218,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
       isInternalScrimmage: true,
       opponentName: '',
       notes: '',
+      color: DEFAULT_EVENT_COLOR,
     },
   });
 
@@ -166,6 +227,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
       await apiRequest('POST', '/api/personal-reminders', {
         ...data,
         scheduledAt: data.scheduledAt,
+        color: data.color || null,
       });
     },
     onSuccess: () => {
@@ -196,6 +258,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
         venue: data.venue || null,
         notes: data.notes || null,
         leagueId: null,
+        color: data.color || null,
       });
     },
     onSuccess: () => {
@@ -226,6 +289,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
         scheduledAt: data.scheduledAt,
         endTime: data.endTime || null,
         location: data.location || null,
+        color: data.color || null,
       });
     },
     onSuccess: () => {
@@ -258,6 +322,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
         isInternalScrimmage: data.isInternalScrimmage,
         opponentName: data.isInternalScrimmage ? null : data.opponentName,
         notes: data.notes || null,
+        color: data.color || null,
       });
     },
     onSuccess: () => {
@@ -409,6 +474,20 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={reminderForm.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <CalendarColorPicker
+                      value={field.value || DEFAULT_EVENT_COLOR}
+                      onChange={field.onChange}
+                      testIdPrefix="reminder"
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
@@ -540,6 +619,20 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                         data-testid="input-game-notes"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={gameForm.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <CalendarColorPicker
+                      value={field.value || DEFAULT_EVENT_COLOR}
+                      onChange={field.onChange}
+                      testIdPrefix="game"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -696,6 +789,20 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                         data-testid="input-general-event-location"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={generalEventForm.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <CalendarColorPicker
+                      value={field.value || DEFAULT_EVENT_COLOR}
+                      onChange={field.onChange}
+                      testIdPrefix="general-event"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -893,6 +1000,20 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                         data-testid="input-scrimmage-notes"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={scrimmageEventForm.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <CalendarColorPicker
+                      value={field.value || DEFAULT_EVENT_COLOR}
+                      onChange={field.onChange}
+                      testIdPrefix="scrimmage"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
