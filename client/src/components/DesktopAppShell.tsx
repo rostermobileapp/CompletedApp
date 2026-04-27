@@ -133,14 +133,13 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     >
       {/* Left sidebar */}
       <aside
-        className="fixed top-0 left-0 h-screen w-[240px] flex flex-col bg-card border-r border-border z-40"
+        className="fixed top-0 left-0 h-screen w-[120px] flex flex-col bg-card border-r border-border z-40"
         data-testid="desktop-sidebar"
       >
-        <div className="px-6 py-6 flex items-center gap-3 border-b border-border">
+        <div className="px-2 py-6 flex items-center justify-center border-b border-border">
           <img src={homeLogo} alt="Roster" className="w-10 h-10" />
-          <span className="text-xl font-bold tracking-tight">Roster</span>
         </div>
-        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {MAIN_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeScreen === item.id;
@@ -149,7 +148,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                 key={item.id}
                 onClick={() => handleNavClick(item.route)}
                 className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base transition-colors',
+                  'w-full flex flex-col items-center gap-1 px-2 py-3 rounded-lg transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary font-bold'
                     : 'text-foreground/70 hover:bg-muted hover:text-foreground font-medium',
@@ -183,7 +182,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                     </span>
                   )}
                 </span>
-                <span>{item.label}</span>
+                <span className="text-xs leading-tight text-center">{item.label}</span>
               </button>
             );
           })}
@@ -193,14 +192,14 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       {/* Permanent menu column — always visible on desktop, replacing the
           hamburger-triggered SlideOutMenu */}
       <aside
-        className="fixed top-0 left-[240px] h-screen w-[280px] flex flex-col bg-background border-r border-border z-30 overflow-y-auto"
+        className="fixed top-0 left-[120px] h-screen w-[280px] flex flex-col bg-background border-r border-border z-30 overflow-y-auto"
         data-testid="desktop-menu-sidebar"
       >
         <DesktopMenuColumn />
       </aside>
 
       {/* Right side: header + main content */}
-      <div className="flex-1 ml-[520px] min-h-screen flex flex-col min-w-0">
+      <div className="flex-1 ml-[400px] min-h-screen flex flex-col min-w-0">
         <header
           className="sticky top-0 z-20 flex items-center gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
           data-testid="desktop-header"
