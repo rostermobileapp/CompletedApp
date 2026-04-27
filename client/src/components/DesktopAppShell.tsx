@@ -1,0 +1,302 @@
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { Users, MessageCircle, User, DollarSign, Menu, Trophy } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
+import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
+import { SlideOutMenu } from '@/components/SlideOutMenu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import Dashboard from '@/pages/Dashboard';
+import Teams from '@/pages/Teams';
+import Messages from '@/pages/Messages';
+import PaymentRequests from '@/pages/PaymentRequests';
+import Profile from '@/pages/Profile';
+import homeLogo from '@assets/Home_Logo_1768323157245.png';
+
+type ScreenId = 'home' | 'teams' | 'messages' | 'payments' | 'profile';
+
+const NAV_ITEMS: {
+  id: ScreenId;
+  icon: typeof Users | null;
+  label: string;
+  route: string;
+}[] = [
+  { id: 'home', icon: null, label: 'Home', route: '/' },
+  { id: 'teams', icon: Users, label: 'My Team', route: '/teams' },
+  { id: 'messages', icon: MessageCircle, label: 'Messages', route: '/messages' },
+  { id: 'payments', icon: DollarSign, label: 'Payments', route: '/payment-requests' },
+  { id: 'profile', icon: User, label: 'Profile', route: '/profile' },
+];
+
+function getActiveScreen(
+  pathname: string,
+  primaryTeamId: string | null,
+): ScreenId | '' {
+  if (pathname === '/') return 'home';
+  if (
+    pathname.startsWith('/teams') ||
+    pathname.startsWith('/tournament-teams') ||
+    (pathname.startsWith('/team/') &&
+      primaryTeamId &&
+      pathname.includes(primaryTeamId))
+  ) {
+    return 'teams';
+  }
+  if (pathname.startsWith('/messages')) return 'messages';
+  if (pathname.startsWith('/profile') || pathname.startsWith('/subscription'))
+    return 'profile';
+  if (
+    pathname.startsWith('/payment-requests') ||
+    pathname.startsWith('/create-payment-request')
+  ) {
+    return 'payments';
+  }
+  return '';
+}
+
+/**
+ * For the 5 primary tabs we render the page component directly (mirroring the
+ * mobile SwipeableMainScreens behavior). For every other authenticated route
+ * we fall through to the children (the wouter <Switch>).
+ */
+function getMainScreenForPath(path: string): JSX.Element | null {
+  if (path === '/') return <Dashboard />;
+  if (path === '/teams') return <Teams />;
+  if (path === '/messages') return <Messages />;
+  if (path === '/payment-requests') return <PaymentRequests />;
+  if (path === '/profile') return <Profile />;
+  return null;
+}
+
+interface DesktopAppShellProps {
+  /**
+   * Rendered inside the main content area for routes that are not one of the
+   * 5 primary tabs (e.g. /tournaments, /league-management, /create-team, ...).
+   */
+  children: React.ReactNode;
+}
+
+export function DesktopAppShell({ children }: DesktopAppShellProps) {
+  const [location, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
+  const {
+    selectedType,
+    selectedId,
+    setTeamSelection,
+    setLeagueSelection,
+  } = useDashboardSelection();
+  const [hamburgerOpen, setHamburgerOpen] = useState(false);
+  const slideOverlay = useSlideUpOverlay();
+
+  const { data: userTeams } = useQuery<any[]>({
+    queryKey: ['/api/user/teams'],
+    enabled: !!isAuthenticated,
+  });
+
+  const { data: userLeagueMemberships } = useQuery<any[]>({
+    queryKey: ['/api/user/league-memberships'],
+    enabled: !!isAuthenticated,
+  });
+
+  const { data: unpaidPaymentData } = useQuery({
+    queryKey: ['/api/payment-requests/unpaid-count'],
+    refetchInterval: 60000,
+    staleTime: 30000,
+    enabled: !!isAuthenticated,
+  });
+
+  const unpaidPaymentCount =
+    (unpaidPaymentData as { count: number } | undefined)?.count ?? 0;
+
+  const leagueUnreadMessages = useLeagueUnreadMessages();
+
+  const primaryTeamId =
+    Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0].id : null;
+  const activeScreen = getActiveScreen(location, primaryTeamId);
+
+  const currentLeagueId = useMemo(() => {
+    if (selectedType === 'league') return selectedId;
+    if (selectedType === 'team' && Array.isArray(userTeams)) {
+      const team = userTeams.find((t: any) => t.id === selectedId);
+      return team?.leagueId ?? null;
+    }
+    return null;
+  }, [selectedType, selectedId, userTeams]);
+
+  const currentLeagueUnread = currentLeagueId
+    ? leagueUnreadMessages[currentLeagueId] ?? 0
+    : 0;
+
+  const teamOptions = Array.isArray(userTeams) ? userTeams : [];
+  const teamLeagueIds = new Set(teamOptions.map((t: any) => t.leagueId));
+  const leagueOptions = Array.isArray(userLeagueMemberships)
+    ? userLeagueMemberships.filter(
+        (m: any) => m.leagueId && !teamLeagueIds.has(m.leagueId),
+      )
+    : [];
+
+  const dropdownValue =
+    selectedType && selectedId ? `${selectedType}:${selectedId}` : '';
+
+  const handleDropdownChange = (value: string) => {
+    const [type, id] = value.split(':');
+    if (!id) return;
+    if (type === 'team') setTeamSelection(id);
+    else if (type === 'league') setLeagueSelection(id);
+  };
+
+  const handleNavClick = (route: string) => {
+    if (slideOverlay?.isOverlayRoute) {
+      slideOverlay.closeWithSlideDown(route);
+    } else {
+      navigate(route);
+    }
+  };
+
+  const mainScreen = getMainScreenForPath(location);
+
+  return (
+    <div
+      className="min-h-screen w-full flex bg-background"
+      data-testid="desktop-app-shell"
+    >
+      {/* Left sidebar */}
+      <aside
+        className="fixed top-0 left-0 h-screen w-[240px] flex flex-col bg-card border-r border-border z-40"
+        data-testid="desktop-sidebar"
+      >
+        <div className="px-6 py-6 flex items-center gap-3 border-b border-border">
+          <img src={homeLogo} alt="Roster" className="w-10 h-10" />
+          <span className="text-xl font-bold tracking-tight">Roster</span>
+        </div>
+        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeScreen === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.route)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary font-bold'
+                    : 'text-foreground/70 hover:bg-muted hover:text-foreground font-medium',
+                )}
+                data-testid={`desktop-nav-${item.id}`}
+              >
+                <span className="relative flex items-center justify-center w-7 h-7 flex-shrink-0">
+                  {item.id === 'home' ? (
+                    <img
+                      src={homeLogo}
+                      alt=""
+                      className="w-7 h-7 object-contain"
+                    />
+                  ) : Icon ? (
+                    <Icon className="w-6 h-6" />
+                  ) : null}
+                  {item.id === 'messages' && currentLeagueUnread > 0 && (
+                    <span
+                      className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1"
+                      data-testid="desktop-message-badge"
+                    >
+                      {currentLeagueUnread > 99 ? '99+' : currentLeagueUnread}
+                    </span>
+                  )}
+                  {item.id === 'payments' && unpaidPaymentCount > 0 && (
+                    <span
+                      className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1"
+                      data-testid="desktop-payment-badge"
+                    >
+                      {unpaidPaymentCount > 99 ? '99+' : unpaidPaymentCount}
+                    </span>
+                  )}
+                </span>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Right side: header + main content */}
+      <div className="flex-1 ml-[240px] min-h-screen flex flex-col min-w-0">
+        <header
+          className="sticky top-0 z-30 flex items-center justify-between gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
+          data-testid="desktop-header"
+        >
+          <div className="flex-1 max-w-md">
+            {teamOptions.length > 0 || leagueOptions.length > 0 ? (
+              <Select
+                value={dropdownValue || undefined}
+                onValueChange={handleDropdownChange}
+              >
+                <SelectTrigger
+                  className="w-full h-11"
+                  data-testid="desktop-team-selector"
+                >
+                  <SelectValue placeholder="Select a team or league" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamOptions.map((team: any) => (
+                    <SelectItem
+                      key={`team-${team.id}`}
+                      value={`team:${team.id}`}
+                      data-testid={`desktop-team-option-${team.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-primary" />
+                        <span>{team.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {leagueOptions.map((membership: any) => (
+                    <SelectItem
+                      key={`league-${membership.leagueId}`}
+                      value={`league:${membership.leagueId}`}
+                      data-testid={`desktop-league-option-${membership.leagueId}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-primary" />
+                        <span>{membership.league?.name ?? 'League'}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div />
+            )}
+          </div>
+          <button
+            onClick={() => setHamburgerOpen(true)}
+            className="w-11 h-11 flex items-center justify-center hover:bg-muted rounded-lg transition-colors"
+            aria-label="Open menu"
+            data-testid="desktop-hamburger-menu"
+          >
+            <Menu className="w-7 h-7 text-foreground" />
+          </button>
+          <SlideOutMenu open={hamburgerOpen} onOpenChange={setHamburgerOpen} />
+        </header>
+
+        <main
+          className="flex-1 w-full"
+          data-testid="desktop-main-content"
+        >
+          <div className="mx-auto w-full max-w-[1440px] px-8 py-8">
+            {mainScreen ?? children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

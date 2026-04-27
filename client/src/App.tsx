@@ -11,10 +11,12 @@ import { HPIBBanner } from "@/components/HPIBBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { SwipeableMainScreens } from "@/components/SwipeableMainScreens";
+import { DesktopAppShell } from "@/components/DesktopAppShell";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { SlideUpOverlayProvider } from "@/components/SlideUpOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
+import { useIsDesktopWeb } from "@/hooks/useIsDesktopWeb";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import NotFound from "@/pages/not-found";
@@ -115,6 +117,7 @@ function LoadingScreen() {
 function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
+  const isDesktopWeb = useIsDesktopWeb();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
   const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
@@ -223,18 +226,9 @@ function Router() {
     return <OnboardingQuestionnaire />;
   }
 
-  return (
-    <PermissionProvider>
-      <SlideUpOverlayProvider>
-      <ScrollToTop />
-      <NativelyNotificationsInitializer />
-      <div className="min-h-screen w-full bg-background">
-        <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
-        <SlideOutMenu />
-        <SwipeableMainScreens>
-          <PageTransition>
-              <Switch>
-              <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
+  const routesSwitch = (
+    <Switch>
+      <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
               <Route path="/league-search" component={LeagueSearch} />
               <Route path="/team-search" component={TeamSearch} />
               <Route path="/messages/:conversationId" component={Messages} />
@@ -287,12 +281,29 @@ function Router() {
               <Route path="/admin/stripe" component={StripeAdmin} />
               <Route component={Dashboard} />
             </Switch>
-          </PageTransition>
-        </SwipeableMainScreens>
-          <HPIBBanner placement="bottom-nav" />
-          <BottomNavigation />
-        </div>
-        </div>
+  );
+
+  return (
+    <PermissionProvider>
+      <SlideUpOverlayProvider>
+        <ScrollToTop />
+        <NativelyNotificationsInitializer />
+        {isDesktopWeb ? (
+          <DesktopAppShell>
+            <PageTransition>{routesSwitch}</PageTransition>
+          </DesktopAppShell>
+        ) : (
+          <div className="min-h-screen w-full bg-background">
+            <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
+              <SlideOutMenu />
+              <SwipeableMainScreens>
+                <PageTransition>{routesSwitch}</PageTransition>
+              </SwipeableMainScreens>
+              <HPIBBanner placement="bottom-nav" />
+              <BottomNavigation />
+            </div>
+          </div>
+        )}
       </SlideUpOverlayProvider>
     </PermissionProvider>
   );
