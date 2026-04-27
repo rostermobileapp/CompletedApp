@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Users, Menu, Trophy } from 'lucide-react';
+import { Users, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
-import { SlideOutMenu } from '@/components/SlideOutMenu';
+import { DesktopMenuColumn } from '@/components/DesktopMenuColumn';
 import {
   Select,
   SelectContent,
@@ -57,7 +57,6 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     setTeamSelection,
     setLeagueSelection,
   } = useDashboardSelection();
-  const [hamburgerOpen, setHamburgerOpen] = useState(false);
   const slideOverlay = useSlideUpOverlay();
 
   const { data: userTeams } = useQuery<any[]>({
@@ -191,10 +190,19 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         </nav>
       </aside>
 
+      {/* Permanent menu column — always visible on desktop, replacing the
+          hamburger-triggered SlideOutMenu */}
+      <aside
+        className="fixed top-0 left-[240px] h-screen w-[280px] flex flex-col bg-background border-r border-border z-30 overflow-y-auto"
+        data-testid="desktop-menu-sidebar"
+      >
+        <DesktopMenuColumn />
+      </aside>
+
       {/* Right side: header + main content */}
-      <div className="flex-1 ml-[240px] min-h-screen flex flex-col min-w-0">
+      <div className="flex-1 ml-[520px] min-h-screen flex flex-col min-w-0">
         <header
-          className="sticky top-0 z-30 flex items-center justify-between gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
+          className="sticky top-0 z-20 flex items-center gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
           data-testid="desktop-header"
         >
           <div className="flex-1 max-w-md">
@@ -240,15 +248,6 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
               <div />
             )}
           </div>
-          <button
-            onClick={() => setHamburgerOpen(true)}
-            className="w-11 h-11 flex items-center justify-center hover:bg-muted rounded-lg transition-colors"
-            aria-label="Open menu"
-            data-testid="desktop-hamburger-menu"
-          >
-            <Menu className="w-7 h-7 text-foreground" />
-          </button>
-          <SlideOutMenu open={hamburgerOpen} onOpenChange={setHamburgerOpen} />
         </header>
 
         <main
