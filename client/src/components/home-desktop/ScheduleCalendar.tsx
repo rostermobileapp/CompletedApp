@@ -19,6 +19,7 @@ import {
   Trophy,
   MapPin,
   Clock,
+  Plus,
 } from 'lucide-react';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import {
@@ -36,6 +37,9 @@ interface ScheduleCalendarProps {
    *  any team the user belongs to in that league rather than a single team. */
   isLeagueScope?: boolean;
   leagueTeamIds?: string[];
+  /** Opens the global add-event dialog (rendered in Dashboard.tsx). When
+   *  provided, an "+ Add" button appears in the Schedule header. */
+  onAddEvent?: () => void;
 }
 
 export type EventType = 'game' | 'practice' | 'social' | 'tournament';
@@ -56,6 +60,7 @@ export function ScheduleCalendar({
   userTeamIds,
   isLeagueScope = false,
   leagueTeamIds,
+  onAddEvent,
 }: ScheduleCalendarProps) {
   const [, navigate] = useLocation();
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
@@ -267,34 +272,47 @@ export function ScheduleCalendar({
           </div>
         </div>
 
-        {view === 'calendar' && (
-          <div className="flex items-center gap-2 text-[#212121]">
+        <div className="flex items-center gap-2 text-[#212121]">
+          {view === 'calendar' && (
+            <>
+              <button
+                type="button"
+                onClick={goPrev}
+                className="p-1 rounded hover:bg-black/[0.05]"
+                aria-label="Previous month"
+                data-testid="schedule-prev-month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div
+                className="text-[14px] font-medium min-w-[120px] text-center"
+                data-testid="schedule-month-label"
+              >
+                {format(cursorMonth, 'MMMM yyyy')}
+              </div>
+              <button
+                type="button"
+                onClick={goNext}
+                className="p-1 rounded hover:bg-black/[0.05]"
+                aria-label="Next month"
+                data-testid="schedule-next-month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {onAddEvent && (
             <button
               type="button"
-              onClick={goPrev}
-              className="p-1 rounded hover:bg-black/[0.05]"
-              aria-label="Previous month"
-              data-testid="schedule-prev-month"
+              onClick={onAddEvent}
+              className="ml-1 inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground text-[12px] font-medium px-2.5 py-1 hover:bg-primary/90 transition-colors"
+              aria-label="Add event"
+              data-testid="schedule-add-event"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" /> Add
             </button>
-            <div
-              className="text-[14px] font-medium min-w-[120px] text-center"
-              data-testid="schedule-month-label"
-            >
-              {format(cursorMonth, 'MMMM yyyy')}
-            </div>
-            <button
-              type="button"
-              onClick={goNext}
-              className="p-1 rounded hover:bg-black/[0.05]"
-              aria-label="Next month"
-              data-testid="schedule-next-month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {view === 'calendar' ? (
@@ -358,12 +376,7 @@ function CalendarGrid({
         ))}
       </div>
       <div
-        className="grid grid-cols-7 gap-px bg-black/[0.08] rounded-md overflow-hidden"
-        style={{
-          borderWidth: '0.5px',
-          borderStyle: 'solid',
-          borderColor: 'rgba(0,0,0,0.15)',
-        }}
+        className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden border border-border"
       >
         {days.map((d) => {
           const inMonth = isSameMonth(d, monthStart);
@@ -373,15 +386,12 @@ function CalendarGrid({
           return (
             <div
               key={key}
-              className="min-h-[96px] p-1 flex flex-col gap-1 text-[11px]"
-              style={{
-                backgroundColor: inMonth ? '#fff' : '#f1efe8',
-              }}
+              className={`min-h-[96px] p-1 flex flex-col gap-1 text-[11px] ${inMonth ? 'bg-card' : 'bg-muted/40'}`}
               data-testid={`day-cell-${key}`}
             >
               <div className="flex items-center justify-between px-0.5">
                 <span
-                  className={`${isToday ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#212121] text-white text-[11px]' : 'text-[#555]'} ${!inMonth ? 'opacity-50' : ''}`}
+                  className={`${isToday ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[11px] font-medium' : 'text-foreground/70'} ${!inMonth ? 'opacity-50' : ''}`}
                 >
                   {d.getDate()}
                 </span>

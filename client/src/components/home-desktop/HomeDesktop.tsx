@@ -13,22 +13,25 @@ interface UserTeam {
   leagueId?: string | null;
 }
 
+interface HomeDesktopProps {
+  /** Optional callback to open the global add-event dialog (rendered in
+   *  Dashboard.tsx). When provided, the Schedule card shows an "+ Add"
+   *  button in its header that triggers this. */
+  onAddEvent?: () => void;
+}
+
 /**
  * Desktop-only Roster Home page (>=1024px). Renders inside the existing
  * DesktopAppShell. Mobile/tablet (<1024px) and Natively/Capacitor wrappers
  * keep the original mobile Dashboard layout — see Dashboard.tsx where this
  * component is gated by useIsDesktopWeb().
  *
- * Layout:
- *   1024–1279px: Row 1 = Up Next + Alerts (1fr/1fr)
- *                Row 2 = Schedule (capped at 1080px, centered)
- *                Row 3 = Team Leaders + Standings (1.4fr/1fr)
- *   ≥1280px:    Row 1 = Up Next | Alerts | Team Leaders | Standings
- *                       (~1fr 1fr 1.4fr 1fr)
- *                Row 2 = Schedule (capped at 1080px, centered)
- *                Row 3 collapses (no content)
+ * Layout (final, per user feedback on 2026-04-27):
+ *   ≥1024px: Row 1 = Up Next + Alerts (1fr/1fr)
+ *            Row 2 = Schedule card (capped at 1080px, centered)
+ *            Row 3 = Team Leaders + Standings (1.4fr/1fr)
  */
-export function HomeDesktop() {
+export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
   const { selectedType, selectedId, selectedTeamId, selectedLeagueId } =
     useDashboardSelection();
 
@@ -101,8 +104,8 @@ export function HomeDesktop() {
       data-testid="home-desktop"
     >
       <div className="mx-auto w-full max-w-[1280px] px-6 py-6 flex flex-col gap-4">
-        {/* Row 1: supporting cards */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr_1fr]">
+        {/* Row 1: Up Next + Alerts */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <UpNextCard
             effectiveLeagueId={effectiveLeagueId}
             selectedTeamId={selectedTeamId}
@@ -111,20 +114,6 @@ export function HomeDesktop() {
             leagueTeamIds={userTeamIdsInLeague}
           />
           <AlertsExpanded effectiveLeagueId={effectiveLeagueId} />
-          <div className="hidden xl:block">
-            <TeamLeadersCard
-              effectiveLeagueId={effectiveLeagueId}
-              seasonId={activeSeason?.id || null}
-              seasonLabel={seasonLabel}
-            />
-          </div>
-          <div className="hidden xl:block">
-            <StandingsTable
-              effectiveLeagueId={effectiveLeagueId}
-              userTeamIdsInLeague={userTeamIdsInLeague}
-              seasonLabel={seasonLabel}
-            />
-          </div>
         </div>
 
         {/* Row 2: Schedule (capped 1080px, centered) */}
@@ -135,11 +124,12 @@ export function HomeDesktop() {
             userTeamIds={allUserTeamIds}
             isLeagueScope={isLeagueScope}
             leagueTeamIds={userTeamIdsInLeague}
+            onAddEvent={onAddEvent}
           />
         </div>
 
-        {/* Row 3: at lg only — collapses on xl */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr] xl:hidden">
+        {/* Row 3: Team Leaders + Standings */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
           <TeamLeadersCard
             effectiveLeagueId={effectiveLeagueId}
             seasonId={activeSeason?.id || null}

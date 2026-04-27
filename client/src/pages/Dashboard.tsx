@@ -2109,12 +2109,14 @@ export default function Dashboard() {
   // desktop browser, render the new 3-row layout instead of the mobile-style
   // stack. Mobile, tablet, and Natively/Capacitor wrappers fall through to
   // the original mobile layout below. All hooks above this branch run
-  // unconditionally so prefetch/cache behavior is preserved.
-  if (isDesktopWeb) {
-    return <HomeDesktop />;
-  }
-
+  // unconditionally so prefetch/cache behavior is preserved. The dialog tree
+  // at the bottom of the return value is shared between both layouts so the
+  // desktop "+ Add" button can reuse the existing add-event flow.
   return (
+    <>
+    {isDesktopWeb ? (
+      <HomeDesktop onAddEvent={() => setShowAddEventDialog(true)} />
+    ) : (
     <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
       {/* Header — hidden on desktop because the desktop shell provides
           the brand logo and profile entry point in its left sidebar */}
@@ -3113,6 +3115,8 @@ export default function Dashboard() {
           Send Feedback
         </button>
       </div>
+    </div>
+    )}
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
         <DialogContent className="sm:max-w-md">
@@ -3861,6 +3865,6 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
