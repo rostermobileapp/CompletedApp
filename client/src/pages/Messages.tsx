@@ -499,7 +499,7 @@ function ConversationRail({
       data-testid="conversation-rail"
       aria-label="Conversations"
     >
-      <div className="flex flex-col items-center gap-2 py-3 px-2">
+      <div className="flex flex-col items-center gap-2 py-3 px-2 min-h-full">
         {conversations.map((conversation) => {
           const isActive = activeId === conversation.id;
           const unread = unreadCountsMap[conversation.id] || 0;
