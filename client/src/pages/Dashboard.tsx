@@ -37,6 +37,7 @@ import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import Announcements from '@/pages/Announcements';
 import MediaGalleryPage from '@/pages/MediaGallery';
 import StatsPage from '@/pages/Stats';
+import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -2103,6 +2104,15 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000, // 5 minutes - use cached data
     refetchInterval: 90000, // Refresh every 90 seconds (reduced from 30s to lower egress)
   });
+
+  // Desktop-only Roster Home redesign (Task #56). At >=1024px on a real
+  // desktop browser, render the new 3-row layout instead of the mobile-style
+  // stack. Mobile, tablet, and Natively/Capacitor wrappers fall through to
+  // the original mobile layout below. All hooks above this branch run
+  // unconditionally so prefetch/cache behavior is preserved.
+  if (isDesktopWeb) {
+    return <HomeDesktop />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
