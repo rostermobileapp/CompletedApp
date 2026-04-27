@@ -151,8 +151,8 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                 className={cn(
                   'w-full flex flex-col items-center gap-1 px-2 py-3 rounded-lg transition-colors',
                   isActive
-                    ? 'bg-white text-[#3c83f6] font-bold'
-                    : 'text-white/85 hover:bg-white/10 hover:text-white font-medium',
+                    ? 'bg-black/30 text-white font-bold ring-1 ring-white/20'
+                    : 'text-white/85 hover:bg-black/15 hover:text-white font-medium',
                 )}
                 data-testid={`desktop-nav-${item.id}`}
               >
@@ -207,8 +207,8 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                 className={cn(
                   'w-full flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors',
                   isActive
-                    ? 'bg-white text-[#3c83f6] font-bold'
-                    : 'text-white/85 hover:bg-white/10 hover:text-white font-medium',
+                    ? 'bg-black/30 text-white font-bold ring-1 ring-white/20'
+                    : 'text-white/85 hover:bg-black/15 hover:text-white font-medium',
                 )}
                 data-testid={`desktop-footer-${item.id}`}
               >
