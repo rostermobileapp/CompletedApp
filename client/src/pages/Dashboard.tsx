@@ -2613,14 +2613,14 @@ function DashboardMobile() {
               <Plus className="w-[12.8px] h-[12.8px]" />
             </Button>
             <div
-              className="ml-1 inline-flex items-center rounded-md p-0.5 bg-muted text-xs"
+              className="ml-1 grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
               role="tablist"
               aria-label="Schedule view"
             >
               <button
                 type="button"
                 onClick={() => setScheduleView('list')}
-                className={`px-2 py-0.5 rounded transition-colors ${
+                className={`px-2 py-0.5 rounded transition-colors text-center ${
                   scheduleView === 'list'
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground'
@@ -2633,7 +2633,7 @@ function DashboardMobile() {
               <button
                 type="button"
                 onClick={() => setScheduleView('calendar')}
-                className={`px-2 py-0.5 rounded transition-colors ${
+                className={`px-2 py-0.5 rounded transition-colors text-center ${
                   scheduleView === 'calendar'
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground'
