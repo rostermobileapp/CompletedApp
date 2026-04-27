@@ -2622,7 +2622,7 @@ function DashboardMobile() {
                 onClick={() => setScheduleView('list')}
                 className={`px-2 py-0.5 rounded transition-colors text-center ${
                   scheduleView === 'list'
-                    ? 'bg-background text-foreground shadow-sm'
+                    ? 'bg-blue-500 text-white shadow-sm'
                     : 'text-muted-foreground'
                 }`}
                 aria-pressed={scheduleView === 'list'}
@@ -2635,7 +2635,7 @@ function DashboardMobile() {
                 onClick={() => setScheduleView('calendar')}
                 className={`px-2 py-0.5 rounded transition-colors text-center ${
                   scheduleView === 'calendar'
-                    ? 'bg-background text-foreground shadow-sm'
+                    ? 'bg-blue-500 text-white shadow-sm'
                     : 'text-muted-foreground'
                 }`}
                 aria-pressed={scheduleView === 'calendar'}
