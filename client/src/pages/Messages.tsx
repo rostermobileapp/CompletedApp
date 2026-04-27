@@ -2524,7 +2524,7 @@ export default function Messages() {
       {selectedConversation && canSendMessage && (
         <div 
           ref={inputContainerRef}
-          className="bg-background border-t border-border p-4"
+          className="bg-background border-t border-border p-4 pt-[4px] pb-[4px]"
           style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : isDesktopWeb ? '0px' : '64px' }}
           data-testid="message-input-container"
         >
