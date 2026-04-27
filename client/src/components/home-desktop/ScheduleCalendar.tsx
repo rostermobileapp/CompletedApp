@@ -341,18 +341,6 @@ export function ScheduleCalendar({
         />
       )}
 
-      {/* Legend */}
-      {view === 'calendar' && (
-        <div
-          className="mt-3 flex items-center justify-center flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#666]"
-          data-testid="schedule-legend"
-        >
-          <LegendDot color={EVENT_COLORS.game.borderTint} label="Game" />
-          <LegendDot color={EVENT_COLORS.practice.borderTint} label="Practice" />
-          <LegendDot color={EVENT_COLORS.social.borderTint} label="Social" />
-          <LegendDot color={EVENT_COLORS.tournament.borderTint} label="Tournament" />
-        </div>
-      )}
     </div>
   );
 }
@@ -520,16 +508,4 @@ function getReadableTextColor(hex: string): string {
   // Relative luminance (Rec. 709)
   const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return luminance > 0.6 ? '#1f2937' : '#ffffff';
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="inline-block w-2 h-2 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </span>
-  );
 }
