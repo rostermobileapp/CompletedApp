@@ -24,7 +24,7 @@ export const EVENT_COLORS: Record<
   'game' | 'practice' | 'social' | 'tournament',
   EventColor
 > = {
-  game: { bg: '#EEEDFE', text: '#3C3489', borderTint: '#3C3489' },
+  game: { bg: '#DBEAFE', text: '#1E3A8A', borderTint: '#3B82F6' },
   practice: { bg: '#E1F5EE', text: '#085041', borderTint: '#085041' },
   social: { bg: '#FAEEDA', text: '#633806', borderTint: '#633806' },
   tournament: { bg: '#F09595', text: '#3a0a0a', borderTint: '#3a0a0a' },

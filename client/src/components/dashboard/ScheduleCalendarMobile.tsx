@@ -339,16 +339,16 @@ export function ScheduleCalendarMobile({
                 {d.getDate()}
               </span>
               {dayEvents.length > 0 && (
-                <div className="mt-1 flex items-center justify-center gap-[2px] flex-wrap max-w-full px-0.5">
+                <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap max-w-full px-0.5">
                   {visibleDots.map((ev) => (
                     <span
                       key={ev.id}
-                      className="w-1.5 h-1.5 rounded-full inline-block"
+                      className="w-2.5 h-2.5 rounded-full inline-block"
                       style={{ backgroundColor: ev.color }}
                     />
                   ))}
                   {overflow > 0 && (
-                    <span className="text-[8px] leading-none text-muted-foreground ml-[1px]">
+                    <span className="text-[10px] leading-none text-muted-foreground ml-[1px]">
                       +{overflow}
                     </span>
                   )}

@@ -167,7 +167,7 @@ export function UpNextCard({
           className="mt-3 w-full flex items-center gap-3 text-left rounded-lg p-2 -mx-2 hover:bg-black/[0.03] transition-colors"
           data-testid="up-next-game"
         >
-          <div className="w-12 h-12 rounded-lg bg-[#EEEDFE] flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div className="w-12 h-12 rounded-lg bg-[#DBEAFE] flex items-center justify-center overflow-hidden flex-shrink-0">
             {opponent?.logoUrl ? (
               <img
                 src={getImageUrl(opponent.logoUrl) || ''}
@@ -175,7 +175,7 @@ export function UpNextCard({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <Trophy className="w-5 h-5" style={{ color: '#3C3489' }} />
+              <Trophy className="w-5 h-5" style={{ color: '#1E3A8A' }} />
             )}
           </div>
           <div className="min-w-0 flex-1">
