@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Users, Trophy, Info, LifeBuoy, Shield, FileText } from 'lucide-react';
+import { Users, Trophy, Info, LifeBuoy } from 'lucide-react';
+import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
@@ -192,24 +193,52 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           className="px-2 py-3 border-t border-white/20 space-y-1"
           data-testid="desktop-sidebar-footer"
         >
-          {[
+          {([
             { id: 'about', label: 'About', icon: Info, route: '/about' },
             { id: 'support', label: 'Support', icon: LifeBuoy, route: '/support' },
-            { id: 'privacy', label: 'Privacy Policy', icon: Shield, route: '/privacy-policy' },
-            { id: 'terms', label: 'Terms of Service', icon: FileText, route: '/terms-of-service' },
-          ].map((item) => {
+            {
+              id: 'app-store',
+              label: 'App Store',
+              icon: SiAppstore,
+              href: 'https://apps.apple.com/us/app/roster-app/id6741723004',
+            },
+            {
+              id: 'google-play',
+              label: 'Google Play',
+              icon: SiGoogleplay,
+              href: 'https://play.google.com/store/search?q=roster+team+management&c=apps',
+            },
+          ] as const).map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.route;
+            const isActive = 'route' in item && location === item.route;
+            const baseClasses = cn(
+              'w-full flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors',
+              isActive
+                ? 'bg-black/30 text-white font-bold ring-1 ring-white/20'
+                : 'text-white/85 hover:bg-black/15 hover:text-white font-medium',
+            );
+
+            if ('href' in item) {
+              return (
+                <a
+                  key={item.id}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={baseClasses}
+                  data-testid={`desktop-footer-${item.id}`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-[11px] leading-tight text-center">{item.label}</span>
+                </a>
+              );
+            }
+
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.route)}
-                className={cn(
-                  'w-full flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors',
-                  isActive
-                    ? 'bg-black/30 text-white font-bold ring-1 ring-white/20'
-                    : 'text-white/85 hover:bg-black/15 hover:text-white font-medium',
-                )}
+                className={baseClasses}
                 data-testid={`desktop-footer-${item.id}`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
