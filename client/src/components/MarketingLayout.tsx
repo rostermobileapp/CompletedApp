@@ -3,6 +3,7 @@ import { useIsIosDevice } from '@/hooks/useIosPlatform';
 import { Link, useLocation } from 'wouter';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { Menu, X } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
 
 interface MarketingLayoutProps {
@@ -20,6 +21,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isIos = useIsIosDevice();
+  const { isAuthenticated } = useAuth();
 
   // Always scroll to top when this component mounts
   useEffect(() => {
@@ -90,6 +92,8 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
+      {!isAuthenticated && (
+        <>
       {/* Launch banner */}
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
         🚀 Launching May 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
@@ -139,13 +143,15 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
           </div>
         )}
       </header>
+        </>
+      )}
 
       {/* Page content */}
-      <main style={{ paddingTop: 'calc(44px + 40px)' }}>
+      <main style={isAuthenticated ? undefined : { paddingTop: 'calc(44px + 40px)' }}>
         {children}
       </main>
 
-      {/* Footer */}
+      {!isAuthenticated && (
       <footer className="border-t border-gray-200 py-12 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row gap-8 justify-between mb-8">
@@ -193,6 +199,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
           </div>
         </div>
       </footer>
+      )}
     </div>
   );
 }
