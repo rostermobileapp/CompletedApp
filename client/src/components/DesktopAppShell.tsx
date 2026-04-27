@@ -159,7 +159,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                 <span className="relative flex items-center justify-center w-7 h-7 flex-shrink-0">
                   {item.id === 'home' ? (
                     <img
-                      src={homeLogo}
+                      src={desktopHeaderLogo}
                       alt=""
                       className="w-7 h-7 object-contain"
                     />
