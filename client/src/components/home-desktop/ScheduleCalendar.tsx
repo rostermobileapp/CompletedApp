@@ -52,6 +52,8 @@ interface ScheduleEvent {
   // For games we may have an opposing team to navigate to a game detail page
   navigateTo?: string;
   location?: string | null;
+  // User-selected color from the Add Event dialog (hex string), if any
+  color?: string | null;
 }
 
 export function ScheduleCalendar({
@@ -140,6 +142,7 @@ export function ScheduleCalendar({
           title,
           navigateTo: `/game/${g.id}`,
           location: g.venue || g.location || null,
+          color: g.color ?? null,
         });
       }
     }
@@ -172,6 +175,7 @@ export function ScheduleCalendar({
           title: e.title || e.eventType || 'Event',
           navigateTo: `/team-event/${e.id}`,
           location: e.location || null,
+          color: e.color ?? null,
         });
       }
     }
@@ -399,18 +403,24 @@ function CalendarGrid({
               <div className="flex flex-col gap-1 min-h-0">
                 {dayEvents.slice(0, 3).map((ev) => {
                   const c = EVENT_COLORS[ev.type];
+                  // Prefer the user-chosen color; fall back to the type-based tint.
+                  const bg = ev.color || c.bg;
+                  const text = ev.color ? getReadableTextColor(ev.color) : c.text;
                   return (
                     <button
                       type="button"
                       key={ev.id}
                       onClick={() => onEventClick(ev)}
                       disabled={!ev.navigateTo}
-                      className="text-left rounded px-1.5 py-0.5 truncate text-[10.5px] leading-tight"
-                      style={{ backgroundColor: c.bg, color: c.text }}
-                      title={`${format(ev.date, 'h:mma')} ${ev.title}`}
+                      className="text-left rounded px-1.5 py-0.5 text-[10.5px] leading-tight flex flex-col"
+                      style={{ backgroundColor: bg, color: text }}
+                      title={`${ev.title} — ${format(ev.date, 'h:mm a')}`}
                       data-testid={`event-pill-${ev.id}`}
                     >
-                      {format(ev.date, 'h:mma').toLowerCase()} · {ev.title}
+                      <span className="truncate font-medium">{ev.title}</span>
+                      <span className="truncate text-[9.5px] opacity-90">
+                        {format(ev.date, 'h:mm a').toLowerCase()}
+                      </span>
                     </button>
                   );
                 })}
@@ -497,6 +507,19 @@ function ListView({
       })}
     </div>
   );
+}
+
+// Pick black or white text for the best contrast against an arbitrary hex bg.
+function getReadableTextColor(hex: string): string {
+  const m = hex.replace('#', '').trim();
+  if (m.length !== 6) return '#fff';
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  if ([r, g, b].some((v) => Number.isNaN(v))) return '#fff';
+  // Relative luminance (Rec. 709)
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.6 ? '#1f2937' : '#ffffff';
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {
