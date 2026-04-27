@@ -20,9 +20,9 @@ export default function About() {
       {/* ── 1. FOUNDER INTRO ─────────────────────────────────────── */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white">
         <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-12">
+          <div className="flex flex-col xl:flex-row items-center xl:items-start gap-12">
             {/* Founder photo */}
-            <div className="flex-shrink-0 w-72 md:w-80">
+            <div className="flex-shrink-0 w-64 sm:w-72 xl:w-80 max-w-full">
               <div
                 onClick={() => setPhotoModalOpen(true)}
                 className="rounded-3xl overflow-hidden shadow-2xl shadow-blue-300 cursor-pointer"
@@ -36,8 +36,8 @@ export default function About() {
             </div>
 
             {/* Intro copy and quote/stats */}
-            <div className="flex-1">
-              <div className="text-center md:text-left mb-8">
+            <div className="flex-1 min-w-0 w-full">
+              <div className="text-center xl:text-left mb-8">
                 <div className="inline-flex items-center gap-2 bg-[#3c82f4]/10 border border-[#3c82f4]/25 rounded-full px-4 py-1.5 mb-4">
                   <span className="text-sm font-medium text-[#3c82f4]">Meet the founder</span>
                 </div>
@@ -45,13 +45,13 @@ export default function About() {
                   Tobin K.
                 </h1>
                 <p className="text-[#3c82f4] font-semibold text-lg mb-1">Hockey Player - Lifetime Beer League Member</p>
-                <p className="text-gray-600 text-lg leading-relaxed max-w-xl">I didn't set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players. </p>
+                <p className="text-gray-600 text-lg leading-relaxed max-w-xl mx-auto xl:mx-0">I didn't set out to build a software company. I set out to build an app for the hockey community with the added benefit of never wondering if we had enough players. </p>
               </div>
 
               {/* Pull quote card */}
               <div className="space-y-5">
-                <div className="bg-[#3c82f4] rounded-3xl p-8 shadow-xl shadow-blue-200">
-                  <p className="text-white text-2xl font-semibold leading-snug mb-4">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
+                <div className="bg-[#3c82f4] rounded-3xl p-6 sm:p-8 shadow-xl shadow-blue-200">
+                  <p className="text-white text-xl sm:text-2xl font-semibold leading-snug mb-4 break-words">"You'd be amazed at how much admin work there is to do as Commissioner"</p>
                   <p className="text-blue-200 text-sm font-medium">Brian - Tobin's league commissioner</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -96,7 +96,7 @@ export default function About() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
             {[
               {
                 icon: Users,
