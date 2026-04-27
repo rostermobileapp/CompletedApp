@@ -32,6 +32,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
+import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import Announcements from '@/pages/Announcements';
 import MediaGalleryPage from '@/pages/MediaGallery';
@@ -1088,6 +1089,7 @@ export default function Dashboard() {
   });
   const [showDropdown, setShowDropdown] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const isDesktopWeb = useIsDesktopWeb();
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   
   // Save selection to localStorage whenever it changes
@@ -2133,14 +2135,18 @@ export default function Dashboard() {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => setShowHamburgerMenu(true)}
-              className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-              data-testid="button-hamburger-menu"
-            >
-              <Menu className="w-8 h-8 text-foreground" />
-            </button>
-            <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
+            {!isDesktopWeb && (
+              <>
+                <button
+                  onClick={() => setShowHamburgerMenu(true)}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+                  data-testid="button-hamburger-menu"
+                >
+                  <Menu className="w-8 h-8 text-foreground" />
+                </button>
+                <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
+              </>
+            )}
           </div>
         </div>
       </div>
