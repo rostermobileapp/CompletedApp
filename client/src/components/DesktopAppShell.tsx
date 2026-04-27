@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Users, MessageCircle, User, DollarSign, Menu, Trophy } from 'lucide-react';
+import { Users, Menu, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
@@ -20,53 +20,19 @@ import Teams from '@/pages/Teams';
 import Messages from '@/pages/Messages';
 import PaymentRequests from '@/pages/PaymentRequests';
 import Profile from '@/pages/Profile';
+import {
+  MAIN_NAV_ITEMS,
+  getActiveMainScreen,
+} from '@/lib/mainNavRoutes';
 import homeLogo from '@assets/Home_Logo_1768323157245.png';
-
-type ScreenId = 'home' | 'teams' | 'messages' | 'payments' | 'profile';
-
-const NAV_ITEMS: {
-  id: ScreenId;
-  icon: typeof Users | null;
-  label: string;
-  route: string;
-}[] = [
-  { id: 'home', icon: null, label: 'Home', route: '/' },
-  { id: 'teams', icon: Users, label: 'My Team', route: '/teams' },
-  { id: 'messages', icon: MessageCircle, label: 'Messages', route: '/messages' },
-  { id: 'payments', icon: DollarSign, label: 'Payments', route: '/payment-requests' },
-  { id: 'profile', icon: User, label: 'Profile', route: '/profile' },
-];
-
-function getActiveScreen(
-  pathname: string,
-  primaryTeamId: string | null,
-): ScreenId | '' {
-  if (pathname === '/') return 'home';
-  if (
-    pathname.startsWith('/teams') ||
-    pathname.startsWith('/tournament-teams') ||
-    (pathname.startsWith('/team/') &&
-      primaryTeamId &&
-      pathname.includes(primaryTeamId))
-  ) {
-    return 'teams';
-  }
-  if (pathname.startsWith('/messages')) return 'messages';
-  if (pathname.startsWith('/profile') || pathname.startsWith('/subscription'))
-    return 'profile';
-  if (
-    pathname.startsWith('/payment-requests') ||
-    pathname.startsWith('/create-payment-request')
-  ) {
-    return 'payments';
-  }
-  return '';
-}
 
 /**
  * For the 5 primary tabs we render the page component directly (mirroring the
  * mobile SwipeableMainScreens behavior). For every other authenticated route
  * we fall through to the children (the wouter <Switch>).
+ *
+ * Component imports are kept local to this file so the page bundles aren't
+ * eagerly loaded by other consumers of the shared `mainNavRoutes` module.
  */
 function getMainScreenForPath(path: string): JSX.Element | null {
   if (path === '/') return <Dashboard />;
@@ -121,7 +87,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const primaryTeamId =
     Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0].id : null;
-  const activeScreen = getActiveScreen(location, primaryTeamId);
+  const activeScreen = getActiveMainScreen(location, primaryTeamId);
 
   const currentLeagueId = useMemo(() => {
     if (selectedType === 'league') return selectedId;
@@ -179,7 +145,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           <span className="text-xl font-bold tracking-tight">Roster</span>
         </div>
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {MAIN_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeScreen === item.id;
             return (
