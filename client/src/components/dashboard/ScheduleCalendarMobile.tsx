@@ -11,6 +11,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Trophy, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { EVENT_COLORS } from '@/components/home-desktop/cardStyles';
 
 type EventKind =
   | 'invite'
@@ -41,14 +42,17 @@ interface ScheduleCalendarMobileProps {
   primaryTeam?: { id?: string; name?: string } | null;
 }
 
+// Fallback colors mirror the desktop ScheduleCalendar palette (cardStyles.ts)
+// where a corresponding type exists, so list/calendar/desktop look consistent.
+// User-selected event colors always take precedence over these fallbacks.
 const KIND_FALLBACK_COLOR: Record<EventKind, string> = {
-  invite: '#eab308',
-  scrimmage: '#3b82f6',
-  reminder: '#22c55e',
-  'team-event': '#3b82f6',
-  'team-event-scrimmage': '#f97316',
-  tournament: '#FFD700',
-  game: '#3b82f6',
+  invite: '#eab308', // yellow — matches existing mobile invite badge
+  scrimmage: EVENT_COLORS.game.borderTint, // approved scrimmage → desktop 'game'
+  reminder: EVENT_COLORS.practice.borderTint, // green — closest desktop tone
+  'team-event': EVENT_COLORS.practice.borderTint, // general team event → 'practice'
+  'team-event-scrimmage': EVENT_COLORS.game.borderTint, // scrimmage → 'game'
+  tournament: '#FFD700', // gold — matches existing mobile tournament card
+  game: EVENT_COLORS.game.borderTint,
 };
 
 const KIND_BADGE_LABEL: Record<EventKind, string> = {
