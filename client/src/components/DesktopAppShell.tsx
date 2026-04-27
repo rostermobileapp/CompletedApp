@@ -25,6 +25,7 @@ import {
   getActiveMainScreen,
 } from '@/lib/mainNavRoutes';
 import homeLogo from '@assets/Home_Logo_1768323157245.png';
+import desktopHeaderLogo from '@assets/Roster-12_1777300221378.png';
 
 /**
  * For the 5 primary tabs we render the page component directly (mirroring the
@@ -137,7 +138,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         data-testid="desktop-sidebar"
       >
         <div className="px-2 py-6 flex items-center justify-center border-b border-border">
-          <img src={homeLogo} alt="Roster" className="w-10 h-10" />
+          <img src={desktopHeaderLogo} alt="Roster" className="w-14 h-14 object-contain" />
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
           {MAIN_NAV_ITEMS.map((item) => {
