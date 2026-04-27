@@ -15,6 +15,7 @@ import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { useWebSocket } from '@/context/WebSocketContext';
 import { League, ChatPoll, ChatPollVote, Team } from '@shared/schema';
 
@@ -469,6 +470,110 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
   );
 }
 
+// Desktop-only narrow conversation rail rendered to the left of an open thread.
+// Renders ~120px wide vertical strip of avatar tiles with unread badges, native
+// tooltip (title attr), and an active-thread highlight. Tile tap calls `onSelect`
+// which both updates state and pushes the URL.
+interface ConversationRailProps {
+  conversations: Conversation[];
+  activeId: string | null;
+  unreadCountsMap: Record<string, number>;
+  onSelect: (conversationId: string) => void;
+  getOtherParticipantProfileImage: (conversation: Conversation) => string | null | undefined;
+  getParticipantName: (conversation: Conversation) => string;
+  getInitials: (name: string) => string;
+}
+
+function ConversationRail({
+  conversations,
+  activeId,
+  unreadCountsMap,
+  onSelect,
+  getOtherParticipantProfileImage,
+  getParticipantName,
+  getInitials,
+}: ConversationRailProps) {
+  return (
+    <aside
+      className="w-[120px] flex-shrink-0 h-full overflow-y-auto bg-card border-r border-border motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-200"
+      data-testid="conversation-rail"
+      aria-label="Conversations"
+    >
+      <div className="flex flex-col items-center gap-2 py-3 px-2">
+        {conversations.map((conversation) => {
+          const isActive = activeId === conversation.id;
+          const unread = unreadCountsMap[conversation.id] || 0;
+          const isGroup =
+            conversation.type === 'team_group' || conversation.type === 'custom_group';
+          const name = getParticipantName(conversation);
+          const profileImageUrl = !isGroup
+            ? getOtherParticipantProfileImage(conversation)
+            : null;
+          const imageUrl = profileImageUrl ? getImageUrl(profileImageUrl) : null;
+
+          return (
+            <button
+              key={conversation.id}
+              type="button"
+              title={name}
+              aria-label={name}
+              aria-current={isActive ? 'true' : undefined}
+              onClick={() => onSelect(conversation.id)}
+              className={`relative w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all duration-150 ${
+                isActive
+                  ? 'bg-primary/10'
+                  : 'hover:bg-accent/60'
+              }`}
+              data-testid={`rail-conversation-${conversation.id}`}
+            >
+              <div className="relative">
+                {isGroup ? (
+                  <div
+                    className={`w-11 h-11 bg-muted rounded-full flex items-center justify-center transition-all duration-150 ${
+                      isActive ? 'ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    <Users className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                ) : imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    className={`w-11 h-11 rounded-full object-cover transition-all duration-150 ${
+                      isActive ? 'ring-2 ring-primary' : ''
+                    }`}
+                  />
+                ) : (
+                  <div
+                    className={`w-11 h-11 bg-muted rounded-full flex items-center justify-center transition-all duration-150 ${
+                      isActive ? 'ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    <span className="text-muted-foreground text-sm font-semibold">
+                      {getInitials(name)}
+                    </span>
+                  </div>
+                )}
+                {unread > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1"
+                    data-testid={`rail-unread-${conversation.id}`}
+                  >
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] leading-tight text-center text-muted-foreground truncate w-full">
+                {name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 export default function Messages() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, hasRole } = usePermissions();
@@ -480,7 +585,8 @@ export default function Messages() {
   const params = useParams();
   const [, navigate] = useLocation();
   const { selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
-  
+  const isDesktopWeb = useIsDesktopWeb();
+
   // Check if user is on free tier (no premium access)
   const isFreeTier = !canAccessPremiumFeatures();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -1937,7 +2043,7 @@ export default function Messages() {
       <div className="h-full flex flex-col relative" data-testid="messages-page">
         <FeatureLockOverlay isLocked={false} className="h-full flex flex-col">
       {!selectedConversation ? (
-        <>
+        <div className={isDesktopWeb ? 'contents motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200' : 'contents'}>
           {/* Conversations List Header */}
           <div className="sticky top-0 z-50 p-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border pt-[12px] pb-[12px] mt-[12px] mb-[12px] pl-[36px] pr-[36px]">
             <div className="flex items-center justify-between mb-6">
@@ -2082,9 +2188,32 @@ export default function Messages() {
               </div>
             )}
           </div>
-        </>
+        </div>
       ) : (
-        <>
+        <div
+          className={isDesktopWeb ? 'flex h-full min-h-0 overflow-hidden' : 'contents'}
+          data-testid={isDesktopWeb ? 'messages-desktop-split' : undefined}
+        >
+          {isDesktopWeb && (
+            <ConversationRail
+              conversations={conversations}
+              activeId={selectedConversation}
+              unreadCountsMap={unreadCountsMap}
+              onSelect={(id) => setSelectedConversation(id)}
+              getOtherParticipantProfileImage={getOtherParticipantProfileImage}
+              getParticipantName={getParticipantName}
+              getInitials={getInitials}
+            />
+          )}
+          <div
+            key={isDesktopWeb ? `thread-pane-${selectedConversation}` : undefined}
+            className={
+              isDesktopWeb
+                ? 'flex-1 min-w-0 flex flex-col h-full overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-2 motion-safe:duration-200'
+                : 'contents'
+            }
+            data-testid={isDesktopWeb ? 'messages-desktop-thread' : undefined}
+          >
           {/* Chat Header */}
           <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[12px] pb-[12px] pl-[12px] pr-[12px]" data-testid="chat-header">
             <div className="flex items-center gap-3">
@@ -2347,7 +2476,8 @@ export default function Messages() {
             </div>
             </div>
           </div>
-        </>
+          </div>
+        </div>
       )}
         </FeatureLockOverlay>
       {/* Upgrade to reply banner - shown for free tier users in non-team conversations */}
