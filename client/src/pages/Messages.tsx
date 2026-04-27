@@ -591,10 +591,13 @@ export default function Messages() {
   const isFreeTier = !canAccessPremiumFeatures();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
 
-  // Handle conversation ID from URL parameter
+  // Handle conversation ID from URL parameter (sync both ways: opening a thread
+  // reflects the URL, and clearing the URL via back/nav clears the local state)
   useEffect(() => {
     if (params.conversationId) {
       setSelectedConversation(params.conversationId);
+    } else {
+      setSelectedConversation(null);
     }
   }, [params.conversationId]);
   const [newMessage, setNewMessage] = useState('');
@@ -2041,9 +2044,40 @@ export default function Messages() {
         </DialogContent>
       </Dialog>
       <div className="h-full flex flex-col relative" data-testid="messages-page">
+        <div
+          className={
+            isDesktopWeb && selectedConversation
+              ? 'flex flex-1 min-h-0 overflow-hidden'
+              : 'contents'
+          }
+          data-testid={isDesktopWeb && selectedConversation ? 'messages-desktop-split' : undefined}
+        >
+          {isDesktopWeb && selectedConversation && (
+            <ConversationRail
+              conversations={conversations}
+              activeId={selectedConversation}
+              unreadCountsMap={unreadCountsMap}
+              onSelect={(id) => {
+                setSelectedConversation(id);
+                navigate(`/messages/${id}`);
+              }}
+              getOtherParticipantProfileImage={getOtherParticipantProfileImage}
+              getParticipantName={getParticipantName}
+              getInitials={getInitials}
+            />
+          )}
+          <div
+            key={isDesktopWeb && selectedConversation ? `thread-pane-${selectedConversation}` : undefined}
+            className={
+              isDesktopWeb && selectedConversation
+                ? 'flex-1 min-w-0 flex flex-col h-full overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-2 motion-safe:duration-200'
+                : 'contents'
+            }
+            data-testid={isDesktopWeb && selectedConversation ? 'messages-desktop-thread' : undefined}
+          >
         <FeatureLockOverlay isLocked={false} className="h-full flex flex-col">
       {!selectedConversation ? (
-        <div className={isDesktopWeb ? 'contents motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200' : 'contents'}>
+        <>
           {/* Conversations List Header */}
           <div className="sticky top-0 z-50 p-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border pt-[12px] pb-[12px] mt-[12px] mb-[12px] pl-[36px] pr-[36px]">
             <div className="flex items-center justify-between mb-6">
@@ -2099,7 +2133,10 @@ export default function Messages() {
                     key={conversation.id}
                     className="rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#e2e2e2]" 
                     data-testid={`card-conversation-${conversation.id}`}
-                    onClick={() => setSelectedConversation(conversation.id)}
+                    onClick={() => {
+                      setSelectedConversation(conversation.id);
+                      navigate(`/messages/${conversation.id}`);
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       {/* Enhanced Avatar Display */}
@@ -2188,37 +2225,17 @@ export default function Messages() {
               </div>
             )}
           </div>
-        </div>
+        </>
       ) : (
-        <div
-          className={isDesktopWeb ? 'flex h-full min-h-0 overflow-hidden' : 'contents'}
-          data-testid={isDesktopWeb ? 'messages-desktop-split' : undefined}
-        >
-          {isDesktopWeb && (
-            <ConversationRail
-              conversations={conversations}
-              activeId={selectedConversation}
-              unreadCountsMap={unreadCountsMap}
-              onSelect={(id) => setSelectedConversation(id)}
-              getOtherParticipantProfileImage={getOtherParticipantProfileImage}
-              getParticipantName={getParticipantName}
-              getInitials={getInitials}
-            />
-          )}
-          <div
-            key={isDesktopWeb ? `thread-pane-${selectedConversation}` : undefined}
-            className={
-              isDesktopWeb
-                ? 'flex-1 min-w-0 flex flex-col h-full overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-2 motion-safe:duration-200'
-                : 'contents'
-            }
-            data-testid={isDesktopWeb ? 'messages-desktop-thread' : undefined}
-          >
+        <>
           {/* Chat Header */}
           <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[12px] pb-[12px] pl-[12px] pr-[12px]" data-testid="chat-header">
             <div className="flex items-center gap-3">
               <button 
-                onClick={() => setSelectedConversation(null)}
+                onClick={() => {
+                  setSelectedConversation(null);
+                  navigate('/messages');
+                }}
                 className="p-2 hover:bg-accent rounded-lg transition-colors" 
                 data-testid="button-back"
               >
@@ -2476,8 +2493,7 @@ export default function Messages() {
             </div>
             </div>
           </div>
-          </div>
-        </div>
+        </>
       )}
         </FeatureLockOverlay>
       {/* Upgrade to reply banner - shown for free tier users in non-team conversations */}
@@ -2839,6 +2855,8 @@ export default function Messages() {
           </div>
         </div>
       )}
+          </div>
+        </div>
       </div>
       {/* Media Gallery */}
       <MediaGallery
