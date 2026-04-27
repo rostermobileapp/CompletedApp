@@ -248,7 +248,6 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           })}
         </nav>
       </aside>
-
       {/* Permanent menu column — always visible on desktop, replacing the
           hamburger-triggered SlideOutMenu */}
       <aside
@@ -257,7 +256,6 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       >
         <DesktopMenuColumn />
       </aside>
-
       {/* Right side: header + main content */}
       <div className="flex-1 ml-[400px] h-screen flex flex-col min-w-0">
         <header
@@ -313,7 +311,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           className="flex-1 w-full overflow-y-auto"
           data-testid="desktop-main-content"
         >
-          <div className="mx-auto w-full max-w-[1440px] px-8 py-8 h-full">
+          <div className="mx-auto w-full max-w-[1440px] px-8 py-8 h-full pt-[4px] pb-[4px]">
             {mainScreen ?? children}
           </div>
         </main>
