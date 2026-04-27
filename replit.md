@@ -12,11 +12,11 @@ Preferred communication style: Simple, everyday language.
 
 ## Frontend Architecture
 
-The frontend is a mobile-first, responsive single-page application built with React and TypeScript, using `shadcn/ui` (Radix UI) for components, `React Query` for server state, `React Context` for client-side state, and `Wouter` for routing. The UI/UX emphasizes a mobile-first, dark-themed design with intuitive navigation, a fixed bottom navigation bar, and a global slide-out menu, supporting user-controlled light/dark modes and gracefully presenting premium features. The `/app` route serves as a clean, marketing-free entry point for the iOS native wrapper, ensuring authenticated users land directly on the Dashboard or are routed to onboarding, avoiding marketing content for App Store compliance.
+The frontend is a mobile-first, responsive single-page application built with React and TypeScript. It uses `shadcn/ui` (based on Radix UI) for components, `React Query` for server state, `React Context` for client-side state, and `Wouter` for routing. The UI/UX prioritizes a mobile-first responsive design, incorporating an Apple Fitness+ inspired landing page, dark-themed components, and intuitive navigation with a fixed bottom navigation bar and global slide-out menu. It supports user-controlled light/dark modes and gracefully presents premium features.
 
 ## Backend Architecture
 
-The backend is a modular REST API developed with Express.js and TypeScript. Authentication uses Supabase JWT verification, with user data synchronized to a local PostgreSQL database. The system includes messaging infrastructure and generates unique, URL-friendly IDs using `nanoid`.
+The backend is a modular REST API developed with Express.js and TypeScript. Authentication is handled via Supabase JWT token verification, with user data synchronized to a local PostgreSQL database. The system includes a messaging infrastructure and generates unique, URL-friendly IDs for leagues using `nanoid`.
 
 ## Data Storage Solutions
 
@@ -24,43 +24,42 @@ PostgreSQL is the primary database, managed with Drizzle ORM for type-safe opera
 
 ## Timezone Management
 
-The platform uses a **league-local string storage** approach for datetime handling to prevent incorrect UTC conversions. Datetimes are stored as league-local strings in the database, and Zod schemas accept these strings directly. A helper `parseLeagueLocalDateTime` converts these strings to UTC Date objects for arithmetic and comparisons, ensuring consistency across storage, display, and calculations.
+The platform uses a **league-local string storage** approach for datetime handling to prevent incorrect UTC conversions:
+
+- **Storage**: Timestamp columns (games.scheduledAt, scrimmages.dateTime, teamEvents.scheduledAt/endTime, tournamentMatches.scheduledTime, personalReminders.scheduledAt) use Drizzle's `{ mode: 'string' }` to store datetimes as league-local strings (e.g., "2025-01-15T18:00")
+- **API Schemas**: Zod schemas accept datetime strings without Date transformation
+- **Date Arithmetic**: The `parseLeagueLocalDateTime(localString, leagueTimezone)` helper in `server/dateUtils.ts` converts league-local strings to UTC Date objects when comparisons or arithmetic are needed
+- **Formatting**: `formatDateInTimezone()` and related helpers use `parseLeagueLocalDateTime` to properly interpret league-local strings before formatting for display
+- **Background Jobs**: Event reminder and scrimmage invite jobs fetch league timezone before parsing datetime strings
+- **Frontend**: Forms send datetime strings directly without Date conversion; edit forms parse strings directly (e.g., `dateTimeStr.split('T')`) to extract date/time parts
+
+This approach ensures times remain consistent across storage, display, and calculations regardless of server timezone.
 
 ## Authentication and Authorization
 
-Supabase Authentication manages user authentication. The backend validates JWT tokens with a Supabase service role key. A role-based access control system (`free_tier`, `player_pro`, `commissioner`, `secondary_commissioner`) is enforced at both API and UI levels, with real-time subscription enforcement via Stripe webhooks.
+Supabase Authentication manages user authentication via email/password and JWT tokens. The backend validates these tokens using a Supabase service role key. A role-based access control system (`free_tier`, `player_pro`, `commissioner`, `secondary_commissioner`) is enforced at both API and UI levels, with real-time subscription enforcement via Stripe webhooks.
 
 ## Tournament System Implementation
 
-The tournament system supports various formats with a universal state machine for double elimination and intelligent bye handling. It includes bracket generators for triple elimination, 3-game guarantee, consolation, and compass draw, and integrates Round Robin + Playoffs with record-based playoff seeding. The frontend features a `BracketView` component for SVG bracket rendering with zoom/pan controls. A custom bracket builder provides a drag-and-drop interface for designing tournament structures. Standalone tournaments operate on a commissioner-pays model, with players receiving free, time-limited access.
+The tournament system supports various formats with a universal state machine approach for double elimination and intelligent bye handling. It includes phase 2 bracket generators for triple elimination, 3-game guarantee, consolation, and compass draw, and integrates Round Robin + Playoffs with record-based playoff seeding. The frontend features a `BracketView` component for SVG bracket rendering with visual hierarchy, dynamic spacing, connector arrows, and zoom/pan controls. A custom bracket builder provides a drag-and-drop interface for designing tournament structures.
+
+Standalone tournaments operate on a commissioner-pays model ($10 per team via Stripe) with players receiving free, time-limited access to tournament-specific features. Standalone tournament creation is open to all authenticated users via a multi-step wizard, supporting manual team entry and CSV import.
 
 ## Photo Album System
 
-A mobile-optimized photo album feature allows users to upload, view, and download photos. Tournament photo galleries are accessible to approved participants within a time-limited window, featuring a Google Photos-inspired UI. League photo galleries are a premium, subscription-gated feature. Both systems enforce access control, file type restrictions, and file size limits.
+A mobile-optimized photo album feature allows users to upload, view, and download photos from tournaments and leagues. Tournament photo galleries are accessible to approved participants within a time-limited window, featuring a Google Photos-inspired UI. League photo galleries are a premium, subscription-gated feature. Both systems enforce access control, file type restrictions (JPEG, PNG, GIF, WebP), and 10MB file size limits.
 
 ## Feature Specifications
 
-Key features include subscription gating, payment management, a "Needs Attention" notification system, CSV import for players and schedules, bulk delete, facility linking, recurring scrimmages, and automation for finalizing scrimmages and invoicing. Player management, league migration requests, career stats, and team-scoped messages/payments are supported. A comprehensive scrimmage notification system includes in-app push notifications (via a `NotificationCenter`) and email notifications. A unified event reminder system sends push notifications for games and scrimmages. Scrimmage creators can designate co-hosts with granular permissions.
+Key features include subscription gating, payment management, a "Needs Attention" notification system, CSV import for players and schedules, bulk delete operations, facility linking, recurring scrimmages, and automation for finalizing scrimmages and invoicing. Player management, league migration requests, career stats, and team-scoped messages/payments are also supported.
 
-## Multi-Step Onboarding Flow
+A comprehensive scrimmage notification system includes in-app push notifications (via a `NotificationCenter` component) and email notifications for invites, reminders, approvals, and cancellations. Recurring scrimmage invitations are scheduled automatically. A unified event reminder system sends push notifications for both games and scrimmages 2 days before (6 PM) and 2 hours before the event.
 
-A 4-screen onboarding flow guides new users after account creation, collecting basic information, additional details (timezone, competitive level, payment handles), and use case selection (Join a Team, Create & Manage a Team, Create & Manage a League). All data persists to the user profile, and a progress indicator tracks completion. Users who complete onboarding are not shown the flow again.
-
-## iOS In-App Purchases (IAP)
-
-The iOS app uses `NativelyPurchases` for StoreKit 2 IAP, integrating directly with Apple's App Store Server API. The backend handles verification of JWS payloads (preferred for StoreKit 2) or transaction IDs, supporting subscription product IDs for Player Pro and Commissioner tiers.
+The platform allows scrimmage creators to designate co-hosts with granular permissions (`canApproveRequests`, `canSendReminders`, `canManagePayments`).
 
 ## Mobile App (Expo)
 
 The `/mobile` folder contains a native Expo React Native app that provides push notification support via OneSignal, using external IDs for targeted notifications.
-
-## Unified WebSocket Connection
-
-A single app-wide `WebSocketProvider` context (`client/src/context/WebSocketContext.tsx`) consolidates WebSocket connections for real-time messaging, ensuring new messages, read receipts, poll events, and notifications are handled globally. This prevents connection conflicts and ensures consistent real-time updates across the application.
-
-## "The Wall" (formerly "News") Feature Updates
-
-"The Wall" screen allows any league member with Player Pro or Commissioner tier to post, with pinning restricted to Commissioner tier. An announcement comments system has been added, allowing users with appropriate tiers to view and post comments on announcements. Comment counts are displayed on post cards, and clicking a post reveals a detail view with comments.
 
 # External Dependencies
 
@@ -86,3 +85,75 @@ A single app-wide `WebSocketProvider` context (`client/src/context/WebSocketCont
 -   **React Query (TanStack Query)**: Server state management.
 -   **Wouter**: Lightweight client-side routing.
 -   **Drizzle ORM**: Type-safe database operations.
+
+## Recent Changes (Feb 2026)
+
+### Real-Time Message Loading Fix
+- Fixed critical issue where new messages wouldn't appear when navigating to a conversation thread (required force-closing the app)
+- Root cause: Global `staleTime: Infinity` in queryClient meant message/conversation queries never auto-refetched on mount
+- Added `staleTime: 0` and `refetchOnMount: 'always'` to conversations, messages, and payment requests queries in Messages.tsx
+- Stabilized WebSocket connection: removed `selectedConversation` from dependency array, using a ref instead so WS stays connected across conversation switches (no more disconnects/reconnects when switching threads)
+- WebSocket now invalidates messages for ANY conversation receiving new messages (not just the currently viewed one)
+- Added automatic WebSocket reconnection with 3-second delay on unexpected disconnects
+
+### Unified WebSocket Connection for Real-Time Messaging
+- Consolidated two competing WebSocket connections (one in useNotificationWebSocket, one in Messages.tsx) into a single app-wide WebSocketProvider context (`client/src/context/WebSocketContext.tsx`)
+- The old approach caused the server's `activeConnections` map to be overwritten (only one connection per user), so whichever connected last won and the other stopped receiving events
+- New messages, read receipts, poll events, and notifications are now handled globally regardless of which page the user is on
+- Messages.tsx uses the shared context's `subscribe()` API for page-specific events (typing indicators, online status) and `send()` for outgoing typing indicators
+- Old `useNotificationWebSocket` hook is deprecated (file retained but no longer imported)
+
+### "The Wall" (formerly "News") Feature Updates
+- Renamed "News" screen to "The Wall" in Dashboard card and page header
+- Updated posting permissions: Any league member with Player Pro or Commissioner tier can now post (previously required commissioner or team captain role)
+- Pinning posts is restricted to Commissioner tier only (enforced on both frontend and backend)
+- Added announcement comments system:
+  - New `announcement_comments` table in schema with relations
+  - Backend API routes: GET/POST `/api/announcements/:id/comments`, GET `/api/announcements/:id/comment-count`
+  - Comment count shown on each post card with a comment icon
+  - Clicking a post opens a detail view showing the full post and its comments
+  - Comment input for Player Pro or Commissioner tier users
+  - Comment counts are included in announcement list API responses
+
+### Claude Code Skill: App Onboarding Questionnaire
+- Added `github:adamlyttleapps/claude-skill-app-onboarding-questionnaire` as a project-level Claude Code skill dependency in `.claude/settings.json`
+- The full skill definition is installed at `.local/skills/app-onboarding-questionnaire/SKILL.md` (force-tracked in git since `.local/` is system-gitignored)
+- When invoked, the skill analyzes the codebase and guides creation of a high-converting multi-screen onboarding flow (up to 14 screens following Noom/Duolingo conversion psychology)
+- Note: `.local/` is excluded by `/etc/.gitignore`; to reinstall the skill in a fresh environment, run: `curl -s https://raw.githubusercontent.com/adamlyttleapps/claude-skill-app-onboarding-questionnaire/main/SKILL.md -o .local/skills/app-onboarding-questionnaire/SKILL.md`
+
+### Multi-Step Onboarding Flow
+- Added a 4-screen onboarding flow for new users after account creation
+- Screen 1: Basic info (first name, last name, phone, DOB, profile photo upload)
+- Screen 2: Additional info (timezone, competitive level, Venmo/CashApp, city)
+- Screen 3: Use case selection (Join a Team, Create & Manage a Team, Create & Manage a League)
+- Screen 4: Welcome/about screen with Terms of Service and Privacy Policy links
+- New database fields: `competitive_level` enum (Recreational/Competitive/Semi-Pro/Pro), `roster_use_case` enum (join_team/manage_team/manage_league)
+- All data persists to user profile via PATCH `/api/user/onboarding`
+- Progress indicator with step counter and segmented bar
+- Users who completed onboarding are never shown the flow again (checked via `onboardingCompleted` flag)
+- App.tsx intercepts authenticated users with `onboardingCompleted=false` and renders the Onboarding page
+
+### iOS IAP — Natively SDK + Apple App Store Server API (StoreKit 2)
+- The iOS app is wrapped with **Natively** (not Capacitor). `@capgo/native-purchases` (a Capacitor plugin) does NOT work in Natively — it falls back to a web mock.
+- Uses `NativelyPurchases` from the `natively` npm package for StoreKit purchases. This class triggers the native IAP bridge via `window.$agent` (injected by the Natively shell).
+- No RevenueCat is used or required.
+- `client/src/lib/nativePurchases.ts` — Natively bridge wrapper: `isBillingSupported` (detects `window.$agent`), `getIosProducts` (prices via `packagePrice`), `purchaseProduct` (triggers `purchasePackage`), `restorePurchases` (triggers `restore`)
+- Natively callback shape: `{ status: 'SUCCESS'|'FAILED', transactionId, error, jwsRepresentation? }`
+- `server/appleIap.ts` — Apple App Store Server API utilities: JWT generation (ES256), JWS payload decoding via x5c cert chain, transaction lookup by ID. `APPLE_IAP_PRIVATE_KEY` is normalised from literal `\n` to real newlines before `importPKCS8`.
+- `client/src/pages/Subscription.tsx` — iOS-aware UI: detects Natively via UA / `window.$agent`; sends StoreKit 2 JWS (preferred) or transactionId to backend for verification
+- `server/routes.ts` — `POST /api/iap/verify` accepts JWS (StoreKit 2, verified against Apple Root CA G3 + bundleId) or transactionId (App Store Server API lookup with JWT). `POST /api/iap/notifications` is an App Store Server Notifications v2 webhook.
+- Product IDs: `com.rosterapp.player_pro_monthly` → Player Pro, `com.rosterapp.commissioner_monthly` → Commissioner, `com.rosterapp.player_pro_yearly` → Player Pro Yearly, `com.rosterapp.commissioner_yearly` → Commissioner Yearly
+- **Environment variables required (Replit Secrets — global, available in dev + prod):**
+  - `APPLE_IAP_KEY_ID` — Key ID from App Store Connect
+  - `APPLE_IAP_ISSUER_ID` — Issuer ID from App Store Connect Users & Access → Integrations
+  - `APPLE_IAP_PRIVATE_KEY` — Full PEM content of the `.p8` private key file
+- **Debug:** `client/src/lib/debugLogger.ts` + `client/src/components/DebugPanel.tsx` — floating overlay (enabled when `DEBUG_MODE = true`) showing IAP log entries. Raw Natively callback payloads are logged via `console.log('[IAP] purchasePackage raw response:', ...)`.
+- Subscription button copy: "Subscribe via App Store" (IAP) — Apple-compliant per EP v. Apple ruling
+
+### BuildNatively App Entry Point
+- **BuildNatively wrapper URL must be set to `/app`** (e.g. `https://yourdomain.replit.app/app`)
+- The `/app` route is a clean, marketing-free entry point for the iOS native wrapper:
+  - Unauthenticated visitors at `/app` are shown the Login page (no marketing content, no competitor references)
+  - Authenticated + onboarded users land directly on the Dashboard/app shell
+  - Authenticated users who haven't completed onboarding are routed to the Onboarding flow
+- Marketing pages (`/`, `/pricing`, `/about`, sport and segment landing pages) remain intact for web but are **not reachable from within the authenticated app shell**, preventing Apple review rejections due to competitor comparisons or non-App-Store payment references on those pages
