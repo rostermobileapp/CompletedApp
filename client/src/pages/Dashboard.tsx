@@ -31,6 +31,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
+import { ScheduleCalendarMobile } from '@/components/dashboard/ScheduleCalendarMobile';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
@@ -1173,6 +1174,9 @@ function DashboardMobile() {
   // Add event dialog state
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
   const [eventType, setEventType] = useState<'reminder' | 'game' | 'generalEvent' | 'scrimmage' | null>(null);
+
+  // Schedule view toggle (List default, Calendar alt) — session-only state
+  const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>('list');
   
   // Edit team event state
   const [editingTeamEvent, setEditingTeamEvent] = useState<any>(null);
@@ -2598,8 +2602,8 @@ function DashboardMobile() {
       )}
       {/* Upcoming Games */}
       <div className="px-6 mt-[8px] mb-[8px]">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
             <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
             <Button
               onClick={() => setShowAddEventDialog(true)}
@@ -2608,6 +2612,38 @@ function DashboardMobile() {
             >
               <Plus className="w-[12.8px] h-[12.8px]" />
             </Button>
+            <div
+              className="ml-1 inline-flex items-center rounded-md p-0.5 bg-muted text-xs"
+              role="tablist"
+              aria-label="Schedule view"
+            >
+              <button
+                type="button"
+                onClick={() => setScheduleView('list')}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  scheduleView === 'list'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+                aria-pressed={scheduleView === 'list'}
+                data-testid="mobile-schedule-toggle-list"
+              >
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleView('calendar')}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  scheduleView === 'calendar'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+                aria-pressed={scheduleView === 'calendar'}
+                data-testid="mobile-schedule-toggle-calendar"
+              >
+                Calendar
+              </button>
+            </div>
           </div>
           <button 
             onClick={() => navigate('/calendar')}
@@ -2622,7 +2658,58 @@ function DashboardMobile() {
           <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
-        ) : (() => {
+        ) : scheduleView === 'calendar' ? (() => {
+          // Mirror the eligibility filter the list-cards apply to upcomingGames
+          // so the calendar surfaces exactly the same set of games (scrimmages,
+          // user-team games, substitute appearances, tournament-name matches).
+          const userTeamIds = Array.isArray(userTeams) ? userTeams.map((t: any) => t.id) : [];
+          const userTeamNames = Array.isArray(userTeams)
+            ? userTeams.map((t: any) => t.name?.toLowerCase())
+            : [];
+          const filteredGames = Array.isArray(upcomingGames)
+            ? (upcomingGames as any[]).filter((game: any) => {
+                if (game.isScrimmage) return true;
+                const isOnTeam =
+                  userTeamIds.includes(game.homeTeamId) ||
+                  userTeamIds.includes(game.awayTeamId);
+                const isTournamentMatchForUser =
+                  game.isTournamentMatch &&
+                  (userTeamNames.includes(game.homeTeam?.name?.toLowerCase()) ||
+                    userTeamNames.includes(game.awayTeam?.name?.toLowerCase()));
+                const isSubstitute = game.isSubstitute === true;
+                return isOnTeam || isSubstitute || isTournamentMatchForUser;
+              })
+            : [];
+          // Mirror the tournament scope filter the list-cards apply
+          const filteredTournaments = Array.isArray(visibleTournaments)
+            ? (visibleTournaments as any[]).filter((tournament: any) => {
+                if (selectedType === 'team' && selectedId) {
+                  const teamsArray = Array.isArray(userTeamsAll) ? userTeamsAll : [];
+                  const team = teamsArray.find((t: any) => t.id === selectedId);
+                  if (!team?.leagueId) return false;
+                  return tournament.leagueId === team.leagueId;
+                }
+                if (selectedType === 'league' && selectedId) {
+                  return tournament.leagueId === selectedId;
+                }
+                if (selectedType === 'tournament') {
+                  return tournament.id === selectedId;
+                }
+                return true;
+              })
+            : [];
+          return (
+            <ScheduleCalendarMobile
+              scrimmageInvites={Array.isArray(scrimmageInvites) ? scrimmageInvites : []}
+              scrimmageRequests={Array.isArray(scrimmageRequests) ? scrimmageRequests : []}
+              personalReminders={Array.isArray(personalReminders) ? personalReminders : []}
+              teamEvents={Array.isArray(teamEvents) ? teamEvents : []}
+              upcomingGames={filteredGames}
+              visibleTournaments={filteredTournaments}
+              primaryTeam={primaryTeam}
+            />
+          );
+        })() : (() => {
           // Helper to check if a date is today or in the future (comparing local dates, not timestamps)
           // Games should remain visible until the day AFTER they are scheduled
           const isYesterdayOrLater = (dateStr: string) => {
