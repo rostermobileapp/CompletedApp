@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useAuth } from '@/hooks/useAuth';
 // 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
@@ -1175,8 +1175,25 @@ function DashboardMobile() {
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
   const [eventType, setEventType] = useState<'reminder' | 'game' | 'generalEvent' | 'scrimmage' | null>(null);
 
-  // Schedule view toggle (List default, Calendar alt) — session-only state
-  const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>('list');
+  // Schedule view toggle (List default, Calendar alt) — persisted per-device via localStorage
+  const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    try {
+      const stored = window.localStorage.getItem('scheduleView');
+      return stored === 'calendar' ? 'calendar' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('scheduleView', scheduleView);
+    } catch {
+      // ignore storage errors (private mode, quota, etc.)
+    }
+  }, [scheduleView]);
   
   // Edit team event state
   const [editingTeamEvent, setEditingTeamEvent] = useState<any>(null);
