@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Users, MessageCircle, User, DollarSign } from 'lucide-react';
 import { useLocation } from 'wouter';
 import homeLogo from '@assets/Home_Logo_1768323157245.png';
 import { useQuery } from '@tanstack/react-query';
@@ -10,6 +9,11 @@ import { useSwipeableNav, SCREEN_ORDER, ScreenId } from '@/context/SwipeableNavC
 import { useAuth } from '@/hooks/useAuth';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
+import {
+  MAIN_NAV_ITEMS,
+  getActiveMainScreen,
+  type MainScreenId,
+} from '@/lib/mainNavRoutes';
 
 interface BottomNavigationProps {
   useSwipeNav?: boolean;
@@ -66,33 +70,22 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
   // Only count unread messages for the currently selected league
   const currentLeagueUnread = currentLeagueId ? (leagueUnreadMessages[currentLeagueId] ?? 0) : 0;
   
-  const getActiveId = (pathname: string): ScreenId | '' => {
-    if (pathname === '/') return 'home';
-    if (pathname.startsWith('/teams') || pathname.startsWith('/tournament-teams') || (pathname.startsWith('/team/') && primaryTeamId && pathname.includes(primaryTeamId))) return 'teams';
-    if (pathname.startsWith('/messages')) return 'messages';
-    if (pathname.startsWith('/profile') || pathname.startsWith('/subscription')) return 'profile';
-    if (pathname.startsWith('/payment-requests') || pathname.startsWith('/create-payment-request')) return 'payments';
-    return '';
-  };
-  
-  const activeId = useSwipeNav && swipeNav ? SCREEN_ORDER[swipeNav.activeIndex] : getActiveId(location);
-  
-  const getRouteForScreen = (shortcutId: ScreenId): string => {
-    switch (shortcutId) {
-      case 'teams': return '/teams';
-      case 'messages': return '/messages';
-      case 'home': return '/';
-      case 'payments': return '/payment-requests';
-      case 'profile': return '/profile';
-      default: return '/';
-    }
-  };
+  const activeId: ScreenId | '' =
+    useSwipeNav && swipeNav
+      ? SCREEN_ORDER[swipeNav.activeIndex]
+      : (getActiveMainScreen(location, primaryTeamId) as ScreenId | '');
+
+  const navItemsById = useMemo(
+    () => new Map(MAIN_NAV_ITEMS.map((item) => [item.id, item])),
+    [],
+  );
 
   const handleNavClick = (shortcutId: ScreenId) => {
     if (useSwipeNav && swipeNav) {
       swipeNav.navigateToScreen(shortcutId, true);
     } else {
-      const targetRoute = getRouteForScreen(shortcutId);
+      const targetRoute =
+        navItemsById.get(shortcutId as MainScreenId)?.route ?? '/';
       if (slideOverlay?.isOverlayRoute) {
         slideOverlay.closeWithSlideDown(targetRoute);
       } else {
@@ -100,14 +93,21 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
       }
     }
   };
-  
-  const FIXED_SHORTCUTS: { id: ScreenId; icon: typeof Users | null; label: string }[] = [
-    { id: 'teams', icon: Users, label: 'My Team' },
-    { id: 'messages', icon: MessageCircle, label: 'Messages' },
-    { id: 'home', icon: null, label: 'Home' },
-    { id: 'payments', icon: DollarSign, label: 'Payments' },
-    { id: 'profile', icon: User, label: 'Profile' },
-  ];
+
+  // Bottom-nav uses a different visual order than the desktop sidebar:
+  // Home is centered between teams/messages on the left and payments/profile
+  // on the right. Labels and icons are sourced from MAIN_NAV_ITEMS so they
+  // can never drift from the desktop sidebar.
+  const FIXED_SHORTCUTS = (
+    ['teams', 'messages', 'home', 'payments', 'profile'] as ScreenId[]
+  ).map((id) => {
+    const config = navItemsById.get(id as MainScreenId);
+    return {
+      id,
+      icon: config?.icon ?? null,
+      label: config?.label ?? '',
+    };
+  });
   
   if (isKeyboardOpen) {
     return null;

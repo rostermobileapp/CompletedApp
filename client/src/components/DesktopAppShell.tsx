@@ -30,9 +30,6 @@ import homeLogo from '@assets/Home_Logo_1768323157245.png';
  * For the 5 primary tabs we render the page component directly (mirroring the
  * mobile SwipeableMainScreens behavior). For every other authenticated route
  * we fall through to the children (the wouter <Switch>).
- *
- * Component imports are kept local to this file so the page bundles aren't
- * eagerly loaded by other consumers of the shared `mainNavRoutes` module.
  */
 function getMainScreenForPath(path: string): JSX.Element | null {
   if (path === '/') return <Dashboard />;
