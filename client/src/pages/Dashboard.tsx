@@ -2106,50 +2106,49 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
-        <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
-          <div className="flex items-center gap-2">
-            <img 
-              src={theme === 'dark' ? darkModeLogo : lightModeLogo}
-              alt="Roster"
-              className="h-[50px] pl-[12px] pr-[12px]"
-              data-testid="img-roster-logo"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => navigate('/profile')}
-              className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}
-              data-testid="button-profile"
-            >
-              {(userProfile as any)?.profileImageUrl ? (
-                <img 
-                  src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
-                  alt="Profile"
-                  className="w-full h-full object-cover bg-transparent"
-                />
-              ) : (
-                <span className="text-primary-foreground text-lg font-semibold">
-                  {(userProfile as any)?.firstName?.[0] || 'U'}
-                </span>
-              )}
-            </button>
-            {!isDesktopWeb && (
-              <>
-                <button
-                  onClick={() => setShowHamburgerMenu(true)}
-                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-                  data-testid="button-hamburger-menu"
-                >
-                  <Menu className="w-8 h-8 text-foreground" />
-                </button>
-                <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
-              </>
-            )}
+      {/* Header — hidden on desktop because the desktop shell provides
+          the brand logo and profile entry point in its left sidebar */}
+      {!isDesktopWeb && (
+        <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
+          <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
+            <div className="flex items-center gap-2">
+              <img 
+                src={theme === 'dark' ? darkModeLogo : lightModeLogo}
+                alt="Roster"
+                className="h-[50px] pl-[12px] pr-[12px]"
+                data-testid="img-roster-logo"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => navigate('/profile')}
+                className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}
+                data-testid="button-profile"
+              >
+                {(userProfile as any)?.profileImageUrl ? (
+                  <img 
+                    src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
+                    alt="Profile"
+                    className="w-full h-full object-cover bg-transparent"
+                  />
+                ) : (
+                  <span className="text-primary-foreground text-lg font-semibold">
+                    {(userProfile as any)?.firstName?.[0] || 'U'}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setShowHamburgerMenu(true)}
+                className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+                data-testid="button-hamburger-menu"
+              >
+                <Menu className="w-8 h-8 text-foreground" />
+              </button>
+              <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
       {/* Team/League/Tournament Selection Dropdown */}
       {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0)) && (
         <div className="px-6 mb-4">
