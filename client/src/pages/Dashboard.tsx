@@ -38,6 +38,7 @@ import Announcements from '@/pages/Announcements';
 import MediaGalleryPage from '@/pages/MediaGallery';
 import StatsPage from '@/pages/Stats';
 import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
+import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1065,7 +1066,33 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
   return null;
 }
 
+/**
+ * Thin wrapper around the legacy mobile dashboard. On desktop web (>=1024px,
+ * non-Capacitor) we skip mounting `DashboardMobile` entirely so its many
+ * legacy data fetches (incl. the per-game duty N+1) never run on the new
+ * desktop home. The shared add-event dialog flow is rendered at this level so
+ * the desktop schedule's "+ Add" button keeps working.
+ */
 export default function Dashboard() {
+  const isDesktopWeb = useIsDesktopWeb();
+  const [showAddEventDialog, setShowAddEventDialog] = useState(false);
+
+  if (isDesktopWeb) {
+    return (
+      <>
+        <HomeDesktop onAddEvent={() => setShowAddEventDialog(true)} />
+        <AddEventDialog
+          open={showAddEventDialog}
+          onOpenChange={setShowAddEventDialog}
+        />
+      </>
+    );
+  }
+
+  return <DashboardMobile />;
+}
+
+function DashboardMobile() {
   const { user: supabaseUser } = useAuth();
   const tier = (supabaseUser as any)?.role || 'free_tier';
   const { canAccessPremiumFeatures, hasStatManagerAccess } = usePermissions();
@@ -2105,23 +2132,15 @@ export default function Dashboard() {
     refetchInterval: 90000, // Refresh every 90 seconds (reduced from 30s to lower egress)
   });
 
-  // Desktop-only Roster Home redesign (Task #56). At >=1024px on a real
-  // desktop browser, render the new 3-row layout instead of the mobile-style
-  // stack. Mobile, tablet, and Natively/Capacitor wrappers fall through to
-  // the original mobile layout below. All hooks above this branch run
-  // unconditionally so prefetch/cache behavior is preserved. The dialog tree
-  // at the bottom of the return value is shared between both layouts so the
-  // desktop "+ Add" button can reuse the existing add-event flow.
+  // DashboardMobile is only mounted by the parent <Dashboard> when
+  // !isDesktopWeb, so all of the legacy mobile data hooks above this point
+  // are skipped on the new desktop home (Task #59). The desktop layout and
+  // its add-event flow live in the parent component.
   return (
     <>
-    {isDesktopWeb ? (
-      <HomeDesktop onAddEvent={() => setShowAddEventDialog(true)} />
-    ) : (
     <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
-      {/* Header — hidden on desktop because the desktop shell provides
-          the brand logo and profile entry point in its left sidebar */}
-      {!isDesktopWeb && (
-        <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
           <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
             <div className="flex items-center gap-2">
               <img 
@@ -2160,7 +2179,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      )}
       {/* Team/League/Tournament Selection Dropdown */}
       {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0)) && (
         <div className="px-6 mb-4">
@@ -3116,7 +3134,6 @@ export default function Dashboard() {
         </button>
       </div>
     </div>
-    )}
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
         <DialogContent className="sm:max-w-md">
