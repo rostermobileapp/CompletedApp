@@ -1,0 +1,141 @@
+# Replit Prompt — Roster Home Page Responsive Redesign
+
+## Context
+
+I'm redesigning the Roster home page so it scales properly on tablet and desktop displays. The current behavior stretches every element wider as the viewport grows, which wastes space and looks unpolished. I want a true responsive layout that reorganizes content for wider screens rather than just resizing it.
+
+The home page currently has these sections stacked vertically: a season selector, a 4-button quick-nav grid (Wall/Photos/Stats/Standings), Games Left counter, Alerts dropdown, Schedule list, and bottom action buttons.
+
+## Goal
+
+Build a responsive home page that:
+- Keeps the existing mobile layout intact at narrow widths
+- Reorganizes into a multi-row grid layout starting at the desktop breakpoint (≥1024px)
+- Caps the schedule's calendar view at 1080px wide and centers it on larger screens
+- Replaces the 4 quick-nav buttons with expanded inline modules on desktop
+
+## Breakpoints
+
+- **Mobile** (<768px): existing layout, no changes
+- **Tablet** (768–1023px): existing layout, no changes
+- **Desktop** (≥1024px): new layout described below
+- **Wide desktop** (≥1440px): same layout, calendar stays capped at 1080px
+
+## Desktop layout structure
+
+Three vertical rows inside a centered container (max-width 1280px, horizontal padding 24px):
+
+### Row 1 — Schedule (full width, capped at 1080px, centered)
+
+A single card containing:
+- **Header**: "Schedule" title on the left with a Calendar/List view toggle, month navigation (‹ May 2026 ›) on the right
+- **Default view: Calendar** — full month grid, 7 columns × 5–6 rows, day cells ~96px tall
+- **Alternate view: List** — the existing schedule list (preserve current behavior)
+- Each day cell shows the date number and any event pills inline. Event pills are color-coded by type:
+  - Game: purple (`#EEEDFE` bg / `#3C3489` text)
+  - Practice: teal (`#E1F5EE` bg / `#085041` text)
+  - Social: amber (`#FAEEDA` bg / `#633806` text)
+  - Tournament: coral (`#F09595` bg with appropriate dark text)
+- Event pills show start time + opponent/title (e.g., "7:00p · vs Jagr Bombs")
+- Days outside the current month appear muted (gray background, no border)
+- Color legend below the grid
+
+### Row 2 — Two-column split (1fr / 1fr)
+
+**Left column: Up Next card**
+- Section title "Up next"
+- Next upcoming game: opponent logo, opponent name, date/time/rink
+- RSVP summary as 3 inline cells: "9 in" (green), "1 out" (red), "3 ?" (gray)
+
+**Right column: Alerts card (expanded)**
+- Section title "Alerts" with a red badge showing the new alert count (e.g., "5 new")
+- Inline list of all current alerts (no longer collapsed)
+- Each alert has a colored left-border indicating severity:
+  - Red border: action-required (e.g., "Need a sub")
+  - Amber border: nudge-worthy (e.g., "RSVPs pending")
+  - Blue border: informational (e.g., "Dues paid status")
+- Each alert: bold title line + smaller secondary metadata line
+
+### Row 3 — Stats and Standings (1.4fr / 1fr split)
+
+**Left column: 2026 Team Leaders card**
+- Section title with a "Season / Last 5" view toggle on the right
+- Two-column inner grid showing **Points** and **Goals** leaders
+- Each category has:
+  - Top section: 44px circular avatar (blue tint for Points, amber tint for Goals), category label, leader name, jersey + position, and the headline number (large, 26px)
+  - Bottom section: top-5 leaderboard with rank, player name, and stat value. The #1 row is highlighted with the category's color tint.
+- Visual reference: NHL.com-style "Playoff Leaders" panel (clean two-up layout with a featured player and ranked list below)
+
+**Right column: Standings card**
+- Section title "Standings" with season label on the right
+- Compact table with columns: # | Team | GP | W | L | T | PTS
+- The user's own team row is highlighted with a blue background tint
+- Numbers right-aligned, team names left-aligned
+- PTS column bold
+
+## Visual design notes
+
+- Card style: white background, 0.5px border at 15% opacity black, 12px corner radius, 1rem 1.25rem padding
+- Page background: light cream/gray (`#f5f4ee`)
+- Typography: system sans-serif, weights 400 and 500 only (no 600/700)
+- Headings sentence case throughout (no Title Case, no ALL CAPS)
+- No drop shadows, no gradients, flat surfaces only
+- Spacing: 16px gap between cards in a row, 16px margin between rows
+
+## What to remove from the desktop layout
+
+- The 4-button quick-nav grid (Wall/Photos/Stats/Standings) is replaced by the inline expanded modules — no longer needed at this breakpoint
+- The standalone "Games Left" counter and the standalone collapsed Alerts dropdown are absorbed into the new modules
+
+## What to preserve
+
+- All existing mobile/tablet behavior unchanged
+- All current data fetching, state management, and routing
+- The List view of the schedule keeps its existing component — just hide it behind the toggle
+- Wall, Photos, and other secondary pages remain accessible via the main nav
+
+## Implementation approach
+
+1. Create a new `HomeDesktop` component that renders the desktop layout
+2. Use a media query or `useMediaQuery` hook to conditionally render `HomeDesktop` vs the existing `HomeMobile` component at the 1024px breakpoint
+3. Build the calendar grid as a reusable component — it should accept an array of events with `{date, type, title, time}` and render them inline
+4. The team leaders and standings components should fetch from the same data sources used by the existing Stats and Standings pages
+5. Use CSS Grid for all layout (not flexbox for the row structures)
+
+## Files I expect to touch
+
+- New: `components/HomeDesktop.tsx`
+- New: `components/ScheduleCalendar.tsx`
+- New: `components/TeamLeadersCard.tsx`
+- New: `components/StandingsTable.tsx`
+- New: `components/UpNextCard.tsx`
+- New: `components/AlertsExpanded.tsx`
+- Modified: `pages/Home.tsx` (or equivalent) — add breakpoint switching logic
+- Modified: any shared styles or theme file for the new color tokens
+
+## Acceptance criteria
+
+- At 375px (mobile): page looks identical to current production
+- At 1024px+: calendar appears as a full month grid, alerts are expanded inline, stats and standings show as full panels
+- At 1440px+: calendar stays centered at 1080px wide, other rows fill to 1280px max
+- Calendar/List toggle functional
+- Season/Last 5 toggle on stats functional (data can be mocked initially if needed)
+- User's team row highlighted in standings
+- Alert severity colors render correctly
+
+## Visual reference
+
+I have a JPG mockup of the final desktop layout. I'll attach it for reference. Match the layout, spacing, and color treatments exactly.
+
+## Step-by-step build order
+
+1. Set up the breakpoint detection and conditional render shell
+2. Build the empty `HomeDesktop` with the three-row grid scaffolding
+3. Implement `ScheduleCalendar` component with calendar view (use mock event data first)
+4. Wire up real schedule data and the Calendar/List toggle
+5. Build `UpNextCard` and `AlertsExpanded` for row 2
+6. Build `TeamLeadersCard` and `StandingsTable` for row 3
+7. Polish spacing, typography, and color details against the mockup
+8. Test at 1024px, 1440px, and 1920px viewport widths
+
+Please confirm you understand the layout before writing code, and ask any clarifying questions about data shapes, existing component locations, or styling conventions.
