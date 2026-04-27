@@ -519,7 +519,7 @@ function ConversationRail({
               aria-label={name}
               aria-current={isActive ? 'true' : undefined}
               onClick={() => onSelect(conversation.id)}
-              className={`relative w-full flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all duration-150 ${
+              className={`relative flex items-center justify-center p-2 rounded-lg transition-all duration-150 ${
                 isActive
                   ? 'bg-primary/10'
                   : 'hover:bg-accent/60'
@@ -563,9 +563,6 @@ function ConversationRail({
                   </span>
                 )}
               </div>
-              <span className="text-[10px] leading-tight text-center text-muted-foreground truncate w-full">
-                {name}
-              </span>
             </button>
           );
         })}
