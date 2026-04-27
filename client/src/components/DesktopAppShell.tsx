@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Users, Trophy } from 'lucide-react';
+import { Users, Trophy, Info, LifeBuoy, Shield, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
@@ -183,6 +183,36 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                   )}
                 </span>
                 <span className="text-xs leading-tight text-center">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+        <nav
+          className="px-2 py-3 border-t border-border space-y-1"
+          data-testid="desktop-sidebar-footer"
+        >
+          {[
+            { id: 'about', label: 'About', icon: Info, route: '/about' },
+            { id: 'support', label: 'Support', icon: LifeBuoy, route: '/support' },
+            { id: 'privacy', label: 'Privacy Policy', icon: Shield, route: '/privacy-policy' },
+            { id: 'terms', label: 'Terms of Service', icon: FileText, route: '/terms-of-service' },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.route;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.route)}
+                className={cn(
+                  'w-full flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary font-bold'
+                    : 'text-foreground/70 hover:bg-muted hover:text-foreground font-medium',
+                )}
+                data-testid={`desktop-footer-${item.id}`}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span className="text-[11px] leading-tight text-center">{item.label}</span>
               </button>
             );
           })}
