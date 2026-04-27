@@ -130,7 +130,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   return (
     <div
-      className="min-h-screen w-full flex bg-background"
+      className="h-screen w-full flex bg-background overflow-hidden"
       data-testid="desktop-app-shell"
     >
       {/* Left sidebar */}
@@ -259,9 +259,9 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       </aside>
 
       {/* Right side: header + main content */}
-      <div className="flex-1 ml-[400px] min-h-screen flex flex-col min-w-0">
+      <div className="flex-1 ml-[400px] h-screen flex flex-col min-w-0">
         <header
-          className="sticky top-0 z-20 flex items-center gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
+          className="flex-shrink-0 z-20 flex items-center gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
           data-testid="desktop-header"
         >
           <div className="flex-1 max-w-md">
@@ -310,7 +310,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         </header>
 
         <main
-          className="flex-1 w-full"
+          className="flex-1 w-full overflow-y-auto"
           data-testid="desktop-main-content"
         >
           <div className="mx-auto w-full max-w-[1440px] px-8 py-8">
