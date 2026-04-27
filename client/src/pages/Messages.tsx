@@ -2226,7 +2226,7 @@ export default function Messages() {
       ) : (
         <>
           {/* Chat Header */}
-          <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[12px] pb-[12px] pl-[12px] pr-[12px]" data-testid="chat-header">
+          <div className="sticky top-0 z-50 p-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pl-[12px] pr-[12px] pt-[4px] pb-[4px]" data-testid="chat-header">
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => {
