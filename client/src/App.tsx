@@ -278,6 +278,7 @@ function Router() {
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />
               <Route path="/support" component={Support} />
+              <Route path="/about" component={About} />
               <Route path="/admin/stripe" component={StripeAdmin} />
               <Route component={Dashboard} />
             </Switch>
