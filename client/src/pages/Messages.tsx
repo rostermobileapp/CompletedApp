@@ -2044,7 +2044,7 @@ export default function Messages() {
         <div
           className={
             isDesktopWeb && selectedConversation
-              ? 'flex flex-1 min-h-0 overflow-hidden'
+              ? 'flex h-[calc(100vh-9rem)] overflow-hidden'
               : 'contents'
           }
           data-testid={isDesktopWeb && selectedConversation ? 'messages-desktop-split' : undefined}
