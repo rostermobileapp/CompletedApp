@@ -46,10 +46,22 @@ const formSchema = z.object({
   format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
   firstGameDate: z.string().optional(),
+  // Optional access window for season_playoff tournaments (standalone derives them from firstGameDate)
+  accessStartDate: z.string().optional(),
+  accessEndDate: z.string().optional(),
   teams: z.array(z.object({
     name: z.string().min(1, "Team name is required")
   })).optional(),
   teamIds: z.array(z.string()).optional()
+}).refine((data) => {
+  // For season_playoff, if both access dates are provided, end must be after start
+  if (data.type === "season_playoff" && data.accessStartDate && data.accessEndDate) {
+    return new Date(data.accessEndDate) > new Date(data.accessStartDate);
+  }
+  return true;
+}, {
+  message: "Access end date must be after start date",
+  path: ["accessEndDate"]
 }).refine((data) => {
   // Season playoffs require leagueId and seasonId
   if (data.type === "season_playoff") {
@@ -129,6 +141,8 @@ export default function TournamentCreateStandalone() {
       format: "single_elimination",
       description: "",
       firstGameDate: "",
+      accessStartDate: "",
+      accessEndDate: "",
       teams: [],
       teamIds: []
     }
@@ -185,6 +199,8 @@ export default function TournamentCreateStandalone() {
         numTeams: numTeams,
         description: data.description || null,
         firstGameDate: data.firstGameDate || null,
+        accessStartDate: !isSeasonPlayoff ? undefined : (data.accessStartDate || null),
+        accessEndDate: !isSeasonPlayoff ? undefined : (data.accessEndDate || null),
         settings: {
           bracketType: "seeded",
           showSeedNumbers: true,
@@ -805,6 +821,51 @@ export default function TournamentCreateStandalone() {
                         </FormItem>
                       )}
                     />
+                  )}
+
+                  {watchedType === "season_playoff" && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="accessStartDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Access Window Start (optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="datetime-local"
+                                {...field}
+                                data-testid="input-access-start-date"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Leave blank to auto-fill from the match schedule.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accessEndDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Access Window End (optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="datetime-local"
+                                {...field}
+                                data-testid="input-access-end-date"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Leave blank to auto-fill from the match schedule.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>
