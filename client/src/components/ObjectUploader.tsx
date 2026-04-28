@@ -144,12 +144,13 @@ export function ObjectUploader({
   };
 
   const handleCropConfirm = async (croppedFile: File) => {
-    setCropFile(null);
     try {
       const result = await uploadOneFile(croppedFile);
+      setCropFile(null);
       onComplete?.({ successful: [result], failed: [] });
     } catch (error) {
       console.error("Cropped upload failed:", error);
+      setCropFile(null);
       onComplete?.({ successful: [], failed: [{ file: croppedFile.name, error }] });
       toast({
         title: "Upload failed",
