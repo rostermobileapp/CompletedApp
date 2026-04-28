@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, CheckCircle, Trophy, Users, Info, Upload, Plus, X, Download } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Trophy, Users, Info, Upload, Plus, X, Download, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -13,8 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import Papa from "papaparse";
 
 // Parse a "YYYY-MM-DD" date input as a local-midnight Date.
@@ -130,6 +131,9 @@ export default function TournamentCreateStandalone() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [newTeamName, setNewTeamName] = useState("");
   const [csvPlayerData, setCsvPlayerData] = useState<any[] | null>(null);
+  // Optional logo path (e.g. "/tournament-logos/<uuid>") chosen during creation;
+  // applied via PATCH after the tournament row is created.
+  const [logoPath, setLogoPath] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -303,6 +307,16 @@ export default function TournamentCreateStandalone() {
         }
       } else {
         console.log('⏭️ Skipping player import');
+      }
+
+      // Step 4: Attach uploaded logo (standalone only; logo is independent of bracket)
+      if (logoPath && !isSeasonPlayoff) {
+        try {
+          await apiRequest('PATCH', `/api/tournaments/${tournament.id}/logo`, { logoUrl: logoPath });
+        } catch (logoError) {
+          console.error('Failed to attach tournament logo:', logoError);
+          // Don't throw — tournament + bracket are already created
+        }
       }
 
       return tournament;
@@ -821,6 +835,70 @@ export default function TournamentCreateStandalone() {
                         </FormItem>
                       )}
                     />
+                  )}
+
+                  {watchedType === "standalone" && (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Tournament Logo (optional)
+                      </FormLabel>
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30 overflow-hidden shrink-0">
+                          {logoPath ? (
+                            <img
+                              src={getImageUrl(logoPath) || undefined}
+                              alt="Tournament logo preview"
+                              className="w-full h-full object-cover"
+                              data-testid="img-logo-preview"
+                            />
+                          ) : (
+                            <Trophy className="h-8 w-8 text-muted-foreground/40" />
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <ObjectUploader
+                            maxNumberOfFiles={1}
+                            maxFileSize={10 * 1024 * 1024}
+                            buttonClassName="bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 text-sm"
+                            onGetUploadParameters={async () => {
+                              const res = await apiRequest('POST', '/api/tournament-logos/upload');
+                              const json = await res.json();
+                              return { method: 'PUT', url: json.uploadURL, path: json.path };
+                            }}
+                            onComplete={(result) => {
+                              const uploaded = result.successful?.[0];
+                              if (uploaded?.path) {
+                                setLogoPath(uploaded.path);
+                                toast({
+                                  title: "Logo uploaded",
+                                  description: "It will be applied when you finish creating the tournament.",
+                                });
+                              }
+                            }}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {logoPath ? "Replace Logo" : "Upload Logo"}
+                          </ObjectUploader>
+                          {logoPath && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setLogoPath(null)}
+                              className="text-destructive hover:text-destructive h-8 px-2 text-xs"
+                              data-testid="button-remove-logo"
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <FormDescription>
+                        Square images work best. Max 10MB. Used on the tournament header and countdown screen.
+                      </FormDescription>
+                    </FormItem>
                   )}
 
                   {watchedType === "season_playoff" && (

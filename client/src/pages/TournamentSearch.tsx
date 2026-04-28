@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Search, Trophy, Calendar, Users, MapPin, CheckCircle, Clock, XCircle } from "lucide-react";
+import { getImageUrl } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ type Tournament = {
   leagueId: string;
   leagueName?: string;
   sport?: string;
+  logoUrl?: string | null;
 };
 
 type TournamentParticipant = {
@@ -194,8 +196,17 @@ export default function TournamentSearch() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Trophy className="h-6 w-6 text-primary" />
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                    {tournament.logoUrl ? (
+                      <img
+                        src={getImageUrl(tournament.logoUrl) || undefined}
+                        alt={`${tournament.name} logo`}
+                        className="w-full h-full object-cover"
+                        data-testid="img-tournament-logo"
+                      />
+                    ) : (
+                      <Trophy className="h-6 w-6 text-primary" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <CardTitle className="text-2xl mb-1" data-testid="text-tournament-name">

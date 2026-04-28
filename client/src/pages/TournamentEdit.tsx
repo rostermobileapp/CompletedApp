@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, Trophy, Users, Info, AlertTriangle, Calendar } from "lucide-react";
+import { ArrowLeft, ArrowRight, Trophy, Users, Info, AlertTriangle, Calendar, Upload, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -26,7 +26,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import type { Tournament, Team, TournamentTeam } from "@shared/schema";
 
 type FormatRecommendation = {
@@ -626,6 +627,10 @@ export default function TournamentEdit() {
                       )}
                     />
                   )}
+
+                  {watchedType === "standalone" && tournamentId && (
+                    <TournamentLogoField tournamentId={tournamentId} currentLogoUrl={tournament?.logoUrl ?? null} />
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -952,6 +957,106 @@ const dateOnlyFormSchema = z.object({
 
 type DateOnlyFormData = z.infer<typeof dateOnlyFormSchema>;
 
+// Reusable logo upload + preview + remove control. PATCHes the tournament
+// immediately on upload/remove (the tournament row already exists when this
+// is rendered). Use only on standalone tournaments; the backend rejects others.
+function TournamentLogoField({
+  tournamentId,
+  currentLogoUrl,
+}: {
+  tournamentId: string;
+  currentLogoUrl: string | null;
+}) {
+  const { toast } = useToast();
+
+  const setLogo = useMutation({
+    mutationFn: async (logoUrl: string | null) => {
+      const res = await apiRequest('PATCH', `/api/tournaments/${tournamentId}/logo`, { logoUrl });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments/all'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Logo update failed",
+        description: error?.message || "Could not update logo",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <FormItem>
+      <FormLabel className="flex items-center gap-2">
+        <ImageIcon className="h-4 w-4" />
+        Tournament Logo (optional)
+      </FormLabel>
+      <div className="flex items-center gap-4">
+        <div className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30 overflow-hidden shrink-0">
+          {currentLogoUrl ? (
+            <img
+              src={getImageUrl(currentLogoUrl) || undefined}
+              alt="Tournament logo"
+              className="w-full h-full object-cover"
+              data-testid="img-current-logo"
+            />
+          ) : (
+            <Trophy className="h-8 w-8 text-muted-foreground/40" />
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <ObjectUploader
+            maxNumberOfFiles={1}
+            maxFileSize={10 * 1024 * 1024}
+            buttonClassName="bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 text-sm"
+            onGetUploadParameters={async () => {
+              const res = await apiRequest('POST', '/api/tournament-logos/upload');
+              const json = await res.json();
+              return { method: 'PUT', url: json.uploadURL, path: json.path };
+            }}
+            onComplete={(result) => {
+              const uploaded = result.successful?.[0];
+              if (uploaded?.path) {
+                setLogo.mutate(uploaded.path, {
+                  onSuccess: () => {
+                    toast({
+                      title: "Logo updated",
+                      description: "The new logo is now visible on this tournament.",
+                    });
+                  },
+                });
+              }
+            }}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {currentLogoUrl ? "Replace Logo" : "Upload Logo"}
+          </ObjectUploader>
+          {currentLogoUrl && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setLogo.mutate(null)}
+              disabled={setLogo.isPending}
+              className="text-destructive hover:text-destructive h-8 px-2 text-xs"
+              data-testid="button-remove-logo"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Remove
+            </Button>
+          )}
+        </div>
+      </div>
+      <FormDescription>
+        Square images work best. Max 10MB. Used on the tournament header and countdown screen.
+      </FormDescription>
+    </FormItem>
+  );
+}
+
 function DateOnlyEditor({
   tournament,
   onCancel,
@@ -1046,6 +1151,16 @@ function DateOnlyEditor({
             Other settings are locked to preserve bracket integrity.
           </AlertDescription>
         </Alert>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tournament Logo</CardTitle>
+            <CardDescription>Upload, replace, or remove the logo shown on this tournament.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TournamentLogoField tournamentId={tournament.id} currentLogoUrl={tournament.logoUrl ?? null} />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Trophy, ArrowRight, Plus } from 'lucide-react';
+import { getImageUrl } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +19,7 @@ type Tournament = {
   leagueId: string | null;
   leagueName: string | null;
   teamCount: number;
+  logoUrl?: string | null;
 };
 
 export default function TournamentsLanding() {
@@ -91,8 +93,17 @@ export default function TournamentsLanding() {
               >
                 <CardHeader>
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Trophy className="h-6 w-6 text-primary" />
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                      {tournament.logoUrl ? (
+                        <img
+                          src={getImageUrl(tournament.logoUrl) || undefined}
+                          alt={`${tournament.name} logo`}
+                          className="w-full h-full object-cover"
+                          data-testid={`img-tournament-logo-${tournament.id}`}
+                        />
+                      ) : (
+                        <Trophy className="h-6 w-6 text-primary" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">

@@ -1445,7 +1445,16 @@ export default function TournamentDetail() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-tournament-name">
-                  <Trophy className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+                  {tournament.logoUrl ? (
+                    <img
+                      src={getImageUrl(tournament.logoUrl) || undefined}
+                      alt={`${tournament.name} logo`}
+                      className="h-7 w-7 md:h-9 md:w-9 rounded object-cover"
+                      data-testid="img-tournament-logo"
+                    />
+                  ) : (
+                    <Trophy className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+                  )}
                   {tournament.name}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2">

@@ -162,6 +162,87 @@ export class SupabaseStorageService {
     };
   }
 
+  // Tournament Logos
+  async getTournamentLogoUploadURL(): Promise<{ uploadURL: string; path: string }> {
+    const objectId = randomUUID();
+    const filePath = `tournament-logos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .createSignedUploadUrl(filePath);
+
+    if (error) {
+      console.error("Error creating signed upload URL:", error);
+      throw new Error("Failed to create upload URL");
+    }
+
+    return {
+      uploadURL: data.signedUrl,
+      path: `/tournament-logos/${objectId}`,
+    };
+  }
+
+  normalizeTournamentLogoPath(rawPath: string): string {
+    if (rawPath.startsWith("/tournament-logos/")) {
+      return rawPath;
+    }
+
+    if (rawPath.includes("supabase.co/storage")) {
+      try {
+        const url = new URL(rawPath);
+        const pathMatch = url.pathname.match(/\/tournament-logos\/([^?]+)/);
+        if (pathMatch) {
+          return `/tournament-logos/${pathMatch[1]}`;
+        }
+      } catch (e) {
+        console.error("Error parsing tournament logo URL:", e);
+      }
+    }
+
+    return rawPath;
+  }
+
+  async getTournamentLogoFile(tournamentLogoPath: string): Promise<{ data: Blob; contentType: string }> {
+    if (!tournamentLogoPath.startsWith("/tournament-logos/")) {
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    const objectId = tournamentLogoPath.slice("/tournament-logos/".length);
+    const filePath = `tournament-logos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .download(filePath);
+
+    if (error || !data) {
+      console.error("Error downloading tournament logo:", error);
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    return {
+      data,
+      contentType: data.type || "application/octet-stream",
+    };
+  }
+
+  async deleteTournamentLogo(tournamentLogoPath: string): Promise<void> {
+    if (!tournamentLogoPath.startsWith("/tournament-logos/")) {
+      throw new Error("Invalid tournament logo path");
+    }
+
+    const objectId = tournamentLogoPath.slice("/tournament-logos/".length);
+    const filePath = `tournament-logos/${objectId}`;
+
+    const { error } = await this.supabase.storage
+      .from("private")
+      .remove([filePath]);
+
+    if (error) {
+      console.error("Error deleting tournament logo:", error);
+      throw new Error("Failed to delete tournament logo");
+    }
+  }
+
   // Message Attachments
   async getMessageAttachmentUploadURL(): Promise<{ uploadURL: string; path: string }> {
     const objectId = randomUUID();

@@ -564,6 +564,8 @@ export const tournaments = pgTable("tournaments", {
   // League visibility fields
   isVisibleToLeague: boolean("is_visible_to_league").default(false).notNull(),
   visibleToLeagueAt: timestamp("visible_to_league_at"),
+  // Optional creator-uploaded logo (relative path, e.g. /tournament-logos/<uuid>)
+  logoUrl: varchar("logo_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

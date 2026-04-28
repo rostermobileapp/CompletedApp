@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute, useLocation } from "wouter";
 import { useState } from "react";
 import { Plus, Trophy, Calendar, Users, ChevronRight } from "lucide-react";
+import { getImageUrl } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -130,9 +131,23 @@ export default function Tournaments() {
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg line-clamp-2" data-testid={`text-tournament-name-${tournament.id}`}>
-                        {tournament.name}
-                      </CardTitle>
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                          {tournament.logoUrl ? (
+                            <img
+                              src={getImageUrl(tournament.logoUrl) || undefined}
+                              alt={`${tournament.name} logo`}
+                              className="w-full h-full object-cover"
+                              data-testid={`img-tournament-logo-${tournament.id}`}
+                            />
+                          ) : (
+                            <Trophy className="h-6 w-6 text-primary" />
+                          )}
+                        </div>
+                        <CardTitle className="text-lg line-clamp-2" data-testid={`text-tournament-name-${tournament.id}`}>
+                          {tournament.name}
+                        </CardTitle>
+                      </div>
                       {getStatusBadge(tournament.status)}
                     </div>
                     <CardDescription className="flex items-center gap-2">

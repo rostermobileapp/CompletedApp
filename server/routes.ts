@@ -2917,6 +2917,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tournament logo upload URL (presigned PUT)
+  app.post("/api/tournament-logos/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getTournamentLogoUploadURL();
+      res.json({ uploadURL, path });
+    } catch (error) {
+      console.error("Error getting tournament logo upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Update (or remove) the logo on a standalone tournament. Only the tournament
+  // creator or a commissioner of its parent league may change it. Pass
+  // `logoUrl: null` (or omit it) to remove an existing logo.
+  app.patch("/api/tournaments/:id/logo", isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tournamentId = req.params.id;
+      const { logoUrl } = req.body as { logoUrl?: string | null };
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      if (tournament.type !== 'standalone') {
+        return res.status(400).json({ message: "Only standalone tournaments support custom logos" });
+      }
+
+      // Authorization: creator OR a commissioner/admin of the league (when set)
+      let allowed = tournament.createdBy === userId;
+      if (!allowed && tournament.leagueId) {
+        const userWithPermissions = req.userWithPermissions;
+        if (userWithPermissions) {
+          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
+          allowed = await canManageLeagueSpecific(userWithPermissions, tournament.leagueId);
+        }
+      }
+      if (!allowed) {
+        return res.status(403).json({
+          message: "Only the tournament creator or a league commissioner can change this logo",
+        });
+      }
+
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+
+      let normalized: string | null = null;
+      if (typeof logoUrl === 'string' && logoUrl.trim() !== '') {
+        normalized = supabaseStorageService.normalizeTournamentLogoPath(logoUrl.trim());
+        if (!normalized.startsWith('/tournament-logos/')) {
+          return res.status(400).json({ message: "Invalid logo path" });
+        }
+      }
+
+      // Update DB first; only delete the prior file after the row has been
+      // successfully updated. Ordering it the other way risks leaving the row
+      // pointing at a file we already deleted (broken logo) if the UPDATE fails.
+      const [updated] = await db
+        .update(tournaments)
+        .set({ logoUrl: normalized, updatedAt: new Date() })
+        .where(eq(tournaments.id, tournamentId))
+        .returning();
+
+      const previous = tournament.logoUrl;
+      if (previous && previous !== normalized && previous.startsWith('/tournament-logos/')) {
+        try {
+          await supabaseStorageService.deleteTournamentLogo(previous);
+        } catch (cleanupErr) {
+          console.warn("Failed to delete previous tournament logo:", cleanupErr);
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating tournament logo:", error);
+      res.status(500).json({ message: "Failed to update tournament logo" });
+    }
+  });
+
+  // Serve tournament logos
+  app.get("/tournament-logos/:objectPath(*)", async (req, res) => {
+    try {
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const fullPath = `/tournament-logos/${req.params.objectPath}`;
+      const objectFile = await supabaseStorageService.getTournamentLogoFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
+    } catch (error) {
+      console.error("Error serving tournament logo:", error);
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // Announcement media upload URL
   app.post("/api/announcement-media/upload", isAuthenticated, async (req: any, res) => {
     try {
@@ -16764,6 +16867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: tournaments.type,
           leagueId: tournaments.leagueId,
           leagueName: leagues.name,
+          logoUrl: tournaments.logoUrl,
           teamCount: sql<number>`(SELECT COUNT(*) FROM ${tournamentTeams} WHERE ${tournamentTeams.tournamentId} = ${tournaments.id})`
         })
         .from(tournaments)
@@ -17908,6 +18012,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (!rawBody.accessEndDate) {
           rawBody.accessEndDate = null;
         }
+      }
+
+      // Custom logos are only supported on standalone tournaments. Strip any
+      // logoUrl supplied for season_playoff (mirrors PATCH /logo enforcement).
+      if (rawBody.type !== 'standalone') {
+        delete rawBody.logoUrl;
       }
 
       const validatedData = insertTournamentSchema.parse({
