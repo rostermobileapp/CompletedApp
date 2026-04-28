@@ -17602,27 +17602,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // Check if user can manage this tournament
+      // Tournament existence + management + payment status are already
+      // enforced by upstream middleware (requireTournamentManagement +
+      // requireTournamentPaid).
       const tournament = await db.query.tournaments.findFirst({
         where: eq(tournaments.id, tournamentId)
       });
 
       if (!tournament) {
         return res.status(404).json({ message: 'Tournament not found' });
-      }
-
-      // Check permissions - must be creator for standalone or commissioner for league tournaments
-      if (tournament.type === 'standalone' && tournament.createdBy !== userId) {
-        return res.status(403).json({ message: 'Only the tournament creator can import players' });
-      }
-      
-      if (tournament.type === 'league' && tournament.leagueId) {
-        const league = await db.query.leagues.findFirst({
-          where: eq(leagues.id, tournament.leagueId)
-        });
-        if (!league || league.commissionerId !== userId) {
-          return res.status(403).json({ message: 'Only league commissioners can import players' });
-        }
       }
 
       // Read and parse the CSV file
