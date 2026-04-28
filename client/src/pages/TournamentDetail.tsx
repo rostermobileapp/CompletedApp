@@ -1834,6 +1834,21 @@ export default function TournamentDetail() {
 
           {/* Bracket Tab - Full width */}
           <TabsContent value="bracket" className="space-y-4 px-2">
+            {isUnpaid && canManageTournament() && (
+              <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-bracket">
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  Pay your tournament invoice to unlock bracket editing. You can still preview the auto-generated bracket below.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => paymentMutation.mutate()}
+                  disabled={paymentMutation.isPending}
+                  data-testid="button-pay-bracket"
+                >
+                  {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                </Button>
+              </div>
+            )}
             {(matches && matches.length > 0) || 
              tournament.format === 'custom_bracket' ||
              (tournament.status === 'draft' && ['single_elimination', 'double_elimination', 'three_game_guarantee', 'round_robin_split'].includes(tournament.format)) ? (
@@ -2516,7 +2531,22 @@ export default function TournamentDetail() {
           </TabsContent>
 
           {/* Schedule Tab */}
-          <TabsContent value="schedule" className="max-w-7xl mx-auto px-4 md:px-8">
+          <TabsContent value="schedule" className="max-w-7xl mx-auto px-4 md:px-8 space-y-4">
+            {isUnpaid && canManageTournament() && (
+              <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-schedule">
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  Pay your tournament invoice to set match times, locations, and scores.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => paymentMutation.mutate()}
+                  disabled={paymentMutation.isPending}
+                  data-testid="button-pay-schedule"
+                >
+                  {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                </Button>
+              </div>
+            )}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
