@@ -19,6 +19,7 @@ import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { useIsDesktopWeb } from "@/hooks/useIsDesktopWeb";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import { WebSocketProvider } from "@/context/WebSocketContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Pricing from "@/pages/Pricing";
@@ -312,16 +313,20 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <WebSocketProvider>
-            <Toaster />
-            <Router />
-          </WebSocketProvider>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <WebSocketProvider>
+              <Toaster />
+              <ErrorBoundary>
+                <Router />
+              </ErrorBoundary>
+            </WebSocketProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
