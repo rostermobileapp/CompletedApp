@@ -18005,9 +18005,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // If the commissioner asked to shift scheduled matches by the same delta
-      // as the first-game-date change, compute the day-delta now and apply it
-      // to every scheduled tournament match. We then recalculate accessEndDate
-      // from the new last-match time.
+      // as the first-game-date change, pre-compute the per-match new times and
+      // the recomputed accessEndDate. We then write the match shifts and the
+      // tournament metadata atomically inside a single DB transaction below.
+      let shiftedMatches: { id: string; scheduledTime: Date }[] = [];
       let derivedAccessEndDate: Date | undefined;
       if (
         shiftScheduledMatches === true &&
@@ -18028,7 +18029,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dayDelta = Math.round((newStartDayUtc - oldStartDayUtc) / (24 * 60 * 60 * 1000));
 
         if (dayDelta !== 0) {
-          // Load all matches with a scheduled time and shift them by dayDelta.
           const existingMatches = await db
             .select()
             .from(tournamentMatches)
@@ -18036,7 +18036,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Shift while preserving the local wall-clock time of day (e.g. a 7pm
           // match remains 7pm after the shift, even across DST boundaries).
-          const shiftedMatches: { id: string; scheduledTime: Date }[] = [];
           for (const m of existingMatches) {
             if (m.scheduledTime) {
               const old = new Date(m.scheduledTime);
@@ -18053,19 +18052,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          for (const sm of shiftedMatches) {
-            await db
-              .update(tournamentMatches)
-              .set({ scheduledTime: sm.scheduledTime })
-              .where(eq(tournamentMatches.id, sm.id));
-          }
-
-          // Recompute the access window's end from the new last-match time.
-          const reloaded = await db
-            .select()
-            .from(tournamentMatches)
-            .where(eq(tournamentMatches.tournamentId, id));
-          const { accessEndDate: recomputedEnd } = calculateAccessWindows(reloaded);
+          // Build the post-shift match list to recompute accessEndDate without
+          // requiring a re-read after the writes.
+          const projectedMatches = existingMatches.map(m => {
+            const updated = shiftedMatches.find(sm => sm.id === m.id);
+            return updated ? { ...m, scheduledTime: updated.scheduledTime } : m;
+          });
+          const { accessEndDate: recomputedEnd } = calculateAccessWindows(projectedMatches);
           derivedAccessEndDate = recomputedEnd ?? undefined;
         }
       }
@@ -18075,24 +18068,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? { ...(tournament.settings as any || {}), ...settings }
         : tournament.settings;
 
-      // Update tournament metadata
-      const [updated] = await db
-        .update(tournaments)
-        .set({
-          name: name || tournament.name,
-          type: type || tournament.type,
-          seasonId: type === 'season_playoff' ? seasonId : null,
-          format: format || tournament.format,
-          description: description !== undefined ? description : tournament.description,
-          numTeams: teams ? teams.length : tournament.numTeams,
-          settings: mergedSettings,
-          ...(derivedStartDate !== undefined ? { startDate: derivedStartDate } : {}),
-          ...(derivedAccessStartDate !== undefined ? { accessStartDate: derivedAccessStartDate } : {}),
-          ...(derivedAccessEndDate !== undefined ? { accessEndDate: derivedAccessEndDate } : {}),
-          updatedAt: new Date()
-        })
-        .where(eq(tournaments.id, id))
-        .returning();
+      // Update match shifts and tournament metadata atomically so a mid-write
+      // failure can't leave matches shifted but the tournament's access window
+      // un-updated (or vice versa).
+      const updated = await db.transaction(async (tx) => {
+        for (const sm of shiftedMatches) {
+          await tx
+            .update(tournamentMatches)
+            .set({ scheduledTime: sm.scheduledTime })
+            .where(eq(tournamentMatches.id, sm.id));
+        }
+
+        const [row] = await tx
+          .update(tournaments)
+          .set({
+            name: name || tournament.name,
+            type: type || tournament.type,
+            seasonId: type === 'season_playoff' ? seasonId : null,
+            format: format || tournament.format,
+            description: description !== undefined ? description : tournament.description,
+            numTeams: teams ? teams.length : tournament.numTeams,
+            settings: mergedSettings,
+            ...(derivedStartDate !== undefined ? { startDate: derivedStartDate } : {}),
+            ...(derivedAccessStartDate !== undefined ? { accessStartDate: derivedAccessStartDate } : {}),
+            ...(derivedAccessEndDate !== undefined ? { accessEndDate: derivedAccessEndDate } : {}),
+            updatedAt: new Date()
+          })
+          .where(eq(tournaments.id, id))
+          .returning();
+
+        return row;
+      });
 
       // If custom bracket with matchups is being saved, create/update tournament_matches
       if (settings?.customBracket?.matchups && Array.isArray(settings.customBracket.matchups)) {
