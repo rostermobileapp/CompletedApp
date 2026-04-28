@@ -40,6 +40,7 @@ import MediaGalleryPage from '@/pages/MediaGallery';
 import StatsPage from '@/pages/Stats';
 import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
+import { TournamentCountdown } from '@/components/TournamentCountdown';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1904,6 +1905,17 @@ function DashboardMobile() {
     }
     return null;
   }, [selectedType, selectedId, userPaidTournaments]);
+
+  // Fetch the selected tournament's full record so we can detect a 'pending'
+  // access state (approved participant whose access window has not yet opened)
+  // and render a countdown until the window flips open. The query polls every
+  // 30s so the dashboard auto-swaps from countdown to bracket once the window
+  // opens, without requiring a manual refresh.
+  const { data: selectedTournamentDetail } = useQuery<any>({
+    queryKey: ['/api/tournaments', selectedId],
+    enabled: selectedType === 'tournament' && !!selectedId,
+    refetchInterval: 30_000,
+  });
   
   // Get the tournament team ID for the selected tournament
   const selectedTournamentTeamId = React.useMemo(() => {
@@ -2561,25 +2573,37 @@ function DashboardMobile() {
       {/* Tournament-focused section when tournament is selected */}
       {selectedType === 'tournament' && selectedTournament && !primaryTeam && (
         <div className="px-6 mb-6">
-          <div className="rounded-xl border border-border p-4 bg-[#e2e2e2] dark:bg-[#212121]">
-            <div className="flex items-center gap-3 mb-3">
-              <Trophy className="w-8 h-8 text-orange-500" />
-              <div>
-                <h3 className="font-semibold">{selectedTournament.name}</h3>
-                <p className="text-xs text-muted-foreground">Tournament ID: {selectedTournament.uniqueTournamentId}</p>
+          {selectedTournamentDetail?.accessState === 'pending' ? (
+            // Approved participant whose access window has not yet opened —
+            // show a live countdown that polls every 30s and auto-swaps to
+            // the View Bracket card the moment the window flips open.
+            <TournamentCountdown
+              tournamentId={selectedTournament.id}
+              name={selectedTournamentDetail.name || selectedTournament.name}
+              logoUrl={selectedTournamentDetail.logoUrl}
+              accessStartDate={selectedTournamentDetail.accessStartDate}
+            />
+          ) : (
+            <div className="rounded-xl border border-border p-4 bg-[#e2e2e2] dark:bg-[#212121]">
+              <div className="flex items-center gap-3 mb-3">
+                <Trophy className="w-8 h-8 text-orange-500" />
+                <div>
+                  <h3 className="font-semibold">{selectedTournament.name}</h3>
+                  <p className="text-xs text-muted-foreground">Tournament ID: {selectedTournament.uniqueTournamentId}</p>
+                </div>
               </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                View the tournament bracket, manage teams, and track scores on the tournament detail page.
+              </p>
+              <Button
+                onClick={() => navigate(`/tournaments/${selectedTournament.id}`)}
+                className="w-full bg-orange-500 hover:bg-orange-600"
+                data-testid="button-view-bracket"
+              >
+                View Bracket
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              View the tournament bracket, manage teams, and track scores on the tournament detail page.
-            </p>
-            <Button 
-              onClick={() => navigate(`/tournaments/${selectedTournament.id}`)}
-              className="w-full bg-orange-500 hover:bg-orange-600"
-              data-testid="button-view-bracket"
-            >
-              View Bracket
-            </Button>
-          </div>
+          )}
         </div>
       )}
       {/* Quick Stats */}

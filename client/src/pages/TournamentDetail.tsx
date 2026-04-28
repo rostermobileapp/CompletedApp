@@ -921,6 +921,12 @@ export default function TournamentDetail() {
     return false;
   };
 
+  // Tournament is unpaid AND the current user is in the management role —
+  // surface inline gating banners next to disabled controls so creators know
+  // exactly what payment unlocks (player imports, team assignments, bracket
+  // edits, schedule/score). Mirrors the server's `requireTournamentPaid` 402.
+  const isUnpaid = !!tournament && tournament.paymentStatus !== 'paid' && canManageTournament();
+
   const { data: pendingParticipants } = useQuery<any[]>({
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
     enabled: !!tournamentId && !!tournament && !!currentUser && !isPendingAccess && canManageTournament()
@@ -1852,6 +1858,8 @@ export default function TournamentDetail() {
                       </CardHeader>
                       <CardContent>
                         <Button 
+                          disabled={isUnpaid}
+                          title={isUnpaid ? 'Pay your tournament invoice to seed playoffs' : undefined}
                           onClick={async () => {
                             try {
                               await apiRequest('POST', `/api/tournaments/${tournamentId}/seed-playoffs`);
@@ -1898,6 +1906,8 @@ export default function TournamentDetail() {
                               data-testid="button-unlock-bracket"
                               variant="outline"
                               className="gap-2"
+                              disabled={isUnpaid}
+                              title={isUnpaid ? 'Pay your tournament invoice to edit the bracket' : undefined}
                             >
                               <Edit className="h-4 w-4" />
                               Edit Bracket
@@ -1934,7 +1944,7 @@ export default function TournamentDetail() {
                         tournamentId={tournamentId}
                         tournament={tournament}
                         embeddable={true}
-                        locked={tournament.status !== 'draft' || (isBracketLocked && !isEditingBracket)}
+                        locked={tournament.status !== 'draft' || (isBracketLocked && !isEditingBracket) || isUnpaid}
                         initialMatches={matches || []}
                         onSave={async (bracketData) => {
                           try {
@@ -2019,7 +2029,7 @@ export default function TournamentDetail() {
                               tournamentId={tournamentId}
                               tournament={tournament}
                               embeddable={true}
-                              locked={false}
+                              locked={isUnpaid}
                               initialMatches={bracketMatches}
                               onSave={async (bracketData) => {
                                 try {
@@ -2092,6 +2102,8 @@ export default function TournamentDetail() {
                                   variant="outline"
                                   size="sm"
                                   className="gap-2"
+                                  disabled={isUnpaid}
+                                  title={isUnpaid ? 'Pay your tournament invoice to edit the bracket' : undefined}
                                   data-testid="button-edit-bracket"
                                 >
                                   <Edit className="h-4 w-4" />
@@ -2232,12 +2244,28 @@ export default function TournamentDetail() {
                     </a>
                   </div>
 
+                  {isUnpaid && (
+                    <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-csv">
+                      <p className="text-sm text-amber-700 dark:text-amber-400">
+                        Pay your tournament invoice to start importing teams &amp; players.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => paymentMutation.mutate()}
+                        disabled={paymentMutation.isPending}
+                        data-testid="button-pay-csv"
+                      >
+                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     <input
                       type="file"
                       accept=".csv"
                       onChange={handleCsvUpload}
-                      disabled={isUploadingCsv}
+                      disabled={isUploadingCsv || isUnpaid}
                       className="hidden"
                       id="csv-upload"
                       data-testid="input-csv-upload"
@@ -2246,7 +2274,7 @@ export default function TournamentDetail() {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={isUploadingCsv}
+                        disabled={isUploadingCsv || isUnpaid}
                         onClick={() => document.getElementById('csv-upload')?.click()}
                         data-testid="button-csv-upload"
                         className="w-full"
@@ -2278,6 +2306,21 @@ export default function TournamentDetail() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {isUnpaid && (
+                    <div className="mb-4 p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-approve">
+                      <p className="text-sm text-amber-700 dark:text-amber-400">
+                        You can approve players now, but assigning them to teams unlocks after you pay your tournament invoice.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => paymentMutation.mutate()}
+                        disabled={paymentMutation.isPending}
+                        data-testid="button-pay-approve"
+                      >
+                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                      </Button>
+                    </div>
+                  )}
                   <div className="space-y-3">
                     {pendingParticipants.map((participant: any) => (
                       <Card key={participant.id} data-testid={`card-participant-${participant.id}`}>
@@ -2535,6 +2578,8 @@ export default function TournamentDetail() {
                                         size="sm" 
                                         variant="default" 
                                         onClick={() => setScoringMatchId(match.id)}
+                                        disabled={isUnpaid}
+                                        title={isUnpaid ? 'Pay your tournament invoice to score matches' : undefined}
                                         data-testid={`button-score-match-${match.matchNumber}`}
                                       >
                                         <Edit3 className="h-3.5 w-3.5 mr-1" />
@@ -2545,6 +2590,8 @@ export default function TournamentDetail() {
                                       size="sm" 
                                       variant="outline" 
                                       onClick={() => setEditingMatch(match)}
+                                      disabled={isUnpaid}
+                                      title={isUnpaid ? 'Pay your tournament invoice to edit match schedule' : undefined}
                                       data-testid={`button-edit-match-${match.matchNumber}`}
                                     >
                                       Edit

@@ -677,6 +677,295 @@ export const requireTournamentAccessOpen: RequestHandler = async (req, res, next
 };
 
 /**
+ * Programmatic check: can this user manage this specific tournament?
+ *
+ * Returns true when the user is the tournament creator (the standalone-tournament
+ * owner case), a league commissioner / co-commissioner of the league that owns
+ * the tournament, a global commissioner / admin / primary commissioner.
+ *
+ * This intentionally bypasses the broader `requireLeagueManagement` check, which
+ * 403s standalone-tournament creators that are mere league members in some
+ * other league. We want creators to always be able to manage their own
+ * tournaments regardless of unrelated memberships.
+ */
+export async function canManageTournamentSpecific(
+  user: UserWithPermissions,
+  tournamentId: string,
+): Promise<boolean> {
+  if (!user || !tournamentId) return false;
+
+  // Global passes
+  if (user.isPrimaryCommissioner) return true;
+  if (user.role === 'commissioner') return true;
+  if (hasSpecialPermission(user, 'admin')) return true;
+
+  try {
+    const { db } = await import("./db");
+    const { tournaments } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [tournament] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId));
+
+    if (!tournament) return false;
+
+    // Tournament creator always has full management rights on their own tournament
+    if (tournament.createdBy === user.id) return true;
+
+    // League-tournament commissioners have full rights
+    if (tournament.leagueId) {
+      return await canManageLeagueSpecific(user, tournament.leagueId);
+    }
+  } catch (err) {
+    console.error('Error in canManageTournamentSpecific:', err);
+  }
+
+  return false;
+}
+
+/**
+ * Middleware: require management rights on the tournament identified by
+ * `req.params.tournamentId` or `req.params.id`. Allows tournament creators
+ * (standalone) AND league commissioners (playoffs) — unlike the league-only
+ * `requireLeagueManagement` which incorrectly blocks standalone creators that
+ * happen to be plain members of some other league.
+ */
+export const requireTournamentManagement: RequestHandler = async (req, res, next) => {
+  const user = req.userWithPermissions;
+  if (!user) {
+    return res.status(401).json({ message: "User permissions not loaded" });
+  }
+
+  const tournamentId = req.params.tournamentId || req.params.id;
+  if (!tournamentId) {
+    return res.status(400).json({ message: "Tournament ID required" });
+  }
+
+  if (await canManageTournamentSpecific(user, tournamentId)) {
+    return next();
+  }
+
+  return res.status(403).json({
+    message: "Access denied. Only the tournament creator or a league commissioner can perform this action.",
+  });
+};
+
+/**
+ * Variant of `requireTournamentManagement` for endpoints keyed by a participant
+ * id (e.g. PATCH /api/tournament-participants/:id/approve). Loads the
+ * participant to find its tournament, then checks management rights.
+ */
+export const requireTournamentManagementByParticipant: RequestHandler = async (req, res, next) => {
+  const user = req.userWithPermissions;
+  if (!user) {
+    return res.status(401).json({ message: "User permissions not loaded" });
+  }
+
+  const participantId = req.params.id;
+  if (!participantId) {
+    return res.status(400).json({ message: "Participant ID required" });
+  }
+
+  try {
+    const { db } = await import("./db");
+    const { tournamentParticipants } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [participant] = await db
+      .select({ tournamentId: tournamentParticipants.tournamentId })
+      .from(tournamentParticipants)
+      .where(eq(tournamentParticipants.id, participantId));
+
+    if (!participant) {
+      return res.status(404).json({ message: "Participant not found" });
+    }
+
+    if (await canManageTournamentSpecific(user, participant.tournamentId)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      message: "Access denied. Only the tournament creator or a league commissioner can perform this action.",
+    });
+  } catch (err) {
+    console.error('Error in requireTournamentManagementByParticipant:', err);
+    return res.status(500).json({ message: "Failed to verify tournament management access" });
+  }
+};
+
+/**
+ * Variant of `requireTournamentManagement` for endpoints keyed by a tournament
+ * match id at the top level (e.g. PATCH /api/tournament-matches/:id). Loads
+ * the match to find its tournament, then checks management rights.
+ */
+export const requireTournamentManagementByMatch: RequestHandler = async (req, res, next) => {
+  const user = req.userWithPermissions;
+  if (!user) {
+    return res.status(401).json({ message: "User permissions not loaded" });
+  }
+
+  const matchId = req.params.id;
+  if (!matchId) {
+    return res.status(400).json({ message: "Match ID required" });
+  }
+
+  try {
+    const { db } = await import("./db");
+    const { tournamentMatches } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [match] = await db
+      .select({ tournamentId: tournamentMatches.tournamentId })
+      .from(tournamentMatches)
+      .where(eq(tournamentMatches.id, matchId));
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    (req as any)._tournamentIdForGate = match.tournamentId;
+
+    if (await canManageTournamentSpecific(user, match.tournamentId)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      message: "Access denied. Only the tournament creator or a league commissioner can perform this action.",
+    });
+  } catch (err) {
+    console.error('Error in requireTournamentManagementByMatch:', err);
+    return res.status(500).json({ message: "Failed to verify tournament management access" });
+  }
+};
+
+/**
+ * Pre-payment gate: tournament creators must pay their tournament invoice
+ * before they can do bracket-level management actions (assign players to
+ * teams, edit brackets, set per-match schedule, score matches). Returns 402
+ * with `{ paymentRequired: true }` so the client can render a "Pay invoice
+ * to unlock" affordance instead of a generic error toast.
+ *
+ * Options:
+ *  - getTournamentId: derive the tournament id from the request (defaults to
+ *    `req.params.tournamentId || req.params.id || req._tournamentIdForGate`)
+ *  - when: optional predicate that, when supplied and returns false, makes the
+ *    middleware a no-op (e.g. participant approval is only gated when the
+ *    request also assigns the participant to a team).
+ */
+export interface RequireTournamentPaidOptions {
+  getTournamentId?: (req: any) => Promise<string | null | undefined> | string | null | undefined;
+  when?: (req: any) => boolean;
+}
+
+const PAYMENT_REQUIRED_BODY = {
+  paymentRequired: true,
+  message: "Pay your tournament invoice to unlock this.",
+} as const;
+
+export function requireTournamentPaid(options: RequireTournamentPaidOptions = {}): RequestHandler {
+  return async (req, res, next) => {
+    try {
+      if (options.when && !options.when(req)) {
+        return next();
+      }
+
+      let tournamentId: string | null | undefined = undefined;
+      if (options.getTournamentId) {
+        tournamentId = await options.getTournamentId(req);
+      } else {
+        tournamentId =
+          req.params.tournamentId ||
+          req.params.id ||
+          (req as any)._tournamentIdForGate;
+      }
+
+      if (!tournamentId) {
+        // Without a tournament context we cannot evaluate the gate; let the
+        // route handler decide what to do (it will typically 400/404).
+        return next();
+      }
+
+      const { db } = await import("./db");
+      const { tournaments } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const [tournament] = await db
+        .select({ paymentStatus: tournaments.paymentStatus })
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        // Let the route surface its own 404
+        return next();
+      }
+
+      if (tournament.paymentStatus !== 'paid') {
+        return res.status(402).json(PAYMENT_REQUIRED_BODY);
+      }
+
+      return next();
+    } catch (err) {
+      console.error('Error in requireTournamentPaid:', err);
+      // Fail-closed on payment gates is safer than fail-open here.
+      return res.status(500).json({ message: "Failed to verify tournament payment status" });
+    }
+  };
+}
+
+/**
+ * Convenience: payment gate for participant-keyed endpoints. Looks up the
+ * participant's tournament before checking payment status.
+ */
+export function requireTournamentPaidByParticipant(
+  options: Omit<RequireTournamentPaidOptions, 'getTournamentId'> = {},
+): RequestHandler {
+  return requireTournamentPaid({
+    ...options,
+    getTournamentId: async (req: any) => {
+      const participantId = req.params.id;
+      if (!participantId) return null;
+      const { db } = await import("./db");
+      const { tournamentParticipants } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [p] = await db
+        .select({ tournamentId: tournamentParticipants.tournamentId })
+        .from(tournamentParticipants)
+        .where(eq(tournamentParticipants.id, participantId));
+      return p?.tournamentId ?? null;
+    },
+  });
+}
+
+/**
+ * Convenience: payment gate for match-keyed endpoints
+ * (e.g. PATCH /api/tournament-matches/:id). Looks up the match's tournament.
+ * Re-uses `_tournamentIdForGate` populated by `requireTournamentManagementByMatch`
+ * so we don't double-query when chained.
+ */
+export function requireTournamentPaidByMatch(
+  options: Omit<RequireTournamentPaidOptions, 'getTournamentId'> = {},
+): RequestHandler {
+  return requireTournamentPaid({
+    ...options,
+    getTournamentId: async (req: any) => {
+      if (req._tournamentIdForGate) return req._tournamentIdForGate as string;
+      const matchId = req.params.id;
+      if (!matchId) return null;
+      const { db } = await import("./db");
+      const { tournamentMatches } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [m] = await db
+        .select({ tournamentId: tournamentMatches.tournamentId })
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.id, matchId));
+      return m?.tournamentId ?? null;
+    },
+  });
+}
+
+/**
  * Middleware to require valid tournament participant access
  */
 export const requireTournamentParticipant: RequestHandler = async (req, res, next) => {

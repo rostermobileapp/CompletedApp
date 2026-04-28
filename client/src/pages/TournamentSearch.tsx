@@ -127,7 +127,11 @@ export default function TournamentSearch() {
   const windowOpen = !tournament?.accessStartDate || new Date(tournament.accessStartDate) <= now;
   const windowNotClosed = !tournament?.accessEndDate || new Date(tournament.accessEndDate) >= now;
   const windowActive = windowOpen && windowNotClosed;
-  const canJoin = tournament && !participant && tournament.paymentStatus === 'paid' && windowActive;
+  // Allow players to send a join request as soon as a tournament is paid for and
+  // its access window has not yet closed/expired. Pre-window joins are allowed
+  // (and queued for commissioner approval) so players don't have to wait until
+  // the window flips open. Closed/expired windows are still blocked.
+  const canJoin = tournament && !participant && tournament.paymentStatus === 'paid' && windowNotClosed;
   const canView = participant?.status === 'approved';
 
   return (
@@ -296,13 +300,21 @@ export default function TournamentSearch() {
                 </div>
               )}
 
-              {/* Access Window Warning */}
-              {tournament.paymentStatus === 'paid' && !participant && !windowActive && (
+              {/* Pre-window note (informational — joining is still allowed) */}
+              {tournament.paymentStatus === 'paid' && !participant && !windowOpen && windowNotClosed && (
+                <div className="p-4 rounded-lg border border-blue-500/50 bg-blue-500/10">
+                  <p className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-prewindow-note">
+                    Tournament access opens on {format(new Date(tournament.accessStartDate!), 'MMM d, yyyy h:mm a')}.
+                    You can still request to join now — your request will be queued for the commissioner.
+                  </p>
+                </div>
+              )}
+
+              {/* Access Window Closed Warning (blocks joining) */}
+              {tournament.paymentStatus === 'paid' && !participant && !windowNotClosed && (
                 <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10">
-                  <p className="text-sm text-amber-600 dark:text-amber-400">
-                    {!windowOpen
-                      ? `Joins open on ${format(new Date(tournament.accessStartDate!), 'MMM d, yyyy h:mm a')}.`
-                      : `Registration for this tournament has closed.`}
+                  <p className="text-sm text-amber-600 dark:text-amber-400" data-testid="text-window-closed">
+                    Registration for this tournament has closed.
                   </p>
                 </div>
               )}

@@ -15,7 +15,14 @@ import {
   requireSpecialPermission,
   roleHierarchy,
   getTournamentAccessState,
-  requireTournamentAccessOpen
+  requireTournamentAccessOpen,
+  canManageTournamentSpecific,
+  requireTournamentManagement,
+  requireTournamentManagementByParticipant,
+  requireTournamentManagementByMatch,
+  requireTournamentPaid,
+  requireTournamentPaidByParticipant,
+  requireTournamentPaidByMatch
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
@@ -1688,7 +1695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create checkout session for tournament payment
-  app.post('/api/tournaments/:tournamentId/create-checkout', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.post('/api/tournaments/:tournamentId/create-checkout', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { tournamentId } = req.params;
@@ -17571,7 +17578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tournament CSV import endpoint
-  app.post('/api/tournaments/:tournamentId/import-csv', isAuthenticated, (req: any, res, next) => {
+  app.post('/api/tournaments/:tournamentId/import-csv', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), (req: any, res, next) => {
     upload.single('playerFile')(req, res, (err) => {
       if (err) {
         console.error('Multer error:', err);
@@ -17959,7 +17966,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update tournament match (schedule, location, scores)
-  app.patch('/api/tournaments/:tournamentId/matches/:matchId', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Setting per-match schedule / score requires the tournament invoice to be paid.
+  app.patch('/api/tournaments/:tournamentId/matches/:matchId', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const { tournamentId, matchId } = req.params;
       
@@ -18125,7 +18133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add a new match to an existing tournament (for bracket adjustments)
-  app.post('/api/tournaments/:tournamentId/matches', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Add a match to a tournament (bracket editing) — paid only.
+  app.post('/api/tournaments/:tournamentId/matches', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const { tournamentId } = req.params;
       const { round, team1Id, team2Id, notes, advancesToMatchId } = req.body;
@@ -18181,7 +18190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update tournament match scores with player stats
-  app.post('/api/tournaments/:tournamentId/matches/:matchId/score', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Submit match score — paid only.
+  app.post('/api/tournaments/:tournamentId/matches/:matchId/score', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const { tournamentId, matchId } = req.params;
       const { team1Score, team2Score, playerStats } = req.body;
@@ -18652,7 +18662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update tournament (draft only, except date-only edits for standalone tournaments)
-  app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { name, type, seasonId, format, description, teams, settings, firstGameDate, shiftScheduledMatches } = req.body;
@@ -18665,6 +18675,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!tournament) {
         return res.status(404).json({ message: "Tournament not found" });
+      }
+
+      // Pre-payment gate: bracket-level edits and schedule shifts are blocked
+      // until the tournament invoice is paid. Format/numTeams/name/description
+      // edits remain allowed pre-payment so creators can finish setup before
+      // checkout. Bracket-level edits include `settings` (where the custom
+      // bracket lives), `teams` (assignments to bracket positions), and any
+      // schedule shift on existing matches.
+      if (tournament.paymentStatus !== 'paid') {
+        const editsBracket = settings !== undefined;
+        const assignsTeams = Array.isArray(teams) && teams.length > 0;
+        const shiftsSchedule = shiftScheduledMatches === true;
+        if (editsBracket || assignsTeams || shiftsSchedule) {
+          return res.status(402).json({
+            paymentRequired: true,
+            message: "Pay your tournament invoice to unlock this.",
+          });
+        }
       }
 
       // Once a tournament leaves draft, the only allowed edit is a "date-only"
@@ -19675,7 +19703,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update tournament match (scheduling, scores, etc.)
-  app.patch('/api/tournament-matches/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Edit an individual tournament match (bracket-level). Paid only.
+  app.patch('/api/tournament-matches/:id', isAuthenticated, loadUserPermissions, requireTournamentManagementByMatch, requireTournamentPaidByMatch(), async (req: any, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -19722,7 +19751,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Start tournament (lock bracket)
-  app.post('/api/tournaments/:id/start', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Start a tournament — paid only (it locks bracket and produces matches).
+  app.post('/api/tournaments/:id/start', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const { id } = req.params;
 
@@ -19750,7 +19780,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seed playoffs for Round Robin + Playoffs tournament
-  app.post('/api/tournaments/:id/seed-playoffs', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Seed playoffs (round_robin_split) — paid only.
+  app.post('/api/tournaments/:id/seed-playoffs', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const { id } = req.params;
 
@@ -19910,7 +19941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate matches from custom bracket
-  app.post('/api/tournaments/:id/generate-custom-matches', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+  app.post('/api/tournaments/:id/generate-custom-matches', isAuthenticated, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const { id } = req.params;
       const { bracketData } = req.body;
@@ -20088,7 +20119,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete tournament (draft only)
-  app.delete('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Delete tournament — creators can always delete their own tournament regardless of payment.
+  app.delete('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
     try {
       const { id } = req.params;
 
@@ -20153,7 +20185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       next();
     });
-  }, async (req: any, res) => {
+  }, loadUserPermissions, requireTournamentManagement, requireTournamentPaid(), async (req: any, res) => {
     try {
       const tournamentId = req.params.tournamentId;
       const userId = req.user.claims.sub;
@@ -20163,7 +20195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No file uploaded' });
       }
 
-      // Get tournament and verify access
+      // Get tournament (access already validated by requireTournamentManagement + requireTournamentPaid)
       const [tournament] = await db
         .select()
         .from(tournaments)
@@ -20171,26 +20203,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!tournament) {
         return res.status(404).json({ message: 'Tournament not found' });
-      }
-
-      // Check permissions
-      let hasPermission = false;
-      
-      if (tournament.type === 'standalone') {
-        // For standalone tournaments, check if user is the creator
-        hasPermission = tournament.createdBy === userId;
-      } else if (tournament.type === 'season_playoff' && tournament.leagueId) {
-        // For league tournaments, check league management permissions
-        // Load user data first
-        const user = await storage.getUser(userId);
-        if (user) {
-          const { canManageLeagueSpecific } = await import('./permissionMiddleware');
-          hasPermission = await canManageLeagueSpecific(user, tournament.leagueId);
-        }
-      }
-
-      if (!hasPermission) {
-        return res.status(403).json({ message: 'Only tournament creators or league commissioners can import players' });
       }
 
       // Read and parse the CSV file
@@ -21004,7 +21016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get pending participants for a tournament (commissioner only)
-  app.get('/api/tournaments/:tournamentId/participants/pending', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.get('/api/tournaments/:tournamentId/participants/pending', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
     try {
       const { tournamentId } = req.params;
 
@@ -21036,7 +21048,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Approve participant (commissioner only)
-  app.patch('/api/tournament-participants/:id/approve', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  // Approving a participant without assigning to a team is allowed pre-payment.
+  // Assigning to a team (tournamentTeamId in body) requires the tournament invoice to be paid.
+  app.patch('/api/tournament-participants/:id/approve', isAuthenticated, loadUserPermissions, requireTournamentManagementByParticipant, requireTournamentPaidByParticipant({ when: (req) => !!req.body?.tournamentTeamId }), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { id: participantId } = req.params;
@@ -21065,7 +21079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reject participant (commissioner only)
-  app.patch('/api/tournament-participants/:id/reject', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.patch('/api/tournament-participants/:id/reject', isAuthenticated, loadUserPermissions, requireTournamentManagementByParticipant, async (req: any, res) => {
     try {
       const { id: participantId } = req.params;
 
@@ -21089,7 +21103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Merge tournament participant (commissioner only)
-  app.post('/api/tournaments/:tournamentId/merge-participant', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
+  app.post('/api/tournaments/:tournamentId/merge-participant', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
     try {
       const { tournamentId } = req.params;
       const { fromUserId, toUserId } = req.body;
