@@ -9,6 +9,8 @@ import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import { DesktopMenuColumn } from '@/components/DesktopMenuColumn';
+import * as SelectPrimitive from '@radix-ui/react-select';
+import { Check } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -70,6 +72,35 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     queryKey: ['/api/user/league-memberships'],
     enabled: !!isAuthenticated,
   });
+
+  const { data: userLeagues } = useQuery<any[]>({
+    queryKey: ['/api/user/leagues'],
+    enabled: !!isAuthenticated,
+  });
+
+  const getTeamDisplayName = (team: any) => {
+    if (!team) return 'Select Team';
+    if (!team.leagueId) return team.name;
+    const league = Array.isArray(userLeagues)
+      ? userLeagues.find((l: any) => l.id === team.leagueId)
+      : null;
+    if (league) {
+      const seasonLabel = team.seasonName ?? league.seasonName;
+      if (seasonLabel) {
+        return `${league.name}: ${seasonLabel} - ${team.name}`;
+      }
+      return `${league.name}: ${team.name}`;
+    }
+    return team.name;
+  };
+
+  const getLeagueDisplayName = (league: any) => {
+    if (!league) return 'Select League';
+    if (league.seasonName) {
+      return `${league.name}: ${league.seasonName}`;
+    }
+    return league.name;
+  };
 
   const { data: unpaidPaymentData } = useQuery({
     queryKey: ['/api/payment-requests/unpaid-count'],
@@ -357,17 +388,27 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                       (team.leagueId &&
                         notificationCounts?.leagues?.[team.leagueId]) ||
                       0;
+                    const label = getTeamDisplayName(team);
                     return (
-                      <SelectItem
+                      <SelectPrimitive.Item
                         key={`team-${team.id}`}
                         value={`team:${team.id}`}
+                        textValue={label}
+                        className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                         data-testid={`desktop-team-option-${team.id}`}
                       >
+                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                          <SelectPrimitive.ItemIndicator>
+                            <Check className="h-4 w-4" />
+                          </SelectPrimitive.ItemIndicator>
+                        </span>
                         <div className="flex items-center justify-between gap-2 w-full">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-primary" />
-                            <span>{team.name}</span>
-                          </div>
+                          <SelectPrimitive.ItemText>
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Users className="w-4 h-4 text-primary flex-shrink-0" />
+                              <span className="truncate">{label}</span>
+                            </span>
+                          </SelectPrimitive.ItemText>
                           {count > 0 && (
                             <span
                               className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
@@ -377,7 +418,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                             </span>
                           )}
                         </div>
-                      </SelectItem>
+                      </SelectPrimitive.Item>
                     );
                   })}
                   {leagueOptions.map((membership: any) => {
@@ -385,17 +426,28 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                       (membership.leagueId &&
                         notificationCounts?.leagues?.[membership.leagueId]) ||
                       0;
+                    const label =
+                      getLeagueDisplayName(membership.league) ?? 'League';
                     return (
-                      <SelectItem
+                      <SelectPrimitive.Item
                         key={`league-${membership.leagueId}`}
                         value={`league:${membership.leagueId}`}
+                        textValue={label}
+                        className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                         data-testid={`desktop-league-option-${membership.leagueId}`}
                       >
+                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                          <SelectPrimitive.ItemIndicator>
+                            <Check className="h-4 w-4" />
+                          </SelectPrimitive.ItemIndicator>
+                        </span>
                         <div className="flex items-center justify-between gap-2 w-full">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-4 h-4 text-primary" />
-                            <span>{membership.league?.name ?? 'League'}</span>
-                          </div>
+                          <SelectPrimitive.ItemText>
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Trophy className="w-4 h-4 text-primary flex-shrink-0" />
+                              <span className="truncate">{label}</span>
+                            </span>
+                          </SelectPrimitive.ItemText>
                           {count > 0 && (
                             <span
                               className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
@@ -405,7 +457,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                             </span>
                           )}
                         </div>
-                      </SelectItem>
+                      </SelectPrimitive.Item>
                     );
                   })}
                 </SelectContent>
