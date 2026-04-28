@@ -856,7 +856,7 @@ export default function TournamentDetail() {
   const tabFromUrl = urlParams.get('tab');
   const isReadOnlyMode = urlParams.get('readonly') === 'true';
   // In read-only mode, only allow bracket and schedule tabs
-  const allowedTabs = isReadOnlyMode ? ['bracket', 'schedule'] : ['bracket', 'teams', 'schedule'];
+  const allowedTabs = isReadOnlyMode ? ['bracket', 'schedule'] : ['bracket', 'teams', 'players', 'schedule'];
   const defaultTab = (tabFromUrl && allowedTabs.includes(tabFromUrl)) ? tabFromUrl : 'bracket';
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
@@ -1967,7 +1967,7 @@ export default function TournamentDetail() {
       <div className="w-full">
         <Tabs defaultValue={defaultTab} className="space-y-6">
           <div className="max-w-7xl mx-auto px-4 md:px-8 pt-[2px]">
-            <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : 'grid-cols-4'} md:w-auto`}>
+            <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : (canManageTournament() ? 'grid-cols-4' : 'grid-cols-3')} md:w-auto`}>
               <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
               {!isReadOnlyMode && (
                 <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
