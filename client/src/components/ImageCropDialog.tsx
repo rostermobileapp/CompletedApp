@@ -110,7 +110,7 @@ export function ImageCropDialog({
   const [loadError, setLoadError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const CONTAINER_HEIGHT = 360;
-  const [cropFrameSize, setCropFrameSize] = useState<number>(Math.floor(CONTAINER_HEIGHT * 0.75));
+  const [cropFrameSize, setCropFrameSize] = useState<number>(CONTAINER_HEIGHT);
 
   useEffect(() => {
     if (!open) return;
@@ -120,7 +120,7 @@ export function ImageCropDialog({
       const rect = el.getBoundingClientRect();
       const min = Math.min(rect.width, rect.height);
       if (min > 0) {
-        setCropFrameSize(Math.floor(min * 0.75));
+        setCropFrameSize(Math.floor(min));
       }
     };
     measure();
