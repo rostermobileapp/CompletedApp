@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +108,28 @@ export function ImageCropDialog({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setContainerSize({ width: rect.width, height: rect.height });
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
+  const cropFrameSize = containerSize
+    ? Math.floor(Math.min(containerSize.width, containerSize.height) * 0.75)
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -189,14 +211,20 @@ export function ImageCropDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="relative w-full bg-black rounded-md overflow-hidden" style={{ height: 320 }}>
-            {imageSrc ? (
+          <div
+            ref={containerRef}
+            className="relative w-full bg-black rounded-md overflow-hidden"
+            style={{ height: 360 }}
+          >
+            {imageSrc && cropFrameSize ? (
               <Cropper
                 image={imageSrc}
                 crop={crop}
                 zoom={zoom}
                 aspect={1}
                 cropShape={cropShape}
+                cropSize={{ width: cropFrameSize, height: cropFrameSize }}
+                objectFit="cover"
                 showGrid={false}
                 minZoom={1}
                 maxZoom={4}
