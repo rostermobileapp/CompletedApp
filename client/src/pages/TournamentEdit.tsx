@@ -13,6 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -108,6 +118,11 @@ export default function TournamentEdit() {
   const { toast } = useToast();
   const tournamentId = params?.tournamentId;
   const [step, setStep] = useState(1);
+  const [shiftDialog, setShiftDialog] = useState<{
+    open: boolean;
+    dayDelta: number;
+    pendingData: FormData | null;
+  }>({ open: false, dayDelta: 0, pendingData: null });
 
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournaments', tournamentId],
@@ -118,6 +133,12 @@ export default function TournamentEdit() {
     queryKey: ['/api/tournaments', tournamentId, 'teams'],
     enabled: !!tournamentId
   });
+
+  const matchesQuery = useQuery<{ id: string; scheduledTime: string | null }[]>({
+    queryKey: ['/api/tournaments', tournamentId, 'matches'],
+    enabled: !!tournamentId
+  });
+  const matches = matchesQuery.data;
 
   const { data: teams, isLoading: teamsLoading } = useQuery<Team[]>({
     queryKey: ['/api/leagues', tournament?.leagueId, 'teams'],
@@ -188,7 +209,8 @@ export default function TournamentEdit() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async (payload: { data: FormData; shiftScheduledMatches?: boolean }) => {
+      const { data, shiftScheduledMatches } = payload;
       if (!teams) {
         throw new Error("Teams data not loaded");
       }
@@ -218,6 +240,7 @@ export default function TournamentEdit() {
         format: data.format,
         description: data.description || null,
         firstGameDate: data.type === "standalone" ? (data.firstGameDate || null) : undefined,
+        shiftScheduledMatches: shiftScheduledMatches ?? false,
         teams: teamData,
         settings: Object.keys(settings).length > 0 ? settings : undefined
       });
@@ -245,7 +268,50 @@ export default function TournamentEdit() {
   });
 
   const onSubmit = (data: FormData) => {
-    updateMutation.mutate(data);
+    // For standalone tournaments, if the user changed the first game date and
+    // there are scheduled matches, ask whether to shift the whole schedule.
+    if (data.type === "standalone" && data.firstGameDate && tournament?.startDate) {
+      // Make sure we know whether matches exist before deciding whether to
+      // prompt — otherwise a slow query could silently skip the dialog.
+      if (matchesQuery.isLoading || matchesQuery.isError || matches === undefined) {
+        toast({
+          title: matchesQuery.isError ? "Could not load match schedule" : "Loading match schedule…",
+          description: matchesQuery.isError
+            ? "Please refresh the page and try again."
+            : "Please try again in a moment.",
+          variant: matchesQuery.isError ? "destructive" : "default",
+        });
+        return;
+      }
+
+      const newDate = parseLocalDate(data.firstGameDate);
+      const oldDate = (() => {
+        const d = new Date(tournament.startDate);
+        if (Number.isNaN(d.getTime())) return null;
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      })();
+
+      if (newDate && oldDate) {
+        const dayDelta = Math.round(
+          (newDate.getTime() - oldDate.getTime()) / (24 * 60 * 60 * 1000)
+        );
+        const scheduledCount = matches.filter(m => m.scheduledTime).length;
+        if (dayDelta !== 0 && scheduledCount > 0) {
+          setShiftDialog({ open: true, dayDelta, pendingData: data });
+          return;
+        }
+      }
+    }
+
+    updateMutation.mutate({ data, shiftScheduledMatches: false });
+  };
+
+  const handleShiftDecision = (shouldShift: boolean) => {
+    const pending = shiftDialog.pendingData;
+    setShiftDialog({ open: false, dayDelta: 0, pendingData: null });
+    if (pending) {
+      updateMutation.mutate({ data: pending, shiftScheduledMatches: shouldShift });
+    }
   };
 
   const nextStep = async () => {
@@ -814,6 +880,44 @@ export default function TournamentEdit() {
           </form>
         </Form>
       </div>
+
+      <AlertDialog
+        open={shiftDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setShiftDialog({ open: false, dayDelta: 0, pendingData: null });
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-shift-matches">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Shift the rest of the schedule too?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You moved the first game date by{" "}
+              <span className="font-semibold">
+                {Math.abs(shiftDialog.dayDelta)} day{Math.abs(shiftDialog.dayDelta) === 1 ? "" : "s"}{" "}
+                {shiftDialog.dayDelta > 0 ? "later" : "earlier"}
+              </span>
+              . Would you like to move every already-scheduled match by the same amount, keeping
+              the time of day the same? You can also save the date change without touching the
+              existing match schedule.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => handleShiftDecision(false)}
+              data-testid="button-keep-schedule"
+            >
+              Keep current match times
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleShiftDecision(true)}
+              data-testid="button-shift-schedule"
+            >
+              Shift all matches by {Math.abs(shiftDialog.dayDelta)} day
+              {Math.abs(shiftDialog.dayDelta) === 1 ? "" : "s"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

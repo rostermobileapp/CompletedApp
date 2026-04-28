@@ -17941,7 +17941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { name, type, seasonId, format, description, teams, settings, firstGameDate } = req.body;
+      const { name, type, seasonId, format, description, teams, settings, firstGameDate, shiftScheduledMatches } = req.body;
 
       // Check tournament exists and is draft
       const [tournament] = await db
@@ -18004,6 +18004,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         derivedAccessStartDate.setDate(derivedAccessStartDate.getDate() - 14);
       }
 
+      // If the commissioner asked to shift scheduled matches by the same delta
+      // as the first-game-date change, compute the day-delta now and apply it
+      // to every scheduled tournament match. We then recalculate accessEndDate
+      // from the new last-match time.
+      let derivedAccessEndDate: Date | undefined;
+      if (
+        shiftScheduledMatches === true &&
+        derivedStartDate !== undefined &&
+        tournament.startDate
+      ) {
+        const oldStart = new Date(tournament.startDate);
+        const oldStartDayUtc = Date.UTC(
+          oldStart.getFullYear(),
+          oldStart.getMonth(),
+          oldStart.getDate()
+        );
+        const newStartDayUtc = Date.UTC(
+          derivedStartDate.getFullYear(),
+          derivedStartDate.getMonth(),
+          derivedStartDate.getDate()
+        );
+        const dayDelta = Math.round((newStartDayUtc - oldStartDayUtc) / (24 * 60 * 60 * 1000));
+
+        if (dayDelta !== 0) {
+          // Load all matches with a scheduled time and shift them by dayDelta.
+          const existingMatches = await db
+            .select()
+            .from(tournamentMatches)
+            .where(eq(tournamentMatches.tournamentId, id));
+
+          // Shift while preserving the local wall-clock time of day (e.g. a 7pm
+          // match remains 7pm after the shift, even across DST boundaries).
+          const shiftedMatches: { id: string; scheduledTime: Date }[] = [];
+          for (const m of existingMatches) {
+            if (m.scheduledTime) {
+              const old = new Date(m.scheduledTime);
+              const newTime = new Date(
+                old.getFullYear(),
+                old.getMonth(),
+                old.getDate() + dayDelta,
+                old.getHours(),
+                old.getMinutes(),
+                old.getSeconds(),
+                old.getMilliseconds()
+              );
+              shiftedMatches.push({ id: m.id, scheduledTime: newTime });
+            }
+          }
+
+          for (const sm of shiftedMatches) {
+            await db
+              .update(tournamentMatches)
+              .set({ scheduledTime: sm.scheduledTime })
+              .where(eq(tournamentMatches.id, sm.id));
+          }
+
+          // Recompute the access window's end from the new last-match time.
+          const reloaded = await db
+            .select()
+            .from(tournamentMatches)
+            .where(eq(tournamentMatches.tournamentId, id));
+          const { accessEndDate: recomputedEnd } = calculateAccessWindows(reloaded);
+          derivedAccessEndDate = recomputedEnd ?? undefined;
+        }
+      }
+
       // Merge settings if provided
       const mergedSettings = settings 
         ? { ...(tournament.settings as any || {}), ...settings }
@@ -18022,6 +18088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           settings: mergedSettings,
           ...(derivedStartDate !== undefined ? { startDate: derivedStartDate } : {}),
           ...(derivedAccessStartDate !== undefined ? { accessStartDate: derivedAccessStartDate } : {}),
+          ...(derivedAccessEndDate !== undefined ? { accessEndDate: derivedAccessEndDate } : {}),
           updatedAt: new Date()
         })
         .where(eq(tournaments.id, id))
