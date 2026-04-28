@@ -561,6 +561,7 @@ export const tournaments = pgTable("tournaments", {
   accessClosingReminderSentAt: timestamp("access_closing_reminder_sent_at"), // when 24h-close push was sent
   stripePaymentIntentId: varchar("stripe_payment_intent_id"),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id"),
+  stripeProcessedSessionIds: text("stripe_processed_session_ids").array().default(sql`'{}'::text[]`).notNull(),
   // League visibility fields
   isVisibleToLeague: boolean("is_visible_to_league").default(false).notNull(),
   visibleToLeagueAt: timestamp("visible_to_league_at"),

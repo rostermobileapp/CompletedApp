@@ -174,9 +174,87 @@ type VisitorLocationsPayload = {
 };
 let visitorLocationsCache: { data: VisitorLocationsPayload; timestamp: number } | null = null;
 
+// Idempotently mark a tournament as paid based on a verified-paid Stripe Checkout Session.
+// Safe to call from both the Stripe webhook and the post-redirect confirmation endpoint.
+// Returns true if this call performed the update, false if it was a no-op (already paid).
+async function applyTournamentPaymentFromSession(
+  tournamentId: string,
+  session: Stripe.Checkout.Session,
+): Promise<boolean> {
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId));
+
+  if (!tournament) return false;
+  if (tournament.paymentStatus === 'paid') return false;
+
+  const teamCount = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(tournamentTeams)
+    .where(eq(tournamentTeams.tournamentId, tournamentId));
+  const paidTeamCount = teamCount[0]?.count || 0;
+
+  // Conditional update guards against race between webhook and confirm endpoint.
+  const result = await db
+    .update(tournaments)
+    .set({
+      paymentStatus: 'paid',
+      paidTeamCount,
+      stripePaymentIntentId: (session.payment_intent as string) || null,
+      stripeCheckoutSessionId: session.id,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(tournaments.id, tournamentId),
+      sql`${tournaments.paymentStatus} IS DISTINCT FROM 'paid'`,
+    ))
+    .returning({ id: tournaments.id });
+
+  return result.length > 0;
+}
+
+// Idempotently credit additional team purchase based on a verified-paid Stripe Checkout Session.
+// Uses stripeProcessedSessionIds to ensure a given session.id can only credit teams once,
+// regardless of whether the webhook or the confirm endpoint fires first (or both).
+async function applyAdditionalTeamPaymentFromSession(
+  tournamentId: string,
+  sessionId: string,
+  additionalTeamCount: number,
+): Promise<boolean> {
+  if (additionalTeamCount <= 0) return false;
+
+  // Atomic conditional update: only credits if sessionId is not already in the processed list.
+  const result = await db
+    .update(tournaments)
+    .set({
+      paidTeamCount: sql`${tournaments.paidTeamCount} + ${additionalTeamCount}`,
+      stripeProcessedSessionIds: sql`array_append(${tournaments.stripeProcessedSessionIds}, ${sessionId})`,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(tournaments.id, tournamentId),
+      sql`NOT (${sessionId} = ANY(${tournaments.stripeProcessedSessionIds}))`,
+    ))
+    .returning({ id: tournaments.id });
+
+  return result.length > 0;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Ensure tournaments.stripe_processed_session_ids exists in any deployed environment
+  // (idempotent — safe to run on every startup; required for additional-team payment idempotency)
+  try {
+    await db.execute(sql`
+      ALTER TABLE tournaments
+      ADD COLUMN IF NOT EXISTS stripe_processed_session_ids text[] NOT NULL DEFAULT '{}'::text[]
+    `);
+  } catch (err) {
+    console.error('[Init] Failed to ensure tournaments.stripe_processed_session_ids column:', err);
+  }
 
   // Initialize user registration count table
   try {
@@ -1688,8 +1766,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: 1,
           },
         ],
-        success_url: `${appUrl}/tournament/${tournamentId}?payment=success`,
-        cancel_url: `${appUrl}/tournament/${tournamentId}?payment=cancelled`,
+        success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
         client_reference_id: userId,
         metadata: {
           userId: userId,
@@ -1702,7 +1780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db
         .update(tournaments)
         .set({
-          stripeSessionId: session.id,
+          stripeCheckoutSessionId: session.id,
           updatedAt: new Date()
         })
         .where(eq(tournaments.id, tournamentId));
@@ -1811,8 +1889,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: additionalTeamCount,
           },
         ],
-        success_url: `${appUrl}/tournament/${tournamentId}?payment=success&additional=true`,
-        cancel_url: `${appUrl}/tournament/${tournamentId}?payment=cancelled`,
+        success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&additional=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
         client_reference_id: userId,
         metadata: {
           userId: userId,
@@ -1831,6 +1909,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[Stripe] Error creating additional team checkout session:', error);
       res.status(500).json({ message: 'Failed to create checkout session' });
+    }
+  });
+
+  // Confirm a tournament payment after Stripe redirect.
+  // Called by the success page so the user gets immediate confirmation rather than waiting on the webhook.
+  // Verifies the session directly with Stripe, then idempotently applies the same DB update the webhook does.
+  app.post('/api/tournaments/:tournamentId/confirm-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tournamentId } = req.params;
+      const { sessionId: bodySessionId, additional } = req.body || {};
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // For additional-team payments we MUST have the explicit session id from the redirect URL,
+      // because tournament.stripeCheckoutSessionId points at the original (initial) payment session
+      // and confusing the two would silently no-op the additional credit.
+      // For the initial tournament payment, we can safely fall back to the stored session id.
+      let sessionId: string | null;
+      if (additional) {
+        sessionId = bodySessionId || null;
+        if (!sessionId) {
+          return res.status(400).json({ message: 'Stripe session id required for additional team payment confirmation' });
+        }
+      } else {
+        sessionId = bodySessionId || tournament.stripeCheckoutSessionId || null;
+        if (!sessionId) {
+          return res.status(400).json({ message: 'No Stripe session id available to confirm' });
+        }
+      }
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      // Validate this session actually belongs to the requesting user and tournament.
+      if (session.metadata?.tournamentId !== tournamentId) {
+        return res.status(403).json({ message: 'Session does not match tournament' });
+      }
+      if (session.metadata?.userId && session.metadata.userId !== userId) {
+        return res.status(403).json({ message: 'Session does not belong to this user' });
+      }
+
+      if (session.payment_status !== 'paid') {
+        return res.status(409).json({
+          message: 'Payment not yet confirmed by Stripe',
+          paymentStatus: session.payment_status,
+        });
+      }
+
+      let updated = false;
+      if (session.metadata?.type === 'tournament_payment') {
+        updated = await applyTournamentPaymentFromSession(tournamentId, session);
+      } else if (session.metadata?.type === 'additional_team_payment') {
+        const additionalTeamCount = parseInt(session.metadata.additionalTeamCount || '0');
+        updated = await applyAdditionalTeamPaymentFromSession(tournamentId, session.id, additionalTeamCount);
+      } else {
+        return res.status(400).json({ message: 'Unsupported session type' });
+      }
+
+      const [refreshed] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      res.json({
+        confirmed: true,
+        applied: updated, // true if this call performed the update; false if already applied
+        tournament: refreshed,
+      });
+    } catch (error: any) {
+      console.error('[Stripe] Error confirming tournament payment:', error);
+      res.status(500).json({ message: error?.message || 'Failed to confirm payment' });
     }
   });
 
@@ -2335,24 +2491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const tournamentId = session.metadata.tournamentId;
             
             if (tournamentId && session.payment_status === 'paid') {
-              // Get current team count to record as paid team count
-              const teamCount = await db
-                .select({ count: sql<number>`count(*)::int` })
-                .from(tournamentTeams)
-                .where(eq(tournamentTeams.tournamentId, tournamentId));
-              const paidTeamCount = teamCount[0]?.count || 0;
-              
-              await db
-                .update(tournaments)
-                .set({
-                  paymentStatus: 'paid',
-                  paidTeamCount: paidTeamCount,
-                  stripePaymentIntentId: session.payment_intent as string || null,
-                  stripeCheckoutSessionId: session.id,
-                  updatedAt: new Date()
-                })
-                .where(eq(tournaments.id, tournamentId));
-              
+              await applyTournamentPaymentFromSession(tournamentId, session);
             }
           }
           // Handle additional team payment
@@ -2361,15 +2500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const additionalTeamCount = parseInt(session.metadata.additionalTeamCount || '0');
             
             if (tournamentId && session.payment_status === 'paid' && additionalTeamCount > 0) {
-              // Increment the paidTeamCount by the number of additional teams paid for
-              await db
-                .update(tournaments)
-                .set({
-                  paidTeamCount: sql`${tournaments.paidTeamCount} + ${additionalTeamCount}`,
-                  updatedAt: new Date()
-                })
-                .where(eq(tournaments.id, tournamentId));
-              
+              await applyAdditionalTeamPaymentFromSession(tournamentId, session.id, additionalTeamCount);
             }
           }
           // Handle subscription checkout

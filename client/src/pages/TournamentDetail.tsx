@@ -952,23 +952,46 @@ export default function TournamentDetail() {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get('payment');
     const isAdditional = params.get('additional');
-    
+    const sessionId = params.get('session_id');
+
     if (paymentStatus === 'success' && tournamentId) {
       // Show success message
       toast({
         title: "Payment successful!",
-        description: isAdditional 
-          ? "Your additional team payment has been processed. It may take a moment for the balance to update."
-          : "Your tournament payment has been processed successfully. It may take a moment for the payment status to update.",
+        description: isAdditional
+          ? "Your additional team payment has been processed. Updating your balance now…"
+          : "Your tournament payment has been processed. Confirming access now…",
       });
-      
-      // Refresh tournament data to show updated payment status
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
-      
-      // Clean up the URL by removing the payment parameter
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+
+      // Confirm with the backend immediately so payment status updates without waiting for the
+      // Stripe webhook (which may be delayed or unavailable in some environments).
+      // We only clean up the URL AFTER confirmation succeeds so a refresh can retry on transient
+      // failures (network blip, brief 5xx, etc.) without losing the session_id.
+      (async () => {
+        let confirmed = false;
+        try {
+          await apiRequest('POST', `/api/tournaments/${tournamentId}/confirm-payment`, {
+            sessionId: sessionId || undefined,
+            additional: isAdditional === 'true' || isAdditional === '1',
+          });
+          confirmed = true;
+        } catch (err: any) {
+          console.error('Failed to confirm tournament payment:', err);
+          toast({
+            title: "We're still confirming your payment",
+            description: "Stripe accepted the charge, but we couldn't sync it just yet. Please refresh in a moment, or contact support if it doesn't update.",
+            variant: "destructive",
+          });
+        } finally {
+          // Refresh tournament data either way so any webhook-driven update is reflected.
+          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+        }
+        if (confirmed) {
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }
+      })();
     } else if (paymentStatus === 'cancelled') {
       toast({
         title: "Payment cancelled",
