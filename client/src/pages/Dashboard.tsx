@@ -1916,7 +1916,19 @@ function DashboardMobile() {
     enabled: selectedType === 'tournament' && !!selectedId,
     refetchInterval: 30_000,
   });
-  
+
+  // True only when the home screen should be showing the pre-window
+  // tournament countdown. Mirrors the exact condition that renders
+  // <TournamentCountdown /> below so we can suppress every other
+  // home-screen section (Wall/Photos/Stats/Standings cards, schedule)
+  // until the access window opens. Re-evaluates on each refetch, so the
+  // moment accessState flips off 'pending' the hidden sections reappear.
+  const isTournamentCountdownActive =
+    selectedType === 'tournament' &&
+    !!selectedTournament &&
+    !primaryTeam &&
+    selectedTournamentDetail?.accessState === 'pending';
+
   // Get the tournament team ID for the selected tournament
   const selectedTournamentTeamId = React.useMemo(() => {
     return selectedTournament?.tournamentTeamId || null;
@@ -2489,7 +2501,9 @@ function DashboardMobile() {
           </div>
         </div>
       )}
-      {/* 4-Card Section */}
+      {/* 4-Card Section — hidden while a pre-window tournament countdown
+          is active so the player only sees the timer below. */}
+      {!isTournamentCountdownActive && (
       <div className="px-6 mb-6">
         <div className="grid grid-cols-4 gap-3">
           {/* Announcements Card */}
@@ -2570,6 +2584,7 @@ function DashboardMobile() {
           </div>
         </div>
       </div>
+      )}
       {/* Tournament-focused section when tournament is selected */}
       {selectedType === 'tournament' && selectedTournament && !primaryTeam && (
         <div className="px-6 mb-6">
@@ -2704,7 +2719,9 @@ function DashboardMobile() {
           onNavigate={navigate}
         />
       )}
-      {/* Upcoming Games */}
+      {/* Upcoming Games — hidden while a pre-window tournament countdown
+          is active so the player only sees the timer above. */}
+      {!isTournamentCountdownActive && (
       <div className="px-6 mt-[8px] mb-[8px]">
         <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
@@ -3302,6 +3319,7 @@ function DashboardMobile() {
           </div>
         )}
       </div>
+      )}
       {/* Find a League/Team Section - Bottom */}
       <div className="px-6 flex gap-2">
         <button
