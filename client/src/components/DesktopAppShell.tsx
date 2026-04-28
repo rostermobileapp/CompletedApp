@@ -122,21 +122,35 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       )
     : [];
 
-  // Show a slow red pulse on the selector when ANY league/team other than
-  // the one currently in view has actionable items (sub approvals, score
-  // verifications, etc). Mirrors the same logic on mobile.
+  // Show a slow red pulse on the selector when ANY other league/tournament
+  // (i.e. one not currently in view) has unreviewed alerts. "Unreviewed
+  // alerts" = announcements + actionable tasks + tournament notifications,
+  // mirroring the same total used in the mobile selector badge.
+  // We exclude only the currently-displayed league/tournament because the
+  // alerts panel is already showing everything for that scope.
   const otherTeamsHaveAlerts = useMemo(() => {
-    const tasks = notificationCounts?.leagueTasks || {};
+    const leagueCounts = notificationCounts?.leagues || {};
+    const tournamentCounts = notificationCounts?.tournaments || {};
+    const seenLeagues = new Set<string>();
     for (const team of teamOptions) {
-      if (selectedType === 'team' && selectedId === team.id) continue;
       const lid = team.leagueId;
-      if (lid && lid !== currentLeagueId && (tasks[lid] || 0) > 0) return true;
+      if (!lid || seenLeagues.has(lid)) continue;
+      seenLeagues.add(lid);
+      if (lid === currentLeagueId) continue;
+      if ((leagueCounts[lid] || 0) > 0) return true;
     }
     for (const m of leagueOptions) {
-      if (selectedType === 'league' && selectedId === m.leagueId) continue;
-      if (m.leagueId !== currentLeagueId && (tasks[m.leagueId] || 0) > 0) {
-        return true;
-      }
+      if (!m.leagueId || seenLeagues.has(m.leagueId)) continue;
+      seenLeagues.add(m.leagueId);
+      if (m.leagueId === currentLeagueId) continue;
+      if ((leagueCounts[m.leagueId] || 0) > 0) return true;
+    }
+    // Tournament-scoped alerts (e.g. unread announcements in tournaments
+    // the user has joined) should also light up the selector when those
+    // tournaments aren't currently selected.
+    for (const tournamentId of Object.keys(tournamentCounts)) {
+      if (selectedType === 'tournament' && selectedId === tournamentId) continue;
+      if ((tournamentCounts[tournamentId] || 0) > 0) return true;
     }
     return false;
   }, [

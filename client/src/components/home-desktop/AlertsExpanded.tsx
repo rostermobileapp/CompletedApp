@@ -220,9 +220,23 @@ export function AlertsExpanded({
       req?.originalPlayer?.firstName || req?.originalPlayer?.lastName
         ? `${req.originalPlayer.firstName ?? ''} ${req.originalPlayer.lastName ?? ''}`.trim()
         : 'a player';
+    // Identify the team that needs the sub. Prefer an explicit team object
+    // (requestingTeam, team) and fall back to deriving the name from the
+    // game's home/away team using requestingTeamId.
+    const requestingTeamId = req?.requestingTeamId || req?.teamId || null;
+    let requestingTeamName: string | null =
+      req?.requestingTeam?.name || req?.team?.name || null;
+    if (!requestingTeamName && requestingTeamId && req?.game) {
+      if (req.game.homeTeam?.id === requestingTeamId) {
+        requestingTeamName = req.game.homeTeam?.name || null;
+      } else if (req.game.awayTeam?.id === requestingTeamId) {
+        requestingTeamName = req.game.awayTeam?.name || null;
+      }
+    }
     const matchup = req?.game ? describeGameMatchup(req.game, userTeamIds) : null;
     const date = formatGameDate(req?.game?.scheduledAt);
     const metaParts: string[] = [];
+    if (requestingTeamName) metaParts.push(requestingTeamName);
     if (matchup) metaParts.push(matchup);
     if (date) metaParts.push(date);
     alerts.push({
@@ -290,8 +304,10 @@ export function AlertsExpanded({
         : null;
     const date = formatGameDate(m?.scheduledTime);
     const tournamentName = m?.tournamentName || null;
+    const round = m?.round || null;
     const metaParts: string[] = [];
     if (matchup) metaParts.push(matchup);
+    if (round) metaParts.push(round);
     if (date) metaParts.push(date);
     if (tournamentName && !matchup) metaParts.push(tournamentName);
     alerts.push({

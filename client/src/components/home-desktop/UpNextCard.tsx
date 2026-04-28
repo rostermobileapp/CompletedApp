@@ -145,12 +145,17 @@ export function UpNextCard({
     }
 
     if (!nextGame) {
+      const emptyMessage = selectedTeamId
+        ? 'No upcoming games for this team'
+        : isLeagueScope
+          ? 'No upcoming games for this league'
+          : 'No upcoming games scheduled.';
       return (
         <div
           className="mt-3 text-sm text-[#666] py-6 text-center"
           data-testid="up-next-empty"
         >
-          No upcoming games scheduled.
+          {emptyMessage}
         </div>
       );
     }

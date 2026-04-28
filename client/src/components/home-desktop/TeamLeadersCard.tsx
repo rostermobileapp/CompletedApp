@@ -192,36 +192,31 @@ export function TeamLeadersCard({
           ))}
         </div>
       ) : skaters.length === 0 ? (
-        <div className="mt-3 text-sm text-[#666] py-4 text-center">
-          No stats recorded yet.
+        <div
+          className="mt-3 text-sm text-[#666] py-4 text-center"
+          data-testid={
+            mode === 'playoffs' ? 'leaders-empty-playoffs' : 'leaders-empty-season'
+          }
+        >
+          {mode === 'playoffs' ? 'No playoff stats yet.' : 'No stats recorded yet.'}
         </div>
       ) : (
-        <>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <LeaderColumn
-              label="Points"
-              category="points"
-              leaders={topPoints}
-              accentBg={POINTS_BG}
-              accentColor={POINTS_BG_ACCENT}
-            />
-            <LeaderColumn
-              label="Goals"
-              category="goals"
-              leaders={topGoals}
-              accentBg={GOALS_BG}
-              accentColor={GOALS_BG_ACCENT}
-            />
-          </div>
-          {mode === 'playoffs' && (
-            <div
-              className="mt-3 text-[11px] text-[#888] text-center"
-              data-testid="leaders-playoffs-note"
-            >
-              Aggregated across all playoff/tournament games this season.
-            </div>
-          )}
-        </>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <LeaderColumn
+            label="Points"
+            category="points"
+            leaders={topPoints}
+            accentBg={POINTS_BG}
+            accentColor={POINTS_BG_ACCENT}
+          />
+          <LeaderColumn
+            label="Goals"
+            category="goals"
+            leaders={topGoals}
+            accentBg={GOALS_BG}
+            accentColor={GOALS_BG_ACCENT}
+          />
+        </div>
       )}
     </div>
   );
