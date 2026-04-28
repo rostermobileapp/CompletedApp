@@ -21040,6 +21040,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get approved participants for a tournament (commissioner only)
+  // Mirrors the pending-list shape so the client can reuse the same row component.
+  app.get('/api/tournaments/:tournamentId/participants/approved', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+
+      const participants = await db
+        .select({
+          participant: tournamentParticipants,
+          user: users
+        })
+        .from(tournamentParticipants)
+        .innerJoin(users, eq(tournamentParticipants.userId, users.id))
+        .where(and(
+          eq(tournamentParticipants.tournamentId, tournamentId),
+          eq(tournamentParticipants.status, 'approved')
+        ));
+
+      res.json(participants.map(p => ({
+        ...p.participant,
+        user: {
+          id: p.user.id,
+          firstName: p.user.firstName,
+          lastName: p.user.lastName,
+          email: p.user.email
+        }
+      })));
+    } catch (error) {
+      console.error("Error fetching approved participants:", error);
+      res.status(500).json({ message: "Failed to fetch approved participants" });
+    }
+  });
+
+  // Reassign an already-approved participant to a tournament team (or clear back to Free Agent).
+  // Assigning to a team requires the tournament invoice to be paid; clearing back to null is always allowed.
+  // The payment gate `when` predicate must agree with the handler validation: a non-null, non-empty
+  // string assignment triggers the gate; null clears the assignment without payment.
+  app.patch(
+    '/api/tournament-participants/:id',
+    isAuthenticated,
+    loadUserPermissions,
+    requireTournamentManagementByParticipant,
+    requireTournamentPaidByParticipant({
+      when: (req) => typeof req.body?.tournamentTeamId === 'string' && req.body.tournamentTeamId.length > 0,
+    }),
+    async (req: any, res) => {
+    try {
+      const { id: participantId } = req.params;
+
+      const bodySchema = z.object({
+        // Either a non-empty string (team id) or explicit null to clear.
+        tournamentTeamId: z.union([z.string().min(1), z.null()]),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
+
+      const nextTeamId = parsed.data.tournamentTeamId;
+
+      // Look up participant — only approved participants can be (re)assigned via this endpoint;
+      // pending participants must use the approve endpoint instead.
+      const [participant] = await db
+        .select({
+          id: tournamentParticipants.id,
+          tournamentId: tournamentParticipants.tournamentId,
+          status: tournamentParticipants.status,
+        })
+        .from(tournamentParticipants)
+        .where(eq(tournamentParticipants.id, participantId));
+
+      if (!participant) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+
+      if (participant.status !== 'approved') {
+        return res.status(400).json({
+          message: "Only approved participants can be assigned to a team. Approve the request first.",
+        });
+      }
+
+      // Verify target team belongs to the same tournament so managers cannot link
+      // a participant to a tournament team from a different tournament.
+      if (nextTeamId !== null) {
+        const [team] = await db
+          .select({ id: tournamentTeams.id, tournamentId: tournamentTeams.tournamentId })
+          .from(tournamentTeams)
+          .where(eq(tournamentTeams.id, nextTeamId));
+
+        if (!team || team.tournamentId !== participant.tournamentId) {
+          return res.status(400).json({ message: "Team does not belong to this tournament." });
+        }
+      }
+
+      const [updated] = await db
+        .update(tournamentParticipants)
+        .set({ tournamentTeamId: nextTeamId })
+        .where(eq(tournamentParticipants.id, participantId))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating participant:", error);
+      res.status(500).json({ message: "Failed to update participant" });
+    }
+  });
+
   // Approve participant (commissioner only)
   // Approving a participant without assigning to a team is allowed pre-payment.
   // Assigning to a team (tournamentTeamId in body) requires the tournament invoice to be paid.

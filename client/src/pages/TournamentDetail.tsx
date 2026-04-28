@@ -879,6 +879,9 @@ export default function TournamentDetail() {
   const [selectedParticipantToMerge, setSelectedParticipantToMerge] = useState<any | null>(null);
   const [targetUserId, setTargetUserId] = useState('');
   const [targetUserEmail, setTargetUserEmail] = useState('');
+  // Per-pending-row team selection so commissioners can assign during approval.
+  // Map: participantId -> tournamentTeamId (or '__free__' for unassigned).
+  const [pendingApprovalTeamId, setPendingApprovalTeamId] = useState<Record<string, string>>({});
 
   // Announcement state
   const [showCreateAnnouncementModal, setShowCreateAnnouncementModal] = useState(false);
@@ -936,6 +939,11 @@ export default function TournamentDetail() {
 
   const { data: pendingParticipants } = useQuery<any[]>({
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
+    enabled: !!tournamentId && !!tournament && !!currentUser && !isPendingAccess && canManageTournament()
+  });
+
+  const { data: approvedParticipants } = useQuery<any[]>({
+    queryKey: ['/api/tournaments', tournamentId, 'participants', 'approved'],
     enabled: !!tournamentId && !!tournament && !!currentUser && !isPendingAccess && canManageTournament()
   });
 
@@ -1285,6 +1293,21 @@ export default function TournamentDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'] });
+      // Newly approved participant must show up in the Players tab and (when assigned during approval)
+      // in the Teams tab roster drilldown — invalidate the same set the assignment mutation does.
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'approved'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const k = query.queryKey;
+          return Array.isArray(k)
+            && k[0] === '/api/tournaments'
+            && k[1] === tournamentId
+            && k[2] === 'teams'
+            && k.length === 5
+            && k[4] === 'players';
+        },
+      });
       toast({
         title: "Participant approved",
         description: "The participant has been approved successfully"
@@ -1298,6 +1321,41 @@ export default function TournamentDetail() {
       toast({
         title: "Error",
         description: error?.message || "Failed to approve participant",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const assignParticipantTeamMutation = useMutation({
+    mutationFn: async ({ participantId, tournamentTeamId }: { participantId: string; tournamentTeamId: string | null }) => {
+      return await apiRequest('PATCH', `/api/tournament-participants/${participantId}`, { tournamentTeamId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'approved'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      // Invalidate every per-team roster query so the Teams tab drilldown reflects the change.
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const k = query.queryKey;
+          return Array.isArray(k)
+            && k[0] === '/api/tournaments'
+            && k[1] === tournamentId
+            && k[2] === 'teams'
+            && k.length === 5
+            && k[4] === 'players';
+        },
+      });
+      toast({
+        title: "Player updated",
+        description: "Team assignment saved"
+      });
+    },
+    onError: (error: any) => {
+      if (isPaymentRequiredError(error)) return;
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update team assignment",
         variant: "destructive"
       });
     }
@@ -1909,10 +1967,13 @@ export default function TournamentDetail() {
       <div className="w-full">
         <Tabs defaultValue={defaultTab} className="space-y-6">
           <div className="max-w-7xl mx-auto px-4 md:px-8 pt-[2px]">
-            <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : 'grid-cols-3'} md:w-auto`}>
+            <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : 'grid-cols-4'} md:w-auto`}>
               <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
               {!isReadOnlyMode && (
                 <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
+              )}
+              {!isReadOnlyMode && canManageTournament() && (
+                <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
               )}
               <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
             </TabsList>
@@ -2421,11 +2482,13 @@ export default function TournamentDetail() {
                     </div>
                   )}
                   <div className="space-y-3">
-                    {pendingParticipants.map((participant: any) => (
+                    {pendingParticipants.map((participant: any) => {
+                      const teamSelection = pendingApprovalTeamId[participant.id] ?? '__free__';
+                      return (
                       <Card key={participant.id} data-testid={`card-participant-${participant.id}`}>
                         <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1">
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                            <div className="space-y-1 min-w-0">
                               <div className="font-medium" data-testid={`text-participant-name-${participant.id}`}>
                                 {participant.user.firstName} {participant.user.lastName}
                               </div>
@@ -2441,44 +2504,77 @@ export default function TournamentDetail() {
                                 Requested {format(new Date(participant.joinedAt), 'MMM d, yyyy')}
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedParticipantToMerge(participant);
-                                  setShowMergeModal(true);
-                                }}
-                                data-testid={`button-merge-${participant.id}`}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                              <div
+                                className="w-full sm:w-56"
+                                title={isUnpaid ? 'Pay your tournament invoice to assign players to teams.' : undefined}
                               >
-                                <User className="h-4 w-4 mr-1" />
-                                Merge
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => approveParticipantMutation.mutate({ participantId: participant.id })}
-                                disabled={approveParticipantMutation.isPending}
-                                data-testid={`button-approve-${participant.id}`}
-                              >
-                                <UserCheck className="h-4 w-4 mr-1" />
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => rejectParticipantMutation.mutate(participant.id)}
-                                disabled={rejectParticipantMutation.isPending}
-                                data-testid={`button-reject-${participant.id}`}
-                              >
-                                <UserX className="h-4 w-4 mr-1" />
-                                Reject
-                              </Button>
+                                <Select
+                                  value={teamSelection}
+                                  onValueChange={(value) =>
+                                    setPendingApprovalTeamId((prev) => ({ ...prev, [participant.id]: value }))
+                                  }
+                                  disabled={isUnpaid}
+                                >
+                                  <SelectTrigger data-testid={`select-pending-team-${participant.id}`}>
+                                    <SelectValue placeholder="Assign to team" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__free__">Unassigned (Free Agent)</SelectItem>
+                                    {(teams ?? []).map((t) => (
+                                      <SelectItem key={t.id} value={t.id}>
+                                        {t.teamName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedParticipantToMerge(participant);
+                                    setShowMergeModal(true);
+                                  }}
+                                  data-testid={`button-merge-${participant.id}`}
+                                >
+                                  <User className="h-4 w-4 mr-1" />
+                                  Merge
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    approveParticipantMutation.mutate({
+                                      participantId: participant.id,
+                                      tournamentTeamId:
+                                        teamSelection === '__free__' ? undefined : teamSelection,
+                                    })
+                                  }
+                                  disabled={approveParticipantMutation.isPending}
+                                  data-testid={`button-approve-${participant.id}`}
+                                >
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => rejectParticipantMutation.mutate(participant.id)}
+                                  disabled={rejectParticipantMutation.isPending}
+                                  data-testid={`button-reject-${participant.id}`}
+                                >
+                                  <UserX className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -2613,6 +2709,149 @@ export default function TournamentDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Players Tab - Manager only, hidden in read-only */}
+          {!isReadOnlyMode && canManageTournament() && (
+            <TabsContent value="players" className="max-w-7xl mx-auto px-4 md:px-8 space-y-6">
+              {isUnpaid && (
+                <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-players">
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
+                    Pay your tournament invoice to assign players to teams. You can still see the roster below.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => paymentMutation.mutate()}
+                    disabled={paymentMutation.isPending}
+                    data-testid="button-pay-players"
+                  >
+                    {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                  </Button>
+                </div>
+              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Players
+                  </CardTitle>
+                  <CardDescription>
+                    Assign approved players to a tournament team or leave them as Free Agents.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {(() => {
+                    const approved = approvedParticipants ?? [];
+                    if (approved.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <p>No approved players yet</p>
+                          <p className="text-sm mt-1">Players you approve from join requests will appear here.</p>
+                        </div>
+                      );
+                    }
+                    const freeAgents = approved.filter((p: any) => !p.tournamentTeamId);
+                    const teamGroups = (teams ?? []).map((t) => ({
+                      team: t,
+                      players: approved.filter((p: any) => p.tournamentTeamId === t.id),
+                    }));
+
+                    const renderPlayerRow = (participant: any) => {
+                      const currentValue = participant.tournamentTeamId ?? '__free__';
+                      return (
+                        <div
+                          key={participant.id}
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-background rounded-lg border"
+                          data-testid={`row-player-${participant.id}`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <p className="font-medium" data-testid={`text-player-name-${participant.id}`}>
+                              {participant.user.firstName} {participant.user.lastName}
+                            </p>
+                            <p className="text-sm text-muted-foreground" data-testid={`text-player-email-${participant.id}`}>
+                              {participant.user.email}
+                            </p>
+                          </div>
+                          <div
+                            className="w-full sm:w-64"
+                            title={isUnpaid ? 'Pay your tournament invoice to assign players to teams.' : undefined}
+                          >
+                            <Select
+                              value={currentValue}
+                              onValueChange={(value) => {
+                                const nextTeamId = value === '__free__' ? null : value;
+                                if (nextTeamId === (participant.tournamentTeamId ?? null)) return;
+                                // Allow clearing back to Free Agent even when unpaid; block real assignments.
+                                if (isUnpaid && nextTeamId !== null) return;
+                                assignParticipantTeamMutation.mutate({
+                                  participantId: participant.id,
+                                  tournamentTeamId: nextTeamId,
+                                });
+                              }}
+                              disabled={
+                                assignParticipantTeamMutation.isPending ||
+                                // When unpaid, only allow clearing to Free Agent. If already free, fully disable.
+                                (isUnpaid && !participant.tournamentTeamId)
+                              }
+                            >
+                              <SelectTrigger data-testid={`select-player-team-${participant.id}`}>
+                                <SelectValue placeholder="Select team" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__free__">Free Agent / Unassigned</SelectItem>
+                                {(teams ?? []).map((t) => (
+                                  <SelectItem
+                                    key={t.id}
+                                    value={t.id}
+                                    disabled={isUnpaid}
+                                  >
+                                    {t.teamName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <>
+                        <div data-testid="group-free-agents">
+                          <div className="flex items-center gap-2 mb-3">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <h4 className="font-semibold">Free Agents ({freeAgents.length})</h4>
+                          </div>
+                          {freeAgents.length === 0 ? (
+                            <p className="text-sm text-muted-foreground pl-6">No unassigned players.</p>
+                          ) : (
+                            <div className="space-y-2">{freeAgents.map(renderPlayerRow)}</div>
+                          )}
+                        </div>
+
+                        {teamGroups.map(({ team, players }) => (
+                          <div key={team.id} data-testid={`group-team-${team.id}`}>
+                            <Separator className="mb-4" />
+                            <div className="flex items-center gap-2 mb-3">
+                              <Trophy className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="font-semibold">
+                                {team.teamName} ({players.length})
+                              </h4>
+                            </div>
+                            {players.length === 0 ? (
+                              <p className="text-sm text-muted-foreground pl-6">No players assigned.</p>
+                            ) : (
+                              <div className="space-y-2">{players.map(renderPlayerRow)}</div>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* Schedule Tab */}
           <TabsContent value="schedule" className="max-w-7xl mx-auto px-4 md:px-8 space-y-4">
