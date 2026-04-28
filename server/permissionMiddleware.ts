@@ -859,10 +859,7 @@ export interface RequireTournamentPaidOptions {
   when?: (req: any) => boolean;
 }
 
-const PAYMENT_REQUIRED_BODY = {
-  paymentRequired: true,
-  message: "Pay your tournament invoice to unlock this.",
-} as const;
+const PAYMENT_REQUIRED_MESSAGE = "Pay your tournament invoice to unlock this.";
 
 export function requireTournamentPaid(options: RequireTournamentPaidOptions = {}): RequestHandler {
   return async (req, res, next) => {
@@ -902,7 +899,11 @@ export function requireTournamentPaid(options: RequireTournamentPaidOptions = {}
       }
 
       if (tournament.paymentStatus !== 'paid') {
-        return res.status(402).json(PAYMENT_REQUIRED_BODY);
+        return res.status(402).json({
+          paymentRequired: true,
+          message: PAYMENT_REQUIRED_MESSAGE,
+          tournamentId,
+        });
       }
 
       return next();

@@ -18683,6 +18683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(402).json({
             paymentRequired: true,
             message: "Pay your tournament invoice to unlock this.",
+            tournamentId: id,
           });
         }
       }

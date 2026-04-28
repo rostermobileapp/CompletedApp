@@ -25,7 +25,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest, getImageUrl } from "@/lib/queryClient";
+import {
+  queryClient,
+  apiRequest,
+  getImageUrl,
+  TOURNAMENT_PAYMENT_REQUIRED_EVENT,
+  isPaymentRequiredError,
+  type TournamentPaymentRequiredEventDetail,
+} from "@/lib/queryClient";
 import BracketView from "@/components/BracketView";
 import MatchEditDialog from "@/components/MatchEditDialog";
 import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
@@ -34,7 +41,7 @@ import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
 import { TournamentCountdown } from "@/components/TournamentCountdown";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import LocationLink from "@/components/LocationLink";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
@@ -1058,6 +1065,10 @@ export default function TournamentDetail() {
       setLocation(redirectPath);
     },
     onError: (error: any) => {
+      // Payment-required errors are handled by the global event listener,
+      // which shows a single "Payment required" toast and opens the in-app
+      // Stripe modal — skip the redundant destructive "Error" toast here.
+      if (isPaymentRequiredError(error)) return;
       toast({
         title: "Error",
         description: error?.message || "Failed to delete tournament",
@@ -1171,6 +1182,103 @@ export default function TournamentDetail() {
     }
   });
 
+  // Listen for the global "tournament-payment-required" event dispatched by
+  // queryClient.ts whenever a tournament action returns 402 paymentRequired.
+  // This covers gated actions that still hit the server (stale UI state,
+  // race conditions, direct API attempts) — instead of leaving the user with
+  // a generic destructive toast, we open the in-app Stripe checkout modal so
+  // they can act on the message immediately. Scoped to *this* tournament so
+  // an event from a different page doesn't hijack the modal.
+  //
+  // We mirror the latest mutation/modal state into a ref so the listener
+  // doesn't have to re-register on every render (which would otherwise add
+  // and remove the window listener whenever a child piece of state changed).
+  const paymentEventStateRef = useRef({
+    tournament,
+    isCheckoutOpen,
+    activeCheckout,
+    paymentMutation,
+    toast,
+  });
+  useEffect(() => {
+    paymentEventStateRef.current = {
+      tournament,
+      isCheckoutOpen,
+      activeCheckout,
+      paymentMutation,
+      toast,
+    };
+  }, [tournament, isCheckoutOpen, activeCheckout, paymentMutation, toast]);
+
+  // Synchronous re-entrancy guard: React state (`isPending`, `isCheckoutOpen`)
+  // doesn't update until the next render, so back-to-back events fired in the
+  // same tick (e.g. several gated mutations failing in parallel, or the same
+  // request triggering both a source-level dispatch and any future re-dispatch)
+  // could otherwise both pass the state guards and spawn duplicate Stripe
+  // checkout sessions. We also debounce the user-facing toast for a short
+  // window so the user sees one "Payment required" message, not a stack.
+  const paymentRequiredInFlightRef = useRef(false);
+  const lastPaymentRequiredToastAtRef = useRef(0);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<TournamentPaymentRequiredEventDetail>).detail;
+      if (!detail) return;
+      // Only react when the event is for this tournament. If the server
+      // didn't include a tournamentId (older callers), fall through and
+      // assume it's relevant to whatever tournament page is mounted.
+      if (detail.tournamentId && detail.tournamentId !== tournamentId) return;
+
+      const state = paymentEventStateRef.current;
+
+      // If the tournament is already paid, swallow — the 402 was likely a
+      // race against a just-completed payment and a refetch will reconcile.
+      if (state.tournament && state.tournament.paymentStatus === 'paid') return;
+
+      // Coalesce duplicate toasts within a short window so multiple gated
+      // requests failing in quick succession show one informative message.
+      const now = Date.now();
+      if (now - lastPaymentRequiredToastAtRef.current > 1500) {
+        lastPaymentRequiredToastAtRef.current = now;
+        state.toast({
+          title: "Payment required",
+          description:
+            detail.message || "Pay your tournament invoice to unlock this.",
+        });
+      }
+
+      // Avoid stacking modals or kicking off a duplicate checkout session.
+      // The synchronous ref guard catches same-tick repeats that the
+      // render-driven state guards can't yet see.
+      if (
+        paymentRequiredInFlightRef.current ||
+        state.isCheckoutOpen ||
+        state.activeCheckout ||
+        state.paymentMutation.isPending
+      ) {
+        return;
+      }
+      paymentRequiredInFlightRef.current = true;
+      try {
+        state.paymentMutation.mutate(undefined, {
+          // Release the guard once the mutation settles so future 402s
+          // (e.g. user closes the modal without paying then triggers another
+          // gated action) can re-open the checkout.
+          onSettled: () => {
+            paymentRequiredInFlightRef.current = false;
+          },
+        });
+      } catch (err) {
+        paymentRequiredInFlightRef.current = false;
+        throw err;
+      }
+    };
+    window.addEventListener(TOURNAMENT_PAYMENT_REQUIRED_EVENT, handler);
+    return () =>
+      window.removeEventListener(TOURNAMENT_PAYMENT_REQUIRED_EVENT, handler);
+  }, [tournamentId]);
+
   const approveParticipantMutation = useMutation({
     mutationFn: async ({ participantId, tournamentTeamId }: { participantId: string; tournamentTeamId?: string }) => {
       return await apiRequest('PATCH', `/api/tournament-participants/${participantId}/approve`, { tournamentTeamId });
@@ -1183,6 +1291,10 @@ export default function TournamentDetail() {
       });
     },
     onError: (error: any) => {
+      // Assigning a participant to a team is gated by `requireTournamentPaid`
+      // — let the global pay-modal listener handle the 402 instead of
+      // showing a duplicate destructive toast on top of "Payment required".
+      if (isPaymentRequiredError(error)) return;
       toast({
         title: "Error",
         description: error?.message || "Failed to approve participant",
@@ -1203,6 +1315,7 @@ export default function TournamentDetail() {
       });
     },
     onError: (error: any) => {
+      if (isPaymentRequiredError(error)) return;
       toast({
         title: "Error",
         description: error?.message || "Failed to reject participant",
@@ -1231,6 +1344,7 @@ export default function TournamentDetail() {
       });
     },
     onError: (error: any) => {
+      if (isPaymentRequiredError(error)) return;
       toast({
         title: "Error",
         description: error?.message || "Failed to update bracket visibility",
@@ -1475,7 +1589,31 @@ export default function TournamentDetail() {
 
       const result = await response.json();
 
-      // Check if additional payment is required
+      // Base tournament-payment gate (`requireTournamentPaid` middleware).
+      // The CSV upload uses raw fetch so it bypasses `apiRequest`'s
+      // automatic event dispatch — fire the same event manually so the
+      // global pay modal opens here too.
+      if (response.status === 402 && result?.paymentRequired === true) {
+        window.dispatchEvent(
+          new CustomEvent<TournamentPaymentRequiredEventDetail>(
+            TOURNAMENT_PAYMENT_REQUIRED_EVENT,
+            {
+              detail: {
+                tournamentId: result.tournamentId || tournamentId,
+                message:
+                  result.message || "Pay your tournament invoice to unlock this.",
+                url: `/api/tournaments/${tournamentId}/players/import`,
+              },
+            },
+          ),
+        );
+        // Reset file input so the user can retry after paying.
+        event.target.value = '';
+        return;
+      }
+
+      // Check if additional payment is required (separate flow: tournament
+      // is already paid, user is adding more teams than originally bought).
       if (response.status === 402 && result.requiresPayment) {
         setAdditionalPaymentRequired({
           additionalTeamsCount: result.additionalTeamsCount,
