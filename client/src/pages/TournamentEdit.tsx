@@ -29,12 +29,34 @@ type FormatRecommendation = {
   estimatedGames: number;
 };
 
+// Parse a "YYYY-MM-DD" date input as a local-midnight Date.
+// Avoids UTC-offset bugs and rejects impossible calendar dates (e.g. Feb 31).
+function parseLocalDate(value: string): Date | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
 const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   type: z.enum(["season_playoff", "standalone"]),
   seasonId: z.string().optional(),
   format: z.enum(["single_elimination", "double_elimination", "round_robin", "round_robin_split", "three_game_guarantee", "custom_bracket"]),
   description: z.string().optional(),
+  firstGameDate: z.string().optional(),
   teamIds: z.array(z.string()).min(2, "Select at least 2 teams"),
   byePolicy: z.enum(["top_seed_bye", "play_in_game"]).optional()
 }).refine((data) => {
@@ -45,6 +67,37 @@ const formSchema = z.object({
 }, {
   message: "Please select a season for this playoff tournament",
   path: ["seasonId"]
+}).refine((data) => {
+  // Standalone tournaments require a first game date
+  if (data.type === "standalone") {
+    return !!data.firstGameDate;
+  }
+  return true;
+}, {
+  message: "First game date is required for standalone tournaments",
+  path: ["firstGameDate"]
+}).refine((data) => {
+  // First game date must be a valid calendar date when provided
+  if (data.type === "standalone" && data.firstGameDate) {
+    return parseLocalDate(data.firstGameDate) !== null;
+  }
+  return true;
+}, {
+  message: "Please enter a valid first game date",
+  path: ["firstGameDate"]
+}).refine((data) => {
+  // First game date cannot be in the past (compared at local midnight)
+  if (data.type === "standalone" && data.firstGameDate) {
+    const first = parseLocalDate(data.firstGameDate);
+    if (!first) return true; // already caught by previous refine
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return first.getTime() >= today.getTime();
+  }
+  return true;
+}, {
+  message: "First game date cannot be in the past",
+  path: ["firstGameDate"]
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -84,10 +137,22 @@ export default function TournamentEdit() {
       seasonId: undefined,
       format: "single_elimination",
       description: "",
+      firstGameDate: "",
       teamIds: [],
       byePolicy: "top_seed_bye"
     }
   });
+
+  // Format a Date as the local-midnight "YYYY-MM-DD" string the date input expects.
+  const toDateInputValue = (value: Date | string | null | undefined): string => {
+    if (!value) return "";
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
   // Pre-fill form when data loads
   useEffect(() => {
@@ -99,6 +164,7 @@ export default function TournamentEdit() {
         seasonId: tournament.seasonId || undefined,
         format: tournament.format,
         description: tournament.description || "",
+        firstGameDate: toDateInputValue(tournament.startDate),
         teamIds: currentTeams.map(t => t.teamId).filter((id): id is string => id !== null),
         byePolicy: settings?.byePolicy || "top_seed_bye"
       });
@@ -151,6 +217,7 @@ export default function TournamentEdit() {
         seasonId: data.type === "season_playoff" ? (data.seasonId || null) : null,
         format: data.format,
         description: data.description || null,
+        firstGameDate: data.type === "standalone" ? (data.firstGameDate || null) : undefined,
         teams: teamData,
         settings: Object.keys(settings).length > 0 ? settings : undefined
       });
@@ -183,7 +250,7 @@ export default function TournamentEdit() {
 
   const nextStep = async () => {
     const fieldsToValidate = step === 1 
-      ? ["name", "type", "seasonId", "format", "description"] as const
+      ? ["name", "type", "seasonId", "format", "description", "firstGameDate"] as const
       : ["teamIds"] as const;
     
     const isValid = await form.trigger(fieldsToValidate);
@@ -191,6 +258,16 @@ export default function TournamentEdit() {
       setStep(step + 1);
     }
   };
+
+  // Derive access-window-open date as 14 days before the first game date
+  const watchedFirstGameDate = form.watch("firstGameDate");
+  const computedAccessOpenDate = (() => {
+    const first = parseLocalDate(watchedFirstGameDate || "");
+    if (!first) return null;
+    const d = new Date(first);
+    d.setDate(d.getDate() - 14);
+    return d;
+  })();
 
   const getFormatLabel = (format: string) => {
     const labels: Record<string, string> = {
@@ -432,6 +509,47 @@ export default function TournamentEdit() {
                       </FormItem>
                     )}
                   />
+
+                  {watchedType === "standalone" && (
+                    <FormField
+                      control={form.control}
+                      name="firstGameDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            First Game Date
+                            <span className="text-destructive ml-1">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              {...field}
+                              value={field.value ?? ""}
+                              data-testid="input-first-game-date"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {computedAccessOpenDate ? (
+                              <>
+                                Access opens{" "}
+                                <span className="font-medium">
+                                  {computedAccessOpenDate.toLocaleDateString(undefined, {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  })}
+                                </span>{" "}
+                                (2 weeks before the first game). Access closes 1 week after the final game.
+                              </>
+                            ) : (
+                              <>The access window opens 2 weeks before the first game and closes 1 week after the final game.</>
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </CardContent>
               </Card>
             )}

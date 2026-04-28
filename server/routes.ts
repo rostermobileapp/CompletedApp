@@ -17941,7 +17941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { name, type, seasonId, format, description, teams, settings } = req.body;
+      const { name, type, seasonId, format, description, teams, settings, firstGameDate } = req.body;
 
       // Check tournament exists and is draft
       const [tournament] = await db
@@ -17955,6 +17955,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (tournament.status !== 'draft') {
         return res.status(400).json({ message: "Cannot edit tournament after it has started" });
+      }
+
+      // For standalone tournaments, allow updating the first game date which
+      // re-derives startDate (= firstGameDate) and accessStartDate
+      // (= firstGameDate - 14 days), mirroring the create flow.
+      let derivedStartDate: Date | undefined;
+      let derivedAccessStartDate: Date | undefined;
+      const effectiveType = type || tournament.type;
+      if (firstGameDate !== undefined && firstGameDate !== null && firstGameDate !== '') {
+        if (effectiveType !== 'standalone') {
+          return res.status(400).json({ message: "First game date can only be set on standalone tournaments" });
+        }
+
+        let parsedFirstGameDate: Date | null = null;
+        if (typeof firstGameDate === 'string') {
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(firstGameDate);
+          if (m) {
+            const yr = Number(m[1]);
+            const mo = Number(m[2]);
+            const dy = Number(m[3]);
+            const candidate = new Date(yr, mo - 1, dy);
+            if (
+              !Number.isNaN(candidate.getTime()) &&
+              candidate.getFullYear() === yr &&
+              candidate.getMonth() === mo - 1 &&
+              candidate.getDate() === dy
+            ) {
+              parsedFirstGameDate = candidate;
+            }
+          }
+        } else if (firstGameDate instanceof Date && !Number.isNaN(firstGameDate.getTime())) {
+          parsedFirstGameDate = firstGameDate;
+        }
+
+        if (!parsedFirstGameDate) {
+          return res.status(400).json({ message: "First game date is invalid. Please provide a valid date in YYYY-MM-DD format." });
+        }
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        if (parsedFirstGameDate.getTime() < todayStart.getTime()) {
+          return res.status(400).json({ message: "First game date cannot be in the past" });
+        }
+
+        derivedStartDate = parsedFirstGameDate;
+        derivedAccessStartDate = new Date(parsedFirstGameDate);
+        derivedAccessStartDate.setDate(derivedAccessStartDate.getDate() - 14);
       }
 
       // Merge settings if provided
@@ -17973,6 +18020,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: description !== undefined ? description : tournament.description,
           numTeams: teams ? teams.length : tournament.numTeams,
           settings: mergedSettings,
+          ...(derivedStartDate !== undefined ? { startDate: derivedStartDate } : {}),
+          ...(derivedAccessStartDate !== undefined ? { accessStartDate: derivedAccessStartDate } : {}),
           updatedAt: new Date()
         })
         .where(eq(tournaments.id, id))
