@@ -14487,6 +14487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               gamesNeedingVerificationResult,
               tournamentMatchesNeedingVerificationResult,
               gamesNeedingStarsResult,
+              pendingScrimmageInvitesResult,
             ] = await Promise.all([
               // Announcements
               storage.getUnreadAnnouncementCount(leagueId, userId).catch(() => 0),
@@ -14591,6 +14592,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     SELECT 1 FROM game_stars gs WHERE gs.game_id = g.id
                   )
               `),
+              // Pending scrimmage invites for this user in this league
+              db.execute(sql`
+                SELECT COUNT(*)::int AS count
+                FROM announcement_visibility av
+                INNER JOIN announcements a ON av.announcement_id = a.id
+                INNER JOIN scrimmages s ON s.announcement_id = a.id
+                WHERE av.user_id = ${userId}
+                  AND s.league_id = ${leagueId}
+                  AND s.date_time >= NOW()
+                  AND NOT EXISTS (
+                    SELECT 1 FROM scrimmage_requests sr
+                    WHERE sr.scrimmage_id = s.id
+                      AND sr.player_id = ${userId}
+                  )
+              `),
             ]);
 
             const pendingMembersCount = pendingMembersResult[0]?.count || 0;
@@ -14602,13 +14618,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               (tournamentMatchesNeedingVerificationResult.rows?.[0] as any)?.count || 0,
             );
             const starsCount = Number((gamesNeedingStarsResult.rows?.[0] as any)?.count || 0);
+            const scrimmageInvitesCount = Number(
+              (pendingScrimmageInvitesResult.rows?.[0] as any)?.count || 0,
+            );
 
             const taskCount =
               pendingMembersCount +
               pendingSubsCount +
               verifyGamesCount +
               verifyMatchesCount +
-              starsCount;
+              starsCount +
+              scrimmageInvitesCount;
 
             leagueNotifications[leagueId] = unreadCount + taskCount;
             leagueTasks[leagueId] = taskCount;

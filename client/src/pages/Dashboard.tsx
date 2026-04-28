@@ -2210,16 +2210,33 @@ function DashboardMobile() {
                 const leagueCounts = (notificationCounts as any)?.leagues || {};
                 const tournamentCounts = (notificationCounts as any)?.tournaments || {};
                 const teamCounts = (notificationCounts as any)?.teams || {};
+                let currentLeagueId: string | null = null;
+                if (selectedType === 'league') currentLeagueId = selectedId;
+                else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
+                  const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
+                  currentLeagueId = sel?.leagueId ?? null;
+                }
                 if (Array.isArray(userTeamsAll)) {
                   for (const team of userTeamsAll as any[]) {
                     if (selectedType === 'team' && selectedId === team.id) continue;
                     if ((teamCounts[team.id] || 0) > 0) return 'alerts-glow';
                   }
                 }
+                const seenLeagues = new Set<string>();
+                if (Array.isArray(userTeamsAll)) {
+                  for (const team of userTeamsAll as any[]) {
+                    const lid = team.leagueId;
+                    if (!lid || seenLeagues.has(lid)) continue;
+                    seenLeagues.add(lid);
+                    if (lid === currentLeagueId) continue;
+                    if ((leagueCounts[lid] || 0) > 0) return 'alerts-glow';
+                  }
+                }
                 if (Array.isArray(leaguesWithoutTeams)) {
                   for (const lg of leaguesWithoutTeams as any[]) {
-                    if (!lg.id) continue;
-                    if (selectedType === 'league' && selectedId === lg.id) continue;
+                    if (!lg.id || seenLeagues.has(lg.id)) continue;
+                    seenLeagues.add(lg.id);
+                    if (lg.id === currentLeagueId) continue;
                     if ((leagueCounts[lg.id] || 0) > 0) return 'alerts-glow';
                   }
                 }

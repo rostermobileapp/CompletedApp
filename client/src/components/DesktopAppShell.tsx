@@ -124,10 +124,13 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     : [];
 
   // Show a slow red pulse on the selector when ANY non-selected context
-  // (team, league, or tournament) has unreviewed alerts. We compare per-team
-  // when possible so two teams in the same league are tracked independently;
-  // we still fall back to per-league counts for league-only memberships and
-  // include tournaments.
+  // (team, league, or tournament) has unreviewed alerts.
+  //   - Per-team check uses team-specific counts so two teams in the same
+  //     league are distinguishable (e.g. only one captain has stars pending).
+  //   - Per-league check covers commissioner/league-wide items (pending
+  //     members, score verifications, scrimmage invites, unread
+  //     announcements) for ANY league other than the one currently in view.
+  //   - Per-tournament check covers tournament-scoped alerts.
   const otherTeamsHaveAlerts = useMemo(() => {
     const leagueCounts = notificationCounts?.leagues || {};
     const tournamentCounts = notificationCounts?.tournaments || {};
@@ -138,10 +141,21 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       if (selectedType === 'team' && selectedId === team.id) continue;
       if ((teamCounts[team.id] || 0) > 0) return true;
     }
-    // League-only memberships (no team in that league).
+    // Per-league check for any league other than the currently-selected one.
+    // This catches commissioner/league-wide alerts (which aren't attributed
+    // to individual teams) in OTHER leagues the user belongs to.
+    const seenLeagues = new Set<string>();
+    for (const team of teamOptions) {
+      const lid = team.leagueId;
+      if (!lid || seenLeagues.has(lid)) continue;
+      seenLeagues.add(lid);
+      if (lid === currentLeagueId) continue;
+      if ((leagueCounts[lid] || 0) > 0) return true;
+    }
     for (const m of leagueOptions) {
-      if (!m.leagueId) continue;
-      if (selectedType === 'league' && selectedId === m.leagueId) continue;
+      if (!m.leagueId || seenLeagues.has(m.leagueId)) continue;
+      seenLeagues.add(m.leagueId);
+      if (m.leagueId === currentLeagueId) continue;
       if ((leagueCounts[m.leagueId] || 0) > 0) return true;
     }
     // Tournament-scoped alerts.
@@ -156,6 +170,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     leagueOptions,
     selectedType,
     selectedId,
+    currentLeagueId,
   ]);
 
   const dropdownValue =
