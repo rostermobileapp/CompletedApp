@@ -18668,14 +18668,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Pre-payment gate: bracket-level edits and schedule shifts are blocked
       // until the tournament invoice is paid. Format/numTeams/name/description
       // edits remain allowed pre-payment so creators can finish setup before
-      // checkout. Bracket-level edits include `settings` (where the custom
-      // bracket lives), `teams` (assignments to bracket positions), and any
-      // schedule shift on existing matches.
+      // checkout — including the auto-regenerated `teams` payload that the
+      // standard format/numTeams flow sends. Only bracket-level edits
+      // (`settings`, where the custom bracket lives) and schedule shifts on
+      // existing matches require payment.
       if (tournament.paymentStatus !== 'paid') {
         const editsBracket = settings !== undefined;
-        const assignsTeams = Array.isArray(teams) && teams.length > 0;
         const shiftsSchedule = shiftScheduledMatches === true;
-        if (editsBracket || assignsTeams || shiftsSchedule) {
+        if (editsBracket || shiftsSchedule) {
           return res.status(402).json({
             paymentRequired: true,
             message: "Pay your tournament invoice to unlock this.",
