@@ -1678,6 +1678,25 @@ export default function TournamentDetail() {
                       {teams.length} {teams.length === 1 ? 'team' : 'teams'}
                     </Badge>
                   )}
+                  {canManageTournament() && !isReadOnlyMode && (
+                    <>
+                      {tournament.paymentStatus === 'paid' ? (
+                        <Badge variant="default" className="bg-green-600 flex items-center gap-1 text-xs" data-testid="badge-payment-paid">
+                          <CheckCheck className="h-3 w-3" />
+                          Paid
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-amber-500 text-amber-600 flex items-center gap-1 text-xs" data-testid="badge-payment-pending">
+                          <Clock className="h-3 w-3" />
+                          Pending
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="font-normal text-xs flex items-center gap-1" data-testid="text-payment-amount">
+                        <DollarSign className="h-3 w-3" />
+                        {((tournament.paymentAmount || 0) / 100).toFixed(2)}
+                      </Badge>
+                    </>
+                  )}
                 </div>
               </div>
               
@@ -1685,6 +1704,18 @@ export default function TournamentDetail() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {tournament.status === 'draft' ? (
                     <>
+                      {canManageTournament() && tournament.paymentStatus !== 'paid' && (
+                        <Button
+                          onClick={() => paymentMutation.mutate()}
+                          disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
+                          size="sm"
+                          data-testid="button-pay-now"
+                          title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
+                        >
+                          <DollarSign className="h-4 w-4 mr-1" />
+                          {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                        </Button>
+                      )}
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -1726,97 +1757,14 @@ export default function TournamentDetail() {
           </div>
         </div>
       </div>
-      {/* Payment Status Section - Commissioner Only (not in readonly mode) */}
-      {tournament && canManageTournament() && !isReadOnlyMode && (
-        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-4 md:pb-6">
-          <Card className={tournament.paymentStatus === 'paid' ? 'border-green-500/50' : 'border-amber-500/50'}>
-            <CardContent className="p-4 md:p-6 pt-[4px] pb-[4px]">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
-                {/* Left: Title and Status */}
-                <div className="space-y-1 flex-shrink-0">
-                  <CardTitle className="flex items-center gap-2 text-lg md:text-base">
-                    <DollarSign className="h-5 w-5" />
-                    Tournament Payment
-                  </CardTitle>
-                  {tournament.paymentStatus === 'paid' ? (
-                    <Badge variant="default" className="bg-green-600 flex items-center gap-1 w-fit" data-testid="badge-payment-paid">
-                      <CheckCheck className="h-3 w-3" />
-                      Paid
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-amber-500 text-amber-600 flex items-center gap-1 w-fit" data-testid="badge-payment-pending">
-                      <Clock className="h-3 w-3" />
-                      Pending
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Right: Info Boxes - Stack on mobile, flex on desktop */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto md:flex md:gap-3">
-                  {/* Tournament ID */}
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
-                    <div className="mr-2 min-w-0">
-                      <p className="text-xs text-muted-foreground">ID</p>
-                      <p className="text-sm md:text-base font-semibold font-mono truncate" data-testid="text-tournament-id">{tournament.uniqueTournamentId}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 flex-shrink-0"
-                      onClick={() => {
-                        navigator.clipboard.writeText(tournament.uniqueTournamentId || '');
-                        setCopiedTournamentId(true);
-                        setTimeout(() => setCopiedTournamentId(false), 2000);
-                        toast({
-                          title: "Copied!",
-                          description: "Tournament ID copied to clipboard"
-                        });
-                      }}
-                      data-testid="button-copy-id"
-                    >
-                      {copiedTournamentId ? <CheckCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    </Button>
-                  </div>
-
-                  {/* Teams */}
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
-                    <div className="mr-2">
-                      <p className="text-xs text-muted-foreground">Teams</p>
-                      <p className="text-sm md:text-base font-semibold" data-testid="text-team-count">{teams?.length || 0}</p>
-                    </div>
-                    <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  </div>
-
-                  {/* Payment Amount */}
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
-                    <div className="mr-2">
-                      <p className="text-xs text-muted-foreground">Amount</p>
-                      <p className="text-sm md:text-base font-semibold" data-testid="text-payment-amount">
-                        ${((tournament.paymentAmount || 0) / 100).toFixed(2)}
-                      </p>
-                    </div>
-                    {tournament.paymentStatus !== 'paid' ? (
-                      <Button
-                        onClick={() => paymentMutation.mutate()}
-                        disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
-                        size="sm"
-                        className="h-8 px-2 flex-shrink-0 text-xs"
-                        data-testid="button-pay-now"
-                      >
-                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                      </Button>
-                    ) : (
-                      <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {tournament.paymentStatus !== 'paid' && (teams?.length || 0) === 0 && (
-                <p className="text-xs text-muted-foreground mt-3">Add teams to calculate payment amount</p>
-              )}
-            </CardContent>
-          </Card>
+      {/* Payment status now lives in the header (badges + Pay button); the
+          standalone Tournament Payment card was removed per design. */}
+      {tournament && canManageTournament() && !isReadOnlyMode &&
+        tournament.paymentStatus !== 'paid' && (teams?.length || 0) === 0 && (
+        <div className="max-w-7xl mx-auto px-4 md:px-8 pb-2">
+          <p className="text-xs text-muted-foreground" data-testid="text-payment-needs-teams">
+            Add teams to calculate payment amount.
+          </p>
         </div>
       )}
       {/* Content */}
