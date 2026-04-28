@@ -352,30 +352,62 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                   <SelectValue placeholder="Select a team or league" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teamOptions.map((team: any) => (
-                    <SelectItem
-                      key={`team-${team.id}`}
-                      value={`team:${team.id}`}
-                      data-testid={`desktop-team-option-${team.id}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span>{team.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                  {leagueOptions.map((membership: any) => (
-                    <SelectItem
-                      key={`league-${membership.leagueId}`}
-                      value={`league:${membership.leagueId}`}
-                      data-testid={`desktop-league-option-${membership.leagueId}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Trophy className="w-4 h-4 text-primary" />
-                        <span>{membership.league?.name ?? 'League'}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {teamOptions.map((team: any) => {
+                    const count =
+                      (team.leagueId &&
+                        notificationCounts?.leagues?.[team.leagueId]) ||
+                      0;
+                    return (
+                      <SelectItem
+                        key={`team-${team.id}`}
+                        value={`team:${team.id}`}
+                        data-testid={`desktop-team-option-${team.id}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-primary" />
+                            <span>{team.name}</span>
+                          </div>
+                          {count > 0 && (
+                            <span
+                              className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
+                              data-testid={`desktop-team-alert-count-${team.id}`}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                  {leagueOptions.map((membership: any) => {
+                    const count =
+                      (membership.leagueId &&
+                        notificationCounts?.leagues?.[membership.leagueId]) ||
+                      0;
+                    return (
+                      <SelectItem
+                        key={`league-${membership.leagueId}`}
+                        value={`league:${membership.leagueId}`}
+                        data-testid={`desktop-league-option-${membership.leagueId}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-4 h-4 text-primary" />
+                            <span>{membership.league?.name ?? 'League'}</span>
+                          </div>
+                          {count > 0 && (
+                            <span
+                              className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
+                              data-testid={`desktop-league-alert-count-${membership.leagueId}`}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             ) : (
