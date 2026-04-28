@@ -60,7 +60,8 @@ export function UpNextCard({
       return t + 2 * 60 * 60 * 1000 >= now;
     });
 
-    // If a team is selected, prefer that team's games
+    // Strict team scope: when a team is selected, only show that team's
+    // upcoming games. Never fall through to other teams' games.
     if (selectedTeamId) {
       const teamGame = eligible.find(
         (g) =>
@@ -69,7 +70,7 @@ export function UpNextCard({
           g.homeTeamId === selectedTeamId ||
           g.awayTeamId === selectedTeamId,
       );
-      if (teamGame) return teamGame;
+      return teamGame || null;
     }
 
     // If a league is selected (not a specific team), restrict to games

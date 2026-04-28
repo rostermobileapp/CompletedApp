@@ -113,7 +113,10 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
             isLeagueScope={isLeagueScope}
             leagueTeamIds={userTeamIdsInLeague}
           />
-          <AlertsExpanded effectiveLeagueId={effectiveLeagueId} />
+          <AlertsExpanded
+            effectiveLeagueId={effectiveLeagueId}
+            userTeamIds={allUserTeamIds}
+          />
         </div>
 
         {/* Row 2: Schedule (capped 1080px, centered) */}

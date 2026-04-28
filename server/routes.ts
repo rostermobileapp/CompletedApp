@@ -13434,6 +13434,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get aggregated playoff/tournament stats for a league season.
+  // Sums tournament_stats across every tournament that belongs to the league
+  // (optionally narrowed by seasonId) and returns the same skater shape as
+  // /api/leagues/:leagueId/stats so the frontend can swap them transparently.
+  app.get('/api/leagues/:leagueId/playoff-stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const seasonId = Array.isArray(req.query.seasonId)
+        ? req.query.seasonId[0]
+        : req.query.seasonId;
+      const userId = req.user.claims.sub;
+
+      const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!userMembership || userMembership.status !== 'approved') {
+        return res
+          .status(403)
+          .json({ message: 'Access denied - not an approved league member' });
+      }
+
+      if (seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res
+            .status(400)
+            .json({ message: 'Season not found or does not belong to this league' });
+        }
+      }
+
+      // Find all tournaments for this league (and season, if provided).
+      const tournamentRows = await db
+        .select({ id: tournaments.id })
+        .from(tournaments)
+        .where(
+          seasonId
+            ? and(
+                eq(tournaments.leagueId, leagueId),
+                eq(tournaments.seasonId, seasonId),
+              )
+            : eq(tournaments.leagueId, leagueId),
+        );
+
+      const tournamentIds = tournamentRows.map((t) => t.id);
+      if (tournamentIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Aggregate per-user across all tournaments, then attach the user record.
+      const aggregated = await db
+        .select({
+          userId: tournamentStats.userId,
+          gamesPlayed: sql<number>`COALESCE(SUM(${tournamentStats.gamesPlayed}), 0)`,
+          goals: sql<number>`COALESCE(SUM(${tournamentStats.goals}), 0)`,
+          assists: sql<number>`COALESCE(SUM(${tournamentStats.assists}), 0)`,
+          penaltyMinutes: sql<number>`COALESCE(SUM(${tournamentStats.penaltyMinutes}), 0)`,
+        })
+        .from(tournamentStats)
+        .where(inArray(tournamentStats.tournamentId, tournamentIds))
+        .groupBy(tournamentStats.userId);
+
+      if (aggregated.length === 0) {
+        return res.json([]);
+      }
+
+      const userIds = aggregated.map((a) => a.userId);
+      const userRows = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(inArray(users.id, userIds));
+
+      const userById = new Map(userRows.map((u) => [u.id, u]));
+
+      const response = aggregated.map((row) => {
+        const goals = Number(row.goals) || 0;
+        const assists = Number(row.assists) || 0;
+        return {
+          type: 'skater' as const,
+          userId: row.userId,
+          gamesPlayed: Number(row.gamesPlayed) || 0,
+          goals,
+          assists,
+          points: goals + assists,
+          penaltyMinutes: Number(row.penaltyMinutes) || 0,
+          isGoalie: false,
+          user: userById.get(row.userId) || null,
+        };
+      });
+
+      res.json(response);
+    } catch (error) {
+      console.error('Error fetching playoff stats:', error);
+      res.status(500).json({ message: 'Failed to fetch playoff stats' });
+    }
+  });
+
   // Get individual player's stats
   app.get('/api/leagues/:leagueId/stats/players/:playerId', isAuthenticated, async (req: any, res) => {
     try {
@@ -14348,44 +14447,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...commissionerLeagues.map(l => l.id)
       ]);
       
-      // Fetch notification counts for each league
+      // Pre-compute the user's stat-manager permission flags so we can scope
+      // verification work counts correctly per league below.
+      const currentUser = await storage.getUser(userId);
+      const hasGlobalStatManager = !!currentUser?.specialPermissions?.includes('stat_manager');
+
+      // Fetch notification counts for each league. We compute two flavors:
+      //   leagues[id]    -> unread announcements + todo items (badge total)
+      //   leagueTasks[id]-> just actionable todos (used for the red glow that
+      //                     signals "another team needs your attention")
       const leagueNotifications: Record<string, number> = {};
-      
-      for (const leagueId of allLeagueIds) {
-        try {
-          // Get unread announcement count
-          const unreadCount = await storage.getUnreadAnnouncementCount(leagueId, userId);
-          
-          // Check if user is commissioner of this league
-          const [league] = await db
-            .select({ commissionerId: leagues.commissionerId })
-            .from(leagues)
-            .where(eq(leagues.id, leagueId));
-          
-          const isCommissioner = league?.commissionerId === userId;
-          
-          let todoCount = 0;
-          
-          if (isCommissioner) {
-            // Get pending members count
-            const pendingMembersResult = await db
-              .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
-              .from(leagueMemberships)
-              .where(
-                and(
-                  eq(leagueMemberships.leagueId, leagueId),
-                  eq(leagueMemberships.status, 'pending')
+      const leagueTasks: Record<string, number> = {};
+
+      const allLeagueIdList = Array.from(allLeagueIds);
+      await Promise.all(
+        allLeagueIdList.map(async (leagueId) => {
+          try {
+            const [league] = await db
+              .select({ commissionerId: leagues.commissionerId })
+              .from(leagues)
+              .where(eq(leagues.id, leagueId));
+            const isCommissioner = league?.commissionerId === userId;
+
+            // Check league-specific stat_manager permission
+            let hasLeagueStatManager = false;
+            try {
+              const lp = await storage.getUserLeaguePermissions(userId, leagueId);
+              hasLeagueStatManager = !!lp?.leagueSpecialPermissions?.includes('stat_manager');
+            } catch {
+              hasLeagueStatManager = false;
+            }
+            const canVerify = isCommissioner || hasGlobalStatManager || hasLeagueStatManager;
+
+            // Run all per-league counts in parallel.
+            const [
+              unreadCount,
+              pendingMembersResult,
+              pendingSubsResult,
+              gamesNeedingVerificationResult,
+              tournamentMatchesNeedingVerificationResult,
+              gamesNeedingStarsResult,
+            ] = await Promise.all([
+              // Announcements
+              storage.getUnreadAnnouncementCount(leagueId, userId).catch(() => 0),
+              // Pending members (commissioner only)
+              isCommissioner
+                ? db
+                    .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+                    .from(leagueMemberships)
+                    .where(
+                      and(
+                        eq(leagueMemberships.leagueId, leagueId),
+                        eq(leagueMemberships.status, 'pending'),
+                      ),
+                    )
+                : Promise.resolve([{ count: 0 }] as { count: number }[]),
+              // Pending substitute approvals where this user must act
+              db.execute(sql`
+                SELECT COUNT(DISTINCT sr.id)::int AS count
+                FROM substitute_requests sr
+                INNER JOIN games g ON sr.game_id = g.id
+                LEFT JOIN teams ht ON g.home_team_id = ht.id
+                LEFT JOIN teams at ON g.away_team_id = at.id
+                WHERE g.league_id = ${leagueId}
+                  AND sr.status IN (
+                    'pending_opponent_approval',
+                    'pending_commissioner_approval',
+                    'pending_substitute_approval'
+                  )
+                  AND (
+                    -- Captain of the opposing team must approve
+                    (sr.status = 'pending_opponent_approval' AND (
+                      (sr.requesting_team_id = g.home_team_id AND at.captain_id = ${userId})
+                      OR (sr.requesting_team_id = g.away_team_id AND ht.captain_id = ${userId})
+                    ))
+                    -- Commissioner can act
+                    OR (${isCommissioner} AND sr.status IN (
+                      'pending_opponent_approval',
+                      'pending_commissioner_approval'
+                    ))
+                    -- The substitute themselves must accept
+                    OR (sr.status = 'pending_substitute_approval' AND sr.substitute_player_id = ${userId})
+                  )
+              `),
+              // Games needing score verification (only for users who can verify)
+              canVerify
+                ? db.execute(sql`
+                    SELECT COUNT(DISTINCT g.id)::int AS count
+                    FROM games g
+                    WHERE g.league_id = ${leagueId}
+                      AND g.is_scrimmage = false
+                      AND g.scheduled_at <= NOW() - INTERVAL '1 hour'
+                      AND g.id NOT IN (
+                        SELECT game_id FROM tournament_matches WHERE game_id IS NOT NULL
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1 FROM game_score_submissions s
+                        WHERE s.game_id = g.id
+                          AND (s.submitter_role = 'commissioner' OR s.is_commissioner_override = true)
+                      )
+                      AND (
+                        (SELECT COUNT(*) FROM game_score_submissions s WHERE s.game_id = g.id) < 2
+                        OR (
+                          SELECT COUNT(DISTINCT (s.home_score::text || '-' || s.away_score::text))
+                          FROM game_score_submissions s WHERE s.game_id = g.id
+                        ) > 1
+                      )
+                  `)
+                : Promise.resolve({ rows: [{ count: 0 }] }),
+              // Tournament matches needing score verification (verifiers only)
+              canVerify
+                ? db.execute(sql`
+                    SELECT COUNT(*)::int AS count
+                    FROM tournament_matches tm
+                    INNER JOIN tournaments t ON tm.tournament_id = t.id
+                    WHERE t.league_id = ${leagueId}
+                      AND tm.team1_id IS NOT NULL
+                      AND tm.team2_id IS NOT NULL
+                      AND (tm.team1_score IS NULL OR tm.team2_score IS NULL)
+                      AND (tm.status IS NULL OR tm.status <> 'completed')
+                      AND (
+                        (tm.scheduled_time IS NOT NULL AND tm.scheduled_time < NOW())
+                        OR (tm.scheduled_time IS NULL AND t.start_date IS NOT NULL AND t.start_date < NOW())
+                      )
+                  `)
+                : Promise.resolve({ rows: [{ count: 0 }] }),
+              // Games where this user is the winning captain and stars haven't been awarded
+              db.execute(sql`
+                SELECT COUNT(*)::int AS count
+                FROM games g
+                INNER JOIN teams t ON (
+                  (g.home_score > g.away_score AND g.home_team_id = t.id)
+                  OR (g.away_score > g.home_score AND g.away_team_id = t.id)
                 )
-              );
-            todoCount += pendingMembersResult[0]?.count || 0;
+                WHERE g.league_id = ${leagueId}
+                  AND t.captain_id = ${userId}
+                  AND g.is_scrimmage = false
+                  AND g.is_completed = true
+                  AND g.home_score IS NOT NULL
+                  AND g.away_score IS NOT NULL
+                  AND g.home_score <> g.away_score
+                  AND NOT EXISTS (
+                    SELECT 1 FROM game_stars gs WHERE gs.game_id = g.id
+                  )
+              `),
+            ]);
+
+            const pendingMembersCount = pendingMembersResult[0]?.count || 0;
+            const pendingSubsCount = Number((pendingSubsResult.rows?.[0] as any)?.count || 0);
+            const verifyGamesCount = Number(
+              (gamesNeedingVerificationResult.rows?.[0] as any)?.count || 0,
+            );
+            const verifyMatchesCount = Number(
+              (tournamentMatchesNeedingVerificationResult.rows?.[0] as any)?.count || 0,
+            );
+            const starsCount = Number((gamesNeedingStarsResult.rows?.[0] as any)?.count || 0);
+
+            const taskCount =
+              pendingMembersCount +
+              pendingSubsCount +
+              verifyGamesCount +
+              verifyMatchesCount +
+              starsCount;
+
+            leagueNotifications[leagueId] = unreadCount + taskCount;
+            leagueTasks[leagueId] = taskCount;
+          } catch (error) {
+            // If fetching fails for a league, just set to 0
+            leagueNotifications[leagueId] = 0;
+            leagueTasks[leagueId] = 0;
           }
-          
-          leagueNotifications[leagueId] = unreadCount + todoCount;
-        } catch (error) {
-          // If fetching fails for a league, just set to 0
-          leagueNotifications[leagueId] = 0;
-        }
-      }
+        }),
+      );
       
       // Fetch notification counts for each tournament
       const tournamentNotifications: Record<string, number> = {};
@@ -14401,7 +14634,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         leagues: leagueNotifications,
-        tournaments: tournamentNotifications
+        leagueTasks,
+        tournaments: tournamentNotifications,
       });
     } catch (error) {
       console.error('Error fetching notification counts:', error);

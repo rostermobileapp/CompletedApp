@@ -42,18 +42,18 @@ export function TeamLeadersCard({
 }: TeamLeadersCardProps) {
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
-  const [mode, setMode] = useState<'season' | 'last5'>('season');
+  const [mode, setMode] = useState<'season' | 'playoffs'>('season');
 
   const isLocked = !canAccessPremiumFeatures();
 
-  const { data: stats, isLoading } = useQuery<SkaterStat[]>({
+  const { data: seasonStats, isLoading: seasonLoading } = useQuery<SkaterStat[]>({
     queryKey: [
       '/api/leagues',
       effectiveLeagueId,
       'stats',
       { seasonId: seasonId || undefined, playerType: 'non-goalies' },
     ],
-    enabled: !!effectiveLeagueId && !isLocked,
+    enabled: !!effectiveLeagueId && !isLocked && mode === 'season',
     queryFn: async () => {
       const params = new URLSearchParams();
       if (seasonId) params.append('seasonId', seasonId);
@@ -66,6 +66,29 @@ export function TeamLeadersCard({
     },
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: playoffStats, isLoading: playoffLoading } = useQuery<SkaterStat[]>({
+    queryKey: [
+      '/api/leagues',
+      effectiveLeagueId,
+      'playoff-stats',
+      { seasonId: seasonId || undefined },
+    ],
+    enabled: !!effectiveLeagueId && !isLocked && mode === 'playoffs',
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (seasonId) params.append('seasonId', seasonId);
+      const res = await apiRequest(
+        'GET',
+        `/api/leagues/${effectiveLeagueId}/playoff-stats?${params.toString()}`,
+      );
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const stats = mode === 'playoffs' ? playoffStats : seasonStats;
+  const isLoading = mode === 'playoffs' ? playoffLoading : seasonLoading;
 
   const skaters = Array.isArray(stats)
     ? stats.filter((s): s is SkaterStat => s.type === 'skater')
@@ -118,14 +141,14 @@ export function TeamLeadersCard({
           </button>
           <button
             type="button"
-            onClick={() => setMode('last5')}
+            onClick={() => setMode('playoffs')}
             className={`px-2.5 py-1 rounded transition-colors ${
-              mode === 'last5'
+              mode === 'playoffs'
                 ? 'bg-white text-[#212121]'
                 : 'text-[#666] hover:text-[#212121]'
             }`}
             style={
-              mode === 'last5'
+              mode === 'playoffs'
                 ? {
                     borderWidth: '0.5px',
                     borderStyle: 'solid',
@@ -133,9 +156,9 @@ export function TeamLeadersCard({
                   }
                 : undefined
             }
-            data-testid="leaders-toggle-last5"
+            data-testid="leaders-toggle-playoffs"
           >
-            Last 5
+            Playoffs
           </button>
         </div>
       </div>
@@ -190,12 +213,12 @@ export function TeamLeadersCard({
               accentColor={GOALS_BG_ACCENT}
             />
           </div>
-          {mode === 'last5' && (
+          {mode === 'playoffs' && (
             <div
               className="mt-3 text-[11px] text-[#888] text-center"
-              data-testid="leaders-last5-note"
+              data-testid="leaders-playoffs-note"
             >
-              Last 5 games view coming soon — showing season totals.
+              Aggregated across all playoff/tournament games this season.
             </div>
           )}
         </>

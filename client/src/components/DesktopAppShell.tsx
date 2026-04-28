@@ -83,6 +83,20 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const leagueUnreadMessages = useLeagueUnreadMessages();
 
+  // Per-league actionable task counts (sub approvals, score verifications,
+  // pending players, stars). Used to flag the team selector when other
+  // teams/leagues have items that need this user's attention.
+  const { data: notificationCounts } = useQuery<{
+    leagues: Record<string, number>;
+    leagueTasks?: Record<string, number>;
+    tournaments: Record<string, number>;
+  }>({
+    queryKey: ['/api/user/notification-counts'],
+    enabled: !!isAuthenticated,
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+
   const primaryTeamId =
     Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0].id : null;
   const activeScreen = getActiveMainScreen(location, primaryTeamId);
@@ -107,6 +121,32 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         (m: any) => m.leagueId && !teamLeagueIds.has(m.leagueId),
       )
     : [];
+
+  // Show a slow red pulse on the selector when ANY league/team other than
+  // the one currently in view has actionable items (sub approvals, score
+  // verifications, etc). Mirrors the same logic on mobile.
+  const otherTeamsHaveAlerts = useMemo(() => {
+    const tasks = notificationCounts?.leagueTasks || {};
+    for (const team of teamOptions) {
+      if (selectedType === 'team' && selectedId === team.id) continue;
+      const lid = team.leagueId;
+      if (lid && lid !== currentLeagueId && (tasks[lid] || 0) > 0) return true;
+    }
+    for (const m of leagueOptions) {
+      if (selectedType === 'league' && selectedId === m.leagueId) continue;
+      if (m.leagueId !== currentLeagueId && (tasks[m.leagueId] || 0) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }, [
+    notificationCounts,
+    teamOptions,
+    leagueOptions,
+    selectedType,
+    selectedId,
+    currentLeagueId,
+  ]);
 
   const dropdownValue =
     selectedType && selectedId ? `${selectedType}:${selectedId}` : '';
@@ -278,7 +318,10 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                 onValueChange={handleDropdownChange}
               >
                 <SelectTrigger
-                  className="w-full h-11"
+                  className={cn(
+                    'w-full h-11',
+                    otherTeamsHaveAlerts && 'alerts-glow',
+                  )}
                   data-testid="desktop-team-selector"
                 >
                   <SelectValue placeholder="Select a team or league" />

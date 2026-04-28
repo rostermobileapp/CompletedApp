@@ -2206,7 +2206,29 @@ function DashboardMobile() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px]"
+              className={`w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${(() => {
+                const tasks = (notificationCounts as any)?.leagueTasks || {};
+                let currentlySelectedLeagueId: string | null = null;
+                if (selectedType === 'league') currentlySelectedLeagueId = selectedId;
+                else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
+                  const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
+                  currentlySelectedLeagueId = sel?.leagueId ?? null;
+                }
+                if (Array.isArray(userTeamsAll)) {
+                  for (const team of userTeamsAll as any[]) {
+                    if (selectedType === 'team' && selectedId === team.id) continue;
+                    const lid = team.leagueId;
+                    if (lid && lid !== currentlySelectedLeagueId && (tasks[lid] || 0) > 0) return 'alerts-glow';
+                  }
+                }
+                if (Array.isArray(leaguesWithoutTeams)) {
+                  for (const lg of leaguesWithoutTeams as any[]) {
+                    if (selectedType === 'league' && selectedId === lg.id) continue;
+                    if (lg.id !== currentlySelectedLeagueId && (tasks[lg.id] || 0) > 0) return 'alerts-glow';
+                  }
+                }
+                return '';
+              })()}`}
               data-testid="button-selector"
             >
               <div className="flex items-center gap-2">

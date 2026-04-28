@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
+import { format } from 'date-fns';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest } from '@/lib/queryClient';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
@@ -28,6 +29,46 @@ interface AlertItem {
 
 interface AlertsExpandedProps {
   effectiveLeagueId?: string | null;
+  /** All of this user's team IDs, used to figure out the "opponent" for
+   *  per-game alerts (verify score, award stars, etc.). */
+  userTeamIds?: string[];
+}
+
+function formatGameDate(value?: string | Date | null): string | null {
+  if (!value) return null;
+  try {
+    const d = typeof value === 'string' ? new Date(value) : value;
+    if (Number.isNaN(d.getTime())) return null;
+    return format(d, 'EEE MMM d');
+  } catch {
+    return null;
+  }
+}
+
+function formatGameDateTime(value?: string | Date | null): string | null {
+  if (!value) return null;
+  try {
+    const d = typeof value === 'string' ? new Date(value) : value;
+    if (Number.isNaN(d.getTime())) return null;
+    return format(d, 'EEE MMM d • h:mm a');
+  } catch {
+    return null;
+  }
+}
+
+function describeGameMatchup(
+  game: any,
+  userTeamIds: string[],
+): string {
+  const home = game?.homeTeam?.name || 'Home';
+  const away = game?.awayTeam?.name || 'Away';
+  const homeId = game?.homeTeam?.id || game?.homeTeamId;
+  const awayId = game?.awayTeam?.id || game?.awayTeamId;
+  const ownTeamIds = new Set(userTeamIds || []);
+
+  if (homeId && ownTeamIds.has(homeId)) return `vs ${away}`;
+  if (awayId && ownTeamIds.has(awayId)) return `vs ${home}`;
+  return `${home} vs ${away}`;
 }
 
 const SEVERITY_BORDER: Record<AlertSeverity, string> = {
@@ -36,7 +77,10 @@ const SEVERITY_BORDER: Record<AlertSeverity, string> = {
   blue: '#2563eb',
 };
 
-export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
+export function AlertsExpanded({
+  effectiveLeagueId,
+  userTeamIds = [],
+}: AlertsExpandedProps) {
   const [, navigate] = useLocation();
 
   // ── Data sources (mirror the mobile "Needs Attention" summary in
@@ -176,11 +220,16 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
       req?.originalPlayer?.firstName || req?.originalPlayer?.lastName
         ? `${req.originalPlayer.firstName ?? ''} ${req.originalPlayer.lastName ?? ''}`.trim()
         : 'a player';
+    const matchup = req?.game ? describeGameMatchup(req.game, userTeamIds) : null;
+    const date = formatGameDate(req?.game?.scheduledAt);
+    const metaParts: string[] = [];
+    if (matchup) metaParts.push(matchup);
+    if (date) metaParts.push(date);
     alerts.push({
       key: `sub-${req.id}`,
       severity: 'red',
       title: `Need a sub for ${playerName}`,
-      meta: req?.requestingTeam?.name || 'Approve or deny',
+      meta: metaParts.length ? metaParts.join(' · ') : 'Approve or deny',
       onClick: () => {
         setPageTransitionDirection('up');
         navigate('/substitute-confirmations');
@@ -216,11 +265,14 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
     ? gamesNeedingVerification
     : [];
   for (const g of verifGames.slice(0, 4)) {
+    const matchup = describeGameMatchup(g, userTeamIds);
+    const date = formatGameDate(g?.scheduledAt);
+    const meta = [matchup, date].filter(Boolean).join(' · ') || 'Score awaiting confirmation';
     alerts.push({
       key: `verify-game-${g.id}`,
       severity: 'red',
       title: 'Verify game score',
-      meta: g?.opponent?.name ? `vs ${g.opponent.name}` : 'Score awaiting confirmation',
+      meta,
       onClick: () => {
         setPageTransitionDirection('up');
         navigate(`/game/${g.id}`);
@@ -232,11 +284,23 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
     ? tournamentMatchesNeedingVerification
     : [];
   for (const m of verifMatches.slice(0, 4)) {
+    const matchup =
+      m?.team1Name && m?.team2Name
+        ? `${m.team1Name} vs ${m.team2Name}`
+        : null;
+    const date = formatGameDate(m?.scheduledTime);
+    const tournamentName = m?.tournamentName || null;
+    const metaParts: string[] = [];
+    if (matchup) metaParts.push(matchup);
+    if (date) metaParts.push(date);
+    if (tournamentName && !matchup) metaParts.push(tournamentName);
     alerts.push({
       key: `verify-match-${m.id}`,
       severity: 'red',
-      title: 'Verify tournament match',
-      meta: 'Score awaiting confirmation',
+      title: tournamentName
+        ? `Verify ${tournamentName} match`
+        : 'Verify tournament match',
+      meta: metaParts.length ? metaParts.join(' · ') : 'Score awaiting confirmation',
       onClick: () => {
         setPageTransitionDirection('up');
         // Mobile routes both regular games and tournament matches through
@@ -251,11 +315,18 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
   const invites = Array.isArray(scrimmageInvites) ? scrimmageInvites : [];
   for (const inv of invites.slice(0, 4)) {
     const title = inv?.title || inv?.scrimmage?.title || 'Scrimmage invite';
+    const dateValue =
+      inv?.dateTime || inv?.scrimmage?.dateTime || inv?.scheduledAt || null;
+    const date = formatGameDateTime(dateValue);
+    const venue = inv?.venue || inv?.location || inv?.scrimmage?.venue || null;
+    const metaParts: string[] = [];
+    if (date) metaParts.push(date);
+    if (venue) metaParts.push(venue);
     alerts.push({
       key: `inv-${inv.id}`,
       severity: 'amber',
       title: `RSVP: ${title}`,
-      meta: 'Awaiting your response',
+      meta: metaParts.length ? metaParts.join(' · ') : 'Awaiting your response',
       onClick: () => {
         setPageTransitionDirection('up');
         navigate('/scrimmage-management');
@@ -267,11 +338,21 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
   // Amber: games needing player stars
   const starGames = Array.isArray(gamesNeedingStars) ? gamesNeedingStars : [];
   for (const g of starGames.slice(0, 4)) {
+    const matchup = describeGameMatchup(g, userTeamIds);
+    const date = formatGameDate(g?.scheduledAt);
+    const score =
+      g?.homeScore != null && g?.awayScore != null
+        ? `${g.homeScore}-${g.awayScore}`
+        : null;
+    const metaParts: string[] = [];
+    if (matchup) metaParts.push(matchup);
+    if (score) metaParts.push(`Final ${score}`);
+    if (date) metaParts.push(date);
     alerts.push({
       key: `stars-${g.id}`,
       severity: 'amber',
       title: 'Award player stars',
-      meta: g?.opponent?.name ? `vs ${g.opponent.name}` : 'Recent game',
+      meta: metaParts.length ? metaParts.join(' · ') : 'Recent game',
       onClick: () => {
         setPageTransitionDirection('up');
         navigate(`/game/${g.id}`);
