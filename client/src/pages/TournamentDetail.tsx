@@ -38,6 +38,7 @@ import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
+import { useIosPlatform } from "@/hooks/useIosPlatform";
 
 // The tournament detail endpoint may return either a full Tournament record
 // or a minimal pre-access countdown payload for approved participants whose
@@ -1032,6 +1033,38 @@ export default function TournamentDetail() {
     }
   });
 
+  // Stripe checkout URL routing — mirrors the working pattern in the Subscription page.
+  // We must NOT use `window.location.href = stripeUrl` from inside the Natively native
+  // app webview: that drops the user into the in-app webview for Stripe's hosted page
+  // and then bounces the post-payment redirect into a broken context (often a blank
+  // white page) when Stripe sends the user back to our app. Opening Stripe with
+  // `window.open(url, '_system')` tells the Natively bridge to launch the system
+  // browser (Safari/Chrome) instead, so the entire payment flow — including the
+  // success redirect — happens cleanly outside the app shell.
+  const { isIos } = useIosPlatform();
+  const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
+
+  const openStripeUrl = (url: string) => {
+    const stripeWindow = window.open(url, '_system');
+    if (!stripeWindow) {
+      toast({
+        title: 'Unable to open browser',
+        description: 'Please open your default browser and visit the payment page manually.',
+        variant: 'destructive',
+      });
+    }
+    setPendingStripeUrl(null);
+  };
+
+  const routeStripeUrl = (url: string) => {
+    if (isIos) {
+      // Show Apple-required disclosure dialog before leaving the app
+      setPendingStripeUrl(url);
+    } else {
+      openStripeUrl(url);
+    }
+  };
+
   const paymentMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/create-checkout`);
@@ -1052,9 +1085,8 @@ export default function TournamentDetail() {
         return;
       }
       
-      console.log('✅ Redirecting to Stripe checkout:', data.url);
-      // Redirect to Stripe checkout
-      window.location.href = data.url;
+      console.log('✅ Routing to Stripe checkout:', data.url);
+      routeStripeUrl(data.url);
     },
     onError: (error: any) => {
       console.error('❌ Payment mutation error:', error);
@@ -1426,7 +1458,7 @@ export default function TournamentDetail() {
       }
 
       const { url } = await response.json();
-      window.location.href = url;
+      routeStripeUrl(url);
     } catch (error: any) {
       toast({
         title: "Payment failed",
@@ -1485,6 +1517,33 @@ export default function TournamentDetail() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Apple-required disclosure dialog before opening external Stripe checkout — iOS only */}
+      {isIos && (
+        <AlertDialog
+          open={!!pendingStripeUrl}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingStripeUrl(null);
+              setIsProcessingAdditionalPayment(false);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>You're leaving the app</AlertDialogTitle>
+              <AlertDialogDescription>
+                You're about to leave the app and visit an external website to complete your payment. Apple is not responsible for the privacy or security of payments made on third-party sites.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => pendingStripeUrl && openStripeUrl(pendingStripeUrl)}>
+                Continue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
       {/* Header */}
       <div className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 pt-[4px] pb-[4px]">
