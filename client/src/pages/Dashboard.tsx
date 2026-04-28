@@ -3295,6 +3295,10 @@ function DashboardMobile() {
           Send Feedback
         </button>
       </div>
+      {/* Mobile-only spacer so the HPIB banner + bottom nav don't cover the
+          search buttons above. Banner sits ~80px above the bottom nav and is
+          up to 128px tall, so we leave a comfortable scroll cushion. */}
+      <div className="h-56 md:hidden" aria-hidden="true" />
     </div>
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
