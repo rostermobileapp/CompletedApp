@@ -1957,7 +1957,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Session does not belong to this user' });
       }
 
-      if (session.payment_status !== 'paid') {
+      // Accept both 'paid' (normal payment) and 'no_payment_required' (e.g. 100% promo
+      // code makes the total $0). Both indicate Stripe has fully completed the checkout.
+      if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
         return res.status(409).json({
           message: 'Payment not yet confirmed by Stripe',
           paymentStatus: session.payment_status,
@@ -2486,11 +2488,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session;
           
+          // Both 'paid' and 'no_payment_required' (e.g. 100% promo code → $0) indicate
+          // Stripe has fully completed the checkout and access should be granted.
+          const checkoutCompleted =
+            session.payment_status === 'paid' ||
+            session.payment_status === 'no_payment_required';
+
           // Check if this is a tournament payment
           if (session.metadata?.type === 'tournament_payment') {
             const tournamentId = session.metadata.tournamentId;
             
-            if (tournamentId && session.payment_status === 'paid') {
+            if (tournamentId && checkoutCompleted) {
               await applyTournamentPaymentFromSession(tournamentId, session);
             }
           }
@@ -2499,7 +2507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const tournamentId = session.metadata.tournamentId;
             const additionalTeamCount = parseInt(session.metadata.additionalTeamCount || '0');
             
-            if (tournamentId && session.payment_status === 'paid' && additionalTeamCount > 0) {
+            if (tournamentId && checkoutCompleted && additionalTeamCount > 0) {
               await applyAdditionalTeamPaymentFromSession(tournamentId, session.id, additionalTeamCount);
             }
           }
