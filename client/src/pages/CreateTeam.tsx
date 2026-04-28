@@ -12,6 +12,8 @@ import { Upload, Copy, CheckCircle2, Users, UserPlus, Image as ImageIcon, Buildi
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import { getImageUrl } from '@/lib/queryClient';
 
 interface TeamResponse {
   id: string;
@@ -40,9 +42,7 @@ export default function CreateTeam() {
   const [createdTeam, setCreatedTeam] = useState<TeamResponse | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const [copiedTeamId, setCopiedTeamId] = useState(false);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showCreateFacility, setShowCreateFacility] = useState(false);
   const [newFacilityName, setNewFacilityName] = useState('');
   const [newFacilityAddress, setNewFacilityAddress] = useState('');
@@ -232,55 +232,33 @@ export default function CreateTeam() {
     });
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleGetTeamLogoUploadParameters = async () => {
+    const response = await apiRequest('POST', '/api/team-logos/upload', {});
+    const { uploadURL, path } = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: uploadURL,
+      path,
+    };
+  };
 
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: 'Invalid File',
-        description: 'Please upload an image file',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setIsUploadingPhoto(true);
-
-      // Get upload URL and path
-      const urlResponse = await apiRequest('POST', '/api/team-logos/upload', {});
-      const { uploadURL, path } = await urlResponse.json();
-
-      // Upload to object storage
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload photo');
-      }
-
-      // Use the path returned from the API
-      setPhotoUrl(path);
-
+  const handleTeamPhotoUploadComplete = (result: {
+    successful?: Array<{ uploadURL: string; path?: string }>;
+    failed?: Array<any>;
+  }) => {
+    const uploaded = result.successful?.[0];
+    if (uploaded?.path || uploaded?.uploadURL) {
+      setPhotoUrl(uploaded.path || uploaded.uploadURL);
       toast({
         title: 'Photo Uploaded',
         description: 'Team photo uploaded successfully!',
       });
-    } catch (error) {
-      console.error('Error uploading photo:', error);
+    } else if (result.failed && result.failed.length > 0) {
       toast({
         title: 'Upload Failed',
-        description: error instanceof Error ? error.message : 'Failed to upload photo',
+        description: 'Failed to upload photo. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      setIsUploadingPhoto(false);
     }
   };
 
@@ -542,23 +520,37 @@ export default function CreateTeam() {
                   Team Photo (Optional)
                 </label>
                 <div className="flex items-center gap-4">
-                  <Input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    data-testid="input-team-photo"
-                    onChange={handlePhotoUpload}
-                    disabled={isUploadingPhoto}
-                    className="flex-1"
-                  />
+                  <div
+                    className="w-16 h-16 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30 overflow-hidden shrink-0"
+                    data-testid="img-team-photo-preview"
+                  >
+                    {photoUrl ? (
+                      <img
+                        src={getImageUrl(photoUrl) || ''}
+                        alt="Team photo preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={10485760}
+                    onGetUploadParameters={handleGetTeamLogoUploadParameters}
+                    onComplete={handleTeamPhotoUploadComplete}
+                    cropShape="rect"
+                    cropDialogTitle="Position your team logo"
+                    buttonClassName="bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 text-sm"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {photoUrl ? 'Replace Photo' : 'Upload Photo'}
+                  </ObjectUploader>
                   {photoUrl && (
-                    <div className="flex items-center gap-2 text-sm text-green-600">
+                    <div className="flex items-center gap-1 text-sm text-green-600">
                       <CheckCircle2 className="h-4 w-4" />
                       <span>Uploaded</span>
                     </div>
-                  )}
-                  {isUploadingPhoto && (
-                    <span className="text-sm text-muted-foreground">Uploading...</span>
                   )}
                 </div>
               </div>

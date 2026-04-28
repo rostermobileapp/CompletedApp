@@ -1022,6 +1022,8 @@ function TournamentLogoField({
           <ObjectUploader
             maxNumberOfFiles={1}
             maxFileSize={10 * 1024 * 1024}
+            cropShape="rect"
+            cropDialogTitle="Position your tournament logo"
             buttonClassName="bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 text-sm"
             onGetUploadParameters={async () => {
               const res = await apiRequest('POST', '/api/tournament-logos/upload');

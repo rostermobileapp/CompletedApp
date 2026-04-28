@@ -378,6 +378,8 @@ export default function Teams() {
                             maxFileSize={10485760}
                             onGetUploadParameters={handleGetTeamLogoUploadParameters}
                             onComplete={createTeamLogoUploadComplete(team.id)}
+                            cropShape="rect"
+                            cropDialogTitle="Position your team logo"
                             buttonClassName="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-lg opacity-0 hover:opacity-100 bg-black/50 flex items-center justify-center transition-opacity"
                           >
                             <Upload className="w-6 h-6 text-white" />

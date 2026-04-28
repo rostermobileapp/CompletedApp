@@ -272,6 +272,8 @@ function StepBasicInfo({
           <ObjectUploader
             onGetUploadParameters={onGetUploadParameters}
             onComplete={onUploadComplete}
+            cropShape="round"
+            cropDialogTitle="Position your profile photo"
             buttonClassName="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white text-black hover:bg-zinc-200 p-0 flex items-center justify-center"
           >
             <Camera className="w-4 h-4" />

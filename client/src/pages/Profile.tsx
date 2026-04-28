@@ -423,6 +423,8 @@ export default function Profile() {
                   maxFileSize={15728640} // 15MB
                   onGetUploadParameters={handleGetUploadParameters}
                   onComplete={handleUploadComplete}
+                  cropShape="round"
+                  cropDialogTitle="Position your profile photo"
                   buttonClassName="w-8 h-8 bg-primary hover:bg-primary text-primary-foreground rounded-full flex items-center justify-center border-2 border-background"
                 >
                   <Camera className="w-4 h-4" />
