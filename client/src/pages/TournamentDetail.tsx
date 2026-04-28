@@ -1063,9 +1063,11 @@ export default function TournamentDetail() {
   // Embedded Stripe checkout — runs inside an in-app modal instead of redirecting
   // away to the hosted Stripe page. The server creates a Checkout Session with
   // `ui_mode: 'embedded'` and returns a `clientSecret`; we pass that to the modal
-  // which renders Stripe's payment form inline. After payment, the modal swaps to
-  // a success state telling the user to refresh the page (which in turn triggers
-  // the auto-sync useEffect above and reflects the paid status in the UI).
+  // which renders Stripe's payment form inline. After payment, we confirm with
+  // the server, refresh the cached tournament data in place, show a success
+  // toast, and the modal auto-closes — no manual page refresh required. The
+  // page-mount sync-payment useEffect above remains as a fallback for users who
+  // close the modal before confirmation finishes.
   const [activeCheckout, setActiveCheckout] = useState<{
     clientSecret: string;
     sessionId: string;
@@ -1085,27 +1087,51 @@ export default function TournamentDetail() {
   // Called by the modal as soon as Stripe reports the payment complete.
   // We confirm it server-side immediately so additional-team credits and
   // initial-tournament paid status update without waiting for the webhook,
-  // and invalidate cached tournament data so the UI is fresh on refresh.
-  // Memoized so EmbeddedCheckoutProvider options don't churn between renders.
+  // then refetch tournament + teams so the UI updates in place. We surface a
+  // success toast here (instead of inside the modal) since the modal will
+  // auto-close once this resolves. Memoized so EmbeddedCheckoutProvider
+  // options stay referentially stable between renders.
   const handleEmbeddedPaymentComplete = useCallback(async () => {
     if (!activeCheckout || !tournamentId) return;
+    const wasAdditional = activeCheckout.isAdditional;
+    let confirmed = false;
     try {
       await apiRequest(
         'POST',
         `/api/tournaments/${tournamentId}/confirm-payment`,
         {
           sessionId: activeCheckout.sessionId,
-          additional: activeCheckout.isAdditional || undefined,
+          additional: wasAdditional || undefined,
         },
       );
+      confirmed = true;
     } catch (err) {
       // Non-fatal: webhook + sync-payment will eventually reconcile.
       console.warn('[TournamentDetail] confirm-payment after embedded checkout failed:', err);
     } finally {
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      // Refetch (not just invalidate) so the modal closes onto already-updated
+      // UI rather than briefly showing stale data while the next fetch runs.
+      await Promise.allSettled([
+        queryClient.refetchQueries({ queryKey: ['/api/tournaments', tournamentId] }),
+        queryClient.refetchQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] }),
+      ]);
     }
-  }, [activeCheckout, tournamentId]);
+    if (confirmed) {
+      toast({
+        title: "Payment successful!",
+        description: wasAdditional
+          ? "Your additional team payment has been processed."
+          : "Your tournament payment has been processed.",
+      });
+    } else {
+      // Not necessarily a true failure — webhook + sync-payment will reconcile.
+      // Use the default (non-destructive) toast so we don't alarm the user.
+      toast({
+        title: "We're still confirming your payment",
+        description: "Stripe accepted the charge. If this page doesn't update in a moment, please refresh.",
+      });
+    }
+  }, [activeCheckout, tournamentId, toast]);
 
   const paymentMutation = useMutation({
     mutationFn: async () => {
@@ -1566,7 +1592,8 @@ export default function TournamentDetail() {
     <div className="min-h-screen bg-background">
       {/* In-app Stripe payment modal — used for both initial tournament payment and
          additional-team payments. Renders Stripe's embedded checkout inside our
-         own dialog and swaps to a "refresh page" success state on completion. */}
+         own dialog. On success we confirm with the server, refetch tournament
+         data, then auto-close the modal — no manual refresh required. */}
       <StripeCheckoutModal
         clientSecret={activeCheckout?.clientSecret ?? null}
         open={isCheckoutOpen}
