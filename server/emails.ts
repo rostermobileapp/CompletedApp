@@ -774,3 +774,120 @@ Visit: ${appUrl}
     throw error;
   }
 }
+
+interface TournamentScheduleShiftEmailData {
+  tournamentId: string;
+  tournamentName: string;
+  matchCount: number;
+  dayDelta: number;
+  firstNewMatchTime: Date | null;
+}
+
+export async function sendTournamentScheduleShiftEmail(
+  recipientEmail: string,
+  data: TournamentScheduleShiftEmailData
+): Promise<void> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+
+    const appUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : 'https://rosters.replit.app';
+    const tournamentUrl = `${appUrl}/tournaments/${data.tournamentId}`;
+
+    const direction = data.dayDelta > 0 ? 'later' : 'earlier';
+    const days = Math.abs(data.dayDelta);
+    const matchWord = data.matchCount === 1 ? 'match' : 'matches';
+    const dayWord = days === 1 ? 'day' : 'days';
+
+    const firstNewDateStr = data.firstNewMatchTime
+      ? format(data.firstNewMatchTime, 'EEEE, MMMM d, yyyy')
+      : null;
+    const firstNewTimeStr = data.firstNewMatchTime
+      ? format(data.firstNewMatchTime, 'h:mm a')
+      : null;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${data.tournamentName} schedule updated</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <tr>
+                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: bold;">Schedule Updated</h1>
+                      <p style="margin: 10px 0 0 0; color: #e0e0ff; font-size: 16px;">${data.tournamentName}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 40px;">
+                      <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 24px; color: #333333;">
+                        <strong>${data.matchCount}</strong> of your ${matchWord} in <strong>${data.tournamentName}</strong>
+                        moved <strong>${days} ${dayWord} ${direction}</strong>.
+                      </p>
+                      ${firstNewDateStr ? `
+                      <div style="background-color: #f0f4ff; border-left: 4px solid #667eea; border-radius: 4px; padding: 16px; margin: 20px 0;">
+                        <p style="margin: 0 0 6px 0; font-size: 14px; color: #666666;">Your next affected match is now on:</p>
+                        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333333;">${firstNewDateStr}${firstNewTimeStr ? ` at ${firstNewTimeStr}` : ''}</p>
+                      </div>
+                      ` : ''}
+                      <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 20px; color: #555555;">
+                        Open the tournament for the full updated schedule.
+                      </p>
+                      <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                          <td align="center">
+                            <a href="${tournamentUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Tournament</a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
+                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
+                        This notification was sent through <strong>Rosters</strong> - Your sports team management platform<br>
+                        <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit Rosters</a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const textContent = `
+${data.tournamentName} schedule updated
+
+${data.matchCount} of your ${matchWord} moved ${days} ${dayWord} ${direction}.
+${firstNewDateStr ? `Your next affected match is now on ${firstNewDateStr}${firstNewTimeStr ? ` at ${firstNewTimeStr}` : ''}.\n` : ''}
+View the full schedule: ${tournamentUrl}
+
+---
+This notification was sent through Rosters - Your sports team management platform
+Visit: ${appUrl}
+    `.trim();
+
+    await client.emails.send({
+      from: fromEmail,
+      to: recipientEmail,
+      subject: `📅 ${data.tournamentName} schedule updated`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    console.log(`✅ Sent tournament shift email to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send tournament shift email to ${recipientEmail}:`, error);
+  }
+}

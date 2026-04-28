@@ -18121,7 +18121,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // to be sent on a 2xx path, so a later failure suppresses delivery.
       const tournamentNameForDispatch = updated?.name || tournament.name;
       const actorIdForDispatch = (req.user as any)?.claims?.sub || 'unknown';
-      const preResolvedRecipients = new Set<string>();
+      const preResolvedRecipients = new Map<string, { email: string | null }>();
+
+      // Compute the earliest new (post-shift) match time so we can include a
+      // concrete "next match is now on..." date/time in notifications.
+      const firstNewMatchTime: Date | null = shiftedMatches.length > 0
+        ? shiftedMatches
+            .map(sm => sm.scheduledTime)
+            .filter((d): d is Date => d instanceof Date && !isNaN(d.getTime()))
+            .sort((a, b) => a.getTime() - b.getTime())[0] ?? null
+        : null;
+
+      // If a later step in this same handler replaces or rebuilds the matches
+      // (custom-bracket rewrite or full team-regeneration), the shifted match
+      // set no longer reflects what's in the DB and we'll suppress dispatch.
+      let matchesReplacedAfterShift = false;
 
       if (shiftedMatches.length > 0 && shiftDayDelta !== 0) {
         try {
@@ -18134,6 +18148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .filter((x): x is string => !!x)
             )
           );
+
+          const candidateUserIds = new Set<string>();
 
           if (tournamentTeamIds.length > 0) {
             const tournamentTeamRows = await db
@@ -18155,7 +18171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     eq(teamMemberships.status, 'approved')
                   )
                 );
-              for (const m of memberships) preResolvedRecipients.add(m.userId);
+              for (const m of memberships) candidateUserIds.add(m.userId);
             }
           }
 
@@ -18167,20 +18183,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .select({ userId: tournamentMatchRsvps.userId })
               .from(tournamentMatchRsvps)
               .where(inArray(tournamentMatchRsvps.matchId, shiftedMatchIds));
-            for (const r of rsvps) preResolvedRecipients.add(r.userId);
+            for (const r of rsvps) candidateUserIds.add(r.userId);
           }
 
           // Don't notify the commissioner who initiated the shift.
-          preResolvedRecipients.delete(actorIdForDispatch);
+          candidateUserIds.delete(actorIdForDispatch);
+
+          // Fetch each user's email so we can fan out via email too.
+          if (candidateUserIds.size > 0) {
+            const userRows = await db
+              .select({ id: users.id, email: users.email })
+              .from(users)
+              .where(inArray(users.id, Array.from(candidateUserIds)));
+            for (const u of userRows) {
+              preResolvedRecipients.set(u.id, { email: u.email });
+            }
+          }
         } catch (err) {
           // Failure to resolve recipients shouldn't fail the PATCH — log and
-          // proceed; dispatch will simply have an empty set.
+          // proceed; dispatch will simply have an empty map.
           console.error('[TournamentShift] Recipient resolution failed:', err);
         }
       }
 
       const dispatchShiftNotifications = () => {
         if (shiftedMatches.length === 0 || shiftDayDelta === 0) return;
+        if (matchesReplacedAfterShift) {
+          console.log(
+            `[TournamentShift] Suppressing dispatch for tournament=${id}: ` +
+            `matches were replaced after the shift in the same request.`
+          );
+          return;
+        }
         const tournamentId = id;
         const matchCount = shiftedMatches.length;
         const dayDelta = shiftDayDelta;
@@ -18200,17 +18234,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const days = Math.abs(dayDelta);
         const matchWord = matchCount === 1 ? 'match' : 'matches';
         const dayWord = days === 1 ? 'day' : 'days';
-        const summaryMessage =
-          `${matchCount} of your ${matchWord} in ${tournamentNameForDispatch} moved ${days} ${dayWord} ${direction}. ` +
-          `Open the tournament to see the new times.`;
 
-        // Fire-and-forget: don't block the PATCH response on push delivery.
+        // Concrete date/time of the earliest affected match after the shift,
+        // so recipients know exactly when their next match is.
+        const newWhenStr = firstNewMatchTime
+          ? `${format(firstNewMatchTime, 'EEE MMM d')} at ${format(firstNewMatchTime, 'h:mm a')}`
+          : null;
+        const summaryMessage = newWhenStr
+          ? `${matchCount} of your ${matchWord} in ${tournamentNameForDispatch} moved ${days} ${dayWord} ${direction}. Next up: ${newWhenStr}.`
+          : `${matchCount} of your ${matchWord} in ${tournamentNameForDispatch} moved ${days} ${dayWord} ${direction}. Open the tournament to see the new times.`;
+
+        // Fire-and-forget: don't block the PATCH response on delivery.
         (async () => {
           try {
-            const { sendTournamentScheduleShiftPushNotification } =
-              await import('./oneSignalNotifications');
+            const [{ sendTournamentScheduleShiftPushNotification }, { sendTournamentScheduleShiftEmail }] =
+              await Promise.all([
+                import('./oneSignalNotifications'),
+                import('./emails'),
+              ]);
 
-            for (const userId of Array.from(preResolvedRecipients)) {
+            for (const [userId, { email }] of Array.from(preResolvedRecipients.entries())) {
               try {
                 await storage.createNotification({
                   userId,
@@ -18232,13 +18275,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 tournamentNameForDispatch,
                 tournamentId,
                 matchCount,
-                dayDelta
+                dayDelta,
+                firstNewMatchTime
               ).catch(err => {
                 console.error(
                   `[TournamentShift] Push notification failed for user ${userId}:`,
                   err
                 );
               });
+
+              if (email) {
+                try {
+                  // Respect users' upcoming-event preference for the email
+                  // channel just as the push helper does for push.
+                  const prefs = await storage.getNotificationPreferences(userId);
+                  const settings = prefs?.notificationSettings as
+                    | Record<string, boolean>
+                    | undefined;
+                  if (settings?.upcomingEvents !== false) {
+                    sendTournamentScheduleShiftEmail(email, {
+                      tournamentId,
+                      tournamentName: tournamentNameForDispatch,
+                      matchCount,
+                      dayDelta,
+                      firstNewMatchTime,
+                    }).catch(err => {
+                      console.error(
+                        `[TournamentShift] Email notification failed for ${email}:`,
+                        err
+                      );
+                    });
+                  }
+                } catch (err) {
+                  console.error(
+                    `[TournamentShift] Failed to read prefs for user ${userId}:`,
+                    err
+                  );
+                }
+              }
             }
           } catch (err) {
             console.error('[TournamentShift] Notification dispatch failed:', err);
@@ -18249,6 +18323,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If custom bracket with matchups is being saved, create/update tournament_matches
       if (settings?.customBracket?.matchups && Array.isArray(settings.customBracket.matchups)) {
         const matchups = settings.customBracket.matchups;
+        // The shifted match set is about to be deleted and rebuilt — suppress
+        // the schedule-shift notification so we don't tell players about
+        // matches that no longer exist.
+        matchesReplacedAfterShift = true;
         
         // Get existing matches to preserve scheduledTime, location, notes, gameId
         const existingMatches = await db
@@ -18354,7 +18432,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json(finalUpdated);
         }
 
-        // Full regeneration: clear existing teams and matches
+        // Full regeneration: clear existing teams and matches.
+        // The shifted match set is gone — suppress the schedule-shift
+        // notification so we don't tell players about deleted matches.
+        matchesReplacedAfterShift = true;
         await db.delete(tournamentMatches).where(eq(tournamentMatches.tournamentId, id));
         await db.delete(tournamentTeams).where(eq(tournamentTeams.tournamentId, id));
 

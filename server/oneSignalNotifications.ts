@@ -476,7 +476,8 @@ export async function sendTournamentScheduleShiftPushNotification(
   tournamentName: string,
   tournamentId: string,
   matchCount: number,
-  dayDelta: number
+  dayDelta: number,
+  firstNewMatchTime: Date | null = null
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -490,15 +491,34 @@ export async function sendTournamentScheduleShiftPushNotification(
   const matchWord = matchCount === 1 ? 'match' : 'matches';
   const dayWord = days === 1 ? 'day' : 'days';
 
+  // Format the earliest new match time so the recipient sees the concrete
+  // new date/time in the push body, not just a relative shift description.
+  let nextWhen: string | null = null;
+  if (firstNewMatchTime) {
+    const opts: Intl.DateTimeFormatOptions = {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    };
+    nextWhen = firstNewMatchTime.toLocaleString('en-US', opts);
+  }
+
+  const message = nextWhen
+    ? `${matchCount} of your ${matchWord} moved ${days} ${dayWord} ${direction}. Next up: ${nextWhen}.`
+    : `${matchCount} of your ${matchWord} moved ${days} ${dayWord} ${direction}. Tap to see the new times.`;
+
   return sendPushNotificationToUser({
     userId: recipientId,
     title: `📅 ${tournamentName} schedule updated`,
-    message: `${matchCount} of your ${matchWord} moved ${days} ${dayWord} ${direction}. Tap to see the new times.`,
+    message,
     data: {
       type: 'tournament_schedule_changed',
       tournamentId,
       matchCount: String(matchCount),
       dayDelta: String(dayDelta),
+      ...(firstNewMatchTime ? { firstNewMatchTime: firstNewMatchTime.toISOString() } : {}),
     },
   });
 }
