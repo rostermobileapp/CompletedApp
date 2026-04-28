@@ -1669,6 +1669,8 @@ function DashboardMobile() {
   // Fetch notification counts for all leagues and tournaments
   const { data: notificationCounts } = useQuery<{
     leagues: Record<string, number>;
+    leagueTasks?: Record<string, number>;
+    teams?: Record<string, number>;
     tournaments: Record<string, number>;
   }>({
     queryKey: ['/api/user/notification-counts'],
@@ -1692,6 +1694,62 @@ function DashboardMobile() {
       return !hasTeamInLeague;
     });
   }, [userLeagues, userTeamsAll]);
+
+  // Mobile selector glow: pulse when ANY non-selected context (team, league,
+  // or tournament) has unreviewed alerts. Mirrors the desktop logic in
+  // DesktopAppShell.tsx and uses the typed `notificationCounts` query data.
+  const mobileSelectorHasOtherAlerts = React.useMemo(() => {
+    const leagueCounts = notificationCounts?.leagues || {};
+    const tournamentCounts = notificationCounts?.tournaments || {};
+    const teamCounts = notificationCounts?.teams || {};
+    const teams: Array<{ id: string; leagueId?: string | null }> =
+      Array.isArray(userTeamsAll) ? (userTeamsAll as any[]) : [];
+    const leaguesOnly: Array<{ id: string }> =
+      Array.isArray(leaguesWithoutTeams) ? (leaguesWithoutTeams as any[]) : [];
+    const tournaments: Array<{ id: string }> =
+      Array.isArray(userPaidTournaments) ? (userPaidTournaments as any[]) : [];
+
+    let currentLeagueId: string | null = null;
+    if (selectedType === 'league') currentLeagueId = selectedId;
+    else if (selectedType === 'team') {
+      const sel = teams.find((t) => t.id === selectedId);
+      currentLeagueId = sel?.leagueId ?? null;
+    }
+
+    // (a) Per-team check.
+    for (const team of teams) {
+      if (selectedType === 'team' && selectedId === team.id) continue;
+      if ((teamCounts[team.id] || 0) > 0) return true;
+    }
+    // (b) Per-league check excluding the currently selected league.
+    const seenLeagues = new Set<string>();
+    for (const team of teams) {
+      const lid = team.leagueId;
+      if (!lid || seenLeagues.has(lid)) continue;
+      seenLeagues.add(lid);
+      if (lid === currentLeagueId) continue;
+      if ((leagueCounts[lid] || 0) > 0) return true;
+    }
+    for (const lg of leaguesOnly) {
+      if (!lg.id || seenLeagues.has(lg.id)) continue;
+      seenLeagues.add(lg.id);
+      if (lg.id === currentLeagueId) continue;
+      if ((leagueCounts[lg.id] || 0) > 0) return true;
+    }
+    // (c) Per-tournament check.
+    for (const t of tournaments) {
+      if (selectedType === 'tournament' && selectedId === t.id) continue;
+      if ((tournamentCounts[t.id] || 0) > 0) return true;
+    }
+    return false;
+  }, [
+    notificationCounts,
+    userTeamsAll,
+    leaguesWithoutTeams,
+    userPaidTournaments,
+    selectedType,
+    selectedId,
+  ]);
   
   // Set default selection - prefer team first, then league, then tournament
   // Also validate that saved selection still exists
@@ -2206,48 +2264,7 @@ function DashboardMobile() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className={`w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${(() => {
-                const leagueCounts = (notificationCounts as any)?.leagues || {};
-                const tournamentCounts = (notificationCounts as any)?.tournaments || {};
-                const teamCounts = (notificationCounts as any)?.teams || {};
-                let currentLeagueId: string | null = null;
-                if (selectedType === 'league') currentLeagueId = selectedId;
-                else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
-                  const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
-                  currentLeagueId = sel?.leagueId ?? null;
-                }
-                if (Array.isArray(userTeamsAll)) {
-                  for (const team of userTeamsAll as any[]) {
-                    if (selectedType === 'team' && selectedId === team.id) continue;
-                    if ((teamCounts[team.id] || 0) > 0) return 'alerts-glow';
-                  }
-                }
-                const seenLeagues = new Set<string>();
-                if (Array.isArray(userTeamsAll)) {
-                  for (const team of userTeamsAll as any[]) {
-                    const lid = team.leagueId;
-                    if (!lid || seenLeagues.has(lid)) continue;
-                    seenLeagues.add(lid);
-                    if (lid === currentLeagueId) continue;
-                    if ((leagueCounts[lid] || 0) > 0) return 'alerts-glow';
-                  }
-                }
-                if (Array.isArray(leaguesWithoutTeams)) {
-                  for (const lg of leaguesWithoutTeams as any[]) {
-                    if (!lg.id || seenLeagues.has(lg.id)) continue;
-                    seenLeagues.add(lg.id);
-                    if (lg.id === currentLeagueId) continue;
-                    if ((leagueCounts[lg.id] || 0) > 0) return 'alerts-glow';
-                  }
-                }
-                if (Array.isArray(userPaidTournaments)) {
-                  for (const t of userPaidTournaments as any[]) {
-                    if (selectedType === 'tournament' && selectedId === t.id) continue;
-                    if ((tournamentCounts[t.id] || 0) > 0) return 'alerts-glow';
-                  }
-                }
-                return '';
-              })()}`}
+              className={`w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${mobileSelectorHasOtherAlerts ? 'alerts-glow' : ''}`}
               data-testid="button-selector"
             >
               <div className="flex items-center gap-2">
