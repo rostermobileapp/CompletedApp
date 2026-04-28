@@ -2157,6 +2157,7 @@ export default function TournamentDetail() {
                             tournamentId={tournamentId || ''}
                             isCommissioner={!isReadOnlyMode && canManageTournament()}
                             tournamentType={tournament.type}
+                            isUnpaid={isUnpaid}
                           />
                         </CardContent>
                       </Card>

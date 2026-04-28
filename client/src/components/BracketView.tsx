@@ -20,9 +20,13 @@ interface BracketViewProps {
   tournamentId: string;
   isCommissioner?: boolean;
   tournamentType?: 'standalone' | 'season_playoff';
+  // When true, all per-match commissioner edit controls (team assignment
+  // selects, etc.) are disabled because the tournament invoice is unpaid.
+  // The dedicated pay banner lives in TournamentDetail's bracket tab.
+  isUnpaid?: boolean;
 }
 
-export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType }: BracketViewProps) {
+export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType, isUnpaid = false }: BracketViewProps) {
   const [zoom, setZoom] = useState(0.65); // Start slightly zoomed out to show full bracket
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -542,7 +546,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                     <Select
                       value={match.team1Id || ""}
                       onValueChange={(value) => handleTeamSelect(match.id, 'team1', value, match)}
-                      disabled={updateMatchTeamMutation.isPending}
+                      disabled={updateMatchTeamMutation.isPending || isUnpaid}
                     >
                       <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-card-foreground" data-testid={`select-team1-${match.matchNumber}`}>
                         <SelectValue placeholder="Select Team">
@@ -590,7 +594,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
                     <Select
                       value={match.team2Id || ""}
                       onValueChange={(value) => handleTeamSelect(match.id, 'team2', value, match)}
-                      disabled={updateMatchTeamMutation.isPending}
+                      disabled={updateMatchTeamMutation.isPending || isUnpaid}
                     >
                       <SelectTrigger className="h-6 text-xs bg-background border-0 font-bold text-card-foreground" data-testid={`select-team2-${match.matchNumber}`}>
                         <SelectValue placeholder="Select Team">
