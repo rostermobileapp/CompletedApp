@@ -1747,8 +1747,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Payment amount is already stored in cents
       const amountInCents = Math.round(tournament.paymentAmount || 0);
 
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
+      // Embedded checkout = in-app payment modal (preferred for tournament page).
+      // When the client passes { embedded: true } we use Stripe's Embedded Checkout
+      // which renders the payment form inside our own modal instead of redirecting
+      // away. Falls back to hosted checkout (returning a URL) when not requested.
+      const embedded = req.body?.embedded === true;
+
+      const baseSessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         mode: 'payment',
         payment_method_types: ['card'],
@@ -1766,7 +1771,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: 1,
           },
         ],
-        success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
         client_reference_id: userId,
         metadata: {
@@ -1774,7 +1778,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tournamentId: tournamentId,
           type: 'tournament_payment'
         },
-      });
+      };
+
+      const session = embedded
+        ? await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            ui_mode: 'embedded',
+            // 'if_required' lets onComplete fire for normal card payments while still
+            // supporting 3DS / alternative-payment flows that need a full redirect.
+            redirect_on_completion: 'if_required',
+            return_url: `${appUrl}/tournaments/${tournamentId}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+          })
+        : await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+          });
 
       // Update tournament with session ID
       await db
@@ -1784,6 +1802,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedAt: new Date()
         })
         .where(eq(tournaments.id, tournamentId));
+
+      if (embedded) {
+        if (!session.client_secret) {
+          console.error('[Stripe] Embedded session created but client_secret is missing!', session);
+          return res.status(500).json({ message: 'Stripe session client_secret missing' });
+        }
+        return res.json({ clientSecret: session.client_secret, sessionId: session.id });
+      }
 
       if (!session.url) {
         console.error('[Stripe] Session created but URL is missing!', session);
@@ -1870,8 +1896,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate amount: $10 per additional team (1000 cents per team)
       const amountInCents = additionalTeamCount * 1000;
 
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
+      // Embedded checkout = in-app payment modal (preferred for tournament page).
+      const embedded = req.body?.embedded === true;
+
+      const baseSessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         mode: 'payment',
         payment_method_types: ['card'],
@@ -1889,7 +1917,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: additionalTeamCount,
           },
         ],
-        success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&additional=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
         client_reference_id: userId,
         metadata: {
@@ -1898,7 +1925,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'additional_team_payment',
           additionalTeamCount: additionalTeamCount.toString()
         },
-      });
+      };
+
+      const session = embedded
+        ? await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            ui_mode: 'embedded',
+            redirect_on_completion: 'if_required',
+            return_url: `${appUrl}/tournaments/${tournamentId}?payment=success&additional=true&session_id={CHECKOUT_SESSION_ID}`,
+          })
+        : await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&additional=true&session_id={CHECKOUT_SESSION_ID}`,
+          });
+
+      if (embedded) {
+        if (!session.client_secret) {
+          console.error('[Stripe] Embedded session created but client_secret is missing!', session);
+          return res.status(500).json({ message: 'Stripe session client_secret missing' });
+        }
+        return res.json({ clientSecret: session.client_secret, sessionId: session.id });
+      }
 
       if (!session.url) {
         console.error('[Stripe] Session created but URL is missing!', session);

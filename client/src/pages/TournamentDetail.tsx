@@ -34,11 +34,11 @@ import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
 import { TournamentCountdown } from "@/components/TournamentCountdown";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import LocationLink from "@/components/LocationLink";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
-import { useIosPlatform } from "@/hooks/useIosPlatform";
+import { StripeCheckoutModal } from "@/components/StripeCheckoutModal";
 
 // The tournament detail endpoint may return either a full Tournament record
 // or a minimal pre-access countdown payload for approved participants whose
@@ -1060,60 +1060,74 @@ export default function TournamentDetail() {
     }
   });
 
-  // Stripe checkout URL routing — mirrors the working pattern in the Subscription page.
-  // We must NOT use `window.location.href = stripeUrl` from inside the Natively native
-  // app webview: that drops the user into the in-app webview for Stripe's hosted page
-  // and then bounces the post-payment redirect into a broken context (often a blank
-  // white page) when Stripe sends the user back to our app. Opening Stripe with
-  // `window.open(url, '_system')` tells the Natively bridge to launch the system
-  // browser (Safari/Chrome) instead, so the entire payment flow — including the
-  // success redirect — happens cleanly outside the app shell.
-  const { isIos } = useIosPlatform();
-  const [pendingStripeUrl, setPendingStripeUrl] = useState<string | null>(null);
+  // Embedded Stripe checkout — runs inside an in-app modal instead of redirecting
+  // away to the hosted Stripe page. The server creates a Checkout Session with
+  // `ui_mode: 'embedded'` and returns a `clientSecret`; we pass that to the modal
+  // which renders Stripe's payment form inline. After payment, the modal swaps to
+  // a success state telling the user to refresh the page (which in turn triggers
+  // the auto-sync useEffect above and reflects the paid status in the UI).
+  const [activeCheckout, setActiveCheckout] = useState<{
+    clientSecret: string;
+    sessionId: string;
+    isAdditional: boolean;
+  } | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
-  const openStripeUrl = (url: string) => {
-    const stripeWindow = window.open(url, '_system');
-    if (!stripeWindow) {
-      toast({
-        title: 'Unable to open browser',
-        description: 'Please open your default browser and visit the payment page manually.',
-        variant: 'destructive',
-      });
-    }
-    setPendingStripeUrl(null);
+  const openEmbeddedCheckout = (
+    clientSecret: string,
+    sessionId: string,
+    isAdditional: boolean,
+  ) => {
+    setActiveCheckout({ clientSecret, sessionId, isAdditional });
+    setIsCheckoutOpen(true);
   };
 
-  const routeStripeUrl = (url: string) => {
-    if (isIos) {
-      // Show Apple-required disclosure dialog before leaving the app
-      setPendingStripeUrl(url);
-    } else {
-      openStripeUrl(url);
+  // Called by the modal as soon as Stripe reports the payment complete.
+  // We confirm it server-side immediately so additional-team credits and
+  // initial-tournament paid status update without waiting for the webhook,
+  // and invalidate cached tournament data so the UI is fresh on refresh.
+  // Memoized so EmbeddedCheckoutProvider options don't churn between renders.
+  const handleEmbeddedPaymentComplete = useCallback(async () => {
+    if (!activeCheckout || !tournamentId) return;
+    try {
+      await apiRequest(
+        'POST',
+        `/api/tournaments/${tournamentId}/confirm-payment`,
+        {
+          sessionId: activeCheckout.sessionId,
+          additional: activeCheckout.isAdditional || undefined,
+        },
+      );
+    } catch (err) {
+      // Non-fatal: webhook + sync-payment will eventually reconcile.
+      console.warn('[TournamentDetail] confirm-payment after embedded checkout failed:', err);
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
     }
-  };
+  }, [activeCheckout, tournamentId]);
 
   const paymentMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/tournaments/${tournamentId}/create-checkout`);
+      const response = await apiRequest(
+        'POST',
+        `/api/tournaments/${tournamentId}/create-checkout`,
+        { embedded: true },
+      );
       const data = await response.json();
-      return data as { url: string };
+      return data as { clientSecret?: string; sessionId?: string };
     },
     onSuccess: (data) => {
-      console.log('💳 Stripe checkout response:', data);
-      
-      // Validate the URL before redirecting
-      if (!data || !data.url) {
-        console.error('❌ Invalid checkout response:', data);
+      if (!data?.clientSecret || !data?.sessionId) {
+        console.error('❌ Invalid embedded checkout response:', data);
         toast({
           title: "Error",
-          description: "Invalid checkout session URL received",
-          variant: "destructive"
+          description: "Could not start payment. Please try again.",
+          variant: "destructive",
         });
         return;
       }
-      
-      console.log('✅ Routing to Stripe checkout:', data.url);
-      routeStripeUrl(data.url);
+      openEmbeddedCheckout(data.clientSecret, data.sessionId, false);
     },
     onError: (error: any) => {
       console.error('❌ Payment mutation error:', error);
@@ -1476,7 +1490,10 @@ export default function TournamentDetail() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ additionalTeamCount: additionalPaymentRequired.additionalTeamsCount })
+        body: JSON.stringify({
+          additionalTeamCount: additionalPaymentRequired.additionalTeamsCount,
+          embedded: true,
+        })
       });
 
       if (!response.ok) {
@@ -1484,8 +1501,11 @@ export default function TournamentDetail() {
         throw new Error(error.message || 'Failed to create checkout session');
       }
 
-      const { url } = await response.json();
-      routeStripeUrl(url);
+      const data = await response.json();
+      if (!data?.clientSecret || !data?.sessionId) {
+        throw new Error('Could not start payment. Please try again.');
+      }
+      openEmbeddedCheckout(data.clientSecret, data.sessionId, true);
     } catch (error: any) {
       toast({
         title: "Payment failed",
@@ -1544,33 +1564,21 @@ export default function TournamentDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Apple-required disclosure dialog before opening external Stripe checkout — iOS only */}
-      {isIos && (
-        <AlertDialog
-          open={!!pendingStripeUrl}
-          onOpenChange={(open) => {
-            if (!open) {
-              setPendingStripeUrl(null);
-              setIsProcessingAdditionalPayment(false);
-            }
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>You're leaving the app</AlertDialogTitle>
-              <AlertDialogDescription>
-                You're about to leave the app and visit an external website to complete your payment. Apple is not responsible for the privacy or security of payments made on third-party sites.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => pendingStripeUrl && openStripeUrl(pendingStripeUrl)}>
-                Continue
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {/* In-app Stripe payment modal — used for both initial tournament payment and
+         additional-team payments. Renders Stripe's embedded checkout inside our
+         own dialog and swaps to a "refresh page" success state on completion. */}
+      <StripeCheckoutModal
+        clientSecret={activeCheckout?.clientSecret ?? null}
+        open={isCheckoutOpen}
+        onOpenChange={(open) => {
+          setIsCheckoutOpen(open);
+          if (!open) {
+            // Discard the secret on close so reopening starts a fresh session.
+            setActiveCheckout(null);
+          }
+        }}
+        onPaymentComplete={handleEmbeddedPaymentComplete}
+      />
       {/* Header */}
       <div className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 pt-[4px] pb-[4px]">
