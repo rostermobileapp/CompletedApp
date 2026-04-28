@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
@@ -77,6 +78,7 @@ export default function Profile() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
   const [teamJoinLeagueMessage, setTeamJoinLeagueMessage] = useState('');
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
+  const isDesktopWeb = useIsDesktopWeb();
 
   // Fetch full user profile from database (includes displayId)
   const { data: user } = useQuery({
@@ -902,14 +904,16 @@ export default function Profile() {
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4" data-testid="text-settings-title">Settings</h2>
         <div className="space-y-2">
-          {/* Theme Toggle */}
-          <div className="w-full border border-border rounded-lg p-4 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121] pt-[16px] pb-[16px]">
-            <div className="flex items-center gap-3">
-              <Moon className="w-5 h-5 text-muted-foreground" />
-              <span>Light Mode</span>
+          {/* Theme Toggle — hidden on desktop web; desktop is light-only */}
+          {!isDesktopWeb && (
+            <div className="w-full border border-border rounded-lg p-4 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121] pt-[16px] pb-[16px]">
+              <div className="flex items-center gap-3">
+                <Moon className="w-5 h-5 text-muted-foreground" />
+                <span>Light Mode</span>
+              </div>
+              <ThemeToggle />
             </div>
-            <ThemeToggle />
-          </div>
+          )}
           
           {settingsItems.map((item, index) => (
             <button

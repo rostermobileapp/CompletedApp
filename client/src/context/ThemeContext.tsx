@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 
 type Theme = 'light' | 'dark';
 
@@ -11,6 +12,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
+  const isDesktopWeb = useIsDesktopWeb();
+
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme');
     if (stored === 'light' || stored === 'dark') {
@@ -19,26 +22,36 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return 'dark';
   });
 
+  // Desktop web has no dark-mode UI — always force light there. Mobile and
+  // the native (Capacitor/Natively) wrappers keep their stored preference.
+  const effectiveTheme: Theme = isDesktopWeb ? 'light' : theme;
+
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
+    if (effectiveTheme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    // Only persist a user-driven preference, not the desktop override, so
+    // resizing back down to mobile restores the previous choice.
+    if (!isDesktopWeb) {
+      localStorage.setItem('theme', theme);
+    }
+  }, [effectiveTheme, theme, isDesktopWeb]);
 
   const toggleTheme = () => {
+    if (isDesktopWeb) return;
     setThemeState(prev => prev === 'light' ? 'dark' : 'light');
   };
 
   const setTheme = (newTheme: Theme) => {
+    if (isDesktopWeb) return;
     setThemeState(newTheme);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme: effectiveTheme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );
