@@ -14631,10 +14631,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tournamentNotifications[tournamentId] = 0;
         }
       }
-      
+
+      // Per-team unreviewed-alert counts. The selector glow uses these to
+      // detect when ANOTHER team needs the user's attention even when both
+      // teams share the same league (e.g. user is on Team A in League X but
+      // Team B in League X has pending sub approvals).
+      //
+      // Attribution rule: ONLY truly team-specific actionable items count
+      // here, so two teams in the same league are correctly distinguishable.
+      //   - Stars: attributed to the winning team (when this user captains
+      //     it).
+      //   - Sub approvals (`pending_opponent_approval`): attributed to the
+      //     opposing team (when this user captains it).
+      // League-scoped commissioner items (pending members, score
+      // verifications, tournament match verifications) are intentionally
+      // EXCLUDED from per-team counts — they're equally visible from any
+      // team in that league, so they should not trigger a same-league glow.
+      const teamNotifications: Record<string, number> = {};
+      try {
+        const userTeamRows = await storage.getUserTeams(userId);
+        await Promise.all(
+          userTeamRows.map(async (team: any) => {
+            try {
+              if (team.captainId !== userId) {
+                teamNotifications[team.id] = 0;
+                return;
+              }
+              const [starsResult, subsResult] = await Promise.all([
+                db.execute(sql`
+                  SELECT COUNT(*)::int AS count
+                  FROM games g
+                  WHERE g.is_scrimmage = false
+                    AND g.is_completed = true
+                    AND g.home_score IS NOT NULL
+                    AND g.away_score IS NOT NULL
+                    AND g.home_score <> g.away_score
+                    AND (
+                      (g.home_score > g.away_score AND g.home_team_id = ${team.id})
+                      OR (g.away_score > g.home_score AND g.away_team_id = ${team.id})
+                    )
+                    AND NOT EXISTS (
+                      SELECT 1 FROM game_stars gs WHERE gs.game_id = g.id
+                    )
+                `),
+                db.execute(sql`
+                  SELECT COUNT(DISTINCT sr.id)::int AS count
+                  FROM substitute_requests sr
+                  INNER JOIN games g ON sr.game_id = g.id
+                  WHERE sr.status = 'pending_opponent_approval'
+                    AND (
+                      (sr.requesting_team_id = g.home_team_id AND g.away_team_id = ${team.id})
+                      OR (sr.requesting_team_id = g.away_team_id AND g.home_team_id = ${team.id})
+                    )
+                `),
+              ]);
+              const starsCount = Number((starsResult.rows?.[0] as any)?.count || 0);
+              const subsCount = Number((subsResult.rows?.[0] as any)?.count || 0);
+              teamNotifications[team.id] = starsCount + subsCount;
+            } catch {
+              teamNotifications[team.id] = 0;
+            }
+          })
+        );
+      } catch {
+        // If we can't compute per-team counts, leave the map empty so the
+        // frontend falls back to the league/tournament checks.
+      }
+
       res.json({
         leagues: leagueNotifications,
         leagueTasks,
+        teams: teamNotifications,
         tournaments: tournamentNotifications,
       });
     } catch (error) {

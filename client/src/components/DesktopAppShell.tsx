@@ -89,6 +89,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
   const { data: notificationCounts } = useQuery<{
     leagues: Record<string, number>;
     leagueTasks?: Record<string, number>;
+    teams?: Record<string, number>;
     tournaments: Record<string, number>;
   }>({
     queryKey: ['/api/user/notification-counts'],
@@ -122,32 +123,28 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       )
     : [];
 
-  // Show a slow red pulse on the selector when ANY other league/tournament
-  // (i.e. one not currently in view) has unreviewed alerts. "Unreviewed
-  // alerts" = announcements + actionable tasks + tournament notifications,
-  // mirroring the same total used in the mobile selector badge.
-  // We exclude only the currently-displayed league/tournament because the
-  // alerts panel is already showing everything for that scope.
+  // Show a slow red pulse on the selector when ANY non-selected context
+  // (team, league, or tournament) has unreviewed alerts. We compare per-team
+  // when possible so two teams in the same league are tracked independently;
+  // we still fall back to per-league counts for league-only memberships and
+  // include tournaments.
   const otherTeamsHaveAlerts = useMemo(() => {
     const leagueCounts = notificationCounts?.leagues || {};
     const tournamentCounts = notificationCounts?.tournaments || {};
-    const seenLeagues = new Set<string>();
+    const teamCounts = notificationCounts?.teams || {};
+
+    // Per-team check (covers same-league multi-team case).
     for (const team of teamOptions) {
-      const lid = team.leagueId;
-      if (!lid || seenLeagues.has(lid)) continue;
-      seenLeagues.add(lid);
-      if (lid === currentLeagueId) continue;
-      if ((leagueCounts[lid] || 0) > 0) return true;
+      if (selectedType === 'team' && selectedId === team.id) continue;
+      if ((teamCounts[team.id] || 0) > 0) return true;
     }
+    // League-only memberships (no team in that league).
     for (const m of leagueOptions) {
-      if (!m.leagueId || seenLeagues.has(m.leagueId)) continue;
-      seenLeagues.add(m.leagueId);
-      if (m.leagueId === currentLeagueId) continue;
+      if (!m.leagueId) continue;
+      if (selectedType === 'league' && selectedId === m.leagueId) continue;
       if ((leagueCounts[m.leagueId] || 0) > 0) return true;
     }
-    // Tournament-scoped alerts (e.g. unread announcements in tournaments
-    // the user has joined) should also light up the selector when those
-    // tournaments aren't currently selected.
+    // Tournament-scoped alerts.
     for (const tournamentId of Object.keys(tournamentCounts)) {
       if (selectedType === 'tournament' && selectedId === tournamentId) continue;
       if ((tournamentCounts[tournamentId] || 0) > 0) return true;
@@ -159,7 +156,6 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     leagueOptions,
     selectedType,
     selectedId,
-    currentLeagueId,
   ]);
 
   const dropdownValue =

@@ -2209,27 +2209,17 @@ function DashboardMobile() {
               className={`w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${(() => {
                 const leagueCounts = (notificationCounts as any)?.leagues || {};
                 const tournamentCounts = (notificationCounts as any)?.tournaments || {};
-                let currentlySelectedLeagueId: string | null = null;
-                if (selectedType === 'league') currentlySelectedLeagueId = selectedId;
-                else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
-                  const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
-                  currentlySelectedLeagueId = sel?.leagueId ?? null;
-                }
-                const seen = new Set<string>();
+                const teamCounts = (notificationCounts as any)?.teams || {};
                 if (Array.isArray(userTeamsAll)) {
                   for (const team of userTeamsAll as any[]) {
-                    const lid = team.leagueId;
-                    if (!lid || seen.has(lid)) continue;
-                    seen.add(lid);
-                    if (lid === currentlySelectedLeagueId) continue;
-                    if ((leagueCounts[lid] || 0) > 0) return 'alerts-glow';
+                    if (selectedType === 'team' && selectedId === team.id) continue;
+                    if ((teamCounts[team.id] || 0) > 0) return 'alerts-glow';
                   }
                 }
                 if (Array.isArray(leaguesWithoutTeams)) {
                   for (const lg of leaguesWithoutTeams as any[]) {
-                    if (!lg.id || seen.has(lg.id)) continue;
-                    seen.add(lg.id);
-                    if (lg.id === currentlySelectedLeagueId) continue;
+                    if (!lg.id) continue;
+                    if (selectedType === 'league' && selectedId === lg.id) continue;
                     if ((leagueCounts[lg.id] || 0) > 0) return 'alerts-glow';
                   }
                 }
