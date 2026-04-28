@@ -117,6 +117,22 @@ export async function sendPaymentRequestPushNotification(
   });
 }
 
+export async function sendTournamentAccessOpenPushNotification(
+  recipientId: string,
+  tournamentId: string,
+  tournamentName: string
+): Promise<boolean> {
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏆 ${tournamentName} is open!`,
+    message: `Registration for ${tournamentName} is now open. Tap to view the tournament.`,
+    data: {
+      type: 'tournament_access_open',
+      tournamentId,
+    },
+  });
+}
+
 export async function sendSubstitutionPushNotification(
   recipientId: string,
   title: string,

@@ -3,7 +3,10 @@ import { tournaments, tournamentParticipants, users } from "@shared/schema";
 import { and, eq, isNotNull, isNull, lte, gte, ne } from "drizzle-orm";
 import { addHours } from "date-fns";
 import { sendTournamentAccessOpenEmail } from "./emails";
-import { sendPushNotificationToUser } from "./oneSignalNotifications";
+import {
+  sendPushNotificationToUser,
+  sendTournamentAccessOpenPushNotification,
+} from "./oneSignalNotifications";
 
 const JOB_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -67,7 +70,89 @@ async function checkAndSendAccessWindowNotifications(now: Date): Promise<void> {
     console.error('[TournamentAccessJob] Error in window-open email check:', err);
   }
 
-  // ---- 2. Closing reminder push: tournaments closing within 24 hours, reminder not yet sent ----
+  // ---- 2. Access-open push: notify each approved participant exactly once when access opens ----
+  try {
+    const openTournaments = await db
+      .select()
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.paymentStatus, 'paid'),
+          ne(tournaments.status, 'draft'),
+          isNotNull(tournaments.accessStartDate),
+          lte(tournaments.accessStartDate, now),
+        )
+      );
+
+    for (const tournament of openTournaments) {
+      // Approved participants who have not yet been notified.
+      // Skip the tournament creator and any commissioners so they aren't double-notified
+      // (creators/commissioners already manage the tournament).
+      const participants = await db
+        .select({
+          id: tournamentParticipants.id,
+          userId: tournamentParticipants.userId,
+        })
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.tournamentId, tournament.id),
+            eq(tournamentParticipants.status, 'approved'),
+            ne(tournamentParticipants.role, 'commissioner'),
+            ne(tournamentParticipants.userId, tournament.createdBy),
+            isNull(tournamentParticipants.accessOpenedNotifiedAt),
+          )
+        );
+
+      if (participants.length === 0) continue;
+
+      console.log(
+        `[TournamentAccessJob] Sending access-open pushes for tournament ${tournament.id} (${tournament.name}) to ${participants.length} participant(s)`
+      );
+
+      let pushSent = 0;
+      for (const participant of participants) {
+        let sent = false;
+        try {
+          sent = await sendTournamentAccessOpenPushNotification(
+            participant.userId,
+            tournament.id,
+            tournament.name,
+          );
+        } catch (err) {
+          console.error(
+            `[TournamentAccessJob] Failed access-open push for user ${participant.userId}:`,
+            err
+          );
+        }
+
+        // Only stamp accessOpenedNotifiedAt on a confirmed successful send so that
+        // transient failures (network errors, OneSignal API hiccups, OneSignal not
+        // configured yet, user not yet subscribed) get retried on the next job tick.
+        if (!sent) continue;
+        pushSent++;
+        try {
+          await db
+            .update(tournamentParticipants)
+            .set({ accessOpenedNotifiedAt: now })
+            .where(eq(tournamentParticipants.id, participant.id));
+        } catch (err) {
+          console.error(
+            `[TournamentAccessJob] Failed to mark participant ${participant.id} as notified:`,
+            err
+          );
+        }
+      }
+
+      console.log(
+        `[TournamentAccessJob] Sent ${pushSent}/${participants.length} access-open pushes for tournament ${tournament.id}`
+      );
+    }
+  } catch (err) {
+    console.error('[TournamentAccessJob] Error in access-open push check:', err);
+  }
+
+  // ---- 3. Closing reminder push: tournaments closing within 24 hours, reminder not yet sent ----
   try {
     const in24h = addHours(now, 24);
 

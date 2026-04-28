@@ -652,6 +652,7 @@ export const tournamentParticipants = pgTable("tournament_participants", {
   approvedBy: varchar("approved_by").references(() => users.id, { onDelete: 'cascade' }),
   approvedAt: timestamp("approved_at"),
   message: text("message"), // optional message when joining
+  accessOpenedNotifiedAt: timestamp("access_opened_notified_at"), // when access-open push/email was delivered to this participant
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_tournament_user_participant").on(table.tournamentId, table.userId),
