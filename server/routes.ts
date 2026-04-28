@@ -17784,11 +17784,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const firstMatchDate = matchDates[0];
     const lastMatchDate = matchDates[matchDates.length - 1];
 
-    // Access starts 30 days before first match
+    // Access starts 14 days (2 weeks) before first match
     const accessStartDate = new Date(firstMatchDate);
-    accessStartDate.setDate(accessStartDate.getDate() - 30);
+    accessStartDate.setDate(accessStartDate.getDate() - 14);
 
-    // Access ends 7 days after last match
+    // Access ends 7 days (1 week) after last match
     const accessEndDate = new Date(lastMatchDate);
     accessEndDate.setDate(accessEndDate.getDate() + 7);
 
@@ -17847,26 +17847,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique tournament ID
       const uniqueTournamentId = await generateUniqueTournamentId();
       
-      // Parse string dates to Date objects before Zod validation (form sends datetime-local strings)
+      // Parse string dates to Date objects before Zod validation
       const rawBody = { ...req.body };
-      if (rawBody.accessStartDate && typeof rawBody.accessStartDate === 'string') {
-        rawBody.accessStartDate = new Date(rawBody.accessStartDate);
-      } else if (!rawBody.accessStartDate) {
-        rawBody.accessStartDate = null;
-      }
-      if (rawBody.accessEndDate && typeof rawBody.accessEndDate === 'string') {
-        rawBody.accessEndDate = new Date(rawBody.accessEndDate);
-      } else if (!rawBody.accessEndDate) {
-        rawBody.accessEndDate = null;
-      }
 
-      // Enforce access window required for standalone tournaments
+      // For standalone tournaments, the form provides a single firstGameDate
+      // as a "YYYY-MM-DD" string. We derive accessStartDate (= firstGameDate - 14 days)
+      // and set startDate. accessEndDate is left null until matches are scheduled,
+      // at which point calculateAccessWindows populates it (= last match + 7 days).
       if (rawBody.type === 'standalone') {
-        if (!rawBody.accessStartDate || !rawBody.accessEndDate) {
-          return res.status(400).json({ message: "Standalone tournaments require both an access window start and end date" });
+        if (!rawBody.firstGameDate) {
+          return res.status(400).json({ message: "Standalone tournaments require a first game date" });
         }
-        if (rawBody.accessEndDate <= rawBody.accessStartDate) {
-          return res.status(400).json({ message: "Access window end date must be after start date" });
+
+        // Parse the date as local-midnight (avoid UTC-offset bugs from `new Date('YYYY-MM-DD')`)
+        // and reject malformed/impossible calendar dates (e.g. "2026-02-31").
+        let firstGameDate: Date | null = null;
+        if (typeof rawBody.firstGameDate === 'string') {
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(rawBody.firstGameDate);
+          if (m) {
+            const yr = Number(m[1]);
+            const mo = Number(m[2]);
+            const dy = Number(m[3]);
+            const candidate = new Date(yr, mo - 1, dy);
+            if (
+              !Number.isNaN(candidate.getTime()) &&
+              candidate.getFullYear() === yr &&
+              candidate.getMonth() === mo - 1 &&
+              candidate.getDate() === dy
+            ) {
+              firstGameDate = candidate;
+            }
+          }
+        } else if (rawBody.firstGameDate instanceof Date && !Number.isNaN(rawBody.firstGameDate.getTime())) {
+          firstGameDate = rawBody.firstGameDate;
+        }
+
+        if (!firstGameDate) {
+          return res.status(400).json({ message: "First game date is invalid. Please provide a valid date in YYYY-MM-DD format." });
+        }
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        if (firstGameDate.getTime() < todayStart.getTime()) {
+          return res.status(400).json({ message: "First game date cannot be in the past" });
+        }
+        const derivedAccessStart = new Date(firstGameDate);
+        derivedAccessStart.setDate(derivedAccessStart.getDate() - 14);
+        rawBody.startDate = firstGameDate;
+        rawBody.accessStartDate = derivedAccessStart;
+        rawBody.accessEndDate = null;
+        delete rawBody.firstGameDate;
+      } else {
+        // Non-standalone tournaments may still pass these dates explicitly
+        if (rawBody.accessStartDate && typeof rawBody.accessStartDate === 'string') {
+          rawBody.accessStartDate = new Date(rawBody.accessStartDate);
+        } else if (!rawBody.accessStartDate) {
+          rawBody.accessStartDate = null;
+        }
+        if (rawBody.accessEndDate && typeof rawBody.accessEndDate === 'string') {
+          rawBody.accessEndDate = new Date(rawBody.accessEndDate);
+        } else if (!rawBody.accessEndDate) {
+          rawBody.accessEndDate = null;
         }
       }
 

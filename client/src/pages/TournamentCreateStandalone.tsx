@@ -17,6 +17,27 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import Papa from "papaparse";
 
+// Parse a "YYYY-MM-DD" date input as a local-midnight Date.
+// Avoids UTC-offset bugs and rejects impossible calendar dates (e.g. Feb 31).
+function parseLocalDate(value: string): Date | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
 const formSchema = z.object({
   type: z.enum(["season_playoff", "standalone"]),
   leagueId: z.string().optional(),
@@ -24,8 +45,7 @@ const formSchema = z.object({
   name: z.string().min(1, "Tournament name is required"),
   format: z.enum(["single_elimination", "double_elimination", "three_game_guarantee", "round_robin", "round_robin_split", "custom_bracket"]),
   description: z.string().optional(),
-  accessStartDate: z.string().optional(),
-  accessEndDate: z.string().optional(),
+  firstGameDate: z.string().optional(),
   teams: z.array(z.object({
     name: z.string().min(1, "Team name is required")
   })).optional(),
@@ -40,32 +60,36 @@ const formSchema = z.object({
   message: "Please select a league and season for playoff tournaments",
   path: ["leagueId"]
 }).refine((data) => {
-  // Standalone tournaments require access start date
+  // Standalone tournaments require first game date
   if (data.type === "standalone") {
-    return !!data.accessStartDate;
+    return !!data.firstGameDate;
   }
   return true;
 }, {
-  message: "Access window start date is required for standalone tournaments",
-  path: ["accessStartDate"]
+  message: "First game date is required for standalone tournaments",
+  path: ["firstGameDate"]
 }).refine((data) => {
-  // Standalone tournaments require access end date
-  if (data.type === "standalone") {
-    return !!data.accessEndDate;
+  // First game date must be a valid calendar date when provided
+  if (data.type === "standalone" && data.firstGameDate) {
+    return parseLocalDate(data.firstGameDate) !== null;
   }
   return true;
 }, {
-  message: "Access window end date is required for standalone tournaments",
-  path: ["accessEndDate"]
+  message: "Please enter a valid first game date",
+  path: ["firstGameDate"]
 }).refine((data) => {
-  // End date must be after start date when both are provided
-  if (data.accessStartDate && data.accessEndDate) {
-    return new Date(data.accessEndDate) > new Date(data.accessStartDate);
+  // First game date cannot be in the past (compared at local midnight)
+  if (data.type === "standalone" && data.firstGameDate) {
+    const first = parseLocalDate(data.firstGameDate);
+    if (!first) return true; // already caught by previous refine
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return first.getTime() >= today.getTime();
   }
   return true;
 }, {
-  message: "Access end date must be after start date",
-  path: ["accessEndDate"]
+  message: "First game date cannot be in the past",
+  path: ["firstGameDate"]
 }).refine((data) => {
   // Validate teams based on type
   if (data.type === "season_playoff") {
@@ -104,8 +128,7 @@ export default function TournamentCreateStandalone() {
       name: "",
       format: "single_elimination",
       description: "",
-      accessStartDate: "",
-      accessEndDate: "",
+      firstGameDate: "",
       teams: [],
       teamIds: []
     }
@@ -114,6 +137,16 @@ export default function TournamentCreateStandalone() {
   const watchedType = form.watch("type");
   const watchedLeagueId = form.watch("leagueId");
   const watchedFormat = form.watch("format");
+  const watchedFirstGameDate = form.watch("firstGameDate");
+
+  // Derive access-window-open date as 14 days before the first game date
+  const computedAccessOpenDate = (() => {
+    const first = parseLocalDate(watchedFirstGameDate || "");
+    if (!first) return null;
+    const d = new Date(first);
+    d.setDate(d.getDate() - 14);
+    return d;
+  })();
 
   // Fetch leagues the user can manage (for season playoffs)
   const { data: leagues } = useQuery<any[]>({
@@ -151,8 +184,7 @@ export default function TournamentCreateStandalone() {
         format: data.format,
         numTeams: numTeams,
         description: data.description || null,
-        accessStartDate: data.accessStartDate || null,
-        accessEndDate: data.accessEndDate || null,
+        firstGameDate: data.firstGameDate || null,
         settings: {
           bracketType: "seeded",
           showSeedNumbers: true,
@@ -299,7 +331,11 @@ export default function TournamentCreateStandalone() {
 
   const nextStep = async () => {
     if (step === 1) {
-      const isValid = await form.trigger(["name", "format", "description"] as any);
+      const fieldsToValidate: any[] = ["name", "format", "description"];
+      if (watchedType === "standalone") {
+        fieldsToValidate.push("firstGameDate");
+      }
+      const isValid = await form.trigger(fieldsToValidate);
       if (isValid) {
         setStep(step + 1);
       }
@@ -731,58 +767,45 @@ export default function TournamentCreateStandalone() {
                     )}
                   />
 
-                  <div className="grid gap-4 md:grid-cols-2">
+                  {watchedType === "standalone" && (
                     <FormField
                       control={form.control}
-                      name="accessStartDate"
+                      name="firstGameDate"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>
-                            Access Window Start
-                            {watchedType === "standalone" && <span className="text-destructive ml-1">*</span>}
+                            First Game Date
+                            <span className="text-destructive ml-1">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
-                              type="datetime-local"
+                              type="date"
                               {...field}
-                              data-testid="input-access-start-date"
+                              data-testid="input-first-game-date"
                             />
                           </FormControl>
                           <FormDescription>
-                            {watchedType === "standalone"
-                              ? "Required: when players can start joining"
-                              : "When players can start joining (optional)"}
+                            {computedAccessOpenDate ? (
+                              <>
+                                Access opens{" "}
+                                <span className="font-medium">
+                                  {computedAccessOpenDate.toLocaleDateString(undefined, {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  })}
+                                </span>{" "}
+                                (2 weeks before the first game). Access closes 1 week after the final game.
+                              </>
+                            ) : (
+                              <>The access window opens 2 weeks before the first game and closes 1 week after the final game.</>
+                            )}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="accessEndDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            Access Window End
-                            {watchedType === "standalone" && <span className="text-destructive ml-1">*</span>}
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="datetime-local"
-                              {...field}
-                              data-testid="input-access-end-date"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            {watchedType === "standalone"
-                              ? "Required: when player registration closes"
-                              : "When player access closes (optional)"}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -1049,6 +1072,35 @@ export default function TournamentCreateStandalone() {
                         }
                       </p>
                     </div>
+                    {watchedType === "standalone" && watchedFirstGameDate && (
+                      <>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">First Game Date</p>
+                          <p className="text-lg font-semibold" data-testid="text-review-first-game-date">
+                            {(parseLocalDate(watchedFirstGameDate) ?? new Date()).toLocaleDateString(undefined, {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Access Opens</p>
+                          <p className="text-lg font-semibold" data-testid="text-review-access-open-date">
+                            {computedAccessOpenDate
+                              ? computedAccessOpenDate.toLocaleDateString(undefined, {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })
+                              : "—"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Closes 1 week after the final game
+                          </p>
+                        </div>
+                      </>
+                    )}
                     {form.getValues("description") && (
                       <div className="md:col-span-2">
                         <p className="text-sm font-medium text-muted-foreground">Description</p>

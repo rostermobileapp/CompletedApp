@@ -248,14 +248,17 @@ export default function TournamentSearch() {
               </div>
 
               {/* Access Window */}
-              {tournament.accessStartDate && tournament.accessEndDate && (
+              {tournament.accessStartDate && (
                 <div className="p-4 rounded-lg border bg-muted/50">
                   <div className="flex items-start gap-3">
                     <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div className="flex-1">
                       <p className="font-medium mb-1">Access Window</p>
                       <p className="text-sm text-muted-foreground" data-testid="text-access-window">
-                        {format(new Date(tournament.accessStartDate), 'MMM d, yyyy')} - {format(new Date(tournament.accessEndDate), 'MMM d, yyyy')}
+                        {format(new Date(tournament.accessStartDate), 'MMM d, yyyy')} -{' '}
+                        {tournament.accessEndDate
+                          ? format(new Date(tournament.accessEndDate), 'MMM d, yyyy')
+                          : 'TBD (1 week after final game)'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         You'll have access to this tournament during this time period
