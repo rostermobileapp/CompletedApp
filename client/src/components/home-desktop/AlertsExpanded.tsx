@@ -12,6 +12,7 @@ interface Notification {
   body?: string;
   createdAt?: string;
   link?: string;
+  actionUrl?: string;
 }
 
 type AlertSeverity = 'red' | 'amber' | 'blue';
@@ -38,6 +39,8 @@ const SEVERITY_BORDER: Record<AlertSeverity, string> = {
 export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
   const [, navigate] = useLocation();
 
+  // ── Data sources (mirror the mobile "Needs Attention" summary in
+  //    Dashboard.tsx so the desktop count matches the mobile badge) ───────
   const { data: scrimmageInvites } = useQuery<any[]>({
     queryKey: ['/api/users/scrimmage-invites'],
     staleTime: 30_000,
@@ -45,6 +48,8 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
 
   const { data: pendingSubApprovals } = useQuery<{
     requests?: any[];
+    captain?: any[];
+    commissioner?: any[];
     total?: number;
   }>({
     queryKey: [
@@ -66,18 +71,106 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
     staleTime: 30_000,
   });
 
-  const { data: unreadNotifications } = useQuery<Notification[]>({
-    queryKey: ['/api/notifications/unread'],
+  const { data: pendingMembers } = useQuery<any[]>({
+    queryKey: ['/api/leagues', effectiveLeagueId, 'pending-members'],
+    enabled: !!effectiveLeagueId,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest(
+          'GET',
+          `/api/leagues/${effectiveLeagueId}/pending-members`,
+        );
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
     staleTime: 30_000,
   });
 
-  // Build alert list
+  const { data: gamesNeedingVerification } = useQuery<any[]>({
+    queryKey: ['/api/leagues', effectiveLeagueId, 'games-needing-verification'],
+    enabled: !!effectiveLeagueId,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest(
+          'GET',
+          `/api/leagues/${effectiveLeagueId}/games-needing-verification`,
+        );
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: tournamentMatchesNeedingVerification } = useQuery<any[]>({
+    queryKey: [
+      '/api/leagues',
+      effectiveLeagueId,
+      'tournament-matches-needing-verification',
+    ],
+    enabled: !!effectiveLeagueId,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest(
+          'GET',
+          `/api/leagues/${effectiveLeagueId}/tournament-matches-needing-verification`,
+        );
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: gamesNeedingStars } = useQuery<any[]>({
+    queryKey: ['/api/user/games-needing-stars', effectiveLeagueId],
+    enabled: !!effectiveLeagueId,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest(
+          'GET',
+          `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`,
+        );
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 30_000,
+  });
+
+  // Mobile uses /api/notifications (all, not just unread) for its Needs
+  // Attention badge. Match that so the count agrees across devices.
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: ['/api/notifications'],
+    staleTime: 30_000,
+  });
+
+  // ── Build alert list ────────────────────────────────────────────────────
   const alerts: AlertItem[] = [];
 
-  // Red: pending substitute approvals (captain-side action required)
-  const subRequests = Array.isArray(pendingSubApprovals?.requests)
-    ? pendingSubApprovals!.requests!
-    : [];
+  // Red: pending substitute approvals (captain-side action required).
+  // Endpoint may return either { requests: [...] } (legacy/team scope) or
+  // { captain: [...], commissioner: [...] } (current shape).
+  const subRequests: any[] = [
+    ...(Array.isArray(pendingSubApprovals?.requests)
+      ? pendingSubApprovals!.requests!
+      : []),
+    ...(Array.isArray(pendingSubApprovals?.captain)
+      ? pendingSubApprovals!.captain!
+      : []),
+    ...(Array.isArray(pendingSubApprovals?.commissioner)
+      ? pendingSubApprovals!.commissioner!
+      : []),
+  ];
   for (const req of subRequests.slice(0, 4)) {
     const playerName =
       req?.originalPlayer?.firstName || req?.originalPlayer?.lastName
@@ -93,6 +186,64 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
         navigate('/substitute-confirmations');
       },
       testid: `alert-sub-${req.id}`,
+    });
+  }
+
+  // Red: pending player/member approvals for league commissioners
+  const pendingMemberList = Array.isArray(pendingMembers) ? pendingMembers : [];
+  for (const m of pendingMemberList.slice(0, 4)) {
+    const name =
+      `${m?.user?.firstName ?? ''} ${m?.user?.lastName ?? ''}`.trim() ||
+      m?.user?.email ||
+      'New player';
+    alerts.push({
+      key: `pending-member-${m.id}`,
+      severity: 'red',
+      title: `Approve ${name}`,
+      meta: m?.assignedTeam?.name
+        ? `Wants to join ${m.assignedTeam.name}`
+        : 'Pending player approval',
+      onClick: () => {
+        setPageTransitionDirection('up');
+        navigate(`/league-management?leagueId=${effectiveLeagueId}`);
+      },
+      testid: `alert-pending-member-${m.id}`,
+    });
+  }
+
+  // Red: games / tournament matches needing score verification
+  const verifGames = Array.isArray(gamesNeedingVerification)
+    ? gamesNeedingVerification
+    : [];
+  for (const g of verifGames.slice(0, 4)) {
+    alerts.push({
+      key: `verify-game-${g.id}`,
+      severity: 'red',
+      title: 'Verify game score',
+      meta: g?.opponent?.name ? `vs ${g.opponent.name}` : 'Score awaiting confirmation',
+      onClick: () => {
+        setPageTransitionDirection('up');
+        navigate(`/game/${g.id}`);
+      },
+      testid: `alert-verify-${g.id}`,
+    });
+  }
+  const verifMatches = Array.isArray(tournamentMatchesNeedingVerification)
+    ? tournamentMatchesNeedingVerification
+    : [];
+  for (const m of verifMatches.slice(0, 4)) {
+    alerts.push({
+      key: `verify-match-${m.id}`,
+      severity: 'red',
+      title: 'Verify tournament match',
+      meta: 'Score awaiting confirmation',
+      onClick: () => {
+        setPageTransitionDirection('up');
+        // Mobile routes both regular games and tournament matches through
+        // /game/:id (see Dashboard.tsx). Use the same path here.
+        navigate(`/game/${m.id}`);
+      },
+      testid: `alert-verify-match-${m.id}`,
     });
   }
 
@@ -113,25 +264,53 @@ export function AlertsExpanded({ effectiveLeagueId }: AlertsExpandedProps) {
     });
   }
 
-  // Blue: recent unread notifications
-  const notifs = Array.isArray(unreadNotifications) ? unreadNotifications : [];
-  for (const n of notifs.slice(0, 6)) {
+  // Amber: games needing player stars
+  const starGames = Array.isArray(gamesNeedingStars) ? gamesNeedingStars : [];
+  for (const g of starGames.slice(0, 4)) {
+    alerts.push({
+      key: `stars-${g.id}`,
+      severity: 'amber',
+      title: 'Award player stars',
+      meta: g?.opponent?.name ? `vs ${g.opponent.name}` : 'Recent game',
+      onClick: () => {
+        setPageTransitionDirection('up');
+        navigate(`/game/${g.id}`);
+      },
+      testid: `alert-stars-${g.id}`,
+    });
+  }
+
+  // Blue: notifications (matches the mobile badge total)
+  const notifs = Array.isArray(notifications) ? notifications : [];
+  for (const n of notifs.slice(0, 8)) {
+    const link = n.actionUrl || n.link;
     alerts.push({
       key: `notif-${n.id}`,
       severity: 'blue',
       title: n.title || n.message || 'Notification',
       meta: n.body || (n.message && n.title ? n.message : undefined),
-      onClick: n.link
+      onClick: link
         ? () => {
             setPageTransitionDirection('up');
-            navigate(n.link!);
+            navigate(link);
           }
         : undefined,
       testid: `alert-notif-${n.id}`,
     });
   }
 
-  const newCount = alerts.length;
+  // Badge total mirrors the mobile "Needs Attention" badge: it counts every
+  // underlying item, not just the ones we render in the list (which are
+  // capped per category for visual density).
+  const totalCount =
+    subRequests.length +
+    pendingMemberList.length +
+    verifGames.length +
+    verifMatches.length +
+    invites.length +
+    starGames.length +
+    notifs.length;
+  const newCount = totalCount;
 
   return (
     <div className={cardClass} style={cardStyle} data-testid="card-alerts">

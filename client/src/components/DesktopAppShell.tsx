@@ -133,15 +133,20 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       className="h-screen w-full flex bg-background overflow-hidden"
       data-testid="desktop-app-shell"
     >
-      {/* Left sidebar */}
+      {/* Left sidebar — width and icon sizes shrink on smaller / shorter
+          desktop screens so all nav items stay visible without scrolling. */}
       <aside
-        className="fixed top-0 left-0 h-screen w-[120px] flex flex-col bg-[#3c83f6] border-r border-[#3c83f6] z-40"
+        className="fixed top-0 left-0 h-screen w-[88px] xl:w-[120px] [@media(max-height:760px)]:w-[80px] flex flex-col bg-[#3c83f6] border-r border-[#3c83f6] z-40"
         data-testid="desktop-sidebar"
       >
-        <div className="px-2 py-6 flex items-center justify-center border-b border-white/20">
-          <img src={desktopHeaderLogo} alt="Roster" className="w-14 h-14 object-contain" />
+        <div className="px-2 py-3 xl:py-6 [@media(max-height:760px)]:py-2 flex items-center justify-center border-b border-white/20">
+          <img
+            src={desktopHeaderLogo}
+            alt="Roster"
+            className="w-10 h-10 xl:w-14 xl:h-14 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:h-8 object-contain"
+          />
         </div>
-        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-1.5 xl:px-2 py-2 xl:py-4 [@media(max-height:760px)]:py-1 space-y-0.5 xl:space-y-1 overflow-y-auto">
           {MAIN_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeScreen === item.id;
@@ -150,22 +155,22 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                 key={item.id}
                 onClick={() => handleNavClick(item.route)}
                 className={cn(
-                  'w-full flex flex-col items-center gap-1 px-2 py-3 rounded-lg transition-colors',
+                  'w-full flex flex-col items-center gap-0.5 xl:gap-1 px-1.5 xl:px-2 py-2 xl:py-3 [@media(max-height:760px)]:py-1.5 rounded-lg transition-colors',
                   isActive
                     ? 'bg-black/30 text-white font-bold ring-1 ring-white/20'
                     : 'text-white/85 hover:bg-black/15 hover:text-white font-medium',
                 )}
                 data-testid={`desktop-nav-${item.id}`}
               >
-                <span className="relative flex items-center justify-center w-7 h-7 flex-shrink-0">
+                <span className="relative flex items-center justify-center w-6 h-6 xl:w-7 xl:h-7 [@media(max-height:760px)]:w-5 [@media(max-height:760px)]:h-5 flex-shrink-0">
                   {item.id === 'home' ? (
                     <img
                       src={desktopHeaderLogo}
                       alt=""
-                      className="w-7 h-7 object-contain"
+                      className="w-6 h-6 xl:w-7 xl:h-7 [@media(max-height:760px)]:w-5 [@media(max-height:760px)]:h-5 object-contain"
                     />
                   ) : Icon ? (
-                    <Icon className="w-6 h-6" />
+                    <Icon className="w-5 h-5 xl:w-6 xl:h-6 [@media(max-height:760px)]:w-4 [@media(max-height:760px)]:h-4" />
                   ) : null}
                   {item.id === 'messages' && currentLeagueUnread > 0 && (
                     <span
@@ -184,13 +189,15 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                     </span>
                   )}
                 </span>
-                <span className="text-xs leading-tight text-center">{item.label}</span>
+                <span className="text-[11px] xl:text-xs [@media(max-height:760px)]:text-[10px] leading-tight text-center">
+                  {item.label}
+                </span>
               </button>
             );
           })}
         </nav>
         <nav
-          className="px-2 py-3 border-t border-white/20 space-y-1"
+          className="px-1.5 xl:px-2 py-2 xl:py-3 [@media(max-height:760px)]:py-1.5 border-t border-white/20 space-y-0.5 xl:space-y-1"
           data-testid="desktop-sidebar-footer"
         >
           {([
@@ -249,15 +256,17 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         </nav>
       </aside>
       {/* Permanent menu column — always visible on desktop, replacing the
-          hamburger-triggered SlideOutMenu */}
+          hamburger-triggered SlideOutMenu. Its `left` offset tracks the
+          responsive sidebar width above. */}
       <aside
-        className="fixed top-0 left-[120px] h-screen w-[280px] flex flex-col bg-background border-r border-border z-30 overflow-y-auto"
+        className="fixed top-0 left-[88px] xl:left-[120px] [@media(max-height:760px)]:left-[80px] h-screen w-[280px] flex flex-col bg-background border-r border-border z-30 overflow-y-auto"
         data-testid="desktop-menu-sidebar"
       >
         <DesktopMenuColumn />
       </aside>
-      {/* Right side: header + main content */}
-      <div className="flex-1 ml-[400px] h-screen flex flex-col min-w-0">
+      {/* Right side: header + main content. Margin tracks sidebar (88/120) +
+          permanent menu column (280) widths. */}
+      <div className="flex-1 ml-[368px] xl:ml-[400px] [@media(max-height:760px)]:ml-[360px] h-screen flex flex-col min-w-0">
         <header
           className="flex-shrink-0 z-20 flex items-center gap-4 px-8 py-3 bg-card/95 backdrop-blur border-b border-border"
           data-testid="desktop-header"
