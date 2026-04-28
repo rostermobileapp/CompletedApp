@@ -222,7 +222,7 @@ export function ImageCropDialog({
                 aspect={1}
                 cropShape={cropShape}
                 cropSize={{ width: cropFrameSize, height: cropFrameSize }}
-                objectFit="cover"
+                objectFit="auto-cover"
                 showGrid={false}
                 minZoom={1}
                 maxZoom={4}
