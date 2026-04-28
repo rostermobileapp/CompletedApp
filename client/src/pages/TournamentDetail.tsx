@@ -1483,7 +1483,7 @@ export default function TournamentDetail() {
               
               {!isReadOnlyMode && (
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {tournament.status === 'draft' && (
+                  {tournament.status === 'draft' ? (
                     <>
                       <Button 
                         variant="outline" 
@@ -1503,6 +1503,15 @@ export default function TournamentDetail() {
                         Delete
                       </Button>
                     </>
+                  ) : tournament.type === 'standalone' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                      data-testid="button-edit-date"
+                    >
+                      Edit First Game Date
+                    </Button>
                   )}
                 </div>
               )}

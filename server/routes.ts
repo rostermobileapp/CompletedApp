@@ -17937,7 +17937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update tournament (draft only)
+  // Update tournament (draft only, except date-only edits for standalone tournaments)
   app.patch('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -17953,8 +17953,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Tournament not found" });
       }
 
+      // Once a tournament leaves draft, the only allowed edit is a "date-only"
+      // PATCH that updates the first game date on a standalone tournament. This
+      // lets commissioners slip the schedule without disturbing teams/format.
+      const isDateOnlyPatch =
+        firstGameDate !== undefined &&
+        firstGameDate !== null &&
+        firstGameDate !== '' &&
+        teams === undefined &&
+        format === undefined &&
+        settings === undefined &&
+        name === undefined &&
+        description === undefined &&
+        type === undefined &&
+        seasonId === undefined &&
+        shiftScheduledMatches === undefined;
+
       if (tournament.status !== 'draft') {
-        return res.status(400).json({ message: "Cannot edit tournament after it has started" });
+        if (!isDateOnlyPatch) {
+          return res.status(400).json({ message: "Cannot edit tournament after it has started" });
+        }
+        if (tournament.type !== 'standalone') {
+          return res.status(400).json({ message: "First game date can only be updated on standalone tournaments after they have started" });
+        }
       }
 
       // For standalone tournaments, allow updating the first game date which

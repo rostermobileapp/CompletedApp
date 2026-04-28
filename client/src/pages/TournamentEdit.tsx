@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, Trophy, Users, Info, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Trophy, Users, Info, AlertTriangle, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -374,6 +374,16 @@ export default function TournamentEdit() {
   }
 
   if (tournament.status !== 'draft') {
+    if (tournament.type === 'standalone') {
+      return (
+        <DateOnlyEditor
+          tournament={tournament}
+          onCancel={() => setLocation(`/tournaments/${tournamentId}`)}
+          onSaved={() => setLocation(`/tournaments/${tournamentId}`)}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen bg-background p-4 md:p-8">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -918,6 +928,197 @@ export default function TournamentEdit() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+const dateOnlyFormSchema = z.object({
+  firstGameDate: z
+    .string()
+    .min(1, "First game date is required")
+    .refine((value) => parseLocalDate(value) !== null, {
+      message: "Please enter a valid first game date",
+    })
+    .refine((value) => {
+      const first = parseLocalDate(value);
+      if (!first) return true;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return first.getTime() >= today.getTime();
+    }, {
+      message: "First game date cannot be in the past",
+    }),
+});
+
+type DateOnlyFormData = z.infer<typeof dateOnlyFormSchema>;
+
+function DateOnlyEditor({
+  tournament,
+  onCancel,
+  onSaved,
+}: {
+  tournament: Tournament;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+
+  const initialDate = (() => {
+    if (!tournament.startDate) return "";
+    const d = tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate);
+    if (Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  })();
+
+  const form = useForm<DateOnlyFormData>({
+    resolver: zodResolver(dateOnlyFormSchema),
+    defaultValues: { firstGameDate: initialDate },
+  });
+
+  const watched = form.watch("firstGameDate");
+  const computedAccessOpenDate = (() => {
+    const first = parseLocalDate(watched || "");
+    if (!first) return null;
+    const d = new Date(first);
+    d.setDate(d.getDate() - 14);
+    return d;
+  })();
+
+  const updateDate = useMutation({
+    mutationFn: async (data: DateOnlyFormData) => {
+      const response = await apiRequest('PATCH', `/api/tournaments/${tournament.id}`, {
+        firstGameDate: data.firstGameDate,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournament.id, 'matches'] });
+      if (tournament.leagueId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/leagues', tournament.leagueId, 'tournaments'] });
+      }
+      toast({
+        title: "First game date updated",
+        description: "The tournament's start date has been updated.",
+      });
+      onSaved();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update first game date",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          className="-ml-2"
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Tournament
+        </Button>
+
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Calendar className="h-8 w-8 text-primary" />
+            Edit First Game Date
+          </h1>
+          <p className="text-muted-foreground">
+            Adjust the start date for {tournament.name}. Teams, format, and bracket will not change.
+          </p>
+        </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            This tournament has already started, so only the first game date can be changed here.
+            Other settings are locked to preserve bracket integrity.
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>First Game Date</CardTitle>
+            <CardDescription>The access window opens 2 weeks before the first game.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit((data) => updateDate.mutate(data))}
+                className="space-y-6"
+              >
+                <FormField
+                  control={form.control}
+                  name="firstGameDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        First Game Date
+                        <span className="text-destructive ml-1">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          value={field.value ?? ""}
+                          data-testid="input-first-game-date"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {computedAccessOpenDate ? (
+                          <>
+                            Access opens{" "}
+                            <span className="font-medium">
+                              {computedAccessOpenDate.toLocaleDateString(undefined, {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}
+                            </span>{" "}
+                            (2 weeks before the first game). Access closes 1 week after the final game.
+                          </>
+                        ) : (
+                          <>The access window opens 2 weeks before the first game and closes 1 week after the final game.</>
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateDate.isPending}
+                    data-testid="button-submit"
+                  >
+                    {updateDate.isPending ? "Saving..." : "Save Date"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
