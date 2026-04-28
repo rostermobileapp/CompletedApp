@@ -562,6 +562,121 @@ export async function hasValidTournamentAccess(userId: string, tournamentId: str
 }
 
 /**
+ * Tournament access state for a user against a specific tournament:
+ *  - 'full'    : tournament creator or league commissioner — bypass all access windows
+ *  - 'open'    : approved participant currently within the access window
+ *  - 'pending' : approved participant whose access window has not yet opened
+ *  - 'expired' : approved participant whose access window has ended
+ *  - 'none'    : not a participant (or rejected/removed)
+ */
+export type TournamentAccessState = 'full' | 'open' | 'pending' | 'expired' | 'none';
+
+export async function getTournamentAccessState(
+  userId: string,
+  tournamentId: string
+): Promise<{ state: TournamentAccessState; tournament: any | null }> {
+  const { db } = await import("./db");
+  const { tournamentParticipants, tournaments } = await import("@shared/schema");
+  const { eq, and } = await import("drizzle-orm");
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId));
+
+  if (!tournament) {
+    return { state: 'none', tournament: null };
+  }
+
+  // Tournament creator always has full access
+  if (tournament.createdBy === userId) {
+    return { state: 'full', tournament };
+  }
+
+  // For league tournaments, league commissioners/co-commissioners have full access
+  if (tournament.leagueId) {
+    try {
+      const user = await storage.getUser(userId);
+      if (user) {
+        const hasLeagueAccess = await canManageLeagueSpecific(user as UserWithPermissions, tournament.leagueId);
+        if (hasLeagueAccess) {
+          return { state: 'full', tournament };
+        }
+      }
+    } catch (err) {
+      console.error('Error checking league access in getTournamentAccessState:', err);
+    }
+  }
+
+  // Check participant record
+  const [participant] = await db
+    .select()
+    .from(tournamentParticipants)
+    .where(and(
+      eq(tournamentParticipants.tournamentId, tournamentId),
+      eq(tournamentParticipants.userId, userId)
+    ));
+
+  if (!participant || participant.status !== 'approved') {
+    return { state: 'none', tournament };
+  }
+
+  const now = new Date();
+
+  // Check if access window has opened
+  if (tournament.accessStartDate && new Date(tournament.accessStartDate) > now) {
+    return { state: 'pending', tournament };
+  }
+
+  // Check if access has expired (either explicit expiresAt on participant or accessEndDate)
+  if (participant.expiresAt && new Date(participant.expiresAt) < now) {
+    return { state: 'expired', tournament };
+  }
+  if (tournament.accessEndDate && new Date(tournament.accessEndDate) < now) {
+    return { state: 'expired', tournament };
+  }
+
+  return { state: 'open', tournament };
+}
+
+/**
+ * Middleware that allows the request through unless the requesting user is an
+ * approved tournament participant whose access window has not yet opened.
+ *
+ * This is used to gate tournament SUB-RESOURCE endpoints (matches, teams,
+ * announcements, standings, etc.) so that the pre-access countdown UI can
+ * never load real tournament data. Creators, commissioners, and other
+ * existing access paths are unaffected.
+ */
+export const requireTournamentAccessOpen: RequestHandler = async (req, res, next) => {
+  try {
+    const userId = (req.user as any)?.claims?.sub;
+    if (!userId) {
+      return next(); // let downstream auth handle missing user
+    }
+
+    const tournamentId = req.params.tournamentId || req.params.id;
+    if (!tournamentId) {
+      return next();
+    }
+
+    const { state } = await getTournamentAccessState(userId, tournamentId);
+    if (state === 'pending') {
+      return res.status(403).json({
+        message: "Tournament access has not opened yet.",
+        accessState: 'pending',
+      });
+    }
+
+    return next();
+  } catch (error) {
+    console.error('Error in requireTournamentAccessOpen:', error);
+    // Fail open to preserve existing behavior on unexpected errors
+    return next();
+  }
+};
+
+/**
  * Middleware to require valid tournament participant access
  */
 export const requireTournamentParticipant: RequestHandler = async (req, res, next) => {

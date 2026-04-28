@@ -125,19 +125,30 @@ export default function TournamentEdit() {
     pendingData: FormData | null;
   }>({ open: false, dayDelta: 0, pendingData: null });
 
-  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
+  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament & { accessState?: string }>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
   });
 
+  // If the user only has pre-access (countdown) visibility into this
+  // tournament, the edit page must not be reachable. Bounce them back to
+  // the tournament detail route which will render the countdown screen.
+  useEffect(() => {
+    if (tournament && (tournament as any).accessState === 'pending' && tournamentId) {
+      setLocation(`/tournaments/${tournamentId}`);
+    }
+  }, [tournament, tournamentId, setLocation]);
+
+  const isPendingAccess = (tournament as any)?.accessState === 'pending';
+
   const { data: currentTeams } = useQuery<TournamentTeam[]>({
     queryKey: ['/api/tournaments', tournamentId, 'teams'],
-    enabled: !!tournamentId
+    enabled: !!tournamentId && !isPendingAccess
   });
 
   const matchesQuery = useQuery<{ id: string; scheduledTime: string | null }[]>({
     queryKey: ['/api/tournaments', tournamentId, 'matches'],
-    enabled: !!tournamentId
+    enabled: !!tournamentId && !isPendingAccess
   });
   const matches = matchesQuery.data;
 

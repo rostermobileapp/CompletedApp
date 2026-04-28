@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
@@ -16,14 +17,23 @@ export default function CustomBracketBuilderPage() {
   const [, setLocation] = useLocation();
   const tournamentId = params?.tournamentId;
 
-  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament>({
+  const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament & { accessState?: string }>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
   });
 
+  // Pre-access participants must not be able to reach the bracket builder.
+  // The countdown screen on the tournament detail route will replace this.
+  const isPendingAccess = (tournament as any)?.accessState === 'pending';
+  useEffect(() => {
+    if (isPendingAccess && tournamentId) {
+      setLocation(`/tournaments/${tournamentId}`);
+    }
+  }, [isPendingAccess, tournamentId, setLocation]);
+
   const { data: teams, isLoading: teamsLoading } = useQuery<TournamentTeam[]>({
     queryKey: ['/api/tournaments', tournamentId, 'teams'],
-    enabled: !!tournamentId
+    enabled: !!tournamentId && !isPendingAccess
   });
 
   const isLoading = tournamentLoading || teamsLoading;

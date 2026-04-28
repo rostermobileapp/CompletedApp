@@ -13,7 +13,9 @@ import {
   requireUserManagement,
   requirePremiumFeatures,
   requireSpecialPermission,
-  roleHierarchy
+  roleHierarchy,
+  getTournamentAccessState,
+  requireTournamentAccessOpen
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
@@ -3223,7 +3225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/tournaments/:tournamentId/participants", isAuthenticated, async (req: any, res) => {
+  app.get("/api/tournaments/:tournamentId/participants", isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const { tournamentId } = req.params;
       
@@ -3703,7 +3705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Batch endpoint to get tags for multiple tournament photos at once
-  app.get("/api/tournaments/:tournamentId/photos/tags-batch", isAuthenticated, async (req: any, res) => {
+  app.get("/api/tournaments/:tournamentId/photos/tags-batch", isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const { tournamentId } = req.params;
       
@@ -11657,7 +11659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== TOURNAMENT ANNOUNCEMENT ROUTES ==========
 
   // Get unread tournament announcements count
-  app.get('/api/tournaments/:tournamentId/announcements/unread-count', isAuthenticated, async (req: any, res) => {
+  app.get('/api/tournaments/:tournamentId/announcements/unread-count', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const tournamentId = req.params.tournamentId;
       const userId = req.user.claims.sub;
@@ -11689,7 +11691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get announcements for a tournament
-  app.get('/api/tournaments/:tournamentId/announcements', isAuthenticated, async (req: any, res) => {
+  app.get('/api/tournaments/:tournamentId/announcements', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const tournamentId = req.params.tournamentId;
       const userId = req.user.claims.sub;
@@ -11771,7 +11773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create tournament announcement (commissioner only)
-  app.post('/api/tournaments/:tournamentId/announcements', isAuthenticated, async (req: any, res) => {
+  app.post('/api/tournaments/:tournamentId/announcements', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const tournamentId = req.params.tournamentId;
       const userId = req.user.claims.sub;
@@ -16904,17 +16906,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/tournaments/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const userId = req.user?.claims?.sub;
 
-      const [tournament] = await db
-        .select()
-        .from(tournaments)
-        .where(eq(tournaments.id, id));
+      // Determine the requesting user's tournament access state. Approved
+      // participants who hit the tournament before its access window opens
+      // get a minimal countdown payload (no matches/brackets/etc.) instead
+      // of the full tournament data. Creators / commissioners always see
+      // the full tournament. Non-participants of a private tournament will
+      // still get the full record here (existing behavior is preserved for
+      // any non-participant viewer); the access-state field simply reflects
+      // their relationship to the tournament.
+      const { state, tournament } = await getTournamentAccessState(userId, id);
 
       if (!tournament) {
         return res.status(404).json({ message: "Tournament not found" });
       }
 
-      res.json(tournament);
+      if (state === 'pending') {
+        return res.json({
+          id: tournament.id,
+          name: tournament.name,
+          logoUrl: tournament.logoUrl ?? null,
+          accessStartDate: tournament.accessStartDate,
+          accessState: 'pending' as const,
+        });
+      }
+
+      res.json({ ...tournament, accessState: state });
     } catch (error) {
       console.error("Error fetching tournament:", error);
       res.status(500).json({ message: "Failed to fetch tournament" });
@@ -16922,7 +16940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get tournament teams
-  app.get('/api/tournaments/:id/teams', isAuthenticated, async (req: any, res) => {
+  app.get('/api/tournaments/:id/teams', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const { id } = req.params;
 
@@ -17198,7 +17216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get tournament participants (players) by tournament team
-  app.get('/api/tournaments/:tournamentId/teams/:teamId/players', isAuthenticated, async (req: any, res) => {
+  app.get('/api/tournaments/:tournamentId/teams/:teamId/players', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const { tournamentId, teamId } = req.params;
 
@@ -17233,7 +17251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get tournament matches
-  app.get('/api/tournaments/:id/matches', isAuthenticated, async (req: any, res) => {
+  app.get('/api/tournaments/:id/matches', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const { id } = req.params;
 
@@ -17251,7 +17269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single tournament match with player rosters and stats
-  app.get('/api/tournaments/:tournamentId/matches/:matchId/details', isAuthenticated, async (req: any, res) => {
+  app.get('/api/tournaments/:tournamentId/matches/:matchId/details', isAuthenticated, requireTournamentAccessOpen, async (req: any, res) => {
     try {
       const { tournamentId, matchId } = req.params;
 

@@ -31,12 +31,27 @@ import MatchEditDialog from "@/components/MatchEditDialog";
 import TournamentMatchScoreModal from "@/components/TournamentMatchScoreModal";
 import { CustomBracketBuilder } from "@/components/CustomBracketBuilder";
 import { EnhancedMediaUploader } from "@/components/EnhancedMediaUploader";
+import { TournamentCountdown } from "@/components/TournamentCountdown";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentSettings } from "@shared/schema";
 import LocationLink from "@/components/LocationLink";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
+
+// The tournament detail endpoint may return either a full Tournament record
+// or a minimal pre-access countdown payload for approved participants whose
+// access window has not yet opened. We use a discriminated `accessState`
+// field to tell the two apart on the client.
+type TournamentDetailResponse =
+  | (Tournament & { accessState?: 'full' | 'open' | 'expired' | 'none' })
+  | {
+      accessState: 'pending';
+      id: string;
+      name: string;
+      logoUrl: string | null;
+      accessStartDate: string | Date | null;
+    };
 
 // Announcement types
 type AnnouncementReaction = {
@@ -860,23 +875,30 @@ export default function TournamentDetail() {
   // Announcement state
   const [showCreateAnnouncementModal, setShowCreateAnnouncementModal] = useState(false);
 
-  const { data: tournament, isLoading: tournamentLoading} = useQuery<Tournament>({
+  const { data: tournamentResponse, isLoading: tournamentLoading } = useQuery<TournamentDetailResponse>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
   });
-  
+
+  // When the participant is in a pre-access (countdown) state we deliberately
+  // do not fetch teams / matches / announcements — the backend will 403 those
+  // endpoints anyway, and we want to avoid the noisy failed requests while
+  // the countdown screen is showing.
+  const isPendingAccess = tournamentResponse?.accessState === 'pending';
+  const tournament = isPendingAccess ? undefined : (tournamentResponse as Tournament | undefined);
+
   // Derive locked state from tournament data - default to unlocked if no bracket exists yet
   // This now applies to all tournament formats, not just custom_bracket
   const isBracketLocked = (tournament?.settings as any)?.customBracket?.locked ?? false;
 
   const { data: teams, isLoading: teamsLoading } = useQuery<TournamentTeam[]>({
     queryKey: ['/api/tournaments', tournamentId, 'teams'],
-    enabled: !!tournamentId
+    enabled: !!tournamentId && !isPendingAccess
   });
 
   const { data: matches, isLoading: matchesLoading } = useQuery<TournamentMatch[]>({
     queryKey: ['/api/tournaments', tournamentId, 'matches'],
-    enabled: !!tournamentId
+    enabled: !!tournamentId && !isPendingAccess
   });
 
   const { data: currentUser } = useQuery<any>({
@@ -886,7 +908,7 @@ export default function TournamentDetail() {
   // Fetch team players when a team is selected
   const { data: teamPlayers, isLoading: teamPlayersLoading, error: teamPlayersError } = useQuery<any[]>({
     queryKey: selectedTeam ? ['/api/tournaments', tournamentId, 'teams', selectedTeam.id, 'players'] : ['no-team-selected'],
-    enabled: !!tournamentId && !!selectedTeam?.id,
+    enabled: !!tournamentId && !!selectedTeam?.id && !isPendingAccess,
   });
 
   // Check if user can manage this tournament (creator for standalone OR league commissioner for playoffs)
@@ -900,13 +922,13 @@ export default function TournamentDetail() {
 
   const { data: pendingParticipants } = useQuery<any[]>({
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
-    enabled: !!tournamentId && !!tournament && !!currentUser && canManageTournament()
+    enabled: !!tournamentId && !!tournament && !!currentUser && !isPendingAccess && canManageTournament()
   });
 
   // Fetch tournament announcements
   const { data: announcementsData, isLoading: announcementsLoading } = useQuery<{ announcements: Announcement[]; pagination?: { page: number; pageSize: number; total: number } }>({
     queryKey: ['/api/tournaments', tournamentId, 'announcements'],
-    enabled: !!tournamentId,
+    enabled: !!tournamentId && !isPendingAccess,
   });
 
   const announcements: Announcement[] = Array.isArray(announcementsData) ? announcementsData : (announcementsData?.announcements ?? []);
@@ -1401,6 +1423,25 @@ export default function TournamentDetail() {
           <Skeleton className="h-96" />
         </div>
       </div>
+    );
+  }
+
+  // Approved participants whose access window has not yet opened only see the
+  // countdown screen — no tabs, no header actions, no in-tournament links.
+  // The global app shell (team/season selector) remains visible because it
+  // lives outside this component.
+  if (isPendingAccess && tournamentResponse && tournamentId) {
+    const pendingPayload = tournamentResponse as Extract<
+      TournamentDetailResponse,
+      { accessState: 'pending' }
+    >;
+    return (
+      <TournamentCountdown
+        tournamentId={tournamentId}
+        name={pendingPayload.name}
+        logoUrl={pendingPayload.logoUrl ?? null}
+        accessStartDate={pendingPayload.accessStartDate}
+      />
     );
   }
 
