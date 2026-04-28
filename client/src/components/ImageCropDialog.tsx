@@ -109,7 +109,8 @@ export function ImageCropDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const CONTAINER_HEIGHT = 360;
+  const [cropFrameSize, setCropFrameSize] = useState<number>(Math.floor(CONTAINER_HEIGHT * 0.75));
 
   useEffect(() => {
     if (!open) return;
@@ -117,8 +118,9 @@ export function ImageCropDialog({
     if (!el) return;
     const measure = () => {
       const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setContainerSize({ width: rect.width, height: rect.height });
+      const min = Math.min(rect.width, rect.height);
+      if (min > 0) {
+        setCropFrameSize(Math.floor(min * 0.75));
       }
     };
     measure();
@@ -126,10 +128,6 @@ export function ImageCropDialog({
     ro.observe(el);
     return () => ro.disconnect();
   }, [open]);
-
-  const cropFrameSize = containerSize
-    ? Math.floor(Math.min(containerSize.width, containerSize.height) * 0.75)
-    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -214,9 +212,9 @@ export function ImageCropDialog({
           <div
             ref={containerRef}
             className="relative w-full bg-black rounded-md overflow-hidden"
-            style={{ height: 360 }}
+            style={{ height: CONTAINER_HEIGHT }}
           >
-            {imageSrc && cropFrameSize ? (
+            {imageSrc ? (
               <Cropper
                 image={imageSrc}
                 crop={crop}
