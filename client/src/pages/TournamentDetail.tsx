@@ -948,6 +948,33 @@ export default function TournamentDetail() {
     }
   }, [tournamentId, announcements]);
 
+  // Auto-sync tournament payment state from Stripe on every page mount.
+  // Mirrors the Subscription page's `/api/stripe/sync-subscription` pattern.
+  // This is the resilient path: even if the user paid in Safari from the iOS native
+  // app and never came back through the ?payment=success redirect (so the success
+  // useEffect below never fires), this sync will detect the completed Stripe session
+  // and mark the tournament paid the next time the user opens this page.
+  useEffect(() => {
+    if (!tournamentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest('POST', `/api/tournaments/${tournamentId}/sync-payment`);
+        const data = await res.json().catch(() => ({} as any));
+        if (cancelled) return;
+        if (data?.applied) {
+          // Server applied a payment update — refresh tournament + teams so the UI reflects it.
+          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+          queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+        }
+      } catch (err) {
+        // Non-fatal — page should still render normally if Stripe is briefly unreachable.
+        console.warn('Tournament payment sync skipped:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tournamentId]);
+
   // Handle payment success callback from Stripe
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

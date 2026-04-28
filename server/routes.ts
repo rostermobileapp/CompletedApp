@@ -1992,6 +1992,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync tournament payment state from Stripe — mirrors /api/stripe/sync-subscription.
+  // Called on every TournamentDetail page mount so the UI always reflects the latest
+  // payment state, even if the user never returned through the ?payment=success URL
+  // (e.g. paid in Safari from the iOS native app, then came back to the in-app
+  // tournament page; or the success-redirect tab was closed before the React app
+  // could fire confirm-payment). Idempotent and safe to call repeatedly.
+  app.post('/api/tournaments/:tournamentId/sync-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tournamentId } = req.params;
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      // Already paid — nothing to do; return current status so the client cache stays accurate.
+      if (tournament.paymentStatus === 'paid') {
+        return res.json({ synced: false, applied: false, paymentStatus: tournament.paymentStatus });
+      }
+
+      const sessionId = tournament.stripeCheckoutSessionId;
+      if (!sessionId) {
+        // No checkout was ever started — cannot sync.
+        return res.json({ synced: false, applied: false, paymentStatus: tournament.paymentStatus });
+      }
+
+      let session: Stripe.Checkout.Session;
+      try {
+        session = await stripe.checkout.sessions.retrieve(sessionId);
+      } catch (err: any) {
+        // Don't fail the page mount on a Stripe lookup error — return current state and let
+        // the user retry. Logged so we can diagnose stale/invalid session ids in production.
+        console.warn('[Stripe] sync-payment: failed to retrieve session', sessionId, err?.message);
+        return res.json({ synced: false, applied: false, paymentStatus: tournament.paymentStatus });
+      }
+
+      // Validate session belongs to this tournament before applying anything.
+      if (session.metadata?.tournamentId !== tournamentId) {
+        return res.json({ synced: false, applied: false, paymentStatus: tournament.paymentStatus });
+      }
+
+      // Accept both 'paid' (normal) and 'no_payment_required' (100% promo / $0 total).
+      if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        return res.json({
+          synced: true,
+          applied: false,
+          paymentStatus: tournament.paymentStatus,
+          stripePaymentStatus: session.payment_status,
+        });
+      }
+
+      // Only the initial-payment session is syncable here; additional-team sessions are
+      // tracked separately and cannot be reliably looked up from a single stored id.
+      if (session.metadata?.type && session.metadata.type !== 'tournament_payment') {
+        return res.json({ synced: true, applied: false, paymentStatus: tournament.paymentStatus });
+      }
+
+      const applied = await applyTournamentPaymentFromSession(tournamentId, session);
+
+      const [refreshed] = await db
+        .select({ paymentStatus: tournaments.paymentStatus })
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      return res.json({
+        synced: true,
+        applied,
+        paymentStatus: refreshed?.paymentStatus ?? tournament.paymentStatus,
+      });
+    } catch (error: any) {
+      console.error('[Stripe] Error syncing tournament payment:', error);
+      res.status(500).json({ message: error?.message || 'Failed to sync payment' });
+    }
+  });
+
   // Create billing portal session - creates customer in Stripe if needed
   app.post('/api/stripe/create-portal-session', isAuthenticated, async (req: any, res) => {
     try {
