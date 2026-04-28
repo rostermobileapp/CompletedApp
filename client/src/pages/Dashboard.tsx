@@ -2576,13 +2576,18 @@ function DashboardMobile() {
           {selectedTournamentDetail?.accessState === 'pending' ? (
             // Approved participant whose access window has not yet opened —
             // show a live countdown that polls every 30s and auto-swaps to
-            // the View Bracket card the moment the window flips open.
-            <TournamentCountdown
-              tournamentId={selectedTournament.id}
-              name={selectedTournamentDetail.name || selectedTournament.name}
-              logoUrl={selectedTournamentDetail.logoUrl}
-              accessStartDate={selectedTournamentDetail.accessStartDate}
-            />
+            // the View Bracket card the moment the window flips open. We
+            // override the component's default min-h-screen so it fits
+            // naturally inside the mobile dashboard layout instead of
+            // taking over the viewport.
+            <div className="[&>div]:min-h-0 [&>div]:py-0">
+              <TournamentCountdown
+                tournamentId={selectedTournament.id}
+                name={selectedTournamentDetail.name || selectedTournament.name}
+                logoUrl={selectedTournamentDetail.logoUrl}
+                accessStartDate={selectedTournamentDetail.accessStartDate}
+              />
+            </div>
           ) : (
             <div className="rounded-xl border border-border p-4 bg-[#e2e2e2] dark:bg-[#212121]">
               <div className="flex items-center gap-3 mb-3">

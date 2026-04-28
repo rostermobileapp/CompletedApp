@@ -1874,7 +1874,6 @@ export default function TournamentDetail() {
                       <CardContent>
                         <Button 
                           disabled={isUnpaid}
-                          title={isUnpaid ? 'Pay your tournament invoice to seed playoffs' : undefined}
                           onClick={async () => {
                             try {
                               await apiRequest('POST', `/api/tournaments/${tournamentId}/seed-playoffs`);
@@ -1922,7 +1921,6 @@ export default function TournamentDetail() {
                               variant="outline"
                               className="gap-2"
                               disabled={isUnpaid}
-                              title={isUnpaid ? 'Pay your tournament invoice to edit the bracket' : undefined}
                             >
                               <Edit className="h-4 w-4" />
                               Edit Bracket
@@ -2118,7 +2116,6 @@ export default function TournamentDetail() {
                                   size="sm"
                                   className="gap-2"
                                   disabled={isUnpaid}
-                                  title={isUnpaid ? 'Pay your tournament invoice to edit the bracket' : undefined}
                                   data-testid="button-edit-bracket"
                                 >
                                   <Edit className="h-4 w-4" />
@@ -2609,7 +2606,6 @@ export default function TournamentDetail() {
                                         variant="default" 
                                         onClick={() => setScoringMatchId(match.id)}
                                         disabled={isUnpaid}
-                                        title={isUnpaid ? 'Pay your tournament invoice to score matches' : undefined}
                                         data-testid={`button-score-match-${match.matchNumber}`}
                                       >
                                         <Edit3 className="h-3.5 w-3.5 mr-1" />
@@ -2621,7 +2617,6 @@ export default function TournamentDetail() {
                                       variant="outline" 
                                       onClick={() => setEditingMatch(match)}
                                       disabled={isUnpaid}
-                                      title={isUnpaid ? 'Pay your tournament invoice to edit match schedule' : undefined}
                                       data-testid={`button-edit-match-${match.matchNumber}`}
                                     >
                                       Edit
