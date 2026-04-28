@@ -18010,6 +18010,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // tournament metadata atomically inside a single DB transaction below.
       let shiftedMatches: { id: string; scheduledTime: Date }[] = [];
       let derivedAccessEndDate: Date | undefined;
+      // Captured so we can fan out notifications after the transaction commits.
+      let shiftDayDelta = 0;
+      let shiftedMatchTeamIds: { team1Id: string | null; team2Id: string | null }[] = [];
       if (
         shiftScheduledMatches === true &&
         derivedStartDate !== undefined &&
@@ -18060,6 +18063,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           const { accessEndDate: recomputedEnd } = calculateAccessWindows(projectedMatches);
           derivedAccessEndDate = recomputedEnd ?? undefined;
+
+          // Capture team IDs for shifted matches so we can resolve affected
+          // players after the transaction commits successfully.
+          const shiftedIds = new Set(shiftedMatches.map(sm => sm.id));
+          shiftedMatchTeamIds = existingMatches
+            .filter(m => shiftedIds.has(m.id))
+            .map(m => ({ team1Id: m.team1Id, team2Id: m.team2Id }));
+          shiftDayDelta = dayDelta;
         }
       }
 
@@ -18099,6 +18110,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return row;
       });
+
+      // After the shift commits, we want to notify rostered (and RSVP'd)
+      // players exactly once per tournament shift, not once per match.
+      //
+      // Resolve recipients NOW — before any later mutation in this handler
+      // (custom-bracket rewrite, team regeneration) can delete the
+      // tournament_teams or tournament_match_rsvps rows we depend on. The
+      // actual notification dispatch is deferred until the response is about
+      // to be sent on a 2xx path, so a later failure suppresses delivery.
+      const tournamentNameForDispatch = updated?.name || tournament.name;
+      const actorIdForDispatch = (req.user as any)?.claims?.sub || 'unknown';
+      const preResolvedRecipients = new Set<string>();
+
+      if (shiftedMatches.length > 0 && shiftDayDelta !== 0) {
+        try {
+          // Resolve real team IDs from the shifted matches' tournamentTeams refs
+          // (captured before the shift so they're guaranteed to still exist).
+          const tournamentTeamIds = Array.from(
+            new Set(
+              shiftedMatchTeamIds
+                .flatMap(t => [t.team1Id, t.team2Id])
+                .filter((x): x is string => !!x)
+            )
+          );
+
+          if (tournamentTeamIds.length > 0) {
+            const tournamentTeamRows = await db
+              .select({ id: tournamentTeams.id, teamId: tournamentTeams.teamId })
+              .from(tournamentTeams)
+              .where(inArray(tournamentTeams.id, tournamentTeamIds));
+
+            const realTeamIds = tournamentTeamRows
+              .map(r => r.teamId)
+              .filter((x): x is string => !!x);
+
+            if (realTeamIds.length > 0) {
+              const memberships = await db
+                .select({ userId: teamMemberships.userId })
+                .from(teamMemberships)
+                .where(
+                  and(
+                    inArray(teamMemberships.teamId, realTeamIds),
+                    eq(teamMemberships.status, 'approved')
+                  )
+                );
+              for (const m of memberships) preResolvedRecipients.add(m.userId);
+            }
+          }
+
+          // Also notify anyone who has RSVP'd to one of the shifted matches,
+          // even if they're a guest/sub not on the team roster.
+          const shiftedMatchIds = shiftedMatches.map(sm => sm.id);
+          if (shiftedMatchIds.length > 0) {
+            const rsvps = await db
+              .select({ userId: tournamentMatchRsvps.userId })
+              .from(tournamentMatchRsvps)
+              .where(inArray(tournamentMatchRsvps.matchId, shiftedMatchIds));
+            for (const r of rsvps) preResolvedRecipients.add(r.userId);
+          }
+
+          // Don't notify the commissioner who initiated the shift.
+          preResolvedRecipients.delete(actorIdForDispatch);
+        } catch (err) {
+          // Failure to resolve recipients shouldn't fail the PATCH — log and
+          // proceed; dispatch will simply have an empty set.
+          console.error('[TournamentShift] Recipient resolution failed:', err);
+        }
+      }
+
+      const dispatchShiftNotifications = () => {
+        if (shiftedMatches.length === 0 || shiftDayDelta === 0) return;
+        const tournamentId = id;
+        const matchCount = shiftedMatches.length;
+        const dayDelta = shiftDayDelta;
+        const playerCount = preResolvedRecipients.size;
+
+        // Audit log: a single line capturing who shifted what, by how much.
+        // No dedicated audit table exists for tournament edits, so this serves
+        // as a recoverable record alongside the workflow's standard logs.
+        console.log(
+          `[TournamentShift] tournamentId=${tournamentId} actor=${actorIdForDispatch} ` +
+          `matches=${matchCount} dayDelta=${dayDelta} playersNotified=${playerCount}`
+        );
+
+        if (playerCount === 0) return;
+
+        const direction = dayDelta > 0 ? 'later' : 'earlier';
+        const days = Math.abs(dayDelta);
+        const matchWord = matchCount === 1 ? 'match' : 'matches';
+        const dayWord = days === 1 ? 'day' : 'days';
+        const summaryMessage =
+          `${matchCount} of your ${matchWord} in ${tournamentNameForDispatch} moved ${days} ${dayWord} ${direction}. ` +
+          `Open the tournament to see the new times.`;
+
+        // Fire-and-forget: don't block the PATCH response on push delivery.
+        (async () => {
+          try {
+            const { sendTournamentScheduleShiftPushNotification } =
+              await import('./oneSignalNotifications');
+
+            for (const userId of Array.from(preResolvedRecipients)) {
+              try {
+                await storage.createNotification({
+                  userId,
+                  type: 'general',
+                  title: `${tournamentNameForDispatch} schedule updated`,
+                  message: summaryMessage,
+                  actionUrl: `/tournaments/${tournamentId}`,
+                  actionText: 'View tournament',
+                });
+              } catch (err) {
+                console.error(
+                  `[TournamentShift] Failed to write in-app notification for user ${userId}:`,
+                  err
+                );
+              }
+
+              sendTournamentScheduleShiftPushNotification(
+                userId,
+                tournamentNameForDispatch,
+                tournamentId,
+                matchCount,
+                dayDelta
+              ).catch(err => {
+                console.error(
+                  `[TournamentShift] Push notification failed for user ${userId}:`,
+                  err
+                );
+              });
+            }
+          } catch (err) {
+            console.error('[TournamentShift] Notification dispatch failed:', err);
+          }
+        })();
+      };
 
       // If custom bracket with matchups is being saved, create/update tournament_matches
       if (settings?.customBracket?.matchups && Array.isArray(settings.customBracket.matchups)) {
@@ -18204,6 +18350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(tournaments)
             .where(eq(tournaments.id, id));
 
+          dispatchShiftNotifications();
           return res.json(finalUpdated);
         }
 
@@ -18240,6 +18387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bracketResult = generateThreeGameGuarantee(insertedTeams, id, mergedSettings);
             break;
           case 'custom_bracket':
+            dispatchShiftNotifications();
             return res.json(updated);
           default:
             return res.status(400).json({ message: "Invalid tournament format" });
@@ -18306,10 +18454,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(tournaments)
             .where(eq(tournaments.id, id));
           
+          dispatchShiftNotifications();
           return res.json(finalUpdated);
         }
       }
 
+      dispatchShiftNotifications();
       res.json(updated);
     } catch (error) {
       console.error("Error updating tournament:", error);

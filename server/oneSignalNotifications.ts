@@ -471,6 +471,38 @@ export async function sendRsvpReminderPushNotification(
   });
 }
 
+export async function sendTournamentScheduleShiftPushNotification(
+  recipientId: string,
+  tournamentName: string,
+  tournamentId: string,
+  matchCount: number,
+  dayDelta: number
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.upcomingEvents === false) {
+    console.log(`[OneSignal] Upcoming-event notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  const direction = dayDelta > 0 ? 'later' : 'earlier';
+  const days = Math.abs(dayDelta);
+  const matchWord = matchCount === 1 ? 'match' : 'matches';
+  const dayWord = days === 1 ? 'day' : 'days';
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `📅 ${tournamentName} schedule updated`,
+    message: `${matchCount} of your ${matchWord} moved ${days} ${dayWord} ${direction}. Tap to see the new times.`,
+    data: {
+      type: 'tournament_schedule_changed',
+      tournamentId,
+      matchCount: String(matchCount),
+      dayDelta: String(dayDelta),
+    },
+  });
+}
+
 export async function sendPhotoTagPushNotification(
   recipientId: string,
   taggerName: string,
