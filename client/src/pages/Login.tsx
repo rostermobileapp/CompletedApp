@@ -157,21 +157,23 @@ export default function Login() {
           <img
             src={rosterLogo}
             alt="Roster"
-            className="w-48 md:w-64 h-auto"
+            className="w-96 md:w-[512px] h-auto"
             data-testid="logo-image"
           />
+
+          <p className="mt-3 text-gray-500 text-base tracking-wide italic">less admin, more hockey.</p>
 
           <AnimatePresence>
             {!showForm && (
               <motion.div
-                className="mt-12"
+                className="mt-10"
                 initial={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.4 }}
               >
                 <button
                   onClick={() => setShowForm(true)}
-                  className="px-12 py-4 text-lg bg-black text-white rounded-xl min-h-[52px] font-bold hover:bg-gray-900 transition-colors"
+                  className="px-12 py-2 text-lg bg-black text-white rounded-xl font-bold hover:bg-gray-900 transition-colors"
                   data-testid="button-login-initial"
                 >
                   Login
