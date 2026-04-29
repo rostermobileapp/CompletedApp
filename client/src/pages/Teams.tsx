@@ -21,7 +21,7 @@ export default function Teams() {
   const [location, navigate] = useLocation();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
-  const { selectedTeamId, selectedType, selectedTournamentId, setTeamSelection } = useDashboardSelection();
+  const { selectedTeamId, selectedLeagueId, selectedType, selectedTournamentId, setTeamSelection } = useDashboardSelection();
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
   const [editedTeamName, setEditedTeamName] = useState('');
 
@@ -95,15 +95,33 @@ export default function Teams() {
     navigate,
   ]);
 
+  // Filter the user's teams to match the dashboard dropdown selection so
+  // a user with teams across multiple leagues only sees the team(s) for
+  // the league they currently have selected. Tournament selections show
+  // no league teams at all (handled in the render branch above).
+  const displayedTeams = (() => {
+    const all = userTeams as any[];
+    if (selectedType === 'tournament') return [];
+    if (selectedType === 'team' && selectedTeamId) {
+      return all.filter((t: any) => t.id === selectedTeamId);
+    }
+    if (selectedType === 'league' && (selectedLeagueId || selectedTournamentId === null)) {
+      // selectedLeagueId is the same as selectedId when type === 'league'
+      const id = selectedLeagueId;
+      return id ? all.filter((t: any) => t.leagueId === id) : all;
+    }
+    return all;
+  })();
+
   // Define current team early so it can be used in subsequent queries.
   // When a tournament is selected in the dropdown, we never show a regular
   // league team — the user either gets redirected (participant) or sees an
   // admin-only state. Setting currentTeam=null prevents league data from
   // leaking through.
-  const primaryTeam = (userTeams as any[])[0];
+  const primaryTeam = displayedTeams[0];
   const currentTeam = selectedType === 'tournament'
     ? null
-    : (selectedTeamId ? (userTeams as any[]).find((t: any) => t.id === selectedTeamId) : primaryTeam);
+    : (selectedTeamId ? displayedTeams.find((t: any) => t.id === selectedTeamId) : primaryTeam);
 
   // Get selected team members
   const { data: teamMembers = [] } = useQuery({
@@ -487,8 +505,11 @@ export default function Teams() {
             
             {/* Tournament team cards — shown alongside league teams so a user
                 who plays in both contexts can navigate to either from the
-                same place. Filtered to participations with an assigned team. */}
-            {tournamentParticipations.filter((p) => p.tournamentTeamId).length > 0 && (
+                same place. Filtered to participations with an assigned team.
+                Suppressed when the user has a specific league or team
+                selected in the dropdown so the page stays scoped to that
+                selection only. */}
+            {selectedType !== 'league' && selectedType !== 'team' && tournamentParticipations.filter((p) => p.tournamentTeamId).length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">My Tournament Teams</h3>
                 {tournamentParticipations
@@ -527,7 +548,7 @@ export default function Teams() {
             )}
 
             <Tabs value={selectedTeamId || primaryTeam?.id || ''} onValueChange={setTeamSelection}>
-            {(userTeams as any[]).map((team: any) => (
+            {displayedTeams.map((team: any) => (
               <TabsContent key={team.id} value={team.id} className="space-y-6">
                 {/* Team Header Card */}
                 <Card>

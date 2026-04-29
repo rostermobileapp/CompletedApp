@@ -1581,54 +1581,51 @@ function DashboardMobile() {
     
     const games = rawUpcomingGames as any[];
 
-    // Tournament matches the user is a participant of are always shown,
-    // regardless of which team/league is selected. Standalone tournaments
-    // have leagueId='' on the game payload and tournament_team_id values
-    // that don't match any real team selection, so without this carve-out
-    // they get filtered out for tournament-only players.
-    const isUserTournamentMatch = (game: any) =>
-      game?.isTournamentMatch === true &&
-      game?.tournamentId &&
-      participantTournamentIds.has(game.tournamentId);
-    
-    // Filter by team if team is selected
+    // Filter by team if team is selected — strict: only games for that
+    // team. Tournament matches are intentionally excluded; the user can
+    // pick the tournament in the dropdown to see those.
     if (selectedType === 'team' && selectedId) {
-      // Find the selected team name to match tournament matches which have null team IDs
-      const selectedTeam = userTeamsAll?.find((t: any) => t.id === selectedId);
+      // Find the selected team name to match tournament-style matches that
+      // sometimes carry null homeTeamId/awayTeamId but DO belong to this
+      // team's league.
+      const selectedTeam = (userTeamsAll as any[] | undefined)?.find((t: any) => t.id === selectedId);
+      const selectedTeamLeagueId = selectedTeam?.leagueId;
       const selectedTeamName = selectedTeam?.name?.toLowerCase();
-      
-      return games.filter(game => 
-        game.homeTeamId === selectedId || 
+
+      return games.filter(game =>
+        game.homeTeamId === selectedId ||
         game.awayTeamId === selectedId ||
         game.isSubstitute === true || // Always show substitute games regardless of selected team
-        isUserTournamentMatch(game) || // Always show tournaments the user plays in
-        // For tournament matches with null team IDs, match by team name
-        (game.isTournamentMatch && selectedTeamName && (
-          game.homeTeam?.name?.toLowerCase() === selectedTeamName ||
-          game.awayTeam?.name?.toLowerCase() === selectedTeamName
-        ))
+        // For tournament matches with null team IDs, match by team name —
+        // but only if that match belongs to the selected team's league.
+        (game.isTournamentMatch && selectedTeamName && selectedTeamLeagueId &&
+          game.homeTeam?.leagueId === selectedTeamLeagueId && (
+            game.homeTeam?.name?.toLowerCase() === selectedTeamName ||
+            game.awayTeam?.name?.toLowerCase() === selectedTeamName
+          ))
       );
     }
-    
-    // Filter by league if league is selected
+
+    // Filter by league if league is selected — strict: only games for
+    // teams in that league. Tournament matches that belong to a different
+    // league (or to a standalone tournament) are intentionally excluded.
     if (selectedType === 'league' && selectedLeagueId) {
-      return games.filter(game => 
-        game.homeTeam?.leagueId === selectedLeagueId || 
+      return games.filter(game =>
+        game.homeTeam?.leagueId === selectedLeagueId ||
         game.awayTeam?.leagueId === selectedLeagueId ||
-        game.isSubstitute === true || // Always show substitute games regardless of selected league
-        isUserTournamentMatch(game) // Always show tournaments the user plays in
+        game.isSubstitute === true // Always show substitute games regardless of selected league
       );
     }
-    
+
     // Filter by tournament if tournament is selected
     if (selectedType === 'tournament' && selectedId) {
-      return games.filter(game => 
+      return games.filter(game =>
         game.tournamentId === selectedId
       );
     }
-    
+
     return games;
-  }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll, participantTournamentIds]);
+  }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll]);
   
   // Fetch duty assignments for upcoming games
   const { data: dutyAssignments = [] } = useQuery({
