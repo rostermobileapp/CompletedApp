@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -26,7 +26,7 @@ export default function Teams() {
   const [editedTeamName, setEditedTeamName] = useState('');
 
   // Get user's teams
-  const { data: userTeams = [] } = useQuery({
+  const { data: userTeams = [], isLoading: userTeamsLoading } = useQuery({
     queryKey: ['/api/user/teams'],
     enabled: !!isAuthenticated,
   });
@@ -34,10 +34,40 @@ export default function Teams() {
   // Get user's approved tournament participations. These let
   // tournament-only players (no real team membership) still see their
   // tournament team and roster from the "My Team" page.
-  const { data: tournamentParticipations = [] } = useQuery<any[]>({
+  const {
+    data: tournamentParticipations = [],
+    isLoading: tournamentParticipationsLoading,
+  } = useQuery<any[]>({
     queryKey: ['/api/user/tournament-participations'],
     enabled: !!isAuthenticated,
   });
+
+  // For tournament-only players (no real team membership but at least one
+  // approved tournament participation with an assigned team), redirect to
+  // the full Tournament Team page so they get the same first-class team
+  // experience — name, roster, record, and team leaders — as a regular
+  // league player gets here.
+  // Wait until BOTH queries have settled to avoid misrouting users who
+  // actually have a real league team but whose participations resolved
+  // first.
+  const firstTournamentTeamParticipation = (tournamentParticipations as any[]).find(
+    (p) => p?.tournamentTeamId && p?.tournamentId,
+  );
+  useEffect(() => {
+    if (userTeamsLoading || tournamentParticipationsLoading) return;
+    if (
+      (userTeams as any[]).length === 0 &&
+      firstTournamentTeamParticipation
+    ) {
+      navigate(`/tournament-teams/${firstTournamentTeamParticipation.tournamentId}`);
+    }
+  }, [
+    userTeams,
+    userTeamsLoading,
+    tournamentParticipationsLoading,
+    firstTournamentTeamParticipation,
+    navigate,
+  ]);
 
   // Define current team early so it can be used in subsequent queries
   const primaryTeam = (userTeams as any[])[0];

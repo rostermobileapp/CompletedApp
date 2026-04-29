@@ -108,21 +108,17 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return hasSpecialPermission('stat_manager') || hasSpecialPermission('admin') || hasRole('commissioner') || isPrimaryCommissioner;
   };
 
-  // True when the current dashboard selection is a tournament the user is
-  // an approved participant in. Used to grant Player Pro privileges for the
-  // tournament team context regardless of the user's personal subscription.
-  const isParticipantOfSelectedTournament = (): boolean => {
-    if (selectedType !== 'tournament' || !selectedId) return false;
-    return tournamentParticipations.some(
-      (p: any) => p.tournamentId === selectedId,
-    );
+  // True if the user has at least one approved tournament participation —
+  // tournament players are granted Player Pro privileges so they can use
+  // the same player-side features (stats, sub requests, etc.) for their
+  // tournament team regardless of their personal subscription tier.
+  const isActiveTournamentParticipant = (): boolean => {
+    return tournamentParticipations.length > 0;
   };
 
   const canAccessPremiumFeatures = (): boolean => {
     if (hasRole('player_pro')) return true;
-    // Tournament participants get Pro access while their tournament is the
-    // active context (e.g. selected in the team/league/tournament dropdown).
-    return isParticipantOfSelectedTournament();
+    return isActiveTournamentParticipant();
   };
 
   const hasStatManagerAccess = (): boolean => {

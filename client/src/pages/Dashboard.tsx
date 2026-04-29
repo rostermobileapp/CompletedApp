@@ -1563,11 +1563,33 @@ function DashboardMobile() {
     queryKey: ['/api/user/teams']
   });
   
+  // User's approved tournament participations — drives "always include
+  // matches from this tournament" so a tournament-only player still sees
+  // their tournament games regardless of the selected team/league context.
+  const { data: tournamentParticipations = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/tournament-participations'],
+    enabled: !!supabaseUser,
+  });
+  const participantTournamentIds = React.useMemo(
+    () => new Set(tournamentParticipations.map((p: any) => p.tournamentId)),
+    [tournamentParticipations],
+  );
+
   // Filter upcoming games based on selection and handle tournament matches with null team IDs
   const upcomingGames = React.useMemo(() => {
     if (!Array.isArray(rawUpcomingGames)) return rawUpcomingGames;
     
     const games = rawUpcomingGames as any[];
+
+    // Tournament matches the user is a participant of are always shown,
+    // regardless of which team/league is selected. Standalone tournaments
+    // have leagueId='' on the game payload and tournament_team_id values
+    // that don't match any real team selection, so without this carve-out
+    // they get filtered out for tournament-only players.
+    const isUserTournamentMatch = (game: any) =>
+      game?.isTournamentMatch === true &&
+      game?.tournamentId &&
+      participantTournamentIds.has(game.tournamentId);
     
     // Filter by team if team is selected
     if (selectedType === 'team' && selectedId) {
@@ -1579,6 +1601,7 @@ function DashboardMobile() {
         game.homeTeamId === selectedId || 
         game.awayTeamId === selectedId ||
         game.isSubstitute === true || // Always show substitute games regardless of selected team
+        isUserTournamentMatch(game) || // Always show tournaments the user plays in
         // For tournament matches with null team IDs, match by team name
         (game.isTournamentMatch && selectedTeamName && (
           game.homeTeam?.name?.toLowerCase() === selectedTeamName ||
@@ -1592,7 +1615,8 @@ function DashboardMobile() {
       return games.filter(game => 
         game.homeTeam?.leagueId === selectedLeagueId || 
         game.awayTeam?.leagueId === selectedLeagueId ||
-        game.isSubstitute === true // Always show substitute games regardless of selected league
+        game.isSubstitute === true || // Always show substitute games regardless of selected league
+        isUserTournamentMatch(game) // Always show tournaments the user plays in
       );
     }
     
@@ -1604,7 +1628,7 @@ function DashboardMobile() {
     }
     
     return games;
-  }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll]);
+  }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll, participantTournamentIds]);
   
   // Fetch duty assignments for upcoming games
   const { data: dutyAssignments = [] } = useQuery({
