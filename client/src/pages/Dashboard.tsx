@@ -2793,10 +2793,12 @@ function DashboardMobile() {
                 const isOnTeam =
                   userTeamIds.includes(game.homeTeamId) ||
                   userTeamIds.includes(game.awayTeamId);
-                const isTournamentMatchForUser =
-                  game.isTournamentMatch &&
-                  (userTeamNames.includes(game.homeTeam?.name?.toLowerCase()) ||
-                    userTeamNames.includes(game.awayTeam?.name?.toLowerCase()));
+                // Tournament matches: trust the backend filter — the server
+                // already restricts upcoming games to matches the user
+                // should see (admin/creator OR approved participant), so we
+                // don't re-filter by team-name match here. Re-filtering used
+                // to drop admin-only matches from the calendar view.
+                const isTournamentMatchForUser = game.isTournamentMatch === true;
                 const isSubstitute = game.isSubstitute === true;
                 return isOnTeam || isSubstitute || isTournamentMatchForUser;
               })
@@ -3150,13 +3152,14 @@ function DashboardMobile() {
                 }
                 // For regular games, ensure we only show games for teams the user is currently on
                 const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                const userTeamNames = Array.isArray(userTeams) ? userTeams.map((team: any) => team.name?.toLowerCase()) : [];
                 const isOnTeam = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
-                // For tournament matches with null team IDs, check by team name
-                const isTournamentMatchForUser = game.isTournamentMatch && (
-                  userTeamNames.includes(game.homeTeam?.name?.toLowerCase()) || 
-                  userTeamNames.includes(game.awayTeam?.name?.toLowerCase())
-                );
+                // Tournament matches: trust the backend filter (admin/creator OR
+                // approved participant whose team plays in the match). The
+                // server already restricts the upcoming-games response to
+                // matches the user should see, so we don't re-filter by team
+                // name here — that previously hid admin-only matches when the
+                // tournament creator wasn't rostered on either team.
+                const isTournamentMatchForUser = game.isTournamentMatch === true;
                 // Also show games where user is an approved substitute (marked by backend)
                 const isSubstitute = game.isSubstitute === true;
                 return isOnTeam || isSubstitute || isTournamentMatchForUser;

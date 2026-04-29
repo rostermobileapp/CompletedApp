@@ -623,8 +623,59 @@ export async function getTournamentAccessState(
 
   const now = new Date();
 
+  // Effective access window: source of truth is the actual scheduled
+  // matches, not just the tournament's stored accessStartDate /
+  // accessEndDate. The stored values are recomputed when match
+  // scheduledTime mutations come through `recomputeTournamentDatesFromMatches`,
+  // but tournaments created before that helper existed (or whose matches
+  // were inserted via a code path that bypasses it) can have stale
+  // window fields. Reading the matches here means an approved
+  // participant always sees access flip 'open' three days before their
+  // earliest scheduled match — and stays open until three days after
+  // the latest one — regardless of whether the tournament's settings
+  // row has caught up.
+  const { tournamentMatches } = await import("@shared/schema");
+  const { isNotNull } = await import("drizzle-orm");
+  let effectiveAccessStart: Date | null = tournament.accessStartDate
+    ? new Date(tournament.accessStartDate)
+    : null;
+  let effectiveAccessEnd: Date | null = tournament.accessEndDate
+    ? new Date(tournament.accessEndDate)
+    : null;
+  try {
+    const scheduledRows = await db
+      .select({ scheduledTime: tournamentMatches.scheduledTime })
+      .from(tournamentMatches)
+      .where(and(
+        eq(tournamentMatches.tournamentId, tournamentId),
+        isNotNull(tournamentMatches.scheduledTime),
+      ));
+    const matchDates = scheduledRows
+      .map(r => (r.scheduledTime ? new Date(r.scheduledTime) : null))
+      .filter((d): d is Date => d != null && !Number.isNaN(d.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    if (matchDates.length > 0) {
+      const earliest = matchDates[0];
+      const latest = matchDates[matchDates.length - 1];
+      const earliestAccess = new Date(earliest);
+      earliestAccess.setDate(earliestAccess.getDate() - 3);
+      const latestAccess = new Date(latest);
+      latestAccess.setDate(latestAccess.getDate() + 3);
+      // Take the EARLIER opening and the LATER closing so a player isn't
+      // gated out by a stale value on either side.
+      if (!effectiveAccessStart || earliestAccess < effectiveAccessStart) {
+        effectiveAccessStart = earliestAccess;
+      }
+      if (!effectiveAccessEnd || latestAccess > effectiveAccessEnd) {
+        effectiveAccessEnd = latestAccess;
+      }
+    }
+  } catch (err) {
+    console.error('Error reading tournament matches in getTournamentAccessState:', err);
+  }
+
   // Check if access window has opened
-  if (tournament.accessStartDate && new Date(tournament.accessStartDate) > now) {
+  if (effectiveAccessStart && effectiveAccessStart > now) {
     return { state: 'pending', tournament };
   }
 
@@ -632,7 +683,7 @@ export async function getTournamentAccessState(
   if (participant.expiresAt && new Date(participant.expiresAt) < now) {
     return { state: 'expired', tournament };
   }
-  if (tournament.accessEndDate && new Date(tournament.accessEndDate) < now) {
+  if (effectiveAccessEnd && effectiveAccessEnd < now) {
     return { state: 'expired', tournament };
   }
 

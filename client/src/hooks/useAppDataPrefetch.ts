@@ -137,6 +137,26 @@ export function useAppDataPrefetch(enabled: boolean = true) {
     staleTime: 10000,
   });
 
+  // Prefetch personal reminders so the Dashboard schedule section has them
+  // ready on first paint. Otherwise the query only fires when Dashboard
+  // mounts, and a recently created reminder can stay invisible if the
+  // initial fetch races other prefetches or fails silently.
+  const personalRemindersQuery = useQuery({
+    queryKey: ['/api/user/personal-reminders'],
+    enabled,
+    retry: 2,
+    staleTime: 30000,
+  });
+
+  // Prefetch user team events so reminders/team events show up on first
+  // mount alongside the rest of the schedule.
+  const teamEventsQuery = useQuery({
+    queryKey: ['/api/user/team-events'],
+    enabled,
+    retry: 2,
+    staleTime: 30000,
+  });
+
   // If not enabled, we're not loading
   if (!enabled) {
     return { isLoading: false, hasError: false, data: {} };
