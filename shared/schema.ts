@@ -555,8 +555,8 @@ export const tournaments = pgTable("tournaments", {
   paymentStatus: tournamentPaymentStatusEnum("payment_status").default("unpaid"),
   paymentAmount: integer("payment_amount").default(0).notNull(), // in cents: teamCount × 1000
   paidTeamCount: integer("paid_team_count").default(0).notNull(), // number of teams paid for
-  accessStartDate: timestamp("access_start_date"), // 30 days before first match
-  accessEndDate: timestamp("access_end_date"), // 7 days after last match
+  accessStartDate: timestamp("access_start_date"), // 3 days before first match
+  accessEndDate: timestamp("access_end_date"), // 3 days after last match
   accessInvitesSentAt: timestamp("access_invites_sent_at"), // when window-open emails were sent
   accessClosingReminderSentAt: timestamp("access_closing_reminder_sent_at"), // when 24h-close push was sent
   stripePaymentIntentId: varchar("stripe_payment_intent_id"),

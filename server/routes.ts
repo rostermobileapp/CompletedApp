@@ -18706,13 +18706,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const firstMatchDate = matchDates[0];
     const lastMatchDate = matchDates[matchDates.length - 1];
 
-    // Access starts 14 days (2 weeks) before first match
+    // Access starts 3 days before first match
     const accessStartDate = new Date(firstMatchDate);
-    accessStartDate.setDate(accessStartDate.getDate() - 14);
+    accessStartDate.setDate(accessStartDate.getDate() - 3);
 
-    // Access ends 7 days (1 week) after last match
+    // Access ends 3 days after last match
     const accessEndDate = new Date(lastMatchDate);
-    accessEndDate.setDate(accessEndDate.getDate() + 7);
+    accessEndDate.setDate(accessEndDate.getDate() + 3);
 
     return { accessStartDate, accessEndDate };
   }
@@ -18725,8 +18725,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(eq(tournamentTeams.tournamentId, tournamentId));
     
     const count = Number(teamCount[0]?.count || 0);
-    // $5 per team = 500 cents (stored as cents for frontend display)
-    return count * 500;
+    // $10 per team = 1000 cents (stored as cents for frontend display)
+    return count * 1000;
   }
 
   // Create tournament
@@ -18773,9 +18773,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rawBody = { ...req.body };
 
       // For standalone tournaments, the form provides a single firstGameDate
-      // as a "YYYY-MM-DD" string. We derive accessStartDate (= firstGameDate - 14 days)
+      // as a "YYYY-MM-DD" string. We derive accessStartDate (= firstGameDate - 3 days)
       // and set startDate. accessEndDate is left null until matches are scheduled,
-      // at which point calculateAccessWindows populates it (= last match + 7 days).
+      // at which point calculateAccessWindows populates it (= last match + 3 days).
       if (rawBody.type === 'standalone') {
         if (!rawBody.firstGameDate) {
           return res.status(400).json({ message: "Standalone tournaments require a first game date" });
@@ -18813,7 +18813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "First game date cannot be in the past" });
         }
         const derivedAccessStart = new Date(firstGameDate);
-        derivedAccessStart.setDate(derivedAccessStart.getDate() - 14);
+        derivedAccessStart.setDate(derivedAccessStart.getDate() - 3);
         rawBody.startDate = firstGameDate;
         rawBody.accessStartDate = derivedAccessStart;
         rawBody.accessEndDate = null;
@@ -19000,7 +19000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         derivedStartDate = parsedFirstGameDate;
         derivedAccessStartDate = new Date(parsedFirstGameDate);
-        derivedAccessStartDate.setDate(derivedAccessStartDate.getDate() - 14);
+        derivedAccessStartDate.setDate(derivedAccessStartDate.getDate() - 3);
       }
 
       // If the commissioner asked to shift scheduled matches by the same delta
@@ -20833,7 +20833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(tournamentTeams.tournamentId, tournamentId));
         
         const teamCount = Number(totalTeams[0]?.count || 0);
-        const paymentAmount = teamCount * 500; // $5 per team = 500 cents
+        const paymentAmount = teamCount * 1000; // $10 per team = 1000 cents
         
         await db
           .update(tournaments)

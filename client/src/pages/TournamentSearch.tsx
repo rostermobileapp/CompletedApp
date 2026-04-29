@@ -273,7 +273,7 @@ export default function TournamentSearch() {
                         {format(new Date(tournament.accessStartDate), 'MMM d, yyyy')} -{' '}
                         {tournament.accessEndDate
                           ? format(new Date(tournament.accessEndDate), 'MMM d, yyyy')
-                          : 'TBD (1 week after final game)'}
+                          : 'TBD (3 days after final game)'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         You'll have access to this tournament during this time period

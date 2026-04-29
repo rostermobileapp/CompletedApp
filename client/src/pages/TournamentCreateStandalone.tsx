@@ -157,12 +157,12 @@ export default function TournamentCreateStandalone() {
   const watchedFormat = form.watch("format");
   const watchedFirstGameDate = form.watch("firstGameDate");
 
-  // Derive access-window-open date as 14 days before the first game date
+  // Derive access-window-open date as 3 days before the first game date
   const computedAccessOpenDate = (() => {
     const first = parseLocalDate(watchedFirstGameDate || "");
     if (!first) return null;
     const d = new Date(first);
-    d.setDate(d.getDate() - 14);
+    d.setDate(d.getDate() - 3);
     return d;
   })();
 
@@ -825,10 +825,10 @@ export default function TournamentCreateStandalone() {
                                     day: "numeric",
                                   })}
                                 </span>{" "}
-                                (2 weeks before the first game). Access closes 1 week after the final game.
+                                (3 days before the first game). Access closes 3 days after the final game.
                               </>
                             ) : (
-                              <>The access window opens 2 weeks before the first game and closes 1 week after the final game.</>
+                              <>The access window opens 3 days before the first game and closes 3 days after the final game.</>
                             )}
                           </FormDescription>
                           <FormMessage />
@@ -1237,7 +1237,7 @@ export default function TournamentCreateStandalone() {
                               : "—"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Closes 1 week after the final game
+                            Closes 3 days after the final game
                           </p>
                         </div>
                       </>
