@@ -40,6 +40,9 @@ interface ScheduleCalendarProps {
   /** Opens the global add-event dialog (rendered in Dashboard.tsx). When
    *  provided, an "+ Add" button appears in the Schedule header. */
   onAddEvent?: () => void;
+  /** When set, restrict the calendar/list to this tournament's matches and
+   *  hide league/team events entirely. */
+  selectedTournamentId?: string | null;
 }
 
 export type EventType = 'game' | 'practice' | 'social' | 'tournament';
@@ -63,6 +66,7 @@ export function ScheduleCalendar({
   isLeagueScope = false,
   leagueTeamIds,
   onAddEvent,
+  selectedTournamentId,
 }: ScheduleCalendarProps) {
   const [, navigate] = useLocation();
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
@@ -95,8 +99,14 @@ export function ScheduleCalendar({
         if (!g?.scheduledAt) continue;
         const d = new Date(g.scheduledAt);
         if (Number.isNaN(d.getTime())) continue;
+        // Tournament scope: only include this tournament's matches; ignore
+        // every other team-/league-scoped filter so the calendar shows
+        // exactly the tournament games and nothing else.
+        if (selectedTournamentId) {
+          if (g.tournamentId !== selectedTournamentId) continue;
+        }
         // Filter by selected team when applicable
-        if (selectedTeamId) {
+        else if (selectedTeamId) {
           const myMatch =
             g.homeTeam?.id === selectedTeamId ||
             g.awayTeam?.id === selectedTeamId ||
@@ -147,7 +157,9 @@ export function ScheduleCalendar({
       }
     }
 
-    if (Array.isArray(rawTeamEvents)) {
+    // Tournaments don't have league/team events — skip the team-events stream
+    // entirely so the calendar only shows the bracket matches.
+    if (!selectedTournamentId && Array.isArray(rawTeamEvents)) {
       for (const e of rawTeamEvents) {
         if (!e?.scheduledAt) continue;
         const d = new Date(e.scheduledAt);
@@ -189,6 +201,7 @@ export function ScheduleCalendar({
     userTeamIds,
     isLeagueScope,
     leagueTeamIds,
+    selectedTournamentId,
   ]);
 
   // Group events by yyyy-MM-dd

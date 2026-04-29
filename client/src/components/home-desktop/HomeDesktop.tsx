@@ -1,7 +1,13 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { Trophy } from 'lucide-react';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
-import { PAGE_BG } from './cardStyles';
+import { setPageTransitionDirection } from '@/components/PageTransition';
+import { TournamentCountdown } from '@/components/TournamentCountdown';
+import { Button } from '@/components/ui/button';
+import { getImageUrl } from '@/lib/queryClient';
+import { PAGE_BG, cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 import { UpNextCard } from './UpNextCard';
 import { AlertsExpanded } from './AlertsExpanded';
 import { TeamLeadersCard } from './TeamLeadersCard';
@@ -32,8 +38,14 @@ interface HomeDesktopProps {
  *            Row 3 = Team Leaders + Standings (1.4fr/1fr)
  */
 export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
-  const { selectedType, selectedId, selectedTeamId, selectedLeagueId } =
-    useDashboardSelection();
+  const {
+    selectedType,
+    selectedId,
+    selectedTeamId,
+    selectedLeagueId,
+    selectedTournamentId,
+  } = useDashboardSelection();
+  const isTournamentScope = selectedType === 'tournament' && !!selectedTournamentId;
 
   const { data: userTeams } = useQuery<UserTeam[]>({
     queryKey: ['/api/user/teams'],
@@ -46,8 +58,11 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
   });
 
   // Effective league id: explicit league selection, else selected team's league,
-  // else the first league the user has any team in.
+  // else the first league the user has any team in. When the user picked a
+  // tournament we don't fall back to a league at all, otherwise the home
+  // screen would silently show another league's standings/leaders/alerts.
   const effectiveLeagueId = useMemo<string | null>(() => {
+    if (isTournamentScope) return null;
     if (selectedType === 'league' && selectedLeagueId) return selectedLeagueId;
     if (selectedType === 'team' && selectedTeamId && Array.isArray(userTeams)) {
       const t = userTeams.find((x) => x.id === selectedTeamId);
@@ -61,7 +76,14 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
       return userLeagues[0]?.id || null;
     }
     return null;
-  }, [selectedType, selectedLeagueId, selectedTeamId, userTeams, userLeagues]);
+  }, [
+    isTournamentScope,
+    selectedType,
+    selectedLeagueId,
+    selectedTeamId,
+    userTeams,
+    userLeagues,
+  ]);
 
   const allUserTeamIds = useMemo<string[]>(
     () => (Array.isArray(userTeams) ? userTeams.map((t) => t.id) : []),
@@ -112,6 +134,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
             userTeamIds={allUserTeamIds}
             isLeagueScope={isLeagueScope}
             leagueTeamIds={userTeamIdsInLeague}
+            selectedTournamentId={selectedTournamentId}
           />
           <AlertsExpanded
             effectiveLeagueId={effectiveLeagueId}
@@ -128,22 +151,122 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
             isLeagueScope={isLeagueScope}
             leagueTeamIds={userTeamIdsInLeague}
             onAddEvent={onAddEvent}
+            selectedTournamentId={selectedTournamentId}
           />
         </div>
 
-        {/* Row 3: Team Leaders + Standings */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <TeamLeadersCard
-            effectiveLeagueId={effectiveLeagueId}
-            seasonId={activeSeason?.id || null}
-            seasonLabel={seasonLabel}
-          />
-          <StandingsTable
-            effectiveLeagueId={effectiveLeagueId}
-            userTeamIdsInLeague={userTeamIdsInLeague}
-            seasonLabel={seasonLabel}
+        {/* Row 3: Tournament bracket card (when tournament selected) OR
+            Team Leaders + Standings (otherwise) */}
+        {isTournamentScope ? (
+          <TournamentBracketCard tournamentId={selectedTournamentId!} />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+            <TeamLeadersCard
+              effectiveLeagueId={effectiveLeagueId}
+              seasonId={activeSeason?.id || null}
+              seasonLabel={seasonLabel}
+            />
+            <StandingsTable
+              effectiveLeagueId={effectiveLeagueId}
+              userTeamIdsInLeague={userTeamIdsInLeague}
+              seasonLabel={seasonLabel}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Tournament-scoped bottom card. Mirrors the mobile dashboard's tournament
+ * section: shows a live countdown when the user's access window has not yet
+ * opened, otherwise a "View Bracket" CTA that navigates to the tournament
+ * detail page. Polls the tournament every 30s so the countdown auto-swaps to
+ * the bracket card the moment access opens, without requiring a refresh.
+ */
+function TournamentBracketCard({ tournamentId }: { tournamentId: string }) {
+  const [, navigate] = useLocation();
+  const { data: tournament } = useQuery<any>({
+    queryKey: ['/api/tournaments', tournamentId],
+    enabled: !!tournamentId,
+    refetchInterval: 30_000,
+    staleTime: 30_000,
+  });
+
+  if (!tournament) {
+    return (
+      <div
+        className={cardClass}
+        style={cardStyle}
+        data-testid="card-tournament-bracket-loading"
+      >
+        <div className="h-24 rounded-lg bg-black/[0.03] animate-pulse" />
+      </div>
+    );
+  }
+
+  if (tournament.accessState === 'pending') {
+    return (
+      <div
+        className={cardClass}
+        style={cardStyle}
+        data-testid="card-tournament-countdown"
+      >
+        <div className="[&>div]:min-h-0 [&>div]:py-0">
+          <TournamentCountdown
+            tournamentId={tournament.id}
+            name={tournament.name}
+            logoUrl={tournament.logoUrl}
+            accessStartDate={tournament.accessStartDate}
           />
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cardClass}
+      style={cardStyle}
+      data-testid="card-tournament-bracket"
+    >
+      <div className={sectionTitleClass}>Tournament</div>
+      <div className="mt-3 flex items-center gap-3">
+        <div className="w-12 h-12 rounded-lg bg-[#FBEDD8] flex items-center justify-center overflow-hidden flex-shrink-0">
+          {tournament.logoUrl ? (
+            <img
+              src={getImageUrl(tournament.logoUrl) || ''}
+              alt={`${tournament.name} logo`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Trophy className="w-6 h-6" style={{ color: '#d97706' }} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className="text-[15px] font-medium text-[#212121] truncate"
+            data-testid="tournament-bracket-name"
+          >
+            {tournament.name}
+          </div>
+          {tournament.uniqueTournamentId && (
+            <div className="text-[12px] text-[#777] truncate">
+              ID: {tournament.uniqueTournamentId}
+            </div>
+          )}
+        </div>
+        <Button
+          onClick={() => {
+            setPageTransitionDirection('up');
+            navigate(`/tournaments/${tournament.id}`);
+          }}
+          className="bg-orange-500 hover:bg-orange-600"
+          data-testid="button-view-bracket"
+        >
+          View Bracket
+        </Button>
       </div>
     </div>
   );

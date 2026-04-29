@@ -15,6 +15,8 @@ interface UpNextCardProps {
   isLeagueScope?: boolean;
   /** All user-team IDs that belong to the active league (for league scope). */
   leagueTeamIds?: string[];
+  /** When set, restrict to tournament matches for the given tournament. */
+  selectedTournamentId?: string | null;
 }
 
 interface UpcomingItem {
@@ -31,6 +33,8 @@ interface UpcomingItem {
   isCompleted?: boolean;
   homeScore?: number | null;
   awayScore?: number | null;
+  tournamentId?: string | null;
+  isTournamentMatch?: boolean;
 }
 
 export function UpNextCard({
@@ -39,6 +43,7 @@ export function UpNextCard({
   userTeamIds,
   isLeagueScope = false,
   leagueTeamIds,
+  selectedTournamentId,
 }: UpNextCardProps) {
   const [, navigate] = useLocation();
 
@@ -59,6 +64,14 @@ export function UpNextCard({
       // Show items up to 2 hours after scheduled start
       return t + 2 * 60 * 60 * 1000 >= now;
     });
+
+    // Tournament scope: only show this tournament's matches.
+    if (selectedTournamentId) {
+      const tournamentGame = eligible.find(
+        (g) => g.tournamentId === selectedTournamentId,
+      );
+      return tournamentGame || null;
+    }
 
     // Strict team scope: when a team is selected, only show that team's
     // upcoming games. Never fall through to other teams' games.
@@ -145,7 +158,9 @@ export function UpNextCard({
     }
 
     if (!nextGame) {
-      const emptyMessage = selectedTeamId
+      const emptyMessage = selectedTournamentId
+        ? 'No upcoming tournament matches'
+        : selectedTeamId
         ? 'No upcoming games for this team'
         : isLeagueScope
           ? 'No upcoming games for this league'
