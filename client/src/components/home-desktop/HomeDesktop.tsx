@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Trophy } from 'lucide-react';
+import { Trophy, Clipboard, ChevronRight } from 'lucide-react';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
@@ -158,7 +158,10 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
         {/* Row 3: Tournament bracket card (when tournament selected) OR
             Team Leaders + Standings (otherwise) */}
         {isTournamentScope ? (
-          <TournamentBracketCard tournamentId={selectedTournamentId!} />
+          <>
+            <TournamentBracketCard tournamentId={selectedTournamentId!} />
+            <TournamentScorekeeperCard tournamentId={selectedTournamentId!} />
+          </>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
             <TeamLeadersCard
@@ -269,5 +272,63 @@ function TournamentBracketCard({ tournamentId }: { tournamentId: string }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Scorekeeper Dashboard shortcut, shown on the desktop home only when the
+ * user has scorekeeper access for the selected tournament. Mirrors the
+ * mobile Dashboard's scorekeeper link box (Dashboard.tsx ~line 2693).
+ *
+ * Access is determined server-side via `/api/scorekeeper/options`, which
+ * returns the set of leagues + tournaments the current user is allowed to
+ * scorekeep (commissioners, league/global stat_managers, tournament creators,
+ * and explicit tournament scorekeeper invitees). If the selected tournament
+ * appears in that list, we render the card.
+ */
+function TournamentScorekeeperCard({ tournamentId }: { tournamentId: string }) {
+  const [, navigate] = useLocation();
+  const { data: options } = useQuery<{
+    tournaments?: Array<{ id: string }>;
+  }>({
+    queryKey: ['/api/scorekeeper/options'],
+    staleTime: 60_000,
+  });
+
+  const hasAccess = useMemo(
+    () =>
+      Array.isArray(options?.tournaments) &&
+      options!.tournaments!.some((t) => t.id === tournamentId),
+    [options, tournamentId],
+  );
+
+  if (!hasAccess) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setPageTransitionDirection('up');
+        navigate('/scorekeeper');
+      }}
+      className={`${cardClass} w-full text-left hover:bg-black/[0.02] transition-colors`}
+      style={cardStyle}
+      data-testid="card-tournament-scorekeeper"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
+          <Clipboard className="w-5 h-5 text-white" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-medium text-[#212121]">
+            Scorekeeper Dashboard
+          </div>
+          <div className="text-[12px] text-[#777]">
+            Manage game scores for this tournament
+          </div>
+        </div>
+        <ChevronRight className="w-5 h-5 text-[#777] flex-shrink-0" />
+      </div>
+    </button>
   );
 }
