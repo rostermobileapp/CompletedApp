@@ -1,6 +1,6 @@
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import rosterLogo from '@assets/Roster-10_1775764992636.png';
 import { useLocation } from 'wouter';
 import { useState, useEffect, useCallback } from 'react';
@@ -8,6 +8,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
 import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
@@ -49,6 +50,12 @@ export default function Subscription() {
   } | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
+  // Confirmation shown when the user returns from a redirect-based Stripe
+  // flow (billing-portal upgrade for existing subscribers, or any 3DS
+  // fallback redirect from embedded checkout). The success URL in those
+  // cases is `/subscription?success=true[&session_id=...]`.
+  const [showRedirectConfirmation, setShowRedirectConfirmation] = useState(false);
+
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
   const isCommissioner = role === 'commissioner';
@@ -83,6 +90,36 @@ export default function Subscription() {
       }
     };
     syncSubscription();
+  }, []);
+
+  // Detect a redirect-based Stripe success and show a confirmation that
+  // mirrors the embedded checkout modal's success state. The auto-sync
+  // effect above reconciles the user's role. The URL is left intact here
+  // so a refresh before the user acknowledges still re-shows the dialog;
+  // we strip the query params on dismiss (see `acknowledgeRedirectConfirmation`).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success') !== 'true') return;
+    setShowRedirectConfirmation(true);
+  }, []);
+
+  // Acknowledge the post-redirect confirmation: close the dialog and strip
+  // the `success` / `session_id` query params so a refresh doesn't re-trigger
+  // the banner. Other params on the URL (if any) are preserved.
+  const acknowledgeRedirectConfirmation = useCallback(() => {
+    setShowRedirectConfirmation(false);
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('success') && !params.has('session_id')) return;
+    params.delete('success');
+    params.delete('session_id');
+    const remaining = params.toString();
+    const newUrl =
+      window.location.pathname +
+      (remaining ? `?${remaining}` : '') +
+      window.location.hash;
+    window.history.replaceState({}, '', newUrl);
   }, []);
 
   type StripePriceEntry = { id: string; amount: number | null; currency: string | null };
@@ -453,6 +490,48 @@ export default function Subscription() {
         successHeadline="Subscription active"
         successMessage="Updating your account…"
       />
+      {/* Confirmation shown after a redirect-based Stripe success returns to
+         this page (billing-portal upgrade or 3DS fallback). Visually mirrors
+         the embedded modal's success state so both flows feel consistent. */}
+      <Dialog
+        open={showRedirectConfirmation}
+        onOpenChange={(open) => {
+          if (!open) acknowledgeRedirectConfirmation();
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          data-testid="dialog-subscription-redirect-confirmation"
+        >
+          <DialogHeader>
+            <DialogTitle>Subscription active</DialogTitle>
+            <DialogDescription className="sr-only">
+              Your subscription was successfully activated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center text-center px-2 pb-4 pt-2 gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+            </div>
+            <h2 className="text-2xl font-semibold">Subscription active!</h2>
+            <p className="text-muted-foreground max-w-sm">
+              {isCommissioner
+                ? "You're now on the Commissioner plan."
+                : isPlayerPlus
+                ? "You're now on the Player Pro plan."
+                : "Thanks for subscribing — we're confirming your new plan now."}
+            </p>
+            <button
+              type="button"
+              onClick={acknowledgeRedirectConfirmation}
+              className="mt-1 bg-primary text-primary-foreground rounded-lg px-6 py-2 font-semibold hover:bg-primary/90 transition-colors"
+              data-testid="button-redirect-confirmation-close"
+            >
+              Continue
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Apple-required disclosure dialog before opening external payment link — iOS only */}
       {isIos && (
         <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
