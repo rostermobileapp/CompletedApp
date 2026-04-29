@@ -18323,6 +18323,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournamentMatches.id, matchId))
         .returning();
 
+      // If the match's scheduledTime changed (set, cleared, or shifted), keep
+      // the tournament settings in sync: startDate (= earliest match) is what
+      // the "First Game Date" field on the edit page reads from, and the
+      // access window is derived from earliest/latest match. This makes the
+      // form show the correct first-game date the moment a schedule edit
+      // happens on the Schedule tab, instead of waiting for a manual edit.
+      if (updateData.scheduledTime !== undefined) {
+        await recomputeTournamentDatesFromMatches(tournamentId);
+      }
+
       res.json(updatedMatch);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -18715,6 +18725,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     accessEndDate.setDate(accessEndDate.getDate() + 3);
 
     return { accessStartDate, accessEndDate };
+  }
+
+  // Recompute the tournament's startDate and access window from the current
+  // set of scheduled matches. Called after any single-match scheduledTime
+  // mutation so the tournament settings (visible as "First Game Date" in the
+  // edit screen) stay in sync with what the schedule actually shows.
+  //
+  // - startDate         = earliest match scheduledTime (date-only, local midnight)
+  // - accessStartDate   = earliest match - 3 days
+  // - accessEndDate     = latest match + 3 days
+  //
+  // Leaves tournament fields untouched when no matches are scheduled.
+  async function recomputeTournamentDatesFromMatches(tournamentId: string) {
+    try {
+      const matches = await db
+        .select({ scheduledTime: tournamentMatches.scheduledTime })
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.tournamentId, tournamentId));
+
+      const dates = matches
+        .map(m => (m.scheduledTime ? new Date(m.scheduledTime) : null))
+        .filter((d): d is Date => d !== null && !Number.isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      if (dates.length === 0) return; // nothing scheduled, leave settings alone
+
+      const earliest = dates[0];
+      // Normalise startDate to local midnight of the earliest match's day so
+      // it lines up with the date-only "First Game Date" the form renders.
+      const startDate = new Date(
+        earliest.getFullYear(),
+        earliest.getMonth(),
+        earliest.getDate(),
+      );
+
+      const { accessStartDate, accessEndDate } = calculateAccessWindows(matches);
+
+      await db
+        .update(tournaments)
+        .set({
+          startDate,
+          accessStartDate,
+          accessEndDate,
+          updatedAt: new Date(),
+        })
+        .where(eq(tournaments.id, tournamentId));
+    } catch (err) {
+      // Don't fail the caller's response over a settings-sync issue.
+      console.error('recomputeTournamentDatesFromMatches failed:', err);
+    }
   }
 
   // Helper function to calculate tournament payment amount
@@ -19977,6 +20037,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .set({ losses: sql`${tournamentTeams.losses} + 1` })
             .where(eq(tournamentTeams.id, loserId));
         }
+      }
+
+      // Keep the tournament's startDate / access window in sync when this
+      // PATCH changed the match's scheduledTime. See
+      // recomputeTournamentDatesFromMatches for the rationale.
+      if (Object.prototype.hasOwnProperty.call(updates, 'scheduledTime')) {
+        await recomputeTournamentDatesFromMatches(updatedMatch.tournamentId);
       }
 
       res.json(updatedMatch);

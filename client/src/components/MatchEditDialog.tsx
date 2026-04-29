@@ -79,6 +79,11 @@ export default function MatchEditDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tournaments', match.tournamentId, 'matches'] });
+      // The server now keeps tournament.startDate / accessStartDate /
+      // accessEndDate in sync with the earliest scheduled match. Invalidate
+      // the tournament cache so the Settings tab's "First Game Date" field
+      // (which reads tournament.startDate) reflects the change immediately.
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', match.tournamentId] });
       toast({
         title: "Match updated",
         description: "The match schedule has been updated successfully"
