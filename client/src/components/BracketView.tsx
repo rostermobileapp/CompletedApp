@@ -525,9 +525,20 @@ export default function BracketView({ matches, teams, format, settings, tourname
                   </span>
                 </div>
                 {match.scheduledTime && (
-                  <span className="text-[9px] font-bold text-card-foreground whitespace-nowrap">
-                    {formatDate(new Date(match.scheduledTime), "MMM d")}
-                  </span>
+                  <div className="flex flex-col items-end flex-shrink-0 leading-tight">
+                    <span
+                      className="text-[9px] font-bold text-card-foreground whitespace-nowrap"
+                      data-testid={`text-match-date-${match.matchNumber}`}
+                    >
+                      {formatDate(new Date(match.scheduledTime), "MMM d")}
+                    </span>
+                    <span
+                      className="text-[9px] font-medium text-muted-foreground whitespace-nowrap"
+                      data-testid={`text-match-time-${match.matchNumber}`}
+                    >
+                      {formatDate(new Date(match.scheduledTime), "h:mma")}
+                    </span>
+                  </div>
                 )}
               </div>
 

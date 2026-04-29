@@ -3734,9 +3734,40 @@ export class DatabaseStorage implements IStorage {
       );
     const substituteGameIds = substituteGames.map(r => r.gameId);
     console.log(`🏒 getUpcomingGames for user ${userId}: found ${substituteGameIds.length} substitute games:`, substituteGameIds);
-    
-    // If user has neither teams, league memberships, attending RSVPs, nor approved substitutions, return empty
-    if (teamIds.length === 0 && leagueIds.length === 0 && rsvpGameIds.length === 0 && substituteGameIds.length === 0) return [];
+
+    // Tournament-admin discovery (creator OR commissioner of the tournament's
+    // league). Done up here so a standalone tournament admin who has no team
+    // / league membership still gets their tournament matches on the schedule.
+    const adminCreatedRows = await db
+      .select({ id: tournaments.id })
+      .from(tournaments)
+      .where(eq(tournaments.createdBy, userId));
+    const commissionerLeagueRows = await db
+      .select({ id: leagues.id })
+      .from(leagues)
+      .where(eq(leagues.commissionerId, userId));
+    const commissionerLeagueIds = commissionerLeagueRows.map(l => l.id);
+    let adminCommissionerRows: { id: string }[] = [];
+    if (commissionerLeagueIds.length > 0) {
+      adminCommissionerRows = await db
+        .select({ id: tournaments.id })
+        .from(tournaments)
+        .where(inArray(tournaments.leagueId, commissionerLeagueIds));
+    }
+    const adminTournamentIds = new Set<string>([
+      ...adminCreatedRows.map(t => t.id),
+      ...adminCommissionerRows.map(t => t.id),
+    ]);
+
+    // If user has no teams, no league memberships, no RSVPs, no approved
+    // substitutions, AND administers no tournaments, return empty.
+    if (
+      teamIds.length === 0 &&
+      leagueIds.length === 0 &&
+      rsvpGameIds.length === 0 &&
+      substituteGameIds.length === 0 &&
+      adminTournamentIds.size === 0
+    ) return [];
 
     // Build conditions for the query
     const conditions: any[] = [];
@@ -3756,17 +3787,22 @@ export class DatabaseStorage implements IStorage {
       conditions.push(inArray(games.id, substituteGameIds));
     }
 
-    // Get all games first (with generous cutoff), then filter per-game based on league timezone
-    const gamesResult = await db
-      .select()
-      .from(games)
-      .where(
-        and(
-          gte(games.scheduledAt, generousCutoff),
-          or(...conditions)
-        )
-      )
-      .orderBy(asc(games.scheduledAt));
+    // Get all games first (with generous cutoff), then filter per-game based on league timezone.
+    // Skip the query entirely when conditions is empty (admin-only users with no
+    // team / league / RSVP / substitute records) — running or() with zero args
+    // produces invalid SQL.
+    const gamesResult = conditions.length > 0
+      ? await db
+          .select()
+          .from(games)
+          .where(
+            and(
+              gte(games.scheduledAt, generousCutoff),
+              or(...conditions)
+            )
+          )
+          .orderBy(asc(games.scheduledAt))
+      : [];
 
     // Import the centralized visibility helper
     const { shouldShowEventBasedOnLeagueNoon } = await import('./dateUtils');
@@ -3896,24 +3932,32 @@ export class DatabaseStorage implements IStorage {
       resultType: null
     }));
 
-    // Get tournament matches for user's teams
+    // Get tournament matches for user's teams + every match in tournaments
+    // the user administers. adminTournamentIds was computed above.
     const tournamentMatchesAsGames: any[] = [];
-    if (teamIds.length > 0) {
-      // Find tournament_teams that link to the user's teams
-      const userTournamentTeams = await db
-        .select({
-          id: tournamentTeams.id,
-          tournamentId: tournamentTeams.tournamentId,
-          teamId: tournamentTeams.teamId,
-          teamName: tournamentTeams.teamName
-        })
-        .from(tournamentTeams)
-        .where(inArray(tournamentTeams.teamId, teamIds));
-      
-      if (userTournamentTeams.length > 0) {
-        const tournamentTeamIds = userTournamentTeams.map(tt => tt.id);
-        const userTeamNames = userTournamentTeams.map(tt => tt.teamName);
-        const userTournamentIds = [...new Set(userTournamentTeams.map(tt => tt.tournamentId))];
+
+    // Find tournament_teams that link to the user's teams (may be empty
+    // for users that only administer tournaments without playing in them).
+    const userTournamentTeams = teamIds.length > 0
+      ? await db
+          .select({
+            id: tournamentTeams.id,
+            tournamentId: tournamentTeams.tournamentId,
+            teamId: tournamentTeams.teamId,
+            teamName: tournamentTeams.teamName
+          })
+          .from(tournamentTeams)
+          .where(inArray(tournamentTeams.teamId, teamIds))
+      : [];
+
+    if (userTournamentTeams.length > 0 || adminTournamentIds.size > 0) {
+      const tournamentTeamIds = userTournamentTeams.map(tt => tt.id);
+      const userTeamNames = userTournamentTeams.map(tt => tt.teamName);
+      const playerTournamentIdList = userTournamentTeams.map(tt => tt.tournamentId);
+      const adminTournamentIdList = Array.from(adminTournamentIds);
+      const userTournamentIds = Array.from(
+        new Set<string>(playerTournamentIdList.concat(adminTournamentIdList)),
+      );
         
         // Get ALL scheduled tournament matches for tournaments where user has teams
         // This handles custom brackets where team1Id/team2Id may be null but team names are in settings
@@ -4007,13 +4051,22 @@ export class DatabaseStorage implements IStorage {
             }
           }
           
-          // Skip this match if user's team is not involved
-          if (!userTeamInMatch) continue;
+          // Skip this match if user's team is not involved AND user is not
+          // an admin of this tournament. Admins see every match.
+          if (!userTeamInMatch && !adminTournamentIds.has(tournament.id)) continue;
           
-          // Check visibility based on league timezone
-          const leagueTimezone = tournament.leagueId 
-            ? (leagueCache.get(tournament.leagueId)?.timezone || 'America/New_York')
-            : 'America/New_York';
+          // Check visibility based on league timezone. Populate the cache
+          // on miss — admin-only users may not have hit any games above, so
+          // leagueCache could be empty for this tournament's league.
+          let leagueTimezone = 'America/New_York';
+          if (tournament.leagueId) {
+            let cachedLeague = leagueCache.get(tournament.leagueId);
+            if (cachedLeague === undefined && !leagueCache.has(tournament.leagueId)) {
+              cachedLeague = await this.getLeague(tournament.leagueId);
+              leagueCache.set(tournament.leagueId, cachedLeague);
+            }
+            leagueTimezone = cachedLeague?.timezone || 'America/New_York';
+          }
           
           if (!shouldShowEventBasedOnLeagueNoon(match.scheduledTime!, leagueTimezone)) {
             continue;
@@ -4104,7 +4157,6 @@ export class DatabaseStorage implements IStorage {
             linkedGameId: match.gameId // Track linked game to avoid duplicate display
           });
         }
-      }
     }
 
     // Get game IDs that are linked to tournament matches to avoid duplicates
