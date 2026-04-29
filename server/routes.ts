@@ -1669,7 +1669,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 'localhost:5000');
       const appUrl = `${protocol}://${host}`;
 
-      const session = await stripe.checkout.sessions.create({
+      // Embedded checkout = in-app payment modal (preferred for subscription page).
+      // When the client passes { embedded: true } we use Stripe's Embedded Checkout
+      // which renders the payment form inside our own modal instead of redirecting
+      // away. Falls back to hosted checkout (returning a URL) when not requested.
+      const embedded = req.body?.embedded === true;
+
+      const baseSessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: customerId,
         mode: 'subscription',
         payment_method_types: ['card'],
@@ -1680,13 +1686,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         ],
         allow_promotion_codes: true,
-        success_url: `${appUrl}/subscription?success=true`,
         cancel_url: `${appUrl}/subscription`,
         client_reference_id: userId,
         metadata: {
           userId: userId,
         },
-      });
+      };
+
+      const session = embedded
+        ? await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            ui_mode: 'embedded',
+            // 'if_required' lets onComplete fire for normal card payments while still
+            // supporting 3DS / alternative-payment flows that need a full redirect.
+            redirect_on_completion: 'if_required',
+            return_url: `${appUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+          })
+        : await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            success_url: `${appUrl}/subscription?success=true`,
+          });
+
+      if (embedded) {
+        if (!session.client_secret) {
+          console.error('[Stripe] Embedded subscription session created but client_secret is missing!', session);
+          return res.status(500).json({ message: 'Stripe session client_secret missing' });
+        }
+        return res.json({ clientSecret: session.client_secret, sessionId: session.id });
+      }
 
       res.json({ url: session.url });
     } catch (error: any) {

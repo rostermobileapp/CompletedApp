@@ -3,12 +3,13 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import rosterLogo from '@assets/Roster-10_1775764992636.png';
 import { useLocation } from 'wouter';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
+import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
   isBillingSupported,
   getIosProducts,
@@ -32,6 +33,21 @@ export default function Subscription() {
   const [iapReady, setIapReady] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [iosProductPrices, setIosProductPrices] = useState<Record<string, string>>({});
+
+  // In-app embedded Stripe checkout for subscription upgrades — replaces the
+  // hosted-checkout redirect we previously used. The server creates a Checkout
+  // Session with `ui_mode: 'embedded'` and returns a `clientSecret`; we pass
+  // that to <StripeCheckoutModal> which renders Stripe's payment form inline.
+  // After payment we call `/api/stripe/sync-subscription` to update the user's
+  // role immediately rather than waiting for the webhook, then refetch user
+  // data so the page updates in place. The hosted-checkout fallback (returning
+  // `{ url }`) is preserved for the existing-subscription portal-upgrade path.
+  const [activeCheckout, setActiveCheckout] = useState<{
+    clientSecret: string;
+    sessionId: string;
+    tier: 'player_pro' | 'commissioner';
+  } | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
 
@@ -224,15 +240,75 @@ export default function Subscription() {
       }
       const priceId = priceEntry?.id;
       if (!priceId) throw new Error(`Price not configured for ${tier} (${billingPeriod}). Please contact support.`);
-      const response = await apiRequest('POST', '/api/stripe/create-checkout-session', { priceId });
-      const data = await response.json() as { url: string };
-      if (!data.url) throw new Error('No checkout URL received from server');
-      routeStripeUrl(data.url);
+      // Request embedded checkout so the payment form opens in our in-app
+      // modal instead of redirecting away. Server still returns `{ url }` for
+      // the existing-subscription portal-upgrade path — we redirect in that case.
+      const response = await apiRequest('POST', '/api/stripe/create-checkout-session', { priceId, embedded: true });
+      const data = await response.json() as { clientSecret?: string; sessionId?: string; url?: string };
+      if (data.clientSecret && data.sessionId) {
+        setActiveCheckout({ clientSecret: data.clientSecret, sessionId: data.sessionId, tier });
+        setIsCheckoutOpen(true);
+        setIsLoading(false);
+        return;
+      }
+      if (data.url) {
+        // Fallback: server returned a hosted URL (e.g. billing-portal upgrade
+        // flow when the user already has an active subscription).
+        routeStripeUrl(data.url);
+        return;
+      }
+      throw new Error('No checkout session received from server');
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to start checkout. Please try again.', variant: 'destructive' });
       setIsLoading(false);
     }
   };
+
+  // Called by the modal as soon as Stripe reports the payment complete.
+  // We sync the user's subscription status server-side immediately so the role
+  // updates without waiting on the webhook, then refetch user data so the page
+  // updates in place. Memoized so EmbeddedCheckoutProvider options stay stable.
+  const handleEmbeddedPaymentComplete = useCallback(async () => {
+    // Capture the tier the user was upgrading *to* so we can show the correct
+    // label even if the sync response omits `tier` (eventual-consistency edge
+    // case where Stripe lists the subscription a beat after we ask).
+    const purchasedTier = activeCheckout?.tier ?? null;
+    let synced = false;
+    let syncedTier: string | null = null;
+    try {
+      const response = await apiRequest('POST', '/api/stripe/sync-subscription');
+      const data = await response.json() as { tier?: string };
+      synced = true;
+      syncedTier = data.tier ?? null;
+    } catch (err) {
+      // Non-fatal: webhook + the auto-sync on next page load will reconcile.
+      console.warn('[Subscription] sync-subscription after embedded checkout failed:', err);
+    } finally {
+      // Refetch (not just invalidate) so the modal closes onto already-updated
+      // UI rather than briefly showing stale data while the next fetch runs.
+      await Promise.allSettled([
+        queryClient.refetchQueries({ queryKey: ['/api/user'] }),
+        queryClient.refetchQueries({ queryKey: ['/api/auth/user'] }),
+      ]);
+    }
+    if (synced) {
+      // Prefer the server's reported tier; fall back to the tier the user
+      // just clicked so commissioner upgrades don't get mislabeled as
+      // "Player Pro" when the sync response is missing the field.
+      const resolvedTier = syncedTier ?? purchasedTier;
+      const tierLabel = resolvedTier === 'commissioner' ? 'Commissioner' : 'Player Pro';
+      toast({
+        title: 'Subscription active!',
+        description: `You're now on the ${tierLabel} plan.`,
+      });
+    } else {
+      // Not necessarily a true failure — webhook will reconcile shortly.
+      toast({
+        title: "We're still confirming your subscription",
+        description: "Stripe accepted the payment. If your plan doesn't update shortly, try the Sync button.",
+      });
+    }
+  }, [activeCheckout, toast]);
 
   // --- iOS IAP helpers ---
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
@@ -359,6 +435,24 @@ export default function Subscription() {
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
+      {/* In-app Stripe payment modal — replaces the previous redirect to
+         hosted Stripe checkout. After payment we sync the user's subscription
+         server-side, refetch user data, then auto-close the modal. */}
+      <StripeCheckoutModal
+        clientSecret={activeCheckout?.clientSecret ?? null}
+        open={isCheckoutOpen}
+        onOpenChange={(open) => {
+          setIsCheckoutOpen(open);
+          if (!open) {
+            // Discard the secret on close so reopening starts a fresh session.
+            setActiveCheckout(null);
+          }
+        }}
+        onPaymentComplete={handleEmbeddedPaymentComplete}
+        title="Complete Your Subscription"
+        successHeadline="Subscription active"
+        successMessage="Updating your account…"
+      />
       {/* Apple-required disclosure dialog before opening external payment link — iOS only */}
       {isIos && (
         <AlertDialog open={!!pendingStripeUrl} onOpenChange={(open) => { if (!open) { setPendingStripeUrl(null); setIsLoading(false); } }}>
