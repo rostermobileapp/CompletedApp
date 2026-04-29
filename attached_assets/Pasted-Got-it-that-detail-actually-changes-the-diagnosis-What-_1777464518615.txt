@@ -1,0 +1,68 @@
+Got it — that detail actually changes the diagnosis. What you're describing isn't a content-positioning issue, it's the app putting Android into immersive/sticky-immersive mode, which hides the system navigation bar entirely and requires a swipe to reveal it. The CSS safe-area fixes I gave you wouldn't solve that, because the navigation bar isn't being covered — it's being dismissed by the system.
+This is almost always caused by one of three things in a WebView wrapper like BuildNatively:
+
+An immersive/fullscreen flag set in the native Android config
+JavaScript in the web app calling requestFullscreen() (often unintentionally — some video players, image lightboxes, or UI libraries do this automatically)
+A theme or windowFlags setting in the Android manifest that includes SYSTEM_UI_FLAG_HIDE_NAVIGATION or SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+
+Here's a revised prompt for Replit that targets this correctly:
+
+Prompt for Replit:
+I need to fix an Android system navigation bar issue in my Roster web app. On Samsung and some Android devices, the app is causing the system navigation bar (back/home buttons) to be hidden — users have to swipe up from the bottom edge to make it reappear in order to navigate. This is immersive/fullscreen mode behavior, not a content-overlap issue. The app is wrapped as a native Android app via BuildNatively (WebView), so the trigger is likely something in the web code requesting fullscreen.
+Please audit and fix the following:
+1. Search for and disable any fullscreen API calls
+Search the entire codebase for the following terms and report every match with the file name and line number:
+
+requestFullscreen
+requestFullScreen
+webkitRequestFullscreen
+webkitRequestFullScreen
+mozRequestFullScreen
+msRequestFullscreen
+fullscreenEnabled
+fullscreen: true
+fullScreen: true
+
+For any matches found, either remove the call entirely or wrap it so it never fires automatically. Fullscreen should only be triggered by explicit user action (like tapping a "fullscreen video" button), not on page load, route change, or component mount.
+2. Check video and media elements
+If there are any <video> tags, ensure they do not have the autoplay + fullscreen combination, and remove any playsinline="false" attributes. Add playsinline to all video elements:
+html<video playsinline ... >
+This prevents iOS and some Android WebViews from auto-promoting video to fullscreen.
+3. Check for libraries that trigger fullscreen
+Audit package.json and the import statements for libraries that may auto-trigger fullscreen behavior. Common culprits include:
+
+Image lightbox libraries (e.g., react-image-lightbox, photoswipe)
+Video players (e.g., video.js, plyr, react-player with certain configs)
+Carousel/slider libraries
+Modal libraries with "fullscreen" props
+
+For any found, check their config and disable any fullscreen: true options unless explicitly needed.
+4. Check for CSS that might trigger system UI hiding
+Search for any CSS using:
+
+:fullscreen pseudo-class
+position: fixed combined with width: 100vw AND height: 100vh AND top: 0 AND left: 0 on the root layout (this pattern can signal "fullscreen intent" to some WebViews)
+
+5. Check viewport meta tag
+Confirm the viewport meta tag does NOT include any of these (which can trigger fullscreen on Android):
+
+user-scalable=no combined with fullscreen flags
+Any reference to minimal-ui (deprecated but still respected by some WebViews)
+
+The viewport tag should look like:
+html<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+6. Check service worker and PWA manifest
+If there's a manifest.json or PWA manifest file, check the display property. It should be "standalone" or "minimal-ui" — not "fullscreen":
+json{
+  "display": "standalone"
+}
+If it currently says "fullscreen", change it to "standalone".
+7. Report back with findings
+After completing the audit, give me:
+
+A list of every file that contained a fullscreen-related call or config, with the original code and what you changed it to
+The current value of the display property in the PWA manifest
+Any libraries you flagged as potential fullscreen triggers
+Anything suspicious you found that you didn't change but think I should review manually
+
+Do not make changes to anything you're unsure about — flag it for me to review instead.
