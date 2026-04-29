@@ -535,7 +535,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           className="flex-1 w-full overflow-y-auto"
           data-testid="desktop-main-content"
         >
-          <div className="mx-auto w-full max-w-[1440px] px-8 py-8 h-full pt-[4px] pb-[4px]">
+          <div className="mx-auto w-full max-w-[1440px] px-8 py-8 h-full pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
             {mainScreen ?? children}
           </div>
         </main>
