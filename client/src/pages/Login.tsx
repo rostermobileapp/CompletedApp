@@ -187,7 +187,7 @@ export default function Login() {
           {showForm && (
             <>
               <motion.div
-                className="fixed inset-0 z-40 bg-black"
+                className="fixed inset-0 z-40 bg-white"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -196,7 +196,7 @@ export default function Login() {
               />
 
               <motion.div
-                className="fixed left-6 right-6 z-50 rounded-2xl px-5 py-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px] bg-black"
+                className="fixed left-1/2 -translate-x-1/2 z-50 w-full max-w-[512px] px-6"
                 initial={{ opacity: 0, scale: 0.95, top: '33%' }}
                 animate={{ opacity: 1, scale: 1, top: '8%' }}
                 exit={{ opacity: 0, scale: 0.95, top: '33%' }}
@@ -205,18 +205,18 @@ export default function Login() {
                   ease: [0.4, 0, 0.2, 1],
                 }}
               >
-                <div className="text-center pt-[0px] pb-[0px] mt-[12px] mb-[12px]">
-                  <img 
-                    src={rosterModalLogo}
+                <div className="text-center mb-6">
+                  <img
+                    src={rosterLogo}
                     alt="Roster"
-                    className="h-8 mx-auto"
+                    className="w-full h-auto mx-auto"
                     data-testid="modal-logo"
                   />
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-3 pl-[8px] pr-[8px] pt-[0px] pb-[0px] mt-[0px] mb-[0px] ml-[8px] mr-[8px]">
+                <form onSubmit={handleSubmit} className="space-y-3">
                   <div className="space-y-1">
-                    <Label htmlFor="email" className="text-white text-sm">Email</Label>
+                    <Label htmlFor="email" className="text-black text-sm">Email</Label>
                     <Input
                       id="email"
                       type="email"
@@ -224,13 +224,13 @@ export default function Login() {
                       value={email}
                       onChange={(e) => { setEmail(e.target.value); setEmailTaken(false); }}
                       required
-                      className="min-h-[44px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500"
+                      className="min-h-[44px] bg-white border-gray-300 text-black placeholder:text-gray-400"
                       data-testid="input-email"
                     />
                   </div>
                   
                   <div className="space-y-1">
-                    <Label htmlFor="password" className="text-white text-sm">Password</Label>
+                    <Label htmlFor="password" className="text-black text-sm">Password</Label>
                     <div className="relative">
                       <Input
                         id="password"
@@ -240,13 +240,13 @@ export default function Login() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         minLength={6}
-                        className="min-h-[44px] bg-[#2a2a2a] border-gray-700 text-white placeholder:text-gray-500 pr-12"
+                        className="min-h-[44px] bg-white border-gray-300 text-black placeholder:text-gray-400 pr-12"
                         data-testid="input-password"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors p-1"
                         data-testid="button-toggle-password"
                       >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -259,7 +259,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setLocation('/forgot-password')}
-                        className="hover:underline text-xs min-h-[36px] px-1 text-[#ffffff]"
+                        className="hover:underline text-xs min-h-[36px] px-1 text-black"
                         data-testid="link-forgot-password"
                       >
                         Forgot password?
@@ -268,12 +268,12 @@ export default function Login() {
                   )}
                   
                   {emailTaken && (
-                    <div className="rounded-xl bg-red-950/60 border border-red-500/40 px-4 py-3 text-sm">
-                      <p className="text-red-300 font-medium mb-2">An account with this email already exists.</p>
+                    <div className="rounded-xl bg-red-50 border border-red-300 px-4 py-3 text-sm">
+                      <p className="text-red-600 font-medium mb-2">An account with this email already exists.</p>
                       <button
                         type="button"
                         onClick={() => { setEmailTaken(false); setIsSignUp(false); }}
-                        className="text-white font-bold underline underline-offset-2 hover:text-red-200 transition-colors"
+                        className="text-black font-bold underline underline-offset-2 hover:text-red-600 transition-colors"
                       >
                         Go to Log In →
                       </button>
@@ -282,7 +282,7 @@ export default function Login() {
 
                   <Button
                     type="submit"
-                    className="w-full min-h-[48px] bg-transparent text-white font-semibold text-base rounded-xl hover:bg-transparent"
+                    className="w-full min-h-[48px] bg-primary text-primary-foreground font-semibold text-base rounded-xl hover:bg-primary/90"
                     disabled={loading}
                     data-testid="button-submit"
                   >
@@ -293,13 +293,13 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-xs min-h-[36px] px-2 text-[#ffffff]"
+                      className="text-xs min-h-[36px] px-2 text-black"
                       data-testid="button-toggle-mode"
                     >
                       {isSignUp
                         ? 'Already have an account? '
                         : "Don't have an account? "}
-                      <span className="text-[#ffffff] font-extrabold">
+                      <span className="text-black font-extrabold">
                         {isSignUp ? 'Sign in' : 'Sign up'}
                       </span>
                     </button>
