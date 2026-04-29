@@ -41,6 +41,30 @@ export default function BracketView({ matches, teams, format, settings, tourname
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.match-card')) return;
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: containerRef.current?.scrollLeft ?? 0,
+      scrollTop: containerRef.current?.scrollTop ?? 0,
+    };
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    containerRef.current.scrollLeft = dragStartRef.current.scrollLeft - dx;
+    containerRef.current.scrollTop = dragStartRef.current.scrollTop - dy;
+  };
+
+  const stopDrag = () => setIsDragging(false);
   const { toast } = useToast();
 
   // Mutation to update match team assignments
@@ -498,9 +522,11 @@ export default function BracketView({ matches, teams, format, settings, tourname
       winnerBgClass = 'bg-[#32CD32] text-black';
     }
 
-    // Use CSS transform scale so all internal padding, fonts, and spacing scale uniformly
-    const cardX = (x + 50) * zoom;
-    const cardY = (y + 80) * zoom;
+    // Cards are positioned in natural (unscaled) coordinates.
+    // Zoom is applied via a single CSS transform on the parent wrapper so
+    // cards and SVG connector lines share the same coordinate space.
+    const cardX = x + 50;
+    const cardY = y + 80;
 
     return (
       <Card 
@@ -511,8 +537,6 @@ export default function BracketView({ matches, teams, format, settings, tourname
           height: MATCH_HEIGHT,
           left: cardX,
           top: cardY,
-          transform: `scale(${zoom})`,
-          transformOrigin: 'top left',
         }}
         data-testid={`card-match-${match.matchNumber}`}
         onClick={() => setSelectedMatchId(match.id)}
@@ -751,18 +775,12 @@ export default function BracketView({ matches, teams, format, settings, tourname
     setZoom(0.65);
   };
 
-  // Calculate effective dimensions - ensure minimum size for scrolling
-  const effectiveWidth = Math.max(svgWidth * zoom + 100, 1200);
-  const effectiveHeight = Math.max(svgHeight * zoom + 100, 800);
-  
-  console.log('🔍 BracketView Dimensions:', { 
-    svgWidth, 
-    svgHeight, 
-    zoom, 
-    effectiveWidth, 
-    effectiveHeight,
-    matchCount: matches.length 
-  });
+  // Natural (unscaled) content dimensions
+  const naturalWidth = svgWidth + 200;
+  const naturalHeight = svgHeight + 200;
+  // Scaled size drives the scrollable area so scrollbars reflect zoomed content
+  const effectiveWidth = Math.max(naturalWidth * zoom, 1200);
+  const effectiveHeight = Math.max(naturalHeight * zoom, 800);
 
   return (
     <div className="relative" style={{ overflow: 'visible' }}>
@@ -799,7 +817,7 @@ export default function BracketView({ matches, teams, format, settings, tourname
         </div>
       )}
 
-      {/* Bracket Container - scrollable with standard scrollbars */}
+      {/* Bracket Container - scrollable viewport with drag-to-pan on desktop */}
       <div
         ref={containerRef}
         className="border rounded-lg bg-muted/20"
@@ -807,62 +825,75 @@ export default function BracketView({ matches, teams, format, settings, tourname
           height: '70vh',
           overflowX: 'auto',
           overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch'
+          WebkitOverflowScrolling: 'touch',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
         }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={stopDrag}
+        onMouseLeave={stopDrag}
       >
-        {/* Inner container with actual bracket size */}
-        <div 
-          className="relative"
+        {/* Spacer div sets the scrollable area to the zoomed size */}
+        <div
           style={{
             width: effectiveWidth,
             height: effectiveHeight,
-            minWidth: effectiveWidth,
-            minHeight: effectiveHeight
+            position: 'relative',
           }}
         >
-          {/* SVG for connections only - pointer-events: none so clicks go through */}
-          <svg
-            ref={svgRef}
-            className="absolute inset-0 pointer-events-none"
+          {/* Single zoom wrapper — both SVG and cards share this coordinate space
+              so connector lines always align with cards at any zoom level */}
+          <div
             style={{
-              width: effectiveWidth,
-              height: effectiveHeight
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: naturalWidth,
+              height: naturalHeight,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
             }}
           >
-            {/* Arrow marker definitions */}
-            <defs>
-              <marker
-                id="arrowhead-winner"
-                markerWidth="10"
-                markerHeight="10"
-                refX="9"
-                refY="3"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--primary))" />
-              </marker>
-              <marker
-                id="arrowhead-loser"
-                markerWidth="10"
-                markerHeight="10"
-                refX="9"
-                refY="3"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--destructive))" />
-              </marker>
-            </defs>
-            
-            {/* Connectors with zoom transform */}
-            <g transform={`translate(50, 80) scale(${zoom})`}>
-              {renderConnectors()}
-            </g>
-          </svg>
+            {/* SVG for connections only */}
+            <svg
+              ref={svgRef}
+              className="absolute inset-0 pointer-events-none"
+              style={{ width: naturalWidth, height: naturalHeight }}
+            >
+              <defs>
+                <marker
+                  id="arrowhead-winner"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="9"
+                  refY="3"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--primary))" />
+                </marker>
+                <marker
+                  id="arrowhead-loser"
+                  markerWidth="10"
+                  markerHeight="10"
+                  refX="9"
+                  refY="3"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path d="M0,0 L0,6 L9,3 z" fill="hsl(var(--destructive))" />
+                </marker>
+              </defs>
+              {/* Connectors drawn in natural (unscaled) coordinates */}
+              <g transform="translate(50, 80)">
+                {renderConnectors()}
+              </g>
+            </svg>
 
-          {/* Match cards as HTML divs (positioned absolutely) */}
-          {renderMatchCards()}
+            {/* Match cards positioned in natural coordinates */}
+            {renderMatchCards()}
+          </div>
         </div>
       </div>
 
