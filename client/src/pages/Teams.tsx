@@ -18,7 +18,7 @@ import type { UploadResult } from '@uppy/core';
 
 export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
   const { selectedTeamId, setTeamSelection } = useDashboardSelection();
@@ -54,6 +54,11 @@ export default function Teams() {
     (p) => p?.tournamentTeamId && p?.tournamentId,
   );
   useEffect(() => {
+    // Mobile keeps all main tabs mounted at once for swipeable nav, so
+    // Teams.tsx renders even when the user is on /messages, /profile, etc.
+    // Only run the redirect when the user is actually viewing /teams,
+    // otherwise every bottom-nav click would bounce them here.
+    if (location !== '/teams') return;
     if (userTeamsLoading || tournamentParticipationsLoading) return;
     if (
       (userTeams as any[]).length === 0 &&
@@ -62,6 +67,7 @@ export default function Teams() {
       navigate(`/tournament-teams/${firstTournamentTeamParticipation.tournamentId}`);
     }
   }, [
+    location,
     userTeams,
     userTeamsLoading,
     tournamentParticipationsLoading,
