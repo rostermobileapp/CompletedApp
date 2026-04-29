@@ -21274,31 +21274,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Check captain access - either via linked league team OR tournament participant captain
+      // Check captain access - only via linked league team. The
+      // tournament_participant_role enum has no "captain" value (only
+      // "commissioner" and "player"), so for standalone tournaments only
+      // the commissioner / tournament creator can update team metadata.
       let isCaptain = false;
-      
-      // First check linked league team captain (for league-based tournaments)
-      if (team.teamId) {
+
+      // Skip captain lookup entirely if we already authorized via commissioner.
+      if (!isCommissioner && team.teamId) {
         const [linkedTeam] = await db
           .select()
           .from(teams)
           .where(eq(teams.id, team.teamId));
         isCaptain = linkedTeam?.captainId === userId;
-      }
-      
-      // For standalone tournaments (no linked team), check tournament participant captain
-      if (!isCaptain && !team.teamId) {
-        const [captainParticipant] = await db
-          .select()
-          .from(tournamentParticipants)
-          .where(and(
-            eq(tournamentParticipants.tournamentId, tournament.id),
-            eq(tournamentParticipants.userId, userId),
-            eq(tournamentParticipants.tournamentTeamId, team.id),
-            eq(tournamentParticipants.role, 'captain'),
-            eq(tournamentParticipants.status, 'approved')
-          ));
-        isCaptain = !!captainParticipant;
       }
 
       if (!isCommissioner && !isCaptain) {
