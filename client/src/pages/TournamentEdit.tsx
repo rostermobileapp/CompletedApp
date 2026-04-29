@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, Trophy, Users, Info, AlertTriangle, Calendar, Upload, X, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Trophy, Users, Info, AlertTriangle, Calendar, Upload, X, Image as ImageIcon, UserPlus, Trash2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -422,6 +422,8 @@ export default function TournamentEdit() {
               </Button>
             </CardContent>
           </Card>
+
+          <TournamentScorekeeperManager tournamentId={tournament.id} />
         </div>
       </div>
     );
@@ -905,6 +907,10 @@ export default function TournamentEdit() {
             </div>
           </form>
         </Form>
+
+        {tournamentId && (
+          <TournamentScorekeeperManager tournamentId={tournamentId} />
+        )}
       </div>
 
       <AlertDialog
@@ -967,6 +973,133 @@ const dateOnlyFormSchema = z.object({
 });
 
 type DateOnlyFormData = z.infer<typeof dateOnlyFormSchema>;
+
+function TournamentScorekeeperManager({ tournamentId }: { tournamentId: string }) {
+  const { toast } = useToast();
+  const [emailInput, setEmailInput] = useState("");
+
+  const { data: scorekeepers, isLoading } = useQuery<Array<{
+    id: string;
+    userId: string;
+    tournamentId: string;
+    invitedBy: string;
+    createdAt: string;
+    user: { id: string; firstName: string | null; lastName: string | null; email: string | null; profileImageUrl: string | null };
+  }>>({
+    queryKey: ['/api/tournaments', tournamentId, 'scorekeepers'],
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest('POST', `/api/tournaments/${tournamentId}/invite-scorekeeper`, { email });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.message || 'Failed to invite scorekeeper');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setEmailInput("");
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'scorekeepers'] });
+      toast({ title: "Scorekeeper added", description: "They can now score matches for this tournament." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add scorekeeper", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest('DELETE', `/api/tournaments/${tournamentId}/scorekeepers/${userId}`);
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.message || 'Failed to remove scorekeeper');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'scorekeepers'] });
+      toast({ title: "Scorekeeper removed" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not remove scorekeeper", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const handleInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = emailInput.trim();
+    if (!trimmed) return;
+    inviteMutation.mutate(trimmed);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          Scorekeepers
+        </CardTitle>
+        <CardDescription>
+          Scorekeepers can report match scores from the scorekeeper dashboard. As the tournament creator, you already have this access.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form onSubmit={handleInvite} className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="Enter email address"
+            value={emailInput}
+            onChange={e => setEmailInput(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={inviteMutation.isPending || !emailInput.trim()}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add
+          </Button>
+        </form>
+
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading scorekeepers...</div>
+        ) : scorekeepers && scorekeepers.length > 0 ? (
+          <div className="space-y-2">
+            {scorekeepers.map(sk => {
+              const name = [sk.user.firstName, sk.user.lastName].filter(Boolean).join(' ') || sk.user.email || 'Unknown';
+              return (
+                <div key={sk.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {sk.user.profileImageUrl ? (
+                      <img src={sk.user.profileImageUrl} alt={name} className="h-8 w-8 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{name}</div>
+                      {sk.user.email && <div className="text-xs text-muted-foreground truncate">{sk.user.email}</div>}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeMutation.mutate(sk.userId)}
+                    disabled={removeMutation.isPending}
+                    className="shrink-0 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No additional scorekeepers assigned yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 // Reusable logo upload + preview + remove control. PATCHes the tournament
 // immediately on upload/remove (the tournament row already exists when this
@@ -1246,6 +1379,8 @@ function DateOnlyEditor({
             </Form>
           </CardContent>
         </Card>
+
+        <TournamentScorekeeperManager tournamentId={tournament.id} />
       </div>
     </div>
   );

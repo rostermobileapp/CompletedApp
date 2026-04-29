@@ -688,6 +688,72 @@ export const requireTournamentAccessOpen: RequestHandler = async (req, res, next
  * other league. We want creators to always be able to manage their own
  * tournaments regardless of unrelated memberships.
  */
+/**
+ * Check if a user has scorekeeper access to a specific tournament.
+ * More permissive than canManageTournamentSpecific — includes invited scorekeepers.
+ */
+export async function canScorekeeperTournamentSpecific(
+  user: UserWithPermissions,
+  tournamentId: string,
+): Promise<boolean> {
+  // Full management rights implies scorekeeper rights
+  if (await canManageTournamentSpecific(user, tournamentId)) return true;
+
+  // Check if explicitly invited as a tournament scorekeeper
+  try {
+    const { storage } = await import("./storage");
+    return await storage.isTournamentScorekeeper(tournamentId, user.id);
+  } catch (err) {
+    console.error('Error in canScorekeeperTournamentSpecific:', err);
+  }
+  return false;
+}
+
+/**
+ * Middleware variant of canScorekeeperTournamentSpecific for match-keyed routes.
+ * Allows tournament creators, league commissioners, global admins, and
+ * explicitly-invited tournament scorekeepers to update match scores.
+ */
+export const requireTournamentScorekeeperOrManagementByMatch: RequestHandler = async (req, res, next) => {
+  const user = req.userWithPermissions;
+  if (!user) {
+    return res.status(401).json({ message: "User permissions not loaded" });
+  }
+
+  const matchId = req.params.id;
+  if (!matchId) {
+    return res.status(400).json({ message: "Match ID required" });
+  }
+
+  try {
+    const { db } = await import("./db");
+    const { tournamentMatches } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [match] = await db
+      .select({ tournamentId: tournamentMatches.tournamentId })
+      .from(tournamentMatches)
+      .where(eq(tournamentMatches.id, matchId));
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    (req as any)._tournamentIdForGate = match.tournamentId;
+
+    if (await canScorekeeperTournamentSpecific(user, match.tournamentId)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      message: "Access denied. Only the tournament creator, a league commissioner, or an assigned scorekeeper can perform this action.",
+    });
+  } catch (err) {
+    console.error('Error in requireTournamentScorekeeperOrManagementByMatch:', err);
+    return res.status(500).json({ message: "Failed to verify tournament scorekeeper access" });
+  }
+};
+
 export async function canManageTournamentSpecific(
   user: UserWithPermissions,
   tournamentId: string,

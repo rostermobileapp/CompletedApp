@@ -22,10 +22,12 @@ import {
   requireTournamentManagementByMatch,
   requireTournamentPaid,
   requireTournamentPaidByParticipant,
-  requireTournamentPaidByMatch
+  requireTournamentPaidByMatch,
+  requireTournamentScorekeeperOrManagementByMatch,
+  canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
@@ -8576,13 +8578,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get accessible league IDs for tournament filtering
       const accessibleLeagueIds = leaguesWithAccess.map(l => l.id);
 
+      // Get tournaments where user has been invited as a scorekeeper
+      const scorekeeperInviteRows = await db
+        .select({ tournamentId: tournamentScorekeeperInvites.tournamentId })
+        .from(tournamentScorekeeperInvites)
+        .where(eq(tournamentScorekeeperInvites.userId, userId));
+      const invitedTournamentIds = scorekeeperInviteRows.map(r => r.tournamentId);
+
       // Build tournament query conditions
       let tournamentConditions: any[] = [eq(tournaments.createdBy, userId)];
       if (accessibleLeagueIds.length > 0) {
         tournamentConditions.push(inArray(tournaments.leagueId, accessibleLeagueIds));
       }
+      if (invitedTournamentIds.length > 0) {
+        tournamentConditions.push(inArray(tournaments.id, invitedTournamentIds));
+      }
 
-      // Get tournaments where user is creator or has access via leagues
+      // Get tournaments where user is creator, has access via leagues, or is invited scorekeeper
       let userTournaments = await db
         .select({
           id: tournaments.id,
@@ -8663,8 +8675,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasLeagueStatManager = leaguePermissions?.leagueSpecialPermissions?.includes('stat_manager') || false;
         }
 
-        if (!isCreator && !isLeagueCommissioner && !hasGlobalStatManager && !hasLeagueStatManager) {
-          return res.status(403).json({ message: 'Access denied. You must be a tournament creator, league commissioner, or have stat_manager permission.' });
+        const isTournamentScorekeeper = await storage.isTournamentScorekeeper(tournamentId as string, userId);
+        if (!isCreator && !isLeagueCommissioner && !hasGlobalStatManager && !hasLeagueStatManager && !isTournamentScorekeeper) {
+          return res.status(403).json({ message: 'Access denied. You must be a tournament creator, league commissioner, assigned scorekeeper, or have stat_manager permission.' });
         }
 
         // Get tournament matches with team names
@@ -15609,6 +15622,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tournament Scorekeeper Management
+  // GET /api/tournaments/:id/scorekeepers - list scorekeepers for a tournament
+  app.get('/api/tournaments/:id/scorekeepers', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const tournamentId = req.params.id;
+      const userId = req.user.claims.sub;
+      const userPermissions = (req as any).userWithPermissions;
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      const { canManageTournamentSpecific } = await import('./permissionMiddleware');
+      const canManage = await canManageTournamentSpecific(userPermissions, tournamentId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const scorekeepers = await storage.getTournamentScorekeeperInvites(tournamentId);
+      res.json(scorekeepers);
+    } catch (error) {
+      console.error('Error fetching tournament scorekeepers:', error);
+      res.status(500).json({ message: 'Failed to fetch scorekeepers' });
+    }
+  });
+
+  // POST /api/tournaments/:id/invite-scorekeeper - invite a scorekeeper by email
+  app.post('/api/tournaments/:id/invite-scorekeeper', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const tournamentId = req.params.id;
+      const invitingUserId = req.user.claims.sub;
+      const { email } = req.body;
+      const userPermissions = (req as any).userWithPermissions;
+
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      const { canManageTournamentSpecific } = await import('./permissionMiddleware');
+      const canManage = await canManageTournamentSpecific(userPermissions, tournamentId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Access denied - only the tournament creator or league commissioner can invite scorekeepers' });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const targetUser = await storage.getUserByEmail(normalizedEmail);
+
+      if (!targetUser) {
+        return res.status(404).json({
+          message: 'User not found. They must create an account first with this email address.',
+          code: 'USER_NOT_FOUND'
+        });
+      }
+
+      if (targetUser.id === invitingUserId) {
+        return res.status(400).json({ message: 'You are already the tournament creator and have scorekeeper access.' });
+      }
+
+      const invite = await storage.addTournamentScorekeeper(tournamentId, targetUser.id, invitingUserId);
+
+      res.json({
+        message: 'Scorekeeper added successfully',
+        invite,
+        user: {
+          id: targetUser.id,
+          email: targetUser.email,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+          profileImageUrl: targetUser.profileImageUrl
+        }
+      });
+    } catch (error) {
+      console.error('Error inviting tournament scorekeeper:', error);
+      res.status(500).json({ message: 'Failed to invite scorekeeper' });
+    }
+  });
+
+  // DELETE /api/tournaments/:id/scorekeepers/:userId - remove a scorekeeper
+  app.delete('/api/tournaments/:id/scorekeepers/:userId', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const { id: tournamentId, userId: targetUserId } = req.params;
+      const userPermissions = (req as any).userWithPermissions;
+
+      const [tournament] = await db
+        .select()
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId));
+
+      if (!tournament) {
+        return res.status(404).json({ message: 'Tournament not found' });
+      }
+
+      const { canManageTournamentSpecific } = await import('./permissionMiddleware');
+      const canManage = await canManageTournamentSpecific(userPermissions, tournamentId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.removeTournamentScorekeeper(tournamentId, targetUserId);
+      res.json({ message: 'Scorekeeper removed successfully' });
+    } catch (error) {
+      console.error('Error removing tournament scorekeeper:', error);
+      res.status(500).json({ message: 'Failed to remove scorekeeper' });
+    }
+  });
+
   // Invite scorekeeper by email - creates membership and adds stat_manager permission
   app.post('/api/leagues/:leagueId/invite-scorekeeper', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
@@ -19697,7 +19830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Update tournament match (scheduling, scores, etc.)
   // Edit an individual tournament match (bracket-level). Paid only.
-  app.patch('/api/tournament-matches/:id', isAuthenticated, loadUserPermissions, requireTournamentManagementByMatch, requireTournamentPaidByMatch(), async (req: any, res) => {
+  app.patch('/api/tournament-matches/:id', isAuthenticated, loadUserPermissions, requireTournamentScorekeeperOrManagementByMatch, requireTournamentPaidByMatch(), async (req: any, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;

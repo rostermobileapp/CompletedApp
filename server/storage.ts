@@ -206,6 +206,8 @@ import {
   type InsertCalendarEvent,
   type EventParticipant,
   type InsertEventParticipant,
+  tournamentScorekeeperInvites,
+  type TournamentScorekeeperInvite,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike } from "drizzle-orm";
@@ -292,6 +294,12 @@ export interface IStorage {
   addLeagueSpecialPermission(userId: string, leagueId: string, permission: 'admin' | 'stat_manager'): Promise<LeagueMembership>;
   removeLeagueSpecialPermission(userId: string, leagueId: string, permission: 'admin' | 'stat_manager'): Promise<LeagueMembership>;
   getUserLeaguePermissions(userId: string, leagueId: string): Promise<{ leagueRole: string; leagueSpecialPermissions: string[] } | null>;
+
+  // Tournament scorekeeper operations
+  getTournamentScorekeeperInvites(tournamentId: string): Promise<(TournamentScorekeeperInvite & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'profileImageUrl'> })[]>;
+  addTournamentScorekeeper(tournamentId: string, userId: string, invitedBy: string): Promise<TournamentScorekeeperInvite>;
+  removeTournamentScorekeeper(tournamentId: string, userId: string): Promise<void>;
+  isTournamentScorekeeper(tournamentId: string, userId: string): Promise<boolean>;
   
   // League operations
   createLeague(league: InsertLeague): Promise<League>;
@@ -1706,6 +1714,80 @@ export class DatabaseStorage implements IStorage {
       leagueRole: membership.leagueRole || 'free_tier',
       leagueSpecialPermissions: membership.leagueSpecialPermissions || []
     };
+  }
+
+  // Tournament scorekeeper operations
+  async getTournamentScorekeeperInvites(tournamentId: string): Promise<(TournamentScorekeeperInvite & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'email' | 'profileImageUrl'> })[]> {
+    const rows = await db
+      .select({
+        id: tournamentScorekeeperInvites.id,
+        tournamentId: tournamentScorekeeperInvites.tournamentId,
+        userId: tournamentScorekeeperInvites.userId,
+        invitedBy: tournamentScorekeeperInvites.invitedBy,
+        createdAt: tournamentScorekeeperInvites.createdAt,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userEmail: users.email,
+        userProfileImageUrl: users.profileImageUrl,
+      })
+      .from(tournamentScorekeeperInvites)
+      .innerJoin(users, eq(tournamentScorekeeperInvites.userId, users.id))
+      .where(eq(tournamentScorekeeperInvites.tournamentId, tournamentId))
+      .orderBy(tournamentScorekeeperInvites.createdAt);
+
+    return rows.map(r => ({
+      id: r.id,
+      tournamentId: r.tournamentId,
+      userId: r.userId,
+      invitedBy: r.invitedBy,
+      createdAt: r.createdAt,
+      user: {
+        id: r.userId,
+        firstName: r.userFirstName,
+        lastName: r.userLastName,
+        email: r.userEmail,
+        profileImageUrl: r.userProfileImageUrl,
+      }
+    }));
+  }
+
+  async addTournamentScorekeeper(tournamentId: string, userId: string, invitedBy: string): Promise<TournamentScorekeeperInvite> {
+    const [row] = await db
+      .insert(tournamentScorekeeperInvites)
+      .values({ tournamentId, userId, invitedBy })
+      .onConflictDoNothing()
+      .returning();
+    if (!row) {
+      const [existing] = await db
+        .select()
+        .from(tournamentScorekeeperInvites)
+        .where(and(
+          eq(tournamentScorekeeperInvites.tournamentId, tournamentId),
+          eq(tournamentScorekeeperInvites.userId, userId)
+        ));
+      return existing;
+    }
+    return row;
+  }
+
+  async removeTournamentScorekeeper(tournamentId: string, userId: string): Promise<void> {
+    await db
+      .delete(tournamentScorekeeperInvites)
+      .where(and(
+        eq(tournamentScorekeeperInvites.tournamentId, tournamentId),
+        eq(tournamentScorekeeperInvites.userId, userId)
+      ));
+  }
+
+  async isTournamentScorekeeper(tournamentId: string, userId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: tournamentScorekeeperInvites.id })
+      .from(tournamentScorekeeperInvites)
+      .where(and(
+        eq(tournamentScorekeeperInvites.tournamentId, tournamentId),
+        eq(tournamentScorekeeperInvites.userId, userId)
+      ));
+    return !!row;
   }
 
   // League operations

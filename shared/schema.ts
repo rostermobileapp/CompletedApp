@@ -663,6 +663,21 @@ export const tournamentParticipants = pgTable("tournament_participants", {
   index("idx_tournament_participants_expires_at").on(table.expiresAt),
 ]);
 
+// Tournament scorekeeper invites - tracks who can score matches for a tournament
+export const tournamentScorekeeperInvites = pgTable("tournament_scorekeeper_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").references(() => tournaments.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  invitedBy: varchar("invited_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_tournament_scorekeeper").on(table.tournamentId, table.userId),
+  index("idx_tournament_scorekeeper_tournament_id").on(table.tournamentId),
+  index("idx_tournament_scorekeeper_user_id").on(table.userId),
+]);
+
+export type TournamentScorekeeperInvite = typeof tournamentScorekeeperInvites.$inferSelect;
+
 // Tournament photos table - stores photos uploaded to tournaments
 export const tournamentPhotos = pgTable("tournament_photos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
