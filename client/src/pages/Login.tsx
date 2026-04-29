@@ -7,9 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import rosterVideo from '@assets/Roster_white_text_Transparent_Rev1_1768410673997.mp4';
-import rosterLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
+import rosterModalLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 import { EmailVerificationModal } from '@/components/EmailVerificationModal';
+
+const rosterLogo = '/roster-logo-transparent.png';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -23,8 +24,6 @@ export default function Login() {
   const [emailTaken, setEmailTaken] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -106,10 +105,6 @@ export default function Login() {
     setEmail('');
     setPassword('');
     setIsSignUp(false);
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play();
-    }
   };
 
   const handleVerificationSuccess = () => {
@@ -131,7 +126,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col overflow-hidden" data-testid="login-page">
+    <div className="min-h-screen bg-white flex flex-col overflow-hidden" data-testid="login-page">
       <motion.div
         className="absolute top-4 left-4 z-50"
         initial={{ opacity: 0 }}
@@ -159,14 +154,11 @@ export default function Login() {
             ease: [0.4, 0, 0.2, 1],
           }}
         >
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-auto"
+          <img
+            src={rosterLogo}
+            alt="Roster"
+            className="w-48 md:w-64 h-auto"
             data-testid="logo-image"
-            src={rosterVideo}
           />
 
           <AnimatePresence>
@@ -179,7 +171,7 @@ export default function Login() {
               >
                 <button
                   onClick={() => setShowForm(true)}
-                  className="px-12 py-6 text-lg bg-transparent border-none min-h-[52px] text-[#ffffff] font-bold"
+                  className="px-12 py-4 text-lg bg-black text-white rounded-xl min-h-[52px] font-bold hover:bg-gray-900 transition-colors"
                   data-testid="button-login-initial"
                 >
                   Login
@@ -213,7 +205,7 @@ export default function Login() {
               >
                 <div className="text-center pt-[0px] pb-[0px] mt-[12px] mb-[12px]">
                   <img 
-                    src={rosterLogo}
+                    src={rosterModalLogo}
                     alt="Roster"
                     className="h-8 mx-auto"
                     data-testid="modal-logo"
