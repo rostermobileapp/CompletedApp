@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getAuthHeaders } from "@/lib/queryClient";
 
 interface RSVPSummaryProps {
   gameId: string;
@@ -15,13 +16,16 @@ interface RSVPSummaryProps {
 
 export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails, className }: RSVPSummaryProps) {
   const { data: rsvpSummary, isLoading } = useQuery({
-    queryKey: [`/api/games/${gameId}/rsvp-summary`, teamId, showTeamSeparation],
+    queryKey: teamId
+      ? [`/api/games/${gameId}/rsvp-summary?teamId=${teamId}`]
+      : [`/api/games/${gameId}/rsvp-summary`, showTeamSeparation],
     queryFn: async () => {
       let url = `/api/games/${gameId}/rsvp-summary`;
       if (teamId) {
         url += `?teamId=${teamId}`;
       }
-      const response = await fetch(url);
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(url, { headers: authHeaders });
       if (!response.ok) {
         throw new Error('Failed to fetch RSVP summary');
       }

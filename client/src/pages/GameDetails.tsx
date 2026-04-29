@@ -490,15 +490,17 @@ export default function GameDetails() {
     awayTeamIncluded: userTeamIds.includes(game.awayTeam?.id)
   });
   
-  // For tournament matches, check via linked regular team IDs or tournament participant assignment
-  const userTeamFromMembership = isTournamentMatch
-    ? ((linkedHomeTeamId && userTeamIds.includes(linkedHomeTeamId)) ? game.homeTeam :
-       (linkedAwayTeamId && userTeamIds.includes(linkedAwayTeamId)) ? game.awayTeam :
-       (userTournamentTeamId && userTournamentTeamId === game.homeTeam?.id) ? game.homeTeam :
-       (userTournamentTeamId && userTournamentTeamId === game.awayTeam?.id) ? game.awayTeam :
-       null)
-    : (userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam :
-       userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null);
+  // Determine which team the user is on.
+  // Direct match first: handles regular games AND linked tournament games where homeTeam.id is already a regular team UUID.
+  // Fallback checks for unlinked tournament teams via linkedHomeTeamId or tournamentParticipants assignment.
+  const userTeamFromMembership =
+    userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam :
+    userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam :
+    (isTournamentMatch && linkedHomeTeamId && userTeamIds.includes(linkedHomeTeamId)) ? game.homeTeam :
+    (isTournamentMatch && linkedAwayTeamId && userTeamIds.includes(linkedAwayTeamId)) ? game.awayTeam :
+    (isTournamentMatch && userTournamentTeamId && userTournamentTeamId === game.homeTeam?.id) ? game.homeTeam :
+    (isTournamentMatch && userTournamentTeamId && userTournamentTeamId === game.awayTeam?.id) ? game.awayTeam :
+    null;
   // If the user is an approved substitute, use the team they're subbing for
   const userTeamFromSub = !userTeamFromMembership && approvedSubstitute
     ? (game.homeTeam?.id === approvedSubstitute.teamId ? game.homeTeam : 
