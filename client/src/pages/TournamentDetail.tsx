@@ -2043,7 +2043,7 @@ export default function TournamentDetail() {
           </div>
 
           {/* Bracket Tab - Full width */}
-          <TabsContent value="bracket" className="space-y-4 px-2">
+          <TabsContent value="bracket" className="space-y-4 px-2 mt-[4px]">
             {isUnpaid && canManageTournament() && (
               <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-bracket">
                 <p className="text-sm text-amber-700 dark:text-amber-400">
