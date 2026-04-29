@@ -283,6 +283,8 @@ export function EnhancedMediaUploader({
                             src={mediaFile.preview}
                             className="w-full h-full object-cover"
                             controls
+                            playsInline
+                            {...{ "webkit-playsinline": "true" }}
                           />
                         </div>
                       )}

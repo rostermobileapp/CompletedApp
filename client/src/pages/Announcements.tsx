@@ -865,6 +865,8 @@ function AnnouncementCard({
                           src={attachment.url}
                           className="w-full h-full object-cover"
                           controls
+                          playsInline
+                          {...{ "webkit-playsinline": "true" }}
                         />
                       </div>
                       {attachment.filename && (

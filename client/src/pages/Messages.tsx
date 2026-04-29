@@ -2436,6 +2436,8 @@ export default function Messages() {
                                         src={attachment.url}
                                         className="w-full h-auto max-h-48 object-cover"
                                         poster={attachment.thumbnailUrl}
+                                        playsInline
+                                        {...{ "webkit-playsinline": "true" }}
                                       />
                                       <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                                         <div className="bg-black/50 rounded-full p-3">

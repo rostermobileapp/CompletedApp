@@ -239,6 +239,8 @@ export function MediaGallery({
             <video
               src={currentItem.url}
               controls
+              playsInline
+              {...{ "webkit-playsinline": "true" }}
               className="max-w-full max-h-full"
               data-testid="gallery-video"
             >
