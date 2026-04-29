@@ -24,10 +24,20 @@ interface BracketViewProps {
   // selects, etc.) are disabled because the tournament invoice is unpaid.
   // The dedicated pay banner lives in TournamentDetail's bracket tab.
   isUnpaid?: boolean;
+  // Controlled zoom — when provided the parent owns zoom state and the
+  // internal zoom controls are hidden so they can live in the card header.
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
 }
 
-export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType, isUnpaid = false }: BracketViewProps) {
-  const [zoom, setZoom] = useState(0.65); // Start slightly zoomed out to show full bracket
+export default function BracketView({ matches, teams, format, settings, tournamentName, tournamentId, isCommissioner = false, tournamentType, isUnpaid = false, zoom: zoomProp, onZoomChange }: BracketViewProps) {
+  const [zoomInternal, setZoomInternal] = useState(0.65); // Start slightly zoomed out to show full bracket
+  const zoom = zoomProp !== undefined ? zoomProp : zoomInternal;
+  const setZoom = (updater: number | ((prev: number) => number)) => {
+    const next = typeof updater === 'function' ? updater(zoom) : updater;
+    if (onZoomChange) onZoomChange(next);
+    else setZoomInternal(next);
+  };
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -756,36 +766,38 @@ export default function BracketView({ matches, teams, format, settings, tourname
 
   return (
     <div className="relative" style={{ overflow: 'visible' }}>
-      {/* Controls - positioned at top with better visibility */}
-      <div className="flex gap-2 mb-3 justify-end">
-        <Button
-          size="sm"
-          variant="default"
-          onClick={() => setZoom(prev => Math.min(prev + 0.2, 3))}
-          data-testid="button-zoom-in"
-        >
-          <ZoomIn className="h-4 w-4 mr-1" />
-          Zoom In
-        </Button>
-        <Button
-          size="sm"
-          variant="default"
-          onClick={() => setZoom(prev => Math.max(prev - 0.2, 0.3))}
-          data-testid="button-zoom-out"
-        >
-          <ZoomOut className="h-4 w-4 mr-1" />
-          Zoom Out
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={resetZoom}
-          data-testid="button-reset-view"
-        >
-          <Maximize2 className="h-4 w-4 mr-1" />
-          Reset
-        </Button>
-      </div>
+      {/* Internal zoom controls — only shown when zoom is NOT controlled by the parent */}
+      {zoomProp === undefined && (
+        <div className="flex gap-2 mb-3 justify-end">
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => setZoom((prev: number) => Math.min(prev + 0.2, 3))}
+            data-testid="button-zoom-in"
+          >
+            <ZoomIn className="h-4 w-4 mr-1" />
+            Zoom In
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => setZoom((prev: number) => Math.max(prev - 0.2, 0.3))}
+            data-testid="button-zoom-out"
+          >
+            <ZoomOut className="h-4 w-4 mr-1" />
+            Zoom Out
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={resetZoom}
+            data-testid="button-reset-view"
+          >
+            <Maximize2 className="h-4 w-4 mr-1" />
+            Reset
+          </Button>
+        </div>
+      )}
 
       {/* Bracket Container - scrollable with standard scrollbars */}
       <div

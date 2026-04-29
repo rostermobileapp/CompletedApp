@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Calendar, Play, CheckCircle, Trash2, Clock, MapPin, Download, Edit3, Edit, DollarSign, Copy, CheckCheck, Upload, UserPlus, UserCheck, UserX, User, ArrowRight, Megaphone, Plus, Heart, ThumbsUp, Laugh, Frown, Angry, Meh, MessageCircle, BarChart3, Pin, MoreHorizontal, Edit2, FileText, AlertCircle, Eye, EyeOff, ZoomIn, ZoomOut } from "lucide-react";
 import jsPDF from 'jspdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -866,6 +866,7 @@ export default function TournamentDetail() {
   const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
   const [isExportingSchedule, setIsExportingSchedule] = useState(false);
   const [isEditingBracket, setIsEditingBracket] = useState(false);
+  const [bracketZoom, setBracketZoom] = useState(0.65);
   const [copiedTournamentId, setCopiedTournamentId] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
@@ -2298,63 +2299,66 @@ export default function TournamentDetail() {
                     return (
                       <Card className="border-0 shadow-none bg-transparent">
                         <CardHeader className="pt-[2px] pb-[2px] flex flex-row items-center justify-between px-0">
-                          <div>
-                            <CardTitle>
-                              {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Bracket'}
-                            </CardTitle>
-                            <CardDescription>
-                              {playoffRounds.length} round{playoffRounds.length !== 1 ? 's' : ''} • {bracketMatches.length} match{bracketMatches.length !== 1 ? 'es' : ''}
-                              {tournament.format === 'round_robin_split' && (
-                                <span className="block mt-1 text-xs">
-                                  Playoff seeding based on Round Robin record (wins/losses) with goals scored as tiebreaker
-                                </span>
-                              )}
-                              {tournament.isVisibleToLeague && (
-                                <span className="block mt-1 text-xs text-green-600 dark:text-green-400">
-                                  Visible to all league members
-                                </span>
-                              )}
-                            </CardDescription>
+                          <CardTitle>
+                            {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Bracket'}
+                          </CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setBracketZoom(prev => Math.min(prev + 0.2, 3))}
+                              data-testid="button-zoom-in"
+                            >
+                              <ZoomIn className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setBracketZoom(prev => Math.max(prev - 0.2, 0.3))}
+                              data-testid="button-zoom-out"
+                            >
+                              <ZoomOut className="h-4 w-4" />
+                            </Button>
+                            {!isReadOnlyMode && canManageTournament() && (
+                              <>
+                                {tournament.status === 'draft' && (
+                                  <Button
+                                    onClick={() => setIsEditingBracket(true)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2"
+                                    disabled={isUnpaid}
+                                    data-testid="button-edit-bracket"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                    Edit Bracket
+                                  </Button>
+                                )}
+                                {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
+                                  <Button
+                                    onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
+                                    variant={tournament.isVisibleToLeague ? "default" : "outline"}
+                                    size="sm"
+                                    className="gap-2"
+                                    disabled={toggleVisibilityMutation.isPending}
+                                    data-testid="button-toggle-visibility"
+                                  >
+                                    {tournament.isVisibleToLeague ? (
+                                      <>
+                                        <EyeOff className="h-4 w-4" />
+                                        Hide from League
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Eye className="h-4 w-4" />
+                                        Make Visible to League
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </>
+                            )}
                           </div>
-                          {!isReadOnlyMode && canManageTournament() && (
-                            <div className="flex gap-2">
-                              {tournament.status === 'draft' && (
-                                <Button
-                                  onClick={() => setIsEditingBracket(true)}
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-2"
-                                  disabled={isUnpaid}
-                                  data-testid="button-edit-bracket"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  Edit Bracket
-                                </Button>
-                              )}
-                              {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
-                                <Button
-                                  onClick={() => toggleVisibilityMutation.mutate(!tournament.isVisibleToLeague)}
-                                  variant={tournament.isVisibleToLeague ? "default" : "outline"}
-                                  size="sm"
-                                  className="gap-2"
-                                  disabled={toggleVisibilityMutation.isPending}
-                                  data-testid="button-toggle-visibility"
-                                >
-                                  {tournament.isVisibleToLeague ? (
-                                    <>
-                                      <EyeOff className="h-4 w-4" />
-                                      Hide from League
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Eye className="h-4 w-4" />
-                                      Make Visible to League
-                                    </>
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          )}
                         </CardHeader>
                         <CardContent className="p-0">
                           <BracketView 
@@ -2367,6 +2371,8 @@ export default function TournamentDetail() {
                             isCommissioner={!isReadOnlyMode && canManageTournament()}
                             tournamentType={tournament.type}
                             isUnpaid={isUnpaid}
+                            zoom={bracketZoom}
+                            onZoomChange={setBracketZoom}
                           />
                         </CardContent>
                       </Card>
