@@ -2300,7 +2300,7 @@ export default function TournamentDetail() {
                         <CardHeader className="pt-[2px] pb-[2px] flex flex-row items-center justify-between px-0">
                           <div>
                             <CardTitle>
-                              {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Tournament Bracket'}
+                              {tournament.format === 'round_robin_split' ? 'Playoff Bracket' : 'Bracket'}
                             </CardTitle>
                             <CardDescription>
                               {playoffRounds.length} round{playoffRounds.length !== 1 ? 's' : ''} • {bracketMatches.length} match{bracketMatches.length !== 1 ? 'es' : ''}
