@@ -47,6 +47,7 @@ import { usePermissions } from "@/context/SubscriptionContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
 import { StripeCheckoutModal } from "@/components/StripeCheckoutModal";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { ProfilePhotoPreview } from "@/components/ProfilePhotoPreview";
 
 // The tournament detail endpoint may return either a full Tournament record
 // or a minimal pre-access countdown payload for approved participants whose
@@ -869,6 +870,12 @@ export default function TournamentDetail() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<TournamentTeam | null>(null);
+  const [previewPlayer, setPreviewPlayer] = useState<{
+    userId: string;
+    profileImageUrl?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  } | null>(null);
   const [additionalPaymentRequired, setAdditionalPaymentRequired] = useState<{
     additionalTeamsCount: number;
     additionalFee: number;
@@ -2758,12 +2765,21 @@ export default function TournamentDetail() {
                   ) : teamPlayers && teamPlayers.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {teamPlayers.map((player: any) => (
-                        <div
+                        <button
                           key={player.id}
-                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors"
+                          type="button"
+                          onClick={() =>
+                            setPreviewPlayer({
+                              userId: player.userId,
+                              profileImageUrl: player.profileImageUrl,
+                              firstName: player.firstName,
+                              lastName: player.lastName,
+                            })
+                          }
+                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors text-left w-full focus:outline-none focus:ring-2 focus:ring-primary"
                           data-testid={`team-player-${player.userId}`}
                         >
-                          <div className="flex items-center gap-3 flex-1">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
                             {/* Profile Picture */}
                             <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
                               {player.profileImageUrl ? (
@@ -2776,22 +2792,17 @@ export default function TournamentDetail() {
                                 <User className="w-6 h-6 text-muted-foreground" />
                               )}
                             </div>
-                            
+
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium">
-                                  {player.lastName && player.firstName 
-                                    ? `${player.lastName}, ${player.firstName}`
-                                    : player.fullName || player.email
-                                  }
-                                </p>
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                <p>{player.email}</p>
-                              </div>
+                              <p className="font-medium truncate">
+                                {player.lastName && player.firstName
+                                  ? `${player.lastName}, ${player.firstName}`
+                                  : player.fullName || 'Unnamed Player'
+                                }
+                              </p>
                             </div>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   ) : (
@@ -3311,6 +3322,17 @@ export default function TournamentDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {previewPlayer && (
+        <ProfilePhotoPreview
+          isOpen={!!previewPlayer}
+          onClose={() => setPreviewPlayer(null)}
+          userId={previewPlayer.userId}
+          profileImageUrl={previewPlayer.profileImageUrl}
+          firstName={previewPlayer.firstName}
+          lastName={previewPlayer.lastName}
+        />
       )}
     </div>
   );
