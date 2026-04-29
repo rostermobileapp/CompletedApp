@@ -21,7 +21,7 @@ export default function Teams() {
   const [location, navigate] = useLocation();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
-  const { selectedTeamId, setTeamSelection } = useDashboardSelection();
+  const { selectedTeamId, selectedType, selectedTournamentId, setTeamSelection } = useDashboardSelection();
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
   const [editedTeamName, setEditedTeamName] = useState('');
 
@@ -60,6 +60,23 @@ export default function Teams() {
     // otherwise every bottom-nav click would bounce them here.
     if (location !== '/teams') return;
     if (userTeamsLoading || tournamentParticipationsLoading) return;
+
+    // When a tournament is explicitly selected in the dashboard dropdown,
+    // redirect to that tournament's team page if the user is a participant.
+    if (selectedType === 'tournament' && selectedTournamentId) {
+      const matchingParticipation = (tournamentParticipations as any[]).find(
+        (p) => p.tournamentId === selectedTournamentId && p.tournamentTeamId,
+      );
+      if (matchingParticipation) {
+        navigate(`/tournament-teams/${selectedTournamentId}`);
+        return;
+      }
+      // No participation found — fall through to show admin/observer state below.
+      return;
+    }
+
+    // Redirect tournament-only players (no league teams) to their first
+    // tournament team page so they get a first-class team experience.
     if (
       (userTeams as any[]).length === 0 &&
       firstTournamentTeamParticipation
@@ -72,12 +89,21 @@ export default function Teams() {
     userTeamsLoading,
     tournamentParticipationsLoading,
     firstTournamentTeamParticipation,
+    selectedType,
+    selectedTournamentId,
+    tournamentParticipations,
     navigate,
   ]);
 
-  // Define current team early so it can be used in subsequent queries
+  // Define current team early so it can be used in subsequent queries.
+  // When a tournament is selected in the dropdown, we never show a regular
+  // league team — the user either gets redirected (participant) or sees an
+  // admin-only state. Setting currentTeam=null prevents league data from
+  // leaking through.
   const primaryTeam = (userTeams as any[])[0];
-  const currentTeam = selectedTeamId ? (userTeams as any[]).find((t: any) => t.id === selectedTeamId) : primaryTeam;
+  const currentTeam = selectedType === 'tournament'
+    ? null
+    : (selectedTeamId ? (userTeams as any[]).find((t: any) => t.id === selectedTeamId) : primaryTeam);
 
   // Get selected team members
   const { data: teamMembers = [] } = useQuery({
@@ -327,7 +353,27 @@ export default function Teams() {
   return (
     <div className="w-full px-4 py-6 pb-20">
       <div className="space-y-6">
-        {(userTeams as any[]).length === 0 ? (
+        {selectedType === 'tournament' && (userTeams as any[]).length > 0 ? (
+          /* User has league teams but a tournament is selected — they are an
+             admin/observer of this tournament (not a player on any team in it).
+             Players would have been redirected by the effect above. */
+          <Card>
+            <CardContent className="p-6 text-center">
+              <Trophy className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Tournament View</h3>
+              <p className="text-muted-foreground mb-4">
+                You're not on a team roster for this tournament. Switch back to your league in the dropdown above to view your team.
+              </p>
+              <Button
+                onClick={() => selectedTournamentId && navigate(`/tournaments/${selectedTournamentId}`)}
+                className="w-full"
+                data-testid="button-go-to-tournament"
+              >
+                View Tournament Details
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (userTeams as any[]).length === 0 ? (
           <>
             {/* Tournament team cards for tournament-only players who have no
                 real team membership but are an approved tournament participant. */}
