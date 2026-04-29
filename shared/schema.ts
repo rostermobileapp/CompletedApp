@@ -583,6 +583,10 @@ export const tournamentTeams = pgTable("tournament_teams", {
   tournamentId: varchar("tournament_id").references(() => tournaments.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id), // null if new team for standalone
   teamName: varchar("team_name").notNull(), // denormalized for flexibility
+  // Optional logo for this tournament-team. Stored as a normalized object-storage
+  // path (e.g. /team-logos/<uuid>) — see /api/tournament-teams/:teamId PATCH.
+  // Used for standalone tournament entries that have no linked teams row.
+  logoUrl: varchar("logo_url"),
   seed: integer("seed").notNull(),
   division: varchar("division"), // for split round robin
   wins: integer("wins").default(0).notNull(),

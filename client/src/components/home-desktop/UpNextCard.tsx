@@ -175,9 +175,24 @@ export function UpNextCard({
       );
     }
 
-    const opponentName =
-      opponent?.name ||
-      (nextGame.isScrimmage ? nextGame.scrimmageTitle || 'Scrimmage' : 'Game');
+    // Pick the headline. When the viewer plays on one of the teams we use
+    // the familiar "vs Opponent" framing. When they don't (e.g. tournament
+    // admin watching all bracket games), we show "TeamA vs TeamB" so they
+    // can see who's actually playing.
+    const home = nextGame.homeTeam;
+    const away = nextGame.awayTeam;
+    const homeName = home?.name?.trim() || 'TBD';
+    const awayName = away?.name?.trim() || 'TBD';
+    let headline: string;
+    if (nextGame.isScrimmage) {
+      headline = nextGame.scrimmageTitle || 'Scrimmage';
+    } else if (ourTeamId && opponent?.name) {
+      headline = `vs ${opponent.name}`;
+    } else if (home || away) {
+      headline = `${homeName} vs ${awayName}`;
+    } else {
+      headline = 'Game';
+    }
     const venueText = nextGame.venue || nextGame.location || '';
 
     return (
@@ -201,7 +216,7 @@ export function UpNextCard({
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[15px] font-medium text-[#212121] truncate">
-              {ourTeamId ? `vs ${opponentName}` : opponentName}
+              {headline}
             </div>
             <div className="mt-0.5 flex items-center gap-1 text-[13px] text-[#555]">
               <Clock className="w-3.5 h-3.5" />

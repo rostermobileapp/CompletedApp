@@ -3988,16 +3988,19 @@ export class DatabaseStorage implements IStorage {
           
           if (match.team1Id) {
             const [team1Data] = await db
-              .select({ 
+              .select({
                 teamName: tournamentTeams.teamName,
-                teamId: tournamentTeams.teamId
+                teamId: tournamentTeams.teamId,
+                logoUrl: tournamentTeams.logoUrl,
               })
               .from(tournamentTeams)
               .where(eq(tournamentTeams.id, match.team1Id));
             if (team1Data) {
               team1Name = team1Data.teamName;
-              // Get logo from the linked team if it exists
-              if (team1Data.teamId) {
+              // Prefer the tournament-team's own logo, then fall back to the
+              // linked league team's logo if there is one.
+              team1Logo = team1Data.logoUrl || null;
+              if (!team1Logo && team1Data.teamId) {
                 const [linkedTeam] = await db
                   .select({ logoUrl: teams.logoUrl })
                   .from(teams)
@@ -4009,16 +4012,17 @@ export class DatabaseStorage implements IStorage {
           }
           if (match.team2Id) {
             const [team2Data] = await db
-              .select({ 
+              .select({
                 teamName: tournamentTeams.teamName,
-                teamId: tournamentTeams.teamId
+                teamId: tournamentTeams.teamId,
+                logoUrl: tournamentTeams.logoUrl,
               })
               .from(tournamentTeams)
               .where(eq(tournamentTeams.id, match.team2Id));
             if (team2Data) {
               team2Name = team2Data.teamName;
-              // Get logo from the linked team if it exists
-              if (team2Data.teamId) {
+              team2Logo = team2Data.logoUrl || null;
+              if (!team2Logo && team2Data.teamId) {
                 const [linkedTeam] = await db
                   .select({ logoUrl: teams.logoUrl })
                   .from(teams)
