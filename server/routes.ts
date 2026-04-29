@@ -5559,6 +5559,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approved tournament participations for the current user. Used by the
+  // "My Team" page so tournament-only players (who have no real team_membership)
+  // can still see their tournament team and navigate to it.
+  app.get("/api/user/tournament-participations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rows = await db
+        .select({
+          participantId: tournamentParticipants.id,
+          role: tournamentParticipants.role,
+          status: tournamentParticipants.status,
+          tournamentId: tournaments.id,
+          tournamentName: tournaments.name,
+          tournamentLogoUrl: tournaments.logoUrl,
+          tournamentStatus: tournaments.status,
+          tournamentType: tournaments.type,
+          tournamentLeagueId: tournaments.leagueId,
+          tournamentTeamId: tournamentTeams.id,
+          tournamentTeamName: tournamentTeams.teamName,
+          tournamentTeamLogoUrl: tournamentTeams.logoUrl,
+          linkedTeamId: tournamentTeams.teamId,
+        })
+        .from(tournamentParticipants)
+        .innerJoin(tournaments, eq(tournamentParticipants.tournamentId, tournaments.id))
+        .leftJoin(tournamentTeams, eq(tournamentParticipants.tournamentTeamId, tournamentTeams.id))
+        .where(
+          and(
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        );
+
+      res.set({
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching user tournament participations:", error);
+      res.status(500).json({ message: "Failed to fetch tournament participations" });
+    }
+  });
+
   app.patch("/api/teams/:id/captain", isAuthenticated, loadUserPermissions, requireLeagueManagement, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

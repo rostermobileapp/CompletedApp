@@ -31,6 +31,14 @@ export default function Teams() {
     enabled: !!isAuthenticated,
   });
 
+  // Get user's approved tournament participations. These let
+  // tournament-only players (no real team membership) still see their
+  // tournament team and roster from the "My Team" page.
+  const { data: tournamentParticipations = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/tournament-participations'],
+    enabled: !!isAuthenticated,
+  });
+
   // Define current team early so it can be used in subsequent queries
   const primaryTeam = (userTeams as any[])[0];
   const currentTeam = selectedTeamId ? (userTeams as any[]).find((t: any) => t.id === selectedTeamId) : primaryTeam;
@@ -284,32 +292,76 @@ export default function Teams() {
     <div className="w-full px-4 py-6 pb-20">
       <div className="space-y-6">
         {(userTeams as any[]).length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Teams Found</h3>
-              <p className="text-muted-foreground mb-4">
-                You're not currently a member of any teams. Join a league to get started!
-              </p>
-              <div className="flex flex-col gap-2">
-                <Button
-                  onClick={() => navigate('/league-tournament-search')}
-                  className="w-full"
-                  data-testid="button-find-league"
-                >
-                  Find a League
-                </Button>
-                <Button
-                  onClick={() => navigate('/')}
-                  variant="outline"
-                  className="w-full"
-                  data-testid="button-back-home"
-                >
-                  Back to Home
-                </Button>
+          <>
+            {/* Tournament team cards for tournament-only players who have no
+                real team membership but are an approved tournament participant. */}
+            {tournamentParticipations.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">My Tournament Teams</h3>
+                {tournamentParticipations
+                  .filter((p) => p.tournamentTeamId)
+                  .map((p) => (
+                    <Card
+                      key={p.participantId}
+                      className="cursor-pointer hover:bg-accent/30 transition-colors"
+                      onClick={() => navigate(`/tournament-teams/${p.tournamentId}`)}
+                      data-testid={`card-tournament-team-${p.tournamentTeamId}`}
+                    >
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <Avatar className="w-12 h-12">
+                          {p.tournamentTeamLogoUrl && (
+                            <AvatarImage src={getImageUrl(p.tournamentTeamLogoUrl) || undefined} alt={p.tournamentTeamName} />
+                          )}
+                          <AvatarFallback>
+                            <Trophy className="w-6 h-6 text-muted-foreground" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold truncate" data-testid={`text-tournament-team-name-${p.tournamentTeamId}`}>
+                            Team {p.tournamentTeamName}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {p.tournamentName}
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs capitalize">
+                          {p.role}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
               </div>
-            </CardContent>
-          </Card>
+            )}
+
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No Teams Found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {tournamentParticipations.length > 0
+                    ? "You're not on a league team yet. You can still view your tournament team above."
+                    : "You're not currently a member of any teams. Join a league to get started!"}
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    onClick={() => navigate('/league-tournament-search')}
+                    className="w-full"
+                    data-testid="button-find-league"
+                  >
+                    Find a League
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/')}
+                    variant="outline"
+                    className="w-full"
+                    data-testid="button-back-home"
+                  >
+                    Back to Home
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         ) : (
           <>
             {/* Attendance Alerts for Captains */}
@@ -351,6 +403,47 @@ export default function Teams() {
               </div>
             )}
             
+            {/* Tournament team cards — shown alongside league teams so a user
+                who plays in both contexts can navigate to either from the
+                same place. Filtered to participations with an assigned team. */}
+            {tournamentParticipations.filter((p) => p.tournamentTeamId).length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">My Tournament Teams</h3>
+                {tournamentParticipations
+                  .filter((p) => p.tournamentTeamId)
+                  .map((p) => (
+                    <Card
+                      key={p.participantId}
+                      className="cursor-pointer hover:bg-accent/30 transition-colors"
+                      onClick={() => navigate(`/tournament-teams/${p.tournamentId}`)}
+                      data-testid={`card-tournament-team-${p.tournamentTeamId}`}
+                    >
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <Avatar className="w-12 h-12">
+                          {p.tournamentTeamLogoUrl && (
+                            <AvatarImage src={getImageUrl(p.tournamentTeamLogoUrl) || undefined} alt={p.tournamentTeamName} />
+                          )}
+                          <AvatarFallback>
+                            <Trophy className="w-6 h-6 text-muted-foreground" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold truncate">
+                            Team {p.tournamentTeamName}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {p.tournamentName}
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs capitalize">
+                          {p.role}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            )}
+
             <Tabs value={selectedTeamId || primaryTeam?.id || ''} onValueChange={setTeamSelection}>
             {(userTeams as any[]).map((team: any) => (
               <TabsContent key={team.id} value={team.id} className="space-y-6">

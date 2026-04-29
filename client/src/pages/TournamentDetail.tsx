@@ -851,13 +851,14 @@ export default function TournamentDetail() {
   const { toast } = useToast();
   const { canManageLeagueSpecific } = usePermissions();
   
-  // Read tab and readonly mode from URL query parameters
+  // Read tab and readonly mode from URL query parameters.
+  // The "real" isReadOnlyMode is derived later (see below) so it can also
+  // include "user is not a tournament manager" — non-managers must only see
+  // bracket + schedule, never edit/delete/manage controls. allowedTabs and
+  // defaultTab are likewise computed once canManageTournament is available.
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get('tab');
-  const isReadOnlyMode = urlParams.get('readonly') === 'true';
-  // In read-only mode, only allow bracket and schedule tabs
-  const allowedTabs = isReadOnlyMode ? ['bracket', 'schedule'] : ['bracket', 'teams', 'players', 'schedule'];
-  const defaultTab = (tabFromUrl && allowedTabs.includes(tabFromUrl)) ? tabFromUrl : 'bracket';
+  const isReadOnlyUrl = urlParams.get('readonly') === 'true';
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingMatch, setEditingMatch] = useState<TournamentMatch | null>(null);
   const [scoringMatchId, setScoringMatchId] = useState<string | null>(null);
@@ -930,6 +931,17 @@ export default function TournamentDetail() {
     if (tournament.type === 'season_playoff' && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId)) return true;
     return false;
   };
+
+  // Effective read-only mode: either ?readonly=true was passed in the URL,
+  // OR the current user is not allowed to manage this tournament. Non-managers
+  // (including approved tournament participants who are not creators or
+  // commissioners) must only see the bracket and schedule — no Teams tab,
+  // no Edit/Delete/Manage buttons. The same gate is enforced server-side
+  // by requireTournamentManagement, but we hide the controls so they never
+  // appear to participants in the first place.
+  const isReadOnlyMode = isReadOnlyUrl || !canManageTournament();
+  const allowedTabs = isReadOnlyMode ? ['bracket', 'schedule'] : ['bracket', 'teams', 'players', 'schedule'];
+  const defaultTab = (tabFromUrl && allowedTabs.includes(tabFromUrl)) ? tabFromUrl : 'bracket';
 
   // Tournament is unpaid AND the current user is in the management role —
   // surface inline gating banners next to disabled controls so creators know

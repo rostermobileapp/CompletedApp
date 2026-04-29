@@ -49,6 +49,7 @@ import {
   tournaments,
   tournamentTeams,
   tournamentMatches,
+  tournamentParticipants,
   tournamentPhotos,
   leaguePhotos,
   tournamentPhotoTags,
@@ -3938,7 +3939,7 @@ export class DatabaseStorage implements IStorage {
 
     // Find tournament_teams that link to the user's teams (may be empty
     // for users that only administer tournaments without playing in them).
-    const userTournamentTeams = teamIds.length > 0
+    const teamLinkedTournamentTeams = teamIds.length > 0
       ? await db
           .select({
             id: tournamentTeams.id,
@@ -3949,6 +3950,36 @@ export class DatabaseStorage implements IStorage {
           .from(tournamentTeams)
           .where(inArray(tournamentTeams.teamId, teamIds))
       : [];
+
+    // Also include tournament_teams the user is an APPROVED participant of
+    // — tournament-only players (no real team membership) link to their
+    // tournament team via tournament_participants.tournamentTeamId, and
+    // tournament_teams.teamId is often NULL for standalone tournaments, so
+    // the team-linked query above won't find them. Without this discovery
+    // pass, a participant on Team 1 of a standalone tournament would never
+    // see their tournament's matches on the schedule.
+    const participantTournamentTeams = await db
+      .select({
+        id: tournamentTeams.id,
+        tournamentId: tournamentTeams.tournamentId,
+        teamId: tournamentTeams.teamId,
+        teamName: tournamentTeams.teamName
+      })
+      .from(tournamentParticipants)
+      .innerJoin(tournamentTeams, eq(tournamentParticipants.tournamentTeamId, tournamentTeams.id))
+      .where(
+        and(
+          eq(tournamentParticipants.userId, userId),
+          eq(tournamentParticipants.status, 'approved'),
+          isNotNull(tournamentParticipants.tournamentTeamId)
+        )
+      );
+
+    // Merge & dedupe by tournament_team id
+    const userTournamentTeamMap = new Map<string, { id: string; tournamentId: string; teamId: string | null; teamName: string }>();
+    for (const tt of teamLinkedTournamentTeams) userTournamentTeamMap.set(tt.id, tt);
+    for (const tt of participantTournamentTeams) userTournamentTeamMap.set(tt.id, tt);
+    const userTournamentTeams = Array.from(userTournamentTeamMap.values());
 
     if (userTournamentTeams.length > 0 || adminTournamentIds.size > 0) {
       const tournamentTeamIds = userTournamentTeams.map(tt => tt.id);
