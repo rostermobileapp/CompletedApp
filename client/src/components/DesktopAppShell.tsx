@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Users, Trophy, Info, LifeBuoy } from 'lucide-react';
+import { Users, Trophy, Swords, Info, LifeBuoy } from 'lucide-react';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,6 +60,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     selectedId,
     setTeamSelection,
     setLeagueSelection,
+    setTournamentSelection,
   } = useDashboardSelection();
   const slideOverlay = useSlideUpOverlay();
 
@@ -75,6 +76,15 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const { data: userLeagues } = useQuery<any[]>({
     queryKey: ['/api/user/leagues'],
+    enabled: !!isAuthenticated,
+  });
+
+  // Tournaments where the user is a creator/commissioner or an approved
+  // participant. Mirrors the data the mobile dashboard already uses so the
+  // desktop selector exposes the same items (including tournaments the user
+  // created themselves).
+  const { data: userTournaments } = useQuery<any[]>({
+    queryKey: ['/api/user/paid-tournaments'],
     enabled: !!isAuthenticated,
   });
 
@@ -153,6 +163,17 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         (m: any) => m.leagueId && !teamLeagueIds.has(m.leagueId),
       )
     : [];
+  // Deduplicate tournaments by id (a creator who is also a participant
+  // appears twice in the underlying response).
+  const tournamentOptions = Array.isArray(userTournaments)
+    ? Array.from(
+        new Map(
+          userTournaments
+            .filter((t: any) => t && t.id)
+            .map((t: any) => [t.id, t]),
+        ).values(),
+      )
+    : [];
 
   // Show a slow red pulse on the selector when ANY non-selected context
   // (team, league, or tournament) has unreviewed alerts.
@@ -189,16 +210,19 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
       if (m.leagueId === currentLeagueId) continue;
       if ((leagueCounts[m.leagueId] || 0) > 0) return true;
     }
-    // Tournament-scoped alerts.
-    for (const tournamentId of Object.keys(tournamentCounts)) {
-      if (selectedType === 'tournament' && selectedId === tournamentId) continue;
-      if ((tournamentCounts[tournamentId] || 0) > 0) return true;
+    // Tournament-scoped alerts. Only consider tournaments that are actually
+    // selectable from the dropdown so the glow can't fire on tournaments the
+    // user can't navigate to from here.
+    for (const tournament of tournamentOptions) {
+      if (selectedType === 'tournament' && selectedId === tournament.id) continue;
+      if ((tournamentCounts[tournament.id] || 0) > 0) return true;
     }
     return false;
   }, [
     notificationCounts,
     teamOptions,
     leagueOptions,
+    tournamentOptions,
     selectedType,
     selectedId,
     currentLeagueId,
@@ -212,6 +236,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     if (!id) return;
     if (type === 'team') setTeamSelection(id);
     else if (type === 'league') setLeagueSelection(id);
+    else if (type === 'tournament') setTournamentSelection(id);
   };
 
   const handleNavClick = (route: string) => {
@@ -368,7 +393,9 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           data-testid="desktop-header"
         >
           <div className="flex-1 max-w-md">
-            {teamOptions.length > 0 || leagueOptions.length > 0 ? (
+            {teamOptions.length > 0 ||
+            leagueOptions.length > 0 ||
+            tournamentOptions.length > 0 ? (
               <Select
                 value={dropdownValue || undefined}
                 onValueChange={handleDropdownChange}
@@ -380,7 +407,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                   )}
                   data-testid="desktop-team-selector"
                 >
-                  <SelectValue placeholder="Select a team or league" />
+                  <SelectValue placeholder="Select a team, league, or tournament" />
                 </SelectTrigger>
                 <SelectContent>
                   {teamOptions.map((team: any) => {
@@ -452,6 +479,42 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                             <span
                               className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
                               data-testid={`desktop-league-alert-count-${membership.leagueId}`}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </div>
+                      </SelectPrimitive.Item>
+                    );
+                  })}
+                  {tournamentOptions.map((tournament: any) => {
+                    const count =
+                      notificationCounts?.tournaments?.[tournament.id] || 0;
+                    const label = tournament.name || 'Tournament';
+                    return (
+                      <SelectPrimitive.Item
+                        key={`tournament-${tournament.id}`}
+                        value={`tournament:${tournament.id}`}
+                        textValue={label}
+                        className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        data-testid={`desktop-tournament-option-${tournament.id}`}
+                      >
+                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                          <SelectPrimitive.ItemIndicator>
+                            <Check className="h-4 w-4" />
+                          </SelectPrimitive.ItemIndicator>
+                        </span>
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <SelectPrimitive.ItemText>
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Swords className="w-4 h-4 text-primary flex-shrink-0" />
+                              <span className="truncate">{label}</span>
+                            </span>
+                          </SelectPrimitive.ItemText>
+                          {count > 0 && (
+                            <span
+                              className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-semibold"
+                              data-testid={`desktop-tournament-alert-count-${tournament.id}`}
                             >
                               {count}
                             </span>

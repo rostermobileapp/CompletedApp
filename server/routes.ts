@@ -4375,6 +4375,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         commissionerId: userId,
       });
 
+      // Automatically add the creator as an approved league member (commissioner)
+      // so the league shows up in their selector and membership-based queries
+      // include them. Idempotent: skip if a membership row already exists for
+      // this user/league pair (e.g. on retry).
+      try {
+        const [existingLeagueMembership] = await db
+          .select({ id: leagueMemberships.id })
+          .from(leagueMemberships)
+          .where(and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.leagueId, league.id),
+          ))
+          .limit(1);
+        if (!existingLeagueMembership) {
+          await db.insert(leagueMemberships).values({
+            userId,
+            leagueId: league.id,
+            status: 'approved',
+            leagueRole: 'commissioner',
+            approvedBy: userId,
+            approvedAt: new Date(),
+          });
+        }
+      } catch (membershipError) {
+        console.error("Failed to auto-add creator as league member:", membershipError);
+        // Don't fail the whole operation — the league itself was created.
+      }
+
       // Automatically create season if one was provided during league creation
       if (season && season.trim()) {
         try {
@@ -5387,6 +5415,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...teamData,
         captainId: userId,
       });
+
+      // Automatically add the creator as an approved team member (captain)
+      // so the team shows up in their team selector and they have full access.
+      // Idempotent: skip if a membership row already exists for this user/team
+      // pair (e.g. on retry).
+      try {
+        const [existingTeamMembership] = await db
+          .select({ id: teamMemberships.id })
+          .from(teamMemberships)
+          .where(and(
+            eq(teamMemberships.userId, userId),
+            eq(teamMemberships.teamId, team.id),
+          ))
+          .limit(1);
+        if (!existingTeamMembership) {
+          await db.insert(teamMemberships).values({
+            userId,
+            teamId: team.id,
+            status: 'approved',
+            isCaptain: true,
+            approvedBy: userId,
+          });
+        }
+      } catch (membershipError) {
+        console.error("Failed to auto-add creator as team member:", membershipError);
+        // Don't fail the whole operation — the team itself was created.
+      }
+
       res.json(team);
     } catch (error) {
       console.error("Error creating team:", error);
@@ -18795,6 +18851,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .insert(tournaments)
         .values(validatedData)
         .returning();
+
+      // Automatically add the creator as an approved tournament participant
+      // (commissioner role) so the tournament shows up in their selector and
+      // any participant-based queries include them. The unique
+      // (tournamentId, userId) constraint makes onConflictDoNothing safe on
+      // retries.
+      try {
+        await db
+          .insert(tournamentParticipants)
+          .values({
+            tournamentId: tournament.id,
+            userId,
+            role: 'commissioner',
+            status: 'approved',
+            approvedBy: userId,
+            approvedAt: new Date(),
+          })
+          .onConflictDoNothing({
+            target: [
+              tournamentParticipants.tournamentId,
+              tournamentParticipants.userId,
+            ],
+          });
+      } catch (participantError) {
+        console.error("Failed to auto-add creator as tournament participant:", participantError);
+        // Don't fail the whole operation — the tournament itself was created.
+      }
 
       res.status(201).json(tournament);
     } catch (error) {
