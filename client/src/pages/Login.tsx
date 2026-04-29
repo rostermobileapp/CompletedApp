@@ -161,7 +161,7 @@ export default function Login() {
             data-testid="logo-image"
           />
 
-          <p className="mt-3 text-gray-500 text-base tracking-wide italic">less admin, more hockey</p>
+          <p className="mt-3 text-base tracking-wide italic text-[#1e1e21]">less admin, more hockey</p>
 
           <AnimatePresence>
             {!showForm && (
