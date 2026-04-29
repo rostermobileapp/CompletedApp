@@ -196,7 +196,7 @@ export default function Login() {
               />
 
               <motion.div
-                className="fixed left-1/2 -translate-x-1/2 z-50 w-full max-w-[512px] px-6"
+                className="fixed left-0 right-0 mx-auto z-50 w-full max-w-[512px] px-6"
                 initial={{ opacity: 0, scale: 0.95, top: '33%' }}
                 animate={{ opacity: 1, scale: 1, top: '8%' }}
                 exit={{ opacity: 0, scale: 0.95, top: '33%' }}
