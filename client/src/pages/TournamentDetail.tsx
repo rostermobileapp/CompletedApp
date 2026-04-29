@@ -1872,7 +1872,7 @@ export default function TournamentDetail() {
       />
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 pt-[4px] pb-[4px]">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 pt-[4px] pb-[4px] bg-[#ffffff]">
           {/* Top Row: Back link (left) + Action buttons (right) */}
           <div className="flex items-center justify-between gap-2 mb-2">
             <Button
@@ -3102,7 +3102,6 @@ export default function TournamentDetail() {
           </TabsContent>
         </Tabs>
       </div>
-
       {/* Create Tournament Announcement Modal */}
       <CreateTournamentAnnouncementModal
         isOpen={showCreateAnnouncementModal}
@@ -3110,7 +3109,6 @@ export default function TournamentDetail() {
         tournamentId={tournamentId!}
         canPost={canManageTournament()}
       />
-
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -3134,7 +3132,6 @@ export default function TournamentDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       {/* Additional Team Payment Dialog */}
       <AlertDialog open={!!additionalPaymentRequired} onOpenChange={(open) => !open && setAdditionalPaymentRequired(null)}>
         <AlertDialogContent>
@@ -3172,7 +3169,6 @@ export default function TournamentDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       {/* Match Edit Dialog */}
       {editingMatch && (
         <MatchEditDialog
@@ -3183,7 +3179,6 @@ export default function TournamentDetail() {
           team2Name={getTeamName(editingMatch.team2Id, editingMatch, 'team2')}
         />
       )}
-
       {/* Tournament Match Score Modal */}
       {scoringMatchId && tournamentId && (
         <TournamentMatchScoreModal
@@ -3194,7 +3189,6 @@ export default function TournamentDetail() {
           isCommissioner={!!tournament && !!tournament.leagueId && canManageLeagueSpecific(tournament.leagueId)}
         />
       )}
-      
       {/* Merge Participant Modal */}
       {showMergeModal && selectedParticipantToMerge && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -3329,7 +3323,6 @@ export default function TournamentDetail() {
           </div>
         </div>
       )}
-
       {previewPlayer && (
         <ProfilePhotoPreview
           isOpen={!!previewPlayer}
