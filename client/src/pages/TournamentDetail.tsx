@@ -46,6 +46,7 @@ import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
 import { StripeCheckoutModal } from "@/components/StripeCheckoutModal";
+import { ObjectUploader } from "@/components/ObjectUploader";
 
 // The tournament detail endpoint may return either a full Tournament record
 // or a minimal pre-access countdown payload for approved participants whose
@@ -1394,6 +1395,47 @@ export default function TournamentDetail() {
     }
   });
 
+  // Tournament team logo upload mutation
+  const updateTournamentTeamLogoMutation = useMutation({
+    mutationFn: async (data: { teamId: string; logoUrl: string }) => {
+      return apiRequest('PATCH', `/api/tournament-teams/${data.teamId}`, { logoUrl: data.logoUrl });
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      // Keep selectedTeam in sync with the new logo so the UI updates immediately.
+      setSelectedTeam((prev) => (prev && prev.id === variables.teamId ? { ...prev, logoUrl: variables.logoUrl } : prev));
+      toast({
+        title: "Success",
+        description: "Team logo updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      if (isPaymentRequiredError(error)) return;
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update team logo.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGetTournamentTeamLogoUploadParameters = async () => {
+    const response = await apiRequest('POST', '/api/team-logos/upload');
+    const data = await response.json();
+    return {
+      method: 'PUT' as const,
+      url: data.uploadURL,
+      path: data.path,
+    };
+  };
+
+  const createTournamentTeamLogoUploadComplete = (teamId: string) =>
+    (result: { successful?: Array<{ uploadURL: string; path?: string }>; failed?: Array<any> }) => {
+      if (!result.successful || result.successful.length === 0) return;
+      const logoUrl = result.successful[0].path || result.successful[0].uploadURL;
+      updateTournamentTeamLogoMutation.mutate({ teamId, logoUrl });
+    };
+
   const toggleVisibilityMutation = useMutation({
     mutationFn: async (isVisibleToLeague: boolean) => {
       const response = await apiRequest('PATCH', `/api/tournaments/${tournamentId}/visibility`, { isVisibleToLeague });
@@ -1823,140 +1865,141 @@ export default function TournamentDetail() {
       {/* Header */}
       <div className="border-b bg-card">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 pt-[4px] pb-[4px]">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const path = tournament.leagueId 
-                ? `/leagues/${tournament.leagueId}/tournaments`
-                : '/tournaments';
-              setLocation(path);
-            }}
-            className="mb-2 -ml-2"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Tournaments
-          </Button>
-          
-          <div className="space-y-2">
-            {/* Title, Badges, and Actions - Single Row */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-tournament-name">
-                  {tournament.logoUrl ? (
-                    <img
-                      src={getImageUrl(tournament.logoUrl) || undefined}
-                      alt={`${tournament.name} logo`}
-                      className="h-7 w-7 md:h-9 md:w-9 rounded object-cover"
-                      data-testid="img-tournament-logo"
-                    />
-                  ) : (
-                    <Trophy className="h-6 w-6 md:h-7 md:w-7 text-primary" />
-                  )}
-                  {tournament.name}
-                </h1>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge 
-                    variant="outline" 
-                    className="font-mono font-semibold text-xs cursor-pointer hover:bg-muted"
-                    onClick={() => {
-                      navigator.clipboard.writeText(tournament.uniqueTournamentId || '');
-                      setCopiedTournamentId(true);
-                      setTimeout(() => setCopiedTournamentId(false), 2000);
-                      toast({
-                        title: "Copied!",
-                        description: "Tournament ID copied to clipboard"
-                      });
-                    }}
-                    data-testid="badge-tournament-id"
-                  >
-                    {copiedTournamentId ? <CheckCheck className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
-                    ID: {tournament.uniqueTournamentId}
-                  </Badge>
-                  <Badge variant="outline" className="font-normal text-xs">
-                    {tournament.type === 'season_playoff' ? 'Season Playoff' : 'Standalone'}
-                  </Badge>
-                  <Badge variant="outline" className="font-normal text-xs">
-                    {getFormatLabel(tournament.format)}
-                  </Badge>
-                  {teams && teams.length > 0 && (
-                    <Badge variant="secondary" className="font-normal text-xs">
-                      <Users className="h-3 w-3 mr-1" />
-                      {teams.length} {teams.length === 1 ? 'team' : 'teams'}
-                    </Badge>
-                  )}
-                  {canManageTournament() && !isReadOnlyMode && (
-                    <>
-                      {tournament.paymentStatus === 'paid' ? (
-                        <Badge variant="default" className="bg-green-600 flex items-center gap-1 text-xs" data-testid="badge-payment-paid">
-                          <CheckCheck className="h-3 w-3" />
-                          Paid
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="border-amber-500 text-amber-600 flex items-center gap-1 text-xs" data-testid="badge-payment-pending">
-                          <Clock className="h-3 w-3" />
-                          Pending
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="font-normal text-xs flex items-center gap-1" data-testid="text-payment-amount">
-                        <DollarSign className="h-3 w-3" />
-                        {((tournament.paymentAmount || 0) / 100).toFixed(2)}
-                      </Badge>
-                    </>
-                  )}
-                </div>
-              </div>
-              
-              {!isReadOnlyMode && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {tournament.status === 'draft' ? (
-                    <>
-                      {canManageTournament() && tournament.paymentStatus !== 'paid' && (
-                        <Button
-                          onClick={() => paymentMutation.mutate()}
-                          disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
-                          size="sm"
-                          data-testid="button-pay-now"
-                          title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
-                        >
-                          <DollarSign className="h-4 w-4 mr-1" />
-                          {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
+          {/* Top Row: Back link (left) + Action buttons (right) */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const path = tournament.leagueId 
+                  ? `/leagues/${tournament.leagueId}/tournaments`
+                  : '/tournaments';
+                setLocation(path);
+              }}
+              className="-ml-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Tournaments
+            </Button>
+
+            {!isReadOnlyMode && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {tournament.status === 'draft' ? (
+                  <>
+                    {canManageTournament() && tournament.paymentStatus !== 'paid' && (
+                      <Button
+                        onClick={() => paymentMutation.mutate()}
+                        disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
                         size="sm"
-                        onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
-                        data-testid="button-edit"
+                        data-testid="button-pay-now"
+                        title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
                       >
-                        Edit Settings
+                        <DollarSign className="h-4 w-4 mr-1" />
+                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
                       </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={() => setShowDeleteDialog(true)}
-                        data-testid="button-delete"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
-                    </>
-                  ) : tournament.type === 'standalone' && (
-                    <Button
-                      variant="outline"
+                    )}
+                    <Button 
+                      variant="outline" 
                       size="sm"
                       onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
-                      data-testid="button-edit-date"
+                      data-testid="button-edit"
                     >
-                      Edit First Game Date
+                      Edit Settings
                     </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => setShowDeleteDialog(true)}
+                      data-testid="button-delete"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </>
+                ) : tournament.type === 'standalone' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                    data-testid="button-edit-date"
+                  >
+                    Edit First Game Date
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {/* Line 1: Tournament title with logo */}
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-tournament-name">
+              {tournament.logoUrl ? (
+                <img
+                  src={getImageUrl(tournament.logoUrl) || undefined}
+                  alt={`${tournament.name} logo`}
+                  className="h-7 w-7 md:h-9 md:w-9 rounded object-cover"
+                  data-testid="img-tournament-logo"
+                />
+              ) : (
+                <Trophy className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+              )}
+              {tournament.name}
+            </h1>
+
+            {/* Line 2: All badges (ID, type, format, team count, payment) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge 
+                variant="outline" 
+                className="font-mono font-semibold text-xs cursor-pointer hover:bg-muted"
+                onClick={() => {
+                  navigator.clipboard.writeText(tournament.uniqueTournamentId || '');
+                  setCopiedTournamentId(true);
+                  setTimeout(() => setCopiedTournamentId(false), 2000);
+                  toast({
+                    title: "Copied!",
+                    description: "Tournament ID copied to clipboard"
+                  });
+                }}
+                data-testid="badge-tournament-id"
+              >
+                {copiedTournamentId ? <CheckCheck className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                ID: {tournament.uniqueTournamentId}
+              </Badge>
+              <Badge variant="outline" className="font-normal text-xs">
+                {tournament.type === 'season_playoff' ? 'Season Playoff' : 'Standalone'}
+              </Badge>
+              <Badge variant="outline" className="font-normal text-xs">
+                {getFormatLabel(tournament.format)}
+              </Badge>
+              {teams && teams.length > 0 && (
+                <Badge variant="secondary" className="font-normal text-xs">
+                  <Users className="h-3 w-3 mr-1" />
+                  {teams.length} {teams.length === 1 ? 'team' : 'teams'}
+                </Badge>
+              )}
+              {canManageTournament() && !isReadOnlyMode && (
+                <>
+                  {tournament.paymentStatus === 'paid' ? (
+                    <Badge variant="default" className="bg-green-600 flex items-center gap-1 text-xs" data-testid="badge-payment-paid">
+                      <CheckCheck className="h-3 w-3" />
+                      Paid
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 flex items-center gap-1 text-xs" data-testid="badge-payment-pending">
+                      <Clock className="h-3 w-3" />
+                      Pending
+                    </Badge>
                   )}
-                </div>
+                  <Badge variant="outline" className="font-normal text-xs flex items-center gap-1" data-testid="text-payment-amount">
+                    <DollarSign className="h-3 w-3" />
+                    {((tournament.paymentAmount || 0) / 100).toFixed(2)}
+                  </Badge>
+                </>
               )}
             </div>
 
-            {/* Description - Optional Second Line */}
+            {/* Description - Optional */}
             {tournament.description && (
               <p className="text-sm text-muted-foreground max-w-3xl" data-testid="text-tournament-description">
                 {tournament.description}
@@ -1980,14 +2023,14 @@ export default function TournamentDetail() {
         <Tabs defaultValue={defaultTab} className="space-y-6">
           <div className="max-w-7xl mx-auto px-4 md:px-8 pt-[2px]">
             <TabsList className={`grid w-full ${isReadOnlyMode ? 'grid-cols-2' : (canManageTournament() ? 'grid-cols-4' : 'grid-cols-3')} md:w-auto`}>
-              <TabsTrigger value="bracket" data-testid="tab-bracket">Bracket</TabsTrigger>
+              <TabsTrigger value="bracket" data-testid="tab-bracket" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Bracket</TabsTrigger>
               {!isReadOnlyMode && (
-                <TabsTrigger value="teams" data-testid="tab-teams">Teams</TabsTrigger>
+                <TabsTrigger value="teams" data-testid="tab-teams" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Teams</TabsTrigger>
               )}
               {!isReadOnlyMode && canManageTournament() && (
-                <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
+                <TabsTrigger value="players" data-testid="tab-players" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Players</TabsTrigger>
               )}
-              <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
+              <TabsTrigger value="schedule" data-testid="tab-schedule" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Schedule</TabsTrigger>
             </TabsList>
           </div>
 
@@ -2595,18 +2638,49 @@ export default function TournamentDetail() {
             {/* Teams List */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      {selectedTeam ? selectedTeam.teamName : 'Participating Teams'}
-                    </CardTitle>
-                    <CardDescription>
-                      {selectedTeam 
-                        ? `${teamPlayers?.length || 0} player${teamPlayers?.length !== 1 ? 's' : ''}`
-                        : `${teams?.length || 0} team${teams?.length !== 1 ? 's' : ''} registered`
-                      }
-                    </CardDescription>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {selectedTeam && (
+                      <div className="relative group flex-shrink-0">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${selectedTeam.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+                          {selectedTeam.logoUrl ? (
+                            <img
+                              src={getImageUrl(selectedTeam.logoUrl) || ''}
+                              alt={`${selectedTeam.teamName} logo`}
+                              className="w-full h-full rounded-lg object-contain bg-transparent"
+                              data-testid={`img-selected-team-logo-${selectedTeam.id}`}
+                            />
+                          ) : (
+                            <Trophy className="w-6 h-6 text-primary-foreground" />
+                          )}
+                        </div>
+                        {canManageTournament() && (
+                          <ObjectUploader
+                            maxNumberOfFiles={1}
+                            maxFileSize={10485760}
+                            onGetUploadParameters={handleGetTournamentTeamLogoUploadParameters}
+                            onComplete={createTournamentTeamLogoUploadComplete(selectedTeam.id)}
+                            cropShape="rect"
+                            cropDialogTitle="Position your team logo"
+                            buttonClassName="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-lg opacity-0 hover:opacity-100 bg-black/50 flex items-center justify-center transition-opacity"
+                          >
+                            <Upload className="w-5 h-5 text-white" />
+                          </ObjectUploader>
+                        )}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <CardTitle className="flex items-center gap-2">
+                        {!selectedTeam && <Users className="h-5 w-5" />}
+                        <span className="truncate">{selectedTeam ? selectedTeam.teamName : 'Participating Teams'}</span>
+                      </CardTitle>
+                      <CardDescription>
+                        {selectedTeam 
+                          ? `${teamPlayers?.length || 0} player${teamPlayers?.length !== 1 ? 's' : ''}${canManageTournament() ? ' · Hover the logo to change it' : ''}`
+                          : `${teams?.length || 0} team${teams?.length !== 1 ? 's' : ''} registered`
+                        }
+                      </CardDescription>
+                    </div>
                   </div>
                   {selectedTeam && (
                     <Button
@@ -2614,6 +2688,7 @@ export default function TournamentDetail() {
                       size="sm"
                       onClick={() => setSelectedTeam(null)}
                       data-testid="button-back-to-teams"
+                      className="flex-shrink-0"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
                       Back to Teams
@@ -2624,7 +2699,7 @@ export default function TournamentDetail() {
               <CardContent>
                 {!selectedTeam ? (
                   // Teams List View
-                  (teams && teams.length > 0 ? (<div className="space-y-3">
+                  (teams && teams.length > 0 ? (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {teams.map((team, index) => {
                       // Count players for this team (we don't have this data in teams list, but we can show seed)
                       return (
@@ -2634,15 +2709,24 @@ export default function TournamentDetail() {
                           onClick={() => setSelectedTeam(team)}
                           data-testid={`team-${team.id}`}
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <p className="font-medium text-base" data-testid={`text-team-name-${team.id}`}>
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${team.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+                              {team.logoUrl ? (
+                                <img
+                                  src={getImageUrl(team.logoUrl) || ''}
+                                  alt={`${team.teamName} logo`}
+                                  className="w-full h-full rounded-lg object-contain bg-transparent"
+                                  data-testid={`img-team-logo-${team.id}`}
+                                />
+                              ) : (
+                                <Trophy className="w-5 h-5 text-primary-foreground" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-base truncate" data-testid={`text-team-name-${team.id}`}>
                                 {team.teamName}
                               </p>
-                            </div>
-                            <div className="text-sm text-muted-foreground space-y-1">
-                              <p>Seed: #{team.seed || index + 1}</p>
-                              <p>Click to view players</p>
+                              <p className="text-sm text-muted-foreground">Seed: #{team.seed || index + 1}</p>
                             </div>
                           </div>
                           <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -2672,7 +2756,7 @@ export default function TournamentDetail() {
                       </p>
                     </div>
                   ) : teamPlayers && teamPlayers.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {teamPlayers.map((player: any) => (
                         <div
                           key={player.id}
@@ -2773,19 +2857,19 @@ export default function TournamentDetail() {
                       return (
                         <div
                           key={participant.id}
-                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-background rounded-lg border"
+                          className="flex flex-col gap-3 p-3 bg-background rounded-lg border"
                           data-testid={`row-player-${participant.id}`}
                         >
                           <div className="space-y-0.5 min-w-0">
-                            <p className="font-medium" data-testid={`text-player-name-${participant.id}`}>
+                            <p className="font-medium truncate" data-testid={`text-player-name-${participant.id}`}>
                               {participant.user.firstName} {participant.user.lastName}
                             </p>
-                            <p className="text-sm text-muted-foreground" data-testid={`text-player-email-${participant.id}`}>
+                            <p className="text-sm text-muted-foreground truncate" data-testid={`text-player-email-${participant.id}`}>
                               {participant.user.email}
                             </p>
                           </div>
                           <div
-                            className="w-full sm:w-64"
+                            className="w-full"
                             title={isUnpaid ? 'Pay your tournament invoice to assign players to teams.' : undefined}
                           >
                             <Select
@@ -2837,7 +2921,7 @@ export default function TournamentDetail() {
                           {freeAgents.length === 0 ? (
                             <p className="text-sm text-muted-foreground pl-6">No unassigned players.</p>
                           ) : (
-                            <div className="space-y-2">{freeAgents.map(renderPlayerRow)}</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">{freeAgents.map(renderPlayerRow)}</div>
                           )}
                         </div>
 
@@ -2853,7 +2937,7 @@ export default function TournamentDetail() {
                             {players.length === 0 ? (
                               <p className="text-sm text-muted-foreground pl-6">No players assigned.</p>
                             ) : (
-                              <div className="space-y-2">{players.map(renderPlayerRow)}</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">{players.map(renderPlayerRow)}</div>
                             )}
                           </div>
                         ))}
