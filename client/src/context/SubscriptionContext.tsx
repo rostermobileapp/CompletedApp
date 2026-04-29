@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useQuery } from '@tanstack/react-query';
 import type { User } from '@shared/schema';
 
@@ -44,6 +45,7 @@ const roleHierarchy: Record<UserRole, number> = {
 
 export function PermissionProvider({ children }: { children: ReactNode }) {
   const { user: authUser, isLoading: authLoading } = useAuth();
+  const { selectedType, selectedId } = useDashboardSelection();
   
   // Fetch full user from database (includes role from PostgreSQL)
   const { data: user, isLoading: userLoading } = useQuery<User>({
@@ -54,6 +56,14 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
   // Fetch user's league memberships with permissions
   const { data: leagueMemberships = [], isLoading: isMembershipsLoading } = useQuery<any[]>({
     queryKey: ['/api/user/league-memberships'],
+    enabled: !!authUser,
+  });
+
+  // Fetch the user's approved tournament participations. A tournament
+  // participant gets Player Pro privileges while their tournament is the
+  // active context, regardless of their personal subscription tier.
+  const { data: tournamentParticipations = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/tournament-participations'],
     enabled: !!authUser,
   });
   
@@ -98,8 +108,21 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return hasSpecialPermission('stat_manager') || hasSpecialPermission('admin') || hasRole('commissioner') || isPrimaryCommissioner;
   };
 
+  // True when the current dashboard selection is a tournament the user is
+  // an approved participant in. Used to grant Player Pro privileges for the
+  // tournament team context regardless of the user's personal subscription.
+  const isParticipantOfSelectedTournament = (): boolean => {
+    if (selectedType !== 'tournament' || !selectedId) return false;
+    return tournamentParticipations.some(
+      (p: any) => p.tournamentId === selectedId,
+    );
+  };
+
   const canAccessPremiumFeatures = (): boolean => {
-    return hasRole('player_pro');
+    if (hasRole('player_pro')) return true;
+    // Tournament participants get Pro access while their tournament is the
+    // active context (e.g. selected in the team/league/tournament dropdown).
+    return isParticipantOfSelectedTournament();
   };
 
   const hasStatManagerAccess = (): boolean => {
