@@ -7493,6 +7493,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
       const approvedSubstitute = approvedSubRow ? { teamId: approvedSubRow.requestingTeamId } : null;
 
+      // For tournament matches, also check tournamentParticipants to find the user's assigned team
+      let userTournamentTeamId: string | null = null;
+      if (isTournamentMatch) {
+        const participantTeamIds = [homeTeamId, awayTeamId].filter((id): id is string => !!id && id !== 'tbd');
+        if (participantTeamIds.length > 0) {
+          const [participant] = await db
+            .select({ tournamentTeamId: tournamentParticipants.tournamentTeamId })
+            .from(tournamentParticipants)
+            .where(and(
+              eq(tournamentParticipants.userId, userId),
+              inArray(tournamentParticipants.tournamentTeamId, participantTeamIds)
+            ))
+            .limit(1);
+          userTournamentTeamId = participant?.tournamentTeamId ?? null;
+        }
+      }
+
       res.json({
         game: formattedGame,
         league,
@@ -7505,6 +7522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         linkedHomeTeamId,
         linkedAwayTeamId,
         approvedSubstitute,
+        userTournamentTeamId,
       });
     } catch (error) {
       console.error('Error fetching full game details:', error);
@@ -8044,7 +8062,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isApprovedSubstitute = !!subRow;
       }
 
-      if (!hasDirectTeamMembership && !hasLeagueTeamAssignment && !isApprovedSubstitute) {
+      // For tournament matches, also check if user is a tournament participant or on the linked regular team
+      let isTournamentParticipant = false;
+      if (isTournamentMatch && !hasDirectTeamMembership && !hasLeagueTeamAssignment && !isApprovedSubstitute) {
+        // Check direct tournament participant record
+        const [participant] = await db
+          .select({ id: tournamentParticipants.id })
+          .from(tournamentParticipants)
+          .where(and(
+            eq(tournamentParticipants.userId, userId),
+            eq(tournamentParticipants.tournamentTeamId, teamId)
+          ))
+          .limit(1);
+        if (participant) {
+          isTournamentParticipant = true;
+        } else {
+          // Also check if teamId is a tournament team with a linked regular team, and user is on that team
+          const [tournamentTeamRow] = await db
+            .select({ linkedTeamId: tournamentTeams.teamId })
+            .from(tournamentTeams)
+            .where(eq(tournamentTeams.id, teamId))
+            .limit(1);
+          if (tournamentTeamRow?.linkedTeamId) {
+            const linkedMembers = await storage.getTeamMembers(tournamentTeamRow.linkedTeamId).catch(() => []);
+            isTournamentParticipant = linkedMembers.some(m => m.userId === userId);
+          }
+        }
+      }
+
+      if (!hasDirectTeamMembership && !hasLeagueTeamAssignment && !isApprovedSubstitute && !isTournamentParticipant) {
         return res.status(403).json({ message: 'You must be on this team to RSVP' });
       }
 
@@ -8177,8 +8223,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Also check if user is an approved substitute for this game
         const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
         const isApprovedSubstitute = substituteGameIds.includes(gameId);
+
+        // For tournament matches, also check tournament participant or linked regular team membership
+        let isTournamentParticipant = false;
+        if (isTournamentMatch && !isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment && !isApprovedSubstitute) {
+          const [participant] = await db
+            .select({ id: tournamentParticipants.id })
+            .from(tournamentParticipants)
+            .where(and(
+              eq(tournamentParticipants.userId, userId),
+              eq(tournamentParticipants.tournamentTeamId, teamId as string)
+            ))
+            .limit(1);
+          if (participant) {
+            isTournamentParticipant = true;
+          } else {
+            // Also check if teamId is a tournament team with a linked regular team
+            const [tournamentTeamRow] = await db
+              .select({ linkedTeamId: tournamentTeams.teamId })
+              .from(tournamentTeams)
+              .where(eq(tournamentTeams.id, teamId as string))
+              .limit(1);
+            if (tournamentTeamRow?.linkedTeamId) {
+              const linkedMembers = await storage.getTeamMembers(tournamentTeamRow.linkedTeamId).catch(() => []);
+              isTournamentParticipant = linkedMembers.some(m => m.userId === userId);
+            }
+          }
+        }
         
-        if (!isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment && !isApprovedSubstitute) {
+        if (!isCommissioner && !isCaptainOfRequestedTeam && !isMemberOfTeam && !hasLeagueTeamAssignment && !isApprovedSubstitute && !isTournamentParticipant) {
           return res.status(403).json({ message: 'You must be on this team, a captain, or commissioner to view attendance' });
         }
         

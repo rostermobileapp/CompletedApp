@@ -58,6 +58,7 @@ export default function GameDetails() {
     linkedHomeTeamId?: string | null;
     linkedAwayTeamId?: string | null;
     approvedSubstitute?: { teamId: string } | null;
+    userTournamentTeamId?: string | null;
   }
 
   const { data: fullGameData, isLoading: gameLoading } = useQuery<FullGameData>({
@@ -84,6 +85,7 @@ export default function GameDetails() {
   const linkedHomeTeamId = fullGameData?.linkedHomeTeamId;
   const linkedAwayTeamId = fullGameData?.linkedAwayTeamId;
   const approvedSubstitute = fullGameData?.approvedSubstitute ?? null;
+  const userTournamentTeamId = fullGameData?.userTournamentTeamId ?? null;
 
   // Get primary team (first team for now)
   const primaryTeam = Array.isArray(userTeams) && userTeams.length > 0 ? userTeams[0] : null;
@@ -488,8 +490,15 @@ export default function GameDetails() {
     awayTeamIncluded: userTeamIds.includes(game.awayTeam?.id)
   });
   
-  const userTeamFromMembership = userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam : 
-                   userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null;
+  // For tournament matches, check via linked regular team IDs or tournament participant assignment
+  const userTeamFromMembership = isTournamentMatch
+    ? ((linkedHomeTeamId && userTeamIds.includes(linkedHomeTeamId)) ? game.homeTeam :
+       (linkedAwayTeamId && userTeamIds.includes(linkedAwayTeamId)) ? game.awayTeam :
+       (userTournamentTeamId && userTournamentTeamId === game.homeTeam?.id) ? game.homeTeam :
+       (userTournamentTeamId && userTournamentTeamId === game.awayTeam?.id) ? game.awayTeam :
+       null)
+    : (userTeamIds.includes(game.homeTeam?.id) ? game.homeTeam :
+       userTeamIds.includes(game.awayTeam?.id) ? game.awayTeam : null);
   // If the user is an approved substitute, use the team they're subbing for
   const userTeamFromSub = !userTeamFromMembership && approvedSubstitute
     ? (game.homeTeam?.id === approvedSubstitute.teamId ? game.homeTeam : 

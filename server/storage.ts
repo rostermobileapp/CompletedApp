@@ -6326,7 +6326,22 @@ export class DatabaseStorage implements IStorage {
         eq(gameRsvps.teamId, teamId)
       ))
       .limit(1);
-    return rsvp;
+    if (rsvp) return rsvp;
+
+    // Also check tournament match RSVPs (stored in separate table)
+    const [tournamentRsvp] = await db
+      .select()
+      .from(tournamentMatchRsvps)
+      .where(and(
+        eq(tournamentMatchRsvps.matchId, gameId),
+        eq(tournamentMatchRsvps.userId, userId),
+        eq(tournamentMatchRsvps.teamId, teamId)
+      ))
+      .limit(1);
+    if (tournamentRsvp) {
+      return { ...tournamentRsvp, gameId: tournamentRsvp.matchId } as any;
+    }
+    return undefined;
   }
 
   async getUserGameRsvps(gameId: string, userId: string): Promise<GameRsvp[]> {
