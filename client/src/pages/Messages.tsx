@@ -2501,11 +2501,11 @@ export default function Messages() {
                     )}
                     
                     <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
-                      <div className={`rounded-lg p-3 elev-rest ${
-                        isCurrentUser 
-                          ? 'text-white ml-auto' 
-                          : 'text-white'
-                      }`} style={{ backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}>
+                      <div className={`rounded-lg ${
+                        message.messageType === 'poll'
+                          ? `text-foreground ${isCurrentUser ? 'ml-auto' : ''}`
+                          : `p-3 elev-rest ${isCurrentUser ? 'text-white ml-auto' : 'text-white'}`
+                      }`} style={message.messageType === 'poll' ? undefined : { backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}>
                         {!isCurrentUser && (
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
@@ -2528,7 +2528,7 @@ export default function Messages() {
                             )}
                           </div>
                         )}
-                        {message.messageType !== 'gif' && (
+                        {message.messageType !== 'gif' && message.messageType !== 'poll' && (
                           <p className="text-sm" data-testid={`text-message-content-${message.id}`}>
                             {message.content}
                           </p>
