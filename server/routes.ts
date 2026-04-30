@@ -14,6 +14,8 @@ import {
   requirePremiumFeatures,
   requireSpecialPermission,
   roleHierarchy,
+  canManageLeagueSpecific,
+  canAccessPremiumFeatures,
   getTournamentAccessState,
   requireTournamentAccessOpen,
   canManageTournamentSpecific,
@@ -5088,6 +5090,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching league members for scrimmage:", error);
       res.status(500).json({ message: "Failed to fetch league members" });
+    }
+  });
+
+  // Players who can be invoiced in a league: real members + every placeholder
+  // (both `@placeholder.roster` users and team-scoped placeholder players).
+  // Accessible to league commissioners or globally to player_pro+.
+  app.get("/api/leagues/:id/invoiceable-players", isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.id;
+      const userId = req.user.claims.sub;
+      const userWithPermissions = req.userWithPermissions;
+      if (!userWithPermissions) {
+        return res.status(401).json({ message: "User permissions not loaded" });
+      }
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const membership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: "You must be an approved member of this league" });
+      }
+
+      const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
+      const isPremium = canAccessPremiumFeatures(userWithPermissions);
+      if (!isLeagueCommissioner && !isPremium) {
+        return res.status(403).json({
+          message: "Creating invoices requires Player Pro or commissioner permissions",
+        });
+      }
+
+      const players = await storage.getInvoiceablePlayersForLeague(leagueId);
+      const usersList = players.filter(p => p.type === 'user');
+      const placeholdersList = players.filter(p => p.type === 'placeholder');
+      res.json({ users: usersList, placeholders: placeholdersList });
+    } catch (error) {
+      console.error("Error fetching invoiceable players:", error);
+      res.status(500).json({ message: "Failed to fetch invoiceable players" });
     }
   });
 
@@ -16686,12 +16728,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Payment request routes
   // Create a new payment request
-  app.post('/api/payment-requests', isAuthenticated, async (req: any, res) => {
+  app.post('/api/payment-requests', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+      const userWithPermissions = req.userWithPermissions;
+      if (!userWithPermissions) {
+        return res.status(401).json({ message: "User permissions not loaded" });
+      }
+
       // Validate request body using Zod schema
       const validatedData = createPaymentRequestSchema.parse(req.body);
+      const { leagueId } = validatedData;
+
+      // 1) The creator must be an approved member of the target league.
+      const creatorMembership = await storage.getUserLeagueMembership(userId, leagueId);
+      if (!creatorMembership || creatorMembership.status !== 'approved') {
+        return res.status(403).json({
+          message: "You must be an approved member of this league to create invoices",
+        });
+      }
+
+      // 2) Creator must be commissioner of THIS league or globally player_pro+.
+      const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
+      const isPremium = canAccessPremiumFeatures(userWithPermissions);
+      if (!isLeagueCommissioner && !isPremium) {
+        return res.status(403).json({
+          message: "Creating invoices requires Player Pro or commissioner permissions",
+        });
+      }
+
+      // 3) Validate every recipient belongs to this league. The
+      //    invoiceable-players query is the source of truth.
+      const allowedPlayers = await storage.getInvoiceablePlayersForLeague(leagueId);
+      const allowedUserIds = new Set(allowedPlayers.filter(p => p.type === 'user').map(p => p.id));
+      const allowedPlaceholderIds = new Set(allowedPlayers.filter(p => p.type === 'placeholder').map(p => p.id));
+      for (const id of validatedData.recipientUserIds) {
+        if (!allowedUserIds.has(id)) {
+          return res.status(400).json({ message: `Recipient ${id} is not a member of this league` });
+        }
+      }
+      for (const id of validatedData.placeholderPlayerIds) {
+        if (!allowedPlaceholderIds.has(id)) {
+          return res.status(400).json({ message: `Placeholder ${id} does not belong to this league` });
+        }
+      }
 
       const paymentRequest = await storage.createPaymentRequest({
         creatorId: userId,
@@ -16701,7 +16781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deadline: validatedData.deadline || null,
         relatedScrimmageId: validatedData.relatedScrimmageId || null,
         relatedConversationId: validatedData.relatedConversationId || null,
-      }, validatedData.recipientUserIds);
+      }, validatedData.recipientUserIds, validatedData.placeholderPlayerIds);
 
       // Send push notifications to recipients (async, don't wait)
       (async () => {

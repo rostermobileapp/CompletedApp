@@ -394,11 +394,16 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
                   <span className="text-xs font-semibold">
-                    {recipient.user.firstName?.[0]}{recipient.user.lastName?.[0]}
+                    {(recipient.user?.firstName || recipient.placeholderPlayer?.firstName)?.[0]}
+                    {(recipient.user?.lastName || recipient.placeholderPlayer?.lastName)?.[0]}
                   </span>
                 </div>
                 <span className="text-sm">
-                  {recipient.user.firstName} {recipient.user.lastName}
+                  {recipient.user
+                    ? `${recipient.user.firstName ?? ''} ${recipient.user.lastName ?? ''}`.trim()
+                    : recipient.placeholderPlayer
+                      ? `${recipient.placeholderPlayer.firstName} ${recipient.placeholderPlayer.lastName} (Placeholder)`
+                      : 'Unknown'}
                 </span>
               </div>
               {recipient.isPaid ? (

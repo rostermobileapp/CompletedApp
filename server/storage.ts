@@ -252,6 +252,30 @@ async function generateUniqueTeamId(): Promise<string> {
   throw new Error('Failed to generate unique team ID after maximum attempts');
 }
 
+// Recipient row hydrated with either the real user or the placeholder player.
+// Exactly one of `user` / `placeholderPlayer` is populated for any given row.
+export type HydratedPaymentRequestRecipient = PaymentRequestRecipient & {
+  user: User | null;
+  placeholderPlayer: PlaceholderPlayer | null;
+};
+
+// A player who can receive an invoice in a given league. Real users and
+// team-scoped placeholder players are merged into a single shape so the UI
+// can render them together with a team filter.
+export type InvoiceablePlayer = {
+  type: 'user' | 'placeholder';
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string;
+  profileImageUrl: string | null;
+  venmoUsername: string | null;
+  cashappUsername: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  isPlaceholderUser: boolean; // true for @placeholder.roster users
+};
+
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
@@ -598,16 +622,18 @@ export interface IStorage {
   createFeedbackSubmission(feedbackData: InsertFeedbackSubmission): Promise<FeedbackSubmission>;
   
   // Payment request operations
-  createPaymentRequest(paymentRequest: InsertPaymentRequest, recipientUserIds: string[]): Promise<PaymentRequest>;
-  getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] }) | undefined>;
-  getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
-  getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
-  getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
-  getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]>;
+  createPaymentRequest(paymentRequest: InsertPaymentRequest, recipientUserIds: string[], placeholderPlayerIds?: string[]): Promise<PaymentRequest>;
+  getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] }) | undefined>;
+  getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: HydratedPaymentRequestRecipient[] })[]>;
+  getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
+  getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
+  getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
   updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient>;
   confirmPaymentRequestRecipient(recipientId: string, isConfirmed: boolean): Promise<PaymentRequestRecipient>;
   deletePaymentRequest(id: string): Promise<void>;
   getUnpaidPaymentRequestCount(userId: string): Promise<number>;
+  getInvoiceablePlayersForLeague(leagueId: string): Promise<InvoiceablePlayer[]>;
+  transferInvoicesFromPlaceholderToUser(placeholderPlayerId: string, userId: string): Promise<number>;
   
   // User payment methods
   updateUserPaymentMethods(userId: string, paymentMethods: { venmoUsername?: string; cashappUsername?: string }): Promise<User>;
@@ -2696,7 +2722,40 @@ export class DatabaseStorage implements IStorage {
           status: 'approved', // Manually added players are auto-approved
         })
         .returning();
-      
+
+      // If there's already a name-matching team-scoped placeholder on this
+      // team, treat this as a "claim": transfer their outstanding invoices
+      // to the real user and remove the placeholder so the team roster
+      // doesn't have duplicates. To avoid over-claiming when two different
+      // people share a name, also require the email to match when the
+      // placeholder has an email set.
+      try {
+        const matchingPlaceholders = await db
+          .select()
+          .from(placeholderPlayers)
+          .where(and(
+            eq(placeholderPlayers.teamId, teamId),
+            sql`LOWER(${placeholderPlayers.firstName}) = LOWER(${firstName})`,
+            sql`LOWER(${placeholderPlayers.lastName}) = LOWER(${lastName})`,
+          ));
+        for (const ph of matchingPlaceholders) {
+          // Only claim when we have positive evidence the placeholder refers
+          // to this user. A placeholder with an email is a strong identifier;
+          // if it doesn't match the new user's email (or the new user has no
+          // email at all), skip to avoid silently moving someone else's
+          // invoices.
+          if (ph.email) {
+            if (!email || ph.email.toLowerCase() !== email.toLowerCase()) {
+              continue;
+            }
+          }
+          await this.transferInvoicesFromPlaceholderToUser(ph.id, user.id);
+          await db.delete(placeholderPlayers).where(eq(placeholderPlayers.id, ph.id));
+        }
+      } catch (error) {
+        console.error('Error transferring placeholder data to real user:', error);
+      }
+
       // Sync team chat participants after adding player
       try {
         // Get team to find league ID
@@ -9579,6 +9638,97 @@ export class DatabaseStorage implements IStorage {
           sql`${gamePenalties.gameId} IN (SELECT id FROM ${games} WHERE league_id = ${leagueId})`
         ));
 
+      // 4b. Transfer payment request recipients from fromUser → toUser within
+      // this league. We scope by:
+      //   • requests created by a member of this league, OR
+      //   • requests linked to a scrimmage in this league, OR
+      //   • requests linked to a conversation that belongs to a team in this league.
+      // For each transferable row, if the toUser is already a recipient on the
+      // same payment request, delete the duplicate; otherwise re-point userId.
+      const fromRecipientRows = await tx
+        .select({
+          id: paymentRequestRecipients.id,
+          paymentRequestId: paymentRequestRecipients.paymentRequestId,
+          creatorId: paymentRequests.creatorId,
+          relatedScrimmageId: paymentRequests.relatedScrimmageId,
+          relatedConversationId: paymentRequests.relatedConversationId,
+        })
+        .from(paymentRequestRecipients)
+        .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
+        .where(eq(paymentRequestRecipients.userId, fromUserId));
+
+      if (fromRecipientRows.length > 0) {
+        // Build the set of "in-league" payment requests.
+        const leagueMemberUserIds = new Set(
+          (await tx
+            .select({ userId: leagueMemberships.userId })
+            .from(leagueMemberships)
+            .where(eq(leagueMemberships.leagueId, leagueId))
+          ).map(r => r.userId),
+        );
+        const scrimmageIds = fromRecipientRows
+          .map(r => r.relatedScrimmageId)
+          .filter((id): id is string => Boolean(id));
+        const inLeagueScrimmageIds = scrimmageIds.length > 0
+          ? new Set((await tx
+              .select({ id: scrimmages.id })
+              .from(scrimmages)
+              .where(and(
+                inArray(scrimmages.id, scrimmageIds),
+                eq(scrimmages.leagueId, leagueId),
+              ))).map(r => r.id))
+          : new Set<string>();
+        const conversationIds = fromRecipientRows
+          .map(r => r.relatedConversationId)
+          .filter((id): id is string => Boolean(id));
+        const inLeagueConversationIds = conversationIds.length > 0
+          ? new Set((await tx
+              .select({ id: conversations.id })
+              .from(conversations)
+              .leftJoin(teams, eq(conversations.teamId, teams.id))
+              .where(and(
+                inArray(conversations.id, conversationIds),
+                or(
+                  eq(conversations.leagueId, leagueId),
+                  eq(teams.leagueId, leagueId),
+                )!,
+              ))).map(r => r.id))
+          : new Set<string>();
+
+        const transferableRows = fromRecipientRows.filter(r =>
+          leagueMemberUserIds.has(r.creatorId) ||
+          (r.relatedScrimmageId && inLeagueScrimmageIds.has(r.relatedScrimmageId)) ||
+          (r.relatedConversationId && inLeagueConversationIds.has(r.relatedConversationId)),
+        );
+
+        if (transferableRows.length > 0) {
+          const transferableRequestIds = transferableRows.map(r => r.paymentRequestId);
+          const existingForToUser = await tx
+            .select({ paymentRequestId: paymentRequestRecipients.paymentRequestId })
+            .from(paymentRequestRecipients)
+            .where(and(
+              inArray(paymentRequestRecipients.paymentRequestId, transferableRequestIds),
+              eq(paymentRequestRecipients.userId, toUserId),
+            ));
+          const dupSet = new Set(existingForToUser.map(r => r.paymentRequestId));
+
+          const dupIds = transferableRows.filter(r => dupSet.has(r.paymentRequestId)).map(r => r.id);
+          if (dupIds.length > 0) {
+            await tx
+              .delete(paymentRequestRecipients)
+              .where(inArray(paymentRequestRecipients.id, dupIds));
+          }
+
+          const moveIds = transferableRows.filter(r => !dupSet.has(r.paymentRequestId)).map(r => r.id);
+          if (moveIds.length > 0) {
+            await tx
+              .update(paymentRequestRecipients)
+              .set({ userId: toUserId, updatedAt: new Date() })
+              .where(inArray(paymentRequestRecipients.id, moveIds));
+          }
+        }
+      }
+
       // 5. Merge league membership data
       // Determine which membership was approved (prefer the approved one for status/timing)
       const approvedMembership = fromMembership.status === 'approved' ? fromMembership 
@@ -10191,28 +10341,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Payment request operations
-  async createPaymentRequest(paymentRequest: InsertPaymentRequest, recipientUserIds: string[]): Promise<PaymentRequest> {
+  async createPaymentRequest(
+    paymentRequest: InsertPaymentRequest,
+    recipientUserIds: string[],
+    placeholderPlayerIds: string[] = [],
+  ): Promise<PaymentRequest> {
     return await db.transaction(async (tx) => {
       const [newPaymentRequest] = await tx
         .insert(paymentRequests)
         .values(paymentRequest)
         .returning();
 
-      if (recipientUserIds.length > 0) {
-        await tx.insert(paymentRequestRecipients).values(
-          recipientUserIds.map(userId => ({
-            paymentRequestId: newPaymentRequest.id,
-            userId,
-            isPaid: false,
-          }))
-        );
+      const rows: { paymentRequestId: string; userId?: string; placeholderPlayerId?: string; isPaid: boolean }[] = [];
+      const seenUsers = new Set<string>();
+      for (const userId of recipientUserIds) {
+        if (!userId || seenUsers.has(userId)) continue;
+        seenUsers.add(userId);
+        rows.push({ paymentRequestId: newPaymentRequest.id, userId, isPaid: false });
+      }
+      const seenPlaceholders = new Set<string>();
+      for (const placeholderPlayerId of placeholderPlayerIds) {
+        if (!placeholderPlayerId || seenPlaceholders.has(placeholderPlayerId)) continue;
+        seenPlaceholders.add(placeholderPlayerId);
+        rows.push({ paymentRequestId: newPaymentRequest.id, placeholderPlayerId, isPaid: false });
+      }
+      if (rows.length > 0) {
+        await tx.insert(paymentRequestRecipients).values(rows);
       }
 
       return newPaymentRequest;
     });
   }
 
-  async getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] }) | undefined> {
+  // Internal helper: load recipients for a request and hydrate either the
+  // user or placeholder player on each row. Exactly one of those is populated.
+  private async hydrateRecipientsForRequest(requestId: string): Promise<HydratedPaymentRequestRecipient[]> {
+    const rows = await db
+      .select()
+      .from(paymentRequestRecipients)
+      .leftJoin(users, eq(paymentRequestRecipients.userId, users.id))
+      .leftJoin(placeholderPlayers, eq(paymentRequestRecipients.placeholderPlayerId, placeholderPlayers.id))
+      .where(eq(paymentRequestRecipients.paymentRequestId, requestId));
+
+    return rows.map(r => ({
+      ...r.payment_request_recipients,
+      user: r.users ?? null,
+      placeholderPlayer: r.placeholder_players ?? null,
+    }));
+  }
+
+  async getPaymentRequest(id: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] }) | undefined> {
     const [paymentRequest] = await db
       .select()
       .from(paymentRequests)
@@ -10225,16 +10403,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.id, paymentRequest.creatorId));
 
-    const recipientsResult = await db
-      .select()
-      .from(paymentRequestRecipients)
-      .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
-      .where(eq(paymentRequestRecipients.paymentRequestId, id));
-
-    const recipients = recipientsResult.map(r => ({
-      ...r.payment_request_recipients,
-      user: r.users,
-    }));
+    const recipients = await this.hydrateRecipientsForRequest(id);
 
     return {
       ...paymentRequest,
@@ -10243,7 +10412,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+  async getPaymentRequestsByCreator(creatorId: string): Promise<(PaymentRequest & { recipients: HydratedPaymentRequestRecipient[] })[]> {
     const requests = await db
       .select()
       .from(paymentRequests)
@@ -10252,16 +10421,7 @@ export class DatabaseStorage implements IStorage {
 
     return Promise.all(
       requests.map(async (request) => {
-        const recipientsResult = await db
-          .select()
-          .from(paymentRequestRecipients)
-          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
-          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
-
-        const recipients = recipientsResult.map(r => ({
-          ...r.payment_request_recipients,
-          user: r.users,
-        }));
+        const recipients = await this.hydrateRecipientsForRequest(request.id);
 
         // Hydrate leagueId and teamId from related scrimmage or conversation
         let leagueId: string | null = null;
@@ -10300,33 +10460,43 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Fallback: if no direct links, derive from recipients' team memberships
-        // Find teams that ALL recipients are members of (common teams)
+        // Find teams that ALL recipients are members of (common teams). For
+        // placeholder-only recipients we use the placeholder's team directly.
         if (!leagueId && !teamId && recipients.length > 0) {
-          const recipientUserIds = recipients.map(r => r.userId);
-          
-          // Get all team memberships for all recipients
-          const allMemberships = await db
+          const recipientUserIds = recipients
+            .map(r => r.userId)
+            .filter((id): id is string => Boolean(id));
+          const placeholderTeamIds = recipients
+            .map(r => r.placeholderPlayer?.teamId)
+            .filter((id): id is string => Boolean(id));
+
+          // Get all team memberships for all real-user recipients
+          const allMemberships = recipientUserIds.length > 0 ? await db
             .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId, leagueId: teams.leagueId })
             .from(teamMemberships)
             .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-            .where(inArray(teamMemberships.userId, recipientUserIds));
-          
+            .where(inArray(teamMemberships.userId, recipientUserIds)) : [];
+
           // Group by team and count how many recipients are in each team
           const teamCounts = new Map<string, { count: number; leagueId: string | null }>();
           for (const m of allMemberships) {
             const existing = teamCounts.get(m.teamId) || { count: 0, leagueId: m.leagueId };
             teamCounts.set(m.teamId, { count: existing.count + 1, leagueId: m.leagueId });
           }
-          
+          for (const tId of placeholderTeamIds) {
+            const existing = teamCounts.get(tId) || { count: 0, leagueId: null };
+            teamCounts.set(tId, { count: existing.count + 1, leagueId: existing.leagueId });
+          }
+
           // Find the first team where ALL recipients are members
           for (const [tId, data] of teamCounts) {
-            if (data.count >= recipientUserIds.length) {
+            if (data.count >= recipients.length) {
               teamId = tId;
               leagueId = data.leagueId;
               break;
             }
           }
-          
+
           // If no common team, try to find a common league
           if (!leagueId) {
             const leagueCounts = new Map<string, number>();
@@ -10354,7 +10524,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[]; leagueId?: string | null; teamId?: string | null })[]> {
+  async getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[]; leagueId?: string | null; teamId?: string | null })[]> {
     const recipientEntries = await db
       .select()
       .from(paymentRequestRecipients)
@@ -10377,16 +10547,7 @@ export class DatabaseStorage implements IStorage {
           .from(users)
           .where(eq(users.id, request.creatorId));
 
-        const recipientsResult = await db
-          .select()
-          .from(paymentRequestRecipients)
-          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
-          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
-
-        const recipients = recipientsResult.map(r => ({
-          ...r.payment_request_recipients,
-          user: r.users,
-        }));
+        const recipients = await this.hydrateRecipientsForRequest(request.id);
 
         // Hydrate leagueId and teamId from related scrimmage or conversation
         let leagueId: string | null = null;
@@ -10427,34 +10588,39 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Fallback: if no direct links, derive from recipients' team memberships
-        // Find teams that ALL recipients are members of (common teams)
+        // (placeholders use their own teamId directly).
         if (!leagueId && !teamId && recipients.length > 0) {
-          const recipientUserIds = recipients.map(r => r.userId);
-          
-          // Get all team memberships for all recipients
-          const allMemberships = await db
+          const recipientUserIds = recipients
+            .map(r => r.userId)
+            .filter((id): id is string => Boolean(id));
+          const placeholderTeamIds = recipients
+            .map(r => r.placeholderPlayer?.teamId)
+            .filter((id): id is string => Boolean(id));
+
+          const allMemberships = recipientUserIds.length > 0 ? await db
             .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId, leagueId: teams.leagueId })
             .from(teamMemberships)
             .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-            .where(inArray(teamMemberships.userId, recipientUserIds));
-          
-          // Group by team and count how many recipients are in each team
+            .where(inArray(teamMemberships.userId, recipientUserIds)) : [];
+
           const teamCounts = new Map<string, { count: number; leagueId: string | null }>();
           for (const m of allMemberships) {
             const existing = teamCounts.get(m.teamId) || { count: 0, leagueId: m.leagueId };
             teamCounts.set(m.teamId, { count: existing.count + 1, leagueId: m.leagueId });
           }
-          
-          // Find the first team where ALL recipients are members
+          for (const tId of placeholderTeamIds) {
+            const existing = teamCounts.get(tId) || { count: 0, leagueId: null };
+            teamCounts.set(tId, { count: existing.count + 1, leagueId: existing.leagueId });
+          }
+
           for (const [tId, data] of teamCounts) {
-            if (data.count >= recipientUserIds.length) {
+            if (data.count >= recipients.length) {
               teamId = tId;
               leagueId = data.leagueId;
               break;
             }
           }
-          
-          // If no common team, try to find a common league
+
           if (!leagueId) {
             const leagueCounts = new Map<string, number>();
             for (const m of allMemberships) {
@@ -10482,7 +10648,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+  async getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]> {
     const requests = await db
       .select()
       .from(paymentRequests)
@@ -10496,16 +10662,7 @@ export class DatabaseStorage implements IStorage {
           .from(users)
           .where(eq(users.id, request.creatorId));
 
-        const recipientsResult = await db
-          .select()
-          .from(paymentRequestRecipients)
-          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
-          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
-
-        const recipients = recipientsResult.map(r => ({
-          ...r.payment_request_recipients,
-          user: r.users,
-        }));
+        const recipients = await this.hydrateRecipientsForRequest(request.id);
 
         return {
           ...request,
@@ -10516,7 +10673,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: (PaymentRequestRecipient & { user: User })[] })[]> {
+  async getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]> {
     const requests = await db
       .select()
       .from(paymentRequests)
@@ -10530,16 +10687,7 @@ export class DatabaseStorage implements IStorage {
           .from(users)
           .where(eq(users.id, request.creatorId));
 
-        const recipientsResult = await db
-          .select()
-          .from(paymentRequestRecipients)
-          .innerJoin(users, eq(paymentRequestRecipients.userId, users.id))
-          .where(eq(paymentRequestRecipients.paymentRequestId, request.id));
-
-        const recipients = recipientsResult.map(r => ({
-          ...r.payment_request_recipients,
-          user: r.users,
-        }));
+        const recipients = await this.hydrateRecipientsForRequest(request.id);
 
         return {
           ...request,
@@ -10595,6 +10743,134 @@ export class DatabaseStorage implements IStorage {
       );
     
     return unpaidRecipients.length;
+  }
+
+  // Returns every player a commissioner / Player Pro can invoice in a league:
+  // approved league members (real users + @placeholder.roster users created
+  // via CSV import) plus team-scoped placeholder players whose team belongs
+  // to this league.
+  async getInvoiceablePlayersForLeague(leagueId: string): Promise<InvoiceablePlayer[]> {
+    // 1) Approved league members joined to users + their assigned team.
+    const memberRows = await db
+      .select({
+        userId: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+        venmoUsername: users.venmoUsername,
+        cashappUsername: users.cashappUsername,
+        displayFirstName: leagueMemberships.displayFirstName,
+        displayLastName: leagueMemberships.displayLastName,
+        assignedTeamId: leagueMemberships.assignedTeamId,
+        teamName: teams.name,
+      })
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .leftJoin(teams, eq(leagueMemberships.assignedTeamId, teams.id))
+      .where(and(
+        eq(leagueMemberships.leagueId, leagueId),
+        eq(leagueMemberships.status, 'approved'),
+      ));
+
+    const userPlayers: InvoiceablePlayer[] = memberRows.map(r => {
+      const first = r.displayFirstName || r.firstName || '';
+      const last = r.displayLastName || r.lastName || '';
+      const display = `${first} ${last}`.trim() || (r.email ?? 'Unknown player');
+      return {
+        type: 'user' as const,
+        id: r.userId,
+        firstName: first || null,
+        lastName: last || null,
+        displayName: display,
+        profileImageUrl: r.profileImageUrl ?? null,
+        venmoUsername: r.venmoUsername ?? null,
+        cashappUsername: r.cashappUsername ?? null,
+        teamId: r.assignedTeamId ?? null,
+        teamName: r.teamName ?? null,
+        isPlaceholderUser: r.email?.endsWith('@placeholder.roster') ?? false,
+      };
+    });
+
+    // 2) Team-scoped placeholder players whose team belongs to this league.
+    const placeholderRows = await db
+      .select({
+        id: placeholderPlayers.id,
+        firstName: placeholderPlayers.firstName,
+        lastName: placeholderPlayers.lastName,
+        teamId: placeholderPlayers.teamId,
+        teamName: teams.name,
+      })
+      .from(placeholderPlayers)
+      .innerJoin(teams, eq(placeholderPlayers.teamId, teams.id))
+      .where(eq(teams.leagueId, leagueId));
+
+    const placeholderPlayersList: InvoiceablePlayer[] = placeholderRows.map(r => ({
+      type: 'placeholder' as const,
+      id: r.id,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      displayName: `${r.firstName} ${r.lastName}`.trim(),
+      profileImageUrl: null,
+      venmoUsername: null,
+      cashappUsername: null,
+      teamId: r.teamId,
+      teamName: r.teamName ?? null,
+      isPlaceholderUser: true,
+    }));
+
+    return [...userPlayers, ...placeholderPlayersList];
+  }
+
+  // Move every payment-request-recipient row pointing at this placeholder to
+  // the given user. If the same payment request already has the user as a
+  // recipient (e.g. they were invoiced both as a placeholder and personally),
+  // delete the placeholder row instead of duplicating. Returns the number of
+  // rows transferred.
+  async transferInvoicesFromPlaceholderToUser(placeholderPlayerId: string, userId: string): Promise<number> {
+    return await db.transaction(async (tx) => {
+      const placeholderRows = await tx
+        .select()
+        .from(paymentRequestRecipients)
+        .where(eq(paymentRequestRecipients.placeholderPlayerId, placeholderPlayerId));
+
+      if (placeholderRows.length === 0) return 0;
+
+      const requestIds = placeholderRows.map(r => r.paymentRequestId);
+      const existingForUser = await tx
+        .select({ paymentRequestId: paymentRequestRecipients.paymentRequestId })
+        .from(paymentRequestRecipients)
+        .where(and(
+          inArray(paymentRequestRecipients.paymentRequestId, requestIds),
+          eq(paymentRequestRecipients.userId, userId),
+        ));
+      const existingSet = new Set(existingForUser.map(r => r.paymentRequestId));
+
+      const conflictingIds = placeholderRows
+        .filter(r => existingSet.has(r.paymentRequestId))
+        .map(r => r.id);
+      if (conflictingIds.length > 0) {
+        await tx
+          .delete(paymentRequestRecipients)
+          .where(inArray(paymentRequestRecipients.id, conflictingIds));
+      }
+
+      const transferableIds = placeholderRows
+        .filter(r => !existingSet.has(r.paymentRequestId))
+        .map(r => r.id);
+      if (transferableIds.length > 0) {
+        await tx
+          .update(paymentRequestRecipients)
+          .set({
+            userId,
+            placeholderPlayerId: null,
+            updatedAt: new Date(),
+          })
+          .where(inArray(paymentRequestRecipients.id, transferableIds));
+      }
+
+      return transferableIds.length;
+    });
   }
 
   // User payment methods

@@ -235,12 +235,20 @@ export default function PaymentRequestDetail() {
                     <Avatar className="w-10 h-10">
                       <AvatarImage src={getImageUrl(recipient.user?.profileImageUrl) || ''} />
                       <AvatarFallback>
-                        {recipient.user?.firstName?.[0]}{recipient.user?.lastName?.[0]}
+                        {(recipient.user?.firstName || recipient.placeholderPlayer?.firstName)?.[0]}
+                        {(recipient.user?.lastName || recipient.placeholderPlayer?.lastName)?.[0]}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="font-medium">
-                        {recipient.user?.firstName} {recipient.user?.lastName}
+                        {recipient.user
+                          ? `${recipient.user.firstName ?? ''} ${recipient.user.lastName ?? ''}`.trim()
+                          : recipient.placeholderPlayer
+                            ? `${recipient.placeholderPlayer.firstName} ${recipient.placeholderPlayer.lastName}`
+                            : 'Unknown'}
+                        {!recipient.user && recipient.placeholderPlayer && (
+                          <span className="text-xs text-muted-foreground ml-2">(Placeholder)</span>
+                        )}
                         {isMe && <span className="text-xs text-muted-foreground ml-2">(You)</span>}
                       </p>
                       {(recipient.user?.venmoUsername || recipient.user?.cashappUsername) && (

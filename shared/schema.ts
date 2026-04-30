@@ -11,6 +11,7 @@ import {
   pgEnum,
   decimal,
   unique,
+  check,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1421,10 +1422,15 @@ export const paymentRequests = pgTable("payment_requests", {
 ]);
 
 // Payment request recipients table
+// Recipients can be either a registered user (userId) OR a team-scoped placeholder
+// player (placeholderPlayerId). Exactly one of the two FKs is set per row. When a
+// placeholder is later replaced/merged with a real user, the corresponding rows are
+// migrated from placeholderPlayerId → userId so the invoice follows the player.
 export const paymentRequestRecipients = pgTable("payment_request_recipients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   paymentRequestId: varchar("payment_request_id").references(() => paymentRequests.id).notNull(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  placeholderPlayerId: varchar("placeholder_player_id").references(() => placeholderPlayers.id, { onDelete: 'cascade' }),
   isPaid: boolean("is_paid").default(false).notNull(),
   paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
@@ -1433,9 +1439,17 @@ export const paymentRequestRecipients = pgTable("payment_request_recipients", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
+  // Each user / placeholder can only be a recipient once per request.
   unique("unique_payment_request_user").on(table.paymentRequestId, table.userId),
+  unique("unique_payment_request_placeholder").on(table.paymentRequestId, table.placeholderPlayerId),
+  // Exactly one of userId / placeholderPlayerId must be set.
+  check(
+    "payment_request_recipient_exactly_one_fk",
+    sql`(${table.userId} IS NOT NULL) <> (${table.placeholderPlayerId} IS NOT NULL)`,
+  ),
   index("idx_payment_request_recipients_request").on(table.paymentRequestId),
   index("idx_payment_request_recipients_user").on(table.userId),
+  index("idx_payment_request_recipients_placeholder").on(table.placeholderPlayerId),
 ]);
 
 // Line combinations enum
@@ -2783,8 +2797,15 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
 }).extend({
   // Keep datetime as string - stored as league-local time
   deadline: z.string().optional().nullable(),
-  recipientUserIds: z.array(z.string()).min(1, "At least one recipient is required"),
-});
+  // League the invoice belongs to. Required so the server can authorize the
+  // creator and validate that every recipient belongs to this league.
+  leagueId: z.string().min(1, "League is required"),
+  recipientUserIds: z.array(z.string()).default([]),
+  placeholderPlayerIds: z.array(z.string()).default([]),
+}).refine(
+  (data) => (data.recipientUserIds?.length ?? 0) + (data.placeholderPlayerIds?.length ?? 0) >= 1,
+  { message: "At least one recipient is required", path: ["recipientUserIds"] },
+);
 
 export const updatePaymentRequestRecipientSchema = z.object({
   isPaid: z.boolean(),

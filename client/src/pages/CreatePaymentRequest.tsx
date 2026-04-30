@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { setPageTransitionDirection } from '@/components/PageTransition';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
-import { ArrowLeft, DollarSign, Users } from 'lucide-react';
+import { ArrowLeft, DollarSign, Users, UserCircle2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { createPaymentRequestSchema } from '@shared/schema';
 import { z } from 'zod';
@@ -17,28 +16,67 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
 type CreatePaymentRequestForm = z.infer<typeof createPaymentRequestSchema>;
+
+type InvoiceableUser = {
+  type: 'user';
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string;
+  profileImageUrl: string | null;
+  venmoUsername: string | null;
+  cashappUsername: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  isPlaceholderUser: boolean;
+};
+
+type InvoiceablePlaceholder = {
+  type: 'placeholder';
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string;
+  profileImageUrl: null;
+  venmoUsername: null;
+  cashappUsername: null;
+  teamId: string | null;
+  teamName: string | null;
+  isPlaceholderUser: true;
+};
+
+type InvoiceablePayload = { users: InvoiceableUser[]; placeholders: InvoiceablePlaceholder[] };
+
+type TeamOption = { id: string; name: string };
+
+const FREE_AGENT_TEAM_VALUE = '__free_agents__';
+const ALL_TEAMS_VALUE = '__all__';
 
 export default function CreatePaymentRequest() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { closeWithSlideDown } = useSlideUpOverlay();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
-  const [showPremiumAlert, setShowPremiumAlert] = useState(false);
-  const { canAccessPremiumFeatures } = usePermissions();
+  const { selectedLeagueId, selectedTeamId } = useDashboardSelection();
 
-  const handlePremiumAlertClose = (open: boolean) => {
-    setShowPremiumAlert(open);
-    if (!open && !canAccessPremiumFeatures()) {
-      closeWithSlideDown('/payment-requests');
-    }
-  };
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedPlaceholderIds, setSelectedPlaceholderIds] = useState<string[]>([]);
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>(ALL_TEAMS_VALUE);
+  const [showPremiumAlert, setShowPremiumAlert] = useState(false);
+
+  const {
+    canAccessPremiumFeatures,
+    canManageLeagueSpecific,
+  } = usePermissions();
 
   const form = useForm<CreatePaymentRequestForm>({
     resolver: zodResolver(createPaymentRequestSchema),
@@ -47,66 +85,167 @@ export default function CreatePaymentRequest() {
       description: '',
       amountPerPerson: '',
       deadline: undefined,
+      leagueId: '',
       recipientUserIds: [],
+      placeholderPlayerIds: [],
       relatedScrimmageId: null,
       relatedConversationId: null,
     },
   });
 
-  // Check if user has premium access, show paywall if not
+  // Fetch user's leagues for fallback selection.
+  const { data: userLeagues = [], isLoading: leaguesLoading } = useQuery<any[]>({
+    queryKey: ['/api/user/leagues'],
+  });
+
+  // Fetch teams to look up team's parent league when dashboard selection is a team.
+  const { data: userTeams = [] } = useQuery<any[]>({
+    queryKey: ['/api/user/teams'],
+  });
+
+  // Resolve which league this invoice belongs to.
+  const activeLeagueId = useMemo<string | null>(() => {
+    if (selectedLeagueId) return selectedLeagueId;
+    if (selectedTeamId) {
+      const t = userTeams.find((t: any) => t.id === selectedTeamId);
+      if (t?.leagueId) return t.leagueId;
+    }
+    if (userLeagues.length > 0) return userLeagues[0].id;
+    return null;
+  }, [selectedLeagueId, selectedTeamId, userTeams, userLeagues]);
+
+  // Permission check: must be league commissioner OR globally player_pro+.
+  const isLeagueCommissionerOfActive = activeLeagueId
+    ? canManageLeagueSpecific(activeLeagueId)
+    : false;
+  const isPremium = canAccessPremiumFeatures();
+  const canCreate = isPremium || isLeagueCommissionerOfActive;
+
+  // If the user can't create, show paywall.
   useEffect(() => {
-    if (!canAccessPremiumFeatures()) {
+    if (!leaguesLoading && !canCreate) {
       setShowPremiumAlert(true);
     }
-  }, [canAccessPremiumFeatures]);
+  }, [leaguesLoading, canCreate]);
 
-  // Pre-fill form from URL query parameters
+  // Keep the form's leagueId in sync with the active dashboard league
+  // so Zod validation passes the required-field check.
+  useEffect(() => {
+    if (activeLeagueId) {
+      form.setValue('leagueId', activeLeagueId);
+    }
+  }, [activeLeagueId, form]);
+
+  const handlePremiumAlertClose = (open: boolean) => {
+    setShowPremiumAlert(open);
+    if (!open && !canCreate) {
+      closeWithSlideDown('/payment-requests');
+    }
+  };
+
+  // Fetch teams for the team filter dropdown.
+  const { data: leagueTeams = [] } = useQuery<TeamOption[]>({
+    queryKey: ['/api/leagues', activeLeagueId, 'teams'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/leagues/${activeLeagueId}/teams`);
+      return res.json();
+    },
+    enabled: !!activeLeagueId && canCreate,
+  });
+
+  // Fetch invoiceable players for the active league.
+  const { data: invoiceable, isLoading: playersLoading } = useQuery<InvoiceablePayload>({
+    queryKey: ['/api/leagues', activeLeagueId, 'invoiceable-players'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/leagues/${activeLeagueId}/invoiceable-players`);
+      return res.json();
+    },
+    enabled: !!activeLeagueId && canCreate,
+  });
+
+  // Pre-fill form from URL query params after first render.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const title = params.get('title');
     const amount = params.get('amount');
     const relatedScrimmageId = params.get('relatedScrimmageId');
     const recipientIds = params.get('recipientIds');
-
-    if (title) {
-      form.setValue('title', title);
-    }
-    if (amount) {
-      form.setValue('amountPerPerson', amount);
-    }
-    if (relatedScrimmageId) {
-      form.setValue('relatedScrimmageId', relatedScrimmageId);
-    }
+    if (title) form.setValue('title', title);
+    if (amount) form.setValue('amountPerPerson', amount);
+    if (relatedScrimmageId) form.setValue('relatedScrimmageId', relatedScrimmageId);
     if (recipientIds) {
-      const ids = recipientIds.split(',');
-      setSelectedRecipientIds(ids);
+      const ids = recipientIds.split(',').filter(Boolean);
+      setSelectedUserIds(ids);
       form.setValue('recipientUserIds', ids);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch user's leagues to get league members
-  const { data: userLeagues = [], isLoading: leaguesLoading } = useQuery({
-    queryKey: ['/api/user/leagues'],
-  });
+  // Combined and filtered invoiceable list.
+  const allPlayers = useMemo(() => {
+    if (!invoiceable) return [];
+    return [
+      ...invoiceable.users,
+      ...invoiceable.placeholders,
+    ];
+  }, [invoiceable]);
 
-  // Fetch league members for the selected league
-  const selectedLeague = (userLeagues as any[])?.[0]; // Use first league for now
-  const { data: leagueMembers = [], isLoading: membersLoading } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
-    enabled: !!selectedLeague?.id,
-  });
+  const filteredPlayers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return allPlayers.filter(p => {
+      // Team filter
+      if (selectedTeamFilter === FREE_AGENT_TEAM_VALUE) {
+        if (p.teamId) return false;
+      } else if (selectedTeamFilter !== ALL_TEAMS_VALUE) {
+        if (p.teamId !== selectedTeamFilter) return false;
+      }
+      if (!q) return true;
+      return p.displayName.toLowerCase().includes(q);
+    });
+  }, [allPlayers, selectedTeamFilter, searchTerm]);
 
-  // Filter members based on search term
-  const filteredMembers = (leagueMembers as any[]).filter((member: any) => 
-    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const totalSelected = selectedUserIds.length + selectedPlaceholderIds.length;
+
+  const togglePlayer = (player: InvoiceableUser | InvoiceablePlaceholder) => {
+    if (player.type === 'user') {
+      const next = selectedUserIds.includes(player.id)
+        ? selectedUserIds.filter(id => id !== player.id)
+        : [...selectedUserIds, player.id];
+      setSelectedUserIds(next);
+      form.setValue('recipientUserIds', next);
+      form.trigger('recipientUserIds');
+    } else {
+      const next = selectedPlaceholderIds.includes(player.id)
+        ? selectedPlaceholderIds.filter(id => id !== player.id)
+        : [...selectedPlaceholderIds, player.id];
+      setSelectedPlaceholderIds(next);
+      form.setValue('placeholderPlayerIds', next);
+      form.trigger('placeholderPlayerIds');
+    }
+  };
+
+  const selectAllVisible = () => {
+    const userIds = filteredPlayers.filter(p => p.type === 'user').map(p => p.id);
+    const phIds = filteredPlayers.filter(p => p.type === 'placeholder').map(p => p.id);
+    const mergedUsers = Array.from(new Set([...selectedUserIds, ...userIds]));
+    const mergedPh = Array.from(new Set([...selectedPlaceholderIds, ...phIds]));
+    setSelectedUserIds(mergedUsers);
+    setSelectedPlaceholderIds(mergedPh);
+    form.setValue('recipientUserIds', mergedUsers);
+    form.setValue('placeholderPlayerIds', mergedPh);
+    form.trigger('recipientUserIds');
+  };
+
+  const deselectAll = () => {
+    setSelectedUserIds([]);
+    setSelectedPlaceholderIds([]);
+    form.setValue('recipientUserIds', []);
+    form.setValue('placeholderPlayerIds', []);
+    form.trigger('recipientUserIds');
+  };
 
   const createPaymentRequestMutation = useMutation({
     mutationFn: async (data: CreatePaymentRequestForm) => {
-      if (!selectedLeague?.id) {
-        throw new Error('No league available. Please join a league first.');
-      }
-
       const response = await apiRequest('POST', '/api/payment-requests', data);
       return response.json();
     },
@@ -129,42 +268,28 @@ export default function CreatePaymentRequest() {
   });
 
   const onSubmit = (data: CreatePaymentRequestForm) => {
-    if (selectedRecipientIds.length === 0) {
+    if (totalSelected === 0) {
       form.setError('recipientUserIds', {
         type: 'required',
-        message: 'Please select at least one recipient'
+        message: 'Please select at least one recipient',
+      });
+      return;
+    }
+    if (!activeLeagueId) {
+      toast({
+        title: 'No league selected',
+        description: 'Please select a league before creating a payment request.',
+        variant: 'destructive',
       });
       return;
     }
 
-    const formData = { 
-      ...data, 
-      recipientUserIds: selectedRecipientIds 
-    };
-    createPaymentRequestMutation.mutate(formData);
-  };
-
-  const toggleRecipientSelection = (memberId: string) => {
-    const newSelection = selectedRecipientIds.includes(memberId) 
-      ? selectedRecipientIds.filter(id => id !== memberId)
-      : [...selectedRecipientIds, memberId];
-    
-    setSelectedRecipientIds(newSelection);
-    form.setValue('recipientUserIds', newSelection);
-    form.trigger('recipientUserIds');
-  };
-
-  const selectAllRecipients = () => {
-    const allMemberIds = filteredMembers.map((member: any) => member.user.id);
-    setSelectedRecipientIds(allMemberIds);
-    form.setValue('recipientUserIds', allMemberIds);
-    form.trigger('recipientUserIds');
-  };
-
-  const deselectAllRecipients = () => {
-    setSelectedRecipientIds([]);
-    form.setValue('recipientUserIds', []);
-    form.trigger('recipientUserIds');
+    createPaymentRequestMutation.mutate({
+      ...data,
+      leagueId: activeLeagueId,
+      recipientUserIds: selectedUserIds,
+      placeholderPlayerIds: selectedPlaceholderIds,
+    });
   };
 
   return (
@@ -172,7 +297,7 @@ export default function CreatePaymentRequest() {
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
-          <button 
+          <button
             onClick={() => closeWithSlideDown('/payment-requests')}
             className="text-muted-foreground"
             data-testid="button-back"
@@ -255,11 +380,11 @@ export default function CreatePaymentRequest() {
                 <h2 className="text-lg font-semibold">Select Recipients *</h2>
               </div>
               <span className="text-sm text-muted-foreground" data-testid="text-selected-count">
-                {selectedRecipientIds.length} selected
+                {totalSelected} selected
               </span>
             </div>
 
-            {!selectedLeague ? (
+            {!activeLeagueId ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Please join a league first to create payment requests.</p>
                 <Button
@@ -271,17 +396,34 @@ export default function CreatePaymentRequest() {
                   Find Leagues
                 </Button>
               </div>
-            ) : membersLoading ? (
+            ) : playersLoading ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Loading league members...</p>
               </div>
             ) : (
               <>
+                {/* Team filter */}
+                <div className="mb-4">
+                  <Label className="text-sm text-muted-foreground">Filter by team</Label>
+                  <Select value={selectedTeamFilter} onValueChange={setSelectedTeamFilter}>
+                    <SelectTrigger className="mt-1" data-testid="select-team-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_TEAMS_VALUE}>All teams</SelectItem>
+                      <SelectItem value={FREE_AGENT_TEAM_VALUE}>Free agents (no team)</SelectItem>
+                      {leagueTeams.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Search Bar */}
                 <div className="mb-4">
                   <Input
                     type="text"
-                    placeholder="Search members..."
+                    placeholder="Search players..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     data-testid="input-search-recipients"
@@ -294,98 +436,118 @@ export default function CreatePaymentRequest() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={selectAllRecipients}
+                    onClick={selectAllVisible}
                     data-testid="button-select-all"
                   >
-                    Select All
+                    Select All Visible
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={deselectAllRecipients}
+                    onClick={deselectAll}
                     data-testid="button-deselect-all"
                   >
                     Deselect All
                   </Button>
                 </div>
 
-                {/* Member List */}
+                {/* Player List */}
                 <ScrollArea className="h-[300px]">
-                  {filteredMembers.length === 0 ? (
+                  {filteredPlayers.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground">No members found</p>
+                      <p className="text-muted-foreground">No players found</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {filteredMembers.map((member: any) => (
-                        <div
-                          key={member.user.id}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
-                          data-testid={`recipient-item-${member.user.id}`}
-                        >
-                          <Checkbox
-                            checked={selectedRecipientIds.includes(member.user.id)}
-                            onCheckedChange={() => toggleRecipientSelection(member.user.id)}
-                            data-testid={`checkbox-recipient-${member.user.id}`}
-                          />
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={getImageUrl(member.user.profileImageUrl) || ''} />
-                            <AvatarFallback>
-                              {member.user.firstName?.[0]}{member.user.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="font-medium" data-testid={`text-recipient-name-${member.user.id}`}>
-                              {member.user.firstName} {member.user.lastName}
-                            </p>
-                            {(member.user.venmoUsername || member.user.cashappUsername) && (
-                              <p className="text-xs text-muted-foreground">
-                                {member.user.venmoUsername && (
-                                  <>
-                                    Venmo:{' '}
-                                    <a
-                                      href={`https://venmo.com/${member.user.venmoUsername.replace(/^@/, '')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline"
-                                      data-testid={`link-venmo-${member.user.id}`}
-                                    >
-                                      {member.user.venmoUsername}
-                                    </a>
-                                  </>
+                      {filteredPlayers.map((p) => {
+                        const checked = p.type === 'user'
+                          ? selectedUserIds.includes(p.id)
+                          : selectedPlaceholderIds.includes(p.id);
+                        const initials = `${p.firstName?.[0] ?? ''}${p.lastName?.[0] ?? ''}` || '?';
+                        const isPlaceholder = p.type === 'placeholder' || p.isPlaceholderUser;
+                        return (
+                          <div
+                            key={`${p.type}-${p.id}`}
+                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50"
+                            data-testid={`recipient-item-${p.type}-${p.id}`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => togglePlayer(p)}
+                              data-testid={`checkbox-recipient-${p.type}-${p.id}`}
+                            />
+                            <Avatar className="w-10 h-10">
+                              {p.profileImageUrl
+                                ? <AvatarImage src={getImageUrl(p.profileImageUrl) || ''} />
+                                : null}
+                              <AvatarFallback>
+                                {p.type === 'placeholder'
+                                  ? <UserCircle2 className="w-5 h-5" />
+                                  : initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium" data-testid={`text-recipient-name-${p.type}-${p.id}`}>
+                                  {p.displayName}
+                                </p>
+                                {isPlaceholder && (
+                                  <Badge variant="secondary" className="text-xs">Placeholder</Badge>
                                 )}
-                                {member.user.venmoUsername && member.user.cashappUsername && ' • '}
-                                {member.user.cashappUsername && (
-                                  <>
-                                    CashApp:{' '}
-                                    <a
-                                      href={`https://cash.app/$${member.user.cashappUsername.replace(/^\$/, '')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline"
-                                      data-testid={`link-cashapp-${member.user.id}`}
-                                    >
-                                      {member.user.cashappUsername}
-                                    </a>
-                                  </>
+                                {p.teamName && (
+                                  <Badge variant="outline" className="text-xs">{p.teamName}</Badge>
                                 )}
-                              </p>
-                            )}
+                              </div>
+                              {(p.venmoUsername || p.cashappUsername) && (
+                                <p className="text-xs text-muted-foreground">
+                                  {p.venmoUsername && (
+                                    <>
+                                      Venmo:{' '}
+                                      <a
+                                        href={`https://venmo.com/${p.venmoUsername.replace(/^@/, '')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline"
+                                        data-testid={`link-venmo-${p.id}`}
+                                      >
+                                        {p.venmoUsername}
+                                      </a>
+                                    </>
+                                  )}
+                                  {p.venmoUsername && p.cashappUsername && ' • '}
+                                  {p.cashappUsername && (
+                                    <>
+                                      CashApp:{' '}
+                                      <a
+                                        href={`https://cash.app/$${p.cashappUsername.replace(/^\$/, '')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline"
+                                        data-testid={`link-cashapp-${p.id}`}
+                                      >
+                                        {p.cashappUsername}
+                                      </a>
+                                    </>
+                                  )}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </ScrollArea>
 
                 {form.formState.errors.recipientUserIds && (
-                  <p className="text-sm text-destructive mt-2">{form.formState.errors.recipientUserIds.message}</p>
+                  <p className="text-sm text-destructive mt-2">
+                    {form.formState.errors.recipientUserIds.message}
+                  </p>
                 )}
               </>
             )}
           </div>
-
         </form>
       </div>
 
@@ -394,7 +556,7 @@ export default function CreatePaymentRequest() {
           type="submit"
           form="create-payment-form"
           className="w-full"
-          disabled={createPaymentRequestMutation.isPending || !selectedLeague}
+          disabled={createPaymentRequestMutation.isPending || !activeLeagueId || !canCreate}
           data-testid="button-submit"
         >
           {createPaymentRequestMutation.isPending ? 'Creating...' : 'Create Payment Request'}
@@ -402,9 +564,9 @@ export default function CreatePaymentRequest() {
       </FixedBottomButton>
 
       {/* Premium Feature Alert */}
-      <PremiumFeatureAlert 
-        open={showPremiumAlert} 
-        onOpenChange={handlePremiumAlertClose} 
+      <PremiumFeatureAlert
+        open={showPremiumAlert}
+        onOpenChange={handlePremiumAlertClose}
       />
     </div>
   );
