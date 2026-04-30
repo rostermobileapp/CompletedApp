@@ -2501,7 +2501,7 @@ export default function Messages() {
                     )}
                     
                     <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
-                      <div className={`rounded-lg p-3 ${
+                      <div className={`rounded-lg p-3 elev-rest ${
                         isCurrentUser 
                           ? 'text-white ml-auto' 
                           : 'text-white'
@@ -2733,7 +2733,7 @@ export default function Messages() {
           {selectedFiles.length > 0 && (
             <div className="mb-3 space-y-2" data-testid="selected-files">
               {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded border">
+                <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded hairline elev-rest">
                   {getFileIcon(file.type)}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{file.name}</p>
@@ -2755,7 +2755,7 @@ export default function Messages() {
           
           {/* Poll Creator */}
           {showPollCreator && (
-            <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="poll-creator">
+            <div className="mb-3 p-4 bg-muted rounded-lg hairline elev-rest" data-testid="poll-creator">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-medium">Create Poll</h4>
                 <button
@@ -2838,7 +2838,7 @@ export default function Messages() {
 
           {/* Payment Request Creator */}
           {showPaymentRequestCreator && (
-            <div className="mb-3 p-4 bg-muted rounded-lg border" data-testid="payment-request-creator">
+            <div className="mb-3 p-4 bg-muted rounded-lg hairline elev-rest" data-testid="payment-request-creator">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-medium">Request Payment</h4>
                 <button

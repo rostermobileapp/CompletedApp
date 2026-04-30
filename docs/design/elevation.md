@@ -61,6 +61,25 @@ visible without looking ghostly.
   `elev-lift` if a hairline border isn't appropriate).
 - **Replace** existing `border border-border` with `hairline` when
   adopting — they conflict otherwise (double border).
+- **Colored/semantic borders (e.g. payment-card green):** keep the
+  colored border, just add `elev-rest`/`elev-lift`. Don't replace
+  semantic color with `hairline`.
+- **Filled/colored backgrounds (e.g. chat bubbles):** add `elev-rest`
+  only — skip `hairline` so the colored fill isn't outlined.
+
+### Nesting (UPDATED — was previously "outermost only")
+Per user direction (Apr 2026), elevation IS applied to nested cards as
+well as outermost ones. Nested cards inside an already-elevated card
+should still receive `elev-rest`. Examples:
+- Poll cards rendered inside a chat thread: elevated
+- Message bubbles: elevated (with `elev-rest` only, no hairline)
+- File preview chips inside the composer: elevated
+- Poll/payment-request creator panels inside the composer: elevated
+
+The earlier "don't stack shadows" guideline has been retired. If a
+nested elevation looks visually noisy in a future surface, prefer
+tuning the token alphas globally rather than reintroducing per-element
+exclusions.
 
 ---
 
@@ -120,18 +139,14 @@ Pulsing-glow effects (`.alerts-glow` on the team selector,
 
 ## 7. Intentionally NOT Applied (yet)
 
-These were considered out of scope for the initial design pass and
-are tracked for a future broader rollout:
+Tracked for a future broader rollout:
 
 - Shared shadcn primitives (`Card`, `Input`, `Textarea`, `Select`,
   modals/dialogs)
 - Desktop sidebar / DesktopAppShell
-- Inner/nested cards (e.g. event rows inside the calendar's
-  selected-day list) — stacking shadows on nested cards reads as
-  visual noise.
 
-When extending: prefer adding the utility classes at the outermost
-card-like container only. Don't nest `elev-rest` inside `elev-rest`.
+(Inner/nested cards used to be on this list. They are no longer
+excluded — see section 3 "Nesting".)
 
 ---
 

@@ -97,10 +97,17 @@ Approved design language for the mobile home screen as of Apr 2026. See
     wrapped in `<MotionConfig reducedMotion="user">` for a11y.
 -   **Themed accent glow** (`.alerts-glow`, `.bracket-glow`): pulse uses
     `rgb(59, 130, 246)` (theme primary blue), not red.
+-   **Nesting rule**: elevation IS applied to nested cards (poll cards
+    inside threads, message bubbles, file preview chips, creator
+    panels inside the message composer, etc.). The earlier "outermost
+    only" rule was retired by user request — stack depth on every
+    card-shaped surface.
 -   **Currently applied to**: home cards in `Dashboard.tsx`,
-    `BottomNavigation.tsx`, `ScheduleCalendarMobile.tsx`. Broader
-    rollout (shared shadcn primitives, desktop, modals) is tracked
-    separately and intentionally NOT done globally yet.
+    `BottomNavigation.tsx`, `ScheduleCalendarMobile.tsx`, and the full
+    Messages page (conversation list, in-thread poll/payment cards,
+    message bubbles, composer creator panels, file-preview chips).
+    Broader rollout to shared shadcn primitives, desktop sidebar, and
+    modals is still pending.
 
 ## Development and Build Tools
 
