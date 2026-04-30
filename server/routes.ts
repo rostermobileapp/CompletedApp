@@ -14457,6 +14457,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         normalizedLeagueId = team.leagueId ?? null;
       }
 
+      // The DM is filtered client-side by the recipient's dashboard scope, so
+      // it must be stamped with a scope BOTH participants share. If we'd stamp
+      // a team or league the recipient isn't actually a member of, the
+      // recipient would never see the conversation. Downgrade the scope to
+      // the most-specific one both users share.
+      if (normalizedTeamId) {
+        const recipientTeam = await storage.getTeamMembership(otherUserId, normalizedTeamId);
+        if (!recipientTeam || recipientTeam.status !== 'approved') {
+          normalizedTeamId = null;
+        }
+      }
+      if (normalizedLeagueId) {
+        const recipientLeague = await storage.getUserLeagueMembership(otherUserId, normalizedLeagueId);
+        if (!recipientLeague || recipientLeague.status !== 'approved') {
+          normalizedLeagueId = null;
+          // Without a shared league, a team scope makes no sense either.
+          normalizedTeamId = null;
+        }
+      }
+
       const scope = {
         leagueId: normalizedLeagueId,
         teamId: normalizedTeamId,
