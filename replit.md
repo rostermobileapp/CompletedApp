@@ -71,6 +71,36 @@ A native Expo React Native app in the `/mobile` folder provides push notificatio
 -   **shadcn/ui**: Pre-built component library.
 -   **Tailwind CSS**: Utility-first CSS framework.
 -   **Lucide React**: Icon library.
+-   **framer-motion**: Used for the bottom-nav active-tab spring morph.
+
+## Design System — Depth & Elevation (Mobile)
+
+Approved design language for the mobile home screen as of Apr 2026. See
+`docs/design/elevation.md` for the full reference and rollout guide.
+
+-   **Tokens** (defined in `client/src/index.css` `:root` and `.dark`):
+    -   `--elev-rest` — soft drop shadow for cards at rest
+    -   `--elev-lift` — pronounced shadow for floating/active elements
+    -   `--hairline` — 1px border color, replaces `border-border` on cards
+-   **Utilities**: `.elev-rest`, `.elev-lift`, `.hairline`
+-   **Light mode**: black-based shadows
+    -   rest: `0 1px 2px /.10` + `0 6px 16px -2px /.14`
+    -   lift: `0 6px 12px -2px /.20` + `0 18px 36px -8px /.30`
+    -   hairline: black @ 8%
+-   **Dark mode**: inverted to a soft white halo (dark-on-dark disappears)
+    -   rest: `0 1px 2px /.12` + `0 8px 22px -2px /.22`
+    -   lift: `0 8px 18px -2px /.28` + `0 24px 48px -8px /.34`
+    -   hairline: white @ 18%
+-   **Active bottom-nav tab**: lifted into a circular "pill" using
+    `--elev-lift`; morphs between tabs via framer-motion `<LayoutGroup>`
+    + shared `layoutId="active-nav-pill"` (spring 520/30/0.9). App is
+    wrapped in `<MotionConfig reducedMotion="user">` for a11y.
+-   **Themed accent glow** (`.alerts-glow`, `.bracket-glow`): pulse uses
+    `rgb(59, 130, 246)` (theme primary blue), not red.
+-   **Currently applied to**: home cards in `Dashboard.tsx`,
+    `BottomNavigation.tsx`, `ScheduleCalendarMobile.tsx`. Broader
+    rollout (shared shadcn primitives, desktop, modals) is tracked
+    separately and intentionally NOT done globally yet.
 
 ## Development and Build Tools
 
