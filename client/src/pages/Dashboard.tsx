@@ -2309,7 +2309,7 @@ function DashboardMobile() {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className={`w-full border border-border rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${mobileSelectorHasOtherAlerts ? 'alerts-glow' : ''}`}
+              className={`w-full hairline elev-rest rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${mobileSelectorHasOtherAlerts ? 'alerts-glow' : ''}`}
               data-testid="button-selector"
             >
               <div className="flex items-center gap-2">
@@ -2529,7 +2529,7 @@ function DashboardMobile() {
         <div className="grid grid-cols-4 gap-3">
           {/* Announcements Card */}
           <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+            className="rounded-xl hairline elev-rest p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-announcements"
             onClick={() => openOverlay('/announcements', <Announcements />)}
           >
@@ -2546,7 +2546,7 @@ function DashboardMobile() {
 
           {/* Photos Card - Always clickable, paywall shown on MediaGalleryPage if needed */}
           <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
+            className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
             data-testid="card-photos"
             onClick={() => {
               let entityType: 'tournament' | 'league' | 'team' | null = null;
@@ -2580,7 +2580,7 @@ function DashboardMobile() {
 
           {/* Stats Card */}
           <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+            className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-stats"
             onClick={() => openOverlay('/stats', <StatsPage />)}
           >
@@ -2592,7 +2592,7 @@ function DashboardMobile() {
 
           {/* Standings Card */}
           <div 
-            className="rounded-xl border border-border p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+            className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
             data-testid="card-standings"
             onClick={() => {
               setShowStandingsModal(true);
@@ -2625,7 +2625,7 @@ function DashboardMobile() {
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-border p-4 bg-[#e2e2e2] dark:bg-[#212121]">
+            <div className="rounded-xl hairline elev-rest p-4 bg-[#e2e2e2] dark:bg-[#212121]">
               <div className="flex items-center gap-3 mb-3">
                 <Trophy className="w-8 h-8 text-orange-500" />
                 <div>
@@ -2651,7 +2651,7 @@ function DashboardMobile() {
       {primaryTeam && (
         <div className="px-6 mb-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border border-border p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
+            <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                   {primaryTeam?.logoUrl ? (
@@ -2675,7 +2675,7 @@ function DashboardMobile() {
             </div>
             
             {effectiveLeagueId && (
-              <div className="rounded-xl border border-border bg-[#e2e2e2] dark:bg-[#212121]">
+              <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
                     <div className="flex items-center gap-3">
@@ -2713,7 +2713,7 @@ function DashboardMobile() {
       {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
       {!primaryTeam && hasStatManagerAccess() && (
         <div className="px-6 mb-6">
-          <div className="rounded-xl border border-border bg-[#e2e2e2] dark:bg-[#212121]">
+          <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
             <button
               onClick={() => navigate('/scorekeeper')}
               className="w-full h-full flex items-center justify-between rounded-xl px-4 py-3"
@@ -2797,7 +2797,7 @@ function DashboardMobile() {
         </div>
         
         {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
-          <div className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid="loading-upcoming-games">
+          <div className="bg-card rounded-xl hairline elev-rest p-4 animate-pulse" data-testid="loading-upcoming-games">
             <div className="h-16 bg-muted rounded"></div>
           </div>
         ) : scheduleView === 'calendar' ? (() => {
@@ -2878,7 +2878,7 @@ function DashboardMobile() {
             }).map((invite: any) => (
               <div 
                 key={`invite-${invite.id}`}
-                className="rounded-xl border border-yellow-500/50 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                className="rounded-xl border border-yellow-500/50 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
                 data-testid={`card-scrimmage-invite-${invite.id}`}
               >
                 <div className="flex items-center gap-4">
@@ -2933,7 +2933,7 @@ function DashboardMobile() {
                 return (
                   <div 
                     key={`scrimmage-${scrimmage.id}`}
-                    className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                    className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
                     data-testid={`card-scrimmage-${scrimmage.id}`}
                   >
@@ -2988,7 +2988,7 @@ function DashboardMobile() {
                     }}
                   >
                     <div 
-                      className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                      className="rounded-xl border border-green-200 dark:border-green-800 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
                       data-testid={`card-reminder-${reminder.id}`}
                     >
                     <div className="flex items-center gap-4">
@@ -3043,7 +3043,7 @@ function DashboardMobile() {
               .map((event: any) => (
                 <div 
                   key={`team-event-${event.id}`}
-                  className={`rounded-xl border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
+                  className={`rounded-xl border elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
                     event.eventType === 'scrimmage' 
                       ? 'border-orange-200 dark:border-orange-800' 
                       : 'border-blue-200 dark:border-blue-800'
@@ -3128,7 +3128,7 @@ function DashboardMobile() {
               .map((tournament: any) => (
               <div 
                 key={`bracket-${tournament.id}`}
-                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
+                className="rounded-xl hairline p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
                 onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
                 data-testid={`card-bracket-${tournament.id}`}
               >
@@ -3188,7 +3188,7 @@ function DashboardMobile() {
               .slice(0, 5).map((game: any) => (
               <div 
                 key={game.id} 
-                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                 onClick={() => navigate(`/game/${game.id}`)}
                 data-testid={`card-game-${game.id}`}
               >
@@ -3337,7 +3337,7 @@ function DashboardMobile() {
             ))}
           </div>
         ) : (
-          <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-upcoming-games">
+          <div className="bg-card rounded-xl hairline elev-rest p-8 text-center" data-testid="empty-upcoming-games">
             <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No upcoming games scheduled</p>
           </div>

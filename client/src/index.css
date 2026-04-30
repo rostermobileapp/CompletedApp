@@ -134,6 +134,10 @@
   --shadow-2xl: 0px 25px 50px -12px hsl(0, 0%, 0%, 0.25);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+  /* Depth/elevation trial tokens (light mode). */
+  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.05), 0 1px 3px 0 hsl(0 0% 0% / 0.05);
+  --elev-lift: 0 8px 16px -4px hsl(0 0% 0% / 0.18), 0 4px 8px -2px hsl(0 0% 0% / 0.10);
+  --hairline: 0 0% 0% / 0.06;
 }
 
 .dark {
@@ -171,6 +175,11 @@
   --sidebar-accent-foreground: 0 0% 98%;
   --sidebar-border: 240 10% 6%;
   --sidebar-ring: 217 91% 60%;
+  /* Depth/elevation trial tokens (dark mode) — slightly stronger so the
+     soft drop shadows still register on the near-black background. */
+  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.45), 0 1px 3px 0 hsl(0 0% 0% / 0.35);
+  --elev-lift: 0 8px 18px -4px hsl(0 0% 0% / 0.6), 0 4px 8px -2px hsl(0 0% 0% / 0.4);
+  --hairline: 0 0% 100% / 0.08;
 }
 
 @layer base {
@@ -488,6 +497,21 @@
     font-size: 20px !important;
     margin-bottom: 10px !important;
   }
+}
+
+/* Depth/elevation trial utilities. Plain CSS (not @apply) so they can
+   live outside @layer and still be overridden by later Tailwind utilities
+   in the cascade when needed. */
+.elev-rest {
+  box-shadow: var(--elev-rest);
+}
+.elev-lift {
+  box-shadow: var(--elev-lift);
+}
+.hairline {
+  border-width: 1px;
+  border-style: solid;
+  border-color: hsl(var(--hairline));
 }
 
 /* Force hide all scrollbars globally — highest specificity override */

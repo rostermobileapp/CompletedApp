@@ -126,7 +126,21 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
         {FIXED_SHORTCUTS.map((shortcut) => {
           const Icon = shortcut.icon;
           const isActive = activeId === shortcut.id;
-          
+
+          // Badges anchor to the icon's local positioning context so they
+          // travel with the icon whether it sits flat in the bar or floats
+          // up inside the active circle.
+          const badge =
+            shortcut.id === 'messages' && currentLeagueUnread > 0 ? (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="message-badge">
+                {currentLeagueUnread > 99 ? '99+' : currentLeagueUnread}
+              </div>
+            ) : shortcut.id === 'payments' && unpaidPaymentCount > 0 ? (
+              <div className="absolute -top-1 -right-4 bg-red-500 text-white text-[10px] rounded-full w-[17px] h-[17px] flex items-center justify-center font-bold" data-testid="payment-badge">
+                {unpaidPaymentCount > 99 ? '99+' : unpaidPaymentCount}
+              </div>
+            ) : null;
+
           return (
             <button
               key={shortcut.id}
@@ -137,23 +151,29 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
               )}
               data-testid={`nav-${shortcut.id}`}
             >
-              {shortcut.id === 'home' ? (
-                <img src={homeLogo} alt="Home" className="w-[35px] h-[35px] mb-1 -mt-[10px]" />
-              ) : Icon && (
-                <div className="relative">
-                  <Icon className="w-[25px] h-[25px] mb-1" />
-                  {shortcut.id === 'messages' && currentLeagueUnread > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid="message-badge">
-                      {currentLeagueUnread > 99 ? '99+' : currentLeagueUnread}
-                    </div>
-                  )}
-                  {shortcut.id === 'payments' && unpaidPaymentCount > 0 && (
-                    <div className="absolute -top-1 -right-4 bg-red-500 text-white text-[10px] rounded-full w-[17px] h-[17px] flex items-center justify-center font-bold" data-testid="payment-badge">
-                      {unpaidPaymentCount > 99 ? '99+' : unpaidPaymentCount}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Icon slot has a fixed height so labels stay on the same
+                  baseline whether the active tab is floating above or not. */}
+              <div className="relative h-[35px] w-full flex items-center justify-center mb-1">
+                {isActive ? (
+                  <div className="absolute left-1/2 -translate-x-1/2 -top-6 w-12 h-12 rounded-full bg-[#e2e2e2] dark:bg-[#212121] hairline elev-lift flex items-center justify-center">
+                    {shortcut.id === 'home' ? (
+                      <img src={homeLogo} alt="Home" className="w-7 h-7" />
+                    ) : Icon && (
+                      <div className="relative">
+                        <Icon className="w-6 h-6" />
+                        {badge}
+                      </div>
+                    )}
+                  </div>
+                ) : shortcut.id === 'home' ? (
+                  <img src={homeLogo} alt="Home" className="w-[35px] h-[35px] -mt-[10px]" />
+                ) : Icon && (
+                  <div className="relative">
+                    <Icon className="w-[25px] h-[25px]" />
+                    {badge}
+                  </div>
+                )}
+              </div>
               <span className={cn("text-xs", isActive ? "font-bold" : "font-medium")}>{shortcut.label}</span>
             </button>
           );
