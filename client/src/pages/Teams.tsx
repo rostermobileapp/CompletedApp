@@ -375,7 +375,7 @@ export default function Teams() {
           /* User has league teams but a tournament is selected — they are an
              admin/observer of this tournament (not a player on any team in it).
              Players would have been redirected by the effect above. */
-          <Card>
+          <Card className="hairline elev-rest">
             <CardContent className="p-6 text-center">
               <Trophy className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">Tournament View</h3>
@@ -403,7 +403,7 @@ export default function Teams() {
                   .map((p) => (
                     <Card
                       key={p.participantId}
-                      className="cursor-pointer hover:bg-accent/30 transition-colors"
+                      className="cursor-pointer hairline elev-rest hover:bg-accent/30 transition-colors"
                       onClick={() => navigate(`/tournament-teams/${p.tournamentId}`)}
                       data-testid={`card-tournament-team-${p.tournamentTeamId}`}
                     >
@@ -433,7 +433,7 @@ export default function Teams() {
               </div>
             )}
 
-            <Card>
+            <Card className="hairline elev-rest">
               <CardContent className="p-6 text-center">
                 <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No Teams Found</h3>
@@ -481,7 +481,7 @@ export default function Teams() {
                     return (
                       <div
                         key={`attendance-alert-${game.gameId}`}
-                        className="bg-red-500/50 text-white rounded-lg p-3"
+                        className="bg-red-500/50 text-white rounded-lg p-3 elev-rest"
                         data-testid={`alert-attendance-${game.gameId}`}
                       >
                         <div className="flex items-center gap-2">
@@ -517,7 +517,7 @@ export default function Teams() {
                   .map((p) => (
                     <Card
                       key={p.participantId}
-                      className="cursor-pointer hover:bg-accent/30 transition-colors"
+                      className="cursor-pointer hairline elev-rest hover:bg-accent/30 transition-colors"
                       onClick={() => navigate(`/tournament-teams/${p.tournamentId}`)}
                       data-testid={`card-tournament-team-${p.tournamentTeamId}`}
                     >
@@ -551,7 +551,7 @@ export default function Teams() {
             {displayedTeams.map((team: any) => (
               <TabsContent key={team.id} value={team.id} className="space-y-6">
                 {/* Team Header Card */}
-                <Card>
+                <Card className="hairline elev-rest">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 bg-[#e2e2e2] dark:bg-[#212121] pl-[12px] pr-[12px] pt-[4px] pb-[4px]">
                     <div className="flex items-center gap-4">
                       <div className="relative group">
@@ -646,7 +646,7 @@ export default function Teams() {
                 </Card>
 
                 {/* Team Standings */}
-                <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#e2e2e2] dark:bg-[#212121]">
+                <Card className="rounded-lg hairline elev-rest text-card-foreground bg-[#e2e2e2] dark:bg-[#212121]">
                   <CardHeader className="flex flex-col space-y-1.5 p-6 pt-[5px] pb-[5px]">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-2xl font-semibold leading-none tracking-tight">League Standing</CardTitle>
@@ -693,7 +693,7 @@ export default function Teams() {
                     {teamLeaders ? (
                       <>
                         {/* Points Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-points-leader">
+                        <Card className="rounded-lg hairline elev-rest text-card-foreground p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-points-leader">
                           <div className="flex items-center gap-3">
                             <TrendingUp className="w-5 h-5 text-primary" />
                             <div className="flex items-center gap-2">
@@ -704,7 +704,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Goals Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-goals-leader">
+                        <Card className="rounded-lg hairline elev-rest text-card-foreground p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-goals-leader">
                           <div className="flex items-center gap-3">
                             <Target className="w-5 h-5 text-success" />
                             <div className="flex items-center gap-2">
@@ -715,7 +715,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Assists Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-assists-leader">
+                        <Card className="rounded-lg hairline elev-rest text-card-foreground p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-assists-leader">
                           <div className="flex items-center gap-3">
                             <Apple className="w-5 h-5 text-info" />
                             <div className="flex items-center gap-2">
@@ -726,7 +726,7 @@ export default function Teams() {
                         </Card>
 
                         {/* Penalty Minutes Leader */}
-                        <Card className="rounded-lg border text-card-foreground shadow-sm p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-penalty-leader">
+                        <Card className="rounded-lg hairline elev-rest text-card-foreground p-3 h-10 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-team-penalty-leader">
                           <div className="flex items-center gap-3">
                             <Flag className="w-5 h-5 text-red-500" />
                             <div className="flex items-center gap-2">

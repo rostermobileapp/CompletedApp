@@ -18,7 +18,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
   });
 
   return (
-    <Card className="rounded-lg border text-card-foreground shadow-sm bg-[#e2e2e2] dark:bg-[#212121] mt-[4px] mb-[4px]">
+    <Card className="rounded-lg hairline elev-rest text-card-foreground bg-[#e2e2e2] dark:bg-[#212121] mt-[4px] mb-[4px]">
       <CardHeader className="flex flex-col space-y-1.5 p-6 pl-[12px] pr-[12px] pt-[8px] pb-[4px]">
         <CardTitle className="flex items-center gap-2">
           <Users className="w-5 h-5" />
@@ -48,7 +48,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
               return (
                 <div
                   key={member.id || playerId}
-                  className="flex items-center py-1.5 px-2 rounded hover:bg-muted/50 transition-colors bg-card border border-border"
+                  className="flex items-center py-1.5 px-2 rounded hover:bg-muted/50 transition-colors bg-card hairline elev-rest"
                   data-testid={`roster-player-${playerId}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
