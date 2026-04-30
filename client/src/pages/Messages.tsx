@@ -581,7 +581,7 @@ function ConversationRail({
 
 export default function Messages() {
   const { user } = useAuth();
-  const { canAccessPremiumFeatures, hasRole } = usePermissions();
+  const { canAccessPremiumFeatures, hasRole, role } = usePermissions();
   const { data: dbUser } = useQuery<{ id: string }>({
     queryKey: ['/api/user'],
     enabled: !!user,
@@ -2224,7 +2224,10 @@ export default function Messages() {
                 {conversations.map((conversation: Conversation) => {
                   // Free-tier users see direct messages in the list, but the
                   // sender info is blurred and the only action is "Upgrade to view".
-                  const isLockedDM = isFreeTier && conversation.type === 'direct';
+                  // Use the literal role here — tournament participation grants
+                  // player-pro privileges for the user's tournament team but
+                  // should NOT unlock arbitrary DMs from outside the tournament.
+                  const isLockedDM = role === 'free_tier' && conversation.type === 'direct';
                   return (
                   <div 
                     key={conversation.id}
