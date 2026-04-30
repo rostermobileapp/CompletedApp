@@ -1226,6 +1226,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ios_badgeType: 'Increase',
           ios_badgeCount: 1,
           ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
+          // Force the current Roster brand icons on every push so an old
+          // OneSignal-dashboard default cannot leak through (see
+          // server/oneSignalNotifications.ts for the same overrides).
+          chrome_web_icon: 'https://www.roster-app.com/icon-512.png',
+          chrome_web_badge: 'https://www.roster-app.com/icon-192.png',
+          firefox_icon: 'https://www.roster-app.com/icon-512.png',
+          large_icon: 'https://www.roster-app.com/icon-512.png',
         }),
       });
       

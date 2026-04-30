@@ -1,5 +1,13 @@
 import { storage } from './storage';
 
+// Public, absolute URLs to the brand icons used by OneSignal for web push
+// (Chrome / Firefox / Safari) and as the Android "large icon" in the
+// notification tray. These override whatever default icon is configured on
+// the OneSignal dashboard, so the notification always carries the current
+// Roster logo no matter which environment sends it.
+const NOTIFICATION_ICON_URL = 'https://www.roster-app.com/icon-512.png';
+const NOTIFICATION_BADGE_URL = 'https://www.roster-app.com/icon-192.png';
+
 interface SendPushNotificationOptions {
   userId: string;
   title: string;
@@ -50,6 +58,16 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         ios_badgeType: 'Increase',
         ios_badgeCount: 1,
         ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
+        // Web push (Chrome / Firefox / Edge / Safari) — override the dashboard
+        // default with the current Roster logo so old uploads don't appear.
+        chrome_web_icon: NOTIFICATION_ICON_URL,
+        chrome_web_badge: NOTIFICATION_BADGE_URL,
+        firefox_icon: NOTIFICATION_ICON_URL,
+        // Android — the small icon in the status bar uses the bundled
+        // `ic_stat_onesignal_default` silhouette from the mobile app, while
+        // `large_icon` (this URL) shows the colored logo in the expanded
+        // notification card.
+        large_icon: NOTIFICATION_ICON_URL,
         data,
       }),
     });
