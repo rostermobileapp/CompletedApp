@@ -668,6 +668,7 @@ export default function Messages() {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [inputBarHeight, setInputBarHeight] = useState(0);
+  const [bottomNavHeight, setBottomNavHeight] = useState(80);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerEl = useRef<HTMLDivElement | null>(null);
   const inputResizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -717,6 +718,38 @@ export default function Messages() {
       }
     };
   }, []);
+
+  // Measure the actual bottom navigation height so the input bar can sit
+  // directly above it (the nav height varies across devices because of the
+  // iOS safe-area inset and Android nav bars).
+  useEffect(() => {
+    if (isDesktopWeb) {
+      setBottomNavHeight(0);
+      return;
+    }
+    const measure = () => {
+      const nav = document.querySelector('[data-testid="bottom-navigation"]') as HTMLElement | null;
+      if (nav) {
+        setBottomNavHeight(nav.getBoundingClientRect().height);
+      } else {
+        // Bottom nav is hidden (e.g. virtual keyboard open) — no offset needed.
+        setBottomNavHeight(0);
+      }
+    };
+    measure();
+    let ro: ResizeObserver | null = null;
+    const nav = document.querySelector('[data-testid="bottom-navigation"]') as HTMLElement | null;
+    if (nav && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure);
+      ro.observe(nav);
+    }
+    // Also re-measure when the keyboard toggles (the nav unmounts when open).
+    const interval = window.setInterval(measure, 250);
+    return () => {
+      if (ro) ro.disconnect();
+      window.clearInterval(interval);
+    };
+  }, [isDesktopWeb, keyboardHeight]);
 
   // Auto-resize textarea as content changes
   const autoResizeTextarea = () => {
@@ -2326,7 +2359,8 @@ export default function Messages() {
                   ? undefined
                   : {
                       paddingBottom: `${
-                        (inputBarHeight || 56) + (keyboardHeight > 0 ? 16 : 64 + 16)
+                        (inputBarHeight || 56) +
+                        (keyboardHeight > 0 ? 16 : bottomNavHeight + 16)
                       }px`,
                     }
               }
@@ -2559,7 +2593,7 @@ export default function Messages() {
           style={
             isDesktopWeb
               ? undefined
-              : { bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }
+              : { bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : `${bottomNavHeight}px` }
           }
           data-testid="upgrade-to-reply-banner"
         >
@@ -2595,7 +2629,7 @@ export default function Messages() {
           style={
             isDesktopWeb
               ? undefined
-              : { bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }
+              : { bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : `${bottomNavHeight}px` }
           }
           data-testid="message-input-container"
         >
