@@ -4,6 +4,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -588,7 +589,8 @@ export default function Messages() {
   });
   const currentUserId = dbUser?.id || (user as any)?.id;
   const params = useParams();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const isMessagesRouteActive = location === '/messages' || location.startsWith('/messages/');
   const { selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
   const isDesktopWeb = useIsDesktopWeb();
 
@@ -2661,7 +2663,8 @@ export default function Messages() {
       {/* Upgrade to reply banner - shown for free tier users in non-team conversations.
           Suppressed when the entire thread is blurred (the overlay's CTA is the only
           path forward in that state). */}
-      {selectedConversation && !canSendMessage && !isThreadLocked && (
+      {selectedConversation && !canSendMessage && !isThreadLocked && (() => {
+        const upgradeBanner = (
         <div
           ref={inputContainerRef}
           className={
@@ -2695,9 +2698,14 @@ export default function Messages() {
             Upgrade
           </Button>
         </div>
-      )}
+        );
+        if (isDesktopWeb) return upgradeBanner;
+        if (!isMessagesRouteActive) return null;
+        return createPortal(upgradeBanner, document.body);
+      })()}
       {/* Message Input - only show when conversation is selected and user can send */}
-      {selectedConversation && canSendMessage && (
+      {selectedConversation && canSendMessage && (() => {
+        const inputBar = (
         <div 
           ref={inputContainerRef}
           className={
@@ -3035,7 +3043,11 @@ export default function Messages() {
             />
           </div>
         </div>
-      )}
+        );
+        if (isDesktopWeb) return inputBar;
+        if (!isMessagesRouteActive) return null;
+        return createPortal(inputBar, document.body);
+      })()}
           </div>
         </div>
       </div>
