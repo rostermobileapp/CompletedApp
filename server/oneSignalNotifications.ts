@@ -103,6 +103,9 @@ export async function sendMessagePushNotification(
   // Free-tier users cannot read direct messages in-app — they only see a
   // blurred row with an "Upgrade to view" CTA. The push notification must
   // not leak the sender name or message content for those recipients.
+  // For censored notifications we show only the title "New message" with
+  // no visible body. OneSignal requires the contents field, so we send a
+  // single space which renders as essentially blank on iOS/Android/web.
   let title = `💬 ${senderName}`;
   let message = messagePreview.length > 50
     ? messagePreview.substring(0, 50) + '...'
@@ -119,7 +122,7 @@ export async function sendMessagePushNotification(
       // free-tier user we can't classify).
       if (!conversation || conversation.type === 'direct') {
         title = 'New message';
-        message = 'Upgrade to view this message';
+        message = ' ';
       }
     }
   } catch (err) {
@@ -128,7 +131,7 @@ export async function sendMessagePushNotification(
     // transient errors.
     console.error('[OneSignal] Failed to evaluate DM tier censoring; using generic payload:', err);
     title = 'New message';
-    message = 'Upgrade to view this message';
+    message = ' ';
   }
 
   return sendPushNotificationToUser({
