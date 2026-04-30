@@ -81,15 +81,19 @@ Approved design language for the mobile home screen as of Apr 2026. See
 -   **Tokens** (defined in `client/src/index.css` `:root` and `.dark`):
     -   `--elev-rest` — soft drop shadow for cards at rest
     -   `--elev-lift` — pronounced shadow for floating/active elements
+    -   `--elev-inset` — sunken inset shadow for inputs / recessed surfaces
     -   `--hairline` — 1px border color, replaces `border-border` on cards
--   **Utilities**: `.elev-rest`, `.elev-lift`, `.hairline`
+-   **Utilities**: `.elev-rest`, `.elev-lift`, `.elev-inset`, `.hairline`
 -   **Light mode**: black-based shadows
     -   rest: `0 1px 2px /.10` + `0 6px 16px -2px /.14`
     -   lift: `0 6px 12px -2px /.20` + `0 18px 36px -8px /.30`
+    -   inset: `inset 0 2px 4px /.10` + `inset 0 1px 2px /.06` (dark inset)
     -   hairline: black @ 8%
 -   **Dark mode**: inverted to a soft white halo (dark-on-dark disappears)
     -   rest: `0 1px 2px /.12` + `0 8px 22px -2px /.22`
     -   lift: `0 8px 18px -2px /.28` + `0 24px 48px -8px /.34`
+    -   inset: `inset 0 1px 0 white/.16` (bright top rim) +
+        `inset 0 3px 8px -1px black/.45` (soft inner darken)
     -   hairline: white @ 18%
 -   **Active bottom-nav tab**: lifted into a circular "pill" using
     `--elev-lift`; morphs between tabs via framer-motion `<LayoutGroup>`

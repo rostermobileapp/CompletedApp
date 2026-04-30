@@ -37,6 +37,15 @@ Defined in `client/src/index.css` under `:root` (light) and `.dark`.
 --elev-lift: 0 8px 18px -2px hsl(0 0% 100% / 0.28),
              0 24px 48px -8px hsl(0 0% 100% / 0.34);
 --hairline:  0 0% 100% / 0.18;
+
+/* Sunken / inset (inputs, recessed surfaces) */
+/* Light: dark inset, classic "pressed in" look */
+--elev-inset: inset 0 2px 4px 0 hsl(0 0% 0% / 0.10),
+              inset 0 1px 2px 0 hsl(0 0% 0% / 0.06);
+/* Dark: bright top rim (suggests surrounding surface is higher)
+   plus a soft inner darken */
+--elev-inset: inset 0 1px 0 0 hsl(0 0% 100% / 0.16),
+              inset 0 3px 8px -1px hsl(0 0% 0% / 0.45);
 ```
 
 ### Why white halos in dark mode?
@@ -52,6 +61,7 @@ visible without looking ghostly.
 ```css
 .elev-rest  { box-shadow: var(--elev-rest); }
 .elev-lift  { box-shadow: var(--elev-lift); }
+.elev-inset { box-shadow: var(--elev-inset); }
 .hairline   { border: 1px solid; border-color: hsl(var(--hairline)); }
 ```
 

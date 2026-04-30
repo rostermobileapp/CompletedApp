@@ -3023,7 +3023,7 @@ export default function Messages() {
                 }
               }}
               onBlur={handleTypingStop}
-              className="flex-1 resize-none overflow-y-auto min-h-[40px] max-h-[120px] py-2 px-3 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex-1 resize-none overflow-y-auto min-h-[40px] max-h-[120px] py-2 px-3 rounded-md hairline elev-inset bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               rows={1}
               data-testid="input-message"
             />
