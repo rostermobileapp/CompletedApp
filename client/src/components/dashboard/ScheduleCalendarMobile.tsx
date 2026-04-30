@@ -262,7 +262,7 @@ export function ScheduleCalendarMobile({
 
   return (
     <div
-      className="rounded-xl border border-border bg-card overflow-hidden w-full max-w-full min-w-0"
+      className="rounded-xl hairline elev-rest bg-card overflow-hidden w-full max-w-full min-w-0"
       data-testid="schedule-calendar-mobile"
     >
       {/* Month header */}
