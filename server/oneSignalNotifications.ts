@@ -1,12 +1,18 @@
 import { storage } from './storage';
 
-// Public, absolute URLs to the brand icons used by OneSignal for web push
-// (Chrome / Firefox / Safari) and as the Android "large icon" in the
-// notification tray. These override whatever default icon is configured on
-// the OneSignal dashboard, so the notification always carries the current
-// Roster logo no matter which environment sends it.
+// Public, absolute URLs to the brand icons used by OneSignal for web push.
+//
+// NOTIFICATION_ICON_URL is the colored body image shown inside the
+// notification card (Chrome / Firefox / Android expanded view).
+//
+// NOTIFICATION_BADGE_URL is the *status-bar* small icon that Android Chrome
+// renders in the top bar. Android requires this to be a fully monochrome
+// silhouette PNG (transparent background, white shapes) — anything else
+// gets silently rejected and Android falls back to its default bell icon.
+// `notification-badge.png` is a 96x96 white-on-alpha Roster R created
+// specifically for this purpose; do not swap it for a colored asset.
 const NOTIFICATION_ICON_URL = 'https://www.roster-app.com/icon-512.png';
-const NOTIFICATION_BADGE_URL = 'https://www.roster-app.com/icon-192.png';
+const NOTIFICATION_BADGE_URL = 'https://www.roster-app.com/notification-badge.png';
 
 interface SendPushNotificationOptions {
   userId: string;

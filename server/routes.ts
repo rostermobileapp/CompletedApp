@@ -1229,8 +1229,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Force the current Roster brand icons on every push so an old
           // OneSignal-dashboard default cannot leak through (see
           // server/oneSignalNotifications.ts for the same overrides).
+          // chrome_web_badge MUST be the monochrome silhouette PNG —
+          // Android's status-bar icon falls back to the default bell when
+          // given anything but a transparent + single-color image.
           chrome_web_icon: 'https://www.roster-app.com/icon-512.png',
-          chrome_web_badge: 'https://www.roster-app.com/icon-192.png',
+          chrome_web_badge: 'https://www.roster-app.com/notification-badge.png',
           firefox_icon: 'https://www.roster-app.com/icon-512.png',
           large_icon: 'https://www.roster-app.com/icon-512.png',
         }),
