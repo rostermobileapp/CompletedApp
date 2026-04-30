@@ -226,7 +226,7 @@ function PollCard({ message, currentUserId }: { message: any; currentUserId: str
   const canClosePoll = message.senderId === currentUserId && poll.status === 'active';
 
   return (
-    <div className="mt-3 p-5 border border-border rounded-xl bg-card shadow-sm" data-testid={`poll-card-${poll.id}`}>
+    <div className="mt-3 p-5 hairline elev-rest rounded-xl bg-card" data-testid={`poll-card-${poll.id}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="bg-primary text-primary-foreground text-xs px-2.5 py-1 rounded-md font-medium">
@@ -357,7 +357,7 @@ function PaymentRequestCard({ paymentRequestId, currentUserId }: { paymentReques
   const paidCount = paymentRequest.recipients.filter((r: any) => r.isPaid).length;
 
   return (
-    <div className="p-4 border border-green-500/20 rounded-lg dark:bg-green-950/20 bg-[#00000080] pt-[2px] pb-[2px] pl-[5px] pr-[5px] mt-[8px] mb-[8px]" data-testid={`payment-request-card-${paymentRequest.id}`}>
+    <div className="p-4 border border-green-500/20 elev-rest rounded-lg dark:bg-green-950/20 bg-[#00000080] pt-[2px] pb-[2px] pl-[5px] pr-[5px] mt-[8px] mb-[8px]" data-testid={`payment-request-card-${paymentRequest.id}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="bg-green-600 text-white text-xs px-2 py-1 rounded font-medium">
@@ -2274,7 +2274,7 @@ export default function Messages() {
             {conversationsLoading ? (
               <div className="space-y-3" data-testid="conversations-loading">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="bg-card rounded-lg border border-border p-4 animate-pulse">
+                  <div key={i} className="bg-card rounded-lg hairline elev-rest p-4 animate-pulse">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-muted rounded-full"></div>
                       <div className="flex-1">
@@ -2290,7 +2290,7 @@ export default function Messages() {
                 {conversations.map((conversation: Conversation) => (
                   <div 
                     key={conversation.id}
-                    className="rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#e2e2e2]" 
+                    className="rounded-lg hairline elev-rest p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#e2e2e2]" 
                     data-testid={`card-conversation-${conversation.id}`}
                     onClick={() => {
                       setSelectedConversation(conversation.id);
