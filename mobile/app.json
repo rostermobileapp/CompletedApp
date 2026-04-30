@@ -42,14 +42,10 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "onesignal-expo-plugin",
-        {
-          "mode": "development",
-          "smallIcons": ["./assets/ic_stat_onesignal_default.png"],
-          "largeIcons": ["./assets/ic_onesignal_large_icon_default.png"]
-        }
-      ]
+      ["onesignal-expo-plugin", {
+        "smallIcons": ["./assets/ic_stat_onesignal_default.png"],
+        "largeIcons": ["./assets/ic_onesignal_large_icon_default.png"]
+      }]
     ],
     "extra": {
       "oneSignalAppId": "c73c3e8e-8121-4cb6-8979-a09427b5523c"
