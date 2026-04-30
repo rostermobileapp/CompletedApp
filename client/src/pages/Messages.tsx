@@ -824,36 +824,44 @@ export default function Messages() {
     return userTeams.map((t: any) => t.id);
   }, [userTeams]);
   
-  // Filter conversations by selected league, team, or tournament (client-side for instant filtering)
+  // Filter conversations by selected league, team, or tournament (client-side for instant filtering).
+  // Direct messages are personal channels — they always show, regardless of which
+  // league/team/tournament is currently selected on the dashboard.
   const conversations = useMemo(() => {
     let filtered = allConversations;
-    
+
     // Filter by tournament if one is selected
     if (selectedTournamentId) {
-      filtered = filtered.filter(conv => conv.tournamentId === selectedTournamentId);
+      filtered = filtered.filter(conv =>
+        conv.type === 'direct' || conv.tournamentId === selectedTournamentId
+      );
     }
     // Filter by team if one is selected - get the team's league and filter by that
     else if (selectedTeamId) {
       // Find the selected team to get its league ID
       const selectedTeamData = userTeams.find((t: any) => t.id === selectedTeamId);
       const teamLeagueId = selectedTeamData?.leagueId;
-      
-      // Filter by the team's league first
+
+      // Filter by the team's league first (DMs always show)
       if (teamLeagueId) {
-        filtered = filtered.filter(conv => conv.leagueId === teamLeagueId);
+        filtered = filtered.filter(conv =>
+          conv.type === 'direct' || conv.leagueId === teamLeagueId
+        );
       }
-      
+
       // Show team chat AND league-wide chats (direct, captain)
       // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
-      filtered = filtered.filter(conv => 
-        conv.teamId === selectedTeamId || conv.teamId === null
+      filtered = filtered.filter(conv =>
+        conv.type === 'direct' || conv.teamId === selectedTeamId || conv.teamId === null
       );
     }
     // Filter by league if one is selected
     else if (selectedLeagueId) {
-      filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
+      filtered = filtered.filter(conv =>
+        conv.type === 'direct' || conv.leagueId === selectedLeagueId
+      );
     }
-    
+
     return filtered;
   }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams, isFreeTier, userTeamIds]);
 

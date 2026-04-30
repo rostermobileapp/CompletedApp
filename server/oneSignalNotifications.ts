@@ -100,14 +100,41 @@ export async function sendMessagePushNotification(
   conversationId: string,
   messagePreview: string
 ): Promise<boolean> {
-  const truncatedPreview = messagePreview.length > 50 
-    ? messagePreview.substring(0, 50) + '...' 
+  // Free-tier users cannot read direct messages in-app — they only see a
+  // blurred row with an "Upgrade to view" CTA. The push notification must
+  // not leak the sender name or message content for those recipients.
+  let title = `💬 ${senderName}`;
+  let message = messagePreview.length > 50
+    ? messagePreview.substring(0, 50) + '...'
     : messagePreview;
-  
+
+  try {
+    const recipient = await storage.getUser(recipientId);
+    const recipientRole = recipient?.role || 'free_tier';
+    if (recipientRole === 'free_tier') {
+      const { messagingService } = await import('./messagingService');
+      const conversation = await messagingService.getConversation(conversationId);
+      // Censor when the conversation is a direct message OR when the lookup
+      // returns nothing (we'd rather omit content than risk leaking it for a
+      // free-tier user we can't classify).
+      if (!conversation || conversation.type === 'direct') {
+        title = 'New message';
+        message = 'Upgrade to view this message';
+      }
+    }
+  } catch (err) {
+    // If the lookup fails, fall back to the safer (censored) payload rather
+    // than risk leaking content. This keeps free-tier privacy intact even on
+    // transient errors.
+    console.error('[OneSignal] Failed to evaluate DM tier censoring; using generic payload:', err);
+    title = 'New message';
+    message = 'Upgrade to view this message';
+  }
+
   return sendPushNotificationToUser({
     userId: recipientId,
-    title: `💬 ${senderName}`,
-    message: truncatedPreview,
+    title,
+    message,
     data: {
       type: 'message',
       conversationId,
