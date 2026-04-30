@@ -1,5 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
+import { MotionConfig } from "framer-motion";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -318,10 +319,15 @@ function App() {
         <ThemeProvider>
           <TooltipProvider>
             <WebSocketProvider>
-              <Toaster />
-              <ErrorBoundary>
-                <Router />
-              </ErrorBoundary>
+              {/* Honor the user's OS-level "reduce motion" preference for any
+                  framer-motion animation in the app (e.g. the bottom-nav
+                  active-tab morph). */}
+              <MotionConfig reducedMotion="user">
+                <Toaster />
+                <ErrorBoundary>
+                  <Router />
+                </ErrorBoundary>
+              </MotionConfig>
             </WebSocketProvider>
           </TooltipProvider>
         </ThemeProvider>

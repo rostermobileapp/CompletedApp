@@ -134,10 +134,10 @@
   --shadow-2xl: 0px 25px 50px -12px hsl(0, 0%, 0%, 0.25);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
-  /* Depth/elevation trial tokens (light mode). */
-  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.05), 0 1px 3px 0 hsl(0 0% 0% / 0.05);
-  --elev-lift: 0 8px 16px -4px hsl(0 0% 0% / 0.18), 0 4px 8px -2px hsl(0 0% 0% / 0.10);
-  --hairline: 0 0% 0% / 0.06;
+  /* Depth/elevation trial tokens (light mode) — stronger pass for more depth. */
+  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.10), 0 6px 16px -2px hsl(0 0% 0% / 0.14);
+  --elev-lift: 0 6px 12px -2px hsl(0 0% 0% / 0.20), 0 18px 36px -8px hsl(0 0% 0% / 0.30);
+  --hairline: 0 0% 0% / 0.08;
 }
 
 .dark {
@@ -175,11 +175,11 @@
   --sidebar-accent-foreground: 0 0% 98%;
   --sidebar-border: 240 10% 6%;
   --sidebar-ring: 217 91% 60%;
-  /* Depth/elevation trial tokens (dark mode) — slightly stronger so the
-     soft drop shadows still register on the near-black background. */
-  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.45), 0 1px 3px 0 hsl(0 0% 0% / 0.35);
-  --elev-lift: 0 8px 18px -4px hsl(0 0% 0% / 0.6), 0 4px 8px -2px hsl(0 0% 0% / 0.4);
-  --hairline: 0 0% 100% / 0.08;
+  /* Depth/elevation trial tokens (dark mode) — heavier pass: shadows have
+     to push much further on near-black surfaces to read as "depth". */
+  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.55), 0 8px 20px -2px hsl(0 0% 0% / 0.55);
+  --elev-lift: 0 8px 16px -2px hsl(0 0% 0% / 0.70), 0 22px 44px -8px hsl(0 0% 0% / 0.65);
+  --hairline: 0 0% 100% / 0.10;
 }
 
 @layer base {
