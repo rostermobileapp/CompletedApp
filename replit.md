@@ -99,6 +99,13 @@ Approved design language for the mobile home screen as of Apr 2026. See
     `--elev-lift`; morphs between tabs via framer-motion `<LayoutGroup>`
     + shared `layoutId="active-nav-pill"` (spring 520/30/0.9). App is
     wrapped in `<MotionConfig reducedMotion="user">` for a11y.
+-   **App-wide rollout (Apr 2026)**: depth tokens are now baked into
+    the shared shadcn primitives (`Card`, `Input`, `Textarea`,
+    `Select`, `Dialog`, `AlertDialog`, `Sheet`, `Drawer`, `Popover`,
+    `DropdownMenu`, `ContextMenu`, `Menubar`, `HoverCard`, `Tooltip`,
+    `NavigationMenu`, `Command`, `Toast`, `Alert`) so every screen
+    inherits the depth treatment automatically. Active items in the
+    desktop sidebar (`DesktopAppShell.tsx`) also get `elev-lift`.
 -   **Themed accent glow** (`.alerts-glow`, `.bracket-glow`): pulse uses
     `rgb(59, 130, 246)` (theme primary blue), not red.
 -   **Nesting rule**: elevation IS applied to nested cards (poll cards

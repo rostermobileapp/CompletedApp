@@ -138,25 +138,35 @@ Pulsing-glow effects (`.alerts-glow` on the team selector,
 
 ## 6. Currently Applied To
 
-- `client/src/pages/Dashboard.tsx` — all 13 mobile home cards
-  (selector, 4-grid, tournament focus, Games Left, Alerts,
-  Scorekeeper, loading, approved scrimmages, bracket-glow, game,
-  empty, etc.)
-- `client/src/components/BottomNavigation.tsx` — the floating active
-  tab pill + framer-motion morph
-- `client/src/components/dashboard/ScheduleCalendarMobile.tsx` — the
-  mobile month-grid calendar container
+**App-wide via shared shadcn primitives** (Apr 2026 rollout — every
+screen inherits these automatically):
 
-## 7. Intentionally NOT Applied (yet)
+- `ui/card.tsx` → `hairline + elev-rest`
+- `ui/input.tsx` / `ui/textarea.tsx` → `hairline + elev-inset`
+- `ui/select.tsx` → trigger `hairline + elev-inset`,
+  content `hairline + elev-lift`
+- `ui/dialog.tsx`, `ui/alert-dialog.tsx`, `ui/sheet.tsx`,
+  `ui/drawer.tsx`, `ui/popover.tsx`, `ui/dropdown-menu.tsx`,
+  `ui/context-menu.tsx`, `ui/menubar.tsx`, `ui/hover-card.tsx`,
+  `ui/tooltip.tsx`, `ui/navigation-menu.tsx`, `ui/command.tsx`,
+  `ui/toast.tsx` → `hairline + elev-lift`
+- `ui/alert.tsx` → `hairline + elev-rest`
 
-Tracked for a future broader rollout:
+**Bespoke surfaces** (still wired manually because they don't go
+through a shadcn primitive):
 
-- Shared shadcn primitives (`Card`, `Input`, `Textarea`, `Select`,
-  modals/dialogs)
-- Desktop sidebar / DesktopAppShell
+- `pages/Dashboard.tsx` — all 13 mobile home cards
+- `pages/Teams.tsx` + `components/LineManager.tsx` — team header,
+  league standing, leaders, tournament cards, attendance alert,
+  roster, player pills
+- `pages/Messages.tsx` — conversation list, poll/payment cards,
+  creator panels, file chips, message bubbles, composer textarea
+- `components/BottomNavigation.tsx` — floating active-tab pill
+- `components/DesktopAppShell.tsx` — active sidebar nav items
+- `components/dashboard/ScheduleCalendarMobile.tsx` — month grid
 
-(Inner/nested cards used to be on this list. They are no longer
-excluded — see section 3 "Nesting".)
+(Inner/nested cards used to be excluded. They are no longer — see
+section 3 "Nesting".)
 
 ---
 
