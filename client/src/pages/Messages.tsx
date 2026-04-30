@@ -667,8 +667,32 @@ export default function Messages() {
   const [paymentRequestAmount, setPaymentRequestAmount] = useState('');
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [inputBarHeight, setInputBarHeight] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const inputContainerEl = useRef<HTMLDivElement | null>(null);
+  const inputResizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Callback ref that measures the bottom bar (input or upgrade banner) and
+  // re-measures whenever its size changes (e.g. attachments, poll creator).
+  const inputContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (inputResizeObserverRef.current) {
+      inputResizeObserverRef.current.disconnect();
+      inputResizeObserverRef.current = null;
+    }
+    inputContainerEl.current = node;
+    if (!node) {
+      setInputBarHeight(0);
+      return;
+    }
+    setInputBarHeight(node.getBoundingClientRect().height);
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        setInputBarHeight(node.getBoundingClientRect().height);
+      });
+      ro.observe(node);
+      inputResizeObserverRef.current = ro;
+    }
+  }, []);
 
   // Keyboard detection for mobile devices (including Android)
   useEffect(() => {
@@ -2048,7 +2072,16 @@ export default function Messages() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="h-full flex flex-col relative" data-testid="messages-page">
+      <div
+        className={
+          isDesktopWeb
+            ? 'h-full flex flex-col relative'
+            : selectedConversation
+              ? 'h-[100dvh] flex flex-col relative overflow-hidden'
+              : 'min-h-screen flex flex-col relative'
+        }
+        data-testid="messages-page"
+      >
         <div
           className={
             isDesktopWeb && selectedConversation
@@ -2286,7 +2319,18 @@ export default function Messages() {
               </div>
             )}
             <div ref={messagesScrollRef} className="absolute inset-0 overflow-y-auto z-10">
-            <div className="relative p-4 space-y-4 pb-4">
+            <div
+              className="relative p-4 space-y-4 pb-4"
+              style={
+                isDesktopWeb
+                  ? undefined
+                  : {
+                      paddingBottom: `${
+                        (inputBarHeight || 56) + (keyboardHeight > 0 ? 16 : 64 + 16)
+                      }px`,
+                    }
+              }
+            >
             {messagesLoading ? (
               <div className="space-y-4" data-testid="messages-loading">
                 {[1, 2, 3].map(i => (
@@ -2506,8 +2550,17 @@ export default function Messages() {
       {/* Upgrade to reply banner - shown for free tier users in non-team conversations */}
       {selectedConversation && !canSendMessage && (
         <div
-          className="bg-background border-t border-border p-4 flex items-center justify-between gap-4"
-          style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }}
+          ref={inputContainerRef}
+          className={
+            isDesktopWeb
+              ? 'bg-background border-t border-border p-4 flex items-center justify-between gap-4'
+              : 'fixed left-0 right-0 mx-auto max-w-[1000px] z-[60] bg-background border-t border-border p-4 flex items-center justify-between gap-4'
+          }
+          style={
+            isDesktopWeb
+              ? undefined
+              : { bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }
+          }
           data-testid="upgrade-to-reply-banner"
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -2534,8 +2587,16 @@ export default function Messages() {
       {selectedConversation && canSendMessage && (
         <div 
           ref={inputContainerRef}
-          className="bg-background border-t border-border p-4 pt-[4px] pb-[4px]"
-          style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : isDesktopWeb ? '0px' : '64px' }}
+          className={
+            isDesktopWeb
+              ? 'bg-background border-t border-border p-4 pt-[4px] pb-[4px]'
+              : 'fixed left-0 right-0 mx-auto max-w-[1000px] z-[60] bg-background border-t border-border p-4 pt-[4px] pb-[4px]'
+          }
+          style={
+            isDesktopWeb
+              ? undefined
+              : { bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '64px' }
+          }
           data-testid="message-input-container"
         >
           {/* File previews */}
