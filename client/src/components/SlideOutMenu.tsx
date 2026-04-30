@@ -228,7 +228,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
                   key={item.path}
                   onClick={() => handleNavigate(item.path, item.locked)}
                   disabled={isLoading}
-                  className={`w-full bg-card border border-border rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${showLock ? 'opacity-50' : ''} ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
+                  className={`w-full bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-3 flex items-center justify-between transition-all hover:bg-card/80 hover:border-primary/50 ${showLock ? 'opacity-50' : ''} ${isLoading ? 'opacity-70 cursor-wait' : ''}`}
                   data-testid={`menu-item-${item.path.replace(/\//g, '-')}`}
                 >
                   <div className="flex items-center gap-3">

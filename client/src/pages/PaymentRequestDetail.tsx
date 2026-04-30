@@ -147,7 +147,7 @@ export default function PaymentRequestDetail() {
         </div>
 
         {/* Payment Details Card */}
-        <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <h1 className="text-2xl font-bold mb-2" data-testid="text-request-title">{request.title}</h1>
@@ -215,7 +215,7 @@ export default function PaymentRequestDetail() {
         </div>
 
         {/* Recipients List */}
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <h2 className="text-lg font-semibold mb-4" data-testid="text-recipients-title">
             Recipients ({totalRecipients})
           </h2>

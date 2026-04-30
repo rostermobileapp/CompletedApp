@@ -566,7 +566,7 @@ export default function Subscription() {
       </div>
       {/* Current Status */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <div className="flex items-center gap-3 mb-3">
             <Crown className="w-6 h-6 text-primary" />
             <h2 className="text-lg font-semibold">Current Plan</h2>

@@ -125,7 +125,7 @@ export default function ScoreVerification() {
     };
 
     return (
-      <div className="bg-card border border-border rounded-lg p-4 pt-[4px] pb-[4px]">
+      <div className="bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-4 pt-[4px] pb-[4px]">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-medium">
             {game.homeTeam?.name} vs {game.awayTeam?.name}
@@ -279,7 +279,7 @@ export default function ScoreVerification() {
     };
 
     return (
-      <div className="bg-card border border-border rounded-lg p-4">
+      <div className="bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-amber-500" />

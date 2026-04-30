@@ -298,7 +298,7 @@ export default function GameDetails() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse">
             <div className="h-32 bg-muted rounded"></div>
           </div>
         </div>
@@ -327,7 +327,7 @@ export default function GameDetails() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <p className="text-center text-muted-foreground">Game not found</p>
           </div>
         </div>
@@ -361,7 +361,7 @@ export default function GameDetails() {
 
         <div className="px-6 py-6 space-y-6">
           {/* Scrimmage Info */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                 <Trophy className="w-6 h-6 text-primary-foreground" />
@@ -402,7 +402,7 @@ export default function GameDetails() {
           </div>
 
           {/* Approved Players */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">
@@ -467,7 +467,7 @@ export default function GameDetails() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <p className="text-center text-muted-foreground">Game not found</p>
           </div>
         </div>
@@ -635,7 +635,7 @@ export default function GameDetails() {
       </div>
       {/* Game Info */}
       <div className="px-6 py-6 space-y-6 pt-[4px] pb-[4px] pl-[12px] pr-[12px]">
-        <div className="rounded-xl border border-border p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2] dark:bg-[#212121]">
+        <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[2px] pb-[2px] pl-[5px] pr-[5px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center gap-4 mb-4">
             <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
               {opponentTeam?.logoUrl ? (
@@ -703,7 +703,7 @@ export default function GameDetails() {
 
         {/* RSVP Section */}
         {!isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
+          <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[0px] mb-[0px] pt-[2px] pb-[2px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               RSVP & Attendance
@@ -793,7 +793,7 @@ export default function GameDetails() {
 
         {/* Score Submission */}
         {(canSubmitScore || isGameCompleted) && (
-          <div className="bg-card rounded-xl border border-border p-6 mt-[4px] mb-[4px] pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[4px] mb-[4px] pt-[4px] pb-[4px] pl-[4px] pr-[4px]">
             <h3 className="text-lg font-semibold mb-4" data-testid="text-score-title">
               <Target className="w-5 h-5 inline mr-2" />
               Game Score
@@ -1031,7 +1031,7 @@ export default function GameDetails() {
 
         {/* Game Stars Section */}
         {!isScrimmage && isGameCompleted && (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121]">
+          <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 bg-[#e2e2e2] dark:bg-[#212121]">
             <h3 className="text-lg font-semibold mb-4" data-testid="text-stars-title">
               <Star className="w-5 h-5 inline mr-2 text-yellow-500" />
               Three Stars of the Game

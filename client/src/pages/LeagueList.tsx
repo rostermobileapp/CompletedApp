@@ -124,7 +124,7 @@ export default function LeagueList() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by name or League ID..."
-            className="w-full bg-card border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             data-testid="input-search-league"
           />
         </div>
@@ -133,7 +133,7 @@ export default function LeagueList() {
       {/* Leagues List */}
       <div className="px-6">
         {!leagues || leagues.length === 0 ? (
-          <div className="bg-card rounded-xl border border-border p-8 text-center">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-8 text-center">
             <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No leagues yet</h3>
             <p className="text-muted-foreground mb-4">
@@ -148,7 +148,7 @@ export default function LeagueList() {
             </button>
           </div>
         ) : filteredLeagues.length === 0 ? (
-          <div className="bg-card rounded-xl border border-border p-8 text-center">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-8 text-center">
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No leagues found</h3>
             <p className="text-muted-foreground mb-4">

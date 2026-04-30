@@ -15,7 +15,7 @@ export function AdSenseBanner() {
       data-testid="adsense-banner-container"
     >
       <div 
-        className="adsense-banner flex items-center justify-center bg-background border border-border rounded"
+        className="adsense-banner flex items-center justify-center bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded"
         style={{ width: '320px', height: '50px' }}
         data-testid="adsense-banner"
       >

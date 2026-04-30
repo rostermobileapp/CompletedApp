@@ -188,7 +188,7 @@ export default function CreatePaymentRequest() {
         {/* Form */}
         <form id="create-payment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Payment Details Card */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <div className="flex items-center gap-2 mb-4">
               <DollarSign className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">Payment Details</h2>
@@ -248,7 +248,7 @@ export default function CreatePaymentRequest() {
           </div>
 
           {/* Recipients Card */}
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />

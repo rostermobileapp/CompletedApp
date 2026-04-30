@@ -132,7 +132,7 @@ export default function TeamView() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse">
             <div className="h-32 bg-muted rounded"></div>
           </div>
         </div>
@@ -165,7 +165,7 @@ export default function TeamView() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <p className="text-center text-muted-foreground">Team not found</p>
           </div>
         </div>
@@ -200,7 +200,7 @@ export default function TeamView() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse">
             <div className="h-32 bg-muted rounded"></div>
           </div>
         </div>

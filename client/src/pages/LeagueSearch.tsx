@@ -140,7 +140,7 @@ export default function LeagueSearch() {
           // Searching - show loading state
           <div className="space-y-4" data-testid="loading-leagues">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-card rounded-xl border border-border p-4 animate-pulse">
+              <div key={i} className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse">
                 <div className="h-20 bg-muted rounded"></div>
               </div>
             ))}
@@ -149,7 +149,7 @@ export default function LeagueSearch() {
           // Search results found - show leagues
           <div className="space-y-4">
             {leagues.map((league: any) => (
-              <div key={league.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-league-${league.id}`}>
+              <div key={league.id} className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4" data-testid={`card-league-${league.id}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-semibold text-lg" data-testid={`text-league-name-${league.id}`}>
@@ -222,7 +222,7 @@ export default function LeagueSearch() {
               value={joinMessage}
               onChange={(e) => setJoinMessage(e.target.value)}
               placeholder="e.g., Hi! I'm an experienced player looking to join a competitive league..."
-              className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+              className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
               maxLength={500}
               data-testid="textarea-join-message"
             />

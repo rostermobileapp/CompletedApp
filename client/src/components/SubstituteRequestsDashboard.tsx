@@ -128,7 +128,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {/* Original Player */}
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Player Unable to Attend:</p>
-          <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
+          <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <ClickableAvatar
               userId={request.originalPlayer.id}
               profileImageUrl={request.originalPlayer.profileImageUrl}
@@ -151,7 +151,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {request.substitutePlayer && (
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Requested Substitute:</p>
-            <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
+            <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
               <ClickableAvatar
                 userId={request.substitutePlayer.id}
                 profileImageUrl={request.substitutePlayer.profileImageUrl}
@@ -174,7 +174,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {/* Requested By */}
         <div>
           <p className="text-sm font-medium text-muted-foreground mb-2">Requested By:</p>
-          <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
+          <div className="flex items-center gap-3 p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <User className="h-4 w-4" />
             <div>
               <p className="text-sm font-medium">
@@ -189,7 +189,7 @@ export function SubstituteRequestsDashboard({ className, gameId }: SubstituteReq
         {request.reason && (
           <div>
             <p className="text-sm font-medium text-muted-foreground mb-2">Reason:</p>
-            <div className="p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-border">
+            <div className="p-3 bg-[#e2e2e2] dark:bg-[#212121] rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
               <p className="text-sm">{request.reason}</p>
             </div>
           </div>

@@ -63,7 +63,7 @@ export default function TeamSearch() {
         ) : isLoading ? (
           <div className="space-y-4" data-testid="loading-teams">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-card rounded-xl border border-border p-4 animate-pulse">
+              <div key={i} className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse">
                 <div className="h-20 bg-muted rounded"></div>
               </div>
             ))}
@@ -71,7 +71,7 @@ export default function TeamSearch() {
         ) : teams && teams.length > 0 ? (
           <div className="space-y-4">
             {teams.map((team: any) => (
-              <div key={team.id} className="bg-card rounded-xl border border-border p-4" data-testid={`card-team-${team.id}`}>
+              <div key={team.id} className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4" data-testid={`card-team-${team.id}`}>
                 <div className="flex items-start gap-4">
                   {team.logoUrl && (
                     <img 

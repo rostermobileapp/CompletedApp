@@ -2258,7 +2258,7 @@ export default function LeagueManagement() {
         </div>
 
         <div className="px-6 flex-1">
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <h3 className="text-lg font-semibold mb-4">Your Leagues</h3>
             {userLeagues.length === 0 ? (
               <div className="text-center py-8">
@@ -2354,7 +2354,7 @@ export default function LeagueManagement() {
               <select
                 value={selectedSeasonId}
                 onChange={(e) => setSelectedSeasonId(e.target.value)}
-                className="w-full p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full p-2 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 data-testid="select-season"
               >
                 {seasons.map((season) => (
@@ -2377,7 +2377,7 @@ export default function LeagueManagement() {
 
         {/* Create First Season */}
         {seasons.length === 0 && (
-          <div className="mb-4 p-4 bg-card border border-border rounded-lg">
+          <div className="mb-4 p-4 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium">No seasons yet</h3>
@@ -2476,7 +2476,7 @@ export default function LeagueManagement() {
 
             {/* Import Panel */}
             {showBulkImport && (
-              <div className="mt-4 p-4 bg-card rounded-lg border border-border">
+              <div className="mt-4 p-4 bg-card rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
                 <div className="flex flex-col gap-3">
                   {/* Download Template Button */}
                   <div className="flex items-center justify-between pb-2 border-b border-border">
@@ -2554,7 +2554,7 @@ export default function LeagueManagement() {
             {/* Manual Add Player Modal */}
             {showManualAddPlayer && (
               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-card rounded-lg border border-border p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div className="bg-card rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold mb-4">Add Player Manually</h3>
                   
                   <form onSubmit={(e) => {
@@ -2567,7 +2567,7 @@ export default function LeagueManagement() {
                         type="text"
                         value={manualPlayerForm.firstName}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, firstName: e.target.value})}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="First name"
                         required
                         data-testid="input-manual-player-first-name"
@@ -2580,7 +2580,7 @@ export default function LeagueManagement() {
                         type="text"
                         value={manualPlayerForm.lastName}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, lastName: e.target.value})}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Last name"
                         required
                         data-testid="input-manual-player-last-name"
@@ -2593,7 +2593,7 @@ export default function LeagueManagement() {
                         type="email"
                         value={manualPlayerForm.email}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, email: e.target.value})}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Email address"
                         required
                         data-testid="input-manual-player-email"
@@ -2606,7 +2606,7 @@ export default function LeagueManagement() {
                         type="tel"
                         value={manualPlayerForm.phoneNumber}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, phoneNumber: e.target.value})}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Phone number (optional)"
                         data-testid="input-manual-player-phone"
                       />
@@ -2618,7 +2618,7 @@ export default function LeagueManagement() {
                         value={manualPlayerForm.seasonId}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, seasonId: e.target.value})}
                         disabled={seasonsLoading}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                         data-testid="select-manual-player-season"
                       >
                         <option value="">
@@ -2637,7 +2637,7 @@ export default function LeagueManagement() {
                       <select
                         value={manualPlayerForm.assignedTeamId}
                         onChange={(e) => setManualPlayerForm({...manualPlayerForm, assignedTeamId: e.target.value})}
-                        className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         data-testid="select-manual-player-team"
                       >
                         <option value="">No team (optional)</option>
@@ -2684,7 +2684,7 @@ export default function LeagueManagement() {
 
             {/* Pending Approvals */}
             {pendingMembers.length > 0 && (
-              <div className="bg-card rounded-xl border border-border p-6">
+              <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <UserPlus className="w-5 h-5 text-warning" />
                   <h3 className="text-lg font-semibold">Pending Approval ({pendingMembers.length})</h3>
@@ -2743,7 +2743,7 @@ export default function LeagueManagement() {
 
             {/* Team Join Requests */}
             {teamJoinRequests.length > 0 && (
-              <div className="bg-card rounded-xl border border-border p-6">
+              <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Users className="w-5 h-5 text-warning" />
                   <h3 className="text-lg font-semibold">Team Join Requests ({teamJoinRequests.length})</h3>
@@ -2803,7 +2803,7 @@ export default function LeagueManagement() {
             )}
 
             {/* Approved Members */}
-            <div className="bg-card rounded-xl border border-border p-6">
+            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <UserCheck className="w-5 h-5 text-green-500/50" />
@@ -2904,7 +2904,7 @@ export default function LeagueManagement() {
         {/* Team Management Tab */}
         {activeTab === 'teams' && (
           <div className="space-y-6">
-            <div className="bg-card rounded-xl border border-border p-6">
+            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   {selectedTeam && (
@@ -2953,7 +2953,7 @@ export default function LeagueManagement() {
                       <label className="block text-sm font-medium mb-2">Team Name</label>
                       <input
                         {...teamForm.register('name')}
-                        className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Enter team name"
                         data-testid="input-team-name"
                       />
@@ -3235,7 +3235,7 @@ export default function LeagueManagement() {
         {/* Game Scheduling Tab */}
         {activeTab === 'games' && (
           <div className="space-y-6">
-            <div className="bg-card rounded-xl border border-border p-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
+            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Calendar className="w-5 h-5 text-primary" />
@@ -3379,7 +3379,7 @@ export default function LeagueManagement() {
                         <label className="block text-sm font-medium mb-2">Home Team</label>
                         <select
                           {...gameForm.register('homeTeamId')}
-                          className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           data-testid="select-home-team"
                         >
                           <option value="">Select home team</option>
@@ -3397,7 +3397,7 @@ export default function LeagueManagement() {
                         </label>
                         <select
                           {...gameForm.register('awayTeamId')}
-                          className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           data-testid="select-away-team"
                         >
                           {gameForm.watch('isScrimmage') ? (
@@ -3421,7 +3421,7 @@ export default function LeagueManagement() {
                       <input
                         {...gameForm.register('scheduledAt')}
                         type="datetime-local"
-                        className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         data-testid="input-game-time"
                       />
                     </div>
@@ -3429,7 +3429,7 @@ export default function LeagueManagement() {
                       <label className="block text-sm font-medium mb-2">Venue (optional)</label>
                       <input
                         {...gameForm.register('venue')}
-                        className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Game venue"
                         data-testid="input-venue"
                       />
@@ -3458,7 +3458,7 @@ export default function LeagueManagement() {
 
               {/* Schedule Import Panel */}
               {showScheduleImport && (
-                <div className="mb-6 p-4 bg-card rounded-lg border border-border">
+                <div className="mb-6 p-4 bg-card rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
                   <div className="flex flex-col gap-3">
                     {/* Download Template Button */}
                     <div className="flex items-center justify-between pb-2 border-b border-border">
@@ -3791,7 +3791,7 @@ export default function LeagueManagement() {
       {/* Player Detail Modal */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -3813,7 +3813,7 @@ export default function LeagueManagement() {
                   <select
                     value={playerEditForm.assignedTeamId}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, assignedTeamId: e.target.value }))}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="">No team assigned</option>
                     {teams.map((team: Team) => (
@@ -3830,7 +3830,7 @@ export default function LeagueManagement() {
                       type="text"
                       value={playerEditForm.displayFirstName}
                       onChange={(e) => setPlayerEditForm(prev => ({ ...prev, displayFirstName: e.target.value }))}
-                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="Enter first name"
                       data-testid="input-first-name"
                     />
@@ -3841,7 +3841,7 @@ export default function LeagueManagement() {
                       type="text"
                       value={playerEditForm.displayLastName}
                       onChange={(e) => setPlayerEditForm(prev => ({ ...prev, displayLastName: e.target.value }))}
-                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="Enter last name"
                       data-testid="input-last-name"
                     />
@@ -3915,7 +3915,7 @@ export default function LeagueManagement() {
                     type="text"
                     value={playerEditForm.position}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, position: e.target.value }))}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., Forward, Defense, Goalie"
                   />
                 </div>
@@ -3927,7 +3927,7 @@ export default function LeagueManagement() {
                     type="text"
                     value={playerEditForm.skillLevel}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, skillLevel: e.target.value }))}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., 1-10, A-E, Beginner"
                   />
                 </div>
@@ -3941,7 +3941,7 @@ export default function LeagueManagement() {
                     max="99"
                     value={playerEditForm.jerseyNumber}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, jerseyNumber: e.target.value }))}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Enter jersey number"
                   />
                 </div>
@@ -3953,7 +3953,7 @@ export default function LeagueManagement() {
                     value={playerEditForm.notes}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, notes: e.target.value }))}
                     rows={3}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                     placeholder="Add notes about this player..."
                   />
                 </div>
@@ -3964,7 +3964,7 @@ export default function LeagueManagement() {
                   <select
                     value={playerEditForm.timezone}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, timezone: e.target.value }))}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="select-player-timezone"
                   >
                     {TIMEZONES.map((tz) => (
@@ -4162,7 +4162,7 @@ export default function LeagueManagement() {
       {/* Edit League Modal */}
       {showEditLeague && league && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden">
             <div className="px-6 pt-6 pb-4 flex-shrink-0 flex items-center justify-between">
               <h2 className="text-xl font-bold">Edit League</h2>
               <button
@@ -4187,7 +4187,7 @@ export default function LeagueManagement() {
                   <input
                     {...editLeagueForm.register('name')}
                     type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Enter league name"
                     data-testid="input-league-name"
                   />
@@ -4204,7 +4204,7 @@ export default function LeagueManagement() {
                   <textarea
                     {...editLeagueForm.register('description')}
                     rows={3}
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                     placeholder="Describe your league..."
                     data-testid="input-league-description"
                   />
@@ -4227,7 +4227,7 @@ export default function LeagueManagement() {
                             value={facilitySearch}
                             onChange={(e) => setFacilitySearch(e.target.value)}
                             placeholder="Search for a facility..."
-                            className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                             data-testid="input-facility-search"
                           />
                           {facilitySearch && facilities.length > 0 && (
@@ -4300,7 +4300,7 @@ export default function LeagueManagement() {
                   <input
                     {...editLeagueForm.register('season')}
                     type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., Spring 2024"
                     data-testid="input-league-season"
                   />
@@ -4458,7 +4458,7 @@ export default function LeagueManagement() {
                       value={coCommissionerEmail}
                       onChange={(e) => setCoCommissionerEmail(e.target.value)}
                       placeholder="Enter user's email"
-                      className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="flex-1 p-2 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="input-cocommissioner-email"
                     />
                     <button
@@ -4527,7 +4527,7 @@ export default function LeagueManagement() {
                       value={adminEmail}
                       onChange={(e) => setAdminEmail(e.target.value)}
                       placeholder="Enter league member's email"
-                      className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="flex-1 p-2 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="input-admin-email"
                     />
                     <button
@@ -4596,7 +4596,7 @@ export default function LeagueManagement() {
                       value={statManagerEmail}
                       onChange={(e) => setStatManagerEmail(e.target.value)}
                       placeholder="Enter scorekeeper's email"
-                      className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="flex-1 p-2 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="input-stat-manager-email"
                     />
                     <button
@@ -4627,7 +4627,7 @@ export default function LeagueManagement() {
                     <input
                       type="email"
                       placeholder="Enter new commissioner's email"
-                      className="flex-1 p-2 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="flex-1 p-2 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                       data-testid="input-new-commissioner-email"
                     />
                     <button
@@ -4709,7 +4709,7 @@ export default function LeagueManagement() {
       {/* Create Season Modal */}
       {showCreateSeason && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">Create New Season</h2>
@@ -4734,7 +4734,7 @@ export default function LeagueManagement() {
                   <input
                     {...seasonForm.register('name')}
                     type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., Spring 2024, Fall League 2023"
                     data-testid="input-season-name"
                   />
@@ -4751,7 +4751,7 @@ export default function LeagueManagement() {
                   <input
                     {...seasonForm.register('startDate')}
                     type="date"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-season-start-date"
                   />
                 </div>
@@ -4762,7 +4762,7 @@ export default function LeagueManagement() {
                   <input
                     {...seasonForm.register('endDate')}
                     type="date"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-season-end-date"
                   />
                 </div>
@@ -4807,7 +4807,7 @@ export default function LeagueManagement() {
       {/* Create Facility Modal */}
       {showCreateFacility && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">Create New Facility</h2>
@@ -4835,7 +4835,7 @@ export default function LeagueManagement() {
                   <input
                     {...createFacilityForm.register('name')}
                     type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., Downtown Ice Arena"
                     data-testid="input-facility-name"
                   />
@@ -4852,7 +4852,7 @@ export default function LeagueManagement() {
                   <input
                     {...createFacilityForm.register('address')}
                     type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="e.g., 123 Main Street"
                     data-testid="input-facility-address"
                   />
@@ -4865,7 +4865,7 @@ export default function LeagueManagement() {
                     <input
                       {...createFacilityForm.register('city')}
                       type="text"
-                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="City"
                       data-testid="input-facility-city"
                     />
@@ -4875,7 +4875,7 @@ export default function LeagueManagement() {
                     <input
                       {...createFacilityForm.register('state')}
                       type="text"
-                      className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="State"
                       data-testid="input-facility-state"
                     />
@@ -4887,7 +4887,7 @@ export default function LeagueManagement() {
                   <input
                     {...createFacilityForm.register('zipCode')}
                     type="text"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Zip Code"
                     data-testid="input-facility-zip"
                   />
@@ -4899,7 +4899,7 @@ export default function LeagueManagement() {
                   <input
                     {...createFacilityForm.register('phoneNumber')}
                     type="tel"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="(555) 123-4567"
                     data-testid="input-facility-phone"
                   />
@@ -4910,7 +4910,7 @@ export default function LeagueManagement() {
                   <input
                     {...createFacilityForm.register('email')}
                     type="email"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="facility@example.com"
                     data-testid="input-facility-email"
                   />
@@ -4927,7 +4927,7 @@ export default function LeagueManagement() {
                   <input
                     {...createFacilityForm.register('website')}
                     type="url"
-                    className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="https://facility.com"
                     data-testid="input-facility-website"
                   />
@@ -4963,7 +4963,7 @@ export default function LeagueManagement() {
       {/* Edit Game Modal */}
       {showEditGame && selectedGame && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -5032,7 +5032,7 @@ export default function LeagueManagement() {
                     <label className="block text-xs font-medium mb-1">Home Team</label>
                     <select
                       {...editGameForm.register('homeTeamId')}
-                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-2 text-sm bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="select-home-team"
                     >
                       <option value="">Select</option>
@@ -5045,7 +5045,7 @@ export default function LeagueManagement() {
                     <label className="block text-xs font-medium mb-1">Away Team</label>
                     <select
                       {...editGameForm.register('awayTeamId')}
-                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-2 text-sm bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="select-away-team"
                     >
                       <option value="">Select</option>
@@ -5069,7 +5069,7 @@ export default function LeagueManagement() {
                             <button
                               type="button"
                               onClick={() => setShowDatePicker(!showDatePicker)}
-                              className="w-full p-2 pr-8 text-sm bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                              className="w-full p-2 pr-8 text-sm bg-card text-card-foreground border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
                               data-testid="button-game-date"
                             >
                               {field.value ? (() => {
@@ -5130,7 +5130,7 @@ export default function LeagueManagement() {
                             <button
                               type="button"
                               onClick={() => setShowTimePicker(!showTimePicker)}
-                              className="w-full p-2 pr-8 text-sm bg-card text-card-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
+                              className="w-full p-2 pr-8 text-sm bg-card text-card-foreground border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-left"
                               data-testid="button-game-time"
                             >
                               {field.value ? (() => {
@@ -5149,7 +5149,7 @@ export default function LeagueManagement() {
                                   <div className="flex items-start justify-center gap-4">
                                     <div className="flex flex-col items-center">
                                       <div className="text-sm font-semibold mb-2 text-foreground">Hour</div>
-                                      <div className="h-32 w-14 overflow-y-auto border border-border rounded-lg bg-card">
+                                      <div className="h-32 w-14 overflow-y-auto border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg bg-card">
                                         {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
                                           <button
                                             key={hour}
@@ -5187,7 +5187,7 @@ export default function LeagueManagement() {
                                     <div className="flex items-center text-xl font-bold text-muted-foreground mt-8">:</div>
                                     <div className="flex flex-col items-center">
                                       <div className="text-sm font-semibold mb-2 text-foreground">Min</div>
-                                      <div className="h-32 w-14 overflow-y-auto border border-border rounded-lg bg-card">
+                                      <div className="h-32 w-14 overflow-y-auto border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg bg-card">
                                         {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
                                           <button
                                             key={minute}
@@ -5270,7 +5270,7 @@ export default function LeagueManagement() {
                     {...editGameForm.register('venue')}
                     type="text"
                     placeholder="Enter rink name"
-                    className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-2 text-sm bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-game-venue"
                   />
                 </div>
@@ -5283,7 +5283,7 @@ export default function LeagueManagement() {
                       {...editGameForm.register('homeTeamLockerRoom')}
                       type="text"
                       placeholder="Home locker"
-                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-2 text-sm bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="input-home-locker-room"
                     />
                   </div>
@@ -5293,7 +5293,7 @@ export default function LeagueManagement() {
                       {...editGameForm.register('awayTeamLockerRoom')}
                       type="text"
                       placeholder="Away locker"
-                      className="w-full p-2 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full p-2 text-sm bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="input-away-locker-room"
                     />
                   </div>
@@ -5638,7 +5638,7 @@ export default function LeagueManagement() {
                         )}
 
                         {/* Commissioner Score Override */}
-                        <div className="bg-card border border-border rounded-lg p-4">
+                        <div className="bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-4">
                           <h4 className="text-sm font-medium mb-3">Commissioner Score Override</h4>
                           <div className="grid grid-cols-2 gap-3 mb-3">
                             <div>
@@ -5818,7 +5818,7 @@ export default function LeagueManagement() {
       {/* Delete Game Confirmation Modal */}
       {showDeleteConfirmation && selectedGame && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] max-w-md w-full">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
@@ -5878,7 +5878,7 @@ export default function LeagueManagement() {
       {/* Delete Team Confirmation Modal */}
       {showDeleteTeamConfirmation && teamToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl border border-border max-w-md w-full">
+          <div className="bg-background rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] max-w-md w-full">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
@@ -5950,7 +5950,7 @@ export default function LeagueManagement() {
       {/* Player Approval Modal */}
       {showMergeModal && selectedMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-border">
+          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
                 {approvalMode === 'initial' ? 'Approve Player' : 'Replace Placeholder'}
@@ -6029,7 +6029,7 @@ export default function LeagueManagement() {
                         });
                         setPlaceholderSearchResults(placeholders);
                       }}
-                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
+                      className="w-full px-3 py-2 border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg bg-background text-foreground"
                     />
                   </div>
                   
@@ -6159,7 +6159,7 @@ export default function LeagueManagement() {
       {/* Post-Merge Placeholder Delete Dialog */}
       {showPostMergeDeleteDialog && postMergePlaceholderInfo && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-border">
+          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Delete Placeholder User?</h3>
               <button
@@ -6245,7 +6245,7 @@ export default function LeagueManagement() {
       {/* Delete Placeholder With Stats Dialog */}
       {showDeletePlaceholderWithStatsDialog && playerToDeleteWithStats && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-border">
+          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-amber-500">Placeholder Has Stats</h3>
               <button
@@ -6318,7 +6318,7 @@ export default function LeagueManagement() {
       {/* Edit Team Modal */}
       {showEditTeam && selectedTeamForEdit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Edit Team</h3>
               <button
@@ -6438,7 +6438,7 @@ export default function LeagueManagement() {
       {/* Replace Player Modal */}
       {showReplacePlayerModal && selectedPlayerToReplace && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 pt-8 z-50">
-          <div className="bg-card rounded-lg p-6 max-w-lg w-full border border-border max-h-[85vh] overflow-hidden flex flex-col">
+          <div className="bg-card rounded-lg p-6 max-w-lg w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] max-h-[85vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Replace Player</h3>
               <button
@@ -6479,7 +6479,7 @@ export default function LeagueManagement() {
                     value={replaceSearchQuery}
                     onChange={(e) => setReplaceSearchQuery(e.target.value)}
                     placeholder="Search by name or email..."
-                    className="flex-1 p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="flex-1 p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-replace-search"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && replaceSearchQuery.trim().length >= 2) {

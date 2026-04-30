@@ -112,7 +112,7 @@ export default function TeamEventDetails() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-4 animate-pulse">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse">
             <div className="h-32 bg-muted rounded"></div>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function TeamEventDetails() {
           </div>
         </div>
         <div className="px-6 py-6">
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <p className="text-center text-muted-foreground">Event not found</p>
           </div>
         </div>
@@ -192,7 +192,7 @@ export default function TeamEventDetails() {
       </div>
 
       <div className="px-6 py-6 space-y-6">
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <div className="flex items-center gap-4 mb-4">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
               isScrimmage ? 'bg-orange-500' : 'bg-blue-500'
@@ -285,7 +285,7 @@ export default function TeamEventDetails() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold">Attendance</h3>

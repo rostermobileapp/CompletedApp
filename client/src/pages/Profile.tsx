@@ -401,7 +401,7 @@ export default function Profile() {
       <div className="sticky top-0 z-10 bg-background">
         {/* Profile Info */}
         <div className="px-6 pt-[24px] pb-[8px]">
-          <div className="bg-card rounded-xl border border-border p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
             <div className="relative flex-shrink-0">
               <div className={`w-20 h-20 rounded-full flex items-center justify-center ${(user as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}>
                 {(user as any)?.profileImageUrl ? (
@@ -477,7 +477,7 @@ export default function Profile() {
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
         {/* Profile Details */}
         <div className="px-6 mb-6 pt-2">
-        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
+        <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
             <button
@@ -497,7 +497,7 @@ export default function Profile() {
                   <label className="block text-sm font-medium mb-1">First Name</label>
                   <input
                     {...form.register('firstName')}
-                    className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-first-name"
                   />
                 </div>
@@ -505,7 +505,7 @@ export default function Profile() {
                   <label className="block text-sm font-medium mb-1">Last Name</label>
                   <input
                     {...form.register('lastName')}
-                    className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     data-testid="input-last-name"
                   />
                 </div>
@@ -516,7 +516,7 @@ export default function Profile() {
                 <input
                   {...form.register('email')}
                   type="email"
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="your@email.com"
                   data-testid="input-email"
                 />
@@ -530,7 +530,7 @@ export default function Profile() {
                 <input
                   {...form.register('dateOfBirth')}
                   type="date"
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="input-date-of-birth"
                 />
               </div>
@@ -539,7 +539,7 @@ export default function Profile() {
                 <label className="block text-sm font-medium mb-1">City</label>
                 <input
                   {...form.register('city')}
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Your city of residence"
                   data-testid="input-city"
                 />
@@ -549,7 +549,7 @@ export default function Profile() {
                 <label className="block text-sm font-medium mb-1">Zip Code</label>
                 <input
                   {...form.register('zipCode')}
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="e.g. 80203 or T2P"
                   data-testid="input-zip-code"
                 />
@@ -655,7 +655,7 @@ export default function Profile() {
       <div className="px-6 mb-6">
         <div className="overflow-hidden rounded-xl">
           <FeatureLockOverlay isLocked={!canAccessPremiumFeatures()}>
-            <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
+            <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold" data-testid="text-payment-methods-title">Payment Methods</h2>
@@ -680,7 +680,7 @@ export default function Profile() {
                 <label className="block text-sm font-medium mb-1">Venmo Username</label>
                 <input
                   {...paymentMethodsForm.register('venmoUsername')}
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="@username"
                   data-testid="input-venmo-username"
                 />
@@ -691,7 +691,7 @@ export default function Profile() {
                 <label className="block text-sm font-medium mb-1">CashApp Username</label>
                 <input
                   {...paymentMethodsForm.register('cashappUsername')}
-                  className="w-full p-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="$username"
                   data-testid="input-cashapp-username"
                 />
@@ -754,7 +754,7 @@ export default function Profile() {
           <h2 className="text-lg font-semibold mb-4" data-testid="text-leagues-title">Your Leagues</h2>
           <div className="space-y-3">
             {userLeagues.map((league: any) => (
-              <div key={league.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid={`card-league-${league.id}`}>
+              <div key={league.id} className="rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid={`card-league-${league.id}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Users className="w-5 h-5 text-muted-foreground" />
@@ -816,7 +816,7 @@ export default function Profile() {
               const showDeleteButton = isCaptain; // Captains can delete teams they manage
               
               return (
-                <div key={team.id} className="rounded-lg border border-border p-4 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid={`card-team-${team.id}`}>
+                <div key={team.id} className="rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid={`card-team-${team.id}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <Users className="w-5 h-5 text-muted-foreground" />
@@ -908,7 +908,7 @@ export default function Profile() {
         <div className="space-y-2">
           {/* Theme Toggle — hidden on desktop web; desktop is light-only */}
           {!isDesktopWeb && (
-            <div className="w-full border border-border rounded-lg p-4 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121] pt-[16px] pb-[16px]">
+            <div className="w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-4 flex items-center justify-between bg-[#e2e2e2] dark:bg-[#212121] pt-[16px] pb-[16px]">
               <div className="flex items-center gap-3">
                 <Moon className="w-5 h-5 text-muted-foreground" />
                 <span>Light Mode</span>
@@ -921,7 +921,7 @@ export default function Profile() {
             <button
               key={index}
               onClick={item.action}
-              className="w-full border border-border rounded-lg p-4 flex items-center justify-between hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121]"
+              className="w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-4 flex items-center justify-between hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid={`button-setting-${index}`}
             >
               <div className="flex items-center gap-3">
@@ -1028,7 +1028,7 @@ export default function Profile() {
               // Force a full page reload to the login page to clear all state
               window.location.href = '/login';
             }}
-            className="w-full border border-border rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
+            className="w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg p-4 flex items-center justify-between text-destructive hover:bg-card/80 bg-[#e2e2e2] dark:bg-[#212121] font-bold"
             data-testid="button-log-out"
           >
             <div className="flex items-center gap-3">
@@ -1074,7 +1074,7 @@ export default function Profile() {
                 value={teamJoinLeagueMessage}
                 onChange={(e) => setTeamJoinLeagueMessage(e.target.value)}
                 placeholder="e.g., Our team is looking for a competitive league to join this season..."
-                className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+                className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
                 maxLength={500}
                 data-testid="textarea-team-join-message"
               />

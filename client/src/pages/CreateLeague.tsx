@@ -129,7 +129,7 @@ export default function CreateLeague() {
       <div className="px-6">
         <form id="create-league-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Basic Information */}
-          <div className="bg-card rounded-xl border border-border p-6 pt-[4px] pb-[4px]">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px]">
             <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
             
             <div className="space-y-4">
@@ -139,7 +139,7 @@ export default function CreateLeague() {
                 </label>
                 <input
                   {...form.register('name')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="e.g., Downtown Hockey League"
                   data-testid="input-league-name"
                 />
@@ -154,7 +154,7 @@ export default function CreateLeague() {
                 </label>
                 <input
                   {...form.register('uniqueLeagueId')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Leave blank for auto-generated ID"
                   data-testid="input-unique-id"
                 />
@@ -169,7 +169,7 @@ export default function CreateLeague() {
           </div>
 
           {/* Location & Venue */}
-          <div className="bg-card rounded-xl border border-border p-6 pt-[4px] pb-[4px] mt-[4px]">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] mt-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <MapPin className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">Location & Venue</h3>
@@ -182,7 +182,7 @@ export default function CreateLeague() {
                 </label>
                 <input
                   {...form.register('location')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="e.g., Downtown Toronto"
                   data-testid="input-location"
                 />
@@ -194,7 +194,7 @@ export default function CreateLeague() {
                 </label>
                 <input
                   {...form.register('rinkName')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="e.g., Metro Ice Center"
                   data-testid="input-rink-name"
                 />
@@ -206,7 +206,7 @@ export default function CreateLeague() {
                 </label>
                 <textarea
                   {...form.register('rinkAddress')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   rows={2}
                   placeholder="Full address of the venue"
                   data-testid="textarea-rink-address"
@@ -216,7 +216,7 @@ export default function CreateLeague() {
           </div>
 
           {/* League Settings */}
-          <div className="bg-card rounded-xl border border-border p-6 mt-[4px] pt-[4px] pb-[4px]">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[4px] pt-[4px] pb-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">League Settings</h3>
@@ -229,7 +229,7 @@ export default function CreateLeague() {
                 </label>
                 <input
                   {...form.register('season')}
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="e.g., Winter 2025"
                   data-testid="input-season"
                 />
@@ -244,7 +244,7 @@ export default function CreateLeague() {
                   type="number"
                   min="4"
                   max="32"
-                  className="w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="input-max-teams"
                 />
                 {form.formState.errors.maxTeams && (

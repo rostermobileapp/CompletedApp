@@ -316,7 +316,7 @@ export default function ScrimmageManagement() {
           </div>
         </div>
         <div className="max-w-md mx-auto p-4">
-          <div className="bg-card rounded-xl border border-border p-8 text-center">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-8 text-center">
             <h3 className="text-lg font-semibold mb-2 text-destructive">Error Loading Scrimmages</h3>
             <p className="text-muted-foreground mb-4">{scrimmagesError?.message || 'Failed to load your scrimmages. Please try again.'}</p>
             <Button onClick={() => window.location.reload()}>Try Again</Button>
@@ -341,7 +341,7 @@ export default function ScrimmageManagement() {
         <div className="max-w-md mx-auto p-4">
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-card rounded-xl border border-border p-6 animate-pulse">
+              <div key={i} className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 animate-pulse">
                 <div className="h-6 bg-muted rounded w-3/4 mb-4"></div>
                 <div className="h-4 bg-muted rounded w-1/2 mb-2"></div>
                 <div className="h-4 bg-muted rounded w-2/3"></div>
@@ -361,7 +361,7 @@ export default function ScrimmageManagement() {
     const color = getScrimmageColor(scrimmage);
 
     return (
-      <Card key={scrimmage.id} className="bg-card border border-border overflow-hidden">
+      <Card key={scrimmage.id} className="bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] overflow-hidden">
         {/* Color accent bar */}
         <div className="h-1 w-full" style={{ backgroundColor: color }} />
         <CardHeader className="pb-3">
@@ -813,7 +813,7 @@ export default function ScrimmageManagement() {
   const renderListView = () => {
     if (scrimmages.length === 0) {
       return (
-        <div className="bg-card rounded-xl border border-border p-8 text-center">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-8 text-center">
           <Crown className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No Scrimmages Created</h3>
           <p className="text-muted-foreground mb-4">

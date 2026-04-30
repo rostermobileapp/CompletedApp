@@ -183,7 +183,7 @@ export default function PaymentRequests() {
 
     return (
       <div
-        className="bg-[#e2e2e2] dark:bg-card rounded-lg border border-border p-4 cursor-pointer hover:border-primary transition-colors"
+        className="bg-[#e2e2e2] dark:bg-card rounded-lg border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 cursor-pointer hover:border-primary transition-colors"
         onClick={() => {
           setPageTransitionDirection('up');
           navigate(`/payment-requests/${request.id}`);

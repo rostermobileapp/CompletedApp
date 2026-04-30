@@ -84,12 +84,12 @@ export function TournamentCountdown({
               <img
                 src={resolvedLogo}
                 alt={`${name} logo`}
-                className="h-24 w-24 md:h-32 md:w-32 rounded-xl object-cover border border-border bg-card"
+                className="h-24 w-24 md:h-32 md:w-32 rounded-xl object-cover border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] bg-card"
                 data-testid="img-countdown-logo"
               />
             ) : (
               <div
-                className="h-24 w-24 md:h-32 md:w-32 rounded-xl border border-border bg-card flex items-center justify-center"
+                className="h-24 w-24 md:h-32 md:w-32 rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] bg-card flex items-center justify-center"
                 data-testid="img-countdown-logo-fallback"
               >
                 <Trophy className="h-12 w-12 md:h-16 md:w-16 text-primary" />
@@ -128,7 +128,7 @@ export function TournamentCountdown({
                 ].map((unit) => (
                   <div
                     key={unit.label}
-                    className="rounded-xl border border-border bg-card/60 p-3 md:p-5 flex flex-col items-center"
+                    className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] bg-card/60 p-3 md:p-5 flex flex-col items-center"
                   >
                     <span
                       className="text-3xl md:text-6xl font-bold tabular-nums text-foreground"

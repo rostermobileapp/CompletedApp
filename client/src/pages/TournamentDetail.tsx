@@ -3192,7 +3192,7 @@ export default function TournamentDetail() {
       {/* Merge Participant Modal */}
       {showMergeModal && selectedParticipantToMerge && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Merge Participant</h3>
               <button
@@ -3226,7 +3226,7 @@ export default function TournamentDetail() {
                   value={targetUserId}
                   onChange={(e) => setTargetUserId(e.target.value)}
                   placeholder="e.g., 47231827"
-                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="input-merge-target-user-id"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -3241,7 +3241,7 @@ export default function TournamentDetail() {
                   value={targetUserEmail}
                   onChange={(e) => setTargetUserEmail(e.target.value)}
                   placeholder="e.g., user@example.com"
-                  className="w-full p-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="input-merge-target-user-email"
                 />
                 <p className="text-xs text-muted-foreground">

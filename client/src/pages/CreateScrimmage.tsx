@@ -578,7 +578,7 @@ export default function CreateScrimmage() {
       {/* Form */}
       <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
         {/* Scrimmage Details */}
-        <div className="rounded-xl border border-border p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
+        <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5" />
             Scrimmage Details
@@ -716,7 +716,7 @@ export default function CreateScrimmage() {
                         <div className="flex items-start justify-center gap-3">
                           <div className="flex flex-col items-center">
                             <div className="text-sm font-semibold mb-2 text-foreground">Hour</div>
-                            <div className="h-32 w-12 overflow-y-auto border border-border rounded-lg bg-card">
+                            <div className="h-32 w-12 overflow-y-auto border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg bg-card">
                               {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => {
                                 const currentTime = form.watch('time') || '12:00';
                                 const currentHour24 = parseInt(currentTime.split(':')[0]);
@@ -757,7 +757,7 @@ export default function CreateScrimmage() {
                           <div className="flex items-center text-xl font-bold text-muted-foreground mt-8">:</div>
                           <div className="flex flex-col items-center">
                             <div className="text-sm font-semibold mb-2 text-foreground">Min</div>
-                            <div className="h-32 w-12 overflow-y-auto border border-border rounded-lg bg-card">
+                            <div className="h-32 w-12 overflow-y-auto border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg bg-card">
                               {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => {
                                 const currentTime = form.watch('time') || '12:00';
                                 const currentMinute = parseInt(currentTime.split(':')[1]);
@@ -1066,7 +1066,7 @@ export default function CreateScrimmage() {
         </div>
 
         {/* Venue Information */}
-        <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[8px] mb-[8px]">
+        <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[8px] mb-[8px]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
             Venue Information
@@ -1147,7 +1147,7 @@ export default function CreateScrimmage() {
 
         {/* Co-Host Selection - Only show if user has leagues */}
         {selectedLeague && (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
+          <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
               <Crown className="w-5 h-5" />
               Add Co-Hosts (Optional)
@@ -1268,7 +1268,7 @@ export default function CreateScrimmage() {
 
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (
-          <div className="rounded-xl border border-border p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] mt-[8px] mb-[8px] pl-[8px] pr-[8px]">
+          <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] mt-[8px] mb-[8px] pl-[8px] pr-[8px]">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Invite Members
@@ -1541,7 +1541,7 @@ export default function CreateScrimmage() {
             )}
           </div>
         ) : (
-          <div className="bg-card rounded-xl border border-border p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               League Required

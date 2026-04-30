@@ -225,7 +225,7 @@ export default function Calendar() {
         {gamesLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-card rounded-xl border border-border p-4 animate-pulse" data-testid={`loading-game-${i}`}>
+              <div key={i} className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 animate-pulse" data-testid={`loading-game-${i}`}>
                 <div className="h-16 bg-muted rounded"></div>
               </div>
             ))}
@@ -238,7 +238,7 @@ export default function Calendar() {
                 return (
                   <div 
                     key={`scrimmage-${event.id}`}
-                    className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                    className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                     onClick={() => navigate(`/scrimmage-management`)}
                     data-testid={`card-scrimmage-${event.id}`}
                   >
@@ -362,7 +362,7 @@ export default function Calendar() {
               return (
               <div 
                 key={game.id} 
-                className="rounded-xl border border-border p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
                 data-testid={`card-game-${game.id}`}
                 onMouseEnter={() => {
                   queryClient.prefetchQuery({
@@ -434,7 +434,7 @@ export default function Calendar() {
             })}
           </div>
         ) : (
-          <div className="bg-card rounded-xl border border-border p-8 text-center" data-testid="empty-all-events">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-8 text-center" data-testid="empty-all-events">
             <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No upcoming games or scrimmages scheduled</p>
           </div>

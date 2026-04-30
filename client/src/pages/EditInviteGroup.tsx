@@ -265,7 +265,7 @@ export default function EditInviteGroup() {
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
         {/* Group Info */}
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <UserPlus className="w-5 h-5" />
             Group Information
@@ -298,7 +298,7 @@ export default function EditInviteGroup() {
         </div>
 
         {/* Add Members */}
-        <div className="bg-card rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Users className="w-5 h-5" />
             Add Members to Group
