@@ -14316,13 +14316,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const requestSchema = z.object({
         otherUserId: z.string().min(1),
-        leagueId: z.string().min(1).nullish()
+        leagueId: z.string().min(1).nullish(),
+        teamId: z.string().min(1).nullish(),
+        tournamentId: z.string().min(1).nullish()
       });
-      
-      const { otherUserId, leagueId } = requestSchema.parse(req.body);
-      
-      // Check if conversation already exists
-      const existingConversation = await messagingService.findDirectConversation(userId, otherUserId, leagueId || null);
+
+      const { otherUserId, leagueId, teamId, tournamentId } = requestSchema.parse(req.body);
+
+      // Normalize the scope server-side so all callers behave consistently
+      // and stale/inconsistent client tuples can't fragment DM threads:
+      // - Tournament context wins outright: when a tournamentId is provided,
+      //   stamp tournament-only and ignore any league/team the client sent.
+      // - When a teamId is provided, canonicalize leagueId to the team's
+      //   actual leagueId (overriding whatever the client sent) so create +
+      //   lookup always agree on the full tuple.
+      let normalizedLeagueId: string | null = leagueId ?? null;
+      let normalizedTeamId: string | null = teamId ?? null;
+      const normalizedTournamentId: string | null = tournamentId ?? null;
+
+      if (normalizedTournamentId) {
+        normalizedLeagueId = null;
+        normalizedTeamId = null;
+      } else if (normalizedTeamId) {
+        const team = await storage.getTeam(normalizedTeamId);
+        if (!team) {
+          return res.status(400).json({ message: 'Invalid teamId for conversation scope' });
+        }
+        normalizedLeagueId = team.leagueId ?? null;
+      }
+
+      const scope = {
+        leagueId: normalizedLeagueId,
+        teamId: normalizedTeamId,
+        tournamentId: normalizedTournamentId,
+      };
+
+      // Check if conversation already exists in this exact dashboard scope
+      const existingConversation = await messagingService.findDirectConversation(userId, otherUserId, scope);
       if (existingConversation) {
         const participants = await messagingService.getConversationParticipants(existingConversation.id);
         return res.json({
@@ -14330,9 +14360,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           participants
         });
       }
-      
-      // Create new conversation
-      const conversation = await messagingService.createDirectConversation(userId, otherUserId, leagueId || null);
+
+      // Create new conversation tagged with this scope
+      const conversation = await messagingService.createDirectConversation(userId, otherUserId, scope);
       const participants = await messagingService.getConversationParticipants(conversation.id);
       
       res.status(201).json({

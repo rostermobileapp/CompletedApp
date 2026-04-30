@@ -823,39 +823,68 @@ export default function Messages() {
   const userTeamIds = useMemo(() => {
     return userTeams.map((t: any) => t.id);
   }, [userTeams]);
-  
-  // Filter conversations by selected league, team, or tournament (client-side for instant filtering)
-  const conversations = useMemo(() => {
-    let filtered = allConversations;
-    
-    // Filter by tournament if one is selected
+
+  // Single source of truth for the DM scope tuple derived from the dashboard.
+  // This is used both when creating a new DM (so it gets stamped with the
+  // active scope) and when filtering the conversation list (so it shows only
+  // DMs from the same scope). useDashboardSelection only ever sets ONE of
+  // selectedLeagueId / selectedTeamId / selectedTournamentId at a time, so
+  // here we expand a team selection into its underlying league as well.
+  const effectiveDmScope = useMemo<{
+    leagueId: string | null;
+    teamId: string | null;
+    tournamentId: string | null;
+  }>(() => {
     if (selectedTournamentId) {
-      filtered = filtered.filter(conv => conv.tournamentId === selectedTournamentId);
+      return { leagueId: null, teamId: null, tournamentId: selectedTournamentId };
     }
-    // Filter by team if one is selected - get the team's league and filter by that
-    else if (selectedTeamId) {
-      // Find the selected team to get its league ID
-      const selectedTeamData = userTeams.find((t: any) => t.id === selectedTeamId);
-      const teamLeagueId = selectedTeamData?.leagueId;
-      
-      // Filter by the team's league first
-      if (teamLeagueId) {
-        filtered = filtered.filter(conv => conv.leagueId === teamLeagueId);
+    if (selectedTeamId) {
+      const team = (userTeams as any[]).find((t: any) => t.id === selectedTeamId);
+      return { leagueId: team?.leagueId ?? null, teamId: selectedTeamId, tournamentId: null };
+    }
+    if (selectedLeagueId) {
+      return { leagueId: selectedLeagueId, teamId: null, tournamentId: null };
+    }
+    return { leagueId: null, teamId: null, tournamentId: null };
+  }, [selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
+
+  // Filter conversations by selected league, team, or tournament (client-side for instant filtering).
+  //
+  // Direct messages are scoped strictly to the (leagueId, teamId, tournamentId)
+  // tuple they were created under — switching the dashboard selector switches
+  // which DM thread you see, and DMs do not leak across teams/leagues/tournaments.
+  // Group conversations (team_group, custom_group, captain_only) keep their
+  // pre-existing scoping behavior because they're inherently tied to a league
+  // or team and don't fragment per dashboard selection.
+  const conversations = useMemo(() => {
+    const isDirect = (conv: Conversation) => conv.type === 'direct';
+
+    return allConversations.filter(conv => {
+      if (isDirect(conv)) {
+        // Direct conversations: exact scope match against the effective tuple.
+        return (
+          (conv.leagueId ?? null) === effectiveDmScope.leagueId &&
+          (conv.teamId ?? null) === effectiveDmScope.teamId &&
+          (conv.tournamentId ?? null) === effectiveDmScope.tournamentId
+        );
       }
-      
-      // Show team chat AND league-wide chats (direct, captain)
-      // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
-      filtered = filtered.filter(conv => 
-        conv.teamId === selectedTeamId || conv.teamId === null
-      );
-    }
-    // Filter by league if one is selected
-    else if (selectedLeagueId) {
-      filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
-    }
-    
-    return filtered;
-  }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams, isFreeTier, userTeamIds]);
+
+      // Group conversations: keep existing scoping rules.
+      if (selectedTournamentId) {
+        return conv.tournamentId === selectedTournamentId;
+      }
+      if (selectedTeamId) {
+        const selectedTeamData = userTeams.find((t: any) => t.id === selectedTeamId);
+        const teamLeagueId = selectedTeamData?.leagueId;
+        if (teamLeagueId && conv.leagueId !== teamLeagueId) return false;
+        return conv.teamId === selectedTeamId || conv.teamId === null;
+      }
+      if (selectedLeagueId) {
+        return conv.leagueId === selectedLeagueId;
+      }
+      return true;
+    });
+  }, [allConversations, effectiveDmScope, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({
@@ -908,7 +937,12 @@ export default function Messages() {
 
   // Create new conversation mutation
   const createConversationMutation = useMutation({
-    mutationFn: async (data: { otherUserId: string; leagueId: string }) => {
+    mutationFn: async (data: {
+      otherUserId: string;
+      leagueId: string | null;
+      teamId: string | null;
+      tournamentId: string | null;
+    }) => {
       const response = await apiRequest('POST', '/api/conversations/direct', data);
       return response.json();
     },
@@ -1810,11 +1844,33 @@ export default function Messages() {
   });
 
   const handleStartConversation = (contact: Contact) => {
-    const leagueId = selectedLeague || dialogLeagues[0]?.id;
-    if (!leagueId) return;
+    // Stamp the new DM with the effective dashboard scope so it appears in
+    // the conversation list only under the matching team/league/tournament.
+    //
+    // - Tournament dashboard: tournament is authoritative; ignore any league
+    //   the user happened to see in the dialog and stamp tournament-only.
+    // - League / team dashboard: if the user explicitly picked a *different*
+    //   league in the dialog, treat it as a pure league-scoped DM (they've
+    //   intentionally moved out of the current team context).
+    // - Otherwise, stamp with the full effective dashboard tuple.
+    if (effectiveDmScope.tournamentId) {
+      createConversationMutation.mutate({
+        otherUserId: contact.id,
+        leagueId: null,
+        teamId: null,
+        tournamentId: effectiveDmScope.tournamentId,
+      });
+      return;
+    }
+
+    const pickedLeagueId = selectedLeague || dialogLeagues[0]?.id || null;
+    const stampWithDashboardScope =
+      !pickedLeagueId || pickedLeagueId === effectiveDmScope.leagueId;
     createConversationMutation.mutate({
       otherUserId: contact.id,
-      leagueId
+      leagueId: stampWithDashboardScope ? effectiveDmScope.leagueId : pickedLeagueId,
+      teamId: stampWithDashboardScope ? effectiveDmScope.teamId : null,
+      tournamentId: null,
     });
   };
 

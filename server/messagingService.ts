@@ -474,8 +474,26 @@ export class MessagingService {
   }
 
   // Conversation management operations
-  async findDirectConversation(user1Id: string, user2Id: string, leagueId?: string): Promise<Conversation | undefined> {
-    // Find existing direct conversation between two users
+  // DMs are scoped strictly to the dashboard selection that was active when
+  // they were created. Two users can therefore have multiple distinct DM
+  // threads — one per (leagueId, teamId, tournamentId) tuple — and switching
+  // the dashboard selector switches which thread you see.
+  async findDirectConversation(
+    user1Id: string,
+    user2Id: string,
+    scope: { leagueId: string | null; teamId: string | null; tournamentId: string | null }
+  ): Promise<Conversation | undefined> {
+    const leagueFilter = scope.leagueId === null
+      ? isNull(conversations.leagueId)
+      : eq(conversations.leagueId, scope.leagueId);
+    const teamFilter = scope.teamId === null
+      ? isNull(conversations.teamId)
+      : eq(conversations.teamId, scope.teamId);
+    const tournamentFilter = scope.tournamentId === null
+      ? isNull(conversations.tournamentId)
+      : eq(conversations.tournamentId, scope.tournamentId);
+
+    // Find existing direct conversation between two users in this exact scope
     const conversations_result = await db
       .select()
       .from(conversations)
@@ -486,7 +504,9 @@ export class MessagingService {
       .where(
         and(
           eq(conversations.type, 'direct'),
-          leagueId ? eq(conversations.leagueId, leagueId) : sql`true`
+          leagueFilter,
+          teamFilter,
+          tournamentFilter
         )
       );
 
@@ -517,14 +537,21 @@ export class MessagingService {
     return undefined;
   }
 
-  async createDirectConversation(user1Id: string, user2Id: string, leagueId: string | null): Promise<Conversation> {
+  async createDirectConversation(
+    user1Id: string,
+    user2Id: string,
+    scope: { leagueId: string | null; teamId: string | null; tournamentId: string | null }
+  ): Promise<Conversation> {
     return await db.transaction(async (tx) => {
-      // Create conversation
+      // Create conversation tagged with the full dashboard scope so the
+      // thread only appears under that exact selection going forward.
       const [conversation] = await tx
         .insert(conversations)
         .values({
           type: 'direct',
-          leagueId: leagueId,
+          leagueId: scope.leagueId,
+          teamId: scope.teamId,
+          tournamentId: scope.tournamentId,
           createdBy: user1Id
         })
         .returning();

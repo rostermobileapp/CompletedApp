@@ -1107,9 +1107,13 @@ export default function LeagueManagement() {
   // Mutation for messaging a player
   const createDirectMessageMutation = useMutation({
     mutationFn: async (otherUserId: string) => {
+      // League management page is league-scoped by URL; the resulting DM
+      // lives at the league level (no team or tournament scope).
       const response = await apiRequest('POST', '/api/conversations/direct', {
         otherUserId,
         leagueId: leagueId,
+        teamId: null,
+        tournamentId: null,
       });
       return response.json();
     },

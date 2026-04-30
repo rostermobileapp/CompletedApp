@@ -31,7 +31,7 @@ export default function UserProfile() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const { selectedLeagueId } = useDashboardSelection();
+  const { selectedLeagueId, selectedTeamId, selectedTournamentId } = useDashboardSelection();
 
   const { data: user, isLoading } = useQuery<UserProfileData>({
     queryKey: ['/api/users', userId],
@@ -40,9 +40,13 @@ export default function UserProfile() {
 
   const createDirectMessageMutation = useMutation({
     mutationFn: async (otherUserId: string) => {
+      // Scope DM to the user's full dashboard selection so the thread
+      // only appears under the same team/league/tournament going forward.
       const response = await apiRequest('POST', '/api/conversations/direct', {
         otherUserId,
-        leagueId: selectedLeagueId,
+        leagueId: selectedLeagueId ?? null,
+        teamId: selectedTeamId ?? null,
+        tournamentId: selectedTournamentId ?? null,
       });
       return response.json();
     },
