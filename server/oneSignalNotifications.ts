@@ -115,14 +115,34 @@ export async function sendMessagePushNotification(
     const recipient = await storage.getUser(recipientId);
     const recipientRole = recipient?.role || 'free_tier';
     if (recipientRole === 'free_tier') {
-      const { messagingService } = await import('./messagingService');
-      const conversation = await messagingService.getConversation(conversationId);
-      // Censor when the conversation is a direct message OR when the lookup
-      // returns nothing (we'd rather omit content than risk leaking it for a
-      // free-tier user we can't classify).
-      if (!conversation || conversation.type === 'direct') {
-        title = 'New message';
-        message = ' ';
+      // Tournament participants are treated as premium for the duration of
+      // their tournament — they get the full DM preview just like paid users.
+      // Only censor for true free-tier users with no active tournament access.
+      const { db } = await import('./db');
+      const { tournamentParticipants } = await import('@shared/schema');
+      const { and, eq } = await import('drizzle-orm');
+      const activeParticipations = await db
+        .select({ id: tournamentParticipants.id })
+        .from(tournamentParticipants)
+        .where(
+          and(
+            eq(tournamentParticipants.userId, recipientId),
+            eq(tournamentParticipants.status, 'approved')
+          )
+        )
+        .limit(1);
+      const isTournamentPremium = activeParticipations.length > 0;
+
+      if (!isTournamentPremium) {
+        const { messagingService } = await import('./messagingService');
+        const conversation = await messagingService.getConversation(conversationId);
+        // Censor when the conversation is a direct message OR when the lookup
+        // returns nothing (we'd rather omit content than risk leaking it for a
+        // free-tier user we can't classify).
+        if (!conversation || conversation.type === 'direct') {
+          title = 'New message';
+          message = ' ';
+        }
       }
     }
   } catch (err) {
