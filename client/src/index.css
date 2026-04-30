@@ -175,11 +175,12 @@
   --sidebar-accent-foreground: 0 0% 98%;
   --sidebar-border: 240 10% 6%;
   --sidebar-ring: 217 91% 60%;
-  /* Depth/elevation trial tokens (dark mode) — heavier pass: shadows have
-     to push much further on near-black surfaces to read as "depth". */
-  --elev-rest: 0 1px 2px 0 hsl(0 0% 0% / 0.55), 0 8px 20px -2px hsl(0 0% 0% / 0.55);
-  --elev-lift: 0 8px 16px -2px hsl(0 0% 0% / 0.70), 0 22px 44px -8px hsl(0 0% 0% / 0.65);
-  --hairline: 0 0% 100% / 0.10;
+  /* Depth/elevation trial tokens (dark mode) — invert to soft white halos so
+     "shadow" reads as a subtle glow on near-black surfaces (dark on dark
+     just disappears). Keep alphas low so it doesn't look ghostly. */
+  --elev-rest: 0 1px 2px 0 hsl(0 0% 100% / 0.05), 0 6px 18px -2px hsl(0 0% 100% / 0.09);
+  --elev-lift: 0 6px 14px -2px hsl(0 0% 100% / 0.12), 0 20px 40px -8px hsl(0 0% 100% / 0.16);
+  --hairline: 0 0% 100% / 0.12;
 }
 
 @layer base {
