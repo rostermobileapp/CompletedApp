@@ -824,44 +824,36 @@ export default function Messages() {
     return userTeams.map((t: any) => t.id);
   }, [userTeams]);
   
-  // Filter conversations by selected league, team, or tournament (client-side for instant filtering).
-  // Direct messages are personal channels — they always show, regardless of which
-  // league/team/tournament is currently selected on the dashboard.
+  // Filter conversations by selected league, team, or tournament (client-side for instant filtering)
   const conversations = useMemo(() => {
     let filtered = allConversations;
-
+    
     // Filter by tournament if one is selected
     if (selectedTournamentId) {
-      filtered = filtered.filter(conv =>
-        conv.type === 'direct' || conv.tournamentId === selectedTournamentId
-      );
+      filtered = filtered.filter(conv => conv.tournamentId === selectedTournamentId);
     }
     // Filter by team if one is selected - get the team's league and filter by that
     else if (selectedTeamId) {
       // Find the selected team to get its league ID
       const selectedTeamData = userTeams.find((t: any) => t.id === selectedTeamId);
       const teamLeagueId = selectedTeamData?.leagueId;
-
-      // Filter by the team's league first (DMs always show)
+      
+      // Filter by the team's league first
       if (teamLeagueId) {
-        filtered = filtered.filter(conv =>
-          conv.type === 'direct' || conv.leagueId === teamLeagueId
-        );
+        filtered = filtered.filter(conv => conv.leagueId === teamLeagueId);
       }
-
+      
       // Show team chat AND league-wide chats (direct, captain)
       // This includes conversations with matching teamId OR conversations with no teamId (direct/captain chats)
-      filtered = filtered.filter(conv =>
-        conv.type === 'direct' || conv.teamId === selectedTeamId || conv.teamId === null
+      filtered = filtered.filter(conv => 
+        conv.teamId === selectedTeamId || conv.teamId === null
       );
     }
     // Filter by league if one is selected
     else if (selectedLeagueId) {
-      filtered = filtered.filter(conv =>
-        conv.type === 'direct' || conv.leagueId === selectedLeagueId
-      );
+      filtered = filtered.filter(conv => conv.leagueId === selectedLeagueId);
     }
-
+    
     return filtered;
   }, [allConversations, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams, isFreeTier, userTeamIds]);
 
@@ -1531,36 +1523,22 @@ export default function Messages() {
 
   // Mark all messages in conversation as read (atomic operation)
   const markAllMessagesAsRead = async (conversationId: string) => {
-    // Optimistic cache update FIRST so the unread badge (in this list and in
-    // the bottom nav) clears immediately when the user opens the thread.
-    queryClient.setQueryData(['/api/messages/unread-count-per-conversation'], (old: any) => {
-      if (!old?.unreadCounts) return old;
-      return {
-        unreadCounts: old.unreadCounts.filter((item: any) => item.conversationId !== conversationId)
-      };
-    });
-    queryClient.setQueryData(['/api/messages/unread-count'], (old: any) => {
-      if (!old || typeof old.count !== 'number') return old;
-      const convoUnread = (queryClient.getQueryData(['/api/messages/unread-count-per-conversation']) as any);
-      // We already filtered the per-conversation map above, so recompute from it.
-      const newTotal = (convoUnread?.unreadCounts || []).reduce(
-        (sum: number, item: any) => sum + (item.unreadCount || 0),
-        0
-      );
-      return { ...old, count: newTotal };
-    });
-
     try {
       await apiRequest('POST', `/api/conversations/${conversationId}/mark-all-read`);
-
-      // Refetch in the background to reconcile with the server.
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+      
+      // Immediate cache update - remove this conversation from unread counts
+      queryClient.setQueryData(['/api/messages/unread-count-per-conversation'], (old: any) => {
+        if (!old?.unreadCounts) return old;
+        return {
+          unreadCounts: old.unreadCounts.filter((item: any) => item.conversationId !== conversationId)
+        };
+      });
+      
+      // Force immediate refetch of fresh data
+      await queryClient.refetchQueries({ queryKey: ['/api/messages/unread-count'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
     } catch (error) {
       console.error('Failed to mark all messages as read:', error);
-      // Roll back by refetching authoritative data
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
     }
   };
   
@@ -2221,30 +2199,19 @@ export default function Messages() {
               </div>
             ) : conversations.length > 0 ? (
               <div className="space-y-3" data-testid="conversations-list">
-                {conversations.map((conversation: Conversation) => {
-                  // Free-tier users see direct messages in the list, but the
-                  // sender info is blurred and the only action is "Upgrade to view".
-                  // Tournament participants are treated as premium for the
-                  // duration of their tournament and get full DM access — the
-                  // canAccessPremiumFeatures() check already accounts for that.
-                  const isLockedDM = isFreeTier && conversation.type === 'direct';
-                  return (
+                {conversations.map((conversation: Conversation) => (
                   <div 
                     key={conversation.id}
                     className="rounded-lg border border-border p-4 cursor-pointer hover:bg-accent/50 transition-colors group dark:bg-[#212121] bg-[#e2e2e2]" 
                     data-testid={`card-conversation-${conversation.id}`}
                     onClick={() => {
-                      if (isLockedDM) {
-                        navigate('/subscription');
-                        return;
-                      }
                       setSelectedConversation(conversation.id);
                       navigate(`/messages/${conversation.id}`);
                     }}
                   >
                     <div className="flex items-center gap-3">
                       {/* Enhanced Avatar Display */}
-                      <div className={`relative ${isLockedDM ? 'blur-sm select-none pointer-events-none' : ''}`}>
+                      <div className="relative">
                         {conversation.type === 'team_group' || conversation.type === 'custom_group' ? (
                           // Group chat avatar
                           (<div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
@@ -2272,17 +2239,14 @@ export default function Messages() {
                         )}
                       </div>
                       
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <h3
-                            className={`font-semibold truncate ${isLockedDM ? 'blur-sm select-none' : ''}`}
-                            data-testid={`text-conversation-name-${conversation.id}`}
-                          >
+                          <h3 className="font-semibold" data-testid={`text-conversation-name-${conversation.id}`}>
                             {getParticipantName(conversation)}
                           </h3>
                           {/* Unread message indicator */}
                           {unreadCountsMap[conversation.id] > 0 && (
-                            <div className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold flex-shrink-0" data-testid={`badge-unread-${conversation.id}`}>
+                            <div className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold" data-testid={`badge-unread-${conversation.id}`}>
                               {unreadCountsMap[conversation.id] > 99 ? '99+' : unreadCountsMap[conversation.id]}
                             </div>
                           )}
@@ -2291,10 +2255,7 @@ export default function Messages() {
                         
                         {/* Enhanced last message display */}
                         {conversation.lastMessage && (
-                          <p
-                            className={`text-sm text-muted-foreground truncate ${isLockedDM ? 'blur-sm select-none' : ''}`}
-                            data-testid={`text-last-message-${conversation.id}`}
-                          >
+                          <p className="text-sm text-muted-foreground truncate" data-testid={`text-last-message-${conversation.id}`}>
                             {conversation.lastMessage.content}
                           </p>
                         )}
@@ -2302,20 +2263,8 @@ export default function Messages() {
                         
                       </div>
                       
-                      {/* Free-tier Upgrade CTA / Delete / Leave */}
-                      {isLockedDM ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/subscription');
-                          }}
-                          className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors flex-shrink-0"
-                          title="Upgrade to view this message"
-                          data-testid={`button-upgrade-to-view-${conversation.id}`}
-                        >
-                          Upgrade to view
-                        </button>
-                      ) : canUserManageConversation(conversation) ? (
+                      {/* Conditional Delete/Leave conversation button */}
+                      {canUserManageConversation(conversation) ? (
                         <button
                           onClick={(e) => handleDeleteConversation(conversation.id, e)}
                           className="p-2 hover:bg-destructive/20 rounded-lg transition-colors"
@@ -2337,8 +2286,7 @@ export default function Messages() {
                       )}
                     </div>
                   </div>
-                  );
-                })}
+                ))}
               </div>
             ) : (
               <div className="text-center py-12" data-testid="empty-conversations">

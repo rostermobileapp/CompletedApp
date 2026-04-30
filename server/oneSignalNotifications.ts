@@ -100,64 +100,14 @@ export async function sendMessagePushNotification(
   conversationId: string,
   messagePreview: string
 ): Promise<boolean> {
-  // Free-tier users cannot read direct messages in-app — they only see a
-  // blurred row with an "Upgrade to view" CTA. The push notification must
-  // not leak the sender name or message content for those recipients.
-  // For censored notifications we show only the title "New message" with
-  // no visible body. OneSignal requires the contents field, so we send a
-  // single space which renders as essentially blank on iOS/Android/web.
-  let title = `💬 ${senderName}`;
-  let message = messagePreview.length > 50
-    ? messagePreview.substring(0, 50) + '...'
+  const truncatedPreview = messagePreview.length > 50 
+    ? messagePreview.substring(0, 50) + '...' 
     : messagePreview;
-
-  try {
-    const recipient = await storage.getUser(recipientId);
-    const recipientRole = recipient?.role || 'free_tier';
-    if (recipientRole === 'free_tier') {
-      // Tournament participants are treated as premium for the duration of
-      // their tournament — they get the full DM preview just like paid users.
-      // Only censor for true free-tier users with no active tournament access.
-      const { db } = await import('./db');
-      const { tournamentParticipants } = await import('@shared/schema');
-      const { and, eq } = await import('drizzle-orm');
-      const activeParticipations = await db
-        .select({ id: tournamentParticipants.id })
-        .from(tournamentParticipants)
-        .where(
-          and(
-            eq(tournamentParticipants.userId, recipientId),
-            eq(tournamentParticipants.status, 'approved')
-          )
-        )
-        .limit(1);
-      const isTournamentPremium = activeParticipations.length > 0;
-
-      if (!isTournamentPremium) {
-        const { messagingService } = await import('./messagingService');
-        const conversation = await messagingService.getConversation(conversationId);
-        // Censor when the conversation is a direct message OR when the lookup
-        // returns nothing (we'd rather omit content than risk leaking it for a
-        // free-tier user we can't classify).
-        if (!conversation || conversation.type === 'direct') {
-          title = 'New message';
-          message = ' ';
-        }
-      }
-    }
-  } catch (err) {
-    // If the lookup fails, fall back to the safer (censored) payload rather
-    // than risk leaking content. This keeps free-tier privacy intact even on
-    // transient errors.
-    console.error('[OneSignal] Failed to evaluate DM tier censoring; using generic payload:', err);
-    title = 'New message';
-    message = ' ';
-  }
-
+  
   return sendPushNotificationToUser({
     userId: recipientId,
-    title,
-    message,
+    title: `💬 ${senderName}`,
+    message: truncatedPreview,
     data: {
       type: 'message',
       conversationId,
