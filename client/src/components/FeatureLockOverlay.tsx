@@ -7,9 +7,17 @@ interface FeatureLockOverlayProps {
   isLocked: boolean;
   children: React.ReactNode;
   className?: string;
+  title?: string;
+  ctaLabel?: string;
 }
 
-export function FeatureLockOverlay({ isLocked, children, className = '' }: FeatureLockOverlayProps) {
+export function FeatureLockOverlay({
+  isLocked,
+  children,
+  className = '',
+  title = 'Premium Feature',
+  ctaLabel = 'Upgrade',
+}: FeatureLockOverlayProps) {
   const [, navigate] = useLocation();
 
   if (!isLocked) {
@@ -32,13 +40,13 @@ export function FeatureLockOverlay({ isLocked, children, className = '' }: Featu
           <div className="w-10 h-10 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
             <Lock className="w-5 h-5 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold">Premium Feature</h3>
+          <h3 className="text-lg font-semibold">{title}</h3>
           <Button 
             onClick={handleUpgrade}
             size="sm"
             data-testid="button-upgrade-feature"
           >
-            Upgrade
+            {ctaLabel}
           </Button>
         </div>
       </div>

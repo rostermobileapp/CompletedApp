@@ -98,12 +98,37 @@ export async function sendMessagePushNotification(
   senderName: string,
   recipientId: string,
   conversationId: string,
-  messagePreview: string
+  messagePreview: string,
+  conversationType?: string,
 ): Promise<boolean> {
-  const truncatedPreview = messagePreview.length > 50 
-    ? messagePreview.substring(0, 50) + '...' 
+  // Censor direct-message previews for free-tier recipients so we don't leak
+  // sender identity or message content via push (the recipient can't read the
+  // thread in-app either). Group / team / captain chats keep the rich preview
+  // for everyone. The recipient's stored role is the source of truth here —
+  // pushes are sent server-side and don't see the in-app dropdown context.
+  if (conversationType === 'direct') {
+    try {
+      const recipient = await storage.getUser(recipientId);
+      if (recipient?.role === 'free_tier') {
+        return sendPushNotificationToUser({
+          userId: recipientId,
+          title: 'New Message Received',
+          message: 'New Message Received',
+          data: {
+            type: 'message',
+            conversationId,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('[OneSignal] Failed to look up recipient role for DM censoring:', err);
+    }
+  }
+
+  const truncatedPreview = messagePreview.length > 50
+    ? messagePreview.substring(0, 50) + '...'
     : messagePreview;
-  
+
   return sendPushNotificationToUser({
     userId: recipientId,
     title: `💬 ${senderName}`,

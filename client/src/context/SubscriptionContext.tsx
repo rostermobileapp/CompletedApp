@@ -108,12 +108,16 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return hasSpecialPermission('stat_manager') || hasSpecialPermission('admin') || hasRole('commissioner') || isPrimaryCommissioner;
   };
 
-  // True if the user has at least one approved tournament participation —
-  // tournament players are granted Player Pro privileges so they can use
-  // the same player-side features (stats, sub requests, etc.) for their
-  // tournament team regardless of their personal subscription tier.
+  // True only when the dashboard's active context is a standalone tournament
+  // the user is an approved participant in. Tournament-player Pro elevation
+  // is intentionally scoped to that tournament — switching the dropdown back
+  // to a regular league or team should snap premium gates back on for an
+  // otherwise free-tier user.
   const isActiveTournamentParticipant = (): boolean => {
-    return tournamentParticipations.length > 0;
+    if (selectedType !== 'tournament' || !selectedId) return false;
+    return tournamentParticipations.some(
+      (p: any) => p?.tournamentId === selectedId
+    );
   };
 
   const canAccessPremiumFeatures = (): boolean => {

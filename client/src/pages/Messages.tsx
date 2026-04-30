@@ -1714,6 +1714,22 @@ export default function Messages() {
     return currentConversation.type === 'team_group' && userTeamIds.includes(currentConversation.teamId);
   }, [isFreeTier, selectedConversation, currentConversation, userTeamIds]);
 
+  // Free-tier users get a fully blurred thread view (with an "Upgrade to view"
+  // CTA) on every conversation they're a participant in EXCEPT the team group
+  // chats they themselves belong to. This gates the entire reading experience,
+  // not just the reply input — when locked we also suppress the message input
+  // and the legacy "Upgrade to reply" banner so the overlay's CTA is the only
+  // path forward.
+  const isThreadLocked = useMemo(() => {
+    if (!isFreeTier) return false;
+    if (!selectedConversation) return false;
+    if (!currentConversation) return true;
+    const isOwnTeamChat =
+      currentConversation.type === 'team_group' &&
+      userTeamIds.includes(currentConversation.teamId);
+    return !isOwnTeamChat;
+  }, [isFreeTier, selectedConversation, currentConversation, userTeamIds]);
+
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
     queryKey: ['/api/teams', currentConversation?.teamId],
@@ -2146,7 +2162,12 @@ export default function Messages() {
             }
             data-testid={isDesktopWeb && selectedConversation ? 'messages-desktop-thread' : undefined}
           >
-        <FeatureLockOverlay isLocked={false} className="h-full flex flex-col">
+        <FeatureLockOverlay
+          isLocked={isThreadLocked}
+          className="h-full flex flex-col"
+          title="Upgrade to view"
+          ctaLabel="Upgrade to view"
+        >
       {!selectedConversation ? (
         <>
           {/* Conversations List Header */}
@@ -2581,8 +2602,10 @@ export default function Messages() {
         </>
       )}
         </FeatureLockOverlay>
-      {/* Upgrade to reply banner - shown for free tier users in non-team conversations */}
-      {selectedConversation && !canSendMessage && (
+      {/* Upgrade to reply banner - shown for free tier users in non-team conversations.
+          Suppressed when the entire thread is blurred (the overlay's CTA is the only
+          path forward in that state). */}
+      {selectedConversation && !canSendMessage && !isThreadLocked && (
         <div
           ref={inputContainerRef}
           className={

@@ -14774,6 +14774,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (recipientIds.length > 0) {
             console.log('[Message Notification Debug] Calling sendMessageNotification for', recipientIds.length, 'recipients');
+            // Look up the conversation type so the push helper can censor
+            // direct-message previews for free-tier recipients.
+            const conversationRecord = await messagingService.getConversation(conversationId);
+            const conversationType = conversationRecord?.type;
             const { sendMessagePushNotification } = await import('./oneSignalNotifications');
             for (const recipientId of recipientIds) {
               await sendMessagePushNotification(
@@ -14781,7 +14785,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 senderName,
                 recipientId,
                 conversationId,
-                content
+                content,
+                conversationType,
               );
             }
             console.log('[Message Notification Debug] Push notifications sent');
