@@ -24,6 +24,31 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error("[ErrorBoundary] Caught render error:", error);
     console.error("[ErrorBoundary] Component stack:", errorInfo.componentStack);
     this.setState({ errorInfo });
+
+    // Best-effort: report the crash to the server so we can debug what's
+    // actually failing on user devices (mobile users can't easily share
+    // console output). Fire-and-forget; never throw or block the fallback UI.
+    try {
+      const payload = {
+        url: typeof window !== "undefined" ? window.location.href : "",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        message: `${error.name}: ${error.message}`,
+        stack: error.stack ?? "",
+        componentStack: errorInfo.componentStack ?? "",
+        timestamp: new Date().toISOString(),
+      };
+      void fetch("/api/client-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+        keepalive: true,
+      }).catch(() => {
+        // Swallow — we already logged to console; don't risk re-triggering.
+      });
+    } catch {
+      // Ignore reporting failures.
+    }
   }
 
   handleReload = () => {

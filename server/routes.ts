@@ -296,6 +296,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('Error initializing user_registration_count table:', e);
   }
 
+  // Lightweight endpoint for the client-side ErrorBoundary to report rendering
+  // crashes so we can debug what's failing in production / on user devices.
+  // No auth required (the user may be unauthenticated at the time of the crash).
+  // Hardening: per-IP rate limit, payload truncation, URL query-string redaction
+  // to avoid logging tokens / session ids that may appear in query params.
+  const clientErrorRateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const CLIENT_ERROR_WINDOW_MS = 60_000;
+  const CLIENT_ERROR_MAX_PER_WINDOW = 10;
+
+  app.post('/api/client-error', (req, res) => {
+    // Always 204 — never let this endpoint surface an error to the browser
+    // (we don't want a logging endpoint to itself trigger alarms). All early
+    // returns just stop processing.
+    try {
+      const ip = (req.ip || req.socket?.remoteAddress || 'unknown').toString();
+      const now = Date.now();
+      const bucket = clientErrorRateBuckets.get(ip);
+      if (!bucket || bucket.resetAt < now) {
+        clientErrorRateBuckets.set(ip, { count: 1, resetAt: now + CLIENT_ERROR_WINDOW_MS });
+      } else {
+        bucket.count += 1;
+        if (bucket.count > CLIENT_ERROR_MAX_PER_WINDOW) {
+          // Drop silently once over the per-window cap.
+          return res.status(204).end();
+        }
+      }
+      // Opportunistic cleanup so the map can't grow without bound under abuse.
+      if (clientErrorRateBuckets.size > 1000) {
+        for (const [k, v] of clientErrorRateBuckets) {
+          if (v.resetAt < now) clientErrorRateBuckets.delete(k);
+        }
+      }
+
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const truncate = (v: unknown, max: number): string => {
+        const s = typeof v === 'string' ? v : v == null ? '' : String(v);
+        return s.length > max ? s.slice(0, max) + '…[truncated]' : s;
+      };
+      // Strip query string and hash from reported URL so we don't log
+      // tokens/session ids that may be present in query params.
+      const redactUrl = (raw: string): string => {
+        try {
+          const u = new URL(raw);
+          const hadQuery = !!u.search || !!u.hash;
+          return `${u.origin}${u.pathname}${hadQuery ? '?[redacted]' : ''}`;
+        } catch {
+          // Not a parseable URL — strip anything after ? or #.
+          return raw.split('?')[0].split('#')[0];
+        }
+      };
+      const userAgent = truncate(req.get('user-agent') ?? body.userAgent, 300);
+      const url = redactUrl(truncate(body.url, 500));
+      const message = truncate(body.message, 500);
+      const stack = truncate(body.stack, 4000);
+      const componentStack = truncate(body.componentStack, 4000);
+      console.error(
+        '[ClientError] Render crash reported by ErrorBoundary',
+        '\n  url:', url,
+        '\n  ua:', userAgent,
+        '\n  message:', message,
+        '\n  stack:', stack,
+        '\n  componentStack:', componentStack,
+      );
+      return res.status(204).end();
+    } catch (err) {
+      console.error('[ClientError] Failed to log client error report:', err);
+      return res.status(204).end();
+    }
+  });
+
   // Returns a signed GCS URL for the demo video so the browser streams directly from GCS
   app.get('/api/demo-video-url', async (req, res) => {
     const SIDECAR = 'http://127.0.0.1:1106';

@@ -125,14 +125,12 @@ export async function sendMessagePushNotification(
     }
   }
 
-  const truncatedPreview = messagePreview.length > 50
-    ? messagePreview.substring(0, 50) + '...'
-    : messagePreview;
+  const headline = `Message from ${senderName}`;
 
   return sendPushNotificationToUser({
     userId: recipientId,
-    title: `💬 ${senderName}`,
-    message: truncatedPreview,
+    title: headline,
+    message: headline,
     data: {
       type: 'message',
       conversationId,

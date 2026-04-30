@@ -1578,14 +1578,6 @@ export default function Messages() {
     }
   };
   
-  // Mark all unread messages as read when conversation is opened
-  useEffect(() => {
-    if (selectedConversation && currentUserId) {
-      // Use atomic operation to mark all messages as read
-      markAllMessagesAsRead(selectedConversation);
-    }
-  }, [selectedConversation, currentUserId]);
-  
   // File upload functions
   const uploadFiles = async (files: File[]): Promise<any[]> => {
     const uploadPromises = files.map(async (file) => {
@@ -1765,6 +1757,23 @@ export default function Messages() {
       userTeamIds.includes(currentConversation.teamId);
     return !isOwnTeamChat;
   }, [isFreeTier, selectedConversation, currentConversation, userTeamIds]);
+
+  // Mark all unread messages as read when conversation is opened.
+  // Skip for free-tier users when the thread is locked behind the
+  // "Upgrade to view" overlay — they haven't actually seen the content,
+  // so the unread badge should remain to nudge them to upgrade.
+  // Also skip while conversation metadata is still loading (isThreadLocked
+  // defaults to true in that state for free-tier users), to avoid clearing
+  // unread counts on a thread we later determine to be locked.
+  useEffect(() => {
+    if (!selectedConversation || !currentUserId) return;
+    if (isFreeTier && !currentConversation) return;
+    if (isThreadLocked) return;
+    markAllMessagesAsRead(selectedConversation);
+    // markAllMessagesAsRead is a stable closure over queryClient/apiRequest;
+    // we intentionally only re-run on conversation/user/lock-state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConversation, currentUserId, isFreeTier, isThreadLocked, currentConversation]);
 
   // Fetch team data for team group chats (to get logo)
   const { data: conversationTeam } = useQuery<Team>({
