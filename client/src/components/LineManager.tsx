@@ -58,6 +58,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                       firstName={firstName}
                       lastName={lastName}
                       size="xs"
+                      className="!h-[45px] !w-[45px]"
                     />
                     <Link
                       href={`/user/${playerId}`}
