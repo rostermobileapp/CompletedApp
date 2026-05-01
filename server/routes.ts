@@ -17059,6 +17059,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send a push reminder to every recipient on this payment request who has
+  // not yet been marked paid. Creator-only. Skips placeholder players (they
+  // have no account / push subscription) and recipients who have notifications
+  // disabled (handled inside sendPaymentRequestPushNotification).
+  app.post('/api/payment-requests/:id/remind-unpaid', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const paymentRequest = await storage.getPaymentRequest(id);
+      if (!paymentRequest) {
+        return res.status(404).json({ message: "Payment request not found" });
+      }
+      if (paymentRequest.creatorId !== userId) {
+        return res.status(403).json({ message: "Only the creator can remind recipients" });
+      }
+
+      const unpaidUserIds = paymentRequest.recipients
+        .filter(r => !r.isPaid && r.userId)
+        .map(r => r.userId as string);
+
+      if (unpaidUserIds.length === 0) {
+        return res.json({ remindedCount: 0 });
+      }
+
+      const creator = paymentRequest.creator;
+      const creatorName = creator
+        ? (`${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || creator.email || 'Someone')
+        : 'Someone';
+
+      const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+      const results = await Promise.all(
+        unpaidUserIds.map(recipientId =>
+          sendPaymentRequestPushNotification(
+            recipientId,
+            creatorName,
+            paymentRequest.amountPerPerson,
+            paymentRequest.title,
+            paymentRequest.id,
+          ).catch(err => {
+            console.error(`[remind-unpaid] Failed to push to ${recipientId}:`, err);
+            return false;
+          })
+        )
+      );
+      const remindedCount = results.filter(Boolean).length;
+      res.json({ remindedCount, attempted: unpaidUserIds.length });
+    } catch (error) {
+      console.error("Error sending payment request reminders:", error);
+      res.status(500).json({ message: "Failed to send reminders" });
+    }
+  });
+
   // Update user payment methods (Venmo/CashApp)
   app.patch('/api/users/payment-methods', isAuthenticated, async (req: any, res) => {
     try {
