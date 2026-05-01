@@ -184,7 +184,7 @@ export default function PaymentRequestDetail() {
               return (
                 <div
                   key={recipient.id}
-                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-[hsl(var(--hairline))] bg-background/40 dark:bg-background/20"
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-[hsl(var(--hairline))] bg-background/40 dark:bg-background/20 pl-[8px] pr-[8px] pt-[4px] pb-[4px]"
                   data-testid={`recipient-${recipient.id}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -249,7 +249,6 @@ export default function PaymentRequestDetail() {
                       )}
                     </div>
                   </div>
-
                   <div className="flex items-center gap-2 shrink-0">
                     {recipient.isPaid ? (
                       <div className="flex flex-col items-end gap-1">
