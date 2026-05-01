@@ -468,8 +468,8 @@ export default function Stats() {
 
         {/* Star Leaders Section - only for leagues */}
         {!isTournamentContext && Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
-          <div className="px-4 py-4 bg-gradient-to-b from-yellow-900/10 to-transparent pt-[4px] pb-[4px]">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
+          <div className="px-4 py-4 pt-[4px] pb-[4px]">
+            <h2 className="text-lg font-bold text-[#212121] dark:text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               3 Stars of the League
             </h2>
@@ -477,7 +477,7 @@ export default function Stats() {
               {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
                 <div 
                   key={leader.user.id} 
-                  className="bg-gray-100/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-lg p-3 flex items-start gap-2 text-[12px] pt-[4px] pb-[4px] pl-[0px] pr-[0px]"
+                  className="bg-[#e2e2e2] dark:bg-[#212121] hairline elev-rest rounded-lg p-3 flex items-start gap-2 text-[12px] pt-[4px] pb-[4px] pl-[0px] pr-[0px]"
                   data-testid={`row-star-leader-${index}`}
                 >
                   <Avatar className="w-12 h-12">
@@ -528,7 +528,7 @@ export default function Stats() {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-xl font-bold text-white capitalize" data-testid="text-table-title">
+                <h2 className="text-xl font-bold text-[#212121] dark:text-white capitalize" data-testid="text-table-title">
                   {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy}
                 </h2>
               </div>
@@ -755,7 +755,7 @@ function StatSection({
       </h2>
       <button
         onClick={onClick}
-        className="w-full bg-[#f5f5f5] dark:bg-[#0a0a0a] rounded-lg p-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors group pt-[8px] pb-[8px]"
+        className="w-full bg-[#f5f5f5] dark:bg-[#0a0a0a] hairline elev-rest rounded-lg p-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors group pt-[8px] pb-[8px]"
         data-testid={`button-${title.toLowerCase().replace(/\s+/g, '-')}`}
       >
         <div className="flex items-center gap-4 flex-1">

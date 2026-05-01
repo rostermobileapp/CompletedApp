@@ -266,7 +266,7 @@ export function TeamPhotos({
         {filteredPhotos.map((photo, index) => (
           <div
             key={photo.id}
-            className="group relative bg-muted rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+            className="group relative bg-muted hairline elev-rest rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setSelectedPhotoIndex(index)}
             data-testid={`card-photo-${photo.id}`}
           >

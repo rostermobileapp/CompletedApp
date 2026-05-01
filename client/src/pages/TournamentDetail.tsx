@@ -488,7 +488,7 @@ function TournamentPollCard({
   isPending: boolean;
 }) {
   return (
-    <Card className="bg-card border-border shadow-sm">
+    <Card>
       <CardHeader className="flex flex-col space-y-2 p-5 pb-4">
         <div className="flex items-center justify-between">
           <h4 className="text-base font-semibold flex items-center gap-2.5 text-foreground">
@@ -735,7 +735,7 @@ function TournamentAnnouncementCard({
         {announcement.attachments && announcement.attachments.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
             {announcement.attachments.map((attachment) => (
-              <div key={attachment.id} className="relative aspect-video rounded-lg overflow-hidden border">
+              <div key={attachment.id} className="relative aspect-video rounded-lg overflow-hidden hairline elev-rest">
                 <img 
                   src={attachment.url} 
                   alt={attachment.filename || 'Attachment'}
@@ -2718,7 +2718,7 @@ export default function TournamentDetail() {
                       return (
                         <div
                           key={team.id}
-                          className="flex items-center justify-between p-4 rounded-lg border bg-background hover:bg-muted/50 cursor-pointer transition-colors"
+                          className="flex items-center justify-between p-4 rounded-lg hairline elev-rest bg-background hover:bg-muted/50 cursor-pointer transition-colors"
                           onClick={() => setSelectedTeam(team)}
                           data-testid={`team-${team.id}`}
                         >
@@ -2782,7 +2782,7 @@ export default function TournamentDetail() {
                               lastName: player.lastName,
                             })
                           }
-                          className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors text-left w-full focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="flex items-center justify-between p-3 bg-background rounded-lg hairline elev-rest hover:bg-muted/50 transition-colors text-left w-full focus:outline-none focus:ring-2 focus:ring-primary"
                           data-testid={`team-player-${player.userId}`}
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -2874,7 +2874,7 @@ export default function TournamentDetail() {
                       return (
                         <div
                           key={participant.id}
-                          className="flex flex-col gap-3 p-3 bg-background rounded-lg border"
+                          className="flex flex-col gap-3 p-3 bg-background rounded-lg hairline elev-rest"
                           data-testid={`row-player-${participant.id}`}
                         >
                           <div className="space-y-0.5 min-w-0">
@@ -3192,7 +3192,7 @@ export default function TournamentDetail() {
       {/* Merge Participant Modal */}
       {showMergeModal && selectedParticipantToMerge && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg p-6 max-w-md w-full border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)]">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full hairline elev-rest">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Merge Participant</h3>
               <button
@@ -3226,7 +3226,7 @@ export default function TournamentDetail() {
                   value={targetUserId}
                   onChange={(e) => setTargetUserId(e.target.value)}
                   placeholder="e.g., 47231827"
-                  className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="input-merge-target-user-id"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -3241,7 +3241,7 @@ export default function TournamentDetail() {
                   value={targetUserEmail}
                   onChange={(e) => setTargetUserEmail(e.target.value)}
                   placeholder="e.g., user@example.com"
-                  className="w-full p-3 bg-card border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   data-testid="input-merge-target-user-email"
                 />
                 <p className="text-xs text-muted-foreground">

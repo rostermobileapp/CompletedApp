@@ -392,7 +392,7 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 pb-24 z-50 animate-modal-backdrop">
-      <div className="bg-card rounded-lg border border-border w-full max-w-md h-[90vh] flex flex-col animate-modal-pop">
+      <div className="bg-card rounded-lg hairline elev-lift w-full max-w-md h-[90vh] flex flex-col animate-modal-pop">
         {/* Header */}
         <div className="p-6 border-b border-border pt-[4px] pb-[4px]">
           <h2 className="text-2xl font-semibold text-center">Needs Attention</h2>
@@ -945,7 +945,7 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: {
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-1 sm:p-4 z-50 animate-modal-backdrop">
-      <div className="bg-card rounded-lg border border-border w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-2rem)] md:max-w-lg h-[90vh] flex flex-col animate-modal-pop">
+      <div className="bg-card rounded-lg hairline elev-lift w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-2rem)] md:max-w-lg h-[90vh] flex flex-col animate-modal-pop">
         {/* Header */}
         <div className="p-3 sm:p-6 border-b border-border relative">
           <h2 className="text-xl sm:text-2xl font-semibold text-center pr-10">
@@ -2396,7 +2396,7 @@ function DashboardMobile() {
             </button>
             
             {showDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-[400px] overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-card hairline elev-lift rounded-lg z-50 max-h-[400px] overflow-y-auto">
                 {/* Teams Section */}
                 {Array.isArray(userTeamsAll) && userTeamsAll.length > 0 && (
                   <>
@@ -3368,8 +3368,10 @@ function DashboardMobile() {
       </div>
       {/* Mobile-only spacer so the HPIB banner + bottom nav don't cover the
           search buttons above. Banner sits ~80px above the bottom nav and is
-          up to 128px tall, so we leave a comfortable scroll cushion. */}
-      <div className="h-56 md:hidden" aria-hidden="true" />
+          up to 128px tall; with the new lifted active-tab pill that floats
+          above the nav we add a touch more cushion so nothing scrolls
+          underneath the lifted icon. */}
+      <div className="h-72 md:hidden" aria-hidden="true" />
     </div>
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>

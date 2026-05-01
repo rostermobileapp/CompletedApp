@@ -74,7 +74,7 @@ function UserFilterSearch({
         />
       </div>
       {isOpen && searchQuery.length >= 2 && (
-        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-background hairline elev-lift rounded-md max-h-60 overflow-y-auto">
           {isLoading ? (
             <div className="p-3 flex items-center justify-center">
               <Loader2 className="h-4 w-4 animate-spin" />

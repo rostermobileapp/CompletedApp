@@ -507,7 +507,7 @@ function PollCard({
   isPending: boolean;
 }) {
   return (
-    <Card className="bg-card border-border shadow-sm">
+    <Card>
       <CardHeader className="flex flex-col space-y-2 p-5 pb-4">
         <div className="flex items-center justify-between">
           <h4 className="text-base font-semibold flex items-center gap-2.5 text-foreground">
@@ -756,7 +756,7 @@ function AnnouncementCard({
   };
 
   return (
-    <Card className="rounded-lg border text-card-foreground shadow-sm relative border-primary bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer" onClick={() => onOpenDetail()}>
+    <Card className="relative border-primary bg-[#e2e2e2] dark:bg-[#212121] elev-rest cursor-pointer" onClick={() => onOpenDetail()}>
       {announcement.isPinned && (
         <div className="absolute top-3 right-3">
           <Pin className="w-4 h-4 text-primary" />
@@ -833,7 +833,7 @@ function AnnouncementCard({
                   return (
                     <div 
                       key={index} 
-                      className="relative border rounded-lg overflow-hidden bg-muted/30"
+                      className="relative hairline elev-rest rounded-lg overflow-hidden bg-muted/30"
                       data-testid={`attachment-image-${index}`}
                     >
                       <div className="aspect-video relative">
@@ -857,7 +857,7 @@ function AnnouncementCard({
                   return (
                     <div 
                       key={index} 
-                      className="relative border rounded-lg overflow-hidden bg-muted/30"
+                      className="relative hairline elev-rest rounded-lg overflow-hidden bg-muted/30"
                       data-testid={`attachment-video-${index}`}
                     >
                       <div className="aspect-video relative bg-black">
@@ -883,7 +883,7 @@ function AnnouncementCard({
                   return (
                     <div 
                       key={index} 
-                      className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer"
+                      className="flex items-center gap-3 p-3 hairline elev-rest rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer"
                       onClick={() => window.open(attachment.url, '_blank')}
                       data-testid={`attachment-file-${index}`}
                     >
