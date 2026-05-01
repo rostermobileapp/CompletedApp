@@ -4,9 +4,13 @@
  * The commissioner pre-pays N "seats" of Player Pro for a contiguous month
  * window (startMonth..endMonth, both inclusive). Pricing rules:
  *
- *   individualTotalCents  = seats * months * perPlayerMonthlyCents
- *   discountedTotalCents  = round(individualTotalCents * (1 - DISCOUNT_PERCENT/100))
- *   savingsCents          = individualTotalCents - discountedTotalCents
+ *   perPlayerEffectiveMonthlyCents = round(perPlayerMonthlyCents * (1 - DISCOUNT_PERCENT/100))
+ *   individualTotalCents           = seats * months * perPlayerMonthlyCents
+ *   discountedTotalCents           = seats * months * perPlayerEffectiveMonthlyCents
+ *   savingsCents                   = individualTotalCents - discountedTotalCents
+ *
+ * Per-seat-monthly is rounded first so the bulk total exactly equals the
+ * "$X.YY/player/month × seats × months" copy shown in the UI.
  *
  * Months are stored and compared as `YYYY-MM` strings so we never deal with
  * timezone drift. Seat assignments are scoped to the league (per-league
@@ -72,15 +76,14 @@ export function computeLeagueProPricing(input: {
 }): LeagueProPricing {
   const { seatCount, startMonth, endMonth, perPlayerMonthlyCents } = input;
   const monthsCount = monthsBetween(startMonth, endMonth);
-  const individualTotalCents = seatCount * monthsCount * perPlayerMonthlyCents;
-  const discountedTotalCents = Math.round(
-    individualTotalCents * (1 - LEAGUE_PRO_DISCOUNT_PERCENT / 100)
+  // Round per-seat-monthly first so the displayed "$X.YY/player/month × seats
+  // × months" copy multiplies out to exactly the discounted total charged.
+  const perPlayerEffectiveMonthlyCents = Math.round(
+    perPlayerMonthlyCents * (1 - LEAGUE_PRO_DISCOUNT_PERCENT / 100)
   );
+  const individualTotalCents = seatCount * monthsCount * perPlayerMonthlyCents;
+  const discountedTotalCents = seatCount * monthsCount * perPlayerEffectiveMonthlyCents;
   const savingsCents = individualTotalCents - discountedTotalCents;
-  const perPlayerEffectiveMonthlyCents =
-    seatCount > 0 && monthsCount > 0
-      ? Math.round(discountedTotalCents / (seatCount * monthsCount))
-      : 0;
   return {
     seatCount,
     startMonth,
