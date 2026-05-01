@@ -9,7 +9,10 @@
 // always canonical and never pre-fill an amount — true for the fallback path
 // as well as the override path.
 
-const VENMO_HANDLE_RE = /^[A-Za-z0-9_.-]{1,30}$/;
+// Keep these regexes in lock-step with the server-side equivalents in
+// shared/schema.ts (VENMO_HANDLE_RE / CASHAPP_HANDLE_RE) so the client
+// fallback path accepts/rejects the same handles the server does.
+const VENMO_HANDLE_RE = /^[A-Za-z0-9_-]{1,30}$/;
 const CASHAPP_HANDLE_RE = /^[A-Za-z][A-Za-z0-9_]{0,19}$/;
 
 function buildVenmoFromHandle(handle: string | null | undefined): string | null {
