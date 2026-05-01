@@ -258,7 +258,12 @@ function Router() {
               <Route path="/stats" component={Stats} />
               <Route path="/stats-management" component={StatsManagement} />
               <Route path="/scorekeeper" component={ScorekeeperDashboard} />
-              <Route path="/create-payment-request" component={CreatePaymentRequest} />
+              <Route path="/create-payment-request">
+                {() => <CreatePaymentRequest />}
+              </Route>
+              <Route path="/payment-requests/:id/edit">
+                {(params) => <CreatePaymentRequest editingRequestId={params.id} />}
+              </Route>
               <Route path="/payment-requests/:id" component={PaymentRequestDetail} />
               <Route path="/facilities" component={FacilityBrowse} />
               <Route path="/facilities/:id" component={FacilityDetail} />

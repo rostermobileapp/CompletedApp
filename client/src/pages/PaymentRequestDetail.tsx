@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, DollarSign, Trash2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -129,6 +129,20 @@ export default function PaymentRequestDetail() {
           </button>
 
           <div className="flex items-center gap-2">
+            {isCreator && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPageTransitionDirection('up');
+                  navigate(`/payment-requests/${id}/edit`);
+                }}
+                data-testid="button-edit"
+              >
+                <Pencil className="w-4 h-4 mr-1" />
+                Edit
+              </Button>
+            )}
             {isCreator && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>

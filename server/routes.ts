@@ -72,6 +72,7 @@ import {
   createFeedbackSubmissionSchema,
   createPaymentRequestSchema,
   updatePaymentRequestRecipientSchema,
+  updatePaymentRequestSchema,
   createFacilityRequestSchema,
   updateFacilityRequestSchema,
   createFacilityMembershipRequestSchema,
@@ -17056,6 +17057,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting payment request:", error);
       res.status(500).json({ message: "Failed to delete payment request" });
+    }
+  });
+
+  // Edit a payment request. Creator-only. Allows updating title, description,
+  // amount, deadline, and the recipient list. Recipients who have already paid
+  // cannot be removed (they are silently kept).
+  app.patch('/api/payment-requests/:id', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const existing = await storage.getPaymentRequest(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Payment request not found" });
+      }
+      if (existing.creatorId !== userId) {
+        return res.status(403).json({ message: "Only the creator can edit this payment request" });
+      }
+
+      const validated = updatePaymentRequestSchema.parse(req.body);
+      const leagueIdRaw = req.body?.leagueId;
+      const leagueId = typeof leagueIdRaw === 'string' && leagueIdRaw.length > 0 ? leagueIdRaw : null;
+
+      const wantsRecipientChange =
+        validated.recipientUserIds !== undefined || validated.placeholderPlayerIds !== undefined;
+
+      let recipientsArg: { recipientUserIds: string[]; placeholderPlayerIds: string[] } | undefined;
+
+      if (wantsRecipientChange) {
+        if (!leagueId) {
+          return res.status(400).json({ message: "leagueId is required when changing recipients" });
+        }
+
+        const userWithPermissions = req.userWithPermissions;
+        if (!userWithPermissions) {
+          return res.status(401).json({ message: "User permissions not loaded" });
+        }
+
+        // Mirror POST: creator must be an approved member of the league we
+        // are validating recipients against.
+        const creatorMembership = await storage.getUserLeagueMembership(userId, leagueId);
+        if (!creatorMembership || creatorMembership.status !== 'approved') {
+          return res.status(403).json({
+            message: "You must be an approved member of this league to edit invoice recipients",
+          });
+        }
+
+        const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
+        const isPremium = canAccessPremiumFeatures(userWithPermissions);
+        if (!isLeagueCommissioner && !isPremium) {
+          return res.status(403).json({
+            message: "Editing invoices requires Player Pro or commissioner permissions",
+          });
+        }
+
+        const allowedPlayers = await storage.getInvoiceablePlayersForLeague(leagueId);
+        const allowedUserIds = new Set(allowedPlayers.filter(p => p.type === 'user').map(p => p.id));
+        const allowedPlaceholderIds = new Set(allowedPlayers.filter(p => p.type === 'placeholder').map(p => p.id));
+
+        const incomingUsers = validated.recipientUserIds ?? [];
+        const incomingPlaceholders = validated.placeholderPlayerIds ?? [];
+
+        for (const rid of incomingUsers) {
+          if (!allowedUserIds.has(rid)) {
+            return res.status(400).json({ message: `Recipient ${rid} is not a member of this league` });
+          }
+        }
+        for (const rid of incomingPlaceholders) {
+          if (!allowedPlaceholderIds.has(rid)) {
+            return res.status(400).json({ message: `Placeholder ${rid} does not belong to this league` });
+          }
+        }
+
+        const paidUserIds = existing.recipients.filter(r => r.isPaid && r.userId).map(r => r.userId as string);
+        const paidPlaceholderIds = existing.recipients.filter(r => r.isPaid && r.placeholderPlayerId).map(r => r.placeholderPlayerId as string);
+
+        const finalUsers = Array.from(new Set([...incomingUsers, ...paidUserIds]));
+        const finalPlaceholders = Array.from(new Set([...incomingPlaceholders, ...paidPlaceholderIds]));
+
+        if (finalUsers.length + finalPlaceholders.length === 0) {
+          return res.status(400).json({ message: "At least one recipient is required" });
+        }
+
+        recipientsArg = { recipientUserIds: finalUsers, placeholderPlayerIds: finalPlaceholders };
+      }
+
+      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; deadline: Date | null }> = {};
+      if (validated.title !== undefined) updates.title = validated.title;
+      if (validated.description !== undefined) updates.description = validated.description;
+      if (validated.amountPerPerson !== undefined) updates.amountPerPerson = validated.amountPerPerson;
+      if (validated.deadline !== undefined) {
+        updates.deadline = validated.deadline ? new Date(validated.deadline) : null;
+      }
+
+      await storage.updatePaymentRequest(id, updates, recipientsArg);
+      const refreshed = await storage.getPaymentRequest(id);
+      res.json(refreshed);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          message: "Invalid payment request data",
+          errors: error.errors,
+        });
+      }
+      console.error("Error updating payment request:", error);
+      res.status(500).json({ message: "Failed to update payment request" });
     }
   });
 

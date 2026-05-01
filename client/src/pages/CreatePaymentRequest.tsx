@@ -25,6 +25,10 @@ import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 
 type CreatePaymentRequestForm = z.infer<typeof createPaymentRequestSchema>;
 
+interface CreatePaymentRequestProps {
+  editingRequestId?: string;
+}
+
 type InvoiceableUser = {
   type: 'user';
   id: string;
@@ -60,12 +64,18 @@ type TeamOption = { id: string; name: string };
 const FREE_AGENT_TEAM_VALUE = '__free_agents__';
 const ALL_TEAMS_VALUE = '__all__';
 
-export default function CreatePaymentRequest() {
+export default function CreatePaymentRequest({ editingRequestId }: CreatePaymentRequestProps = {}) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { closeWithSlideDown } = useSlideUpOverlay();
   const { selectedLeagueId, selectedTeamId } = useDashboardSelection();
+  const isEditing = !!editingRequestId;
+
+  const { data: existingRequest, isLoading: existingLoading } = useQuery<any>({
+    queryKey: [`/api/payment-requests/${editingRequestId}`],
+    enabled: isEditing,
+  });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -163,8 +173,9 @@ export default function CreatePaymentRequest() {
     enabled: !!activeLeagueId && canCreate,
   });
 
-  // Pre-fill form from URL query params after first render.
+  // Pre-fill form from URL query params after first render (create mode only).
   useEffect(() => {
+    if (isEditing) return;
     const params = new URLSearchParams(window.location.search);
     const title = params.get('title');
     const amount = params.get('amount');
@@ -180,6 +191,48 @@ export default function CreatePaymentRequest() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pre-fill form from existing request when editing.
+  const [didHydrateFromExisting, setDidHydrateFromExisting] = useState(false);
+  const [originalUserIds, setOriginalUserIds] = useState<string[]>([]);
+  const [originalPlaceholderIds, setOriginalPlaceholderIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (!isEditing || !existingRequest || didHydrateFromExisting) return;
+    form.setValue('title', existingRequest.title ?? '');
+    form.setValue('description', existingRequest.description ?? '');
+    form.setValue('amountPerPerson', String(existingRequest.amountPerPerson ?? ''));
+    if (existingRequest.deadline) {
+      const d = new Date(existingRequest.deadline);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      form.setValue('deadline', `${yyyy}-${mm}-${dd}`);
+    } else {
+      form.setValue('deadline', undefined);
+    }
+    const recipients: any[] = Array.isArray(existingRequest.recipients) ? existingRequest.recipients : [];
+    const userIds = recipients.filter(r => r.userId).map(r => r.userId as string);
+    const phIds = recipients.filter(r => r.placeholderPlayerId).map(r => r.placeholderPlayerId as string);
+    setSelectedUserIds(userIds);
+    setSelectedPlaceholderIds(phIds);
+    setOriginalUserIds(userIds);
+    setOriginalPlaceholderIds(phIds);
+    form.setValue('recipientUserIds', userIds);
+    form.setValue('placeholderPlayerIds', phIds);
+    setDidHydrateFromExisting(true);
+  }, [isEditing, existingRequest, didHydrateFromExisting, form]);
+
+  // Recipients who have paid cannot be unchecked.
+  const paidUserIds = useMemo<Set<string>>(() => {
+    if (!existingRequest) return new Set();
+    const recipients: any[] = Array.isArray(existingRequest.recipients) ? existingRequest.recipients : [];
+    return new Set(recipients.filter((r: any) => r.isPaid && r.userId).map((r: any) => r.userId as string));
+  }, [existingRequest]);
+  const paidPlaceholderIds = useMemo<Set<string>>(() => {
+    if (!existingRequest) return new Set();
+    const recipients: any[] = Array.isArray(existingRequest.recipients) ? existingRequest.recipients : [];
+    return new Set(recipients.filter((r: any) => r.isPaid && r.placeholderPlayerId).map((r: any) => r.placeholderPlayerId as string));
+  }, [existingRequest]);
 
   // Combined and filtered invoiceable list.
   const allPlayers = useMemo(() => {
@@ -208,6 +261,15 @@ export default function CreatePaymentRequest() {
 
   const togglePlayer = (player: InvoiceableUser | InvoiceablePlaceholder) => {
     if (player.type === 'user') {
+      // In edit mode, paid recipients cannot be unchecked.
+      if (selectedUserIds.includes(player.id) && paidUserIds.has(player.id)) {
+        toast({
+          title: 'Cannot remove paid recipient',
+          description: 'This player has already paid and cannot be removed from the invoice.',
+          variant: 'destructive',
+        });
+        return;
+      }
       const next = selectedUserIds.includes(player.id)
         ? selectedUserIds.filter(id => id !== player.id)
         : [...selectedUserIds, player.id];
@@ -215,6 +277,14 @@ export default function CreatePaymentRequest() {
       form.setValue('recipientUserIds', next);
       form.trigger('recipientUserIds');
     } else {
+      if (selectedPlaceholderIds.includes(player.id) && paidPlaceholderIds.has(player.id)) {
+        toast({
+          title: 'Cannot remove paid recipient',
+          description: 'This player has already paid and cannot be removed from the invoice.',
+          variant: 'destructive',
+        });
+        return;
+      }
       const next = selectedPlaceholderIds.includes(player.id)
         ? selectedPlaceholderIds.filter(id => id !== player.id)
         : [...selectedPlaceholderIds, player.id];
@@ -237,10 +307,17 @@ export default function CreatePaymentRequest() {
   };
 
   const deselectAll = () => {
-    setSelectedUserIds([]);
-    setSelectedPlaceholderIds([]);
-    form.setValue('recipientUserIds', []);
-    form.setValue('placeholderPlayerIds', []);
+    // In edit mode, paid recipients are locked and must remain selected.
+    const keepUsers = isEditing
+      ? selectedUserIds.filter(id => paidUserIds.has(id))
+      : [];
+    const keepPlaceholders = isEditing
+      ? selectedPlaceholderIds.filter(id => paidPlaceholderIds.has(id))
+      : [];
+    setSelectedUserIds(keepUsers);
+    setSelectedPlaceholderIds(keepPlaceholders);
+    form.setValue('recipientUserIds', keepUsers);
+    form.setValue('placeholderPlayerIds', keepPlaceholders);
     form.trigger('recipientUserIds');
   };
 
@@ -267,6 +344,31 @@ export default function CreatePaymentRequest() {
     },
   });
 
+  const updatePaymentRequestMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('PATCH', `/api/payment-requests/${editingRequestId}`, data);
+      return response.json();
+    },
+    onSuccess: (paymentRequest) => {
+      toast({
+        title: 'Payment Request Updated',
+        description: `"${paymentRequest.title}" has been updated.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${editingRequestId}`] });
+      closeWithSlideDown(`/payment-requests/${editingRequestId}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to Update Payment Request',
+        description: error.message || 'An error occurred while updating the payment request',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const onSubmit = (data: CreatePaymentRequestForm) => {
     if (totalSelected === 0) {
       form.setError('recipientUserIds', {
@@ -275,10 +377,46 @@ export default function CreatePaymentRequest() {
       });
       return;
     }
+
+    if (isEditing) {
+      const sortedEqual = (a: string[], b: string[]) => {
+        if (a.length !== b.length) return false;
+        const sa = [...a].sort();
+        const sb = [...b].sort();
+        return sa.every((v, i) => v === sb[i]);
+      };
+      const usersChanged = !sortedEqual(selectedUserIds, originalUserIds);
+      const placeholdersChanged = !sortedEqual(selectedPlaceholderIds, originalPlaceholderIds);
+      const recipientsChanged = usersChanged || placeholdersChanged;
+
+      const payload: any = {
+        title: data.title,
+        description: data.description ?? null,
+        amountPerPerson: data.amountPerPerson,
+        deadline: data.deadline ? data.deadline : null,
+      };
+      if (recipientsChanged) {
+        if (!activeLeagueId) {
+          toast({
+            title: 'No league selected',
+            description: 'Please select the league this invoice belongs to before changing recipients.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        payload.recipientUserIds = selectedUserIds;
+        payload.placeholderPlayerIds = selectedPlaceholderIds;
+        payload.leagueId = activeLeagueId;
+      }
+
+      updatePaymentRequestMutation.mutate(payload);
+      return;
+    }
+
     if (!activeLeagueId) {
       toast({
         title: 'No league selected',
-        description: 'Please select a league before creating a payment request.',
+        description: 'Please select a league before submitting.',
         variant: 'destructive',
       });
       return;
@@ -298,15 +436,19 @@ export default function CreatePaymentRequest() {
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => closeWithSlideDown('/payment-requests')}
+            onClick={() => closeWithSlideDown(isEditing ? `/payment-requests/${editingRequestId}` : '/payment-requests')}
             className="text-muted-foreground"
             data-testid="button-back"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Create Payment Request</h1>
-            <p className="text-sm text-muted-foreground">Request payment from league members</p>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              {isEditing ? 'Edit Payment Request' : 'Create Payment Request'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isEditing ? 'Update the invoice details and recipients' : 'Request payment from league members'}
+            </p>
           </div>
         </div>
 
@@ -464,6 +606,9 @@ export default function CreatePaymentRequest() {
                         const checked = p.type === 'user'
                           ? selectedUserIds.includes(p.id)
                           : selectedPlaceholderIds.includes(p.id);
+                        const isPaidLocked = isEditing && checked && (
+                          p.type === 'user' ? paidUserIds.has(p.id) : paidPlaceholderIds.has(p.id)
+                        );
                         const initials = `${p.firstName?.[0] ?? ''}${p.lastName?.[0] ?? ''}` || '?';
                         const isPlaceholder = p.type === 'placeholder' || p.isPlaceholderUser;
                         return (
@@ -474,6 +619,7 @@ export default function CreatePaymentRequest() {
                           >
                             <Checkbox
                               checked={checked}
+                              disabled={isPaidLocked}
                               onCheckedChange={() => togglePlayer(p)}
                               data-testid={`checkbox-recipient-${p.type}-${p.id}`}
                             />
@@ -497,6 +643,11 @@ export default function CreatePaymentRequest() {
                                 )}
                                 {p.teamName && (
                                   <Badge variant="outline" className="text-xs">{p.teamName}</Badge>
+                                )}
+                                {isPaidLocked && (
+                                  <Badge variant="default" className="text-xs" data-testid={`badge-paid-locked-${p.type}-${p.id}`}>
+                                    Paid
+                                  </Badge>
                                 )}
                               </div>
                               {(p.venmoUsername || p.cashappUsername) && (
@@ -556,10 +707,18 @@ export default function CreatePaymentRequest() {
           type="submit"
           form="create-payment-form"
           className="w-full"
-          disabled={createPaymentRequestMutation.isPending || !activeLeagueId || !canCreate}
+          disabled={
+            createPaymentRequestMutation.isPending ||
+            updatePaymentRequestMutation.isPending ||
+            (!isEditing && !activeLeagueId) ||
+            !canCreate ||
+            (isEditing && existingLoading)
+          }
           data-testid="button-submit"
         >
-          {createPaymentRequestMutation.isPending ? 'Creating...' : 'Create Payment Request'}
+          {isEditing
+            ? (updatePaymentRequestMutation.isPending ? 'Saving...' : 'Save Changes')
+            : (createPaymentRequestMutation.isPending ? 'Creating...' : 'Create Payment Request')}
         </Button>
       </FixedBottomButton>
 

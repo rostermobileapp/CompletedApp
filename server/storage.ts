@@ -631,6 +631,11 @@ export interface IStorage {
   updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient>;
   confirmPaymentRequestRecipient(recipientId: string, isConfirmed: boolean): Promise<PaymentRequestRecipient>;
   deletePaymentRequest(id: string): Promise<void>;
+  updatePaymentRequest(
+    id: string,
+    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline'>>,
+    recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
+  ): Promise<PaymentRequest>;
   getUnpaidPaymentRequestCount(userId: string): Promise<number>;
   getInvoiceablePlayersForLeague(leagueId: string): Promise<InvoiceablePlayer[]>;
   transferInvoicesFromPlaceholderToUser(placeholderPlayerId: string, userId: string): Promise<number>;
@@ -10728,6 +10733,89 @@ export class DatabaseStorage implements IStorage {
     await db.transaction(async (tx) => {
       await tx.delete(paymentRequestRecipients).where(eq(paymentRequestRecipients.paymentRequestId, id));
       await tx.delete(paymentRequests).where(eq(paymentRequests.id, id));
+    });
+  }
+
+  async updatePaymentRequest(
+    id: string,
+    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline'>>,
+    recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
+  ): Promise<PaymentRequest> {
+    return await db.transaction(async (tx) => {
+      const updatePayload: Record<string, any> = { updatedAt: new Date() };
+      if (updates.title !== undefined) updatePayload.title = updates.title;
+      if (updates.description !== undefined) updatePayload.description = updates.description;
+      if (updates.amountPerPerson !== undefined) updatePayload.amountPerPerson = updates.amountPerPerson;
+      if (updates.deadline !== undefined) updatePayload.deadline = updates.deadline;
+
+      const [updated] = await tx
+        .update(paymentRequests)
+        .set(updatePayload)
+        .where(eq(paymentRequests.id, id))
+        .returning();
+
+      if (!updated) {
+        throw new Error('Payment request not found');
+      }
+
+      if (recipients) {
+        const existing = await tx
+          .select()
+          .from(paymentRequestRecipients)
+          .where(eq(paymentRequestRecipients.paymentRequestId, id));
+
+        const desiredUserIds = new Set(recipients.recipientUserIds.filter(Boolean));
+        const desiredPlaceholderIds = new Set(recipients.placeholderPlayerIds.filter(Boolean));
+
+        const existingUserIds = new Set(
+          existing.filter(r => r.userId).map(r => r.userId as string),
+        );
+        const existingPlaceholderIds = new Set(
+          existing.filter(r => r.placeholderPlayerId).map(r => r.placeholderPlayerId as string),
+        );
+
+        const toRemove = existing.filter(r => {
+          if (r.isPaid) return false;
+          if (r.userId) return !desiredUserIds.has(r.userId);
+          if (r.placeholderPlayerId) return !desiredPlaceholderIds.has(r.placeholderPlayerId);
+          return false;
+        });
+
+        if (toRemove.length > 0) {
+          // Guard with isPaid=false in the WHERE clause as well, so that a
+          // recipient who pays after we read but before we delete is not
+          // silently removed.
+          await tx
+            .delete(paymentRequestRecipients)
+            .where(
+              and(
+                inArray(
+                  paymentRequestRecipients.id,
+                  toRemove.map(r => r.id),
+                ),
+                eq(paymentRequestRecipients.isPaid, false),
+              ),
+            );
+        }
+
+        const newRows: { paymentRequestId: string; userId?: string; placeholderPlayerId?: string; isPaid: boolean }[] = [];
+        for (const userId of desiredUserIds) {
+          if (!existingUserIds.has(userId)) {
+            newRows.push({ paymentRequestId: id, userId, isPaid: false });
+          }
+        }
+        for (const placeholderPlayerId of desiredPlaceholderIds) {
+          if (!existingPlaceholderIds.has(placeholderPlayerId)) {
+            newRows.push({ paymentRequestId: id, placeholderPlayerId, isPaid: false });
+          }
+        }
+
+        if (newRows.length > 0) {
+          await tx.insert(paymentRequestRecipients).values(newRows);
+        }
+      }
+
+      return updated;
     });
   }
 

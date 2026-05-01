@@ -2812,6 +2812,27 @@ export const updatePaymentRequestRecipientSchema = z.object({
   paymentMethod: z.enum(['venmo', 'cashapp', 'cash', 'other']).optional(),
 });
 
+export const updatePaymentRequestSchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  description: z.string().optional().nullable(),
+  amountPerPerson: z.union([z.string(), z.number()])
+    .transform((v) => typeof v === 'number' ? v.toString() : v)
+    .optional(),
+  deadline: z.string().optional().nullable(),
+  recipientUserIds: z.array(z.string()).optional(),
+  placeholderPlayerIds: z.array(z.string()).optional(),
+}).refine(
+  (data) => {
+    if (data.recipientUserIds === undefined && data.placeholderPlayerIds === undefined) {
+      return true;
+    }
+    const userCount = data.recipientUserIds?.length ?? 0;
+    const phCount = data.placeholderPlayerIds?.length ?? 0;
+    return userCount + phCount >= 1;
+  },
+  { message: "At least one recipient is required", path: ["recipientUserIds"] },
+);
+
 // Substitution request schemas
 export const insertSubstituteRequestSchema = createInsertSchema(substituteRequests).omit({
   id: true,
