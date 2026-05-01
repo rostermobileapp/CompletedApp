@@ -357,7 +357,7 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
       }}
       data-testid={`payment-request-card-${request.id}`}
     >
-      {/* Top row: title + status pill */}
+      {/* Top row: title + paid count + status pill */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h3 className="font-semibold text-base leading-tight truncate" data-testid={`text-request-title-${request.id}`}>
@@ -367,12 +367,17 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
             {formatMoney(amountPerPerson)} per player
           </p>
         </div>
-        <span
-          className={`shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${theme.pillBg} ${theme.pillText}`}
-          data-testid={`status-pill-${request.id}`}
-        >
-          {theme.pillLabel}
-        </span>
+        <div className="shrink-0 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground" data-testid={`text-paid-count-${request.id}`}>
+            {paidCount} / {recipientCount} paid
+          </span>
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${theme.pillBg} ${theme.pillText}`}
+            data-testid={`status-pill-${request.id}`}
+          >
+            {theme.pillLabel}
+          </span>
+        </div>
       </div>
       {/* Collected line + progress bar */}
       <div className="mb-2">
@@ -399,7 +404,7 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           {dueLine}
         </p>
       )}
-      {/* Bottom row: dots + paid count, action on the right */}
+      {/* Bottom row: dots, action on the right */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {recipientCount > 0 ? (
@@ -419,9 +424,6 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
               )}
             </div>
           ) : null}
-          <span className="text-xs text-muted-foreground ml-1" data-testid={`text-paid-count-${request.id}`}>
-            {paidCount} / {recipientCount} paid
-          </span>
         </div>
 
         {showRemindButton ? (
