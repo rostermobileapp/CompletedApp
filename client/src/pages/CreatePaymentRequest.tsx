@@ -437,7 +437,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background pb-[8px]" data-testid="create-payment-request-page" data-page-content>
+    <div className="bg-background pb-48" data-testid="create-payment-request-page" data-page-content>
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
