@@ -395,6 +395,30 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           />
         </div>
       </div>
+      {/* Action row right under the progress bar, right-aligned */}
+      {(showRemindButton || showAllPaidLabel) && (
+        <div className="flex justify-end mb-2">
+          {showRemindButton ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!remindMutation.isPending) remindMutation.mutate();
+              }}
+              disabled={remindMutation.isPending}
+              className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--hairline))] px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-60"
+              data-testid={`button-remind-unpaid-${request.id}`}
+            >
+              {remindMutation.isPending ? 'Sending…' : 'Remind unpaid'}
+              <ArrowUpRight className="w-3 h-3" />
+            </button>
+          ) : (
+            <span className="shrink-0 text-xs text-muted-foreground" data-testid={`text-all-paid-${request.id}`}>
+              All paid
+            </span>
+          )}
+        </div>
+      )}
       {/* Due / overdue / closed line */}
       {dueLine && (
         <p
@@ -404,48 +428,26 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           {dueLine}
         </p>
       )}
-      {/* Bottom row: dots, action on the right */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Bottom row: dots */}
+      {recipientCount > 0 && (
         <div className="flex items-center gap-2 min-w-0">
-          {recipientCount > 0 ? (
-            <div className="flex items-center gap-1 flex-wrap">
-              {recipients.slice(0, 12).map((r: any, i: number) => (
-                <span
-                  key={r.id ?? i}
-                  className={`block w-2 h-2 rounded-full ${
-                    r.isPaid ? theme.dot : 'bg-black/15 dark:bg-white/15'
-                  }`}
-                />
-              ))}
-              {recipientCount > 12 && (
-                <span className="text-[10px] text-muted-foreground ml-1">
-                  +{recipientCount - 12}
-                </span>
-              )}
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1 flex-wrap">
+            {recipients.slice(0, 12).map((r: any, i: number) => (
+              <span
+                key={r.id ?? i}
+                className={`block w-2 h-2 rounded-full ${
+                  r.isPaid ? theme.dot : 'bg-black/15 dark:bg-white/15'
+                }`}
+              />
+            ))}
+            {recipientCount > 12 && (
+              <span className="text-[10px] text-muted-foreground ml-1">
+                +{recipientCount - 12}
+              </span>
+            )}
+          </div>
         </div>
-
-        {showRemindButton ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!remindMutation.isPending) remindMutation.mutate();
-            }}
-            disabled={remindMutation.isPending}
-            className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--hairline))] px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-60"
-            data-testid={`button-remind-unpaid-${request.id}`}
-          >
-            {remindMutation.isPending ? 'Sending…' : 'Remind unpaid'}
-            <ArrowUpRight className="w-3 h-3" />
-          </button>
-        ) : showAllPaidLabel ? (
-          <span className="shrink-0 text-xs text-muted-foreground" data-testid={`text-all-paid-${request.id}`}>
-            All paid
-          </span>
-        ) : null}
-      </div>
+      )}
     </div>
   );
 }
