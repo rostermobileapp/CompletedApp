@@ -415,6 +415,11 @@ export interface IStorage {
   backfillLeagueProSeats(grantId: string): Promise<number>;
   /** Active seats covering the current month for the given user. */
   getActiveLeagueProSeatsForUser(userId: string, monthYM: string): Promise<(LeagueProSeat & { grant: LeagueProGrant })[]>;
+  /** Reserved seats whose grant window starts after `monthYM` (between-grants messaging). */
+  getUpcomingLeagueProSeatsForUser(
+    userId: string,
+    monthYM: string,
+  ): Promise<(LeagueProSeat & { grant: LeagueProGrant; leagueName: string })[]>;
   /** Whether `userId` has an active Player Pro seat in `leagueId` for `monthYM`. */
   userHasActiveLeagueProSeat(userId: string, leagueId: string, monthYM: string): Promise<boolean>;
 
@@ -3379,6 +3384,33 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return rows.map(r => ({ ...r.league_pro_seats, grant: r.league_pro_grants }));
+  }
+
+  async getUpcomingLeagueProSeatsForUser(
+    userId: string,
+    monthYM: string,
+  ): Promise<(LeagueProSeat & { grant: LeagueProGrant; leagueName: string })[]> {
+    // Seats whose grant window starts strictly after `monthYM` — used to tell
+    // users their league has reserved them a Player Pro seat that activates
+    // when the next window opens (the "between grants" messaging case).
+    const rows = await db
+      .select()
+      .from(leagueProSeats)
+      .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
+      .innerJoin(leagues, eq(leagues.id, leagueProSeats.leagueId))
+      .where(
+        and(
+          eq(leagueProSeats.userId, userId),
+          eq(leagueProGrants.status, 'paid'),
+          gt(leagueProGrants.startMonth, monthYM),
+        )
+      )
+      .orderBy(asc(leagueProGrants.startMonth));
+    return rows.map(r => ({
+      ...r.league_pro_seats,
+      grant: r.league_pro_grants,
+      leagueName: r.leagues.name,
+    }));
   }
 
   async userHasActiveLeagueProSeat(

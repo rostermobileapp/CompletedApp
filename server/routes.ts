@@ -2987,10 +2987,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Returns the leagues this user is in where the commissioner has bought
-  // League-Wide Player Pro seats but they're all claimed — used by the
-  // Subscription page upsell to explain why the user is still on the free
-  // tier even though their league has Pro seats. Free-tier-only signal.
+  // Reserved Player Pro seats that activate when the grant window opens.
+  // Used by the Subscription page to tell a user "your league bought you a
+  // Player Pro seat for May 2026 – Oct 2026" when they're between grants or
+  // joined before a future grant starts.
+  app.get('/api/user/league-pro-seats-upcoming', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const monthYM = currentMonth();
+      const seats = await storage.getUpcomingLeagueProSeatsForUser(userId, monthYM);
+      res.json(
+        seats.map((s) => ({
+          leagueId: s.leagueId,
+          leagueName: s.leagueName,
+          grantId: s.grantId,
+          startMonth: s.grant.startMonth,
+          endMonth: s.grant.endMonth,
+        }))
+      );
+    } catch (error: any) {
+      console.error('[League Pro] Upcoming seats error:', error);
+      res.status(500).json({ message: 'Failed to load upcoming seats' });
+    }
+  });
+
   app.get('/api/user/league-pro-seats-full', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

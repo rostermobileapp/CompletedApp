@@ -701,6 +701,7 @@ export default function Subscription() {
           are now all claimed. This is requirement #8 of the league-wide
           Player Pro spec: the upsell UI must explain that league-paid seats
           are full so the user understands why they're still on free tier. */}
+      <LeagueProUpcomingSeatNotice />
       {isFree && <LeagueProSeatsFullUpsell />}
 
       {/* Available Plans */}
@@ -885,6 +886,52 @@ export default function Subscription() {
  * league having Pro seats. Renders nothing when the user isn't in such a
  * league (so the section disappears once a seat opens up or the grant lapses).
  */
+function formatMonthYM(ym: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(ym);
+  if (!m) return ym;
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  return date.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function LeagueProUpcomingSeatNotice() {
+  const { data: upcoming = [] } = useQuery<
+    {
+      leagueId: string;
+      leagueName: string;
+      grantId: string;
+      startMonth: string;
+      endMonth: string;
+    }[]
+  >({ queryKey: ['/api/user/league-pro-seats-upcoming'] });
+  if (upcoming.length === 0) return null;
+  return (
+    <div className="px-6 mb-4" data-testid="league-pro-upcoming-seats-notice">
+      <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4">
+        <div className="flex items-start gap-3">
+          <Crown className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <div className="font-semibold mb-1">
+              {upcoming.length === 1
+                ? "You're reserved a Player Pro seat"
+                : "You're reserved Player Pro seats"}
+            </div>
+            <ul className="text-muted-foreground space-y-0.5">
+              {upcoming.map((s) => (
+                <li key={s.grantId}>
+                  <span className="font-medium text-foreground">
+                    {s.leagueName}
+                  </span>
+                  : {formatMonthYM(s.startMonth)} – {formatMonthYM(s.endMonth)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LeagueProSeatsFullUpsell() {
   const { data: leaguesFull = [] } = useQuery<
     { leagueId: string; leagueName: string; seatsTotal: number }[]
