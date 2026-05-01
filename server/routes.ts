@@ -2844,7 +2844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: 1,
           },
         ],
-        cancel_url: `${appUrl}/leagues/${leagueId}?league_pro=cancelled`,
+        cancel_url: `${appUrl}/league-management?leagueId=${leagueId}&league_pro=cancelled`,
         client_reference_id: userId,
         metadata: {
           type: 'league_pro_bulk',
@@ -2862,11 +2862,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...baseSessionParams,
             ui_mode: 'embedded',
             redirect_on_completion: 'if_required',
-            return_url: `${appUrl}/leagues/${leagueId}?league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
+            return_url: `${appUrl}/league-management?leagueId=${leagueId}&league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
           })
         : await stripe.checkout.sessions.create({
             ...baseSessionParams,
-            success_url: `${appUrl}/leagues/${leagueId}?league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
+            success_url: `${appUrl}/league-management?leagueId=${leagueId}&league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
           });
 
       // Bind the Stripe session id back to the grant so the webhook can find it.
@@ -2941,11 +2941,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const grants = await storage.getLeagueProGrantsByLeague(leagueId);
       const monthYM = currentMonth();
-      // Show only active + upcoming grants (drop expired). Pending grants
-      // also stay visible so the commissioner can see in-progress checkouts.
-      const visible = grants.filter(
-        (g) => g.status !== 'paid' || g.endMonth >= monthYM,
-      );
+      // Show only active + upcoming paid grants (drop expired). Pending grants
+      // remain visible while the checkout is fresh so the commissioner sees
+      // in-progress purchases, but stale pending rows (Stripe call failed or
+      // user abandoned > 1h ago) are dropped to avoid phantom purchases.
+      const STALE_PENDING_MS = 60 * 60 * 1000;
+      const now = Date.now();
+      const visible = grants.filter((g) => {
+        if (g.status === 'paid') return g.endMonth >= monthYM;
+        if (g.status === 'pending') {
+          const created = g.createdAt ? new Date(g.createdAt).getTime() : 0;
+          return now - created < STALE_PENDING_MS;
+        }
+        return false;
+      });
       const enriched = await Promise.all(
         visible.map(async (g) => {
           const seats = await storage.getLeagueProSeatsByGrant(g.id);
