@@ -3162,27 +3162,51 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     monthYM: string,
   ): Promise<{ leagueId: string; leagueName: string }[]> {
-    // Find leagues this user is an approved member of that have at least one
-    // currently-active League-Wide Player Pro grant where every paid seat is
-    // already assigned and the user is not the holder. Done in one query so
-    // the per-grant capacity check stays consistent with assignLeagueProSeat.
+    // Return a league only when ALL of the following are true for `monthYM`:
+    //   1. The user is an approved member of the league.
+    //   2. At least one currently-active (paid) League-Wide Pro grant exists.
+    //   3. The user holds NO seat in ANY currently-active grant in this
+    //      league (cross-grant check — overlapping grants are explicitly
+    //      expected because adding seats requires a separate purchase).
+    //   4. The TOTAL active capacity across all currently-active grants is
+    //      fully consumed (sum(seat_count) <= sum(assigned seats)). If even
+    //      one active grant has a free seat, the league is not "full".
+    //
+    // This grouping is what fixes the false-positive: when grant A is full
+    // but grant B has the user's seat (or B has a free seat), the league
+    // does NOT appear here, so the upsell stays correctly hidden.
     const rows = await db.execute<{ leagueId: string; leagueName: string }>(sql`
-      SELECT DISTINCT l.id AS "leagueId", l.name AS "leagueName"
+      WITH active_grants AS (
+        SELECT g.id, g.league_id, g.seat_count
+        FROM league_pro_grants g
+        WHERE g.status = 'paid'
+          AND g.start_month <= ${monthYM}
+          AND g.end_month   >= ${monthYM}
+      ),
+      grant_assignments AS (
+        SELECT
+          ag.league_id,
+          SUM(ag.seat_count) AS total_capacity,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM league_pro_seats s
+            WHERE s.grant_id IN (SELECT id FROM active_grants ag2 WHERE ag2.league_id = ag.league_id)
+          ), 0) AS total_assigned,
+          BOOL_OR(EXISTS (
+            SELECT 1 FROM league_pro_seats s2
+            WHERE s2.grant_id = ag.id AND s2.user_id = ${userId}
+          )) AS user_has_seat
+        FROM active_grants ag
+        GROUP BY ag.league_id
+      )
+      SELECT l.id AS "leagueId", l.name AS "leagueName"
       FROM league_memberships lm
       INNER JOIN leagues l ON l.id = lm.league_id
-      INNER JOIN league_pro_grants g ON g.league_id = lm.league_id
+      INNER JOIN grant_assignments ga ON ga.league_id = lm.league_id
       WHERE lm.user_id = ${userId}
         AND lm.status = 'approved'
-        AND g.status = 'paid'
-        AND g.start_month <= ${monthYM}
-        AND g.end_month   >= ${monthYM}
-        AND g.seat_count <= (
-          SELECT COUNT(*) FROM league_pro_seats s WHERE s.grant_id = g.id
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM league_pro_seats s2
-          WHERE s2.grant_id = g.id AND s2.user_id = ${userId}
-        )
+        AND ga.user_has_seat = FALSE
+        AND ga.total_assigned >= ga.total_capacity
     `);
     return rows.rows;
   }

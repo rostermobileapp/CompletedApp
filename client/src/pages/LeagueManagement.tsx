@@ -5049,7 +5049,7 @@ export default function LeagueManagement() {
 
                   {leagueProGrants.length > 0 && (
                     <div className="mt-4">
-                      <h4 className="text-sm font-medium mb-2">Active & past purchases</h4>
+                      <h4 className="text-sm font-medium mb-2">Active & upcoming purchases</h4>
                       <div className="space-y-2" data-testid="list-pro-grants">
                         {leagueProGrants.map((g) => (
                           <div
