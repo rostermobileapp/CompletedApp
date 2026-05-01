@@ -740,6 +740,7 @@ export default function LeagueManagement() {
   const leagueId = searchParams.get('leagueId') || '';
   const editMode = searchParams.get('edit') === 'true';
   const editMemberId = searchParams.get('editMember') || '';
+  const settingsDeepLink = searchParams.get('settings') || '';
   
   // Fetch current user for commissioner checks
   const { user } = useAuth();
@@ -871,6 +872,24 @@ export default function LeagueManagement() {
       websocket.close();
     };
   }, [user?.id, leagueId, refetchPending]);
+
+  // Deep-link: open settings modal and scroll to Player Pro when
+  // ?settings=player-pro is in the URL (e.g. after Create League success).
+  useEffect(() => {
+    if (settingsDeepLink !== 'player-pro' || !leagueId) return;
+    setShowEditLeague(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('settings');
+    window.history.replaceState({}, '', url.toString());
+    const scrollToPlayerPro = () => {
+      const el = document.querySelector('[data-testid="section-league-player-pro"]');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    const t = window.setTimeout(scrollToPlayerPro, 300);
+    return () => window.clearTimeout(t);
+  }, [settingsDeepLink, leagueId]);
 
   // Fetch pending team join requests
   const { data: teamJoinRequests = [], refetch: refetchTeamJoinRequests } = useQuery({
