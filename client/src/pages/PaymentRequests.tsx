@@ -7,70 +7,17 @@ import CreatePaymentRequestPage from '@/pages/CreatePaymentRequest';
 import { ArrowLeft, ArrowUpRight, DollarSign, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { format, differenceInCalendarDays } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
-
-type PaymentStatus = 'open' | 'overdue' | 'settled';
-
-const STATUS_THEME: Record<PaymentStatus, {
-  pillBg: string;
-  pillText: string;
-  bar: string;
-  dot: string;
-  text: string;
-  pillLabel: string;
-}> = {
-  open: {
-    pillBg: 'bg-blue-500/15 dark:bg-blue-400/15',
-    pillText: 'text-blue-600 dark:text-blue-300',
-    bar: 'bg-blue-500 dark:bg-blue-400',
-    dot: 'bg-blue-500 dark:bg-blue-400',
-    text: 'text-blue-600 dark:text-blue-300',
-    pillLabel: 'Open',
-  },
-  overdue: {
-    pillBg: 'bg-red-500/15 dark:bg-red-400/15',
-    pillText: 'text-red-600 dark:text-red-300',
-    bar: 'bg-red-500 dark:bg-red-400',
-    dot: 'bg-red-500 dark:bg-red-400',
-    text: 'text-red-600 dark:text-red-300',
-    pillLabel: 'Overdue',
-  },
-  settled: {
-    pillBg: 'bg-emerald-500/15 dark:bg-emerald-400/15',
-    pillText: 'text-emerald-600 dark:text-emerald-300',
-    bar: 'bg-emerald-500 dark:bg-emerald-400',
-    dot: 'bg-emerald-500 dark:bg-emerald-400',
-    text: 'text-emerald-600 dark:text-emerald-300',
-    pillLabel: 'Settled',
-  },
-};
-
-function formatMoney(value: number) {
-  return value % 1 === 0
-    ? `$${value.toFixed(0)}`
-    : `$${value.toFixed(2)}`;
-}
-
-function getDueLine(status: PaymentStatus, deadline: Date | null, settledAt: Date | null) {
-  if (status === 'settled') {
-    const date = settledAt ?? deadline;
-    if (!date) return null;
-    return `Closed — ${format(date, 'MMM d')}`;
-  }
-  if (!deadline) return 'No due date';
-  if (status === 'overdue') {
-    return `Overdue — was ${format(deadline, 'MMM d')}`;
-  }
-  // open
-  const daysUntil = differenceInCalendarDays(deadline, new Date());
-  if (daysUntil <= 0) return `Due today — ${format(deadline, 'MMM d')}`;
-  if (daysUntil === 1) return `Due tomorrow — ${format(deadline, 'MMM d')}`;
-  return `Due in ${daysUntil} days — ${format(deadline, 'MMM d')}`;
-}
+import {
+  STATUS_THEME,
+  formatMoney,
+  getDueLine,
+  computePaymentStatus,
+  type PaymentStatus,
+} from '@/lib/paymentStatus';
 
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
@@ -301,9 +248,7 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
   const fillPct = total > 0 ? Math.min(100, Math.round((collected / total) * 100)) : 0;
 
   const deadline = request.deadline ? new Date(request.deadline) : null;
-  const isAllPaid = recipientCount > 0 && paidCount === recipientCount;
-  const isOverdue = !!deadline && deadline.getTime() < Date.now() && !isAllPaid;
-  const status: PaymentStatus = isAllPaid ? 'settled' : isOverdue ? 'overdue' : 'open';
+  const status: PaymentStatus = computePaymentStatus(recipients, deadline);
   const theme = STATUS_THEME[status];
 
   // For settled: most recent paidAt across recipients (fallback to deadline)
