@@ -203,8 +203,8 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
     form.setValue('title', existingRequest.title ?? '');
     form.setValue('description', existingRequest.description ?? '');
     form.setValue('amountPerPerson', String(existingRequest.amountPerPerson ?? ''));
-    form.setValue('venmoLinkOverride', (existingRequest as any).venmoLinkOverride ?? '');
-    form.setValue('cashappLinkOverride', (existingRequest as any).cashappLinkOverride ?? '');
+    form.setValue('venmoLinkOverride', existingRequest.venmoLinkOverride ?? '');
+    form.setValue('cashappLinkOverride', existingRequest.cashappLinkOverride ?? '');
     if (existingRequest.deadline) {
       const d = new Date(existingRequest.deadline);
       const yyyy = d.getFullYear();
