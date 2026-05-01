@@ -439,7 +439,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
   return (
     <div className="min-h-screen flex flex-col bg-background pb-48" data-testid="create-payment-request-page" data-page-content>
       {/* Header */}
-      <div className="p-6 pt-12 flex-1 flex flex-col min-h-0">
+      <div className="p-6 flex-1 flex flex-col min-h-0 pt-[12px] pb-[12px] pr-[12px] pl-[12px]">
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => closeWithSlideDown(isEditing ? `/payment-requests/${editingRequestId}` : '/payment-requests')}
