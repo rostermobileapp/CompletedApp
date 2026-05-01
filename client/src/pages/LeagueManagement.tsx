@@ -709,6 +709,7 @@ export default function LeagueManagement() {
   const [proStartMonth, setProStartMonth] = useState<string>(_ymOffset(0));
   const [proEndMonth, setProEndMonth] = useState<string>(_ymOffset(5));
   const [showCreateSeason, setShowCreateSeason] = useState(false);
+  const [showSeasonProPrompt, setShowSeasonProPrompt] = useState(false);
   const [newSeasonStep, setNewSeasonStep] = useState<NewSeasonStep>('close');
   const [closeCurrentSeason, setCloseCurrentSeason] = useState(true);
   const [notReturningMemberIds, setNotReturningMemberIds] = useState<Set<string>>(new Set());
@@ -872,6 +873,11 @@ export default function LeagueManagement() {
       websocket.close();
     };
   }, [user?.id, leagueId, refetchPending]);
+
+  // Reset the post-season-creation Player Pro prompt when the active league changes.
+  useEffect(() => {
+    setShowSeasonProPrompt(false);
+  }, [leagueId]);
 
   // Deep-link: open settings modal and scroll to Player Pro when
   // ?settings=player-pro is in the URL (e.g. after Create League success).
@@ -2533,6 +2539,7 @@ export default function LeagueManagement() {
     onSuccess: (data) => {
       toast({ title: 'Season created successfully' });
       setShowCreateSeason(false);
+      if (isDesktopWeb) setShowSeasonProPrompt(true);
       setNewSeasonStep('close');
       setCloseCurrentSeason(true);
       setNotReturningMemberIds(new Set());
@@ -2726,6 +2733,47 @@ export default function LeagueManagement() {
               <Plus className="w-4 h-4 mr-2 inline" />
               New Season
             </button>
+          </div>
+        )}
+
+        {/* Player Pro upsell — shown on desktop after a new season is created */}
+        {showSeasonProPrompt && (
+          <div
+            className="mb-4 rounded-xl border border-yellow-500/40 bg-yellow-500/5 p-5"
+            data-testid="season-player-pro-upsell-card"
+          >
+            <div className="flex items-start gap-3">
+              <Crown className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-semibold mb-1">Cover this season's players with Player Pro</div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Buy seats for the season's date range and they'll auto-assign to members in join order.
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setShowSeasonProPrompt(false);
+                      setShowEditLeague(true);
+                      window.setTimeout(() => {
+                        const el = document.querySelector('[data-testid="section-league-player-pro"]');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 300);
+                    }}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-sm font-medium"
+                    data-testid="button-season-buy-player-pro"
+                  >
+                    Buy Player Pro seats
+                  </button>
+                  <button
+                    onClick={() => setShowSeasonProPrompt(false)}
+                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-medium"
+                    data-testid="button-season-skip-player-pro"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
