@@ -13,6 +13,7 @@ import type { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 
 const TIMEZONE_OPTIONS = [
@@ -37,7 +38,6 @@ const TIMEZONE_OPTIONS = [
   { value: 'Asia/Tokyo', label: 'JST - Tokyo' },
 ];
 
-// Create a form schema that includes the new fields, making most fields optional
 const createLeagueSchema = insertLeagueSchema.extend({
   uniqueLeagueId: insertLeagueSchema.shape.uniqueLeagueId.optional(),
   description: insertLeagueSchema.shape.description.optional(),
@@ -47,8 +47,8 @@ const createLeagueSchema = insertLeagueSchema.extend({
   season: insertLeagueSchema.shape.season.optional(),
   sport: insertLeagueSchema.shape.sport.optional(),
 }).partial().extend({
-  name: insertLeagueSchema.shape.name, // Keep name as required
-  maxTeams: insertLeagueSchema.shape.maxTeams, // Keep maxTeams as required
+  name: insertLeagueSchema.shape.name,
+  maxTeams: insertLeagueSchema.shape.maxTeams,
 });
 
 type CreateLeagueForm = z.infer<typeof createLeagueSchema>;
@@ -59,7 +59,9 @@ export default function CreateLeague() {
   const queryClient = useQueryClient();
   const { canManageLeague } = usePermissions();
   const isMobile = useIsMobile();
-  
+  const isDesktopWeb = useIsDesktopWeb();
+  const [createdLeague, setCreatedLeague] = useState<{ id: string; name: string } | null>(null);
+
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
     defaultValues: {
@@ -81,14 +83,18 @@ export default function CreateLeague() {
       return response.json();
     },
     onSuccess: (league) => {
-      toast({
-        title: 'League Created',
-        description: `${league.name} has been created successfully!`,
-      });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues/commissioner'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
-      navigate(`/league-management?leagueId=${league.id}`);
+      if (isDesktopWeb) {
+        setCreatedLeague({ id: league.id, name: league.name });
+      } else {
+        toast({
+          title: 'League Created',
+          description: `${league.name} has been created successfully!`,
+        });
+        navigate(`/league-management?leagueId=${league.id}`);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -102,9 +108,6 @@ export default function CreateLeague() {
   const onSubmit = (data: CreateLeagueForm) => {
     createLeagueMutation.mutate(data);
   };
-
-  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
-  // All users now have commissioner access to create leagues
 
   if (isMobile) {
     return (
@@ -149,9 +152,75 @@ export default function CreateLeague() {
     );
   }
 
+  if (createdLeague) {
+    return (
+      <div className="min-h-screen flex flex-col pb-12" data-testid="create-league-success">
+        <div className="p-6 pt-[12px] pb-[12px]">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => navigate(`/league-management?leagueId=${createdLeague.id}`)}
+              className="text-muted-foreground"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-bold">League Created</h1>
+          </div>
+        </div>
+        <div className="px-6 space-y-4 max-w-xl">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <Crown className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <div className="font-semibold">{createdLeague.name}</div>
+                <div className="text-sm text-muted-foreground">Ready to go</div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="bg-card rounded-xl border border-yellow-500/40 bg-yellow-500/5 p-5"
+            data-testid="player-pro-upsell-card"
+          >
+            <div className="flex items-start gap-3">
+              <Crown className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold mb-1">Cover your players with Player Pro</div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  As commissioner you can pre-pay Player Pro for your whole league and save
+                  25% versus everyone paying individually. Seats auto-assign to members in
+                  join order.
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() =>
+                      navigate(`/league-management?leagueId=${createdLeague.id}&settings=player-pro`)
+                    }
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-sm font-medium"
+                    data-testid="button-buy-player-pro"
+                  >
+                    Buy Player Pro seats
+                  </button>
+                  <button
+                    onClick={() => navigate(`/league-management?leagueId=${createdLeague.id}`)}
+                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-medium"
+                    data-testid="button-skip-player-pro"
+                  >
+                    Skip for now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col pb-48" data-testid="create-league-page">
-      {/* Header */}
       <div className="p-6 pt-[12px] pb-[12px]">
         <div className="flex items-center gap-4 mb-6">
           <button 
@@ -171,10 +240,8 @@ export default function CreateLeague() {
           Set up a new league for your sport community
         </p>
       </div>
-      {/* Form */}
       <div className="px-6">
         <form id="create-league-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Basic Information */}
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px]">
             <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
             
@@ -214,7 +281,6 @@ export default function CreateLeague() {
             </div>
           </div>
 
-          {/* Location & Venue */}
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] mt-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <MapPin className="w-5 h-5 text-primary" />
@@ -261,7 +327,6 @@ export default function CreateLeague() {
             </div>
           </div>
 
-          {/* League Settings */}
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[4px] pt-[4px] pb-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-5 h-5 text-primary" />

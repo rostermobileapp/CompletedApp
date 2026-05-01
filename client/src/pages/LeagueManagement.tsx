@@ -84,6 +84,7 @@ import {
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { GoogleAddressAutocomplete } from '@/components/GoogleAddressAutocomplete';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import {
   AlertDialog,
@@ -519,6 +520,7 @@ export default function LeagueManagement() {
   const queryClient = useQueryClient();
   const { canManageLeague, hasLeagueProSeat } = usePermissions();
   const isMobile = useIsMobile();
+  const isDesktopWeb = useIsDesktopWeb();
   const [showDesktopRequiredLeague, setShowDesktopRequiredLeague] = useState(false);
   const [showDesktopRequiredSeason, setShowDesktopRequiredSeason] = useState(false);
   const [seasonToDelete, setSeasonToDelete] = useState<Season | null>(null);
@@ -4984,7 +4986,8 @@ export default function LeagueManagement() {
                   </div>
                 </div>
 
-                {/* League-Wide Player Pro */}
+                {/* League-Wide Player Pro — desktop browsers only (Apple policy) */}
+                {isDesktopWeb && (
                 <div className="border-t pt-4" data-testid="section-league-player-pro">
                   <h3 className="font-medium mb-1 flex items-center gap-2">
                     <Crown className="w-4 h-4 text-yellow-500" />
@@ -5117,6 +5120,7 @@ export default function LeagueManagement() {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Manage Seasons */}
                 <div className="border-t pt-4">
