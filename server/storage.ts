@@ -3258,14 +3258,21 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     monthYM: string,
   ): Promise<LeagueProSeat | null> {
+    // Per-grant assignment: consider every active grant individually rather
+    // than short-circuiting when the user already has any active seat in the
+    // league. This prevents the overlap edge case where user holds a seat in
+    // grant A (Jan–Jun) and is skipped from grant B (Mar–Dec), then loses
+    // coverage in Jul–Dec when A expires. assignLeagueProSeat is idempotent
+    // via the (grant_id, user_id) unique constraint and returns the existing
+    // row, so calling it across overlapping grants is safe.
     if (await this.userHasGlobalPlayerProOrHigher(userId)) return null;
-    if (await this.userHasActiveLeagueProSeat(userId, leagueId, monthYM)) return null;
     const grants = await this.getActiveLeagueProGrantsForLeague(leagueId, monthYM);
+    let assigned: LeagueProSeat | null = null;
     for (const g of grants) {
       const seat = await this.assignLeagueProSeat(g.id, userId);
-      if (seat) return seat;
+      if (seat && !assigned) assigned = seat;
     }
-    return null;
+    return assigned;
   }
 
   /**
@@ -3393,11 +3400,22 @@ export class DatabaseStorage implements IStorage {
     // Seats whose grant window starts strictly after `monthYM` — used to tell
     // users their league has reserved them a Player Pro seat that activates
     // when the next window opens (the "between grants" messaging case).
+    // Gated by approved league membership so a user who left the league no
+    // longer sees a stale "your reserved seat" notice (the seat row still
+    // exists for audit/refund purposes by design).
     const rows = await db
       .select()
       .from(leagueProSeats)
       .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
       .innerJoin(leagues, eq(leagues.id, leagueProSeats.leagueId))
+      .innerJoin(
+        leagueMemberships,
+        and(
+          eq(leagueMemberships.leagueId, leagueProSeats.leagueId),
+          eq(leagueMemberships.userId, leagueProSeats.userId),
+          eq(leagueMemberships.status, 'approved'),
+        ),
+      )
       .where(
         and(
           eq(leagueProSeats.userId, userId),
