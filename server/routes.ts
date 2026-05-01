@@ -12,6 +12,7 @@ import {
   requireStatsManagement, 
   requireUserManagement,
   requirePremiumFeatures,
+  requireLeaguePremiumFeatures,
   requireSpecialPermission,
   roleHierarchy,
   canManageLeagueSpecific,
@@ -5575,7 +5576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // League members for scrimmage creation - accessible by Player Pro+ users who are members of the league
-  app.get("/api/leagues/:id/members-for-scrimmage", isAuthenticated, loadUserPermissions, requirePremiumFeatures, async (req: any, res) => {
+  app.get("/api/leagues/:id/members-for-scrimmage", isAuthenticated, loadUserPermissions, requireLeaguePremiumFeatures('id'), async (req: any, res) => {
     try {
       const leagueId = req.params.id;
       const userId = req.user.claims.sub;

@@ -3112,6 +3112,11 @@ export class DatabaseStorage implements IStorage {
     const grant = await this.getLeagueProGrant(grantId);
     if (!grant || grant.status !== 'paid') return null;
 
+    // Skip users who already have global Player Pro (or higher) — they don't
+    // need a league seat, and consuming one would waste the commissioner's
+    // bulk purchase.
+    if (await this.userHasGlobalPlayerProOrHigher(userId)) return null;
+
     // If already assigned, return existing row instead of failing.
     const [existing] = await db
       .select()
@@ -3120,7 +3125,7 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     if (existing) return existing;
 
-    const result = await db.execute(sql`
+    const result = await db.execute<LeagueProSeat>(sql`
       INSERT INTO league_pro_seats (grant_id, league_id, user_id)
       SELECT ${grantId}, ${grant.leagueId}, ${userId}
       WHERE (
@@ -3129,8 +3134,7 @@ export class DatabaseStorage implements IStorage {
       ON CONFLICT (grant_id, user_id) DO NOTHING
       RETURNING id, grant_id AS "grantId", league_id AS "leagueId", user_id AS "userId", assigned_at AS "assignedAt"
     `);
-    const rows = (result as any).rows ?? [];
-    return rows[0] ?? null;
+    return (result.rows[0] as LeagueProSeat | undefined) ?? null;
   }
 
   async backfillLeagueProSeats(grantId: string): Promise<number> {
@@ -3143,10 +3147,13 @@ export class DatabaseStorage implements IStorage {
     const alreadyAssigned = new Set(existingSeats.map(s => s.userId));
 
     // Order by approvedAt (join order); fall back to requestedAt for older rows
-    // that pre-date approvedAt being populated.
+    // that pre-date approvedAt being populated. Join in users.role so we can
+    // skip users with global Player Pro / Commissioner without an extra query
+    // per member.
     const members = await db
-      .select({ userId: leagueMemberships.userId })
+      .select({ userId: leagueMemberships.userId, userRole: users.role })
       .from(leagueMemberships)
+      .innerJoin(users, eq(users.id, leagueMemberships.userId))
       .where(
         and(
           eq(leagueMemberships.leagueId, grant.leagueId),
@@ -3155,14 +3162,40 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(asc(sql`COALESCE(${leagueMemberships.approvedAt}, ${leagueMemberships.requestedAt})`));
 
+    const PRO_OR_HIGHER: ReadonlyArray<string | null> = [
+      'player_pro',
+      'secondary_commissioner',
+      'commissioner',
+    ];
+
     let assigned = 0;
     for (const m of members) {
       if (assigned >= remaining) break;
       if (alreadyAssigned.has(m.userId)) continue;
+      // Skip global Player Pro (or higher) users — they already have access
+      // and consuming a paid seat would waste the commissioner's purchase.
+      if (PRO_OR_HIGHER.includes(m.userRole)) continue;
       const seat = await this.assignLeagueProSeat(grantId, m.userId);
       if (seat) assigned += 1;
     }
     return assigned;
+  }
+
+  /**
+   * True if the user's global role is Player Pro or higher (a global premium
+   * tier that already includes Player Pro features). Used to avoid wasting
+   * paid league seats on users who already have the entitlement.
+   */
+  private async userHasGlobalPlayerProOrHigher(userId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!row) return false;
+    return row.role === 'player_pro'
+      || row.role === 'secondary_commissioner'
+      || row.role === 'commissioner';
   }
 
   async getActiveLeagueProSeatsForUser(
@@ -3338,19 +3371,25 @@ export class DatabaseStorage implements IStorage {
         result.membership.leagueId,
         monthYM,
       );
+      // Bail out early if the user already has global Player Pro — they don't
+      // need a league seat and shouldn't get a "seats are full" notification.
+      const userIsAlreadyPro = await this.userHasGlobalPlayerProOrHigher(result.membership.userId);
       let assigned = false;
-      for (const grant of activeGrants) {
-        const seat = await this.assignLeagueProSeat(grant.id, result.membership.userId);
-        if (seat) {
-          assigned = true;
-          break; // one seat per league is enough
+      if (!userIsAlreadyPro) {
+        for (const grant of activeGrants) {
+          const seat = await this.assignLeagueProSeat(grant.id, result.membership.userId);
+          if (seat) {
+            assigned = true;
+            break; // one seat per league is enough
+          }
         }
       }
       // Player N+1 case: there is at least one active grant in this league but
       // every seat was already filled in join order. Surface a friendly
       // notification so the user knows the league's bulk Pro seats are full
-      // and they can still upgrade individually.
-      if (!assigned && activeGrants.length > 0) {
+      // and they can still upgrade individually. Only show this to free-tier
+      // users (Pro users don't care that league seats are full).
+      if (!assigned && !userIsAlreadyPro && activeGrants.length > 0) {
         await this.createNotification({
           userId: result.membership.userId,
           type: 'general',

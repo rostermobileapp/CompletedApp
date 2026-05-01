@@ -329,6 +329,57 @@ export const requirePremiumFeatures: RequestHandler = async (req, res, next) => 
 };
 
 /**
+ * Premium-features access for a league-scoped endpoint. Allows the caller
+ * through if either:
+ *   - their global role is Player Pro or higher, OR
+ *   - they hold an active League-Wide Player Pro seat in the route's league
+ *     (per-league access only — never elevates the global role).
+ *
+ * Uses the route param to identify the league; defaults to `id` (matches the
+ * existing `/api/leagues/:id/...` convention) but can be customized for routes
+ * that name the param differently.
+ */
+export const requireLeaguePremiumFeatures = (paramName: string = 'id'): RequestHandler => {
+  return async (req, res, next) => {
+    const user = req.userWithPermissions;
+    if (!user) {
+      return res.status(401).json({ message: "User permissions not loaded" });
+    }
+
+    // Global Pro short-circuit so we don't run a DB lookup for users that
+    // already have the entitlement.
+    const userRole = user.role || 'free_tier';
+    if (roleHierarchy[userRole] >= roleHierarchy['player_pro']) {
+      return next();
+    }
+
+    const leagueId = (req.params as Record<string, string | undefined>)[paramName];
+    if (leagueId) {
+      const { currentMonth } = await import('./leaguePro');
+      const hasSeat = await storage.userHasActiveLeagueProSeat(user.id, leagueId, currentMonth());
+      if (hasSeat) return next();
+    }
+
+    res.status(403).json({
+      message: "Access denied. Premium features require Player Pro subscription or a league-provided Player Pro seat",
+    });
+  };
+};
+
+/**
+ * Programmatic version of {@link requireLeaguePremiumFeatures} for use inside
+ * route handlers that need to branch on premium access without a middleware.
+ */
+export async function canAccessLeaguePremiumFeatures(
+  user: UserWithPermissions,
+  leagueId: string,
+): Promise<boolean> {
+  if (canAccessPremiumFeatures(user)) return true;
+  const { currentMonth } = await import('./leaguePro');
+  return storage.userHasActiveLeagueProSeat(user.id, leagueId, currentMonth());
+}
+
+/**
  * Utility functions for programmatic permission checks within route handlers
  */
 

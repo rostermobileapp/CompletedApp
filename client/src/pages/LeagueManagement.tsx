@@ -45,7 +45,30 @@ import {
   User,
   Search
 } from 'lucide-react';
-import { insertTeamSchema, insertSeasonSchema } from '@shared/schema';
+import { insertTeamSchema, insertSeasonSchema, type LeagueProGrant } from '@shared/schema';
+
+// Shape returned by GET /api/leagues/:id/player-pro/grants — base grant row
+// plus the per-grant seat counts and active-window flag the route enriches.
+type LeagueProGrantWithSeats = LeagueProGrant & {
+  seatsAssigned: number;
+  seatsRemaining: number;
+  isActive: boolean;
+};
+
+// Shape returned by POST /api/leagues/:id/player-pro/preview (mirrors
+// LeagueProPricing on the server). All amounts are integer cents.
+type LeagueProPreviewResponse = {
+  seatCount: number;
+  startMonth: string;
+  endMonth: string;
+  monthsCount: number;
+  perPlayerMonthlyCents: number;
+  individualTotalCents: number;
+  discountedTotalCents: number;
+  savingsCents: number;
+  discountPercent: number;
+  perPlayerEffectiveMonthlyCents: number;
+};
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1881,7 +1904,7 @@ export default function LeagueManagement() {
 
   // ─── League-Wide Player Pro: queries, mutations, redirect handler ─────
   // Live grants list (refetched after a successful payment confirmation).
-  const { data: leagueProGrants = [] } = useQuery<any[]>({
+  const { data: leagueProGrants = [] } = useQuery<LeagueProGrantWithSeats[]>({
     queryKey: ['/api/leagues', leagueId, 'player-pro', 'grants'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/player-pro/grants`);
@@ -1890,44 +1913,66 @@ export default function LeagueManagement() {
     enabled: !!leagueId && !!user && !!league && league.commissionerId === user.id,
   });
 
-  // Live Stripe price for the per-player monthly Player Pro tier — used for
-  // the live preview math so the commissioner sees pricing instantly without
-  // hitting the server on every keystroke.
-  const { data: stripePrices } = useQuery<Record<string, { amount: number | null }>>({
-    queryKey: ['/api/stripe/prices'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/stripe/prices');
-      return response.json();
-    },
-    enabled: !!leagueId,
-  });
-
-  const proPerPlayerMonthly = stripePrices?.player_pro_monthly?.amount ?? 6.5;
-
-  // Pure client-side preview math — must mirror server/leaguePro.ts exactly.
-  const proPreview = React.useMemo(() => {
+  // Live cost preview — sourced from the backend so the displayed totals are
+  // *exactly* what Stripe will charge (the server reads the per-player price
+  // from Stripe and applies the discount via the same helper checkout uses).
+  // Inputs are debounced through the query key so React Query naturally caches
+  // each combination and only refetches on change.
+  const proInputsValid = React.useMemo(() => {
     const seats = parseInt(proSeatCount, 10);
-    if (!Number.isFinite(seats) || seats <= 0) return null;
-    const m = /^(\d{4})-(0[1-9]|1[0-2])$/;
-    const s = m.exec(proStartMonth);
-    const e = m.exec(proEndMonth);
-    if (!s || !e) return null;
-    const months = (Number(e[1]) - Number(s[1])) * 12 + (Number(e[2]) - Number(s[2])) + 1;
-    if (months <= 0) return null;
-    const perPlayerMonthlyCents = Math.round(proPerPlayerMonthly * 100);
-    const individualCents = seats * months * perPlayerMonthlyCents;
-    const discountedCents = Math.round(individualCents * 0.75);
-    const savingsCents = individualCents - discountedCents;
+    if (!Number.isFinite(seats) || seats <= 0) return false;
+    const m = /^\d{4}-(0[1-9]|1[0-2])$/;
+    if (!m.test(proStartMonth) || !m.test(proEndMonth)) return false;
+    return proStartMonth <= proEndMonth;
+  }, [proSeatCount, proStartMonth, proEndMonth]);
+
+  const { data: proPreviewResponse, isFetching: proPreviewLoading } =
+    useQuery<LeagueProPreviewResponse>({
+      queryKey: [
+        '/api/leagues',
+        leagueId,
+        'player-pro',
+        'preview',
+        proSeatCount,
+        proStartMonth,
+        proEndMonth,
+      ],
+      queryFn: async () => {
+        const response = await apiRequest(
+          'POST',
+          `/api/leagues/${leagueId}/player-pro/preview`,
+          {
+            seatCount: parseInt(proSeatCount, 10),
+            startMonth: proStartMonth,
+            endMonth: proEndMonth,
+          },
+        );
+        return response.json();
+      },
+      enabled:
+        !!leagueId
+        && !!user
+        && !!league
+        && league.commissionerId === user.id
+        && proInputsValid,
+      staleTime: 60_000,
+    });
+
+  // Adapt the cents-based server response to the dollars-based shape the
+  // existing JSX renders. Computed only when the server returned a result.
+  const proPreview = React.useMemo(() => {
+    if (!proPreviewResponse) return null;
+    const r = proPreviewResponse;
     return {
-      seats,
-      months,
-      perPlayerMonthly: proPerPlayerMonthly,
-      individualTotal: individualCents / 100,
-      discountedTotal: discountedCents / 100,
-      savings: savingsCents / 100,
-      effectivePerPlayerMonthly: discountedCents / (seats * months) / 100,
+      seats: r.seatCount,
+      months: r.monthsCount,
+      perPlayerMonthly: r.perPlayerMonthlyCents / 100,
+      individualTotal: r.individualTotalCents / 100,
+      discountedTotal: r.discountedTotalCents / 100,
+      savings: r.savingsCents / 100,
+      effectivePerPlayerMonthly: r.perPlayerEffectiveMonthlyCents / 100,
     };
-  }, [proSeatCount, proStartMonth, proEndMonth, proPerPlayerMonthly]);
+  }, [proPreviewResponse]);
 
   const leagueProCheckoutMutation = useMutation({
     mutationFn: async () => {
@@ -4978,6 +5023,10 @@ export default function LeagueManagement() {
                         {' '}(vs ${proPreview.perPlayerMonthly.toFixed(2)} individually)
                       </div>
                     </div>
+                  ) : proInputsValid && proPreviewLoading ? (
+                    <div className="text-sm text-muted-foreground mb-3" data-testid="pro-preview-loading">
+                      Calculating price…
+                    </div>
                   ) : (
                     <div className="text-sm text-muted-foreground mb-3">
                       Enter seats and a valid month range to see pricing.
@@ -5002,7 +5051,7 @@ export default function LeagueManagement() {
                     <div className="mt-4">
                       <h4 className="text-sm font-medium mb-2">Active & past purchases</h4>
                       <div className="space-y-2" data-testid="list-pro-grants">
-                        {leagueProGrants.map((g: any) => (
+                        {leagueProGrants.map((g) => (
                           <div
                             key={g.id}
                             className="flex items-center justify-between gap-2 p-3 bg-card hairline elev-rest rounded-lg"
