@@ -4899,6 +4899,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a season. Blocks deletion when the season still has dependent
+  // records (games, teams, tournaments, or per-season player stats) to avoid
+  // a foreign-key violation and prevent silent data loss; the response
+  // includes per-resource counts so the UI can tell the commissioner what
+  // still needs to be removed first.
+  app.delete("/api/leagues/:leagueId/seasons/:seasonId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId, seasonId } = req.params;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: "You can only manage your own leagues" });
+      }
+
+      // Verify the season exists and belongs to this league
+      const [season] = await db
+        .select()
+        .from(seasons)
+        .where(and(eq(seasons.id, seasonId), eq(seasons.leagueId, leagueId)));
+      if (!season) {
+        return res.status(404).json({ message: "Season not found" });
+      }
+
+      // Count dependent rows so we can report exactly what's blocking deletion
+      const [gameCountRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(games)
+        .where(eq(games.seasonId, seasonId));
+      const [teamCountRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(teams)
+        .where(eq(teams.seasonId, seasonId));
+      const [tournamentCountRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(tournaments)
+        .where(eq(tournaments.seasonId, seasonId));
+      const [statsCountRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(playerStats)
+        .where(eq(playerStats.seasonId, seasonId));
+
+      const counts = {
+        games: Number(gameCountRow?.count ?? 0),
+        teams: Number(teamCountRow?.count ?? 0),
+        tournaments: Number(tournamentCountRow?.count ?? 0),
+        playerStats: Number(statsCountRow?.count ?? 0),
+      };
+      const total = counts.games + counts.teams + counts.tournaments + counts.playerStats;
+
+      if (total > 0) {
+        const parts: string[] = [];
+        if (counts.games) parts.push(`${counts.games} game${counts.games === 1 ? '' : 's'}`);
+        if (counts.teams) parts.push(`${counts.teams} team${counts.teams === 1 ? '' : 's'}`);
+        if (counts.tournaments) parts.push(`${counts.tournaments} tournament${counts.tournaments === 1 ? '' : 's'}`);
+        if (counts.playerStats) parts.push(`${counts.playerStats} player stat record${counts.playerStats === 1 ? '' : 's'}`);
+        return res.status(409).json({
+          message: `This season still has ${parts.join(', ')}. Remove them before deleting the season.`,
+          counts,
+        });
+      }
+
+      await storage.deleteSeason(seasonId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting season:", error);
+      res.status(500).json({ message: "Failed to delete season" });
+    }
+  });
+
   // League membership routes
   app.post("/api/leagues/:id/join", isAuthenticated, async (req: any, res) => {
     try {

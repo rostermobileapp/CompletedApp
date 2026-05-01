@@ -489,6 +489,7 @@ export default function LeagueManagement() {
   const isMobile = useIsMobile();
   const [showDesktopRequiredLeague, setShowDesktopRequiredLeague] = useState(false);
   const [showDesktopRequiredSeason, setShowDesktopRequiredSeason] = useState(false);
+  const [seasonToDelete, setSeasonToDelete] = useState<Season | null>(null);
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
@@ -2213,6 +2214,36 @@ export default function LeagueManagement() {
   });
 
   // League delete mutation
+  const deleteSeasonMutation = useMutation({
+    mutationFn: async (seasonId: string) => {
+      const response = await apiRequest('DELETE', `/api/leagues/${leagueId}/seasons/${seasonId}`);
+      return response.json();
+    },
+    onSuccess: (_data, seasonId) => {
+      toast({
+        title: 'Season Deleted',
+        description: 'The season has been removed.',
+      });
+      // If the user was viewing the deleted season, switch to the most-recent
+      // remaining one (or empty string when none are left).
+      if (selectedSeasonId === seasonId) {
+        const remaining = (Array.isArray(seasons) ? seasons : []).filter((s) => s.id !== seasonId);
+        setSelectedSeasonId(remaining[0]?.id ?? '');
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'seasons'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId] });
+      setSeasonToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Cannot Delete Season',
+        description: error.message || 'Failed to delete season.',
+        variant: 'destructive',
+      });
+      setSeasonToDelete(null);
+    },
+  });
+
   const deleteLeagueMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('DELETE', `/api/leagues/${leagueId}`);
@@ -4741,6 +4772,61 @@ export default function LeagueManagement() {
                   </div>
                 </div>
 
+                {/* Manage Seasons */}
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium mb-2">Seasons</label>
+                  {seasons.length === 0 ? (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-seasons">
+                      No seasons yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-2" data-testid="list-seasons">
+                      {seasons.map((season) => (
+                        <div
+                          key={season.id}
+                          className="flex items-center justify-between gap-2 p-3 bg-card hairline elev-rest rounded-lg"
+                          data-testid={`season-row-${season.id}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">
+                              {season.name}
+                              {season.isActive && (
+                                <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                            {(season.startDate || season.endDate) && (
+                              <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                                {season.startDate ? format(new Date(season.startDate), 'MMM d, yyyy') : '—'}
+                                {' – '}
+                                {season.endDate ? format(new Date(season.endDate), 'MMM d, yyyy') : '—'}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSeasonToDelete(season);
+                            }}
+                            disabled={deleteSeasonMutation.isPending}
+                            className="px-3 py-1.5 bg-red-500/50 text-white rounded-lg hover:bg-red-600/50 text-xs font-medium disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
+                            data-testid={`button-delete-season-${season.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Seasons that still contain games, teams, tournaments, or stats can't be deleted — remove those first.
+                  </p>
+                </div>
+
                 {/* Delete League Button */}
                 <div className="border-t pt-4">
                   <button
@@ -7155,6 +7241,39 @@ export default function LeagueManagement() {
         onOpenChange={setShowDesktopRequiredSeason}
         description={DESKTOP_REQUIRED_COPY.season}
       />
+
+      <AlertDialog
+        open={!!seasonToDelete}
+        onOpenChange={(open) => {
+          if (!open) setSeasonToDelete(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-confirm-delete-season">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Season?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {seasonToDelete
+                ? `Permanently delete the season "${seasonToDelete.name}"? This cannot be undone. Seasons with games, teams, tournaments, or stats can't be deleted — remove those first.`
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-season">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (seasonToDelete) {
+                  deleteSeasonMutation.mutate(seasonToDelete.id);
+                }
+              }}
+              disabled={deleteSeasonMutation.isPending}
+              className="bg-red-500 hover:bg-red-600"
+              data-testid="button-confirm-delete-season"
+            >
+              {deleteSeasonMutation.isPending ? 'Deleting...' : 'Delete Season'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
