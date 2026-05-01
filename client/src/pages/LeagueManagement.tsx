@@ -208,6 +208,7 @@ type Team = {
   name: string;
   captainId: string;
   leagueId: string;
+  seasonId?: string | null;
   isFreeAgents?: boolean; // Added missing property
 };
 
@@ -335,10 +336,11 @@ const createSeasonSchema = z.object({
   name: z.string().min(1, 'Season name is required'),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  isActive: z.boolean().default(true),
 });
 
 type CreateSeasonForm = z.infer<typeof createSeasonSchema>;
+
+type NewSeasonStep = 'close' | 'details' | 'players';
 
 // Games Calendar Component
 function GamesCalendar({ games, teams, onGameClick }: {
@@ -656,6 +658,10 @@ export default function LeagueManagement() {
   }, [showTimePicker]);
   const [showEditLeague, setShowEditLeague] = useState(false);
   const [showCreateSeason, setShowCreateSeason] = useState(false);
+  const [newSeasonStep, setNewSeasonStep] = useState<NewSeasonStep>('close');
+  const [closeCurrentSeason, setCloseCurrentSeason] = useState(true);
+  const [notReturningMemberIds, setNotReturningMemberIds] = useState<Set<string>>(new Set());
+  const [showResetPlayersConfirm, setShowResetPlayersConfirm] = useState(false);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [playerEditForm, setPlayerEditForm] = useState({
     assignedTeamId: '',
@@ -820,7 +826,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch teams
-  const { data: teams = [], refetch: refetchTeams } = useQuery({
+  const { data: allTeams = [], refetch: refetchTeams } = useQuery<Team[]>({
     queryKey: ['/api/leagues', leagueId, 'teams'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/teams`);
@@ -830,7 +836,7 @@ export default function LeagueManagement() {
   });
 
   // Fetch games
-  const { data: gamesData = [], refetch: refetchGames } = useQuery({
+  const { data: allGamesData = [], refetch: refetchGames } = useQuery<any[]>({
     queryKey: ['/api/leagues', leagueId, 'games'],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/leagues/${leagueId}/games`);
@@ -845,14 +851,25 @@ export default function LeagueManagement() {
     enabled: !!selectedGame?.id,
   });
 
-  // Sort games chronologically (earliest first)
+  // Scope teams to the currently-selected season so the League Management
+  // views show only that season's teams. Teams without a seasonId (legacy
+  // pre-seasons data) are kept visible only when no season is selected.
+  const teams = React.useMemo(() => {
+    if (!selectedSeasonId) return allTeams;
+    return allTeams.filter((t: any) => t.seasonId === selectedSeasonId);
+  }, [allTeams, selectedSeasonId]);
+
+  // Scope and sort games to the currently-selected season.
   const games = React.useMemo(() => {
-    return [...gamesData].sort((a, b) => {
+    const scoped = selectedSeasonId
+      ? allGamesData.filter((g: any) => g.seasonId === selectedSeasonId)
+      : allGamesData;
+    return [...scoped].sort((a, b) => {
       const dateA = new Date(a.scheduledAt);
       const dateB = new Date(b.scheduledAt);
       return dateA.getTime() - dateB.getTime();
     });
-  }, [gamesData]);
+  }, [allGamesData, selectedSeasonId]);
 
   // Reset scroll state when switching to list view
   useEffect(() => {
@@ -994,7 +1011,8 @@ export default function LeagueManagement() {
     resolver: zodResolver(createSeasonSchema),
     defaultValues: {
       name: '',
-      isActive: true,
+      startDate: '',
+      endDate: '',
     },
   });
 
@@ -2214,22 +2232,71 @@ export default function LeagueManagement() {
     },
   });
 
-  // Season create mutation
-  const createSeasonMutation = useMutation({
-    mutationFn: async (data: CreateSeasonForm) => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/seasons`, data);
-      return response.json();
+  // The currently-active season (if any) — used by the New Season wizard
+  // to ask whether the commissioner wants to close it as part of turnover.
+  const activeSeason = React.useMemo(
+    () => (Array.isArray(seasons) ? seasons.find((s) => s.isActive) : undefined),
+    [seasons],
+  );
+
+  // Open the New Season wizard. Skip the "close current season" step when
+  // there is no active season to close.
+  const openNewSeasonWizard = React.useCallback(() => {
+    seasonForm.reset({ name: '', startDate: '', endDate: '' });
+    setNotReturningMemberIds(new Set());
+    setCloseCurrentSeason(!!activeSeason);
+    setNewSeasonStep(activeSeason ? 'close' : 'details');
+    setShowCreateSeason(true);
+  }, [activeSeason, seasonForm]);
+
+  const closeNewSeasonWizard = React.useCallback(() => {
+    setShowCreateSeason(false);
+    setNewSeasonStep('close');
+    setCloseCurrentSeason(true);
+    setNotReturningMemberIds(new Set());
+    seasonForm.reset({ name: '', startDate: '', endDate: '' });
+  }, [seasonForm]);
+
+  // Season transition mutation: closes current season (optionally), creates
+  // the new season, removes selected/all players, and clears assignedTeamId
+  // for everyone who's returning so they land in Free Agents.
+  const seasonTransitionMutation = useMutation({
+    mutationFn: async (payload: {
+      closeCurrentSeasonId?: string | null;
+      season: { name: string; startDate?: string | null; endDate?: string | null };
+      resetAllPlayers?: boolean;
+      removedMemberIds?: string[];
+    }) => {
+      const response = await apiRequest(
+        'POST',
+        `/api/leagues/${leagueId}/seasons/transition`,
+        payload,
+      );
+      return response.json() as Promise<{ season: Season }>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({ title: 'Season created successfully' });
       setShowCreateSeason(false);
+      setNewSeasonStep('close');
+      setCloseCurrentSeason(true);
+      setNotReturningMemberIds(new Set());
       seasonForm.reset();
+      // Auto-select the brand-new season
+      if (data?.season?.id) {
+        setSelectedSeasonId(data.season.id);
+      }
       refetchSeasons();
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'games'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'standings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/leagues'] });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: 'Creation Failed',
-        description: 'Failed to create season.',
+        description: error.message || 'Failed to create season.',
         variant: 'destructive',
       });
     },
@@ -2365,7 +2432,7 @@ export default function LeagueManagement() {
               </select>
             </div>
             <button
-              onClick={() => setShowCreateSeason(true)}
+              onClick={openNewSeasonWizard}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium"
               data-testid="button-create-season"
             >
@@ -2384,7 +2451,7 @@ export default function LeagueManagement() {
                 <p className="text-sm text-muted-foreground">Create your first season to start organizing games and teams.</p>
               </div>
               <button
-                onClick={() => setShowCreateSeason(true)}
+                onClick={openNewSeasonWizard}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium"
                 data-testid="button-create-first-season"
               >
@@ -4707,103 +4774,408 @@ export default function LeagueManagement() {
         </div>
       )}
       {/* Create Season Modal */}
-      {showCreateSeason && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-xl hairline elev-inset max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Create New Season</h2>
-                <button
-                  onClick={() => setShowCreateSeason(false)}
-                  className="text-muted-foreground hover:text-foreground p-1"
-                  data-testid="button-close-create-season"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {showCreateSeason && (() => {
+        const stepOrder: NewSeasonStep[] = activeSeason
+          ? ['close', 'details', 'players']
+          : ['details', 'players'];
+        const stepIndex = stepOrder.indexOf(newSeasonStep);
+        const totalSteps = stepOrder.length;
+        const goPrev = () => {
+          if (stepIndex > 0) setNewSeasonStep(stepOrder[stepIndex - 1]);
+        };
+        const goNext = () => {
+          if (stepIndex < totalSteps - 1) setNewSeasonStep(stepOrder[stepIndex + 1]);
+        };
 
-              <form
-                onSubmit={seasonForm.handleSubmit((data) => {
-                  createSeasonMutation.mutate(data);
-                })}
-                className="space-y-4"
-              >
-                {/* Season Name */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Season Name</label>
-                  <input
-                    {...seasonForm.register('name')}
-                    type="text"
-                    className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="e.g., Spring 2024, Fall League 2023"
-                    data-testid="input-season-name"
-                  />
-                  {seasonForm.formState.errors.name && (
-                    <p className="text-red-500/50 text-sm mt-1">
-                      {seasonForm.formState.errors.name.message}
+        const handleDetailsContinue = seasonForm.handleSubmit(() => {
+          goNext();
+        });
+
+        const submitTransition = (resetAllPlayers: boolean) => {
+          const data = seasonForm.getValues();
+          seasonTransitionMutation.mutate({
+            closeCurrentSeasonId:
+              activeSeason && closeCurrentSeason ? activeSeason.id : null,
+            season: {
+              name: data.name,
+              startDate: data.startDate || null,
+              endDate: data.endDate || null,
+            },
+            resetAllPlayers,
+            removedMemberIds: resetAllPlayers
+              ? []
+              : Array.from(notReturningMemberIds),
+          });
+        };
+
+        const sortedMembers = [...(members as LeagueMember[])].sort((a, b) => {
+          const an = (a.displayFirstName || a.user?.firstName || a.user?.displayName || a.user?.email || '').toLowerCase();
+          const bn = (b.displayFirstName || b.user?.firstName || b.user?.displayName || b.user?.email || '').toLowerCase();
+          return an.localeCompare(bn);
+        });
+
+        const returningCount =
+          sortedMembers.length - notReturningMemberIds.size;
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-xl hairline elev-inset max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold">New Season</h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Step {stepIndex + 1} of {totalSteps}
+                      {newSeasonStep === 'close' && ' · Close current season'}
+                      {newSeasonStep === 'details' && ' · Season details'}
+                      {newSeasonStep === 'players' && ' · Returning players'}
                     </p>
-                  )}
+                  </div>
+                  <button
+                    onClick={closeNewSeasonWizard}
+                    className="text-muted-foreground hover:text-foreground p-1"
+                    data-testid="button-close-create-season"
+                    disabled={seasonTransitionMutation.isPending}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
-                {/* Start Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Start Date (Optional)</label>
-                  <input
-                    {...seasonForm.register('startDate')}
-                    type="date"
-                    className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="input-season-start-date"
-                  />
-                </div>
-
-                {/* End Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
-                  <input
-                    {...seasonForm.register('endDate')}
-                    type="date"
-                    className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    data-testid="input-season-end-date"
-                  />
-                </div>
-
-                {/* Active Status */}
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      {...seasonForm.register('isActive')}
-                      type="checkbox"
-                      className="rounded border-border focus:ring-primary"
-                      data-testid="checkbox-season-active"
+                {/* Step indicator */}
+                <div className="flex items-center gap-2 mb-6">
+                  {stepOrder.map((s, i) => (
+                    <div
+                      key={s}
+                      className={`h-1.5 flex-1 rounded-full ${
+                        i <= stepIndex ? 'bg-primary' : 'bg-muted'
+                      }`}
                     />
-                    <span className="text-sm font-medium">Season is active</span>
-                  </label>
+                  ))}
                 </div>
 
-                {/* Submit Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateSeason(false)}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
-                    data-testid="button-cancel-create-season"
+                {/* STEP: close current season */}
+                {newSeasonStep === 'close' && activeSeason && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-card hairline elev-rest rounded-lg">
+                      <h3 className="font-medium mb-1">Close current season?</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        <span className="font-medium text-foreground">
+                          {activeSeason.name}
+                        </span>{' '}
+                        is currently active. Would you like to close it before
+                        starting the new one?
+                      </p>
+                      <div className="space-y-2">
+                        <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/50">
+                          <input
+                            type="radio"
+                            name="close-season-choice"
+                            checked={closeCurrentSeason}
+                            onChange={() => setCloseCurrentSeason(true)}
+                            className="mt-1"
+                            data-testid="radio-close-current-season-yes"
+                          />
+                          <div>
+                            <div className="text-sm font-medium">
+                              Yes, close {activeSeason.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              The season is marked inactive. Its games, teams,
+                              and standings stay intact for history.
+                            </div>
+                          </div>
+                        </label>
+                        <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/50">
+                          <input
+                            type="radio"
+                            name="close-season-choice"
+                            checked={!closeCurrentSeason}
+                            onChange={() => setCloseCurrentSeason(false)}
+                            className="mt-1"
+                            data-testid="radio-close-current-season-no"
+                          />
+                          <div>
+                            <div className="text-sm font-medium">
+                              No, keep it active
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Both seasons will be marked active. You can close
+                              the old season later from the season dropdown.
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeNewSeasonWizard}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                        data-testid="button-cancel-create-season"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goNext}
+                        className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium"
+                        data-testid="button-wizard-next-close"
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP: season details */}
+                {newSeasonStep === 'details' && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleDetailsContinue();
+                    }}
+                    className="space-y-4"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createSeasonMutation.isPending}
-                    className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
-                    data-testid="button-create-season-submit"
-                  >
-                    {createSeasonMutation.isPending ? 'Creating...' : 'Create Season'}
-                  </button>
-                </div>
-              </form>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Season Name</label>
+                      <input
+                        {...seasonForm.register('name')}
+                        type="text"
+                        className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="e.g., Spring 2024, Fall League 2023"
+                        data-testid="input-season-name"
+                      />
+                      {seasonForm.formState.errors.name && (
+                        <p className="text-red-500/50 text-sm mt-1">
+                          {seasonForm.formState.errors.name.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Start Date (Optional)</label>
+                      <input
+                        {...seasonForm.register('startDate')}
+                        type="date"
+                        className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="input-season-start-date"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">End Date (Optional)</label>
+                      <input
+                        {...seasonForm.register('endDate')}
+                        type="date"
+                        className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="input-season-end-date"
+                      />
+                    </div>
+
+                    <div className="text-xs text-muted-foreground p-3 bg-muted/40 rounded-lg">
+                      The new season starts with an empty schedule and no
+                      teams. You'll choose which players carry over on the next
+                      step.
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={activeSeason ? goPrev : closeNewSeasonWizard}
+                        className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                        data-testid="button-wizard-back-details"
+                      >
+                        {activeSeason ? 'Back' : 'Cancel'}
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium"
+                        data-testid="button-wizard-next-details"
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* STEP: returning players */}
+                {newSeasonStep === 'players' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium mb-1">Returning players</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Uncheck anyone who isn't returning this season. Players
+                        who return move to Free Agents until you put them on a
+                        team.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="text-muted-foreground" data-testid="text-returning-count">
+                        {returningCount} returning · {notReturningMemberIds.size} removed
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNotReturningMemberIds(new Set())}
+                          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
+                          data-testid="button-mark-all-returning"
+                        >
+                          All returning
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNotReturningMemberIds(
+                              new Set(sortedMembers.map((m) => m.id)),
+                            )
+                          }
+                          className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
+                          data-testid="button-mark-none-returning"
+                        >
+                          None returning
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg max-h-72 overflow-y-auto divide-y divide-border">
+                      {sortedMembers.length === 0 && (
+                        <div className="p-4 text-sm text-muted-foreground text-center">
+                          No players in this league yet.
+                        </div>
+                      )}
+                      {sortedMembers.map((m) => {
+                        const removed = notReturningMemberIds.has(m.id);
+                        const returning = !removed;
+                        const first = m.displayFirstName || m.user?.firstName || '';
+                        const last = m.displayLastName || m.user?.lastName || '';
+                        const name =
+                          (first + ' ' + last).trim() ||
+                          m.user?.displayName ||
+                          m.user?.email ||
+                          'Player';
+                        return (
+                          <label
+                            key={m.id}
+                            className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/40"
+                            data-testid={`row-returning-member-${m.id}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={returning}
+                              onChange={(e) => {
+                                setNotReturningMemberIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.delete(m.id);
+                                  else next.add(m.id);
+                                  return next;
+                                });
+                              }}
+                              className="rounded border-border focus:ring-primary"
+                              data-testid={`checkbox-returning-member-${m.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-sm font-medium truncate ${removed ? 'line-through text-muted-foreground' : ''}`}>
+                                {name}
+                              </div>
+                              {m.user?.email && (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {m.user.email}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                returning
+                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {returning ? 'Returning' : 'Not returning'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={goPrev}
+                        className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                        data-testid="button-wizard-back-players"
+                        disabled={seasonTransitionMutation.isPending}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPlayersConfirm(true)}
+                        className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted"
+                        data-testid="button-skip-reset-players"
+                        disabled={seasonTransitionMutation.isPending || sortedMembers.length === 0}
+                      >
+                        Skip & Reset Player List
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitTransition(false)}
+                        disabled={seasonTransitionMutation.isPending}
+                        className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
+                        data-testid="button-create-season-submit"
+                      >
+                        {seasonTransitionMutation.isPending
+                          ? 'Creating...'
+                          : 'Create Season'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Reset confirm dialog */}
+            {showResetPlayersConfirm && (
+              <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+                <div className="bg-background rounded-xl hairline elev-inset max-w-sm w-full p-6 space-y-4">
+                  <h3 className="text-lg font-bold">Reset entire player list?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    This will remove every player from the league as part of
+                    creating the new season. They'll need to rejoin or be
+                    re-invited. This cannot be undone.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPlayersConfirm(false)}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
+                      data-testid="button-cancel-reset-players"
+                      disabled={seasonTransitionMutation.isPending}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowResetPlayersConfirm(false);
+                        submitTransition(true);
+                      }}
+                      disabled={seasonTransitionMutation.isPending}
+                      className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium disabled:opacity-50"
+                      data-testid="button-confirm-reset-players"
+                    >
+                      {seasonTransitionMutation.isPending
+                        ? 'Resetting...'
+                        : 'Reset & Create'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
       {/* Create Facility Modal */}
       {showCreateFacility && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
