@@ -4789,88 +4789,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Season name is required" });
       }
 
-      // 1. Close the current active season if requested
-      if (closeCurrentSeasonId) {
-        const current = await storage.getSeason(closeCurrentSeasonId);
-        if (current && current.leagueId === leagueId) {
-          await storage.updateSeason(closeCurrentSeasonId, { isActive: false });
-        }
-      }
-
-      // 2. Create the new season (always active)
-      const newSeason = await storage.createSeason({
-        name: season.name,
-        leagueId,
-        startDate: season.startDate ? new Date(season.startDate) : null,
-        endDate: season.endDate ? new Date(season.endDate) : null,
-        isActive: true,
-      });
-
-      // 3. Player review — either reset all or remove specific memberships
-      if (resetAllPlayers) {
-        // Find placeholder users so we can clean them up after deleting memberships
-        const placeholderMembers = await db
-          .select({ userId: leagueMemberships.userId })
-          .from(leagueMemberships)
-          .innerJoin(users, eq(users.id, leagueMemberships.userId))
-          .where(
-            and(
-              eq(leagueMemberships.leagueId, leagueId),
-              ilike(users.email, '%@placeholder.roster')
-            )
-          );
-
-        await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, leagueId));
-
-        for (const pm of placeholderMembers) {
-          const remaining = await db
-            .select({ id: leagueMemberships.id })
-            .from(leagueMemberships)
-            .where(eq(leagueMemberships.userId, pm.userId));
-          if (remaining.length === 0) {
-            await db.delete(users).where(eq(users.id, pm.userId));
+      // Run the entire turnover atomically: closing the old season, creating
+      // the new one, removing players, and clearing assignedTeamId all happen
+      // in a single DB transaction so a partial failure can't leave the
+      // league in a half-migrated state.
+      const newSeason = await db.transaction(async (tx) => {
+        // 1. Close the current active season if requested
+        if (closeCurrentSeasonId) {
+          const [current] = await tx
+            .select()
+            .from(seasons)
+            .where(eq(seasons.id, closeCurrentSeasonId));
+          if (current && current.leagueId === leagueId) {
+            await tx
+              .update(seasons)
+              .set({ isActive: false })
+              .where(eq(seasons.id, closeCurrentSeasonId));
           }
         }
-      } else if (Array.isArray(removedMemberIds) && removedMemberIds.length > 0) {
-        // Resolve which of the requested membership ids actually belong to this
-        // league before deleting (don't trust the client to scope correctly).
-        const targets = await db
-          .select({ id: leagueMemberships.id, userId: leagueMemberships.userId, email: users.email })
-          .from(leagueMemberships)
-          .innerJoin(users, eq(users.id, leagueMemberships.userId))
-          .where(
-            and(
-              eq(leagueMemberships.leagueId, leagueId),
-              inArray(leagueMemberships.id, removedMemberIds)
-            )
-          );
 
-        if (targets.length > 0) {
-          await db
+        // 2. Create the new season (always active)
+        const [created] = await tx
+          .insert(seasons)
+          .values({
+            name: season.name,
+            leagueId,
+            startDate: season.startDate ? new Date(season.startDate) : null,
+            endDate: season.endDate ? new Date(season.endDate) : null,
+            isActive: true,
+          })
+          .returning();
+
+        // 3. Player review — either reset all or remove specific memberships
+        if (resetAllPlayers) {
+          const placeholderMembers = await tx
+            .select({ userId: leagueMemberships.userId })
+            .from(leagueMemberships)
+            .innerJoin(users, eq(users.id, leagueMemberships.userId))
+            .where(
+              and(
+                eq(leagueMemberships.leagueId, leagueId),
+                ilike(users.email, '%@placeholder.roster')
+              )
+            );
+
+          await tx
             .delete(leagueMemberships)
-            .where(inArray(leagueMemberships.id, targets.map(t => t.id)));
+            .where(eq(leagueMemberships.leagueId, leagueId));
 
-          // Clean up placeholder users that now have zero memberships
-          for (const t of targets) {
-            if (t.email && t.email.endsWith('@placeholder.roster')) {
-              const remaining = await db
-                .select({ id: leagueMemberships.id })
-                .from(leagueMemberships)
-                .where(eq(leagueMemberships.userId, t.userId));
-              if (remaining.length === 0) {
-                await db.delete(users).where(eq(users.id, t.userId));
+          for (const pm of placeholderMembers) {
+            const remaining = await tx
+              .select({ id: leagueMemberships.id })
+              .from(leagueMemberships)
+              .where(eq(leagueMemberships.userId, pm.userId));
+            if (remaining.length === 0) {
+              await tx.delete(users).where(eq(users.id, pm.userId));
+            }
+          }
+        } else if (Array.isArray(removedMemberIds) && removedMemberIds.length > 0) {
+          // Resolve which of the requested membership ids actually belong to
+          // this league before deleting (don't trust the client to scope
+          // correctly).
+          const targets = await tx
+            .select({ id: leagueMemberships.id, userId: leagueMemberships.userId, email: users.email })
+            .from(leagueMemberships)
+            .innerJoin(users, eq(users.id, leagueMemberships.userId))
+            .where(
+              and(
+                eq(leagueMemberships.leagueId, leagueId),
+                inArray(leagueMemberships.id, removedMemberIds)
+              )
+            );
+
+          if (targets.length > 0) {
+            await tx
+              .delete(leagueMemberships)
+              .where(inArray(leagueMemberships.id, targets.map(t => t.id)));
+
+            // Clean up placeholder users that now have zero memberships
+            for (const t of targets) {
+              if (t.email && t.email.endsWith('@placeholder.roster')) {
+                const remaining = await tx
+                  .select({ id: leagueMemberships.id })
+                  .from(leagueMemberships)
+                  .where(eq(leagueMemberships.userId, t.userId));
+                if (remaining.length === 0) {
+                  await tx.delete(users).where(eq(users.id, t.userId));
+                }
               }
             }
           }
         }
-      }
 
-      // 4. Clear assignedTeamId on every remaining membership in the league
-      // so all returning players show up as Free Agents in the new season.
-      await db
-        .update(leagueMemberships)
-        .set({ assignedTeamId: null })
-        .where(eq(leagueMemberships.leagueId, leagueId));
+        // 4. Clear assignedTeamId on every remaining membership in the league
+        // so all returning players show up as Free Agents in the new season.
+        await tx
+          .update(leagueMemberships)
+          .set({ assignedTeamId: null })
+          .where(eq(leagueMemberships.leagueId, leagueId));
+
+        return created;
+      });
 
       res.json({ season: newSeason });
     } catch (error) {

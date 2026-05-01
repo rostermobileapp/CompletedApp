@@ -4999,21 +4999,22 @@ export default function LeagueManagement() {
                   </form>
                 )}
 
-                {/* STEP: returning players */}
+                {/* STEP: not returning players */}
                 {newSeasonStep === 'players' && (
                   <div className="space-y-4">
                     <div>
-                      <h3 className="font-medium mb-1">Returning players</h3>
+                      <h3 className="font-medium mb-1">Who's not returning?</h3>
                       <p className="text-sm text-muted-foreground">
-                        Uncheck anyone who isn't returning this season. Players
-                        who return move to Free Agents until you put them on a
-                        team.
+                        Check the box next to anyone who isn't coming back this
+                        season — they'll be removed from the league. Everyone
+                        else returns and moves to Free Agents until you put
+                        them on a team.
                       </p>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
                       <div className="text-muted-foreground" data-testid="text-returning-count">
-                        {returningCount} returning · {notReturningMemberIds.size} removed
+                        {returningCount} returning · {notReturningMemberIds.size} not returning
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -5022,7 +5023,7 @@ export default function LeagueManagement() {
                           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
                           data-testid="button-mark-all-returning"
                         >
-                          All returning
+                          Clear all
                         </button>
                         <button
                           type="button"
@@ -5034,7 +5035,7 @@ export default function LeagueManagement() {
                           className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
                           data-testid="button-mark-none-returning"
                         >
-                          None returning
+                          Select all
                         </button>
                       </div>
                     </div>
@@ -5046,8 +5047,7 @@ export default function LeagueManagement() {
                         </div>
                       )}
                       {sortedMembers.map((m) => {
-                        const removed = notReturningMemberIds.has(m.id);
-                        const returning = !removed;
+                        const notReturning = notReturningMemberIds.has(m.id);
                         const first = m.displayFirstName || m.user?.firstName || '';
                         const last = m.displayLastName || m.user?.lastName || '';
                         const name =
@@ -5063,12 +5063,12 @@ export default function LeagueManagement() {
                           >
                             <input
                               type="checkbox"
-                              checked={returning}
+                              checked={notReturning}
                               onChange={(e) => {
                                 setNotReturningMemberIds((prev) => {
                                   const next = new Set(prev);
-                                  if (e.target.checked) next.delete(m.id);
-                                  else next.add(m.id);
+                                  if (e.target.checked) next.add(m.id);
+                                  else next.delete(m.id);
                                   return next;
                                 });
                               }}
@@ -5076,7 +5076,7 @@ export default function LeagueManagement() {
                               data-testid={`checkbox-returning-member-${m.id}`}
                             />
                             <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-medium truncate ${removed ? 'line-through text-muted-foreground' : ''}`}>
+                              <div className={`text-sm font-medium truncate ${notReturning ? 'line-through text-muted-foreground' : ''}`}>
                                 {name}
                               </div>
                               {m.user?.email && (
@@ -5087,12 +5087,12 @@ export default function LeagueManagement() {
                             </div>
                             <span
                               className={`text-xs px-2 py-0.5 rounded-full ${
-                                returning
-                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-muted text-muted-foreground'
+                                notReturning
+                                  ? 'bg-muted text-muted-foreground'
+                                  : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                               }`}
                             >
-                              {returning ? 'Returning' : 'Not returning'}
+                              {notReturning ? 'Not returning' : 'Returning'}
                             </span>
                           </label>
                         );
