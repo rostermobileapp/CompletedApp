@@ -2246,6 +2246,7 @@ export default function LeagueManagement() {
     setNotReturningMemberIds(new Set());
     setCloseCurrentSeason(!!activeSeason);
     setNewSeasonStep(activeSeason ? 'close' : 'details');
+    setShowResetPlayersConfirm(false);
     setShowCreateSeason(true);
   }, [activeSeason, seasonForm]);
 
@@ -2254,6 +2255,7 @@ export default function LeagueManagement() {
     setNewSeasonStep('close');
     setCloseCurrentSeason(true);
     setNotReturningMemberIds(new Set());
+    setShowResetPlayersConfirm(false);
     seasonForm.reset({ name: '', startDate: '', endDate: '' });
   }, [seasonForm]);
 
@@ -2280,6 +2282,7 @@ export default function LeagueManagement() {
       setNewSeasonStep('close');
       setCloseCurrentSeason(true);
       setNotReturningMemberIds(new Set());
+      setShowResetPlayersConfirm(false);
       seasonForm.reset();
       // Auto-select the brand-new season
       if (data?.season?.id) {
