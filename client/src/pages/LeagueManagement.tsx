@@ -60,6 +60,8 @@ import {
 } from '@/components/ui/select';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { GoogleAddressAutocomplete } from '@/components/GoogleAddressAutocomplete';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -484,6 +486,9 @@ export default function LeagueManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canManageLeague } = usePermissions();
+  const isMobile = useIsMobile();
+  const [showDesktopRequiredLeague, setShowDesktopRequiredLeague] = useState(false);
+  const [showDesktopRequiredSeason, setShowDesktopRequiredSeason] = useState(false);
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showCreateTeam, setShowCreateTeam] = useState(false);
@@ -2242,13 +2247,17 @@ export default function LeagueManagement() {
   // Open the New Season wizard. Skip the "close current season" step when
   // there is no active season to close.
   const openNewSeasonWizard = React.useCallback(() => {
+    if (isMobile) {
+      setShowDesktopRequiredSeason(true);
+      return;
+    }
     seasonForm.reset({ name: '', startDate: '', endDate: '' });
     setNotReturningMemberIds(new Set());
     setCloseCurrentSeason(!!activeSeason);
     setNewSeasonStep(activeSeason ? 'close' : 'details');
     setShowResetPlayersConfirm(false);
     setShowCreateSeason(true);
-  }, [activeSeason, seasonForm]);
+  }, [isMobile, activeSeason, seasonForm]);
 
   const closeNewSeasonWizard = React.useCallback(() => {
     setShowCreateSeason(false);
@@ -2337,7 +2346,13 @@ export default function LeagueManagement() {
                   You haven't created any leagues yet. Create your first league to start managing teams and scheduling games.
                 </p>
                 <button 
-                  onClick={() => navigate('/create-league')}
+                  onClick={() => {
+                    if (isMobile) {
+                      setShowDesktopRequiredLeague(true);
+                      return;
+                    }
+                    navigate('/create-league');
+                  }}
                   className="bg-warning text-black px-6 py-3 rounded-lg font-semibold"
                   data-testid="button-create-first-league"
                 >
@@ -2370,6 +2385,11 @@ export default function LeagueManagement() {
             )}
           </div>
         </div>
+        <DesktopRequiredDialog
+          open={showDesktopRequiredLeague}
+          onOpenChange={setShowDesktopRequiredLeague}
+          description={DESKTOP_REQUIRED_COPY.league}
+        />
       </div>
     );
   }
@@ -7130,6 +7150,11 @@ export default function LeagueManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <DesktopRequiredDialog
+        open={showDesktopRequiredSeason}
+        onOpenChange={setShowDesktopRequiredSeason}
+        description={DESKTOP_REQUIRED_COPY.season}
+      />
     </div>
   );
 }

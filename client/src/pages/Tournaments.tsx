@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from "@/components/DesktopRequiredDialog";
 import type { Tournament } from "@shared/schema";
 
 export default function Tournaments() {
@@ -191,19 +191,11 @@ export default function Tournaments() {
         )}
       </div>
 
-      <Dialog open={showMobileDialog} onOpenChange={setShowMobileDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Desktop Required</DialogTitle>
-            <DialogDescription>
-              Due to the complexity of tournament setup, you must create a tournament on a desktop browser. Login at Roster-App.com to get started.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setShowMobileDialog(false)}>Got it</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DesktopRequiredDialog
+        open={showMobileDialog}
+        onOpenChange={setShowMobileDialog}
+        description={DESKTOP_REQUIRED_COPY.tournament}
+      />
     </div>
   );
 }

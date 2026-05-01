@@ -4,6 +4,8 @@ import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Plus, Users, Trophy, Calendar, Search } from 'lucide-react';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 
 type League = {
   id: string;
@@ -20,8 +22,18 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 export default function LeagueList() {
   const [, navigate] = useLocation();
   const { canManageLeague } = usePermissions();
+  const isMobile = useIsMobile();
+  const [showDesktopRequired, setShowDesktopRequired] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+
+  const handleCreateLeague = () => {
+    if (isMobile) {
+      setShowDesktopRequired(true);
+      return;
+    }
+    navigate('/create-league');
+  };
 
   const { data: leagues, isLoading } = useQuery<League[]>({
     queryKey: ['/api/leagues/commissioner'],
@@ -76,7 +88,7 @@ export default function LeagueList() {
       {/* Create League Button */}
       <div className="px-6 mb-4">
         <button
-          onClick={() => navigate('/create-league')}
+          onClick={handleCreateLeague}
           className="w-full bg-primary text-primary-foreground rounded-lg px-4 py-3 flex items-center justify-center gap-2 font-medium"
           data-testid="button-create-league"
         >
@@ -140,7 +152,7 @@ export default function LeagueList() {
               Create your first league to get started with managing teams and games.
             </p>
             <button
-              onClick={() => navigate('/create-league')}
+              onClick={handleCreateLeague}
               className="bg-primary text-primary-foreground rounded-lg px-6 py-2 font-medium"
               data-testid="button-create-first-league"
             >
@@ -229,6 +241,12 @@ export default function LeagueList() {
           </div>
         )}
       </div>
+
+      <DesktopRequiredDialog
+        open={showDesktopRequired}
+        onOpenChange={setShowDesktopRequired}
+        description={DESKTOP_REQUIRED_COPY.league}
+      />
     </div>
   );
 }

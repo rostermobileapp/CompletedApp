@@ -5,13 +5,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, MapPin, Calendar, Globe } from 'lucide-react';
+import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { insertLeagueSchema } from '@shared/schema';
 import type { z } from 'zod';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -56,6 +58,7 @@ export default function CreateLeague() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canManageLeague } = usePermissions();
+  const isMobile = useIsMobile();
   
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
@@ -102,6 +105,49 @@ export default function CreateLeague() {
 
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   // All users now have commissioner access to create leagues
+
+  if (isMobile) {
+    return (
+      <div className="min-h-screen flex flex-col" data-testid="create-league-mobile-blocked">
+        <div className="p-6 pt-[12px] pb-[12px]">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate('/league-list');
+              }}
+              className="text-muted-foreground"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Create League</h1>
+          </div>
+        </div>
+        <div className="px-6 flex-1 flex items-center justify-center">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-8 text-center max-w-md w-full">
+            <div className="flex justify-center mb-4">
+              <Monitor className="h-12 w-12 text-primary" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Desktop Required</h2>
+            <p className="text-muted-foreground mb-6">
+              {DESKTOP_REQUIRED_COPY.league}
+            </p>
+            <button
+              onClick={() => {
+                setPageTransitionDirection('down');
+                navigate('/league-list');
+              }}
+              className="bg-primary text-primary-foreground rounded-lg px-6 py-2 font-medium"
+              data-testid="button-back-to-leagues"
+            >
+              Back to My Leagues
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col pb-48" data-testid="create-league-page">

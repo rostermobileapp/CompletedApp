@@ -5,6 +5,8 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock, Monitor } from 'lucide-react';
 import { Sheet, AnimatedSheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
+import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +27,10 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
   const [internalOpen, setInternalOpen] = useState(false);
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [showTournamentWarning, setShowTournamentWarning] = useState(false);
+  const [showDesktopRequired, setShowDesktopRequired] = useState(false);
   const [location, navigate] = useLocation();
   const pendingPathRef = useRef<string | null>(null);
+  const isMobile = useIsMobile();
   const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
 
   const isControlled = externalOpen !== undefined && externalOnOpenChange !== undefined;
@@ -163,7 +167,14 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
       setShowTournamentWarning(true);
       return;
     }
-    
+
+    // Block league creation on mobile
+    if (path === '/create-league' && isMobile) {
+      setOpen(false);
+      setShowDesktopRequired(true);
+      return;
+    }
+
     setPageTransitionDirection('up');
     pendingPathRef.current = path;
     setOpen(false);
@@ -248,6 +259,11 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
       <PremiumFeatureAlert 
         open={showPremiumAlert} 
         onOpenChange={setShowPremiumAlert} 
+      />
+      <DesktopRequiredDialog
+        open={showDesktopRequired}
+        onOpenChange={setShowDesktopRequired}
+        description={DESKTOP_REQUIRED_COPY.league}
       />
       {/* Tournament Warning Modal */}
       <AlertDialog open={showTournamentWarning} onOpenChange={setShowTournamentWarning}>
