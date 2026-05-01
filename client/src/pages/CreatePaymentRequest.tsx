@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -650,7 +649,10 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
                 </div>
 
                 {/* Player List */}
-                <ScrollArea className="h-[300px]">
+                <div
+                  className="max-h-[400px] overflow-y-auto pr-1"
+                  data-testid="recipient-list-scroll"
+                >
                   {filteredPlayers.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground">No players found</p>
@@ -744,7 +746,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
                       })}
                     </div>
                   )}
-                </ScrollArea>
+                </div>
 
                 {form.formState.errors.recipientUserIds && (
                   <p className="text-sm text-destructive mt-2">
