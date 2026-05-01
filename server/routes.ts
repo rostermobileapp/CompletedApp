@@ -17096,7 +17096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             recipientId,
             creatorName,
             paymentRequest.amountPerPerson,
-            paymentRequest.title,
+            paymentRequest.description || paymentRequest.title,
             paymentRequest.id,
           ).catch(err => {
             console.error(`[remind-unpaid] Failed to push to ${recipientId}:`, err);
