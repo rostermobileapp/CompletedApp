@@ -400,7 +400,7 @@ export interface IStorage {
   getLeaguesWithFullProSeatsForUser(
     userId: string,
     monthYM: string,
-  ): Promise<{ leagueId: string; leagueName: string }[]>;
+  ): Promise<{ leagueId: string; leagueName: string; seatsTotal: number }[]>;
   getLeagueProSeatsByGrant(grantId: string): Promise<LeagueProSeat[]>;
   assignLeagueProSeat(grantId: string, userId: string): Promise<LeagueProSeat | null>;
   assignLeagueProSeatForLeague(
@@ -3147,12 +3147,13 @@ export class DatabaseStorage implements IStorage {
   async getLeaguesWithFullProSeatsForUser(
     userId: string,
     monthYM: string,
-  ): Promise<{ leagueId: string; leagueName: string }[]> {
+  ): Promise<{ leagueId: string; leagueName: string; seatsTotal: number }[]> {
     // League-grouped: returns a league only when (a) at least one active
     // grant exists, (b) the user has NO seat in ANY active grant in that
     // league, and (c) total active capacity is exhausted across all active
-    // grants. Prevents false positives from overlapping grants.
-    const rows = await db.execute<{ leagueId: string; leagueName: string }>(sql`
+    // grants. seatsTotal is the aggregate active-window capacity so the
+    // upsell copy can show "X seats are all in use".
+    const rows = await db.execute<{ leagueId: string; leagueName: string; seatsTotal: number }>(sql`
       WITH active_grants AS (
         SELECT g.id, g.league_id, g.seat_count
         FROM league_pro_grants g
@@ -3163,7 +3164,7 @@ export class DatabaseStorage implements IStorage {
       grant_assignments AS (
         SELECT
           ag.league_id,
-          SUM(ag.seat_count) AS total_capacity,
+          SUM(ag.seat_count)::int AS total_capacity,
           COALESCE((
             SELECT COUNT(*)
             FROM league_pro_seats s
@@ -3176,7 +3177,10 @@ export class DatabaseStorage implements IStorage {
         FROM active_grants ag
         GROUP BY ag.league_id
       )
-      SELECT l.id AS "leagueId", l.name AS "leagueName"
+      SELECT
+        l.id AS "leagueId",
+        l.name AS "leagueName",
+        ga.total_capacity AS "seatsTotal"
       FROM league_memberships lm
       INNER JOIN leagues l ON l.id = lm.league_id
       INNER JOIN grant_assignments ga ON ga.league_id = lm.league_id

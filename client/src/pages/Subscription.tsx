@@ -886,7 +886,9 @@ export default function Subscription() {
  * league (so the section disappears once a seat opens up or the grant lapses).
  */
 function LeagueProSeatsFullUpsell() {
-  const { data: leaguesFull = [] } = useQuery<{ leagueId: string; leagueName: string }[]>({
+  const { data: leaguesFull = [] } = useQuery<
+    { leagueId: string; leagueName: string; seatsTotal: number }[]
+  >({
     queryKey: ['/api/user/league-pro-seats-full'],
   });
   if (leaguesFull.length === 0) return null;
@@ -908,16 +910,19 @@ function LeagueProSeatsFullUpsell() {
                   <span className="font-medium text-foreground">
                     {leaguesFull[0].leagueName}
                   </span>{' '}
-                  paid for Player Pro seats, but they were all claimed by
-                  earlier members. You can upgrade individually below to
-                  unlock Player Pro features right now.
+                  paid for {leaguesFull[0].seatsTotal} Player Pro seat
+                  {leaguesFull[0].seatsTotal === 1 ? '' : 's'}, and they're all
+                  in use by earlier members. You can upgrade individually
+                  below to unlock Player Pro features right now.
                 </>
               ) : (
                 <>
-                  These leagues paid for Player Pro seats but they were all
-                  claimed by earlier members:{' '}
+                  These leagues paid for Player Pro seats but they're all in
+                  use by earlier members:{' '}
                   <span className="font-medium text-foreground">
-                    {leaguesFull.map((l) => l.leagueName).join(', ')}
+                    {leaguesFull
+                      .map((l) => `${l.leagueName} (${l.seatsTotal} seats)`)
+                      .join(', ')}
                   </span>
                   . You can upgrade individually below to unlock Player Pro
                   features right now.

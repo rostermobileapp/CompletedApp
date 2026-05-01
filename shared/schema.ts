@@ -3587,11 +3587,40 @@ export type LeagueProSeat = typeof leagueProSeats.$inferSelect;
 export type InsertLeagueProSeat = z.infer<typeof insertLeagueProSeatSchema>;
 
 // Validation schema used by the commissioner-facing pricing/checkout endpoints.
+// Sensible bounds: up to 1000 seats per grant, 24-month max window, year range
+// limited to current year .. current year + 5 to prevent pathological totals
+// or integer overflow on the cents columns.
+const monthRe = /^(\d{4})-(0[1-9]|1[0-2])$/;
+const minYear = new Date().getUTCFullYear();
+const maxYear = minYear + 5;
+const yearWithinBounds = (ym: string): boolean => {
+  const m = monthRe.exec(ym);
+  if (!m) return false;
+  const y = Number(m[1]);
+  return y >= minYear && y <= maxYear;
+};
+export const LEAGUE_PRO_MAX_SEATS = 1000;
+export const LEAGUE_PRO_MAX_MONTHS = 24;
 export const leagueProBulkInputSchema = z.object({
-  seatCount: z.number().int().positive().max(10000),
-  startMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'startMonth must be YYYY-MM'),
-  endMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'endMonth must be YYYY-MM'),
-});
+  seatCount: z.number().int().positive().max(LEAGUE_PRO_MAX_SEATS),
+  startMonth: z
+    .string()
+    .regex(monthRe, 'startMonth must be YYYY-MM')
+    .refine(yearWithinBounds, `startMonth year must be ${minYear}–${maxYear}`),
+  endMonth: z
+    .string()
+    .regex(monthRe, 'endMonth must be YYYY-MM')
+    .refine(yearWithinBounds, `endMonth year must be ${minYear}–${maxYear}`),
+}).refine(
+  ({ startMonth, endMonth }) => {
+    const s = monthRe.exec(startMonth);
+    const e = monthRe.exec(endMonth);
+    if (!s || !e) return false;
+    const months = (Number(e[1]) - Number(s[1])) * 12 + (Number(e[2]) - Number(s[2])) + 1;
+    return months >= 1 && months <= LEAGUE_PRO_MAX_MONTHS;
+  },
+  { message: `Window must be 1–${LEAGUE_PRO_MAX_MONTHS} months`, path: ['endMonth'] },
+);
 export type LeagueProBulkInput = z.infer<typeof leagueProBulkInputSchema>;
 
 // Update tournament match schema for PATCH operations
