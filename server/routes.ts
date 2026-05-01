@@ -2941,8 +2941,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const grants = await storage.getLeagueProGrantsByLeague(leagueId);
       const monthYM = currentMonth();
+      // Show only active + upcoming grants (drop expired). Pending grants
+      // also stay visible so the commissioner can see in-progress checkouts.
+      const visible = grants.filter(
+        (g) => g.status !== 'paid' || g.endMonth >= monthYM,
+      );
       const enriched = await Promise.all(
-        grants.map(async (g) => {
+        visible.map(async (g) => {
           const seats = await storage.getLeagueProSeatsByGrant(g.id);
           return {
             ...g,
@@ -5649,10 +5654,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
-      // Recognize League-Wide Player Pro seat holders for *this* league —
-      // global Pro continues to work, and a free-tier user with an active
-      // seat in this league is treated as Pro for league premium operations
-      // (and only this league).
       const isPremium = await canAccessLeaguePremiumFeatures(userWithPermissions, leagueId);
       if (!isLeagueCommissioner && !isPremium) {
         return res.status(403).json({
@@ -17327,9 +17328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 2) Creator must be commissioner of THIS league, globally player_pro+,
-      //    OR hold an active League-Wide Player Pro seat in this league
-      //    (per-league premium access — never elevates the global role).
+      // 2) Creator must be commissioner of THIS league or have league-scoped premium access.
       const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
       const isPremium = await canAccessLeaguePremiumFeatures(userWithPermissions, leagueId);
       if (!isLeagueCommissioner && !isPremium) {
@@ -17672,8 +17671,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
-        // League-scoped premium check: also accepts an active League-Wide
-        // Player Pro seat in this league (per-league only).
         const isPremium = await canAccessLeaguePremiumFeatures(userWithPermissions, leagueId);
         if (!isLeagueCommissioner && !isPremium) {
           return res.status(403).json({
