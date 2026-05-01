@@ -100,6 +100,8 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
       placeholderPlayerIds: [],
       relatedScrimmageId: null,
       relatedConversationId: null,
+      venmoLinkOverride: '',
+      cashappLinkOverride: '',
     },
   });
 
@@ -201,6 +203,8 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
     form.setValue('title', existingRequest.title ?? '');
     form.setValue('description', existingRequest.description ?? '');
     form.setValue('amountPerPerson', String(existingRequest.amountPerPerson ?? ''));
+    form.setValue('venmoLinkOverride', (existingRequest as any).venmoLinkOverride ?? '');
+    form.setValue('cashappLinkOverride', (existingRequest as any).cashappLinkOverride ?? '');
     if (existingRequest.deadline) {
       const d = new Date(existingRequest.deadline);
       const yyyy = d.getFullYear();
@@ -394,6 +398,9 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
         description: data.description ?? null,
         amountPerPerson: data.amountPerPerson,
         deadline: data.deadline ? data.deadline : null,
+        // Always send the overrides so the server can clear them when emptied.
+        venmoLinkOverride: data.venmoLinkOverride ?? null,
+        cashappLinkOverride: data.cashappLinkOverride ?? null,
       };
       if (recipientsChanged) {
         if (!activeLeagueId) {
@@ -510,6 +517,54 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
                   type="date"
                   data-testid="input-deadline"
                 />
+              </div>
+
+              <div className="pt-2 border-t border-[hsl(var(--hairline))]">
+                <p className="text-sm text-muted-foreground mb-3">
+                  By default, recipients will pay you using the Venmo and Cash App handles
+                  on your profile. Use these optional overrides to send payments for this
+                  invoice somewhere else (for example, a team treasurer).
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="venmoLinkOverride">Venmo link override (Optional)</Label>
+                    <Input
+                      id="venmoLinkOverride"
+                      {...form.register('venmoLinkOverride')}
+                      type="text"
+                      placeholder="@treasurer or https://venmo.com/treasurer"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      data-testid="input-venmo-link-override"
+                    />
+                    {form.formState.errors.venmoLinkOverride && (
+                      <p className="text-sm text-destructive mt-1" data-testid="error-venmo-link-override">
+                        {form.formState.errors.venmoLinkOverride.message as string}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cashappLinkOverride">Cash App link override (Optional)</Label>
+                    <Input
+                      id="cashappLinkOverride"
+                      {...form.register('cashappLinkOverride')}
+                      type="text"
+                      placeholder="$treasurer or https://cash.app/$treasurer"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      data-testid="input-cashapp-link-override"
+                    />
+                    {form.formState.errors.cashappLinkOverride && (
+                      <p className="text-sm text-destructive mt-1" data-testid="error-cashapp-link-override">
+                        {form.formState.errors.cashappLinkOverride.message as string}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

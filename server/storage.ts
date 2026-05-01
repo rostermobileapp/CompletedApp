@@ -633,7 +633,7 @@ export interface IStorage {
   deletePaymentRequest(id: string): Promise<void>;
   updatePaymentRequest(
     id: string,
-    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline'>>,
+    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline' | 'venmoLinkOverride' | 'cashappLinkOverride'>>,
     recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
   ): Promise<PaymentRequest>;
   getUnpaidPaymentRequestCount(userId: string): Promise<number>;
@@ -10738,7 +10738,7 @@ export class DatabaseStorage implements IStorage {
 
   async updatePaymentRequest(
     id: string,
-    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline'>>,
+    updates: Partial<Pick<PaymentRequest, 'title' | 'description' | 'amountPerPerson' | 'deadline' | 'venmoLinkOverride' | 'cashappLinkOverride'>>,
     recipients?: { recipientUserIds: string[]; placeholderPlayerIds: string[] },
   ): Promise<PaymentRequest> {
     return await db.transaction(async (tx) => {
@@ -10747,6 +10747,8 @@ export class DatabaseStorage implements IStorage {
       if (updates.description !== undefined) updatePayload.description = updates.description;
       if (updates.amountPerPerson !== undefined) updatePayload.amountPerPerson = updates.amountPerPerson;
       if (updates.deadline !== undefined) updatePayload.deadline = updates.deadline;
+      if (updates.venmoLinkOverride !== undefined) updatePayload.venmoLinkOverride = updates.venmoLinkOverride;
+      if (updates.cashappLinkOverride !== undefined) updatePayload.cashappLinkOverride = updates.cashappLinkOverride;
 
       const [updated] = await tx
         .update(paymentRequests)

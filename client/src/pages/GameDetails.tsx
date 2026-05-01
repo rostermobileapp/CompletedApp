@@ -3,7 +3,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign } from "lucide-react";
+import { SiVenmo, SiCashapp } from "react-icons/si";
+import { resolveVenmoLink, resolveCashAppLink } from "@/lib/paymentLinks";
 import { RSVPButtons } from "@/components/RSVPButtons";
 import { RSVPSummary } from "@/components/RSVPSummary";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
@@ -337,8 +339,22 @@ export default function GameDetails() {
 
   // Early return with scrimmage-specific UI if viewing a scrimmage
   if (isScrimmage) {
-    const { scrimmage, approvedPlayers } = scrimmageData as any;
-    
+    const { scrimmage, approvedPlayers, creator: scrimmageCreator } = scrimmageData as any;
+    const isScrimmageCreator = scrimmage.creatorId === (user as any)?.id;
+    const scrimmageVenmoUrl = resolveVenmoLink(
+      scrimmage.venmoLinkOverride,
+      scrimmageCreator?.venmoUsername,
+    );
+    const scrimmageCashAppUrl = resolveCashAppLink(
+      scrimmage.cashappLinkOverride,
+      scrimmageCreator?.cashappUsername,
+    );
+    const showScrimmagePayCard =
+      !!scrimmage.costPerPlayer && (scrimmageVenmoUrl || scrimmageCashAppUrl);
+    const scrimmageCreatorName = scrimmageCreator
+      ? `${scrimmageCreator.firstName ?? ''} ${scrimmageCreator.lastName ?? ''}`.trim() || 'the organizer'
+      : 'the organizer';
+
     return (
       <div className="min-h-screen bg-background pb-36">
         <div className="bg-card border-b border-border px-6 py-4">
@@ -393,6 +409,15 @@ export default function GameDetails() {
               </div>
             )}
 
+            {scrimmage.costPerPlayer && (
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-cost">
+                  ${Number(scrimmage.costPerPlayer).toFixed(2)} per player
+                </p>
+              </div>
+            )}
+
             {/* RSVP Buttons for players to join/leave */}
             {scrimmage.creatorId !== (user as any)?.id && (
               <div className="mt-6 pt-4 border-t border-border">
@@ -400,6 +425,57 @@ export default function GameDetails() {
               </div>
             )}
           </div>
+
+          {/* Pay-the-organizer card — shown when the scrimmage has a cost
+              and at least one payment link can be resolved. The override
+              wins; otherwise we fall back to the creator's profile handle. */}
+          {showScrimmagePayCard && (
+            <div
+              className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6"
+              data-testid="card-scrimmage-pay"
+            >
+              <h3 className="text-lg font-semibold mb-1">
+                {isScrimmageCreator ? 'How players will pay you' : `Pay ${scrimmageCreatorName}`}
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                {isScrimmageCreator
+                  ? 'These are the links players see for this scrimmage. Edit the scrimmage to change them.'
+                  : `Send ${scrimmage.costPerPlayer ? `$${Number(scrimmage.costPerPlayer).toFixed(2)} ` : ''}using one of the options below.`}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {scrimmageVenmoUrl && (
+                  <a
+                    href={scrimmageVenmoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3D95CE] text-white hover:opacity-90 text-sm font-medium"
+                    data-testid="link-scrimmage-pay-venmo"
+                  >
+                    <SiVenmo className="w-4 h-4" />
+                    Pay with Venmo
+                    {scrimmage.venmoLinkOverride && (
+                      <span className="text-[10px] uppercase tracking-wide opacity-80">override</span>
+                    )}
+                  </a>
+                )}
+                {scrimmageCashAppUrl && (
+                  <a
+                    href={scrimmageCashAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#00C244] text-white hover:opacity-90 text-sm font-medium"
+                    data-testid="link-scrimmage-pay-cashapp"
+                  >
+                    <SiCashapp className="w-4 h-4" />
+                    Pay with Cash App
+                    {scrimmage.cashappLinkOverride && (
+                      <span className="text-[10px] uppercase tracking-wide opacity-80">override</span>
+                    )}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Approved Players */}
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">

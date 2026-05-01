@@ -73,6 +73,8 @@ import {
   createPaymentRequestSchema,
   updatePaymentRequestRecipientSchema,
   updatePaymentRequestSchema,
+  venmoLinkOverrideField,
+  cashappLinkOverrideField,
   createFacilityRequestSchema,
   updateFacilityRequestSchema,
   createFacilityMembershipRequestSchema,
@@ -12553,9 +12555,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Custom schema for API request - keeps datetime as strings
   // Drizzle uses { mode: 'string' } for league-local times
-  const createScrimmageApiSchema = insertScrimmageSchema.extend({
+  const createScrimmageApiSchema = insertScrimmageSchema.omit({
+    venmoLinkOverride: true,   // Re-added below with normalization.
+    cashappLinkOverride: true, // Re-added below with normalization.
+  }).extend({
     dateTime: z.string(),
     recurrenceEndDate: z.string().nullable().optional(),
+    venmoLinkOverride: venmoLinkOverrideField,
+    cashappLinkOverride: cashappLinkOverrideField,
   });
 
   // Create scrimmage (available to all users)
@@ -13060,7 +13067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update scrimmage (Creator only)
-  app.put('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
+  const updateScrimmageHandler = async (req: any, res: any) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -13134,7 +13141,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error updating scrimmage:', error);
       res.status(500).json({ message: 'Failed to update scrimmage' });
     }
-  });
+  };
+  // The edit-scrimmage form (CreateScrimmage.tsx) sends PATCH; keep the
+  // historical PUT registered for backwards compatibility and accept PATCH
+  // so the per-scrimmage payment-link overrides (and other field edits)
+  // can be saved from the existing client.
+  app.put('/api/scrimmages/:id', isAuthenticated, updateScrimmageHandler);
+  app.patch('/api/scrimmages/:id', isAuthenticated, updateScrimmageHandler);
 
   // Batch delete scrimmages (Creator only) - must be before :id route to avoid conflict
   app.delete('/api/scrimmages/batch', isAuthenticated, async (req: any, res) => {
@@ -13370,10 +13383,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get only approved requests
       const allRequests = await storage.getScrimmageRequests(scrimmageId);
       const approvedPlayers = allRequests.filter(request => request.status === 'approved');
-      
+
+      // Hydrate the creator so the scrimmage detail UI can render the
+      // per-scrimmage payment links (override + profile-level fall back).
+      // We only expose the public-safe profile fields the UI needs.
+      const creatorUser = await storage.getUser(scrimmage.creatorId);
+      const creator = creatorUser
+        ? {
+            id: creatorUser.id,
+            firstName: creatorUser.firstName,
+            lastName: creatorUser.lastName,
+            profileImageUrl: creatorUser.profileImageUrl,
+            venmoUsername: creatorUser.venmoUsername,
+            cashappUsername: creatorUser.cashappUsername,
+          }
+        : null;
+
       res.json({
         scrimmage,
-        approvedPlayers
+        approvedPlayers,
+        creator,
       });
     } catch (error) {
       console.error('Error fetching approved players:', error);
@@ -16797,6 +16826,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deadline: validatedData.deadline || null,
         relatedScrimmageId: validatedData.relatedScrimmageId || null,
         relatedConversationId: validatedData.relatedConversationId || null,
+        venmoLinkOverride: validatedData.venmoLinkOverride ?? null,
+        cashappLinkOverride: validatedData.cashappLinkOverride ?? null,
       }, validatedData.recipientUserIds, validatedData.placeholderPlayerIds);
 
       // Send push notifications to recipients (async, don't wait)
@@ -17143,12 +17174,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientsArg = { recipientUserIds: finalUsers, placeholderPlayerIds: finalPlaceholders };
       }
 
-      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; deadline: Date | null }> = {};
+      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; deadline: Date | null; venmoLinkOverride: string | null; cashappLinkOverride: string | null }> = {};
       if (validated.title !== undefined) updates.title = validated.title;
       if (validated.description !== undefined) updates.description = validated.description;
       if (validated.amountPerPerson !== undefined) updates.amountPerPerson = validated.amountPerPerson;
       if (validated.deadline !== undefined) {
         updates.deadline = validated.deadline ? new Date(validated.deadline) : null;
+      }
+      // Only emit override changes when the client actually included the field.
+      // Zod's transform always materializes the key, so distinguish "client sent
+      // it" from "client omitted it" by checking the raw request body.
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'venmoLinkOverride')) {
+        updates.venmoLinkOverride = validated.venmoLinkOverride ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'cashappLinkOverride')) {
+        updates.cashappLinkOverride = validated.cashappLinkOverride ?? null;
       }
 
       await storage.updatePaymentRequest(id, updates, recipientsArg);

@@ -137,6 +137,8 @@ export default function CreateScrimmage() {
       venue: '', // UI field that maps to location
       maxParticipants: 20, // UI field that maps to maxPlayers
       costPerPlayer: '', // Optional cost field
+      venmoLinkOverride: '',
+      cashappLinkOverride: '',
       // Recurring event defaults
       isRecurring: false,
       recurrenceType: 'none',
@@ -262,6 +264,8 @@ export default function CreateScrimmage() {
         venue: existingScrimmage.location || '',
         maxParticipants: existingScrimmage.maxPlayers || 20,
         costPerPlayer: existingScrimmage.costPerPlayer || '',
+        venmoLinkOverride: existingScrimmage.venmoLinkOverride || '',
+        cashappLinkOverride: existingScrimmage.cashappLinkOverride || '',
         isRecurring: existingScrimmage.isRecurring || false,
         recurrenceType: existingScrimmage.recurrenceType || 'none',
         recurrenceDays: existingScrimmage.recurrenceDays || [],
@@ -354,6 +358,9 @@ export default function CreateScrimmage() {
         maxPlayers: data.maxParticipants, // Map maxParticipants to maxPlayers
         dateTime: `${data.date}T${data.time}`, // Send as string without UTC conversion
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
+        // Per-scrimmage payment link overrides (validated + normalized server-side)
+        venmoLinkOverride: data.venmoLinkOverride ?? null,
+        cashappLinkOverride: data.cashappLinkOverride ?? null,
         // Recurring event data
         isRecurring: data.isRecurring,
         recurrenceType: data.isRecurring ? data.recurrenceType : 'none',
@@ -1141,6 +1148,54 @@ export default function CreateScrimmage() {
               <p className="text-xs text-muted-foreground mt-1">
                 If there's a cost, you can create a payment request after approval
               </p>
+            </div>
+
+            <div className="pt-2">
+              <p className="text-sm text-muted-foreground mb-3">
+                By default, players will pay you using the Venmo and Cash App handles
+                on your profile. Use these optional overrides to send payments for this
+                scrimmage somewhere else (for example, a team treasurer).
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="venmoLinkOverride">Venmo link override (Optional)</Label>
+                  <Input
+                    id="venmoLinkOverride"
+                    {...form.register('venmoLinkOverride')}
+                    type="text"
+                    placeholder="@treasurer or https://venmo.com/treasurer"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-testid="input-venmo-link-override"
+                  />
+                  {form.formState.errors.venmoLinkOverride && (
+                    <p className="text-sm text-destructive mt-1" data-testid="error-venmo-link-override">
+                      {form.formState.errors.venmoLinkOverride.message as string}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="cashappLinkOverride">Cash App link override (Optional)</Label>
+                  <Input
+                    id="cashappLinkOverride"
+                    {...form.register('cashappLinkOverride')}
+                    type="text"
+                    placeholder="$treasurer or https://cash.app/$treasurer"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-testid="input-cashapp-link-override"
+                  />
+                  {form.formState.errors.cashappLinkOverride && (
+                    <p className="text-sm text-destructive mt-1" data-testid="error-cashapp-link-override">
+                      {form.formState.errors.cashappLinkOverride.message as string}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

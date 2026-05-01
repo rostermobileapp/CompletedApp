@@ -16,6 +16,8 @@ import {
   computePaymentStatus,
   type PaymentStatus,
 } from '@/lib/paymentStatus';
+import { resolveVenmoLink, resolveCashAppLink } from '@/lib/paymentLinks';
+import { SiVenmo, SiCashapp } from 'react-icons/si';
 
 export default function PaymentRequestDetail() {
   const { id } = useParams();
@@ -177,6 +179,66 @@ export default function PaymentRequestDetail() {
         <div className="mb-6">
           <PaymentSummaryCard request={request} isCreator={isCreator} clickable={false} />
         </div>
+
+        {/* Pay-the-creator card — uses the per-invoice override if set,
+            otherwise falls back to the creator's profile-level handle. Hidden
+            entirely when neither is configured. */}
+        {(() => {
+          const creator = request.creator ?? {};
+          const venmoUrl = resolveVenmoLink(request.venmoLinkOverride, creator.venmoUsername);
+          const cashappUrl = resolveCashAppLink(request.cashappLinkOverride, creator.cashappUsername);
+          if (!venmoUrl && !cashappUrl) return null;
+          const creatorName = `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || 'the organizer';
+          const usingVenmoOverride = !!request.venmoLinkOverride;
+          const usingCashappOverride = !!request.cashappLinkOverride;
+          return (
+            <div
+              className="mb-6 bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5"
+              data-testid="card-pay-creator"
+            >
+              <h2 className="text-base font-semibold mb-1">
+                {isCreator ? 'How recipients will pay you' : `Pay ${creatorName}`}
+              </h2>
+              <p className="text-xs text-muted-foreground mb-3">
+                {isCreator
+                  ? 'These are the links recipients will see. Set a per-invoice override to send payments somewhere else.'
+                  : 'Send payment for this invoice using one of the options below.'}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {venmoUrl && (
+                  <a
+                    href={venmoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#3D95CE] text-white hover:opacity-90 text-sm font-medium"
+                    data-testid="link-pay-venmo"
+                  >
+                    <SiVenmo className="w-4 h-4" />
+                    Pay with Venmo
+                    {usingVenmoOverride && (
+                      <span className="text-[10px] uppercase tracking-wide opacity-80">override</span>
+                    )}
+                  </a>
+                )}
+                {cashappUrl && (
+                  <a
+                    href={cashappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#00C244] text-white hover:opacity-90 text-sm font-medium"
+                    data-testid="link-pay-cashapp"
+                  >
+                    <SiCashapp className="w-4 h-4" />
+                    Pay with Cash App
+                    {usingCashappOverride && (
+                      <span className="text-[10px] uppercase tracking-wide opacity-80">override</span>
+                    )}
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Recipients List */}
         <div className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">

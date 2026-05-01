@@ -1145,6 +1145,12 @@ export const scrimmages = pgTable("scrimmages", {
   skillLevel: varchar("skill_level"), // Optional skill level requirement
   notes: text("notes"), // Additional notes/requirements
   costPerPlayer: decimal("cost_per_player", { precision: 10, scale: 2 }), // Optional cost per player
+  // Optional per-scrimmage payment link overrides. When set, players paying for
+  // this scrimmage should be sent to these URLs instead of the creator's
+  // profile-level Venmo / Cash App handles. Stored as fully-normalized https
+  // URLs (see normalizeVenmoLink / normalizeCashAppLink in this file).
+  venmoLinkOverride: text("venmo_link_override"),
+  cashappLinkOverride: text("cashapp_link_override"),
   status: scrimmageStatusEnum("status").default("open").notNull(),
   announcementId: varchar("announcement_id").references(() => announcements.id), // Link to auto-created announcement
   // Recurring event fields
@@ -1411,6 +1417,12 @@ export const paymentRequests = pgTable("payment_requests", {
   amountPerPerson: decimal("amount_per_person", { precision: 10, scale: 2 }).notNull(),
   deadline: timestamp("deadline"),
   notes: text("notes"),
+  // Optional per-invoice payment link overrides. When set, recipients paying
+  // this invoice should be sent to these URLs instead of the creator's
+  // profile-level Venmo / Cash App handles. Stored as fully-normalized https
+  // URLs (see normalizeVenmoLink / normalizeCashAppLink in this file).
+  venmoLinkOverride: text("venmo_link_override"),
+  cashappLinkOverride: text("cashapp_link_override"),
   relatedScrimmageId: varchar("related_scrimmage_id").references(() => scrimmages.id),
   relatedConversationId: varchar("related_conversation_id").references(() => conversations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -2776,6 +2788,116 @@ export const insertTeamEventRsvpSchema = createInsertSchema(teamEventRsvps).omit
   createdAt: true,
 });
 
+// ----- Per-request payment link override helpers -----
+// Accept either a full URL (https://venmo.com/foo, https://cash.app/$bar) or a
+// bare handle (foo, @foo, $bar) and normalize to a canonical https URL. Reject
+// any other URL host so a captain cannot accidentally paste, say, a PayPal
+// link into the Venmo override field.
+
+const VENMO_HANDLE_RE = /^[A-Za-z0-9_-]{1,30}$/;
+const CASHAPP_HANDLE_RE = /^[A-Za-z][A-Za-z0-9_]{0,19}$/;
+
+export function normalizeVenmoLink(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) throw new Error("Venmo link cannot be empty");
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    let url: URL;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      throw new Error("Enter a valid Venmo URL or @handle");
+    }
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (host !== "venmo.com" && host !== "account.venmo.com") {
+      throw new Error("Link must point to venmo.com");
+    }
+    // Strip leading "/u/" segment Venmo uses for some profile URLs.
+    const path = url.pathname.replace(/^\/u\//, "/").replace(/^\/+/, "");
+    const handle = path.split("/")[0]?.replace(/^@/, "");
+    if (!handle || !VENMO_HANDLE_RE.test(handle)) {
+      throw new Error("Venmo URL is missing a valid username");
+    }
+    return `https://venmo.com/${handle}`;
+  }
+
+  const handle = trimmed.replace(/^@/, "");
+  if (!VENMO_HANDLE_RE.test(handle)) {
+    throw new Error("Enter a valid Venmo @handle or full venmo.com URL");
+  }
+  return `https://venmo.com/${handle}`;
+}
+
+export function normalizeCashAppLink(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) throw new Error("Cash App link cannot be empty");
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    let url: URL;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      throw new Error("Enter a valid Cash App URL or $cashtag");
+    }
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (host !== "cash.app") {
+      throw new Error("Link must point to cash.app");
+    }
+    const path = url.pathname.replace(/^\/+/, "");
+    const handle = path.split("/")[0]?.replace(/^\$/, "");
+    if (!handle || !CASHAPP_HANDLE_RE.test(handle)) {
+      throw new Error("Cash App URL is missing a valid $cashtag");
+    }
+    return `https://cash.app/$${handle}`;
+  }
+
+  const handle = trimmed.replace(/^\$/, "");
+  if (!CASHAPP_HANDLE_RE.test(handle)) {
+    throw new Error("Enter a valid Cash App $cashtag or full cash.app URL");
+  }
+  return `https://cash.app/$${handle}`;
+}
+
+// Zod schema fragment shared by every place that accepts an override on input.
+// Empty string, null and undefined all collapse to null (= "no override, fall
+// back to creator profile"). Anything else is normalized via the helpers
+// above and produces a clear validation error on bad input.
+export const venmoLinkOverrideField = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v, ctx): string | null => {
+    if (v === undefined || v === null) return null;
+    const t = v.trim();
+    if (t === "") return null;
+    try {
+      return normalizeVenmoLink(t);
+    } catch (e) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: e instanceof Error ? e.message : "Invalid Venmo link",
+      });
+      return z.NEVER;
+    }
+  });
+
+export const cashappLinkOverrideField = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v, ctx): string | null => {
+    if (v === undefined || v === null) return null;
+    const t = v.trim();
+    if (t === "") return null;
+    try {
+      return normalizeCashAppLink(t);
+    } catch (e) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: e instanceof Error ? e.message : "Invalid Cash App link",
+      });
+      return z.NEVER;
+    }
+  });
+
 // Payment request schemas
 export const insertPaymentRequestSchema = createInsertSchema(paymentRequests).omit({
   id: true,
@@ -2794,6 +2916,8 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   creatorId: true, // Server-controlled
   createdAt: true,
   updatedAt: true,
+  venmoLinkOverride: true,   // Re-added below with normalization.
+  cashappLinkOverride: true, // Re-added below with normalization.
 }).extend({
   // Keep datetime as string - stored as league-local time
   deadline: z.string().optional().nullable(),
@@ -2802,6 +2926,8 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
   leagueId: z.string().min(1, "League is required"),
   recipientUserIds: z.array(z.string()).default([]),
   placeholderPlayerIds: z.array(z.string()).default([]),
+  venmoLinkOverride: venmoLinkOverrideField,
+  cashappLinkOverride: cashappLinkOverrideField,
 }).refine(
   (data) => (data.recipientUserIds?.length ?? 0) + (data.placeholderPlayerIds?.length ?? 0) >= 1,
   { message: "At least one recipient is required", path: ["recipientUserIds"] },
@@ -2821,6 +2947,8 @@ export const updatePaymentRequestSchema = z.object({
   deadline: z.string().optional().nullable(),
   recipientUserIds: z.array(z.string()).optional(),
   placeholderPlayerIds: z.array(z.string()).optional(),
+  venmoLinkOverride: venmoLinkOverrideField,
+  cashappLinkOverride: cashappLinkOverrideField,
 }).refine(
   (data) => {
     if (data.recipientUserIds === undefined && data.placeholderPlayerIds === undefined) {
@@ -2913,6 +3041,11 @@ export const createScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   announcementId: true, // Server-controlled
   createdAt: true,
   updatedAt: true,
+  venmoLinkOverride: true,   // Re-added below with normalization.
+  cashappLinkOverride: true, // Re-added below with normalization.
+}).extend({
+  venmoLinkOverride: venmoLinkOverrideField,
+  cashappLinkOverride: cashappLinkOverrideField,
 });
 
 export const createScrimmageJoinRequestSchema = createInsertSchema(scrimmageRequests).omit({
@@ -2931,9 +3064,13 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   announcementId: true, // Server-controlled
   createdAt: true,
   updatedAt: true,
+  venmoLinkOverride: true,   // Re-added below with normalization.
+  cashappLinkOverride: true, // Re-added below with normalization.
 }).partial().extend({
   // Keep datetime as string - stored as league-local time
   dateTime: z.string().optional(),
+  venmoLinkOverride: venmoLinkOverrideField,
+  cashappLinkOverride: cashappLinkOverrideField,
 });
 
 // Substitute request API validation schemas
