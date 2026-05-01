@@ -696,6 +696,13 @@ export default function Subscription() {
           )}
         </div>
       </div>
+      {/* League-Wide Player Pro upsell explainer — shown only to free-tier
+          users whose league commissioner has paid for Player Pro seats that
+          are now all claimed. This is requirement #8 of the league-wide
+          Player Pro spec: the upsell UI must explain that league-paid seats
+          are full so the user understands why they're still on free tier. */}
+      {isFree && <LeagueProSeatsFullUpsell />}
+
       {/* Available Plans */}
       <div className="px-6">
         <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
@@ -865,6 +872,60 @@ export default function Subscription() {
             </p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Free-tier explainer card shown above the upgrade plans when the user is in
+ * one or more leagues whose commissioner has bought League-Wide Player Pro
+ * seats but every seat is already assigned. Lets the user know seats are full
+ * so they aren't surprised that they're still on free tier despite their
+ * league having Pro seats. Renders nothing when the user isn't in such a
+ * league (so the section disappears once a seat opens up or the grant lapses).
+ */
+function LeagueProSeatsFullUpsell() {
+  const { data: leaguesFull = [] } = useQuery<{ leagueId: string; leagueName: string }[]>({
+    queryKey: ['/api/user/league-pro-seats-full'],
+  });
+  if (leaguesFull.length === 0) return null;
+  const single = leaguesFull.length === 1;
+  return (
+    <div className="px-6 mb-4" data-testid="league-pro-seats-full-upsell">
+      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+        <div className="flex items-start gap-3">
+          <Crown className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <div className="font-semibold mb-1">
+              {single
+                ? `Your league's Player Pro seats are full`
+                : `Player Pro seats are full in your leagues`}
+            </div>
+            <p className="text-muted-foreground">
+              {single ? (
+                <>
+                  <span className="font-medium text-foreground">
+                    {leaguesFull[0].leagueName}
+                  </span>{' '}
+                  paid for Player Pro seats, but they were all claimed by
+                  earlier members. You can upgrade individually below to
+                  unlock Player Pro features right now.
+                </>
+              ) : (
+                <>
+                  These leagues paid for Player Pro seats but they were all
+                  claimed by earlier members:{' '}
+                  <span className="font-medium text-foreground">
+                    {leaguesFull.map((l) => l.leagueName).join(', ')}
+                  </span>
+                  . You can upgrade individually below to unlock Player Pro
+                  features right now.
+                </>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

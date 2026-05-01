@@ -377,7 +377,30 @@ export interface IStorage {
   getLeagueProGrantByStripeSession(sessionId: string): Promise<LeagueProGrant | undefined>;
   getLeagueProGrantsByLeague(leagueId: string): Promise<LeagueProGrant[]>;
   markLeagueProGrantPaid(id: string, paymentIntentId: string | null): Promise<LeagueProGrant>;
+  /**
+   * Atomic, idempotent variant used by the webhook + confirm-payment endpoint.
+   * Flips status from non-paid → 'paid' in a single conditional UPDATE, so
+   * concurrent deliveries of the same Stripe session can never double-credit
+   * the grant. Returns `true` when this call performed the transition,
+   * `false` when the grant was already paid.
+   */
+  markLeagueProGrantPaidIfNotPaid(
+    id: string,
+    paymentIntentId: string | null,
+    sessionId: string,
+  ): Promise<boolean>;
   getActiveLeagueProGrantsForLeague(leagueId: string, monthYM: string): Promise<LeagueProGrant[]>;
+  /**
+   * For the Player Pro upsell UI: returns the leagues `userId` is a member of
+   * where there is at least one currently-active League-Wide Player Pro grant
+   * but the user does not hold a seat in that league (typically because every
+   * paid seat was already assigned to earlier members). Used to surface the
+   * "your league bought Player Pro seats but they're full" message.
+   */
+  getLeaguesWithFullProSeatsForUser(
+    userId: string,
+    monthYM: string,
+  ): Promise<{ leagueId: string; leagueName: string }[]>;
   getLeagueProSeatsByGrant(grantId: string): Promise<LeagueProSeat[]>;
   /**
    * Atomically assign one seat to `userId` under `grantId`, capped at the
@@ -3081,6 +3104,64 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async markLeagueProGrantPaidIfNotPaid(
+    id: string,
+    paymentIntentId: string | null,
+    sessionId: string,
+  ): Promise<boolean> {
+    // Single conditional UPDATE — only flips the row when its status is not
+    // already 'paid'. Postgres serializes concurrent updates on the same row,
+    // so even if both the webhook and the confirm endpoint fire at the same
+    // time only one of them will see a returned row. We also opportunistically
+    // record the Stripe session id (only updates when not yet set) so the
+    // grant can be looked up by session for diagnostics, mirroring the
+    // tournaments.stripeCheckoutSessionId pattern.
+    const result = await db
+      .update(leagueProGrants)
+      .set({
+        status: 'paid',
+        stripePaymentIntentId: paymentIntentId ?? undefined,
+        stripeCheckoutSessionId: sessionId,
+        paidAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(leagueProGrants.id, id),
+        sql`${leagueProGrants.status} IS DISTINCT FROM 'paid'`,
+      ))
+      .returning({ id: leagueProGrants.id });
+    return result.length > 0;
+  }
+
+  async getLeaguesWithFullProSeatsForUser(
+    userId: string,
+    monthYM: string,
+  ): Promise<{ leagueId: string; leagueName: string }[]> {
+    // Find leagues this user is an approved member of that have at least one
+    // currently-active League-Wide Player Pro grant where every paid seat is
+    // already assigned and the user is not the holder. Done in one query so
+    // the per-grant capacity check stays consistent with assignLeagueProSeat.
+    const rows = await db.execute<{ leagueId: string; leagueName: string }>(sql`
+      SELECT DISTINCT l.id AS "leagueId", l.name AS "leagueName"
+      FROM league_memberships lm
+      INNER JOIN leagues l ON l.id = lm.league_id
+      INNER JOIN league_pro_grants g ON g.league_id = lm.league_id
+      WHERE lm.user_id = ${userId}
+        AND lm.status = 'approved'
+        AND g.status = 'paid'
+        AND g.start_month <= ${monthYM}
+        AND g.end_month   >= ${monthYM}
+        AND g.seat_count <= (
+          SELECT COUNT(*) FROM league_pro_seats s WHERE s.grant_id = g.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM league_pro_seats s2
+          WHERE s2.grant_id = g.id AND s2.user_id = ${userId}
+        )
+    `);
+    return rows.rows;
+  }
+
   async getActiveLeagueProGrantsForLeague(leagueId: string, monthYM: string): Promise<LeagueProGrant[]> {
     return db
       .select()
@@ -3105,36 +3186,46 @@ export class DatabaseStorage implements IStorage {
   }
 
   async assignLeagueProSeat(grantId: string, userId: string): Promise<LeagueProSeat | null> {
-    // Atomic insert guarded by a capacity check — uses INSERT ... SELECT so the
-    // check and insert run in one statement and races between concurrent
-    // member-approvals/webhooks don't oversell seats. The (grant_id, user_id)
-    // unique constraint also makes a duplicate-user insert a no-op.
-    const grant = await this.getLeagueProGrant(grantId);
-    if (!grant || grant.status !== 'paid') return null;
-
     // Skip users who already have global Player Pro (or higher) — they don't
     // need a league seat, and consuming one would waste the commissioner's
-    // bulk purchase.
+    // bulk purchase. This read is safe to do outside the transaction (the
+    // user's role won't flip mid-call in any scenario that matters).
     if (await this.userHasGlobalPlayerProOrHigher(userId)) return null;
 
-    // If already assigned, return existing row instead of failing.
-    const [existing] = await db
-      .select()
-      .from(leagueProSeats)
-      .where(and(eq(leagueProSeats.grantId, grantId), eq(leagueProSeats.userId, userId)))
-      .limit(1);
-    if (existing) return existing;
+    // Run the capacity check + insert inside a transaction that holds a row
+    // lock on the grant. Without the lock, two concurrent inserts can both
+    // observe the same `COUNT(*) < seatCount` snapshot and oversubscribe
+    // seats — the `FOR UPDATE` serializes per-grant assignment so the cap
+    // is enforced strictly. The `(grant_id, user_id)` unique constraint
+    // makes a duplicate-user insert a no-op even if two webhooks race.
+    return db.transaction(async (tx) => {
+      const [grant] = await tx
+        .select()
+        .from(leagueProGrants)
+        .where(eq(leagueProGrants.id, grantId))
+        .for('update');
+      if (!grant || grant.status !== 'paid') return null;
 
-    const result = await db.execute<LeagueProSeat>(sql`
-      INSERT INTO league_pro_seats (grant_id, league_id, user_id)
-      SELECT ${grantId}, ${grant.leagueId}, ${userId}
-      WHERE (
-        SELECT COUNT(*) FROM league_pro_seats WHERE grant_id = ${grantId}
-      ) < ${grant.seatCount}
-      ON CONFLICT (grant_id, user_id) DO NOTHING
-      RETURNING id, grant_id AS "grantId", league_id AS "leagueId", user_id AS "userId", assigned_at AS "assignedAt"
-    `);
-    return (result.rows[0] as LeagueProSeat | undefined) ?? null;
+      // If already assigned, return existing row instead of inserting again.
+      const [existing] = await tx
+        .select()
+        .from(leagueProSeats)
+        .where(and(eq(leagueProSeats.grantId, grantId), eq(leagueProSeats.userId, userId)))
+        .limit(1);
+      if (existing) return existing;
+
+      const [{ count }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(leagueProSeats)
+        .where(eq(leagueProSeats.grantId, grantId));
+      if (count >= grant.seatCount) return null;
+
+      const [seat] = await tx
+        .insert(leagueProSeats)
+        .values({ grantId, leagueId: grant.leagueId, userId })
+        .returning();
+      return seat ?? null;
+    });
   }
 
   async backfillLeagueProSeats(grantId: string): Promise<number> {

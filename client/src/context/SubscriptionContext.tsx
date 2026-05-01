@@ -137,7 +137,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
 
   const hasLeagueProSeat = (leagueId: string): boolean => {
     if (!leagueId) return false;
-    return leagueProSeats.some((s: any) => s?.leagueId === leagueId);
+    return leagueProSeats.some((s) => s?.leagueId === leagueId);
   };
 
   // True only when the dashboard's active context is a league the user

@@ -263,15 +263,22 @@ async function applyLeagueProBulkPaymentFromSession(
   grantId: string,
   session: Stripe.Checkout.Session,
 ): Promise<{ applied: boolean; seatsFilled: number }> {
-  const grant = await storage.getLeagueProGrant(grantId);
-  if (!grant) return { applied: false, seatsFilled: 0 };
-  if (grant.status === 'paid') {
-    // Already paid — return the existing seat count for caller convenience.
+  // Atomic conditional update — mirrors the established
+  // applyTournamentPaymentFromSession pattern. Only the first caller whose
+  // update flips status from non-paid → 'paid' will return a row, which
+  // means concurrent webhook + confirm-endpoint deliveries can never
+  // double-credit a grant. The follow-up backfill is also safe to run
+  // multiple times (it skips users already holding a seat and respects the
+  // grant's seatCount cap inside its row-locked transaction).
+  const applied = await storage.markLeagueProGrantPaidIfNotPaid(
+    grantId,
+    (session.payment_intent as string) || null,
+    session.id,
+  );
+  if (!applied) {
     const seats = await storage.getLeagueProSeatsByGrant(grantId);
     return { applied: false, seatsFilled: seats.length };
   }
-
-  await storage.markLeagueProGrantPaid(grantId, (session.payment_intent as string) || null);
   const seatsFilled = await storage.backfillLeagueProSeats(grantId);
   return { applied: true, seatsFilled };
 }
@@ -2971,6 +2978,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[League Pro] User seats error:', error);
       res.status(500).json({ message: 'Failed to load seats' });
+    }
+  });
+
+  // Returns the leagues this user is in where the commissioner has bought
+  // League-Wide Player Pro seats but they're all claimed — used by the
+  // Subscription page upsell to explain why the user is still on the free
+  // tier even though their league has Pro seats. Free-tier-only signal.
+  app.get('/api/user/league-pro-seats-full', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const monthYM = currentMonth();
+      const leagues = await storage.getLeaguesWithFullProSeatsForUser(userId, monthYM);
+      res.json(leagues);
+    } catch (error: any) {
+      console.error('[League Pro] Full-seat upsell error:', error);
+      res.status(500).json({ message: 'Failed to load league seat status' });
     }
   });
 
