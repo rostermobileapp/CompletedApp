@@ -208,6 +208,15 @@ type Season = {
   createdAt: string;
 };
 
+// Format a YYYY-MM grant window month as a short human label
+// (e.g. "Sep 2026"), used by the commissioner grants list.
+function formatGrantMonth(ym: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(ym);
+  if (!m) return ym;
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  return date.toLocaleString(undefined, { month: 'short', year: 'numeric' });
+}
+
 // Utility function to format names as "Last Name, First Name"
 // Supports display names from league membership for merged players
 function formatUserName(
@@ -5059,7 +5068,7 @@ export default function LeagueManagement() {
                           >
                             <div className="min-w-0 flex-1 text-sm">
                               <div className="font-medium">
-                                {g.seatsAssigned}/{g.seatCount} seats &middot; {g.startMonth} → {g.endMonth}
+                                {g.seatsAssigned}/{g.seatCount} seats &middot; {formatGrantMonth(g.startMonth)} – {formatGrantMonth(g.endMonth)}
                                 {g.isActive && (
                                   <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                     Active
