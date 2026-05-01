@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Users, Trophy, Swords, Info, LifeBuoy } from 'lucide-react';
+import { Users, Trophy, Swords, Info, LifeBuoy, Clock } from 'lucide-react';
+import PastSeasonsModal from '@/components/PastSeasonsModal';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -156,13 +157,73 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     ? leagueUnreadMessages[currentLeagueId] ?? 0
     : 0;
 
-  const teamOptions = Array.isArray(userTeams) ? userTeams : [];
-  const teamLeagueIds = new Set(teamOptions.map((t: any) => t.leagueId));
+  // Split teams into active vs. past based on the season's isActive flag.
+  // Teams with no season association (standalone / legacy) are treated as
+  // active so they keep showing in the main selector.
+  const allTeams = Array.isArray(userTeams) ? userTeams : [];
+  const teamOptions = allTeams.filter(
+    (t: any) => t.seasonIsActive !== false,
+  );
+  const pastSeasonTeams = allTeams.filter(
+    (t: any) => t.seasonIsActive === false,
+  );
+  // Lookup: leagueId -> hasActiveSeason flag (sourced from /api/user/leagues
+  // payload, which we extended in getUserLeagues to include season metadata).
+  const leagueActivityMap = useMemo(() => {
+    const map = new Map<string, { hasActiveSeason: boolean; pastSeasons: any[]; name: string }>();
+    if (Array.isArray(userLeagues)) {
+      for (const lg of userLeagues as any[]) {
+        if (!lg?.id) continue;
+        map.set(lg.id, {
+          hasActiveSeason: lg.hasActiveSeason !== false,
+          pastSeasons: Array.isArray(lg.pastSeasons) ? lg.pastSeasons : [],
+          name: lg.name,
+        });
+      }
+    }
+    return map;
+  }, [userLeagues]);
+
+  // Past-only leagues: leagues the user belongs to where every season has
+  // ended. They're hidden from the main selector and surfaced via the modal.
+  const pastOnlyLeagues = useMemo(() => {
+    if (!Array.isArray(userLeagueMemberships)) return [] as any[];
+    const result: any[] = [];
+    const seen = new Set<string>();
+    for (const m of userLeagueMemberships as any[]) {
+      const lid = m?.leagueId;
+      if (!lid || seen.has(lid)) continue;
+      const info = leagueActivityMap.get(lid);
+      if (info && !info.hasActiveSeason) {
+        seen.add(lid);
+        result.push({
+          id: lid,
+          name: info.name,
+          pastSeasons: info.pastSeasons,
+        });
+      }
+    }
+    return result;
+  }, [userLeagueMemberships, leagueActivityMap]);
+
+  const hasPastSeasons = pastSeasonTeams.length > 0 || pastOnlyLeagues.length > 0;
+  // Only suppress a league from the main list when the user has an ACTIVE
+  // team in it. Also hide leagues whose seasons are all closed — those are
+  // routed through the Past Seasons modal instead.
+  const activeTeamLeagueIds = new Set(teamOptions.map((t: any) => t.leagueId));
   const leagueOptions = Array.isArray(userLeagueMemberships)
-    ? userLeagueMemberships.filter(
-        (m: any) => m.leagueId && !teamLeagueIds.has(m.leagueId),
-      )
+    ? (userLeagueMemberships as any[]).filter((m: any) => {
+        if (!m.leagueId) return false;
+        if (activeTeamLeagueIds.has(m.leagueId)) return false;
+        const info = leagueActivityMap.get(m.leagueId);
+        // If the league isn't yet in the map (e.g. payload still loading)
+        // we keep it visible; once `userLeagues` arrives we filter it out
+        // when its seasons are all closed.
+        if (info && !info.hasActiveSeason) return false;
+        return true;
+      })
     : [];
+  const [pastSeasonsOpen, setPastSeasonsOpen] = useState(false);
   // Deduplicate tournaments by id (a creator who is also a participant
   // appears twice in the underlying response).
   const tournamentOptions = Array.isArray(userTournaments)
@@ -230,6 +291,41 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const dropdownValue =
     selectedType && selectedId ? `${selectedType}:${selectedId}` : '';
+  const [selectOpen, setSelectOpen] = useState(false);
+
+  // Compute the trigger label ourselves so a past-season selection (made via
+  // the modal — those rows are not rendered as SelectItems) still displays
+  // correctly in the trigger instead of falling back to the placeholder.
+  const triggerLabel = useMemo(() => {
+    if (selectedType === 'team' && selectedId) {
+      const team = allTeams.find((t: any) => t.id === selectedId);
+      if (team) return getTeamDisplayName(team);
+    }
+    if (selectedType === 'league' && selectedId) {
+      const membership = Array.isArray(userLeagueMemberships)
+        ? userLeagueMemberships.find((m: any) => m.leagueId === selectedId)
+        : null;
+      if (membership?.league) return getLeagueDisplayName(membership.league);
+      const league = Array.isArray(userLeagues)
+        ? userLeagues.find((l: any) => l.id === selectedId)
+        : null;
+      if (league) return getLeagueDisplayName(league);
+    }
+    if (selectedType === 'tournament' && selectedId) {
+      const tournament = tournamentOptions.find(
+        (t: any) => t.id === selectedId,
+      );
+      if (tournament) return tournament.name || 'Tournament';
+    }
+    return null;
+  }, [
+    selectedType,
+    selectedId,
+    allTeams,
+    userLeagueMemberships,
+    userLeagues,
+    tournamentOptions,
+  ]);
 
   const handleDropdownChange = (value: string) => {
     const [type, id] = value.split(':');
@@ -237,6 +333,11 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     if (type === 'team') setTeamSelection(id);
     else if (type === 'league') setLeagueSelection(id);
     else if (type === 'tournament') setTournamentSelection(id);
+  };
+
+  const handlePastSeasonSelect = (s: { type: 'team' | 'league'; id: string }) => {
+    if (s.type === 'team') setTeamSelection(s.id);
+    else setLeagueSelection(s.id);
   };
 
   const handleNavClick = (route: string) => {
@@ -395,10 +496,13 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           <div className="flex-1 max-w-md">
             {teamOptions.length > 0 ||
             leagueOptions.length > 0 ||
-            tournamentOptions.length > 0 ? (
+            tournamentOptions.length > 0 ||
+            hasPastSeasons ? (
               <Select
                 value={dropdownValue || undefined}
                 onValueChange={handleDropdownChange}
+                open={selectOpen}
+                onOpenChange={setSelectOpen}
               >
                 <SelectTrigger
                   className={cn(
@@ -407,7 +511,9 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                   )}
                   data-testid="desktop-team-selector"
                 >
-                  <SelectValue placeholder="Select a team, league, or tournament" />
+                  <SelectValue placeholder="Select a team, league, or tournament">
+                    {triggerLabel ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {teamOptions.map((team: any) => {
@@ -523,6 +629,26 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                       </SelectPrimitive.Item>
                     );
                   })}
+                  {hasPastSeasons && (
+                    // Non-selectable footer button: closes the Radix select
+                    // and opens the Past Seasons modal instead of selecting a
+                    // value. Using onPointerDown so we beat Radix's internal
+                    // focus/close handling.
+                    <button
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectOpen(false);
+                        setPastSeasonsOpen(true);
+                      }}
+                      className="mt-1 w-full text-left flex items-center gap-2 rounded-sm py-2 pl-8 pr-2 text-sm border-t border-border hover:bg-accent hover:text-accent-foreground"
+                      data-testid="desktop-past-seasons-option"
+                    >
+                      <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="truncate">Past Seasons</span>
+                    </button>
+                  )}
                 </SelectContent>
               </Select>
             ) : (
@@ -530,6 +656,22 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
             )}
           </div>
         </header>
+        <PastSeasonsModal
+          open={pastSeasonsOpen}
+          onOpenChange={setPastSeasonsOpen}
+          teams={pastSeasonTeams as any[]}
+          leagues={
+            Array.isArray(userLeagues)
+              ? (userLeagues as any[]).map((l: any) => ({
+                  id: l.id,
+                  name: l.name,
+                  isPastOnly: l.hasActiveSeason === false,
+                  pastSeasons: Array.isArray(l.pastSeasons) ? l.pastSeasons : [],
+                }))
+              : []
+          }
+          onSelect={handlePastSeasonSelect}
+        />
 
         <main
           className="flex-1 w-full overflow-y-auto"

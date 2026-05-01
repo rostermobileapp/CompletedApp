@@ -330,7 +330,7 @@ export interface IStorage {
   createLeague(league: InsertLeague): Promise<League>;
   getLeagues(sport?: string, search?: string): Promise<League[]>;
   getLeague(id: string): Promise<League | undefined>;
-  getUserLeagues(userId: string): Promise<League[]>;
+  getUserLeagues(userId: string): Promise<(League & { hasActiveSeason?: boolean; pastSeasons?: { id: string; name: string; startDate: Date | null }[] })[]>;
   getLeaguesByCommissioner(commissionerId: string): Promise<League[]>;
   getLeagueByUniqueId(uniqueLeagueId: string): Promise<League | undefined>;
   updateLeague(id: string, updates: Partial<League>): Promise<League>;
@@ -1864,7 +1864,7 @@ export class DatabaseStorage implements IStorage {
     return league;
   }
 
-  async getUserLeagues(userId: string): Promise<(League & { facility?: Facility; seasonName?: string | null })[]> {
+  async getUserLeagues(userId: string): Promise<(League & { facility?: Facility; seasonName?: string | null; hasActiveSeason?: boolean; pastSeasons?: { id: string; name: string; startDate: Date | null }[] })[]> {
     // Get leagues where user is a member
     const memberLeagues = await db
       .select({ 
@@ -1898,33 +1898,67 @@ export class DatabaseStorage implements IStorage {
     ];
     const uniqueLeagues = Array.from(new Map(allLeagueData.map(league => [league.id, league])).values());
     
-    // Fetch active seasons for all leagues
+    // Fetch all seasons for these leagues so we can derive both the active
+    // season name (for display) and a list of past seasons (for the home
+    // dropdown's Past Seasons modal). A league with NO seasons at all is
+    // treated as active so legacy/standalone leagues keep working.
     const leagueIds = uniqueLeagues.map(l => l.id);
     let seasonMap: Record<string, string | null> = {};
-    
+    let hasActiveMap: Record<string, boolean> = {};
+    let pastSeasonsMap: Record<string, { id: string; name: string; startDate: Date | null }[]> = {};
+    let leaguesWithAnySeason = new Set<string>();
+
     if (leagueIds.length > 0) {
       try {
-        const activeSeasons = await db
-          .select({ leagueId: seasons.leagueId, name: seasons.name })
+        const allSeasons = await db
+          .select({
+            id: seasons.id,
+            leagueId: seasons.leagueId,
+            name: seasons.name,
+            isActive: seasons.isActive,
+            startDate: seasons.startDate,
+          })
           .from(seasons)
-          .where(and(
-            inArray(seasons.leagueId, leagueIds),
-            eq(seasons.isActive, true)
-          ));
-        activeSeasons.forEach(s => {
-          seasonMap[s.leagueId] = s.name;
+          .where(inArray(seasons.leagueId, leagueIds));
+        allSeasons.forEach(s => {
+          leaguesWithAnySeason.add(s.leagueId);
+          if (s.isActive) {
+            seasonMap[s.leagueId] = s.name;
+            hasActiveMap[s.leagueId] = true;
+          } else {
+            (pastSeasonsMap[s.leagueId] ||= []).push({
+              id: s.id,
+              name: s.name,
+              startDate: s.startDate ?? null,
+            });
+          }
         });
       } catch (error) {
         // If there's an error fetching seasons, just continue without them
         console.debug("Error fetching seasons:", error);
       }
     }
-    
-    // Attach season names to leagues
-    return uniqueLeagues.map(league => ({
-      ...league,
-      seasonName: seasonMap[league.id] || null
-    }));
+
+    return uniqueLeagues.map(league => {
+      const past = pastSeasonsMap[league.id] || [];
+      // Sort past seasons newest-first by startDate so the modal lists most
+      // recent closed seasons at the top.
+      past.sort((a, b) => {
+        const aTs = a.startDate ? new Date(a.startDate).getTime() : 0;
+        const bTs = b.startDate ? new Date(b.startDate).getTime() : 0;
+        return bTs - aTs;
+      });
+      // A league counts as active if it has an active season OR if it has
+      // no seasons at all (legacy leagues).
+      const hasActiveSeason =
+        hasActiveMap[league.id] === true || !leaguesWithAnySeason.has(league.id);
+      return {
+        ...league,
+        seasonName: seasonMap[league.id] || null,
+        hasActiveSeason,
+        pastSeasons: past,
+      };
+    });
   }
 
   async getUserLeagueMemberships(userId: string): Promise<LeagueMembership[]> {
@@ -2425,7 +2459,7 @@ export class DatabaseStorage implements IStorage {
     return team;
   }
 
-  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null })[]> {
+  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null })[]> {
     // Get teams from direct team memberships
     const teamMembershipResult = await db
       .select({ team: teams })
@@ -2491,22 +2525,33 @@ export class DatabaseStorage implements IStorage {
     // Deduplicate teams by ID
     const uniqueTeams = Array.from(new Map(allTeams.map(team => [team.id, team])).values());
 
-    // Fetch season names for any teams that have a seasonId so the frontend can
+    // Fetch season metadata for any teams that have a seasonId so the frontend can
     // display each team under its own season label (e.g. "Winter 2025" vs "Demo - Winter 2025")
+    // and split active vs. closed seasons in the home dropdown.
     const seasonIds = [...new Set(uniqueTeams.map(t => t.seasonId).filter(Boolean))] as string[];
-    let seasonNameMap: Record<string, string> = {};
+    let seasonInfoMap: Record<string, { name: string; isActive: boolean; startDate: Date | null }> = {};
     if (seasonIds.length > 0) {
       const seasonRows = await db
-        .select({ id: seasons.id, name: seasons.name })
+        .select({ id: seasons.id, name: seasons.name, isActive: seasons.isActive, startDate: seasons.startDate })
         .from(seasons)
         .where(inArray(seasons.id, seasonIds));
-      seasonRows.forEach(s => { seasonNameMap[s.id] = s.name; });
+      seasonRows.forEach(s => {
+        seasonInfoMap[s.id] = { name: s.name, isActive: s.isActive, startDate: s.startDate ?? null };
+      });
     }
 
-    return uniqueTeams.map(team => ({
-      ...team,
-      seasonName: team.seasonId ? (seasonNameMap[team.seasonId] ?? null) : null,
-    }));
+    return uniqueTeams.map(team => {
+      const info = team.seasonId ? seasonInfoMap[team.seasonId] : undefined;
+      return {
+        ...team,
+        seasonName: info ? info.name : null,
+        // null when the team has no season association (standalone teams /
+        // league-level teams with no seasonId). The frontend treats null as
+        // "active" so legacy teams keep showing in the main dropdown.
+        seasonIsActive: info ? info.isActive : null,
+        seasonStartDate: info ? info.startDate : null,
+      };
+    });
   }
 
   async getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]> {

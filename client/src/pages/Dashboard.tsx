@@ -28,6 +28,7 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import lightModeLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 import darkModeLogo from '@assets/Dark_Mode_Logo_1770738054930.png';
 import FeedbackModal from '@/components/FeedbackModal';
+import PastSeasonsModal from '@/components/PastSeasonsModal';
 import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
@@ -1119,6 +1120,7 @@ function DashboardMobile() {
   });
   const [showDropdown, setShowDropdown] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const [showPastSeasonsModal, setShowPastSeasonsModal] = useState(false);
   const isDesktopWeb = useIsDesktopWeb();
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   
@@ -1704,18 +1706,58 @@ function DashboardMobile() {
   // Unread message counts per league (for cross-league notification indicators)
   const leagueUnreadMessages = useLeagueUnreadMessages();
   
-  // Filter leagues to only show those where user has no team
+  // Split user's teams into active vs past based on the season's isActive flag.
+  // Teams with no season association are treated as active so legacy / standalone
+  // teams keep showing in the main dropdown.
+  const activeTeams = React.useMemo(() => {
+    if (!Array.isArray(userTeamsAll)) return [] as any[];
+    return (userTeamsAll as any[]).filter(
+      (team: any) => team.seasonIsActive !== false,
+    );
+  }, [userTeamsAll]);
+
+  const pastSeasonTeams = React.useMemo(() => {
+    if (!Array.isArray(userTeamsAll)) return [] as any[];
+    return (userTeamsAll as any[]).filter(
+      (team: any) => team.seasonIsActive === false,
+    );
+  }, [userTeamsAll]);
+
+  // Active leagues: leagues that still have an active season (or no seasons
+  // at all, for legacy leagues). Leagues whose seasons are all closed are
+  // surfaced via the Past Seasons modal instead.
+  const activeLeagues = React.useMemo(() => {
+    if (!Array.isArray(userLeagues)) return [] as any[];
+    return (userLeagues as any[]).filter(
+      (lg: any) => lg?.hasActiveSeason !== false,
+    );
+  }, [userLeagues]);
+
+  // Past-only leagues: leagues the user is in where every season is closed.
+  const pastOnlyLeagues = React.useMemo(() => {
+    if (!Array.isArray(userLeagues)) return [] as any[];
+    return (userLeagues as any[]).filter(
+      (lg: any) => lg?.hasActiveSeason === false,
+    );
+  }, [userLeagues]);
+
+  // Filter leagues to only show those where user has no ACTIVE team and the
+  // league still has an active season. League memberships aren't
+  // season-scoped today, so we infer "active" from the league's seasons.
   const leaguesWithoutTeams = React.useMemo(() => {
-    if (!Array.isArray(userLeagues) || !Array.isArray(userTeamsAll)) {
+    if (!Array.isArray(userTeamsAll)) {
       return [];
     }
-    
-    return userLeagues.filter(league => {
-      // Check if user has any team in this league
-      const hasTeamInLeague = userTeamsAll.some(team => team.leagueId === league.id);
-      return !hasTeamInLeague;
+
+    return activeLeagues.filter((league: any) => {
+      const hasActiveTeamInLeague = activeTeams.some(
+        (team: any) => team.leagueId === league.id,
+      );
+      return !hasActiveTeamInLeague;
     });
-  }, [userLeagues, userTeamsAll]);
+  }, [activeLeagues, userTeamsAll, activeTeams]);
+
+  const hasPastSeasons = pastSeasonTeams.length > 0 || pastOnlyLeagues.length > 0;
 
   // Mobile selector glow: pulse when ANY non-selected context (team, league,
   // or tournament) has unreviewed alerts. Mirrors the desktop logic in
@@ -1724,8 +1766,10 @@ function DashboardMobile() {
     const leagueCounts = notificationCounts?.leagues || {};
     const tournamentCounts = notificationCounts?.tournaments || {};
     const teamCounts = notificationCounts?.teams || {};
+    // Past-season items must never make the selector pulse, so we only look
+    // at teams whose season is still active (or has no season at all).
     const teams: Array<{ id: string; leagueId?: string | null }> =
-      Array.isArray(userTeamsAll) ? (userTeamsAll as any[]) : [];
+      activeTeams as any[];
     const leaguesOnly: Array<{ id: string }> =
       Array.isArray(leaguesWithoutTeams) ? (leaguesWithoutTeams as any[]) : [];
     const tournaments: Array<{ id: string }> =
@@ -1766,7 +1810,7 @@ function DashboardMobile() {
     return false;
   }, [
     notificationCounts,
-    userTeamsAll,
+    activeTeams,
     leaguesWithoutTeams,
     userPaidTournaments,
     selectedType,
@@ -1812,12 +1856,13 @@ function DashboardMobile() {
       return;
     }
     
-    // Set default selection if none exists
+    // Set default selection if none exists. Prefer active-season items so a
+    // first-time view never lands on a closed season.
     if (!selectedId) {
-      // First try to select a team
-      if (Array.isArray(userTeamsAll) && userTeamsAll.length > 0) {
+      // First try to select an active team
+      if (activeTeams.length > 0) {
         setSelectedType('team');
-        setSelectedId(userTeamsAll[0].id);
+        setSelectedId(activeTeams[0].id);
       }
       // Otherwise select a league (only those without teams)
       else if (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) {
@@ -1829,8 +1874,13 @@ function DashboardMobile() {
         setSelectedType('tournament');
         setSelectedId(userPaidTournaments[0].id);
       }
+      // Last resort: a past-season team if the user has nothing else.
+      else if (Array.isArray(userTeamsAll) && userTeamsAll.length > 0) {
+        setSelectedType('team');
+        setSelectedId(userTeamsAll[0].id);
+      }
     }
-  }, [userTeamsAll, leaguesWithoutTeams, userPaidTournaments, selectedId, selectedType]);
+  }, [userTeamsAll, activeTeams, leaguesWithoutTeams, userPaidTournaments, selectedId, selectedType]);
   
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -2304,7 +2354,7 @@ function DashboardMobile() {
           </div>
         </div>
       {/* Team/League/Tournament Selection Dropdown */}
-      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0)) && (
+      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0) || hasPastSeasons) && (
         <div className="px-6 mb-4">
           <div className="relative" ref={dropdownRef}>
             <button
@@ -2348,21 +2398,21 @@ function DashboardMobile() {
                   // when a user has multiple teams in the same league)
                   const countedMessageLeagues = new Set<string>();
 
-                  // Count notifications from other teams (via their league)
-                  if (Array.isArray(userTeamsAll)) {
-                    userTeamsAll.forEach((team: any) => {
-                      if (selectedType === 'team' && selectedId === team.id) return;
-                      const leagueId = team.leagueId;
-                      if (leagueId && notificationCounts?.leagues[leagueId]) {
-                        totalNotifications += notificationCounts.leagues[leagueId];
-                      }
-                      // Add unread message count for other leagues only
-                      if (leagueId && leagueId !== currentlySelectedLeagueId && !countedMessageLeagues.has(leagueId) && leagueUnreadMessages[leagueId]) {
-                        totalNotifications += leagueUnreadMessages[leagueId];
-                        countedMessageLeagues.add(leagueId);
-                      }
-                    });
-                  }
+                  // Count notifications from other teams (via their league).
+                  // Past-season teams are intentionally excluded so a closed
+                  // season can never inflate the badge total.
+                  activeTeams.forEach((team: any) => {
+                    if (selectedType === 'team' && selectedId === team.id) return;
+                    const leagueId = team.leagueId;
+                    if (leagueId && notificationCounts?.leagues[leagueId]) {
+                      totalNotifications += notificationCounts.leagues[leagueId];
+                    }
+                    // Add unread message count for other leagues only
+                    if (leagueId && leagueId !== currentlySelectedLeagueId && !countedMessageLeagues.has(leagueId) && leagueUnreadMessages[leagueId]) {
+                      totalNotifications += leagueUnreadMessages[leagueId];
+                      countedMessageLeagues.add(leagueId);
+                    }
+                  });
                   
                   // Count notifications from leagues (without teams)
                   if (Array.isArray(leaguesWithoutTeams)) {
@@ -2397,13 +2447,14 @@ function DashboardMobile() {
             
             {showDropdown && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-card hairline elev-lift rounded-lg z-50 max-h-[400px] overflow-y-auto">
-                {/* Teams Section */}
-                {Array.isArray(userTeamsAll) && userTeamsAll.length > 0 && (
+                {/* Teams Section — only active-season teams; closed seasons
+                    live behind the "Past Seasons" entry below. */}
+                {activeTeams.length > 0 && (
                   <>
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30">
                       MY TEAMS
                     </div>
-                    {userTeamsAll.map((team: any) => {
+                    {activeTeams.map((team: any) => {
                       // Get notification count for this team's league (announcements + unread messages)
                       const teamNotificationCount =
                         (team.leagueId && notificationCounts?.leagues[team.leagueId] || 0) +
@@ -2517,11 +2568,50 @@ function DashboardMobile() {
                     })}
                   </>
                 )}
+
+                {/* Past Seasons — single entry that opens a modal listing
+                    every team the user had in a closed season. Hidden when
+                    the user has no past-season items. */}
+                {hasPastSeasons && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setShowPastSeasonsModal(true);
+                    }}
+                    className="w-full p-3 text-left hover:bg-muted/50 transition-colors border-t border-border last:rounded-b-lg"
+                    data-testid="option-past-seasons"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium text-sm">Past Seasons</span>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
+      <PastSeasonsModal
+        open={showPastSeasonsModal}
+        onOpenChange={setShowPastSeasonsModal}
+        teams={pastSeasonTeams}
+        leagues={
+          Array.isArray(userLeagues)
+            ? (userLeagues as any[]).map((lg: any) => ({
+                id: lg.id,
+                name: lg.name,
+                isPastOnly: lg.hasActiveSeason === false,
+                pastSeasons: Array.isArray(lg.pastSeasons) ? lg.pastSeasons : [],
+              }))
+            : []
+        }
+        onSelect={(s) => {
+          setSelectedType(s.type);
+          setSelectedId(s.id);
+        }}
+      />
       {/* 4-Card Section — hidden while a pre-window tournament countdown
           is active so the player only sees the timer below. */}
       {!isTournamentCountdownActive && (
