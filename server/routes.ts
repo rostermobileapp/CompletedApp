@@ -2984,6 +2984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(
         seats.map((s) => ({
           leagueId: s.leagueId,
+          leagueName: s.leagueName,
           grantId: s.grantId,
           assignedAt: s.assignedAt,
           startMonth: s.grant.startMonth,

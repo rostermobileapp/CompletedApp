@@ -517,7 +517,7 @@ export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canManageLeague } = usePermissions();
+  const { canManageLeague, hasLeagueProSeat } = usePermissions();
   const isMobile = useIsMobile();
   const [showDesktopRequiredLeague, setShowDesktopRequiredLeague] = useState(false);
   const [showDesktopRequiredSeason, setShowDesktopRequiredSeason] = useState(false);
@@ -761,6 +761,12 @@ export default function LeagueManagement() {
     },
     enabled: !!leagueId,
   });
+
+  // Fetch the user's active League-Wide Player Pro seats so we can show a
+  // "provided by your league" badge to non-commissioner members who hold a seat.
+  const { data: activeLeagueProSeats = [] } = useQuery<
+    { leagueId: string; leagueName: string; grantId: string; startMonth: string; endMonth: string }[]
+  >({ queryKey: ['/api/user/league-pro-seats'] });
 
   // Fetch all facilities for facility selector
   const { data: facilities = [], refetch: refetchFacilities } = useQuery({
@@ -2647,6 +2653,25 @@ export default function LeagueManagement() {
                 {league.name}
               </p>
             )}
+            {/* League-provided Player Pro seat badge — visible only to members
+                (not the commissioner) who hold an active seat for this league */}
+            {leagueId && !isCommissioner && hasLeagueProSeat(leagueId) && (() => {
+              const seat = activeLeagueProSeats.find((s) => s.leagueId === leagueId);
+              if (!seat) return null;
+              const m = /^(\d{4})-(\d{2})$/.exec(seat.endMonth);
+              const endLabel = m
+                ? new Date(Number(m[1]), Number(m[2]) - 1, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' })
+                : seat.endMonth;
+              return (
+                <div
+                  className="flex items-center gap-1 mt-1 text-xs font-medium text-primary"
+                  data-testid="league-pro-seat-badge"
+                >
+                  <Star className="w-3 h-3 shrink-0" />
+                  Player Pro provided by your league through {endLabel}
+                </div>
+              );
+            })()}
           </div>
           <button
             onClick={() => setShowEditLeague(true)}

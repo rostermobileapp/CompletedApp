@@ -414,7 +414,7 @@ export interface IStorage {
   ): Promise<LeagueProGrant[]>;
   backfillLeagueProSeats(grantId: string): Promise<number>;
   /** Active seats covering the current month for the given user. */
-  getActiveLeagueProSeatsForUser(userId: string, monthYM: string): Promise<(LeagueProSeat & { grant: LeagueProGrant })[]>;
+  getActiveLeagueProSeatsForUser(userId: string, monthYM: string): Promise<(LeagueProSeat & { grant: LeagueProGrant; leagueName: string })[]>;
   /** Reserved seats whose grant window starts after `monthYM` (between-grants messaging). */
   getUpcomingLeagueProSeatsForUser(
     userId: string,
@@ -3377,11 +3377,12 @@ export class DatabaseStorage implements IStorage {
   async getActiveLeagueProSeatsForUser(
     userId: string,
     monthYM: string,
-  ): Promise<(LeagueProSeat & { grant: LeagueProGrant })[]> {
+  ): Promise<(LeagueProSeat & { grant: LeagueProGrant; leagueName: string })[]> {
     const rows = await db
       .select()
       .from(leagueProSeats)
       .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
+      .innerJoin(leagues, eq(leagues.id, leagueProSeats.leagueId))
       .where(
         and(
           eq(leagueProSeats.userId, userId),
@@ -3390,7 +3391,7 @@ export class DatabaseStorage implements IStorage {
           gte(leagueProGrants.endMonth, monthYM),
         )
       );
-    return rows.map(r => ({ ...r.league_pro_seats, grant: r.league_pro_grants }));
+    return rows.map(r => ({ ...r.league_pro_seats, grant: r.league_pro_grants, leagueName: r.leagues.name }));
   }
 
   async getUpcomingLeagueProSeatsForUser(

@@ -701,6 +701,7 @@ export default function Subscription() {
           are now all claimed. This is requirement #8 of the league-wide
           Player Pro spec: the upsell UI must explain that league-paid seats
           are full so the user understands why they're still on free tier. */}
+      <LeagueProActiveSeatNotice />
       <LeagueProUpcomingSeatNotice />
       {isFree && <LeagueProSeatsFullUpsell />}
 
@@ -873,6 +874,53 @@ export default function Subscription() {
             </p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Banner shown on the Subscription page when the user currently holds one or
+ * more active League-Wide Player Pro seats. Tells them which league(s) are
+ * covering their Pro access and when the grant ends, so they understand they
+ * don't need to subscribe individually.
+ */
+function LeagueProActiveSeatNotice() {
+  const { data: activeSeats = [] } = useQuery<
+    {
+      leagueId: string;
+      leagueName: string;
+      grantId: string;
+      startMonth: string;
+      endMonth: string;
+    }[]
+  >({ queryKey: ['/api/user/league-pro-seats'] });
+  if (activeSeats.length === 0) return null;
+  return (
+    <div className="px-6 mb-4" data-testid="league-pro-active-seat-notice">
+      <div className="rounded-xl border border-primary/40 bg-primary/10 p-4">
+        <div className="flex items-start gap-3">
+          <Crown className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <div className="font-semibold mb-1">
+              Player Pro provided by your league
+            </div>
+            <ul className="text-muted-foreground space-y-0.5">
+              {activeSeats.map((s) => (
+                <li key={s.grantId}>
+                  <span className="font-medium text-foreground">
+                    {s.leagueName}
+                  </span>{' '}
+                  covers your Player Pro access through{' '}
+                  <span className="font-medium text-foreground">
+                    {formatMonthYM(s.endMonth)}
+                  </span>
+                  . No personal upgrade needed.
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
