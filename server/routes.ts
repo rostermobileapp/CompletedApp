@@ -17,6 +17,7 @@ import {
   roleHierarchy,
   canManageLeagueSpecific,
   canAccessPremiumFeatures,
+  canAccessLeaguePremiumFeatures,
   getTournamentAccessState,
   requireTournamentAccessOpen,
   canManageTournamentSpecific,
@@ -5648,7 +5649,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
-      const isPremium = canAccessPremiumFeatures(userWithPermissions);
+      // Recognize League-Wide Player Pro seat holders for *this* league —
+      // global Pro continues to work, and a free-tier user with an active
+      // seat in this league is treated as Pro for league premium operations
+      // (and only this league).
+      const isPremium = await canAccessLeaguePremiumFeatures(userWithPermissions, leagueId);
       if (!isLeagueCommissioner && !isPremium) {
         return res.status(403).json({
           message: "Creating invoices requires Player Pro or commissioner permissions",
@@ -17322,9 +17327,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // 2) Creator must be commissioner of THIS league or globally player_pro+.
+      // 2) Creator must be commissioner of THIS league, globally player_pro+,
+      //    OR hold an active League-Wide Player Pro seat in this league
+      //    (per-league premium access — never elevates the global role).
       const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
-      const isPremium = canAccessPremiumFeatures(userWithPermissions);
+      const isPremium = await canAccessLeaguePremiumFeatures(userWithPermissions, leagueId);
       if (!isLeagueCommissioner && !isPremium) {
         return res.status(403).json({
           message: "Creating invoices requires Player Pro or commissioner permissions",
@@ -17665,7 +17672,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const isLeagueCommissioner = await canManageLeagueSpecific(userWithPermissions, leagueId);
-        const isPremium = canAccessPremiumFeatures(userWithPermissions);
+        // League-scoped premium check: also accepts an active League-Wide
+        // Player Pro seat in this league (per-league only).
+        const isPremium = await canAccessLeaguePremiumFeatures(userWithPermissions, leagueId);
         if (!isLeagueCommissioner && !isPremium) {
           return res.status(403).json({
             message: "Editing invoices requires Player Pro or commissioner permissions",
