@@ -420,6 +420,50 @@ export const leagueMemberships = pgTable("league_memberships", {
   leagueSpecialPermissions: specialPermissionEnum("league_special_permissions").array(), // Special permissions within this league
 });
 
+// League-wide Player Pro grants — a commissioner pre-pays Player Pro for a
+// fixed number of seats over a fixed month window. The grant is the source of
+// truth for "this league has X paid Pro seats from M1 to M2"; individual seat
+// assignments live in `leagueProSeats`.
+export const leagueProGrants = pgTable("league_pro_grants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id, { onDelete: 'cascade' }).notNull(),
+  paidByUserId: varchar("paid_by_user_id").references(() => users.id, { onDelete: 'set null' }),
+  seatCount: integer("seat_count").notNull(),
+  // Month window stored as 'YYYY-MM' strings for unambiguous month math
+  startMonth: varchar("start_month", { length: 7 }).notNull(),
+  endMonth: varchar("end_month", { length: 7 }).notNull(),
+  monthsCount: integer("months_count").notNull(),
+  perPlayerMonthlyCents: integer("per_player_monthly_cents").notNull(),
+  individualTotalCents: integer("individual_total_cents").notNull(),
+  discountedTotalCents: integer("discounted_total_cents").notNull(),
+  savingsCents: integer("savings_cents").notNull(),
+  discountPercent: integer("discount_percent").notNull(),
+  status: varchar("status", { length: 16 }).default("pending").notNull(), // pending | paid | cancelled
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id").unique(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_league_pro_grants_league").on(table.leagueId),
+  index("idx_league_pro_grants_status").on(table.status),
+]);
+
+// Individual Player Pro seat assignments tied to a grant. One row per
+// (grant, user); the unique constraint guarantees the same user cannot
+// occupy more than one seat in the same grant.
+export const leagueProSeats = pgTable("league_pro_seats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  grantId: varchar("grant_id").references(() => leagueProGrants.id, { onDelete: 'cascade' }).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+}, (table) => [
+  unique("league_pro_seats_grant_user_unique").on(table.grantId, table.userId),
+  index("idx_league_pro_seats_user_league").on(table.userId, table.leagueId),
+  index("idx_league_pro_seats_grant").on(table.grantId),
+]);
+
 // Team memberships table
 export const teamMemberships = pgTable("team_memberships", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3525,6 +3569,30 @@ export const insertTournamentPhotoSchema = createInsertSchema(tournamentPhotos).
 export const insertLeaguePhotoSchema = createInsertSchema(leaguePhotos).omit({ id: true, uploadedAt: true });
 export const insertTournamentPhotoTagSchema = createInsertSchema(tournamentPhotoTags).omit({ id: true, taggedAt: true });
 export const insertLeaguePhotoTagSchema = createInsertSchema(leaguePhotoTags).omit({ id: true, taggedAt: true });
+
+// League-wide Player Pro grants & seats
+export const insertLeagueProGrantSchema = createInsertSchema(leagueProGrants).omit({
+  id: true,
+  paidAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertLeagueProSeatSchema = createInsertSchema(leagueProSeats).omit({
+  id: true,
+  assignedAt: true,
+});
+export type LeagueProGrant = typeof leagueProGrants.$inferSelect;
+export type InsertLeagueProGrant = z.infer<typeof insertLeagueProGrantSchema>;
+export type LeagueProSeat = typeof leagueProSeats.$inferSelect;
+export type InsertLeagueProSeat = z.infer<typeof insertLeagueProSeatSchema>;
+
+// Validation schema used by the commissioner-facing pricing/checkout endpoints.
+export const leagueProBulkInputSchema = z.object({
+  seatCount: z.number().int().positive().max(10000),
+  startMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'startMonth must be YYYY-MM'),
+  endMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'endMonth must be YYYY-MM'),
+});
+export type LeagueProBulkInput = z.infer<typeof leagueProBulkInputSchema>;
 
 // Update tournament match schema for PATCH operations
 export const updateTournamentMatchSchema = z.object({

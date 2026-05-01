@@ -663,6 +663,17 @@ export default function LeagueManagement() {
     };
   }, [showTimePicker]);
   const [showEditLeague, setShowEditLeague] = useState(false);
+  // League-Wide Player Pro form state. Default to current month → +5 months
+  // (a typical season window) so the commissioner sees realistic numbers
+  // instantly without picking dates first.
+  const _today = new Date();
+  const _ymOffset = (offset: number) => {
+    const d = new Date(_today.getUTCFullYear(), _today.getUTCMonth() + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [proSeatCount, setProSeatCount] = useState<string>('20');
+  const [proStartMonth, setProStartMonth] = useState<string>(_ymOffset(0));
+  const [proEndMonth, setProEndMonth] = useState<string>(_ymOffset(5));
   const [showCreateSeason, setShowCreateSeason] = useState(false);
   const [newSeasonStep, setNewSeasonStep] = useState<NewSeasonStep>('close');
   const [closeCurrentSeason, setCloseCurrentSeason] = useState(true);
@@ -1867,6 +1878,128 @@ export default function LeagueManagement() {
       });
     },
   });
+
+  // ─── League-Wide Player Pro: queries, mutations, redirect handler ─────
+  // Live grants list (refetched after a successful payment confirmation).
+  const { data: leagueProGrants = [] } = useQuery<any[]>({
+    queryKey: ['/api/leagues', leagueId, 'player-pro', 'grants'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/player-pro/grants`);
+      return response.json();
+    },
+    enabled: !!leagueId && !!user && !!league && league.commissionerId === user.id,
+  });
+
+  // Live Stripe price for the per-player monthly Player Pro tier — used for
+  // the live preview math so the commissioner sees pricing instantly without
+  // hitting the server on every keystroke.
+  const { data: stripePrices } = useQuery<Record<string, { amount: number | null }>>({
+    queryKey: ['/api/stripe/prices'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/stripe/prices');
+      return response.json();
+    },
+    enabled: !!leagueId,
+  });
+
+  const proPerPlayerMonthly = stripePrices?.player_pro_monthly?.amount ?? 6.5;
+
+  // Pure client-side preview math — must mirror server/leaguePro.ts exactly.
+  const proPreview = React.useMemo(() => {
+    const seats = parseInt(proSeatCount, 10);
+    if (!Number.isFinite(seats) || seats <= 0) return null;
+    const m = /^(\d{4})-(0[1-9]|1[0-2])$/;
+    const s = m.exec(proStartMonth);
+    const e = m.exec(proEndMonth);
+    if (!s || !e) return null;
+    const months = (Number(e[1]) - Number(s[1])) * 12 + (Number(e[2]) - Number(s[2])) + 1;
+    if (months <= 0) return null;
+    const perPlayerMonthlyCents = Math.round(proPerPlayerMonthly * 100);
+    const individualCents = seats * months * perPlayerMonthlyCents;
+    const discountedCents = Math.round(individualCents * 0.75);
+    const savingsCents = individualCents - discountedCents;
+    return {
+      seats,
+      months,
+      perPlayerMonthly: proPerPlayerMonthly,
+      individualTotal: individualCents / 100,
+      discountedTotal: discountedCents / 100,
+      savings: savingsCents / 100,
+      effectivePerPlayerMonthly: discountedCents / (seats * months) / 100,
+    };
+  }, [proSeatCount, proStartMonth, proEndMonth, proPerPlayerMonthly]);
+
+  const leagueProCheckoutMutation = useMutation({
+    mutationFn: async () => {
+      const seats = parseInt(proSeatCount, 10);
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/player-pro/checkout`, {
+        seatCount: seats,
+        startMonth: proStartMonth,
+        endMonth: proEndMonth,
+      });
+      return response.json();
+    },
+    onSuccess: (data: { url?: string }) => {
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        toast({ title: 'Could not start checkout', variant: 'destructive' });
+      }
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Checkout failed',
+        description: err?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // After Stripe redirects back with ?league_pro=success&session_id=..., call
+  // the confirm endpoint so the UI updates immediately rather than waiting on
+  // the asynchronous webhook. The query string is then cleared so a refresh
+  // doesn't re-confirm.
+  const proRedirectHandled = useRef(false);
+  useEffect(() => {
+    if (!leagueId) return;
+    if (proRedirectHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('league_pro');
+    const sessionId = params.get('session_id');
+    if (status === 'success' && sessionId) {
+      proRedirectHandled.current = true;
+      apiRequest('POST', `/api/leagues/${leagueId}/player-pro/confirm-payment`, { sessionId })
+        .then(async (r) => {
+          const body = await r.json();
+          toast({
+            title: 'Player Pro purchased',
+            description: `${body.seatsFilled || 0} seat${(body.seatsFilled || 0) === 1 ? '' : 's'} assigned to current league members.`,
+          });
+          queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'player-pro', 'grants'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/league-pro-seats'] });
+        })
+        .catch((err) => {
+          toast({
+            title: 'Could not confirm payment',
+            description: err?.message || 'Refresh in a moment to see updated status.',
+            variant: 'destructive',
+          });
+        })
+        .finally(() => {
+          // Strip the query string so a refresh doesn't re-confirm.
+          const url = new URL(window.location.href);
+          url.searchParams.delete('league_pro');
+          url.searchParams.delete('session_id');
+          window.history.replaceState({}, '', url.toString());
+        });
+    } else if (status === 'cancelled') {
+      proRedirectHandled.current = true;
+      toast({ title: 'Player Pro checkout cancelled' });
+      const url = new URL(window.location.href);
+      url.searchParams.delete('league_pro');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [leagueId, queryClient, toast]);
 
   // Add stat manager special permission mutation - uses invite-scorekeeper endpoint
   // This allows inviting users by email even if they're not league members yet
@@ -4770,6 +4903,136 @@ export default function LeagueManagement() {
                       Transfer
                     </button>
                   </div>
+                </div>
+
+                {/* League-Wide Player Pro */}
+                <div className="border-t pt-4" data-testid="section-league-player-pro">
+                  <h3 className="font-medium mb-1 flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-yellow-500" />
+                    Player Pro for League
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Pre-pay Player Pro for a fixed number of seats over a date range and save 25% versus everyone paying individually. Seats auto-assign to current league members in join order; new approvals receive any remaining seats automatically.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Number of seats</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={proSeatCount}
+                        onChange={(e) => setProSeatCount(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-full p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="input-pro-seat-count"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Start month</label>
+                      <input
+                        type="month"
+                        value={proStartMonth}
+                        onChange={(e) => setProStartMonth(e.target.value)}
+                        className="w-full p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="input-pro-start-month"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">End month</label>
+                      <input
+                        type="month"
+                        value={proEndMonth}
+                        onChange={(e) => setProEndMonth(e.target.value)}
+                        className="w-full p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        data-testid="input-pro-end-month"
+                      />
+                    </div>
+                  </div>
+
+                  {proPreview ? (
+                    <div className="rounded-lg bg-card hairline elev-rest p-3 mb-3 text-sm" data-testid="pro-preview">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Seats × Months</span>
+                        <span data-testid="text-pro-seats-months">
+                          {proPreview.seats} × {proPreview.months}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">If paid individually</span>
+                        <span className="line-through text-muted-foreground" data-testid="text-pro-individual-total">
+                          ${proPreview.individualTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>League price (25% off)</span>
+                        <span data-testid="text-pro-discounted-total">
+                          ${proPreview.discountedTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-green-600 dark:text-green-400">
+                        <span>You save</span>
+                        <span data-testid="text-pro-savings">${proPreview.savings.toFixed(2)}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Effective ${proPreview.effectivePerPlayerMonthly.toFixed(2)} per player / month
+                        {' '}(vs ${proPreview.perPlayerMonthly.toFixed(2)} individually)
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground mb-3">
+                      Enter seats and a valid month range to see pricing.
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={!proPreview || leagueProCheckoutMutation.isPending}
+                    onClick={() => leagueProCheckoutMutation.mutate()}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
+                    data-testid="button-pro-pay-now"
+                  >
+                    {leagueProCheckoutMutation.isPending
+                      ? 'Starting checkout…'
+                      : proPreview
+                        ? `Pay $${proPreview.discountedTotal.toFixed(2)} now`
+                        : 'Pay now'}
+                  </button>
+
+                  {leagueProGrants.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium mb-2">Active & past purchases</h4>
+                      <div className="space-y-2" data-testid="list-pro-grants">
+                        {leagueProGrants.map((g: any) => (
+                          <div
+                            key={g.id}
+                            className="flex items-center justify-between gap-2 p-3 bg-card hairline elev-rest rounded-lg"
+                            data-testid={`pro-grant-row-${g.id}`}
+                          >
+                            <div className="min-w-0 flex-1 text-sm">
+                              <div className="font-medium">
+                                {g.seatsAssigned}/{g.seatCount} seats &middot; {g.startMonth} → {g.endMonth}
+                                {g.isActive && (
+                                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                    Active
+                                  </span>
+                                )}
+                                {g.status === 'pending' && (
+                                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                    Pending payment
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                Paid ${(g.discountedTotalCents / 100).toFixed(2)}
+                                {g.savingsCents > 0 && ` · saved $${(g.savingsCents / 100).toFixed(2)}`}
+                                {g.seatsRemaining > 0 && g.status === 'paid' && ` · ${g.seatsRemaining} seat${g.seatsRemaining === 1 ? '' : 's'} open for new members`}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Manage Seasons */}

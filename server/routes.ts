@@ -29,7 +29,8 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema } from "@shared/schema";
+import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
@@ -231,6 +232,49 @@ async function applyTournamentPaymentFromSession(
 // Idempotently credit additional team purchase based on a verified-paid Stripe Checkout Session.
 // Uses stripeProcessedSessionIds to ensure a given session.id can only credit teams once,
 // regardless of whether the webhook or the confirm endpoint fires first (or both).
+/**
+ * Idempotently mark a League-Wide Player Pro grant as paid based on a verified
+ * Stripe Checkout Session, then back-fill seats from current league members in
+ * join order. Safe to call from both the webhook and the confirm-payment
+ * endpoint — the underlying status check + unique stripeCheckoutSessionId
+ * makes the operation a no-op the second time.
+ */
+/**
+ * Resolve the per-player monthly Player Pro price (in cents) from Stripe so
+ * the bulk-pricing math always tracks live pricing. Falls back to the local
+ * default when the Stripe lookup fails (e.g. transient API error or missing
+ * price env var) so checkout never silently mis-prices.
+ */
+async function getPlayerProMonthlyCents(): Promise<number> {
+  const priceId = process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY;
+  if (!priceId) return LEAGUE_PRO_DEFAULT_MONTHLY_CENTS;
+  try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
+    const price = await stripe.prices.retrieve(priceId);
+    if (price.unit_amount && price.unit_amount > 0) return price.unit_amount;
+  } catch (err) {
+    console.error('[League Pro] Failed to retrieve player_pro_monthly price; using default:', err);
+  }
+  return LEAGUE_PRO_DEFAULT_MONTHLY_CENTS;
+}
+
+async function applyLeagueProBulkPaymentFromSession(
+  grantId: string,
+  session: Stripe.Checkout.Session,
+): Promise<{ applied: boolean; seatsFilled: number }> {
+  const grant = await storage.getLeagueProGrant(grantId);
+  if (!grant) return { applied: false, seatsFilled: 0 };
+  if (grant.status === 'paid') {
+    // Already paid — return the existing seat count for caller convenience.
+    const seats = await storage.getLeagueProSeatsByGrant(grantId);
+    return { applied: false, seatsFilled: seats.length };
+  }
+
+  await storage.markLeagueProGrantPaid(grantId, (session.payment_intent as string) || null);
+  const seatsFilled = await storage.backfillLeagueProSeats(grantId);
+  return { applied: true, seatsFilled };
+}
+
 async function applyAdditionalTeamPaymentFromSession(
   tournamentId: string,
   sessionId: string,
@@ -2689,6 +2733,246 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //   League-Wide Player Pro (commissioner pre-pays N seats for a month range)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Compute pricing preview without writing anything. Used by the settings UI
+  // to show seats × months × price math (with the bulk discount) live.
+  app.post('/api/leagues/:leagueId/player-pro/preview', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.params;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only the league commissioner can purchase Player Pro for the league' });
+      }
+
+      const parsed = leagueProBulkInputSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message || 'Invalid input' });
+      }
+      const { seatCount, startMonth, endMonth } = parsed.data;
+      if (monthsBetween(startMonth, endMonth) === 0) {
+        return res.status(400).json({ message: 'endMonth must be the same as or after startMonth' });
+      }
+
+      const perPlayerMonthlyCents = await getPlayerProMonthlyCents();
+      const pricing = computeLeagueProPricing({ seatCount, startMonth, endMonth, perPlayerMonthlyCents });
+      res.json(pricing);
+    } catch (error: any) {
+      console.error('[League Pro] Preview error:', error);
+      res.status(500).json({ message: 'Failed to compute preview' });
+    }
+  });
+
+  // Create a Stripe Checkout Session (one-time payment) for a League-Wide
+  // Player Pro purchase. Persists a pending `leagueProGrants` row first so the
+  // webhook can reconcile by stripeCheckoutSessionId.
+  app.post('/api/leagues/:leagueId/player-pro/checkout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.params;
+      const { embedded } = req.body || {};
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only the league commissioner can purchase Player Pro for the league' });
+      }
+
+      const parsed = leagueProBulkInputSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0]?.message || 'Invalid input' });
+      }
+      const { seatCount, startMonth, endMonth } = parsed.data;
+      if (monthsBetween(startMonth, endMonth) === 0) {
+        return res.status(400).json({ message: 'endMonth must be the same as or after startMonth' });
+      }
+
+      const perPlayerMonthlyCents = await getPlayerProMonthlyCents();
+      const pricing = computeLeagueProPricing({ seatCount, startMonth, endMonth, perPlayerMonthlyCents });
+
+      // Create the pending grant first so we can pass its id in metadata. The
+      // webhook & confirm endpoints look the grant up either by id or by the
+      // Stripe session id (set in a follow-up update once Stripe returns).
+      const grant = await storage.createLeagueProGrant({
+        leagueId,
+        paidByUserId: userId,
+        seatCount,
+        startMonth,
+        endMonth,
+        monthsCount: pricing.monthsCount,
+        perPlayerMonthlyCents,
+        individualTotalCents: pricing.individualTotalCents,
+        discountedTotalCents: pricing.discountedTotalCents,
+        savingsCents: pricing.savingsCents,
+        discountPercent: pricing.discountPercent,
+        status: 'pending',
+        stripeCheckoutSessionId: null,
+        stripePaymentIntentId: null,
+      });
+
+      const protocol = req.protocol || 'https';
+      const host = req.get('host') || (process.env.REPLIT_DOMAINS ? `${process.env.REPLIT_DOMAINS}` : 'localhost:5000');
+      const appUrl = `${protocol}://${host}`;
+
+      const baseSessionParams: Stripe.Checkout.SessionCreateParams = {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `Player Pro — ${league.name}`,
+                description: `${seatCount} seat${seatCount > 1 ? 's' : ''} × ${pricing.monthsCount} month${pricing.monthsCount > 1 ? 's' : ''} (${startMonth} → ${endMonth}) with ${pricing.discountPercent}% bulk discount`,
+              },
+              unit_amount: pricing.discountedTotalCents,
+            },
+            quantity: 1,
+          },
+        ],
+        cancel_url: `${appUrl}/leagues/${leagueId}?league_pro=cancelled`,
+        client_reference_id: userId,
+        metadata: {
+          type: 'league_pro_bulk',
+          grantId: grant.id,
+          leagueId,
+          userId,
+          seatCount: String(seatCount),
+          startMonth,
+          endMonth,
+        },
+      };
+
+      const session = embedded
+        ? await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            ui_mode: 'embedded',
+            redirect_on_completion: 'if_required',
+            return_url: `${appUrl}/leagues/${leagueId}?league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
+          })
+        : await stripe.checkout.sessions.create({
+            ...baseSessionParams,
+            success_url: `${appUrl}/leagues/${leagueId}?league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
+          });
+
+      // Bind the Stripe session id back to the grant so the webhook can find it.
+      await db
+        .update(leagueProGrants)
+        .set({ stripeCheckoutSessionId: session.id, updatedAt: new Date() })
+        .where(eq(leagueProGrants.id, grant.id));
+
+      if (embedded) {
+        if (!session.client_secret) {
+          return res.status(500).json({ message: 'Stripe session client_secret missing' });
+        }
+        return res.json({ clientSecret: session.client_secret, sessionId: session.id, grantId: grant.id });
+      }
+      if (!session.url) {
+        return res.status(500).json({ message: 'Stripe session URL missing' });
+      }
+      res.json({ url: session.url, sessionId: session.id, grantId: grant.id });
+    } catch (error: any) {
+      console.error('[League Pro] Checkout error:', error);
+      res.status(500).json({ message: error.message || 'Failed to create checkout session' });
+    }
+  });
+
+  // Confirm a League-Wide Player Pro payment after Stripe redirect — mirrors
+  // the tournament confirm-payment flow so the UI doesn't have to wait on the
+  // webhook for the success state.
+  app.post('/api/leagues/:leagueId/player-pro/confirm-payment', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.params;
+      const { sessionId } = req.body || {};
+      if (!sessionId) return res.status(400).json({ message: 'sessionId required' });
+
+      const grant = await storage.getLeagueProGrantByStripeSession(sessionId);
+      if (!grant || grant.leagueId !== leagueId) {
+        return res.status(404).json({ message: 'Grant not found for this session' });
+      }
+      if (grant.paidByUserId && grant.paidByUserId !== userId) {
+        return res.status(403).json({ message: 'Not authorized to confirm this payment' });
+      }
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const completed = session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
+      if (!completed) {
+        return res.json({ status: grant.status, paymentStatus: session.payment_status, seatsFilled: 0 });
+      }
+
+      const result = await applyLeagueProBulkPaymentFromSession(grant.id, session);
+      const refreshed = await storage.getLeagueProGrant(grant.id);
+      res.json({
+        status: refreshed?.status || 'paid',
+        applied: result.applied,
+        seatsFilled: result.seatsFilled,
+        grant: refreshed,
+      });
+    } catch (error: any) {
+      console.error('[League Pro] Confirm error:', error);
+      res.status(500).json({ message: error.message || 'Failed to confirm payment' });
+    }
+  });
+
+  // List all grants for a league. Commissioner only.
+  app.get('/api/leagues/:leagueId/player-pro/grants', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.params;
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only the league commissioner can view grants' });
+      }
+      const grants = await storage.getLeagueProGrantsByLeague(leagueId);
+      const monthYM = currentMonth();
+      const enriched = await Promise.all(
+        grants.map(async (g) => {
+          const seats = await storage.getLeagueProSeatsByGrant(g.id);
+          return {
+            ...g,
+            seatsAssigned: seats.length,
+            seatsRemaining: Math.max(0, g.seatCount - seats.length),
+            isActive: g.status === 'paid' && g.startMonth <= monthYM && g.endMonth >= monthYM,
+          };
+        })
+      );
+      res.json(enriched);
+    } catch (error: any) {
+      console.error('[League Pro] List grants error:', error);
+      res.status(500).json({ message: 'Failed to load grants' });
+    }
+  });
+
+  // Returns the current user's active per-league Player Pro seats, scoped to
+  // the current month. The client SubscriptionContext uses this to grant
+  // per-league premium feature access without elevating the global role.
+  app.get('/api/user/league-pro-seats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const monthYM = currentMonth();
+      const seats = await storage.getActiveLeagueProSeatsForUser(userId, monthYM);
+      res.json(
+        seats.map((s) => ({
+          leagueId: s.leagueId,
+          grantId: s.grantId,
+          assignedAt: s.assignedAt,
+          startMonth: s.grant.startMonth,
+          endMonth: s.grant.endMonth,
+        }))
+      );
+    } catch (error: any) {
+      console.error('[League Pro] User seats error:', error);
+      res.status(500).json({ message: 'Failed to load seats' });
+    }
+  });
+
   // Stripe webhook handler - Note: This endpoint needs raw body, configured in server/index.ts
   app.post('/api/stripe-webhook', async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -2747,6 +3031,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (tournamentId && checkoutCompleted) {
               await applyTournamentPaymentFromSession(tournamentId, session);
+            }
+          }
+          // Handle league-wide Player Pro bulk payment
+          else if (session.metadata?.type === 'league_pro_bulk') {
+            const grantId = session.metadata.grantId;
+            if (grantId && checkoutCompleted) {
+              try {
+                await applyLeagueProBulkPaymentFromSession(grantId, session);
+              } catch (err) {
+                console.error('[Webhook] Failed to apply league_pro_bulk payment:', err);
+              }
             }
           }
           // Handle additional team payment

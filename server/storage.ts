@@ -209,6 +209,12 @@ import {
   type InsertEventParticipant,
   tournamentScorekeeperInvites,
   type TournamentScorekeeperInvite,
+  // League-wide Player Pro
+  leagueProGrants,
+  leagueProSeats,
+  type LeagueProGrant,
+  type InsertLeagueProGrant,
+  type LeagueProSeat,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike } from "drizzle-orm";
@@ -365,6 +371,33 @@ export interface IStorage {
   approveTeamJoinLeague(requestId: string, approverId: string): Promise<TeamLeagueRequest>;
   rejectTeamJoinLeague(requestId: string, approverId: string): Promise<TeamLeagueRequest>;
   
+  // League-wide Player Pro (commissioner pre-pays N seats for a month range)
+  createLeagueProGrant(grant: InsertLeagueProGrant): Promise<LeagueProGrant>;
+  getLeagueProGrant(id: string): Promise<LeagueProGrant | undefined>;
+  getLeagueProGrantByStripeSession(sessionId: string): Promise<LeagueProGrant | undefined>;
+  getLeagueProGrantsByLeague(leagueId: string): Promise<LeagueProGrant[]>;
+  markLeagueProGrantPaid(id: string, paymentIntentId: string | null): Promise<LeagueProGrant>;
+  getActiveLeagueProGrantsForLeague(leagueId: string, monthYM: string): Promise<LeagueProGrant[]>;
+  getLeagueProSeatsByGrant(grantId: string): Promise<LeagueProSeat[]>;
+  /**
+   * Atomically assign one seat to `userId` under `grantId`, capped at the
+   * grant's `seatCount`. Returns the seat row when newly assigned, the
+   * existing seat row if the user already had one, or `null` when the grant
+   * is full or the user is ineligible.
+   */
+  assignLeagueProSeat(grantId: string, userId: string): Promise<LeagueProSeat | null>;
+  /**
+   * Backfill seats for an existing paid grant by assigning current league
+   * members (in join order) until the grant is full. Used by the webhook
+   * immediately after payment confirmation. Returns the number of newly
+   * assigned seats.
+   */
+  backfillLeagueProSeats(grantId: string): Promise<number>;
+  /** Active seats covering the current month for the given user. */
+  getActiveLeagueProSeatsForUser(userId: string, monthYM: string): Promise<(LeagueProSeat & { grant: LeagueProGrant })[]>;
+  /** Whether `userId` has an active Player Pro seat in `leagueId` for `monthYM`. */
+  userHasActiveLeagueProSeat(userId: string, leagueId: string, monthYM: string): Promise<boolean>;
+
   // Membership operations
   requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership>;
   approveLeagueMembership(membershipId: string, approverId: string): Promise<LeagueMembership>;
@@ -3006,7 +3039,173 @@ export class DatabaseStorage implements IStorage {
     return rejectedRequest;
   }
 
-  // Membership operations
+  // ─── League-wide Player Pro: grants & seats ─────────────────────────────
+  async createLeagueProGrant(grant: InsertLeagueProGrant): Promise<LeagueProGrant> {
+    const [row] = await db.insert(leagueProGrants).values(grant).returning();
+    return row;
+  }
+
+  async getLeagueProGrant(id: string): Promise<LeagueProGrant | undefined> {
+    const [row] = await db.select().from(leagueProGrants).where(eq(leagueProGrants.id, id)).limit(1);
+    return row;
+  }
+
+  async getLeagueProGrantByStripeSession(sessionId: string): Promise<LeagueProGrant | undefined> {
+    const [row] = await db
+      .select()
+      .from(leagueProGrants)
+      .where(eq(leagueProGrants.stripeCheckoutSessionId, sessionId))
+      .limit(1);
+    return row;
+  }
+
+  async getLeagueProGrantsByLeague(leagueId: string): Promise<LeagueProGrant[]> {
+    return db
+      .select()
+      .from(leagueProGrants)
+      .where(eq(leagueProGrants.leagueId, leagueId))
+      .orderBy(desc(leagueProGrants.createdAt));
+  }
+
+  async markLeagueProGrantPaid(id: string, paymentIntentId: string | null): Promise<LeagueProGrant> {
+    const [row] = await db
+      .update(leagueProGrants)
+      .set({
+        status: 'paid',
+        stripePaymentIntentId: paymentIntentId ?? undefined,
+        paidAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(leagueProGrants.id, id))
+      .returning();
+    return row;
+  }
+
+  async getActiveLeagueProGrantsForLeague(leagueId: string, monthYM: string): Promise<LeagueProGrant[]> {
+    return db
+      .select()
+      .from(leagueProGrants)
+      .where(
+        and(
+          eq(leagueProGrants.leagueId, leagueId),
+          eq(leagueProGrants.status, 'paid'),
+          lte(leagueProGrants.startMonth, monthYM),
+          gte(leagueProGrants.endMonth, monthYM),
+        )
+      )
+      .orderBy(asc(leagueProGrants.createdAt));
+  }
+
+  async getLeagueProSeatsByGrant(grantId: string): Promise<LeagueProSeat[]> {
+    return db
+      .select()
+      .from(leagueProSeats)
+      .where(eq(leagueProSeats.grantId, grantId))
+      .orderBy(asc(leagueProSeats.assignedAt));
+  }
+
+  async assignLeagueProSeat(grantId: string, userId: string): Promise<LeagueProSeat | null> {
+    // Atomic insert guarded by a capacity check — uses INSERT ... SELECT so the
+    // check and insert run in one statement and races between concurrent
+    // member-approvals/webhooks don't oversell seats. The (grant_id, user_id)
+    // unique constraint also makes a duplicate-user insert a no-op.
+    const grant = await this.getLeagueProGrant(grantId);
+    if (!grant || grant.status !== 'paid') return null;
+
+    // If already assigned, return existing row instead of failing.
+    const [existing] = await db
+      .select()
+      .from(leagueProSeats)
+      .where(and(eq(leagueProSeats.grantId, grantId), eq(leagueProSeats.userId, userId)))
+      .limit(1);
+    if (existing) return existing;
+
+    const result = await db.execute(sql`
+      INSERT INTO league_pro_seats (grant_id, league_id, user_id)
+      SELECT ${grantId}, ${grant.leagueId}, ${userId}
+      WHERE (
+        SELECT COUNT(*) FROM league_pro_seats WHERE grant_id = ${grantId}
+      ) < ${grant.seatCount}
+      ON CONFLICT (grant_id, user_id) DO NOTHING
+      RETURNING id, grant_id AS "grantId", league_id AS "leagueId", user_id AS "userId", assigned_at AS "assignedAt"
+    `);
+    const rows = (result as any).rows ?? [];
+    return rows[0] ?? null;
+  }
+
+  async backfillLeagueProSeats(grantId: string): Promise<number> {
+    const grant = await this.getLeagueProGrant(grantId);
+    if (!grant || grant.status !== 'paid') return 0;
+
+    const existingSeats = await this.getLeagueProSeatsByGrant(grantId);
+    const remaining = grant.seatCount - existingSeats.length;
+    if (remaining <= 0) return 0;
+    const alreadyAssigned = new Set(existingSeats.map(s => s.userId));
+
+    // Order by approvedAt (join order); fall back to requestedAt for older rows
+    // that pre-date approvedAt being populated.
+    const members = await db
+      .select({ userId: leagueMemberships.userId })
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, grant.leagueId),
+          eq(leagueMemberships.status, 'approved'),
+        )
+      )
+      .orderBy(asc(sql`COALESCE(${leagueMemberships.approvedAt}, ${leagueMemberships.requestedAt})`));
+
+    let assigned = 0;
+    for (const m of members) {
+      if (assigned >= remaining) break;
+      if (alreadyAssigned.has(m.userId)) continue;
+      const seat = await this.assignLeagueProSeat(grantId, m.userId);
+      if (seat) assigned += 1;
+    }
+    return assigned;
+  }
+
+  async getActiveLeagueProSeatsForUser(
+    userId: string,
+    monthYM: string,
+  ): Promise<(LeagueProSeat & { grant: LeagueProGrant })[]> {
+    const rows = await db
+      .select()
+      .from(leagueProSeats)
+      .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
+      .where(
+        and(
+          eq(leagueProSeats.userId, userId),
+          eq(leagueProGrants.status, 'paid'),
+          lte(leagueProGrants.startMonth, monthYM),
+          gte(leagueProGrants.endMonth, monthYM),
+        )
+      );
+    return rows.map(r => ({ ...r.league_pro_seats, grant: r.league_pro_grants }));
+  }
+
+  async userHasActiveLeagueProSeat(
+    userId: string,
+    leagueId: string,
+    monthYM: string,
+  ): Promise<boolean> {
+    const [row] = await db
+      .select({ id: leagueProSeats.id })
+      .from(leagueProSeats)
+      .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
+      .where(
+        and(
+          eq(leagueProSeats.userId, userId),
+          eq(leagueProSeats.leagueId, leagueId),
+          eq(leagueProGrants.status, 'paid'),
+          lte(leagueProGrants.startMonth, monthYM),
+          gte(leagueProGrants.endMonth, monthYM),
+        )
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
   async requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership> {
     const [newMembership] = await db.insert(leagueMemberships).values(membership).returning();
     return newMembership;
@@ -3126,6 +3325,45 @@ export class DatabaseStorage implements IStorage {
         console.error('Error syncing team chat after team assignment:', error);
         // Don't fail the approval if chat sync fails
       }
+    }
+
+    // Auto-assign a Player Pro seat from any active League-Wide Pro grant the
+    // commissioner has paid for. The grant's seatCount cap is enforced inside
+    // assignLeagueProSeat — when grants are full, this is a no-op (player N+1
+    // simply remains free-tier) and we notify them so they understand why.
+    try {
+      const { currentMonth } = await import('./leaguePro');
+      const monthYM = currentMonth();
+      const activeGrants = await this.getActiveLeagueProGrantsForLeague(
+        result.membership.leagueId,
+        monthYM,
+      );
+      let assigned = false;
+      for (const grant of activeGrants) {
+        const seat = await this.assignLeagueProSeat(grant.id, result.membership.userId);
+        if (seat) {
+          assigned = true;
+          break; // one seat per league is enough
+        }
+      }
+      // Player N+1 case: there is at least one active grant in this league but
+      // every seat was already filled in join order. Surface a friendly
+      // notification so the user knows the league's bulk Pro seats are full
+      // and they can still upgrade individually.
+      if (!assigned && activeGrants.length > 0) {
+        await this.createNotification({
+          userId: result.membership.userId,
+          type: 'general',
+          title: 'League Pro seats are full',
+          message:
+            "Your league's Player Pro seats are all taken — you're using the free plan. You can still upgrade individually any time.",
+          actionUrl: '/subscriptions',
+          actionText: 'View Player Pro',
+        });
+      }
+    } catch (error) {
+      console.error('Error auto-assigning league pro seat on approval:', error);
+      // Don't fail the approval — the commissioner can still grant manually.
     }
 
     return result.membership;

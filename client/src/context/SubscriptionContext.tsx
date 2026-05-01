@@ -23,6 +23,13 @@ interface PermissionContextType {
   canAccessPremiumFeatures: () => boolean;
   hasStatManagerAccess: () => boolean;
   isCoCommissionerOfAnyLeague: () => boolean;
+  /**
+   * True if the user has been granted a paid Player Pro seat for the given
+   * league, scoped to the current month. This is the per-league elevation
+   * powered by the commissioner-purchased League-Wide Player Pro flow and is
+   * intentionally NOT a global role bump.
+   */
+  hasLeagueProSeat: (leagueId: string) => boolean;
   // League-specific permission checks
   hasLeagueRole: (leagueId: string, requiredRole: UserRole) => boolean;
   hasAnyLeagueRole: (leagueId: string, roles: UserRole[]) => boolean;
@@ -64,6 +71,14 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
   // active context, regardless of their personal subscription tier.
   const { data: tournamentParticipations = [] } = useQuery<any[]>({
     queryKey: ['/api/user/tournament-participations'],
+    enabled: !!authUser,
+  });
+
+  // Active League-Wide Player Pro seats for the user, scoped to the current
+  // month. Each seat elevates premium access only for that specific league —
+  // never globally, never for other leagues.
+  const { data: leagueProSeats = [] } = useQuery<{ leagueId: string }[]>({
+    queryKey: ['/api/user/league-pro-seats'],
     enabled: !!authUser,
   });
   
@@ -120,9 +135,24 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const hasLeagueProSeat = (leagueId: string): boolean => {
+    if (!leagueId) return false;
+    return leagueProSeats.some((s: any) => s?.leagueId === leagueId);
+  };
+
+  // True only when the dashboard's active context is a league the user
+  // currently holds a paid Player Pro seat in. Mirrors the tournament
+  // elevation pattern — switching the dropdown to a different league should
+  // snap premium gates back on for an otherwise free-tier user.
+  const isActiveLeagueProSeatHolder = (): boolean => {
+    if (selectedType !== 'league' || !selectedId) return false;
+    return hasLeagueProSeat(selectedId);
+  };
+
   const canAccessPremiumFeatures = (): boolean => {
     if (hasRole('player_pro')) return true;
-    return isActiveTournamentParticipant();
+    if (isActiveTournamentParticipant()) return true;
+    return isActiveLeagueProSeatHolder();
   };
 
   const hasStatManagerAccess = (): boolean => {
@@ -221,6 +251,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       canAccessPremiumFeatures,
       hasStatManagerAccess,
       isCoCommissionerOfAnyLeague,
+      hasLeagueProSeat,
       hasLeagueRole,
       hasAnyLeagueRole,
       hasLeagueSpecialPermission,
