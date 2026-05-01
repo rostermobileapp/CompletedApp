@@ -833,45 +833,44 @@ export default function Messages() {
 
   // Single source of truth for the DM scope tuple derived from the dashboard.
   // This is used both when creating a new DM (so it gets stamped with the
-  // active scope) and when filtering the conversation list (so it shows only
-  // DMs from the same scope). useDashboardSelection only ever sets ONE of
-  // selectedLeagueId / selectedTeamId / selectedTournamentId at a time, so
-  // here we expand a team selection into its underlying league as well.
+  // active scope) and when filtering the conversation list (so DMs surface
+  // under the right dashboard). Direct messages are person-to-person and
+  // therefore not team-scoped: a team selection collapses to its league for
+  // DM-matching purposes. Group conversations still respect team scoping.
   const effectiveDmScope = useMemo<{
     leagueId: string | null;
-    teamId: string | null;
     tournamentId: string | null;
   }>(() => {
     if (selectedTournamentId) {
-      return { leagueId: null, teamId: null, tournamentId: selectedTournamentId };
+      return { leagueId: null, tournamentId: selectedTournamentId };
     }
     if (selectedTeamId) {
       const team = (userTeams as any[]).find((t: any) => t.id === selectedTeamId);
-      return { leagueId: team?.leagueId ?? null, teamId: selectedTeamId, tournamentId: null };
+      return { leagueId: team?.leagueId ?? null, tournamentId: null };
     }
     if (selectedLeagueId) {
-      return { leagueId: selectedLeagueId, teamId: null, tournamentId: null };
+      return { leagueId: selectedLeagueId, tournamentId: null };
     }
-    return { leagueId: null, teamId: null, tournamentId: null };
+    return { leagueId: null, tournamentId: null };
   }, [selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
 
   // Filter conversations by selected league, team, or tournament (client-side for instant filtering).
   //
-  // Direct messages are scoped strictly to the (leagueId, teamId, tournamentId)
-  // tuple they were created under — switching the dashboard selector switches
-  // which DM thread you see, and DMs do not leak across teams/leagues/tournaments.
-  // Group conversations (team_group, custom_group, captain_only) keep their
-  // pre-existing scoping behavior because they're inherently tied to a league
-  // or team and don't fragment per dashboard selection.
+  // Direct messages are scoped to the (leagueId, tournamentId) pair they were
+  // created under — they intentionally ignore team selection so a player on
+  // team A can DM a player on team B (or a commissioner with no team) within
+  // the same league without the conversation getting hidden by the dashboard
+  // team filter. Group conversations (team_group, custom_group, captain_only)
+  // keep their pre-existing scoping because they're inherently tied to a
+  // league or team.
   const conversations = useMemo(() => {
     const isDirect = (conv: Conversation) => conv.type === 'direct';
 
     return allConversations.filter(conv => {
       if (isDirect(conv)) {
-        // Direct conversations: exact scope match against the effective tuple.
+        // Direct conversations: match by league + tournament only.
         return (
           (conv.leagueId ?? null) === effectiveDmScope.leagueId &&
-          (conv.teamId ?? null) === effectiveDmScope.teamId &&
           (conv.tournamentId ?? null) === effectiveDmScope.tournamentId
         );
       }

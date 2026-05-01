@@ -14443,43 +14443,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //   actual leagueId (overriding whatever the client sent) so create +
       //   lookup always agree on the full tuple.
       let normalizedLeagueId: string | null = leagueId ?? null;
-      let normalizedTeamId: string | null = teamId ?? null;
       const normalizedTournamentId: string | null = tournamentId ?? null;
 
+      // Direct messages are person-to-person and are never team-scoped: the
+      // recipient may be on a different team (or no team at all), and a
+      // commissioner with no team must still be able to DM any league member.
+      // We only keep a league or tournament tag so the conversation surfaces
+      // under the right dashboard for display-name resolution.
       if (normalizedTournamentId) {
         normalizedLeagueId = null;
-        normalizedTeamId = null;
-      } else if (normalizedTeamId) {
-        const team = await storage.getTeam(normalizedTeamId);
+      } else if (teamId) {
+        // If the caller picked a team scope, derive the league from the team
+        // and drop the team component.
+        const team = await storage.getTeam(teamId);
         if (!team) {
           return res.status(400).json({ message: 'Invalid teamId for conversation scope' });
         }
         normalizedLeagueId = team.leagueId ?? null;
       }
 
-      // The DM is filtered client-side by the recipient's dashboard scope, so
-      // it must be stamped with a scope BOTH participants share. If we'd stamp
-      // a team or league the recipient isn't actually a member of, the
-      // recipient would never see the conversation. Downgrade the scope to
-      // the most-specific one both users share.
-      if (normalizedTeamId) {
-        const recipientTeam = await storage.getTeamMembership(otherUserId, normalizedTeamId);
-        if (!recipientTeam || recipientTeam.status !== 'approved') {
-          normalizedTeamId = null;
-        }
-      }
+      // The DM must land in a scope BOTH participants share. If the recipient
+      // isn't an approved member of the chosen league, fall back to the
+      // global (null) scope so the conversation is visible to both.
       if (normalizedLeagueId) {
         const recipientLeague = await storage.getUserLeagueMembership(otherUserId, normalizedLeagueId);
         if (!recipientLeague || recipientLeague.status !== 'approved') {
           normalizedLeagueId = null;
-          // Without a shared league, a team scope makes no sense either.
-          normalizedTeamId = null;
         }
       }
 
       const scope = {
         leagueId: normalizedLeagueId,
-        teamId: normalizedTeamId,
+        teamId: null, // direct conversations are never team-scoped
         tournamentId: normalizedTournamentId,
       };
 
