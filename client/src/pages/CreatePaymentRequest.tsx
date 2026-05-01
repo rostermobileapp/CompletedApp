@@ -437,7 +437,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
   };
 
   return (
-    <div className="min-h-screen flex flex-col pb-48 bg-background" data-testid="create-payment-request-page" data-page-content>
+    <div className="min-h-screen flex flex-col bg-background pb-[8px]" data-testid="create-payment-request-page" data-page-content>
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center gap-4 mb-6">
@@ -758,7 +758,6 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
           </div>
         </form>
       </div>
-
       <FixedBottomButton>
         <Button
           type="submit"
@@ -778,7 +777,6 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
             : (createPaymentRequestMutation.isPending ? 'Creating...' : 'Create Payment Request')}
         </Button>
       </FixedBottomButton>
-
       {/* Premium Feature Alert */}
       <PremiumFeatureAlert
         open={showPremiumAlert}
