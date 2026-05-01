@@ -340,14 +340,37 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           />
         </div>
       </div>
-      {/* Bottom row: due-date line on the left, action on the right */}
-      <div className="flex items-center justify-between gap-3">
+      {dueLine && (
         <p
-          className={`text-xs truncate ${status === 'overdue' ? theme.text : 'text-muted-foreground'}`}
+          className={`text-xs mb-3 ${status === 'overdue' ? theme.text : 'text-muted-foreground'}`}
           data-testid={`text-due-line-${request.id}`}
         >
-          {dueLine ?? ''}
+          {dueLine}
         </p>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {recipientCount > 0 ? (
+            <div className="flex items-center gap-1 flex-wrap">
+              {recipients.slice(0, 12).map((r: any, i: number) => (
+                <span
+                  key={r.id ?? i}
+                  className={`block w-2 h-2 rounded-full ${
+                    r.isPaid ? theme.dot : 'bg-black/15 dark:bg-white/15'
+                  }`}
+                />
+              ))}
+              {recipientCount > 12 && (
+                <span className="text-[10px] text-muted-foreground ml-1">
+                  +{recipientCount - 12}
+                </span>
+              )}
+            </div>
+          ) : null}
+          <span className="text-xs text-muted-foreground ml-1" data-testid={`text-paid-count-${request.id}`}>
+            {paidCount} / {recipientCount} paid
+          </span>
+        </div>
         {showRemindButton ? (
           <button
             type="button"

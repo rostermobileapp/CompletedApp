@@ -260,10 +260,38 @@ export default function PaymentRequestDetail() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <p className={`text-xs truncate ${status === 'overdue' ? theme.text : 'text-muted-foreground'}`} data-testid="text-due-line">
-              {dueLine ?? ''}
+          {dueLine && (
+            <p
+              className={`text-xs mb-3 ${status === 'overdue' ? theme.text : 'text-muted-foreground'}`}
+              data-testid="text-due-line"
+            >
+              {dueLine}
             </p>
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {totalRecipients > 0 ? (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {recipients.slice(0, 12).map((recipient: any, i: number) => (
+                    <span
+                      key={recipient.id ?? i}
+                      className={`block w-2 h-2 rounded-full ${
+                        recipient.isPaid ? theme.dot : 'bg-black/15 dark:bg-white/15'
+                      }`}
+                    />
+                  ))}
+                  {totalRecipients > 12 && (
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      +{totalRecipients - 12}
+                    </span>
+                  )}
+                </div>
+              ) : null}
+              <span className="text-xs text-muted-foreground ml-1">
+                {paidCount} / {totalRecipients} paid
+              </span>
+            </div>
             {isCreator && status !== 'settled' && unpaidRegisteredCount > 0 ? (
               <button
                 type="button"
