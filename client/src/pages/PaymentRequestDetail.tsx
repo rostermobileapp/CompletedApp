@@ -221,53 +221,34 @@ export default function PaymentRequestDetail() {
         </div>
 
         {/* Payment Summary Card — same visual language as the list cards */}
-        <div className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5 mb-6">
-          {/* Title row + status pill */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold leading-tight" data-testid="text-request-title">
+        <div className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 mb-6">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="min-w-0">
+              <h1 className="font-semibold text-base leading-tight truncate" data-testid="text-request-title">
                 {request.title}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {formatMoney(amountPerPerson)} per player
               </p>
             </div>
-            <span
-              className={`shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${theme.pillBg} ${theme.pillText}`}
-              data-testid="status-pill"
-            >
-              {theme.pillLabel}
-            </span>
+            <div className="shrink-0 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground" data-testid="text-paid-count">
+                {paidCount} / {totalRecipients} paid
+              </span>
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${theme.pillBg} ${theme.pillText}`}
+                data-testid="status-pill"
+              >
+                {theme.pillLabel}
+              </span>
+            </div>
           </div>
 
-          {request.description && (
-            <p className="text-sm text-muted-foreground mb-3" data-testid="text-request-description">
-              {request.description}
-            </p>
-          )}
-
-          {/* Creator avatar/info */}
-          <div className="flex items-center gap-2 mb-3">
-            <Avatar className="w-7 h-7">
-              <AvatarImage src={getImageUrl(request.creator?.profileImageUrl) || ''} />
-              <AvatarFallback className="text-xs">
-                {request.creator?.firstName?.[0]}{request.creator?.lastName?.[0]}
-              </AvatarFallback>
-            </Avatar>
-            <p className="text-xs text-muted-foreground">
-              Created by {request.creator?.firstName} {request.creator?.lastName}
-            </p>
-          </div>
-
-          {/* Collected line + progress bar */}
-          <div className="mb-2">
+          <div className="mb-1.5">
             <div className="flex items-baseline justify-between mb-1">
               <span className="text-xs text-muted-foreground">Collected</span>
               <span className="text-sm font-medium" data-testid="text-collected">
                 {formatMoney(collected)} of {formatMoney(total)}
-                <span className="text-xs text-muted-foreground ml-2" data-testid="text-paid-count">
-                  ({paidCount} / {totalRecipients})
-                </span>
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
@@ -279,15 +260,30 @@ export default function PaymentRequestDetail() {
             </div>
           </div>
 
-          {/* Due-date status line */}
-          {dueLine && (
-            <p
-              className={`text-xs ${status === 'overdue' ? theme.text : 'text-muted-foreground'}`}
-              data-testid="text-due-line"
-            >
-              {dueLine}
+          <div className="flex items-center justify-between gap-3">
+            <p className={`text-xs truncate ${status === 'overdue' ? theme.text : 'text-muted-foreground'}`} data-testid="text-due-line">
+              {dueLine ?? ''}
             </p>
-          )}
+            {isCreator && status !== 'settled' && unpaidRegisteredCount > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!remindMutation.isPending) remindMutation.mutate();
+                }}
+                disabled={remindMutation.isPending}
+                className="shrink-0 inline-flex items-center gap-1 rounded-full border border-[hsl(var(--hairline))] px-3 py-1.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-60"
+                data-testid={`button-remind-unpaid-${request.id}`}
+              >
+                {remindMutation.isPending ? 'Sending…' : 'Remind unpaid'}
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
+            ) : isCreator && status === 'settled' ? (
+              <span className="shrink-0 text-xs text-muted-foreground" data-testid={`text-all-paid-${request.id}`}>
+                All paid
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {/* Recipients List */}
