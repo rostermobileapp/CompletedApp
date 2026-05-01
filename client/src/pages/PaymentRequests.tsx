@@ -350,7 +350,7 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
 
   return (
     <div
-      className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 cursor-pointer hover:border-primary transition-colors"
+      className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 cursor-pointer hover:border-primary transition-colors pt-[4px] pb-[4px] pl-[8px] pr-[8px]"
       onClick={() => {
         setPageTransitionDirection('up');
         navigate(`/payment-requests/${request.id}`);
@@ -374,7 +374,6 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           {theme.pillLabel}
         </span>
       </div>
-
       {/* Collected line + progress bar */}
       <div className="mb-2">
         <div className="flex items-baseline justify-between mb-1.5">
@@ -391,7 +390,6 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           />
         </div>
       </div>
-
       {/* Due / overdue / closed line */}
       {dueLine && (
         <p
@@ -401,7 +399,6 @@ function PaymentRequestCard({ request, isCreator }: { request: any; isCreator: b
           {dueLine}
         </p>
       )}
-
       {/* Bottom row: dots + paid count, action on the right */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
