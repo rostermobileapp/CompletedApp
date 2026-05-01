@@ -437,9 +437,9 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
   };
 
   return (
-    <div className="bg-background pb-48" data-testid="create-payment-request-page" data-page-content>
+    <div className="min-h-screen flex flex-col bg-background pb-48" data-testid="create-payment-request-page" data-page-content>
       {/* Header */}
-      <div className="p-6 pt-12">
+      <div className="p-6 pt-12 flex-1 flex flex-col min-h-0">
         <div className="flex items-center gap-4 mb-6">
           <button
             onClick={() => closeWithSlideDown(isEditing ? `/payment-requests/${editingRequestId}` : '/payment-requests')}
@@ -459,7 +459,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
         </div>
 
         {/* Form */}
-        <form id="create-payment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form id="create-payment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 flex-1 flex flex-col min-h-0">
           {/* Payment Details Card */}
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -569,7 +569,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
           </div>
 
           {/* Recipients Card */}
-          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" />
@@ -650,7 +650,7 @@ export default function CreatePaymentRequest({ editingRequestId }: CreatePayment
 
                 {/* Player List */}
                 <div
-                  className="max-h-[400px] overflow-y-auto pr-1"
+                  className="flex-1 min-h-[200px] overflow-y-auto pr-1"
                   data-testid="recipient-list-scroll"
                 >
                   {filteredPlayers.length === 0 ? (
