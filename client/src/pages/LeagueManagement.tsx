@@ -1551,6 +1551,9 @@ export default function LeagueManagement() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('scheduleFile', file);
+      if (selectedSeasonId) {
+        formData.append('seasonId', selectedSeasonId);
+      }
 
       // Get auth headers from supabase
       const { supabase } = await import('@/lib/supabase');
@@ -2215,6 +2218,7 @@ export default function LeagueManagement() {
       const gameData = {
         ...data,
         leagueId: leagueId,
+        seasonId: selectedSeasonId || undefined,
         scheduledAt: data.scheduledAt,
       };
       const response = await apiRequest('POST', '/api/games', gameData);
@@ -2895,7 +2899,8 @@ export default function LeagueManagement() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowBulkImport(!showBulkImport)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                  disabled={seasons.length === 0}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   data-testid="button-import-players"
                 >
                   <Upload className="w-3 h-3" />
@@ -2903,7 +2908,8 @@ export default function LeagueManagement() {
                 </button>
                 <button
                   onClick={() => setShowManualAddPlayer(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                  disabled={seasons.length === 0}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   data-testid="button-add-player-manually"
                 >
                   <UserPlus className="w-3 h-3" />
@@ -2911,6 +2917,21 @@ export default function LeagueManagement() {
                 </button>
               </div>
             </div>
+
+            {seasons.length === 0 && (
+              <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-sm text-amber-700 dark:text-amber-400 flex-1">
+                  A season is required before importing or adding players.
+                </p>
+                <button
+                  onClick={openNewSeasonWizard}
+                  className="text-sm font-medium text-amber-700 dark:text-amber-400 underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200 shrink-0"
+                >
+                  Create Season
+                </button>
+              </div>
+            )}
 
             {/* Import Panel */}
             {showBulkImport && (
@@ -3729,7 +3750,8 @@ export default function LeagueManagement() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowScheduleImport(!showScheduleImport)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                      disabled={seasons.length === 0}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                       data-testid="button-import-schedules"
                     >
                       <Upload className="w-3 h-3" />
@@ -3737,7 +3759,7 @@ export default function LeagueManagement() {
                     </button>
                     <button
                       onClick={() => setShowScheduleGame(!showScheduleGame)}
-                      disabled={teams.length < 2}
+                      disabled={teams.length < 2 || seasons.length === 0}
                       className="flex items-center gap-2 px-4 py-2 bg-warning text-black rounded-lg text-sm font-medium disabled:opacity-50"
                       data-testid="button-schedule-game"
                     >
@@ -3761,7 +3783,8 @@ export default function LeagueManagement() {
                 <div className="md:hidden flex flex-wrap gap-2">
                   <button
                     onClick={() => setShowScheduleImport(!showScheduleImport)}
-                    className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex-1"
+                    disabled={seasons.length === 0}
+                    className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     data-testid="button-import-schedules"
                   >
                     <Upload className="w-3 h-3" />
@@ -3769,7 +3792,7 @@ export default function LeagueManagement() {
                   </button>
                   <button
                     onClick={() => setShowScheduleGame(!showScheduleGame)}
-                    disabled={teams.length < 2}
+                    disabled={teams.length < 2 || seasons.length === 0}
                     className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex-1 bg-[#289d14] text-[#ffffff]"
                     data-testid="button-schedule-game"
                   >
@@ -3789,7 +3812,22 @@ export default function LeagueManagement() {
                 </div>
               </div>
 
-              {teams.length < 2 && (
+              {seasons.length === 0 && (
+                <div className="flex items-center gap-3 mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <p className="text-sm text-amber-700 dark:text-amber-400 flex-1">
+                    A season is required before scheduling or importing games.
+                  </p>
+                  <button
+                    onClick={openNewSeasonWizard}
+                    className="text-sm font-medium text-amber-700 dark:text-amber-400 underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200 shrink-0"
+                  >
+                    Create Season
+                  </button>
+                </div>
+              )}
+
+              {teams.length < 2 && seasons.length > 0 && (
                 <div className="mb-4 p-3 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     You need at least 2 teams to schedule games. Create teams first.

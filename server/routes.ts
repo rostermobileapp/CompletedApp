@@ -7040,6 +7040,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!hasPermission) {
         return res.status(403).json({ message: "You don't have permission to schedule games. Only team captains, team creators, or league commissioners can schedule games." });
       }
+
+      // Require at least one season for league games
+      if (gameData.leagueId) {
+        const leagueSeasons = await storage.getSeasonsByLeague(gameData.leagueId);
+        if (leagueSeasons.length === 0) {
+          return res.status(400).json({ message: "A season must exist before scheduling league games. Create a season first." });
+        }
+      }
       
       const game = await storage.createGame(gameData);
       const formattedGame = formatGameForResponse(game);
@@ -10449,6 +10457,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can import players' });
       }
 
+      // Require at least one season before importing players
+      const leagueSeasonsForImport = await storage.getSeasonsByLeague(leagueId);
+      if (leagueSeasonsForImport.length === 0) {
+        return res.status(400).json({ message: "A season must exist before importing players. Create a season first." });
+      }
+
       // Read and parse the CSV file
       let fileContent = fs.readFileSync(file.path, 'utf8');
       
@@ -11326,6 +11340,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can import schedules' });
       }
 
+      // Require at least one season before importing schedules
+      const leagueSeasonsForSchedule = await storage.getSeasonsByLeague(leagueId);
+      if (leagueSeasonsForSchedule.length === 0) {
+        return res.status(400).json({ message: "A season must exist before importing schedules. Create a season first." });
+      }
+      const activeSeasonForSchedule = leagueSeasonsForSchedule.find(s => s.isActive) || leagueSeasonsForSchedule[0];
+
       // Read and parse the CSV file
       const fileContent = fs.readFileSync(file.path, 'utf8');
       const parseResults = Papa.parse(fileContent, {
@@ -11570,6 +11591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               await storage.createGame({
                 leagueId: leagueId,
+                seasonId: activeSeasonForSchedule.id,
                 homeTeamId: schedule.homeTeamId,
                 awayTeamId: schedule.awayTeamId,
                 scheduledAt: scheduledAt,
