@@ -658,6 +658,31 @@ export async function requestCaptainReady(
 }
 
 /**
+ * Cancel an awaiting_captains lobby back to `pending` (commissioner-only).
+ * Used when the commissioner wants to abort the lobby and edit setup.
+ */
+export async function cancelDraftToPending(
+  draftId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status !== "awaiting_captains") {
+    return { ok: false, error: "Draft is not in the captain-ready lobby" };
+  }
+  await db
+    .update(drafts)
+    .set({
+      status: "pending",
+      captainReadyState: {},
+      updatedAt: new Date(),
+    })
+    .where(eq(drafts.id, draftId));
+  await broadcastState(draftId);
+  broadcastToDraft(draftId, { type: "draft_lobby_cancelled", payload: { draftId } });
+  return { ok: true };
+}
+
+/**
  * Mark a captain as ready in the awaiting_captains lobby. Idempotent.
  */
 export async function markCaptainReady(
@@ -690,6 +715,24 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   const validation = await validateStartPrereqs(draft);
   if (!validation.ok) return validation;
   const draftOrder = (draft.draftOrder as string[]) || [];
+
+  // If we're transitioning out of the captain-ready lobby, the server enforces
+  // that every captain in the draft order has explicitly confirmed READY. The
+  // commissioner cannot bypass this gate.
+  if (draft.status === "awaiting_captains") {
+    const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
+    const captainIds = teamRows
+      .map((t) => t.captainId)
+      .filter((x): x is string => !!x);
+    const ready = (draft.captainReadyState as Record<string, boolean>) || {};
+    const notReady = captainIds.filter((cid) => !ready[cid]);
+    if (notReady.length) {
+      return {
+        ok: false,
+        error: `Cannot begin: ${notReady.length} captain(s) have not confirmed READY yet`,
+      };
+    }
+  }
 
   // Random goalie draw if configured
   if (draft.goalieMethod === "random_draw") {

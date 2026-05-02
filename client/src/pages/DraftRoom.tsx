@@ -297,6 +297,29 @@ export default function DraftRoom() {
     onError: (err: any) =>
       toast({ title: "Failed to begin draft", description: err?.message, variant: "destructive" }),
   });
+  const resendInvitesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/resend-ready`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) =>
+      toast({
+        title: "Invites resent",
+        description: `Reminders sent to ${data?.sent ?? 0} captain(s).`,
+      }),
+    onError: (err: any) =>
+      toast({ title: "Failed to resend", description: err?.message, variant: "destructive" }),
+  });
+  const cancelLobbyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/cancel-lobby`, {});
+      return res.json();
+    },
+    onSuccess: () =>
+      toast({ title: "Lobby cancelled", description: "Draft is back in setup." }),
+    onError: (err: any) =>
+      toast({ title: "Failed to cancel", description: err?.message, variant: "destructive" }),
+  });
 
   const sendChat = () => {
     const trimmed = chatInput.trim();
@@ -555,6 +578,33 @@ export default function DraftRoom() {
                 >
                   <CheckCircle2 className="w-5 h-5" />
                   You're ready. Waiting on the others...
+                </div>
+              )}
+
+              {isCommissioner && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => resendInvitesMutation.mutate()}
+                    disabled={resendInvitesMutation.isPending}
+                    className="flex-1 px-3 py-2 bg-card border border-border rounded text-sm font-medium hover-elevate active-elevate-2 disabled:opacity-50"
+                    data-testid="button-resend-invites"
+                  >
+                    Resend reminders
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("Cancel the lobby and return to setup?")) {
+                        cancelLobbyMutation.mutate();
+                      }
+                    }}
+                    disabled={cancelLobbyMutation.isPending}
+                    className="flex-1 px-3 py-2 bg-destructive/10 border border-destructive/40 text-destructive rounded text-sm font-medium hover-elevate active-elevate-2 disabled:opacity-50"
+                    data-testid="button-cancel-lobby"
+                  >
+                    Back to setup
+                  </button>
                 </div>
               )}
 

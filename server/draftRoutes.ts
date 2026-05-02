@@ -27,6 +27,7 @@ import {
   undoLastPick,
   requestCaptainReady,
   markCaptainReady,
+  cancelDraftToPending,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -383,7 +384,75 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     }
   });
 
+  // === Commissioner re-sends READY notifications to captains who are not
+  //     yet ready ===
+  app.post("/api/drafts/:draftId/resend-ready", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can resend invites" });
+      }
+      if (draft.status !== "awaiting_captains") {
+        return res.status(400).json({ message: "Draft is not in the captain-ready lobby" });
+      }
+      const draftOrder = (draft.draftOrder as string[]) || [];
+      const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
+      const ready = (draft.captainReadyState as Record<string, boolean>) || {};
+      const pendingCaptains = teamRows
+        .map((t) => t.captainId)
+        .filter((x): x is string => !!x && !ready[x] && x !== userId);
+
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, draft.leagueId));
+      const leagueName = league?.name || "your league";
+      let sent = 0;
+      for (const captainUserId of pendingCaptains) {
+        try {
+          await storage.createNotification({
+            userId: captainUserId,
+            type: "general",
+            title: "Reminder: Draft starting soon",
+            message: `${leagueName} draft is waiting on you. Open the draft and confirm you're ready.`,
+            actionUrl: `/draft/${draftId}`,
+            actionText: "Open draft",
+          });
+          broadcastNotificationUpdate(captainUserId);
+          sent++;
+        } catch (e) {
+          console.error("[draft] failed to resend captain", captainUserId, e);
+        }
+      }
+      res.json({ ok: true, sent, pending: pendingCaptains.length });
+    } catch (err) {
+      console.error("Resend ready error:", err);
+      res.status(500).json({ message: "Failed to resend invites" });
+    }
+  });
+
+  // === Commissioner cancels the lobby back to pending ===
+  app.post("/api/drafts/:draftId/cancel-lobby", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can cancel the lobby" });
+      }
+      const result = await cancelDraftToPending(draftId);
+      if (!result.ok) return res.status(400).json({ message: result.error });
+      res.json({ ok: true, status: "pending" });
+    } catch (err) {
+      console.error("Cancel lobby error:", err);
+      res.status(500).json({ message: "Failed to cancel lobby" });
+    }
+  });
+
   // === Commissioner actually begins the draft (transitions to active) ===
+  // Server-enforced gate: startDraft refuses to transition unless every
+  // captain in draftOrder has confirmed READY.
   app.post("/api/drafts/:draftId/begin", isAuthenticated, async (req: any, res) => {
     try {
       const { draftId } = req.params;
@@ -406,7 +475,8 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
   // Returns drafts where the user is the league commissioner OR is the captain
   // of a team in draftOrder, AND the draft is active/paused/awaiting_captains.
   // Used by the persistent banner so users can return to an in-progress draft
-  // from anywhere in the app.
+  // from anywhere in the app, including live round/captain/deadline info so
+  // the banner can render an inline countdown + pulse.
   app.get("/api/user/active-drafts", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -433,24 +503,73 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         .where(eq(teams.captainId, userId));
       const myTeamIds = new Set(myTeams.map((t) => t.id));
 
+      // Pre-load the team + captain lookup tables for the candidates so we
+      // can attach the current picking captain's display name.
+      const allTeamIds = new Set<string>();
+      for (const row of candidates) {
+        for (const tid of (row.draft.draftOrder as string[]) || []) allTeamIds.add(tid);
+      }
+      const teamRows = allTeamIds.size
+        ? await db.select().from(teams).where(inArray(teams.id, Array.from(allTeamIds)))
+        : [];
+      const teamById = new Map(teamRows.map((t) => [t.id, t]));
+      const captainIds = teamRows
+        .map((t) => t.captainId)
+        .filter((x): x is string => !!x);
+      const captainRows = captainIds.length
+        ? await db.select().from(users).where(inArray(users.id, captainIds))
+        : [];
+      const userById = new Map(captainRows.map((u) => [u.id, u]));
+
       const result: Array<{
         id: string;
         leagueId: string;
         leagueName: string;
         status: string;
         role: "commissioner" | "captain";
+        currentRound: number;
+        totalRounds: number;
+        currentTurn: number;
+        currentTurnDeadline: string | null;
+        pickingCaptainName: string | null;
+        readyCount?: number;
+        captainCount?: number;
       }> = [];
       for (const row of candidates) {
         const isCommish = row.commissionerId === userId;
         const order = (row.draft.draftOrder as string[]) || [];
         const isCaptain = order.some((tid) => myTeamIds.has(tid));
         if (!isCommish && !isCaptain) continue;
+        const idx = (row.draft.currentTurn || 1) - 1;
+        const teamId = order[idx];
+        const team = teamId ? teamById.get(teamId) : null;
+        const cap = team?.captainId ? userById.get(team.captainId) : null;
+        const pickingCaptainName = cap
+          ? (`${cap.firstName || ""} ${cap.lastName || ""}`.trim() ||
+              cap.displayName ||
+              cap.email ||
+              "Captain")
+          : null;
+        const ready =
+          (row.draft.captainReadyState as Record<string, boolean>) || {};
+        const orderCaptainIds = order
+          .map((tid) => teamById.get(tid)?.captainId)
+          .filter((x): x is string => !!x);
         result.push({
           id: row.draft.id,
           leagueId: row.draft.leagueId,
           leagueName: row.leagueName || "League",
           status: row.draft.status,
           role: isCommish ? "commissioner" : "captain",
+          currentRound: row.draft.currentRound || 1,
+          totalRounds: row.draft.totalRounds || 1,
+          currentTurn: row.draft.currentTurn || 1,
+          currentTurnDeadline: row.draft.currentTurnDeadline
+            ? new Date(row.draft.currentTurnDeadline).toISOString()
+            : null,
+          pickingCaptainName,
+          readyCount: orderCaptainIds.filter((cid) => ready[cid]).length,
+          captainCount: orderCaptainIds.length,
         });
       }
       res.json(result);

@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Snowflake, ChevronRight } from "lucide-react";
+import { Snowflake, ChevronRight, Clock, Crown, Hourglass, Pause } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/context/WebSocketContext";
 
@@ -11,10 +11,17 @@ interface ActiveDraft {
   leagueName: string;
   status: "active" | "paused" | "awaiting_captains";
   role: "commissioner" | "captain";
+  currentRound: number;
+  totalRounds: number;
+  currentTurn: number;
+  currentTurnDeadline: string | null;
+  pickingCaptainName: string | null;
+  readyCount?: number;
+  captainCount?: number;
 }
 
-function statusLabel(status: ActiveDraft["status"]) {
-  switch (status) {
+function statusLabel(d: ActiveDraft) {
+  switch (d.status) {
     case "active":
       return "In progress";
     case "paused":
@@ -22,6 +29,99 @@ function statusLabel(status: ActiveDraft["status"]) {
     case "awaiting_captains":
       return "Waiting for captains";
   }
+}
+
+function fmtClock(secs: number): string {
+  const m = Math.max(0, Math.floor(secs / 60));
+  const s = Math.max(0, Math.floor(secs % 60));
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function DraftRow({ draft, onOpen }: { draft: ActiveDraft; onOpen: () => void }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (draft.status !== "active" || !draft.currentTurnDeadline) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [draft.status, draft.currentTurnDeadline]);
+
+  const remainingSec = draft.currentTurnDeadline
+    ? Math.max(0, Math.ceil((new Date(draft.currentTurnDeadline).getTime() - now) / 1000))
+    : 0;
+  const lowTime = draft.status === "active" && remainingSec > 0 && remainingSec < 15;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-amber-400/40 transition-colors border-b last:border-b-0 border-amber-700/20 ${
+        lowTime ? "animate-pulse" : ""
+      }`}
+      data-testid={`button-return-to-draft-${draft.id}`}
+    >
+      <span
+        className={`relative inline-flex w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+          draft.status === "active"
+            ? "bg-emerald-600"
+            : draft.status === "paused"
+              ? "bg-amber-700"
+              : "bg-blue-600"
+        }`}
+        data-testid={`pulse-${draft.id}`}
+      >
+        {draft.status === "active" && (
+          <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+        )}
+      </span>
+      <Snowflake className="w-4 h-4 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold truncate" data-testid={`banner-title-${draft.id}`}>
+          {draft.leagueName} · {statusLabel(draft)}
+        </div>
+        <div className="text-[11px] opacity-90 truncate flex items-center gap-2 mt-0.5">
+          {draft.status === "active" && (
+            <>
+              <span data-testid={`banner-round-${draft.id}`}>
+                Rd {draft.currentRound}/{draft.totalRounds} · Pick {draft.currentTurn}
+              </span>
+              {draft.pickingCaptainName && (
+                <span className="flex items-center gap-1 truncate">
+                  <Crown className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate" data-testid={`banner-captain-${draft.id}`}>
+                    {draft.pickingCaptainName}
+                  </span>
+                </span>
+              )}
+              {draft.currentTurnDeadline && (
+                <span
+                  className={`flex items-center gap-1 font-mono ${lowTime ? "font-bold" : ""}`}
+                  data-testid={`banner-timer-${draft.id}`}
+                >
+                  <Clock className="w-3 h-3" />
+                  {fmtClock(remainingSec)}
+                </span>
+              )}
+            </>
+          )}
+          {draft.status === "paused" && (
+            <span className="flex items-center gap-1">
+              <Pause className="w-3 h-3" /> Rd {draft.currentRound}/{draft.totalRounds} · Paused by commissioner
+            </span>
+          )}
+          {draft.status === "awaiting_captains" && (
+            <span className="flex items-center gap-1">
+              <Hourglass className="w-3 h-3" />
+              {draft.readyCount ?? 0}/{draft.captainCount ?? 0} captains ready
+            </span>
+          )}
+        </div>
+      </div>
+      <span className="text-[11px] font-bold uppercase tracking-wide whitespace-nowrap">
+        Return to draft
+      </span>
+      <ChevronRight className="w-4 h-4 flex-shrink-0" />
+    </button>
+  );
 }
 
 export function ActiveDraftsBanner() {
@@ -37,19 +137,24 @@ export function ActiveDraftsBanner() {
     queryKey: ["/api/user/active-drafts"],
     enabled: !!isAuthenticated && !onDraftRoute,
     refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
 
-  // Refresh the banner whenever a draft transitions on the server.
+  // Refresh the banner whenever a draft transitions or ticks on the server,
+  // so the round / picking captain / deadline stay in sync.
   useEffect(() => {
     if (!isAuthenticated) return;
     const refresh = () =>
       queryClient.invalidateQueries({ queryKey: ["/api/user/active-drafts"] });
     const offs = [
+      ws.subscribe("draft_state", refresh),
+      ws.subscribe("draft_pick_made", refresh),
       ws.subscribe("draft_started", refresh),
       ws.subscribe("draft_paused", refresh),
       ws.subscribe("draft_resumed", refresh),
       ws.subscribe("draft_completed", refresh),
       ws.subscribe("draft_awaiting_captains", refresh),
+      ws.subscribe("draft_lobby_cancelled", refresh),
     ];
     return () => {
       offs.forEach((o) => o());
@@ -59,38 +164,18 @@ export function ActiveDraftsBanner() {
   if (onDraftRoute) return null;
   if (!activeDrafts.length) return null;
 
-  // If there's exactly one, show a single-line banner. If there are multiple
-  // we still show a single banner that opens to a list-on-tap.
-  const primary = activeDrafts[0];
-  const extra = activeDrafts.length - 1;
-
   return (
     <div
       className="sticky top-0 z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black border-b border-amber-700/30 shadow-sm"
       data-testid="active-drafts-banner"
     >
-      <button
-        type="button"
-        onClick={() => setLocation(`/draft/${primary.id}`)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-amber-400/40 transition-colors"
-        data-testid="button-return-to-draft"
-      >
-        <Snowflake className="w-4 h-4 flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold truncate">
-            {primary.leagueName} draft · {statusLabel(primary.status)}
-          </div>
-          {extra > 0 && (
-            <div className="text-[10px] opacity-80">
-              and {extra} other active draft{extra === 1 ? "" : "s"}
-            </div>
-          )}
-        </div>
-        <span className="text-xs font-bold uppercase tracking-wide">
-          Return to draft
-        </span>
-        <ChevronRight className="w-4 h-4" />
-      </button>
+      {activeDrafts.map((d) => (
+        <DraftRow
+          key={d.id}
+          draft={d}
+          onOpen={() => setLocation(`/draft/${d.id}`)}
+        />
+      ))}
     </div>
   );
 }
