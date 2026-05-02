@@ -43,7 +43,9 @@ import {
   Shield,
   AlertCircle as AlertIcon,
   User,
-  Search
+  Search,
+  Zap,
+  Snowflake
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema, type LeagueProGrant } from '@shared/schema';
 
@@ -786,6 +788,24 @@ export default function LeagueManagement() {
       return response.json();
     },
   });
+
+  // Fetch existing draft for the selected season so we can show Launch vs Setup buttons
+  const { data: existingDraftData } = useQuery<{ draft: any } | null>({
+    queryKey: ['/api/leagues', leagueId, 'seasons', selectedSeasonId, 'draft'],
+    queryFn: async () => {
+      if (!leagueId || !selectedSeasonId) return null;
+      try {
+        const res = await apiRequest('GET', `/api/leagues/${leagueId}/seasons/${selectedSeasonId}/draft`);
+        if (!res.ok) return null;
+        return res.json();
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!leagueId && !!selectedSeasonId,
+    retry: false,
+  });
+  const existingDraft = existingDraftData?.draft ?? null;
 
   // Fetch seasons for this league
   const { data: seasons = [], refetch: refetchSeasons, isLoading: seasonsLoading } = useQuery<Season[]>({
@@ -2575,6 +2595,22 @@ export default function LeagueManagement() {
     },
   });
 
+  // Launch a saved-but-not-started draft directly (without re-opening the wizard)
+  const launchDraftMutation = useMutation({
+    mutationFn: async (draftId: string) => {
+      const res = await apiRequest('POST', `/api/drafts/${draftId}/start`, {});
+      return res.json();
+    },
+    onSuccess: (_data, draftId) => {
+      toast({ title: 'Draft launched!', description: 'Captains have been notified to get ready.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'seasons', selectedSeasonId, 'draft'] });
+      navigate(`/draft/${draftId}`);
+    },
+    onError: (err: any) => {
+      toast({ title: 'Failed to launch draft', description: err?.message || 'Please try again.', variant: 'destructive' });
+    },
+  });
+
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   // All users now have commissioner access to manage leagues
 
@@ -2743,15 +2779,54 @@ export default function LeagueManagement() {
               New Season
             </button>
             {selectedSeasonId && teams.length >= 2 && (
-              <button
-                onClick={() => setShowDraftWizard(true)}
-                className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
-                data-testid="button-setup-draft"
-                title="Set up player draft for this season"
-              >
-                <Crown className="w-4 h-4" />
-                Setup Draft
-              </button>
+              <>
+                {/* No draft configured yet (or completed): offer full setup */}
+                {(!existingDraft || existingDraft.status === 'completed') && (
+                  <button
+                    onClick={() => setShowDraftWizard(true)}
+                    className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
+                    data-testid="button-setup-draft"
+                    title="Set up player draft for this season"
+                  >
+                    <Crown className="w-4 h-4" />
+                    Setup Draft
+                  </button>
+                )}
+                {/* Draft saved but not yet launched: edit config OR launch now */}
+                {existingDraft && existingDraft.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => setShowDraftWizard(true)}
+                      className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
+                      data-testid="button-edit-draft"
+                      title="Edit draft configuration"
+                    >
+                      <Crown className="w-4 h-4" />
+                      Edit Draft
+                    </button>
+                    <button
+                      onClick={() => launchDraftMutation.mutate(existingDraft.id)}
+                      disabled={launchDraftMutation.isPending}
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                      data-testid="button-launch-draft"
+                    >
+                      <Zap className="w-4 h-4" />
+                      {launchDraftMutation.isPending ? 'Launching…' : 'Launch Draft'}
+                    </button>
+                  </>
+                )}
+                {/* Draft in progress or paused: go straight to the room */}
+                {existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status) && (
+                  <button
+                    onClick={() => navigate(`/draft/${existingDraft.id}`)}
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center gap-1.5"
+                    data-testid="button-view-draft"
+                  >
+                    <Snowflake className="w-4 h-4" />
+                    View Draft
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -2878,15 +2953,53 @@ export default function LeagueManagement() {
               <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Crown className="w-4 h-4 text-primary shrink-0" />
-                  <span>No players assigned to teams yet — want to run a draft instead?</span>
+                  <span>
+                    {existingDraft && existingDraft.status === 'pending'
+                      ? 'Draft is configured and ready — launch it when you\'re set.'
+                      : existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status)
+                      ? 'A draft is currently in progress.'
+                      : 'No players assigned to teams yet — want to run a draft instead?'}
+                  </span>
                 </div>
-                <button
-                  onClick={() => setShowDraftWizard(true)}
-                  className="shrink-0 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
-                  data-testid="button-setup-draft-players-tab"
-                >
-                  Set up draft
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {(!existingDraft || existingDraft.status === 'completed') && (
+                    <button
+                      onClick={() => setShowDraftWizard(true)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                      data-testid="button-setup-draft-players-tab"
+                    >
+                      Set up draft
+                    </button>
+                  )}
+                  {existingDraft && existingDraft.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => setShowDraftWizard(true)}
+                        className="px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-xs font-medium"
+                        data-testid="button-edit-draft-players-tab"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => launchDraftMutation.mutate(existingDraft.id)}
+                        disabled={launchDraftMutation.isPending}
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium disabled:opacity-50"
+                        data-testid="button-launch-draft-players-tab"
+                      >
+                        {launchDraftMutation.isPending ? 'Launching…' : 'Launch Draft'}
+                      </button>
+                    </>
+                  )}
+                  {existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status) && (
+                    <button
+                      onClick={() => navigate(`/draft/${existingDraft.id}`)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                      data-testid="button-view-draft-players-tab"
+                    >
+                      View Draft
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -3369,15 +3482,53 @@ export default function LeagueManagement() {
               <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Crown className="w-4 h-4 text-primary shrink-0" />
-                  <span>Players aren't assigned to teams yet — run a draft to fill the rosters?</span>
+                  <span>
+                    {existingDraft && existingDraft.status === 'pending'
+                      ? 'Draft is configured and ready — launch it when you\'re set.'
+                      : existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status)
+                      ? 'A draft is currently in progress.'
+                      : 'Players aren\'t assigned to teams yet — run a draft to fill the rosters?'}
+                  </span>
                 </div>
-                <button
-                  onClick={() => setShowDraftWizard(true)}
-                  className="shrink-0 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
-                  data-testid="button-setup-draft-teams-tab"
-                >
-                  Set up draft
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {(!existingDraft || existingDraft.status === 'completed') && (
+                    <button
+                      onClick={() => setShowDraftWizard(true)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                      data-testid="button-setup-draft-teams-tab"
+                    >
+                      Set up draft
+                    </button>
+                  )}
+                  {existingDraft && existingDraft.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => setShowDraftWizard(true)}
+                        className="px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-xs font-medium"
+                        data-testid="button-edit-draft-teams-tab"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => launchDraftMutation.mutate(existingDraft.id)}
+                        disabled={launchDraftMutation.isPending}
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium disabled:opacity-50"
+                        data-testid="button-launch-draft-teams-tab"
+                      >
+                        {launchDraftMutation.isPending ? 'Launching…' : 'Launch Draft'}
+                      </button>
+                    </>
+                  )}
+                  {existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status) && (
+                    <button
+                      onClick={() => navigate(`/draft/${existingDraft.id}`)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                      data-testid="button-view-draft-teams-tab"
+                    >
+                      View Draft
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
