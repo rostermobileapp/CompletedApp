@@ -475,7 +475,12 @@ export default function DraftRoom() {
                 .filter((t: any) => draft.draftOrder.includes(t.id))
                 .map((t: any) => t.captainId)
                 .filter(Boolean) as string[];
-              const allReady = captainIds.every((cid) => ready[cid]) && captainIds.length > 0;
+              // Match server logic: when there are no captains assigned the
+              // server will accept /begin, so we don't dead-end the UI; if a
+              // commissioner manages to reach the lobby with zero captains we
+              // surface a clearer hint instead of a permanently disabled button.
+              const noCaptains = captainIds.length === 0;
+              const allReady = noCaptains || captainIds.every((cid) => ready[cid]);
               return (
                 <button
                   onClick={() => beginMutation.mutate()}
@@ -483,9 +488,11 @@ export default function DraftRoom() {
                   className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm font-medium flex items-center gap-1 disabled:opacity-50"
                   data-testid="button-begin-draft"
                   title={
-                    allReady
-                      ? "All captains are ready — begin the draft"
-                      : "Waiting for all captains to confirm READY"
+                    noCaptains
+                      ? "No captains assigned — assign captains in setup if you need a captain-ready lobby"
+                      : allReady
+                        ? "All captains are ready — begin the draft"
+                        : "Waiting for all captains to confirm READY"
                   }
                 >
                   <Snowflake className="w-4 h-4" /> Begin
