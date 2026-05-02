@@ -28,6 +28,7 @@ import {
   requestCaptainReady,
   markCaptainReady,
   cancelDraftToPending,
+  computePickingTeam,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -540,8 +541,22 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         const order = (row.draft.draftOrder as string[]) || [];
         const isCaptain = order.some((tid) => myTeamIds.has(tid));
         if (!isCommish && !isCaptain) continue;
-        const idx = (row.draft.currentTurn || 1) - 1;
-        const teamId = order[idx];
+        // Use the same snake/linear-aware logic as the engine so the banner
+        // shows the correct captain for the current turn (matters in even
+        // rounds of a snake draft where order reverses).
+        const style =
+          (row.draft.draftStyle as string) ||
+          (row.draft as any).roundType ||
+          "snake";
+        const teamId =
+          row.draft.status === "active" || row.draft.status === "paused"
+            ? computePickingTeam(
+                order,
+                row.draft.currentRound || 1,
+                row.draft.currentTurn || 1,
+                style,
+              )
+            : null;
         const team = teamId ? teamById.get(teamId) : null;
         const cap = team?.captainId ? userById.get(team.captainId) : null;
         const pickingCaptainName = cap

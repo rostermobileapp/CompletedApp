@@ -23,6 +23,25 @@ import {
 type DraftStyle = "snake" | "linear" | "auction" | "3rd_round_reversal";
 type GoalieMethod = "commissioner_assigned" | "random_draw" | "included_with_skaters";
 type TimerExpiryRule = "auto_pick" | "halve_next";
+
+function timerRuleLabel(rule: TimerExpiryRule): string {
+  if (rule === "halve_next")
+    return "+30s extension, then halve your next pick's timer";
+  return "Auto-pick best available";
+}
+
+function goalieMethodLabel(m: string): string {
+  switch (m) {
+    case "included_with_skaters":
+      return "Included with skaters";
+    case "commissioner_assigned":
+      return "Commissioner assigned";
+    case "random_draw":
+      return "Random draw";
+    default:
+      return m.replace(/_/g, " ");
+  }
+}
 type SkillScale = "letters" | "numbers" | null;
 
 interface Member {
@@ -762,10 +781,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 <Lock className="w-4 h-4" /> Review & Lock
               </h3>
               <div className="space-y-2 text-sm">
+                <Row label="Goalies" value={goalieMethodLabel(goalieMethod)} onEdit={() => goTo("goalies")} />
                 <Row label="Style" value={draftStyle.replace(/_/g, " ")} onEdit={() => goTo("format")} />
                 <Row label="Rounds" value={`${totalRounds}`} onEdit={() => goTo("format")} />
-                <Row label="Goalies" value={goalieMethod.replace(/_/g, " ")} onEdit={() => goTo("goalies")} />
-                <Row label="Timer" value={`${timePerPick}s · ${timerExpiryRule.replace(/_/g, " ")}`} onEdit={() => goTo("timer")} />
+                <Row label="Timer" value={`${timePerPick}s · ${timerRuleLabel(timerExpiryRule)}`} onEdit={() => goTo("timer")} />
                 <Row
                   label="Skill ranking"
                   value={skillRankingEnabled ? `On (${skillScale})` : "Off"}
