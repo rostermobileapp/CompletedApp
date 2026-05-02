@@ -296,7 +296,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-background rounded-t-2xl sm:rounded-2xl hairline elev-inset w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+      <div className="bg-background rounded-t-2xl sm:rounded-2xl hairline elev-inset w-full sm:max-w-3xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col">
         <div className="p-5 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -801,7 +801,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
           )}
         </div>
 
-        <div className="border-t border-border p-4 flex gap-2">
+        <div className="border-t border-border p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] flex gap-2 shrink-0">
           {stepIdx > 0 ? (
             <button
               onClick={prev}
