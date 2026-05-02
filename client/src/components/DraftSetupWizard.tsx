@@ -86,7 +86,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // Format
   const [draftStyle, setDraftStyle] = useState<DraftStyle>("snake");
   const [draftOrder, setDraftOrder] = useState<string[]>(teams.map((t) => t.id));
-  const [totalRounds, setTotalRounds] = useState<number>(Math.max(8, teams.length));
+  const [totalRounds, setTotalRounds] = useState<number>(8);
 
   // Goalies
   const [goalieMethod, setGoalieMethod] = useState<GoalieMethod>("included_with_skaters");
@@ -115,6 +115,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // draft, after a window focus) doesn't blow away in-progress edits to the
   // notes textareas.
   const hydratedRef = useRef(false);
+
+  // Tracks whether the user has manually edited totalRounds. If they have, we
+  // stop auto-suggesting rounds based on goalie method / roster size.
+  const userOverrodeRoundsRef = useRef(false);
 
   // Load league members
   const { data: members = [] } = useQuery<Member[]>({
@@ -147,10 +151,34 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       if (d.playerNotes && typeof d.playerNotes === "object") setPlayerNotes(d.playerNotes);
       if (d.goalieAssignments) setGoalieAssignments(d.goalieAssignments);
       if (Array.isArray(d.draftOrder) && d.draftOrder.length) setDraftOrder(d.draftOrder);
-      if (d.totalRounds) setTotalRounds(d.totalRounds);
+      if (d.totalRounds) {
+        setTotalRounds(d.totalRounds);
+        // Persisted rounds count as a user override — preserve it.
+        userOverrodeRoundsRef.current = true;
+      }
       if (existing.buddyPairs?.length) setBuddyPairs(existing.buddyPairs.map((p) => p.userIds));
     }
   }, [existing]);
+
+  // Auto-suggest totalRounds based on roster size + goalie method, until the
+  // user manually edits the value. The suggestion uses (skaters / teams)
+  // when goalies are pulled out (commissioner_assigned / random_draw) and
+  // ((skaters + goalies) / teams) when goalies are drafted as skaters.
+  const suggestedRounds = useMemo(() => {
+    const teamCount = Math.max(1, draftOrder.length || 0);
+    const skaters = members.filter((m) => !m.membership.isGoalie).length;
+    const goalies = members.filter((m) => m.membership.isGoalie).length;
+    const drafterPool =
+      goalieMethod === "included_with_skaters" ? skaters + goalies : skaters;
+    if (drafterPool === 0) return 8;
+    return Math.max(1, Math.ceil(drafterPool / teamCount));
+  }, [members, draftOrder.length, goalieMethod]);
+
+  useEffect(() => {
+    if (!userOverrodeRoundsRef.current) {
+      setTotalRounds(suggestedRounds);
+    }
+  }, [suggestedRounds]);
 
   // Initialize skillLevels from existing memberships
   useEffect(() => {
@@ -319,7 +347,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   min={1}
                   max={50}
                   value={totalRounds}
-                  onChange={(e) => setTotalRounds(parseInt(e.target.value) || 1)}
+                  onChange={(e) => {
+                    userOverrodeRoundsRef.current = true;
+                    setTotalRounds(parseInt(e.target.value) || 1);
+                  }}
                   className="w-32 p-2 bg-card border border-border rounded-lg"
                   data-testid="input-total-rounds"
                 />
@@ -683,28 +714,44 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 <StickyNote className="w-4 h-4" /> Player Notes (optional)
               </h3>
               <p className="text-sm text-muted-foreground">
-                These notes appear on the trading-card overlay during the draft. Max 200 chars.
+                These notes appear on the trading-card overlay during the draft. Max 200 chars per player.
               </p>
               <div className="border border-border rounded-lg max-h-96 overflow-y-auto divide-y divide-border">
-                {members.map((m) => (
-                  <div key={m.user.id} className="p-2">
-                    <div className="text-sm font-medium mb-1">{memberName(m)}</div>
-                    <textarea
-                      value={playerNotes[m.user.id] || ""}
-                      onChange={(e) =>
-                        setPlayerNotes((prev) => ({
-                          ...prev,
-                          [m.user.id]: e.target.value.slice(0, 200),
-                        }))
-                      }
-                      placeholder="e.g. Plays defense, fast skater..."
-                      maxLength={200}
-                      rows={1}
-                      className="w-full p-2 bg-card border border-border rounded text-xs resize-none"
-                      data-testid={`textarea-note-${m.user.id}`}
-                    />
-                  </div>
-                ))}
+                {members.map((m) => {
+                  const noteVal = playerNotes[m.user.id] || "";
+                  const remaining = 200 - noteVal.length;
+                  return (
+                    <div key={m.user.id} className="p-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-sm font-medium">{memberName(m)}</div>
+                        <div
+                          className={`text-[10px] font-mono tabular-nums ${
+                            remaining < 20
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-muted-foreground"
+                          }`}
+                          data-testid={`note-charcount-${m.user.id}`}
+                        >
+                          {noteVal.length}/200
+                        </div>
+                      </div>
+                      <textarea
+                        value={noteVal}
+                        onChange={(e) =>
+                          setPlayerNotes((prev) => ({
+                            ...prev,
+                            [m.user.id]: e.target.value.slice(0, 200),
+                          }))
+                        }
+                        placeholder="e.g. Plays defense, fast skater..."
+                        maxLength={200}
+                        rows={1}
+                        className="w-full p-2 bg-card border border-border rounded text-xs resize-none"
+                        data-testid={`textarea-note-${m.user.id}`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Hourglass,
   Zap,
+  StickyNote,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -101,6 +102,14 @@ export default function DraftRoom() {
   const [showChat, setShowChat] = useState(false);
   const [cardUserId, setCardUserId] = useState<string | null>(null);
   const [teamPanelId, setTeamPanelId] = useState<string | null>(null);
+  // In-room buzzer banner: shown for ~6s when the engine fires
+  // draft_buzzer_extension on this draft.
+  const [buzzerBanner, setBuzzerBanner] = useState<{ at: number } | null>(null);
+  useEffect(() => {
+    if (!buzzerBanner) return;
+    const id = setTimeout(() => setBuzzerBanner(null), 6000);
+    return () => clearTimeout(id);
+  }, [buzzerBanner]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const serverDriftRef = useRef(0);
 
@@ -152,6 +161,7 @@ export default function DraftRoom() {
     });
     const offBuzzer = ws.subscribe("draft_buzzer_extension", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
+      setBuzzerBanner({ at: Date.now() });
       toast({
         title: "Buzzer! +30s",
         description:
@@ -371,6 +381,19 @@ export default function DraftRoom() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Buzzer banner — shown for ~6s after a halve_next timer expiry */}
+      {buzzerBanner && (
+        <div
+          className="sticky top-0 z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black px-4 py-2 flex items-center gap-2 font-semibold text-sm animate-pulse border-b border-amber-700/40"
+          data-testid="buzzer-banner"
+        >
+          <Zap className="w-4 h-4 flex-shrink-0" />
+          <span>
+            Buzzer! +30 seconds added — captain's next pick will be on a halved
+            timer.
+          </span>
+        </div>
+      )}
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background border-b border-border">
         <div className="flex items-center justify-between p-3 gap-2">
@@ -686,8 +709,18 @@ export default function DraftRoom() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium truncate">
-                      {m.user.firstName || m.user.displayName || m.user.email}
+                    <div className="text-xs font-medium truncate flex items-center gap-1">
+                      <span className="truncate">
+                        {m.user.firstName || m.user.displayName || m.user.email}
+                      </span>
+                      {!!(draft.playerNotes || {})[m.user.id] && (
+                        <StickyNote
+                          className="w-3 h-3 text-amber-500 flex-shrink-0"
+                          data-testid={`note-indicator-${m.user.id}`}
+                        >
+                          <title>Has scouting note</title>
+                        </StickyNote>
+                      )}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
                       {m.user.lastName || ""}

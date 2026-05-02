@@ -164,18 +164,32 @@ export function ActiveDraftsBanner() {
   if (onDraftRoute) return null;
   if (!activeDrafts.length) return null;
 
+  // Cap the banner at 2 stacked rows; if more, show a "+N more" hint that
+  // links to the user's leagues so they can pick which to enter.
+  const MAX_ROWS = 2;
+  const visible = activeDrafts.slice(0, MAX_ROWS);
+  const overflow = activeDrafts.length - visible.length;
+
   return (
     <div
       className="sticky top-0 z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black border-b border-amber-700/30 shadow-sm"
       data-testid="active-drafts-banner"
     >
-      {activeDrafts.map((d) => (
+      {visible.map((d) => (
         <DraftRow
           key={d.id}
           draft={d}
           onOpen={() => setLocation(`/draft/${d.id}`)}
         />
       ))}
+      {overflow > 0 && (
+        <div
+          className="px-3 py-1 text-[11px] font-medium text-amber-900 bg-amber-400/60 border-t border-amber-700/20"
+          data-testid="banner-overflow"
+        >
+          +{overflow} more active draft{overflow === 1 ? "" : "s"}
+        </div>
+      )}
     </div>
   );
 }
