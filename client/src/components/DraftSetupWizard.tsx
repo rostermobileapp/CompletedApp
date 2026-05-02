@@ -18,6 +18,7 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  Crown,
 } from "lucide-react";
 
 type DraftStyle = "snake" | "linear" | "auction" | "3rd_round_reversal";
@@ -78,6 +79,7 @@ interface Props {
 }
 
 const STEPS = [
+  { id: "captains", label: "Captains" },
   { id: "goalies", label: "Goalies" },
   { id: "format", label: "Format" },
   { id: "timer", label: "Timer" },
@@ -101,6 +103,16 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   const queryClient = useQueryClient();
   const [stepIdx, setStepIdx] = useState(0);
   const stepId: StepId = STEPS[stepIdx].id;
+
+  // Captains
+  const [captainAssignments, setCaptainAssignments] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const t of teams) {
+      if (t.captainId) init[t.id] = t.captainId;
+    }
+    return init;
+  });
+  const [captainSearch, setCaptainSearch] = useState("");
 
   // Format
   const [draftStyle, setDraftStyle] = useState<DraftStyle>("snake");
@@ -169,6 +181,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       if (d.skillScale) setSkillScale(d.skillScale);
       if (d.playerNotes && typeof d.playerNotes === "object") setPlayerNotes(d.playerNotes);
       if (d.goalieAssignments) setGoalieAssignments(d.goalieAssignments);
+      if (d.captainAssignments) setCaptainAssignments(d.captainAssignments);
       if (Array.isArray(d.draftOrder) && d.draftOrder.length) setDraftOrder(d.draftOrder);
       if (d.totalRounds) {
         setTotalRounds(d.totalRounds);
@@ -235,6 +248,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         playerNotes,
         buddyPairs: buddyPairs.length ? buddyPairs : undefined,
         goalieAssignments: goalieMethod === "commissioner_assigned" ? goalieAssignments : undefined,
+        captainAssignments: Object.keys(captainAssignments).length ? captainAssignments : undefined,
         draftOrder,
         totalRounds,
       };
@@ -328,6 +342,80 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {stepId === "captains" && (
+            <div className="space-y-4" data-testid="step-captains">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Crown className="w-4 h-4" /> Assign Team Captains
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Captains make picks during the draft. Assign one member per team.
+              </p>
+
+              {members.length > 0 && (
+                <input
+                  type="text"
+                  value={captainSearch}
+                  onChange={(e) => setCaptainSearch(e.target.value)}
+                  placeholder="Filter members..."
+                  className="w-full p-2 bg-card border border-border rounded-lg text-sm"
+                  data-testid="input-captain-search"
+                />
+              )}
+
+              <div className="space-y-2">
+                {teams.map((team) => {
+                  const assignedId = captainAssignments[team.id] || "";
+                  const assignedMember = members.find((m) => m.user.id === assignedId);
+                  const filtered = members.filter((m) => {
+                    const q = captainSearch.trim().toLowerCase();
+                    return !q || memberName(m).toLowerCase().includes(q);
+                  });
+                  return (
+                    <div
+                      key={team.id}
+                      className="p-3 bg-card border border-border rounded-lg space-y-2"
+                      data-testid={`captain-row-${team.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{team.name}</span>
+                        {assignedMember && (
+                          <span className="text-xs text-primary font-medium flex items-center gap-1">
+                            <Crown className="w-3 h-3" />
+                            {memberName(assignedMember)}
+                          </span>
+                        )}
+                      </div>
+                      <select
+                        value={assignedId}
+                        onChange={(e) =>
+                          setCaptainAssignments((prev) => ({
+                            ...prev,
+                            [team.id]: e.target.value,
+                          }))
+                        }
+                        className="w-full p-2 bg-background border border-border rounded text-sm"
+                        data-testid={`select-captain-${team.id}`}
+                      >
+                        <option value="">— Select captain —</option>
+                        {filtered.map((m) => (
+                          <option key={m.user.id} value={m.user.id}>
+                            {memberName(m)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {teams.some((t) => !captainAssignments[t.id]) && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Teams without a captain can still draft — the commissioner picks for them.
+                </p>
+              )}
+            </div>
+          )}
+
           {stepId === "format" && (
             <div className="space-y-4" data-testid="step-format">
               <div className="space-y-2">
@@ -781,6 +869,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 <Lock className="w-4 h-4" /> Review & Lock
               </h3>
               <div className="space-y-2 text-sm">
+                <Row
+                  label="Captains"
+                  value={`${Object.values(captainAssignments).filter(Boolean).length} of ${teams.length} assigned`}
+                  onEdit={() => goTo("captains")}
+                />
                 <Row label="Goalies" value={goalieMethodLabel(goalieMethod)} onEdit={() => goTo("goalies")} />
                 <Row label="Style" value={draftStyle.replace(/_/g, " ")} onEdit={() => goTo("format")} />
                 <Row label="Rounds" value={`${totalRounds}`} onEdit={() => goTo("format")} />

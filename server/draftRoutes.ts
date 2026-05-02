@@ -253,6 +253,15 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           }
         }
 
+        // Apply captain assignments directly to teams (commissioner-trusted, pre-draft)
+        if (config.captainAssignments) {
+          for (const [teamId, captainUserId] of Object.entries(config.captainAssignments)) {
+            if (captainUserId) {
+              await db.update(teams).set({ captainId: captainUserId }).where(eq(teams.id, teamId));
+            }
+          }
+        }
+
         // Persist skill levels (per-user) onto leagueMemberships if provided
         if (config.skillLevels) {
           for (const [userIdSkill, tier] of Object.entries(config.skillLevels)) {

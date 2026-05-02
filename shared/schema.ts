@@ -2758,6 +2758,7 @@ export const draftSetupConfigSchema = z.object({
   playerNotes: z.record(z.string(), z.string().max(200)).optional(),
   buddyPairs: z.array(z.array(z.string()).min(2)).optional(),
   goalieAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
+  captainAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
   draftOrder: z.array(z.string()).optional(), // teamId order
 });
 export type DraftSetupConfig = z.infer<typeof draftSetupConfigSchema>;
