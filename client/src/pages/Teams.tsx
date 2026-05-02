@@ -99,31 +99,35 @@ export default function Teams() {
   // a user with teams across multiple leagues only sees the team(s) for
   // the league they currently have selected. Tournament selections show
   // no league teams at all (handled in the render branch above).
-  const displayedTeams = (() => {
+  //
+  // Season awareness: when the league has season-tagged teams but none
+  // belong to an active season, return [] + set isNewSeasonNoTeam=true
+  // instead of falling back to stale prior-season teams. This gives the
+  // user a clear "new season started" empty state rather than showing
+  // old data that no longer applies.
+  const { displayedTeams, isNewSeasonNoTeam } = (() => {
     const all = userTeams as any[];
-    if (selectedType === 'tournament') return [];
+    if (selectedType === 'tournament') return { displayedTeams: [], isNewSeasonNoTeam: false };
     if (selectedType === 'team' && selectedTeamId) {
-      return all.filter((t: any) => t.id === selectedTeamId);
+      return { displayedTeams: all.filter((t: any) => t.id === selectedTeamId), isNewSeasonNoTeam: false };
     }
     if (selectedType === 'league' && (selectedLeagueId || selectedTournamentId === null)) {
       const id = selectedLeagueId;
-      if (!id) return all;
+      if (!id) return { displayedTeams: all, isNewSeasonNoTeam: false };
       const leagueTeams = all.filter((t: any) => t.leagueId === id);
-      // If any teams in this league are season-tagged, show only the active season's
-      // teams (plus any legacy no-season teams). This prevents old seasons' teams
-      // from appearing on My Team when the user has the league selected.
       const hasSeasonedTeams = leagueTeams.some((t: any) => t.seasonId);
       if (hasSeasonedTeams) {
         const activeSeasonTeams = leagueTeams.filter(
           (t: any) => t.seasonId === null || t.seasonIsActive === true
         );
-        // If the active season filter yields at least one team, use it. Otherwise
-        // fall back to all league teams so the page is never accidentally blank.
-        if (activeSeasonTeams.length > 0) return activeSeasonTeams;
+        if (activeSeasonTeams.length > 0) return { displayedTeams: activeSeasonTeams, isNewSeasonNoTeam: false };
+        // All of the user's teams in this league are from an inactive season — a
+        // new season has started and they haven't been assigned to a team yet.
+        return { displayedTeams: [], isNewSeasonNoTeam: true };
       }
-      return leagueTeams;
+      return { displayedTeams: leagueTeams, isNewSeasonNoTeam: false };
     }
-    return all;
+    return { displayedTeams: all, isNewSeasonNoTeam: false };
   })();
 
   // Define current team early so it can be used in subsequent queries.
@@ -298,19 +302,49 @@ export default function Teams() {
     enabled: !!currentTeam?.leagueId && !!teamMembers && teamMembers.length > 0,
   });
 
-  // Fetch league standings — scoped to the current team's season so prior-season
-  // results don't bleed through when the user switches to a new season's team.
+  // Effective league id for season/standings queries — use the selected
+  // league directly when a league is in scope (currentTeam may be null).
+  const teamsPageLeagueId = currentTeam?.leagueId ?? selectedLeagueId ?? null;
+
+  // Fetch the active season for the league so we can scope standings to
+  // the correct season regardless of which team (if any) is shown.
+  const { data: leagueSeasons } = useQuery<any[]>({
+    queryKey: [`/api/leagues/${teamsPageLeagueId}/seasons`],
+    enabled: !!teamsPageLeagueId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const leagueActiveSeason = Array.isArray(leagueSeasons)
+    ? (leagueSeasons.find((s: any) => s.isActive) ?? leagueSeasons[0] ?? null)
+    : null;
+
+  // Whether this league uses seasons at all (any of the user's teams in
+  // the league have a seasonId). No-season leagues stay on all-time data.
+  const leagueIsSeasonAware = (userTeams as any[])
+    .filter((t: any) => t.leagueId === teamsPageLeagueId)
+    .some((t: any) => t.seasonId !== null);
+
+  // Determine which seasonId to use for the standings query:
+  //   League scope → always use the active season (shows new season data).
+  //   Team scope   → use that team's own seasonId (respects past-season views).
+  // For leagues with no season tagging at all, fall through to null (all-time).
+  const standingsSeasonId: string | null = (() => {
+    if (!leagueIsSeasonAware) return null;
+    if (selectedType === 'league') return leagueActiveSeason?.id ?? null;
+    return currentTeam?.seasonId ?? leagueActiveSeason?.id ?? null;
+  })();
+
+  // Fetch league standings — scoped to the correct season.
   const { data: leagueStandings = [] } = useQuery({
-    queryKey: ['/api/leagues', currentTeam?.leagueId, 'standings', currentTeam?.seasonId ?? null],
+    queryKey: ['/api/leagues', teamsPageLeagueId, 'standings', standingsSeasonId],
     queryFn: async () => {
-      if (!currentTeam?.leagueId) return [];
-      const url = currentTeam?.seasonId
-        ? `/api/leagues/${currentTeam.leagueId}/standings?seasonId=${currentTeam.seasonId}`
-        : `/api/leagues/${currentTeam.leagueId}/standings`;
+      if (!teamsPageLeagueId) return [];
+      const url = standingsSeasonId
+        ? `/api/leagues/${teamsPageLeagueId}/standings?seasonId=${standingsSeasonId}`
+        : `/api/leagues/${teamsPageLeagueId}/standings`;
       const res = await apiRequest('GET', url);
       return res.json();
     },
-    enabled: !!currentTeam?.leagueId,
+    enabled: !!teamsPageLeagueId,
   }) as { data: any[] };
 
   // Calculate team leaders
@@ -411,6 +445,19 @@ export default function Teams() {
               >
                 View Tournament Details
               </Button>
+            </CardContent>
+          </Card>
+        ) : isNewSeasonNoTeam ? (
+          /* A new season is active for this league but the user hasn't been
+             assigned to a team yet. Show a clear empty state instead of
+             leaking old-season team data. */
+          <Card className="hairline elev-rest">
+            <CardContent className="p-6 text-center">
+              <Trophy className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">New Season Starting</h3>
+              <p className="text-muted-foreground mb-4">
+                A new season has begun for this league. Team assignments haven't been set up yet — check back once the commissioner has drafted teams.
+              </p>
             </CardContent>
           </Card>
         ) : (userTeams as any[]).length === 0 ? (

@@ -910,7 +910,35 @@ export default function Messages() {
         return false;
       }
       if (selectedLeagueId) {
-        return conv.leagueId === selectedLeagueId;
+        if (conv.leagueId !== selectedLeagueId) return false;
+        // For leagues with season-aware teams, hide group conversations that
+        // belong to an old season's team. League-wide conversations (no teamId)
+        // always pass through.
+        if (conv.teamId) {
+          // Only filter if we have season info for this team.
+          if (conv.teamId in teamSeasonMap) {
+            const convTeamSeasonId = teamSeasonMap[conv.teamId];
+            // If the team has a season (not null), check whether it's active.
+            // Teams with seasonId=null are "season-agnostic" and always show.
+            if (convTeamSeasonId !== null) {
+              // Build the set of user teams that belong to an active season or
+              // have no season (so they always show) for this league.
+              const activeTeamIds = new Set(
+                (userTeams as any[])
+                  .filter((t: any) =>
+                    t.leagueId === selectedLeagueId &&
+                    (t.seasonId === null || t.seasonIsActive === true)
+                  )
+                  .map((t: any) => t.id)
+              );
+              // If the league has any active-season teams, only show convs for
+              // those teams. If there are none (new season, no teams yet) hide
+              // old-season team convs.
+              return activeTeamIds.has(conv.teamId);
+            }
+          }
+        }
+        return true;
       }
       return true;
     });
