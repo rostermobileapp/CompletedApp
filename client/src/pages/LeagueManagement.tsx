@@ -2836,7 +2836,7 @@ export default function LeagueManagement() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('teams')}
+            onClick={() => { setActiveTab('teams'); setSelectedTeam(null); }}
             className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'teams'
                 ? 'bg-background text-foreground shadow-sm'
