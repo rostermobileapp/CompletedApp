@@ -13,7 +13,9 @@ import {
   draftSetupConfigSchema,
   type Draft,
 } from "@shared/schema";
-import { eq, and, asc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, or, asc, sql, inArray, isNull } from "drizzle-orm";
+import { storage } from "./storage";
+import { broadcastNotificationUpdate } from "./routes";
 import {
   startDraft,
   pauseDraft,
@@ -23,6 +25,8 @@ import {
   postChat,
   getDraftStateBundle,
   undoLastPick,
+  requestCaptainReady,
+  markCaptainReady,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -317,7 +321,9 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     }
   });
 
-  // === Start draft ===
+  // === Start draft (puts draft into the awaiting_captains lobby) ===
+  // Captains are notified and must each click READY before the commissioner
+  // can press "Begin" via /api/drafts/:draftId/begin.
   app.post("/api/drafts/:draftId/start", isAuthenticated, async (req: any, res) => {
     try {
       const { draftId } = req.params;
@@ -327,12 +333,130 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
         return res.status(403).json({ message: "Only the commissioner can start the draft" });
       }
-      const result = await startDraft(draftId);
+      const result = await requestCaptainReady(draftId, userId);
       if (!result.ok) return res.status(400).json({ message: result.error });
-      res.json({ ok: true });
+
+      // Notify each captain (excluding the commissioner) so they can confirm.
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, draft.leagueId));
+      const leagueName = league?.name || "your league";
+      for (const captainUserId of result.captainUserIds || []) {
+        if (captainUserId === userId) continue;
+        try {
+          await storage.createNotification({
+            userId: captainUserId,
+            type: "general",
+            title: "Draft starting soon",
+            message: `The draft for ${leagueName} is about to begin. Open the draft and confirm you're ready.`,
+            actionUrl: `/draft/${draftId}`,
+            actionText: "Open draft",
+          });
+          broadcastNotificationUpdate(captainUserId);
+        } catch (e) {
+          console.error("[draft] failed to notify captain", captainUserId, e);
+        }
+      }
+      res.json({ ok: true, status: "awaiting_captains" });
     } catch (err) {
       console.error("Start draft error:", err);
       res.status(500).json({ message: "Failed to start draft" });
+    }
+  });
+
+  // === Captain marks themselves ready in the lobby ===
+  app.post("/api/drafts/:draftId/captain-ready", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      const isCommish = await isLeagueCommissioner(draft.leagueId, userId);
+      const isCap = await isCaptainInDraft(draftId, userId);
+      if (!isCommish && !isCap) {
+        return res.status(403).json({ message: "Only captains and commissioner can ready up" });
+      }
+      const result = await markCaptainReady(draftId, userId);
+      if (!result.ok) return res.status(400).json({ message: result.error });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Captain ready error:", err);
+      res.status(500).json({ message: "Failed to mark ready" });
+    }
+  });
+
+  // === Commissioner actually begins the draft (transitions to active) ===
+  app.post("/api/drafts/:draftId/begin", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can begin the draft" });
+      }
+      const result = await startDraft(draftId);
+      if (!result.ok) return res.status(400).json({ message: result.error });
+      res.json({ ok: true, status: "active" });
+    } catch (err) {
+      console.error("Begin draft error:", err);
+      res.status(500).json({ message: "Failed to begin draft" });
+    }
+  });
+
+  // === List drafts the current user has an active stake in ===
+  // Returns drafts where the user is the league commissioner OR is the captain
+  // of a team in draftOrder, AND the draft is active/paused/awaiting_captains.
+  // Used by the persistent banner so users can return to an in-progress draft
+  // from anywhere in the app.
+  app.get("/api/user/active-drafts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const candidates = await db
+        .select({
+          draft: drafts,
+          leagueName: leagues.name,
+          commissionerId: leagues.commissionerId,
+        })
+        .from(drafts)
+        .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
+        .where(
+          or(
+            eq(drafts.status, "active"),
+            eq(drafts.status, "paused"),
+            eq(drafts.status, "awaiting_captains"),
+          ),
+        );
+      if (!candidates.length) return res.json([]);
+
+      const myTeams = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.captainId, userId));
+      const myTeamIds = new Set(myTeams.map((t) => t.id));
+
+      const result: Array<{
+        id: string;
+        leagueId: string;
+        leagueName: string;
+        status: string;
+        role: "commissioner" | "captain";
+      }> = [];
+      for (const row of candidates) {
+        const isCommish = row.commissionerId === userId;
+        const order = (row.draft.draftOrder as string[]) || [];
+        const isCaptain = order.some((tid) => myTeamIds.has(tid));
+        if (!isCommish && !isCaptain) continue;
+        result.push({
+          id: row.draft.id,
+          leagueId: row.draft.leagueId,
+          leagueName: row.leagueName || "League",
+          status: row.draft.status,
+          role: isCommish ? "commissioner" : "captain",
+        });
+      }
+      res.json(result);
+    } catch (err) {
+      console.error("Active drafts error:", err);
+      res.status(500).json({ message: "Failed to fetch active drafts" });
     }
   });
 

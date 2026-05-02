@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -59,8 +59,8 @@ interface Props {
 }
 
 const STEPS = [
-  { id: "format", label: "Format" },
   { id: "goalies", label: "Goalies" },
+  { id: "format", label: "Format" },
   { id: "timer", label: "Timer" },
   { id: "skill", label: "Skill" },
   { id: "buddies", label: "Buddies" },
@@ -108,6 +108,14 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // Notes
   const [playerNotes, setPlayerNotes] = useState<Record<string, string>>({});
 
+  // Buddy add-row filter (replaces the old <select>)
+  const [buddySearch, setBuddySearch] = useState("");
+
+  // One-shot init guard so a query refetch (e.g. after another tab updates the
+  // draft, after a window focus) doesn't blow away in-progress edits to the
+  // notes textareas.
+  const hydratedRef = useRef(false);
+
   // Load league members
   const { data: members = [] } = useQuery<Member[]>({
     queryKey: ["/api/leagues", leagueId, "draft-players"],
@@ -124,7 +132,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   });
 
   useEffect(() => {
-    if (existing?.draft) {
+    // Hydrate from the persisted draft EXACTLY ONCE so we don't clobber
+    // in-progress edits (e.g. notes the user is typing) when the underlying
+    // query refetches after a window focus or another mutation.
+    if (existing?.draft && !hydratedRef.current) {
+      hydratedRef.current = true;
       const d = existing.draft;
       if (d.draftStyle) setDraftStyle(d.draftStyle);
       if (d.goalieMethod) setGoalieMethod(d.goalieMethod);
@@ -132,7 +144,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       if (d.timePerPick) setTimePerPick(d.timePerPick);
       if (typeof d.skillRankingEnabled === "boolean") setSkillRankingEnabled(d.skillRankingEnabled);
       if (d.skillScale) setSkillScale(d.skillScale);
-      if (d.playerNotes) setPlayerNotes(d.playerNotes);
+      if (d.playerNotes && typeof d.playerNotes === "object") setPlayerNotes(d.playerNotes);
       if (d.goalieAssignments) setGoalieAssignments(d.goalieAssignments);
       if (Array.isArray(d.draftOrder) && d.draftOrder.length) setDraftOrder(d.draftOrder);
       if (d.totalRounds) setTotalRounds(d.totalRounds);
@@ -454,7 +466,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   {(
                     [
                       { v: "auto_pick", label: "Auto-pick a random available player" },
-                      { v: "halve_next", label: "Forfeit pick & halve next captain's timer" },
+                      { v: "halve_next", label: "Buzzer: +30s extension, halve YOUR next pick's timer" },
                     ] as { v: TimerExpiryRule; label: string }[]
                   ).map((o) => (
                     <label
@@ -603,29 +615,50 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     </button>
                   </div>
                 ))}
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value && !pendingPair.includes(e.target.value)) {
-                      setPendingPair([...pendingPair, e.target.value]);
-                    }
-                  }}
+                <input
+                  type="text"
+                  value={buddySearch}
+                  onChange={(e) => setBuddySearch(e.target.value)}
+                  placeholder="Search players to add..."
                   className="w-full p-2 bg-card border border-border rounded text-sm"
-                  data-testid="select-pending-buddy"
-                >
-                  <option value="">+ Add player to pair...</option>
+                  data-testid="input-buddy-search"
+                />
+                <div className="max-h-48 overflow-y-auto border border-border rounded divide-y divide-border bg-card">
                   {members
-                    .filter(
-                      (m) =>
-                        !pendingPair.includes(m.user.id) &&
-                        !buddyPairs.some((p) => p.includes(m.user.id)),
-                    )
+                    .filter((m) => {
+                      if (pendingPair.includes(m.user.id)) return false;
+                      if (buddyPairs.some((p) => p.includes(m.user.id))) return false;
+                      const q = buddySearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return memberName(m).toLowerCase().includes(q);
+                    })
+                    .slice(0, 20)
                     .map((m) => (
-                      <option key={m.user.id} value={m.user.id}>
-                        {memberName(m)}
-                      </option>
+                      <button
+                        key={m.user.id}
+                        type="button"
+                        onClick={() => {
+                          setPendingPair([...pendingPair, m.user.id]);
+                          setBuddySearch("");
+                        }}
+                        className="w-full text-left text-sm p-2 hover-elevate active-elevate-2"
+                        data-testid={`button-add-buddy-candidate-${m.user.id}`}
+                      >
+                        + {memberName(m)}
+                      </button>
                     ))}
-                </select>
+                  {members.filter((m) => {
+                    if (pendingPair.includes(m.user.id)) return false;
+                    if (buddyPairs.some((p) => p.includes(m.user.id))) return false;
+                    const q = buddySearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return memberName(m).toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <div className="text-xs text-muted-foreground p-2 text-center">
+                      No players match.
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     if (pendingPair.length >= 2) {

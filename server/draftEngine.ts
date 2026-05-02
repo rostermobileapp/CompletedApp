@@ -204,31 +204,39 @@ async function handleTimerExpired(draftId: string) {
   const style = draft.draftStyle || draft.roundType || "snake";
   const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style);
 
-  if (draft.timerExpiryRule === "halve_next") {
-    // Don't auto-pick; just advance the turn after halving the next pick's timer.
-    // (Current pick is forfeited; the next captain gets a halved timer as penalty.)
-    const halved = Math.max(5, Math.floor((draft.timePerPick || 60) / 2));
-    await db
-      .update(drafts)
-      .set({ nextTimerOverride: halved, updatedAt: new Date() })
-      .where(eq(drafts.id, draftId));
-    // record a forfeited pick row
-    if (pickingTeamId) {
-      const overall = (draft.currentRound - 1) * draftOrder.length + draft.currentTurn;
-      await db.insert(draftPicks).values({
-        draftId,
-        teamId: pickingTeamId,
-        playerId: null,
-        round: draft.currentRound,
-        pick: overall,
-        pickInRound: draft.currentTurn,
-        forfeited: true,
-        expiredAutoPick: true,
-        pickedAt: new Date(),
+  if (draft.timerExpiryRule === "halve_next" && pickingTeamId) {
+    // New "buzzer" rule: on first expiry of THIS pick, grant the captain a 30s
+    // extension AND mark their NEXT turn's timer to be halved as penalty.
+    // On the SECOND expiry (i.e. they didn't pick during the extension either),
+    // fall through to auto-pick a random available player so the draft moves on.
+    const state = (draft.buzzerExtensionState as { currentPickExtended?: boolean; halvedNextTurn?: Record<string, boolean> } | null) || {};
+    if (!state.currentPickExtended) {
+      const newState = {
+        currentPickExtended: true,
+        halvedNextTurn: { ...(state.halvedNextTurn || {}), [pickingTeamId]: true },
+      };
+      const newDeadline = new Date(Date.now() + 30 * 1000);
+      await db
+        .update(drafts)
+        .set({
+          currentTurnDeadline: newDeadline,
+          buzzerExtensionState: newState,
+          updatedAt: new Date(),
+        })
+        .where(eq(drafts.id, draftId));
+      await startTurnTimer(draftId);
+      await broadcastState(draftId);
+      broadcastToDraft(draftId, {
+        type: "draft_buzzer_extension",
+        payload: {
+          draftId,
+          teamId: pickingTeamId,
+          extensionSeconds: 30,
+        },
       });
+      return;
     }
-    await advanceTurn(draftId, /*resetTimer*/ true);
-    return;
+    // Already extended once on this pick — fall through to auto-pick.
   }
 
   // Default: auto_pick - pick a random available player
@@ -311,11 +319,39 @@ async function startTurnTimer(draftId: string) {
 async function setTurnDeadline(draftId: string, durationSeconds?: number) {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return;
-  const dur = durationSeconds ?? draft.nextTimerOverride ?? draft.timePerPick ?? 60;
-  const deadline = new Date(Date.now() + dur * 1000);
+  const draftOrder = (draft.draftOrder as string[]) || [];
+  const style = draft.draftStyle || draft.roundType || "snake";
+  const pickingTeamId = computePickingTeam(
+    draftOrder,
+    draft.currentRound,
+    draft.currentTurn,
+    style,
+  );
+
+  // Buzzer-rule penalty: if the picking captain was previously granted a 30s
+  // extension on a prior turn, halve THIS turn's timer.
+  const state = (draft.buzzerExtensionState as
+    | { currentPickExtended?: boolean; halvedNextTurn?: Record<string, boolean> }
+    | null) || {};
+  const halvedMap = { ...(state.halvedNextTurn || {}) };
+  let baseDur = durationSeconds ?? draft.timePerPick ?? 60;
+  if (pickingTeamId && halvedMap[pickingTeamId]) {
+    baseDur = Math.max(5, Math.floor(baseDur / 2));
+    delete halvedMap[pickingTeamId];
+  }
+  const newState = {
+    currentPickExtended: false,
+    halvedNextTurn: halvedMap,
+  };
+  const deadline = new Date(Date.now() + baseDur * 1000);
   await db
     .update(drafts)
-    .set({ currentTurnDeadline: deadline, nextTimerOverride: null, updatedAt: new Date() })
+    .set({
+      currentTurnDeadline: deadline,
+      nextTimerOverride: null,
+      buzzerExtensionState: newState,
+      updatedAt: new Date(),
+    })
     .where(eq(drafts.id, draftId));
 }
 
@@ -544,16 +580,13 @@ export async function commissionerPick(
   return { ok: true };
 }
 
-export async function startDraft(draftId: string): Promise<{ ok: boolean; error?: string }> {
-  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
-  if (!draft) return { ok: false, error: "Draft not found" };
-  if (draft.status === "active") return { ok: true };
-  if (draft.status === "completed") return { ok: false, error: "Draft is already completed" };
+/**
+ * Validate start-time prerequisites without mutating draft status. Used by
+ * both `requestCaptainReady` (lobby phase) and `startDraft` (active phase).
+ */
+async function validateStartPrereqs(draft: Draft): Promise<{ ok: boolean; error?: string }> {
   const draftOrder = (draft.draftOrder as string[]) || [];
   if (draftOrder.length === 0) return { ok: false, error: "Draft order is empty" };
-
-  // Enforce start-time prerequisites (independent of any prior /lock call).
-  // 1. Skill tiers: every approved league member must have a skillLevel set.
   if (draft.skillRankingEnabled) {
     const missing = await db
       .select({ id: leagueMemberships.id })
@@ -572,8 +605,6 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
       };
     }
   }
-  // 2. Goalie prerequisites for commissioner_assigned mode: every team must
-  //    have a goalie assigned before the draft can start.
   if (draft.goalieMethod === "commissioner_assigned") {
     const assigned = (draft.goalieAssignments as Record<string, string>) || {};
     const unassigned = draftOrder.filter((tid) => !assigned[tid]);
@@ -584,6 +615,81 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
       };
     }
   }
+  return { ok: true };
+}
+
+/**
+ * Move a draft into the awaiting_captains lobby phase. Validates prerequisites
+ * and seeds captainReadyState (the commissioner is implicitly ready). The
+ * caller is expected to send out captain notifications.
+ */
+export async function requestCaptainReady(
+  draftId: string,
+  commissionerUserId: string,
+): Promise<{ ok: boolean; error?: string; captainUserIds?: string[] }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status === "active") return { ok: false, error: "Draft already started" };
+  if (draft.status === "completed") return { ok: false, error: "Draft already completed" };
+
+  const validation = await validateStartPrereqs(draft);
+  if (!validation.ok) return validation;
+
+  const draftOrder = (draft.draftOrder as string[]) || [];
+  const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
+  const captainIds = teamRows.map((t) => t.captainId).filter(Boolean) as string[];
+
+  // Commissioner is implicitly ready; everyone else must confirm.
+  const ready: Record<string, boolean> = { [commissionerUserId]: true };
+
+  await db
+    .update(drafts)
+    .set({
+      status: "awaiting_captains",
+      captainReadyState: ready,
+      updatedAt: new Date(),
+    })
+    .where(eq(drafts.id, draftId));
+
+  await broadcastState(draftId);
+  broadcastToDraft(draftId, { type: "draft_awaiting_captains", payload: { draftId } });
+
+  return { ok: true, captainUserIds: Array.from(new Set(captainIds)) };
+}
+
+/**
+ * Mark a captain as ready in the awaiting_captains lobby. Idempotent.
+ */
+export async function markCaptainReady(
+  draftId: string,
+  userId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status !== "awaiting_captains") {
+    return { ok: false, error: "Draft is not in the captain-ready lobby" };
+  }
+  const ready = ((draft.captainReadyState as Record<string, boolean>) || {});
+  if (ready[userId]) {
+    return { ok: true };
+  }
+  ready[userId] = true;
+  await db
+    .update(drafts)
+    .set({ captainReadyState: ready, updatedAt: new Date() })
+    .where(eq(drafts.id, draftId));
+  await broadcastState(draftId);
+  return { ok: true };
+}
+
+export async function startDraft(draftId: string): Promise<{ ok: boolean; error?: string }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status === "active") return { ok: true };
+  if (draft.status === "completed") return { ok: false, error: "Draft is already completed" };
+  const validation = await validateStartPrereqs(draft);
+  if (!validation.ok) return validation;
+  const draftOrder = (draft.draftOrder as string[]) || [];
 
   // Random goalie draw if configured
   if (draft.goalieMethod === "random_draw") {

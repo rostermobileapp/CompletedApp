@@ -1562,6 +1562,7 @@ export const draftStatusEnum = pgEnum("draft_status", [
   "pending",
   "active",
   "paused",
+  "awaiting_captains",
 ]);
 
 // Draft round type enum
@@ -1602,6 +1603,14 @@ export const drafts = pgTable("drafts", {
   currentTurnDeadline: timestamp("current_turn_deadline"),
   // Halved-timer override (set when prev captain forfeited via halve_next rule)
   nextTimerOverride: integer("next_timer_override"),
+  // Buzzer-extension state for the timerExpiryRule="halve_next" rule.
+  // Shape: { currentPickExtended: boolean, halvedNextTurn: { [teamId]: boolean } }
+  // - currentPickExtended: did the current pick already get its 30s buzzer extension?
+  // - halvedNextTurn: which captains owe a halved timer on their next turn?
+  buzzerExtensionState: jsonb("buzzer_extension_state").default({}),
+  // Per-user ready acknowledgement during the awaiting_captains lobby.
+  // Shape: { [userId]: true }
+  captainReadyState: jsonb("captain_ready_state").default({}),
   scheduledAt: timestamp("scheduled_at"),
   startedAt: timestamp("started_at"),
   lockedAt: timestamp("locked_at"),

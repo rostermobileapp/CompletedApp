@@ -20,6 +20,9 @@ import {
   Users,
   MessageCircle,
   Undo2,
+  CheckCircle2,
+  Hourglass,
+  Zap,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -41,6 +44,12 @@ interface Draft {
   playerNotes: Record<string, string>;
   skillRankingEnabled: boolean;
   skillScale: string | null;
+  captainReadyState?: Record<string, boolean> | null;
+  buzzerExtensionState?: {
+    currentPickExtended?: boolean;
+    halvedNextTurn?: Record<string, boolean>;
+  } | null;
+  timerExpiryRule?: "auto_pick" | "halve_next" | null;
 }
 
 interface DraftPick {
@@ -141,6 +150,14 @@ export default function DraftRoom() {
       if (data.payload?.draftId !== draftId) return;
       toast({ title: "Draft complete!", description: "Rosters have been finalized." });
     });
+    const offBuzzer = ws.subscribe("draft_buzzer_extension", (data: any) => {
+      if (data.payload?.draftId !== draftId) return;
+      toast({
+        title: "Buzzer! +30s",
+        description:
+          "The captain on the clock got a 30-second extension — but their next pick's timer will be halved.",
+      });
+    });
     return () => {
       ws.send({ type: "draft_unsubscribe", draftId });
       offState();
@@ -148,6 +165,7 @@ export default function DraftRoom() {
       offChat();
       offTick();
       offDone();
+      offBuzzer();
     };
   }, [draftId, ws, toast]);
 
@@ -262,6 +280,22 @@ export default function DraftRoom() {
     },
     onError: (err: any) =>
       toast({ title: "Failed to undo", description: err?.message, variant: "destructive" }),
+  });
+  const captainReadyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/captain-ready`, {});
+      return res.json();
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to ready up", description: err?.message, variant: "destructive" }),
+  });
+  const beginMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/begin`, {});
+      return res.json();
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to begin draft", description: err?.message, variant: "destructive" }),
   });
 
   const sendChat = () => {
@@ -389,6 +423,29 @@ export default function DraftRoom() {
                 <Snowflake className="w-4 h-4" /> Start
               </button>
             )}
+            {isCommissioner && draft.status === "awaiting_captains" && (() => {
+              const ready = (draft.captainReadyState || {}) as Record<string, boolean>;
+              const captainIds = teams
+                .filter((t: any) => draft.draftOrder.includes(t.id))
+                .map((t: any) => t.captainId)
+                .filter(Boolean) as string[];
+              const allReady = captainIds.every((cid) => ready[cid]) && captainIds.length > 0;
+              return (
+                <button
+                  onClick={() => beginMutation.mutate()}
+                  disabled={!allReady || beginMutation.isPending}
+                  className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm font-medium flex items-center gap-1 disabled:opacity-50"
+                  data-testid="button-begin-draft"
+                  title={
+                    allReady
+                      ? "All captains are ready — begin the draft"
+                      : "Waiting for all captains to confirm READY"
+                  }
+                >
+                  <Snowflake className="w-4 h-4" /> Begin
+                </button>
+              );
+            })()}
             <button
               onClick={() => setShowChat(true)}
               className="p-2 hover:bg-muted rounded relative"
@@ -438,10 +495,116 @@ export default function DraftRoom() {
             <Trophy className="inline w-4 h-4 mr-1" /> Draft complete! Rosters finalized.
           </div>
         )}
+        {draft.status === "awaiting_captains" && (
+          <div className="px-3 pb-2 text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
+            <Hourglass className="w-3 h-3" /> Waiting for captains to confirm READY
+          </div>
+        )}
       </div>
 
       {/* Main content */}
       <div className="flex-1 overflow-y-auto p-3 pb-24 space-y-4">
+        {/* Captain READY lobby */}
+        {draft.status === "awaiting_captains" && (() => {
+          const ready = (draft.captainReadyState || {}) as Record<string, boolean>;
+          const captainTeams = teams.filter((t: any) =>
+            draft.draftOrder.includes(t.id),
+          );
+          const meReady = !!user && !!ready[user.id];
+          const myCaptainTeam = !!user && captainTeams.find(
+            (t: any) => t.captainId === user.id,
+          );
+          const readyCount = captainTeams.filter(
+            (t: any) => t.captainId && ready[t.captainId],
+          ).length;
+          return (
+            <section
+              className="space-y-3"
+              data-testid="section-awaiting-captains"
+            >
+              <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-4 text-center">
+                <Zap className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                <h2 className="text-lg font-bold mb-1">
+                  Draft starting soon
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  All captains must confirm they're at the keyboard before the
+                  draft begins. Once everyone is ready, the commissioner will
+                  start the clock.
+                </p>
+                <div className="text-xs text-muted-foreground mt-2 font-medium">
+                  {readyCount} of {captainTeams.length} captains ready
+                </div>
+              </div>
+
+              {!!myCaptainTeam && !meReady && (
+                <button
+                  onClick={() => captainReadyMutation.mutate()}
+                  disabled={captainReadyMutation.isPending}
+                  className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
+                  data-testid="button-captain-ready"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  I'm ready — let's draft!
+                </button>
+              )}
+              {!!myCaptainTeam && meReady && (
+                <div
+                  className="w-full px-4 py-3 bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-emerald-700 dark:text-emerald-300 text-center font-medium flex items-center justify-center gap-2"
+                  data-testid="status-captain-ready"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  You're ready. Waiting on the others...
+                </div>
+              )}
+
+              <div className="border border-border rounded-lg divide-y divide-border bg-card">
+                {captainTeams.map((t: any) => {
+                  const cap = t.captainId
+                    ? memberById.get(t.captainId)
+                    : null;
+                  const isReady = !!t.captainId && !!ready[t.captainId];
+                  return (
+                    <div
+                      key={t.id}
+                      className="flex items-center gap-3 p-3"
+                      data-testid={`captain-ready-row-${t.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {t.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {cap
+                            ? `${cap.user.firstName || ""} ${cap.user.lastName || ""}`.trim() ||
+                              cap.user.displayName ||
+                              cap.user.email
+                            : "No captain assigned"}
+                        </div>
+                      </div>
+                      {isReady ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                          data-testid={`status-ready-${t.id}`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground"
+                          data-testid={`status-waiting-${t.id}`}
+                        >
+                          <Hourglass className="w-3.5 h-3.5" /> Waiting
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
+
         {/* Available players (only when active) */}
         {(draft.status === "active" || draft.status === "paused") && (
           <section>

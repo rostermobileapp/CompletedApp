@@ -9,6 +9,7 @@ import { PermissionProvider } from "@/context/SubscriptionContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { HPIBBanner } from "@/components/HPIBBanner";
+import { ActiveDraftsBanner } from "@/components/ActiveDraftsBanner";
 import { PageTransition } from "@/components/PageTransition";
 import { SlideOutMenu } from "@/components/SlideOutMenu";
 import { SwipeableMainScreens } from "@/components/SwipeableMainScreens";
@@ -300,12 +301,14 @@ function Router() {
         <NativelyNotificationsInitializer />
         {isDesktopWeb ? (
           <DesktopAppShell>
+            <ActiveDraftsBanner />
             <PageTransition>{routesSwitch}</PageTransition>
           </DesktopAppShell>
         ) : (
           <div className="min-h-screen w-full bg-background">
             <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
               <SlideOutMenu />
+              <ActiveDraftsBanner />
               <SwipeableMainScreens>
                 <PageTransition>{routesSwitch}</PageTransition>
               </SwipeableMainScreens>

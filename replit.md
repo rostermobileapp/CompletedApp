@@ -120,6 +120,34 @@ Approved design language for the mobile home screen as of Apr 2026. See
     Broader rollout to shared shadcn primitives, desktop sidebar, and
     modals is still pending.
 
+## Draft Tool
+
+The league draft tool (`client/src/components/DraftSetupWizard.tsx`,
+`client/src/pages/DraftRoom.tsx`, `server/draftEngine.ts`,
+`server/draftRoutes.ts`) supports a multi-step setup wizard (Goalies →
+Format → Order → Buddies → Notes → Review), real-time WebSocket-driven
+pick room, and a captain READY lobby (`awaiting_captains` status) that
+sits between commissioner "Start" and the first pick.
+
+Key behaviors:
+
+-   **Captain READY lobby**: `/api/drafts/:id/start` transitions the
+    draft to `awaiting_captains` and notifies each captain via the
+    Alerts/Notifications system. Captains call `/captain-ready` from
+    the lobby UI; the commissioner calls `/begin` (which delegates to
+    `startDraft`) once everyone is ready.
+-   **Buzzer rule (`halve_next`)**: First timer expiry grants a 30-second
+    extension to the captain on the clock and flags their NEXT turn to
+    be halved (state stored in `buzzerExtensionState` jsonb). Second
+    expiry auto-picks a random available player.
+-   **Persistent re-entry**: A site-wide `ActiveDraftsBanner` renders on
+    every screen except `/draft/:id`, queries
+    `/api/user/active-drafts`, and lets users return to any draft they
+    are commissioner or captain of.
+-   **Wizard hydration**: Notes and other config hydrate from the
+    persisted draft exactly once (guarded by `useRef`) so background
+    refetches do not clobber in-progress edits.
+
 ## Development and Build Tools
 
 -   **Vite**: Fast build tool and development server.
