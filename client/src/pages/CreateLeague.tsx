@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor } from 'lucide-react';
+import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor, Snowflake } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { insertLeagueSchema } from '@shared/schema';
@@ -209,6 +209,42 @@ export default function CreateLeague() {
                     data-testid="button-skip-player-pro"
                   >
                     Skip for now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="bg-card rounded-xl border border-blue-500/40 bg-blue-500/5 p-5"
+            data-testid="draft-tool-cta-card"
+          >
+            <div className="flex items-start gap-3">
+              <Snowflake className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold mb-1">Want to draft your rosters live?</div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Once you've added at least two teams (and any captains), open the league
+                  and tap <span className="font-semibold">Setup Draft</span> next to
+                  &quot;New Season&quot; to run a real-time, mobile-friendly draft with
+                  timers, buddy pairs, and goalie modes.
+                </p>
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() =>
+                      navigate(`/league-management?leagueId=${createdLeague.id}&tab=teams`)
+                    }
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-lg text-sm font-medium"
+                    data-testid="button-add-teams-first"
+                  >
+                    Add teams now
+                  </button>
+                  <button
+                    onClick={() => navigate(`/league-management?leagueId=${createdLeague.id}`)}
+                    className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-medium"
+                    data-testid="button-skip-draft-tool"
+                  >
+                    Maybe later
                   </button>
                 </div>
               </div>

@@ -428,21 +428,25 @@ async function applyPick(
         .from(draftPicks)
         .where(eq(draftPicks.draftId, draftId));
       const draftedSet = new Set(drafted.map((d) => d.playerId).filter(Boolean) as string[]);
-      let cursor = overall;
+      // Auto-buddy adds share the SAME overall pick / round / pickInRound as
+      // the parent pick, distinguished only by `isAutoBuddy=true`. This avoids
+      // colliding with the next captain's overall pick number when the turn
+      // advances. Insertion order (pickedAt) preserves stable sub-ordering.
+      const baseTime = Date.now();
+      let subOffset = 1;
       for (const buddyId of otherIds) {
         if (draftedSet.has(buddyId)) continue;
-        cursor += 1;
-        // Use the buddy's auto-add as a sub-pick at the same round/turn
         await db.insert(draftPicks).values({
           draftId,
           teamId,
           playerId: buddyId,
           round: draft.currentRound,
-          pick: cursor,
+          pick: overall,
           pickInRound: draft.currentTurn,
           isAutoBuddy: true,
-          pickedAt: new Date(),
+          pickedAt: new Date(baseTime + subOffset),
         });
+        subOffset += 1;
       }
       // Forfeit captain's next-round pick
       const forfeited = (draft.forfeitedRounds as Record<string, number[]>) || {};
@@ -528,6 +532,39 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   if (draft.status === "completed") return { ok: false, error: "Draft is already completed" };
   const draftOrder = (draft.draftOrder as string[]) || [];
   if (draftOrder.length === 0) return { ok: false, error: "Draft order is empty" };
+
+  // Enforce start-time prerequisites (independent of any prior /lock call).
+  // 1. Skill tiers: every approved league member must have a skillLevel set.
+  if (draft.skillRankingEnabled) {
+    const missing = await db
+      .select({ id: leagueMemberships.id })
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, draft.leagueId),
+          eq(leagueMemberships.status, "approved"),
+          isNull(leagueMemberships.skillLevel),
+        ),
+      );
+    if (missing.length) {
+      return {
+        ok: false,
+        error: `Cannot start: ${missing.length} player(s) are missing a skill tier`,
+      };
+    }
+  }
+  // 2. Goalie prerequisites for commissioner_assigned mode: every team must
+  //    have a goalie assigned before the draft can start.
+  if (draft.goalieMethod === "commissioner_assigned") {
+    const assigned = (draft.goalieAssignments as Record<string, string>) || {};
+    const unassigned = draftOrder.filter((tid) => !assigned[tid]);
+    if (unassigned.length) {
+      return {
+        ok: false,
+        error: `Cannot start: ${unassigned.length} team(s) are missing a goalie assignment`,
+      };
+    }
+  }
 
   // Random goalie draw if configured
   if (draft.goalieMethod === "random_draw") {

@@ -88,6 +88,7 @@ export default function DraftRoom() {
   const [chatInput, setChatInput] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [cardUserId, setCardUserId] = useState<string | null>(null);
+  const [teamPanelId, setTeamPanelId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const serverDriftRef = useRef(0);
 
@@ -437,7 +438,16 @@ export default function DraftRoom() {
 
         {/* Teams + their picks */}
         <section>
-          <h2 className="text-sm font-bold mb-2">Rosters</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-bold">Rosters</h2>
+            <button
+              onClick={() => setTeamPanelId(bundle.pickingTeamId || (draft.draftOrder?.[0] ?? null))}
+              className="text-xs text-primary font-medium underline-offset-2 hover:underline"
+              data-testid="button-open-team-panel"
+            >
+              View team detail
+            </button>
+          </div>
           <div className="space-y-2">
             {(draft.draftOrder || []).map((teamId, idx) => {
               const team = teamById.get(teamId);
@@ -446,11 +456,12 @@ export default function DraftRoom() {
               const goalie = goalieId ? memberById.get(goalieId) : null;
               const isPicking = bundle.pickingTeamId === teamId;
               return (
-                <div
+                <button
                   key={teamId}
-                  className={`p-3 rounded-lg border ${
+                  onClick={() => setTeamPanelId(teamId)}
+                  className={`w-full text-left p-3 rounded-lg border ${
                     isPicking ? "border-primary bg-primary/5" : "border-border bg-card"
-                  }`}
+                  } hover:border-primary transition-colors`}
                   data-testid={`team-roster-${teamId}`}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -481,9 +492,8 @@ export default function DraftRoom() {
                         );
                       const player = p.playerId ? memberById.get(p.playerId) : null;
                       return (
-                        <button
+                        <span
                           key={p.id}
-                          onClick={() => p.playerId && setCardUserId(p.playerId)}
                           className={`px-2 py-0.5 rounded text-[11px] ${
                             p.isAutoBuddy
                               ? "bg-pink-500/15 text-pink-700 dark:text-pink-300"
@@ -494,16 +504,149 @@ export default function DraftRoom() {
                           {player?.user.firstName || player?.user.displayName || "?"}
                           {p.isAutoBuddy && " ♥"}
                           {p.expiredAutoPick && " ⏱"}
-                        </button>
+                        </span>
                       );
                     })}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         </section>
       </div>
+
+      {/* Team detail slide-up panel */}
+      {teamPanelId && (() => {
+        const team = teamById.get(teamPanelId);
+        const teamPicks = bundle.picks.filter((p) => p.teamId === teamPanelId);
+        const goalieId = draft.goalieAssignments?.[teamPanelId];
+        const goalie = goalieId ? memberById.get(goalieId) : null;
+        const captain = team?.captainId ? memberById.get(team.captainId) : null;
+        const orderIdx = (draft.draftOrder || []).indexOf(teamPanelId);
+        return (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 flex items-end"
+            onClick={() => setTeamPanelId(null)}
+          >
+            <div
+              className="w-full bg-background rounded-t-2xl max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`team-panel-${teamPanelId}`}
+            >
+              <div className="p-3 border-b border-border flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Pick #{orderIdx + 1} · {teamPicks.filter((p) => !p.forfeited).length} drafted
+                  </div>
+                  <h3 className="font-bold truncate">{team?.name || "Team"}</h3>
+                  {captain && (
+                    <div className="text-xs text-muted-foreground truncate">
+                      Captain: {captain.user.firstName || captain.user.displayName || captain.user.email}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setTeamPanelId(null)}
+                  className="p-1"
+                  data-testid="button-close-team-panel"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {goalie && (
+                  <button
+                    onClick={() => setCardUserId(goalie.user.id)}
+                    className="w-full flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-left"
+                    data-testid={`team-panel-goalie-${goalie.user.id}`}
+                  >
+                    {goalie.user.profileImageUrl ? (
+                      <img
+                        src={getImageUrl(goalie.user.profileImageUrl) || ""}
+                        alt=""
+                        className="w-9 h-9 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                        {(goalie.user.firstName?.[0] || "?").toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">
+                        {goalie.user.firstName} {goalie.user.lastName}
+                      </div>
+                      <div className="text-[10px] text-blue-600 dark:text-blue-300 uppercase tracking-wider">
+                        Goaltender
+                      </div>
+                    </div>
+                  </button>
+                )}
+                {teamPicks.length === 0 && !goalie && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No picks yet.
+                  </p>
+                )}
+                {teamPicks.map((p) => {
+                  if (p.forfeited) {
+                    return (
+                      <div
+                        key={p.id}
+                        className="p-2 border border-dashed border-border rounded-lg text-xs italic text-muted-foreground"
+                        data-testid={`team-panel-forfeit-${p.id}`}
+                      >
+                        Round {p.round} — forfeited (buddy auto-add)
+                      </div>
+                    );
+                  }
+                  const player = p.playerId ? memberById.get(p.playerId) : null;
+                  if (!player) return null;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => p.playerId && setCardUserId(p.playerId)}
+                      className="w-full flex items-center gap-2 p-2 bg-card border border-border rounded-lg text-left hover:border-primary"
+                      data-testid={`team-panel-pick-${p.id}`}
+                    >
+                      <span className="text-[10px] text-muted-foreground font-mono w-6 text-right">
+                        R{p.round}
+                      </span>
+                      {player.user.profileImageUrl ? (
+                        <img
+                          src={getImageUrl(player.user.profileImageUrl) || ""}
+                          alt=""
+                          className="w-9 h-9 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                          {(player.user.firstName?.[0] || "?").toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">
+                          {player.user.firstName} {player.user.lastName}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          {p.isAutoBuddy && (
+                            <span className="text-pink-600 dark:text-pink-300">♥ buddy</span>
+                          )}
+                          {p.expiredAutoPick && (
+                            <span className="text-amber-600 dark:text-amber-300">⏱ auto</span>
+                          )}
+                          {draft.skillRankingEnabled && player.membership.skillLevel && (
+                            <span className="px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded font-bold">
+                              {player.membership.skillLevel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Card overlay */}
       {cardUserId && (
