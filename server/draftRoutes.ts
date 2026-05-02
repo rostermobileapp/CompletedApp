@@ -353,7 +353,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             userId: captainUserId,
             type: "general",
             title: "Draft starting soon",
-            message: `${commishName} is starting the ${leagueName} draft. Open the draft and confirm you're ready.`,
+            message: `${commishName} is starting the ${leagueName} draft — tap to get ready.`,
             actionUrl: `/draft/${draftId}`,
             actionText: "Open draft",
           });
@@ -425,7 +425,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             userId: captainUserId,
             type: "general",
             title: "Reminder: Draft starting soon",
-            message: `${commishName} is waiting on you for the ${leagueName} draft. Open the draft and confirm you're ready.`,
+            message: `${commishName} is waiting on you for the ${leagueName} draft — tap to get ready.`,
             actionUrl: `/draft/${draftId}`,
             actionText: "Open draft",
           });

@@ -187,7 +187,11 @@ export function ActiveDraftsBanner() {
 
   return (
     <div
-      className="sticky top-0 z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black border-b border-amber-700/30 shadow-sm"
+      className="
+        sticky z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black shadow-sm
+        bottom-16 sm:bottom-auto sm:top-0
+        border-t sm:border-t-0 sm:border-b border-amber-700/30
+      "
       data-testid="active-drafts-banner"
     >
       {visible.map((d) => (
