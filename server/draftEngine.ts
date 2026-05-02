@@ -727,14 +727,26 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   if (!draft) return { ok: false, error: "Draft not found" };
   if (draft.status === "active") return { ok: true };
   if (draft.status === "completed") return { ok: false, error: "Draft is already completed" };
+
+  // Server-authoritative lifecycle: a draft must pass through the
+  // captain-ready lobby (`awaiting_captains`) before it can become `active`.
+  // Direct `pending → active` transitions are rejected so the READY gate
+  // cannot be bypassed by calling /begin out of order.
+  if (draft.status !== "awaiting_captains") {
+    return {
+      ok: false,
+      error:
+        "Draft must be in the captain-ready lobby before it can begin. Open the lobby first via Start.",
+    };
+  }
+
   const validation = await validateStartPrereqs(draft);
   if (!validation.ok) return validation;
   const draftOrder = (draft.draftOrder as string[]) || [];
 
-  // If we're transitioning out of the captain-ready lobby, the server enforces
-  // that every captain in the draft order has explicitly confirmed READY. The
+  // Every captain in draftOrder must have explicitly confirmed READY. The
   // commissioner cannot bypass this gate.
-  if (draft.status === "awaiting_captains") {
+  {
     const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
     const captainIds = teamRows
       .map((t) => t.captainId)
