@@ -1115,9 +1115,14 @@ export default function DraftRoom() {
                       Goalie
                     </span>
                   )}
-                  <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5 flex-wrap">
                     <Crown className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate font-medium">{announcedTeam?.name ?? "Unknown team"}</span>
+                    {lastPick.isAutoPick && (
+                      <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
+                        Auto-pick
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     Round {lastPick.round} · {ordinal(lastPick.pick)} overall
