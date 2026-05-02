@@ -2828,6 +2828,18 @@ export default function LeagueManagement() {
                 )}
               </>
             )}
+            {/* Season selected but not enough teams to draft yet */}
+            {selectedSeasonId && teams.length < 2 && (
+              <button
+                onClick={() => { setActiveTab('teams'); setShowCreateTeam(true); }}
+                className="px-4 py-2 bg-card border border-amber-500/40 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-sm font-medium flex items-center gap-1.5"
+                data-testid="button-setup-draft-needs-teams"
+                title="Create at least 2 teams before setting up a draft"
+              >
+                <Crown className="w-4 h-4" />
+                Setup Draft (add {2 - teams.length} team{teams.length === 1 ? '' : 's'} first)
+              </button>
+            )}
           </div>
         )}
 
