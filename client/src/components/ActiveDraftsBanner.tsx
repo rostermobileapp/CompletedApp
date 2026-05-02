@@ -137,7 +137,8 @@ export function ActiveDraftsBanner() {
     queryKey: ["/api/user/active-drafts"],
     enabled: !!isAuthenticated && !onDraftRoute,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    // No polling: WebSocket events drive invalidation. The local 1s tick on
+    // each row keeps the countdown UI fresh between server updates.
   });
 
   // Refresh the banner whenever a draft transitions or ticks on the server,

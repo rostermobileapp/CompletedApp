@@ -639,8 +639,10 @@ export async function requestCaptainReady(
   const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
   const captainIds = teamRows.map((t) => t.captainId).filter(Boolean) as string[];
 
-  // Commissioner is implicitly ready; everyone else must confirm.
-  const ready: Record<string, boolean> = { [commissionerUserId]: true };
+  // Every captain in draftOrder — including a commissioner who is also a
+  // captain — must explicitly tap READY in the lobby. We start with an empty
+  // map so the begin gate stays honest for everyone.
+  const ready: Record<string, boolean> = {};
 
   await db
     .update(drafts)

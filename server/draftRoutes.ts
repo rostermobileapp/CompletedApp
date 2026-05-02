@@ -341,6 +341,11 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       // Notify each captain (excluding the commissioner) so they can confirm.
       const [league] = await db.select().from(leagues).where(eq(leagues.id, draft.leagueId));
       const leagueName = league?.name || "your league";
+      const [commish] = await db.select().from(users).where(eq(users.id, userId));
+      const commishName =
+        (commish?.firstName || "").trim() ||
+        commish?.displayName ||
+        "Your commissioner";
       for (const captainUserId of result.captainUserIds || []) {
         if (captainUserId === userId) continue;
         try {
@@ -348,7 +353,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             userId: captainUserId,
             type: "general",
             title: "Draft starting soon",
-            message: `The draft for ${leagueName} is about to begin. Open the draft and confirm you're ready.`,
+            message: `${commishName} is starting the ${leagueName} draft. Open the draft and confirm you're ready.`,
             actionUrl: `/draft/${draftId}`,
             actionText: "Open draft",
           });
@@ -408,6 +413,11 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
 
       const [league] = await db.select().from(leagues).where(eq(leagues.id, draft.leagueId));
       const leagueName = league?.name || "your league";
+      const [commish] = await db.select().from(users).where(eq(users.id, userId));
+      const commishName =
+        (commish?.firstName || "").trim() ||
+        commish?.displayName ||
+        "Your commissioner";
       let sent = 0;
       for (const captainUserId of pendingCaptains) {
         try {
@@ -415,7 +425,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             userId: captainUserId,
             type: "general",
             title: "Reminder: Draft starting soon",
-            message: `${leagueName} draft is waiting on you. Open the draft and confirm you're ready.`,
+            message: `${commishName} is waiting on you for the ${leagueName} draft. Open the draft and confirm you're ready.`,
             actionUrl: `/draft/${draftId}`,
             actionText: "Open draft",
           });
