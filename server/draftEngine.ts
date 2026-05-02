@@ -148,7 +148,7 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
     .select()
     .from(draftPicks)
     .where(eq(draftPicks.draftId, draftId))
-    .orderBy(asc(draftPicks.pick));
+    .orderBy(asc(draftPicks.pick), asc(draftPicks.pickedAt));
   const buddyPairs = await db.select().from(draftBuddyPairs).where(eq(draftBuddyPairs.draftId, draftId));
   const chatMessages = await db
     .select({
@@ -448,7 +448,9 @@ async function applyPick(
         });
         subOffset += 1;
       }
-      // Forfeit captain's next-round pick
+      // Forfeit captain's next-round pick. Track on the draft row AND insert
+      // a placeholder draft_picks row marked `forfeited=true` so the UI (which
+      // renders forfeits from draft_picks) shows the skip explicitly.
       const forfeited = (draft.forfeitedRounds as Record<string, number[]>) || {};
       const nextRound = draft.currentRound + 1;
       if (nextRound <= (draft.totalRounds || 1)) {
@@ -457,6 +459,20 @@ async function applyPick(
           .update(drafts)
           .set({ forfeitedRounds: forfeited, updatedAt: new Date() })
           .where(eq(drafts.id, draftId));
+        const draftOrder = (draft.draftOrder as string[]) || [];
+        const numTeams = draftOrder.length || 1;
+        const turnInNextRound = draftOrder.indexOf(teamId) + 1 || 1;
+        const nextOverall = (nextRound - 1) * numTeams + turnInNextRound;
+        await db.insert(draftPicks).values({
+          draftId,
+          teamId,
+          playerId: null,
+          round: nextRound,
+          pick: nextOverall,
+          pickInRound: turnInNextRound,
+          forfeited: true,
+          pickedAt: new Date(baseTime + subOffset),
+        });
       }
     }
   }
