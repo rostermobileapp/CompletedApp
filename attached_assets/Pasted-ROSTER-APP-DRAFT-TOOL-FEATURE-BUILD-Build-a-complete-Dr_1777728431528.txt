@@ -1,0 +1,61 @@
+ROSTER APP — DRAFT TOOL FEATURE BUILD
+Build a complete Draft Tool feature for the Roster app. This spans two phases: (1) draft setup/configuration during league or season creation, and (2) the live draft room UI. Full spec below.
+
+PHASE 1 — DRAFT SETUP (triggered during league/season creation)
+After the user names their league or season, display a modal or step asking:
+"Will you be using the Roster Draft Tool for this league/season?" — Yes / No
+If No, continue the existing creation flow unchanged.
+If Yes, walk the commissioner through the following setup steps in a clean multi-step form (one topic per screen or clearly separated sections):
+
+Draft Style — Dropdown or card selector. Options: Snake, Linear (straight), Auction, 3rd Round Reversal. Label each with a one-line description matching familiar fantasy football formats.
+Goalie Selection Method — Radio buttons: "Commissioner Assigns Goalies" or "Goalies Drawn Randomly Before Draft Begins."
+Buddy System — Allow the commissioner to tag players together as a unit. UI should let you search for a player, then link them to one or more other players. Display linked players as a paired chip/tag (e.g., "Jake M. 🔗 Tyler M."). Rules: if a captain drafts one buddy, the other is automatically added to their team and the captain forfeits their next round pick. Store these pairings in the draft config.
+Skill-Based Ranking — Toggle: "Rank players by skill level?" If Yes, each player must have a skill tier assigned (e.g., A, B, C, D — or 1–5 numeric scale, commissioner chooses). Players without a skill assignment cannot enter the draft pool until one is set. Display a warning/checklist if any players are missing skill data.
+Player Notes — Any player in the pool can have a note added by the commissioner (e.g., "ACL recovery — cleared in 3 weeks" or "Unavailable first 4 games"). Notes are visible on the player's draft card during the live draft. Notes field is free text, max 200 characters.
+Pick Timer — Number input: how many seconds each captain has per pick (suggested range: 30–120 sec). Then ask: "What happens when a captain's timer expires?" — Radio: "Auto-Pick: Randomly select an available player" or "Penalty: Next pick timer is cut in half."
+
+Save all of this configuration to the league/season record in Supabase under a draft_config JSONB column.
+
+PHASE 2 — LIVE DRAFT ROOM UI
+The draft room is a full-screen mobile view. Build it with the following layout zones:
+TOP BAR
+
+Countdown timer (MM:SS) centered and prominent — counts down the active captain's pick time. Style it so it turns red and pulses in the final 10 seconds.
+Current round and pick number displayed smaller below the timer (e.g., "Round 2 · Pick 4")
+
+MAIN AREA — Player Card Carousel (default view)
+
+Vertical rolodex-style card carousel. Cards are stacked with a visible peek of cards above and below the active card. Smooth physics-based scroll. Target 120fps where the device supports it (use will-change: transform, CSS scroll-snap, and requestAnimationFrame or a library like Framer Motion for smoothness).
+Each card shows: Player name (large), Age, Shoots: L or R, and a DRAFT button (right side of card, visually distinct — outlined box style per the sketch).
+Tapping the DRAFT button drafts that player for the active captain.
+Tapping anywhere else on the card opens the Player Trading Card overlay (see below).
+Cards for already-drafted players should be visually dimmed and non-interactive (greyed out, "DRAFTED" label).
+Buddy System: if a player has a linked buddy, show a small chain-link icon on their card.
+
+PLAYER TRADING CARD OVERLAY
+
+Slide up from bottom or fade in as a full-screen modal styled like a classic NHL trading card. Use a bold header with the player's name, a large avatar/initials circle in team colors, and stats laid out like a card (G / A / P in current season, age, position, shoots, skill tier, notes if any). Include a DRAFT button and a red X close button in the top right corner.
+
+TOP TOGGLE
+
+Pill toggle between SCROLL (carousel) and LIST (table/list view). In list view, show all undrafted players in a simple scannable list with the same DRAFT button. List should be sortable by name, skill tier, or position.
+
+BOTTOM BAR
+
+Captain Chat — collapsible chat drawer. Tap the chat icon to expand. Captains can send short messages to each other during the draft. Use Supabase Realtime for live updates. Display sender name and timestamp.
+TEAM button (bottom right) — opens a slide-up panel showing the active captain's current roster as they build it. Each player is shown by round drafted. Players added via Buddy System should be visually tagged as "AUTO" with a chain icon.
+
+
+DATA / SUPABASE NOTES
+
+Draft state (current pick, round, captain order, drafted players, remaining pool) should be stored and synced in real time via Supabase Realtime so all captains see the same board live.
+Buddy System forfeitures (losing next round pick) must be calculated and enforced automatically when a buddied player is drafted.
+Timer expiry logic must be server-enforced or at minimum cross-checked — do not rely solely on client-side timers to prevent cheating or disconnects.
+
+
+STYLE
+
+Match existing Roster app styling (dark background, accent colors, clean sans-serif type).
+Card carousel uses the visual language shown in the attached sketch: stacked cards, active card highlighted/elevated, DRAFT button as a boxed label on the right side.
+Timer turns red + pulses at ≤10 seconds remaining.
+Keep all interactions one-thumb friendly — this is used on mobile rinkside.
