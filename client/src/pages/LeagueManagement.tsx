@@ -2866,6 +2866,26 @@ export default function LeagueManagement() {
         {/* Player Management Tab */}
         {activeTab === 'players' && (
           <div className="space-y-6">
+            {/* Draft call-to-action: shown only while no player has been manually
+                assigned to a team yet (once assignment begins the draft would
+                conflict, so we hide it). Requires ≥2 teams so the wizard can
+                build a proper draft order. */}
+            {selectedSeasonId && teams.length >= 2 && !commissionerDisplayMembers.some((m: LeagueMember) => m.assignedTeamId) && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Crown className="w-4 h-4 text-primary shrink-0" />
+                  <span>No players assigned to teams yet — want to run a draft instead?</span>
+                </div>
+                <button
+                  onClick={() => setShowDraftWizard(true)}
+                  className="shrink-0 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                  data-testid="button-setup-draft-players-tab"
+                >
+                  Set up draft
+                </button>
+              </div>
+            )}
+
             {/* Simple Import Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3322,6 +3342,24 @@ export default function LeagueManagement() {
         {/* Team Management Tab */}
         {activeTab === 'teams' && (
           <div className="space-y-6">
+            {/* Draft call-to-action: mirrors the one on the Players tab.
+                Hidden once any player has been manually assigned. */}
+            {selectedSeasonId && teams.length >= 2 && !commissionerDisplayMembers.some((m: LeagueMember) => m.assignedTeamId) && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Crown className="w-4 h-4 text-primary shrink-0" />
+                  <span>Players aren't assigned to teams yet — run a draft to fill the rosters?</span>
+                </div>
+                <button
+                  onClick={() => setShowDraftWizard(true)}
+                  className="shrink-0 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                  data-testid="button-setup-draft-teams-tab"
+                >
+                  Set up draft
+                </button>
+              </div>
+            )}
+
             <div className="bg-card rounded-xl hairline elev-rest p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -5742,7 +5780,7 @@ export default function LeagueManagement() {
             </div>
             <p className="text-sm text-muted-foreground">
               Configure draft order, timer, buddies, and player notes for this season — or skip
-              and do it later from the season selector.
+              and come back to it from the Players or Teams tab before you start assigning players manually.
             </p>
             <div className="flex gap-3">
               <button
