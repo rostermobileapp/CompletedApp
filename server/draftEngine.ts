@@ -335,7 +335,20 @@ async function setTurnDeadline(draftId: string, durationSeconds?: number) {
     | null) || {};
   const halvedMap = { ...(state.halvedNextTurn || {}) };
   let baseDur = durationSeconds ?? draft.timePerPick ?? 60;
-  if (pickingTeamId && halvedMap[pickingTeamId]) {
+
+  // Legacy compatibility: a draft saved with the old halve_next rule used a
+  // single `nextTimerOverride` integer instead of the per-team halvedNextTurn
+  // map. If we still see a legacy override on a halve_next draft, migrate it
+  // by halving this turn's timer once and clearing the override below.
+  const hasLegacyOverride =
+    draft.timerExpiryRule === "halve_next" &&
+    typeof draft.nextTimerOverride === "number" &&
+    draft.nextTimerOverride > 0 &&
+    pickingTeamId &&
+    !halvedMap[pickingTeamId];
+  if (hasLegacyOverride) {
+    baseDur = Math.max(5, Math.floor(baseDur / 2));
+  } else if (pickingTeamId && halvedMap[pickingTeamId]) {
     baseDur = Math.max(5, Math.floor(baseDur / 2));
     delete halvedMap[pickingTeamId];
   }

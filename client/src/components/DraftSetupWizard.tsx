@@ -27,7 +27,7 @@ type TimerExpiryRule = "auto_pick" | "halve_next";
 function timerRuleLabel(rule: TimerExpiryRule): string {
   if (rule === "halve_next")
     return "+30s extension, then halve your next pick's timer";
-  return "Auto-pick best available";
+  return "Auto-pick a random available player";
 }
 
 function goalieMethodLabel(m: string): string {
