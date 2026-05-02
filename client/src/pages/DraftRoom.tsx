@@ -24,6 +24,7 @@ import {
   Hourglass,
   Zap,
   StickyNote,
+  Shield,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -102,6 +103,20 @@ export default function DraftRoom() {
   const [showChat, setShowChat] = useState(false);
   const [cardUserId, setCardUserId] = useState<string | null>(null);
   const [teamPanelId, setTeamPanelId] = useState<string | null>(null);
+  // Pick announcement modal: shown for 4s whenever any captain makes a pick.
+  const [lastPick, setLastPick] = useState<{
+    teamId: string;
+    playerId: string | null;
+    round: number;
+    pick: number;
+    isAutoPick: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (!lastPick) return;
+    const id = setTimeout(() => setLastPick(null), 4000);
+    return () => clearTimeout(id);
+  }, [lastPick]);
+
   // In-room buzzer banner: shown for ~6s when the engine fires
   // draft_buzzer_extension on this draft.
   const [buzzerBanner, setBuzzerBanner] = useState<{ at: number } | null>(null);
@@ -138,7 +153,8 @@ export default function DraftRoom() {
     });
     const offPick = ws.subscribe("draft_pick_made", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
-      // Server will broadcast a fresh draft_state right after.
+      const { teamId, playerId, round, pick, isAutoPick } = data.payload;
+      setLastPick({ teamId, playerId: playerId ?? null, round, pick, isAutoPick: !!isAutoPick });
     });
     const offChat = ws.subscribe("draft_chat", (data: any) => {
       if (!data.payload || data.payload.draftId !== draftId) return;
@@ -1030,6 +1046,88 @@ export default function DraftRoom() {
           </div>
         </div>
       )}
+
+      {/* Pick announcement modal — auto-dismisses after 4s */}
+      {lastPick && (() => {
+        const announcedTeam = teamById.get(lastPick.teamId);
+        const announcedMember = lastPick.playerId ? memberById.get(lastPick.playerId) : null;
+        const playerName = announcedMember
+          ? [announcedMember.user.firstName, announcedMember.user.lastName].filter(Boolean).join(" ") ||
+            announcedMember.user.displayName ||
+            "Player"
+          : "Unknown Player";
+        const isGoalie = announcedMember?.membership?.isGoalie;
+        const imgUrl = announcedMember?.user?.profileImageUrl
+          ? getImageUrl(announcedMember.user.profileImageUrl)
+          : null;
+        const ordinal = (n: number) => {
+          const s = ["th","st","nd","rd"], v = n % 100;
+          return n + (s[(v-20)%10] || s[v] || s[0]);
+        };
+        return (
+          <div
+            className="fixed inset-x-0 bottom-20 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-[60] flex justify-center px-4 pointer-events-none"
+            data-testid="pick-announcement-modal"
+          >
+            <div className="pointer-events-auto bg-background border border-border rounded-2xl shadow-2xl p-5 w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">
+                    {lastPick.isAutoPick ? "Auto-pick" : "Pick made"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setLastPick(null)}
+                  className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                  data-testid="button-dismiss-pick-announcement"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Avatar */}
+                <div className="relative shrink-0">
+                  {imgUrl ? (
+                    <img
+                      src={imgUrl}
+                      alt={playerName}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-primary/30"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                      <Users className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  {isGoalie && (
+                    <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                      <Shield className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-lg leading-tight truncate">{playerName}</div>
+                  {isGoalie && (
+                    <span className="inline-block text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded mb-0.5 font-medium">
+                      Goalie
+                    </span>
+                  )}
+                  <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <Crown className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate font-medium">{announcedTeam?.name ?? "Unknown team"}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Round {lastPick.round} · {ordinal(lastPick.pick)} overall
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

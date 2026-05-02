@@ -531,7 +531,14 @@ async function applyPick(
 
   broadcastToDraft(draftId, {
     type: "draft_pick_made",
-    payload: { draftId, teamId, playerId, round: draft.currentRound, pick: overall },
+    payload: {
+      draftId,
+      teamId,
+      playerId,
+      round: draft.currentRound,
+      pick: overall,
+      isAutoPick: !!opts?.expired,
+    },
   });
 
   await advanceTurn(draftId, true);
