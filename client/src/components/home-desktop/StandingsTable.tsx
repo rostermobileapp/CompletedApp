@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 
 interface StandingsRow {
@@ -18,15 +19,24 @@ interface StandingsTableProps {
   effectiveLeagueId?: string | null;
   userTeamIdsInLeague: string[];
   seasonLabel?: string;
+  seasonId?: string | null;
 }
 
 export function StandingsTable({
   effectiveLeagueId,
   userTeamIdsInLeague,
   seasonLabel,
+  seasonId,
 }: StandingsTableProps) {
   const { data: standings, isLoading } = useQuery<StandingsRow[]>({
-    queryKey: ['/api/leagues', effectiveLeagueId, 'standings'],
+    queryKey: ['/api/leagues', effectiveLeagueId, 'standings', seasonId ?? null],
+    queryFn: async () => {
+      const url = seasonId
+        ? `/api/leagues/${effectiveLeagueId}/standings?seasonId=${seasonId}`
+        : `/api/leagues/${effectiveLeagueId}/standings`;
+      const res = await apiRequest('GET', url);
+      return res.json();
+    },
     enabled: !!effectiveLeagueId,
     staleTime: 60_000,
   });

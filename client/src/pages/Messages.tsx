@@ -863,6 +863,18 @@ export default function Messages() {
   // team filter. Group conversations (team_group, custom_group, captain_only)
   // keep their pre-existing scoping because they're inherently tied to a
   // league or team.
+  //
+  // Season awareness: build a lookup of teamId → seasonId from the user's
+  // teams so group conversations for a DIFFERENT season's team can be hidden
+  // when the user has switched to a new season.
+  const teamSeasonMap = useMemo(() => {
+    const m: Record<string, string | null> = {};
+    (userTeams as any[]).forEach((t: any) => {
+      if (t.id) m[t.id] = t.seasonId ?? null;
+    });
+    return m;
+  }, [userTeams]);
+
   const conversations = useMemo(() => {
     const isDirect = (conv: Conversation) => conv.type === 'direct';
 
@@ -880,17 +892,29 @@ export default function Messages() {
         return conv.tournamentId === selectedTournamentId;
       }
       if (selectedTeamId) {
-        const selectedTeamData = userTeams.find((t: any) => t.id === selectedTeamId);
+        const selectedTeamData = (userTeams as any[]).find((t: any) => t.id === selectedTeamId);
         const teamLeagueId = selectedTeamData?.leagueId;
+        const teamSeasonId = selectedTeamData?.seasonId ?? null;
         if (teamLeagueId && conv.leagueId !== teamLeagueId) return false;
-        return conv.teamId === selectedTeamId || conv.teamId === null;
+        // League-wide group convs (no teamId) always pass through.
+        if (conv.teamId === null || conv.teamId === undefined) return true;
+        // This team's own conversations always pass.
+        if (conv.teamId === selectedTeamId) return true;
+        // Filter out conversations belonging to a different season's team.
+        // If we don't have season info for the conv's team, allow it through
+        // (e.g. legacy teams without a seasonId).
+        if (teamSeasonId !== null && conv.teamId in teamSeasonMap) {
+          const convTeamSeasonId = teamSeasonMap[conv.teamId];
+          if (convTeamSeasonId !== null && convTeamSeasonId !== teamSeasonId) return false;
+        }
+        return false;
       }
       if (selectedLeagueId) {
         return conv.leagueId === selectedLeagueId;
       }
       return true;
     });
-  }, [allConversations, effectiveDmScope, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
+  }, [allConversations, effectiveDmScope, selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams, teamSeasonMap]);
 
   // Fetch unread message counts per conversation
   const { data: unreadCountsData } = useQuery<{ unreadCounts: Array<{ conversationId: string; unreadCount: number }> }>({

@@ -91,6 +91,21 @@ export default function PaymentRequests() {
     return map;
   }, [userTeams]);
 
+  // Set of team IDs that belong to the currently active season within each
+  // league. Used to exclude cross-season payments when a league is selected.
+  const activeSeasonTeamIds = useMemo(() => {
+    const ids = new Set<string>();
+    userTeams.forEach((team: any) => {
+      if (!team.id) return;
+      // Teams with no seasonId are legacy/standalone teams — always included.
+      // Teams with a seasonId are included only when that season is active.
+      if (team.seasonId === null || team.seasonId === undefined || team.seasonIsActive === true) {
+        ids.add(team.id);
+      }
+    });
+    return ids;
+  }, [userTeams]);
+
   const { data: allCreatedRequests = [], isLoading: createdLoading } = useQuery({
     queryKey: ['/api/payment-requests/created/by-me'],
   });
@@ -105,9 +120,12 @@ export default function PaymentRequests() {
     }
     if (selectedType === 'league' && selectedLeagueId) {
       return requests.filter(request => {
-        if (request.leagueId === selectedLeagueId) return true;
-        if (!request.leagueId && !request.teamId) return true;
-        return false;
+        if (request.leagueId !== selectedLeagueId) return false;
+        // If the request is tied to a specific team, only show it when that team
+        // belongs to the currently active season. This hides prior-season team
+        // payments when the user has a league selected.
+        if (request.teamId) return activeSeasonTeamIds.has(request.teamId);
+        return true;
       });
     }
     if (selectedType === 'team' && selectedTeamId) {
@@ -126,11 +144,11 @@ export default function PaymentRequests() {
 
   const createdRequestsArray = useMemo(() => {
     return filterPaymentRequests(allCreatedRequests as any[]);
-  }, [allCreatedRequests, selectedType, selectedTeamId, selectedLeagueId, teamLeagueMap]);
+  }, [allCreatedRequests, selectedType, selectedTeamId, selectedLeagueId, teamLeagueMap, activeSeasonTeamIds]);
 
   const receivedRequestsArray = useMemo(() => {
     return filterPaymentRequests(allReceivedRequests as any[]);
-  }, [allReceivedRequests, selectedType, selectedTeamId, selectedLeagueId, teamLeagueMap]);
+  }, [allReceivedRequests, selectedType, selectedTeamId, selectedLeagueId, teamLeagueMap, activeSeasonTeamIds]);
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="payment-requests-page">

@@ -106,9 +106,22 @@ export default function Teams() {
       return all.filter((t: any) => t.id === selectedTeamId);
     }
     if (selectedType === 'league' && (selectedLeagueId || selectedTournamentId === null)) {
-      // selectedLeagueId is the same as selectedId when type === 'league'
       const id = selectedLeagueId;
-      return id ? all.filter((t: any) => t.leagueId === id) : all;
+      if (!id) return all;
+      const leagueTeams = all.filter((t: any) => t.leagueId === id);
+      // If any teams in this league are season-tagged, show only the active season's
+      // teams (plus any legacy no-season teams). This prevents old seasons' teams
+      // from appearing on My Team when the user has the league selected.
+      const hasSeasonedTeams = leagueTeams.some((t: any) => t.seasonId);
+      if (hasSeasonedTeams) {
+        const activeSeasonTeams = leagueTeams.filter(
+          (t: any) => t.seasonId === null || t.seasonIsActive === true
+        );
+        // If the active season filter yields at least one team, use it. Otherwise
+        // fall back to all league teams so the page is never accidentally blank.
+        if (activeSeasonTeams.length > 0) return activeSeasonTeams;
+      }
+      return leagueTeams;
     }
     return all;
   })();
@@ -285,9 +298,18 @@ export default function Teams() {
     enabled: !!currentTeam?.leagueId && !!teamMembers && teamMembers.length > 0,
   });
 
-  // Fetch league standings
+  // Fetch league standings — scoped to the current team's season so prior-season
+  // results don't bleed through when the user switches to a new season's team.
   const { data: leagueStandings = [] } = useQuery({
-    queryKey: ['/api/leagues', currentTeam?.leagueId, 'standings'],
+    queryKey: ['/api/leagues', currentTeam?.leagueId, 'standings', currentTeam?.seasonId ?? null],
+    queryFn: async () => {
+      if (!currentTeam?.leagueId) return [];
+      const url = currentTeam?.seasonId
+        ? `/api/leagues/${currentTeam.leagueId}/standings?seasonId=${currentTeam.seasonId}`
+        : `/api/leagues/${currentTeam.leagueId}/standings`;
+      const res = await apiRequest('GET', url);
+      return res.json();
+    },
     enabled: !!currentTeam?.leagueId,
   }) as { data: any[] };
 

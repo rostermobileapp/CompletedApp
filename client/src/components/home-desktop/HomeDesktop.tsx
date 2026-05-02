@@ -114,6 +114,18 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
     return seasons.find((s) => s?.isActive) || seasons[0] || null;
   }, [seasons]);
 
+  // Effective season id: prefer the selected team's own seasonId, fall back to the
+  // league's active season. This ensures standings (and other season-scoped data)
+  // always show data for the season the user currently has selected, not all-time.
+  const effectiveSeasonId = useMemo<string | null>(() => {
+    if (isTournamentScope) return null;
+    if (selectedType === 'team' && selectedTeamId && Array.isArray(userTeams)) {
+      const t = userTeams.find((x: any) => x.id === selectedTeamId);
+      if (t?.seasonId) return t.seasonId;
+    }
+    return activeSeason?.id || null;
+  }, [isTournamentScope, selectedType, selectedTeamId, userTeams, activeSeason]);
+
   const seasonLabel: string | undefined =
     activeSeason?.name ||
     (activeSeason?.year ? String(activeSeason.year) : undefined) ||
@@ -173,6 +185,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
               effectiveLeagueId={effectiveLeagueId}
               userTeamIdsInLeague={userTeamIdsInLeague}
               seasonLabel={seasonLabel}
+              seasonId={effectiveSeasonId}
             />
           </div>
         )}
