@@ -22,6 +22,7 @@ import {
   commissionerPick,
   postChat,
   getDraftStateBundle,
+  undoLastPick,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -387,6 +388,25 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     } catch (err) {
       console.error("Make pick error:", err);
       res.status(500).json({ message: "Failed to make pick" });
+    }
+  });
+
+  // === Undo last pick (commissioner only, within UNDO_WINDOW_MS) ===
+  app.post("/api/drafts/:draftId/undo", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can undo a pick" });
+      }
+      const result = await undoLastPick(draftId);
+      if (!result.ok) return res.status(400).json({ message: result.error });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Undo pick error:", err);
+      res.status(500).json({ message: "Failed to undo pick" });
     }
   });
 

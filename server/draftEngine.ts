@@ -13,7 +13,10 @@ import {
   type DraftBuddyPair,
   type User,
 } from "@shared/schema";
-import { eq, and, asc, isNull, inArray } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, inArray } from "drizzle-orm";
+
+// How long after a pick the commissioner can undo it (milliseconds)
+export const UNDO_WINDOW_MS = 30_000;
 
 // In-memory map of active draft timers (draftId -> setTimeout handle)
 const activeTimers = new Map<string, NodeJS.Timeout>();
@@ -655,6 +658,126 @@ export async function postChat(draftId: string, userId: string, body: string) {
     .values({ draftId, userId, body: trimmed })
     .returning();
   broadcastToDraft(draftId, { type: "draft_chat", payload: row });
+}
+
+/**
+ * Commissioner-only: undo the most recent primary pick made within
+ * UNDO_WINDOW_MS. Reverts the pick row, any buddy auto-picks that were created
+ * as a side-effect, and the buddy-forfeit placeholder for the next round.
+ * Restores currentRound/currentTurn and restarts the turn timer.
+ */
+export async function undoLastPick(
+  draftId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status !== "active") {
+    return { ok: false, error: "Can only undo while the draft is active" };
+  }
+
+  // Find the most recent primary pick (not auto-buddy, not forfeited, has a player).
+  const recent = await db
+    .select()
+    .from(draftPicks)
+    .where(
+      and(
+        eq(draftPicks.draftId, draftId),
+        eq(draftPicks.isAutoBuddy, false),
+        eq(draftPicks.forfeited, false),
+      ),
+    )
+    .orderBy(desc(draftPicks.pickedAt))
+    .limit(1);
+
+  const lastPick = recent[0];
+  if (!lastPick || !lastPick.playerId || !lastPick.pickedAt) {
+    return { ok: false, error: "No picks to undo" };
+  }
+
+  const ageMs = Date.now() - new Date(lastPick.pickedAt).getTime();
+  if (ageMs > UNDO_WINDOW_MS) {
+    return { ok: false, error: "Undo window has expired" };
+  }
+
+  // Identify auto-buddy children for this primary pick.
+  const buddyChildren = await db
+    .select()
+    .from(draftPicks)
+    .where(
+      and(
+        eq(draftPicks.draftId, draftId),
+        eq(draftPicks.teamId, lastPick.teamId),
+        eq(draftPicks.round, lastPick.round),
+        eq(draftPicks.pickInRound, lastPick.pickInRound),
+        eq(draftPicks.isAutoBuddy, true),
+      ),
+    );
+
+  // If buddies were enforced, a forfeit placeholder was inserted for next round.
+  let buddyForfeit: DraftPick | null = null;
+  if (buddyChildren.length > 0) {
+    const candidates = await db
+      .select()
+      .from(draftPicks)
+      .where(
+        and(
+          eq(draftPicks.draftId, draftId),
+          eq(draftPicks.teamId, lastPick.teamId),
+          eq(draftPicks.round, lastPick.round + 1),
+          eq(draftPicks.forfeited, true),
+          isNull(draftPicks.playerId),
+        ),
+      );
+    buddyForfeit = candidates[0] || null;
+  }
+
+  await db.transaction(async (tx) => {
+    for (const c of buddyChildren) {
+      await tx.delete(draftPicks).where(eq(draftPicks.id, c.id));
+    }
+    if (buddyForfeit) {
+      await tx.delete(draftPicks).where(eq(draftPicks.id, buddyForfeit.id));
+    }
+    await tx.delete(draftPicks).where(eq(draftPicks.id, lastPick.id));
+
+    // Remove the buddy-induced forfeit entry from forfeitedRounds (one occurrence).
+    const forfeited = { ...((draft.forfeitedRounds as Record<string, number[]>) || {}) };
+    if (buddyForfeit && forfeited[lastPick.teamId]) {
+      const arr = [...forfeited[lastPick.teamId]];
+      const idx = arr.indexOf(lastPick.round + 1);
+      if (idx >= 0) arr.splice(idx, 1);
+      if (arr.length) forfeited[lastPick.teamId] = arr;
+      else delete forfeited[lastPick.teamId];
+    }
+
+    const newDeadline = new Date(Date.now() + (draft.timePerPick || 60) * 1000);
+    await tx
+      .update(drafts)
+      .set({
+        currentRound: lastPick.round,
+        currentTurn: lastPick.pickInRound,
+        currentTurnDeadline: newDeadline,
+        nextTimerOverride: null,
+        forfeitedRounds: forfeited,
+        updatedAt: new Date(),
+      })
+      .where(eq(drafts.id, draftId));
+  });
+
+  await startTurnTimer(draftId);
+  await broadcastState(draftId);
+  broadcastToDraft(draftId, {
+    type: "draft_pick_undone",
+    payload: {
+      draftId,
+      teamId: lastPick.teamId,
+      playerId: lastPick.playerId,
+      round: lastPick.round,
+      pickInRound: lastPick.pickInRound,
+    },
+  });
+
+  return { ok: true };
 }
 
 // Restart timers for any draft in 'active' status (called on server boot)

@@ -19,7 +19,10 @@ import {
   Trophy,
   Users,
   MessageCircle,
+  Undo2,
 } from "lucide-react";
+
+const UNDO_WINDOW_MS = 30_000;
 
 interface Draft {
   id: string;
@@ -249,6 +252,17 @@ export default function DraftRoom() {
       return res.json();
     },
   });
+  const undoMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/undo`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Pick undone", description: "The last pick has been reverted." });
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to undo", description: err?.message, variant: "destructive" }),
+  });
 
   const sendChat = () => {
     const trimmed = chatInput.trim();
@@ -276,6 +290,28 @@ export default function DraftRoom() {
   const pickingTeam = bundle.pickingTeamId ? teamById.get(bundle.pickingTeamId) : null;
   const pickingCaptain = pickingTeam?.captainId ? memberById.get(pickingTeam.captainId) : null;
 
+  // Most recent primary pick (commissioner can undo this within UNDO_WINDOW_MS).
+  const lastPrimaryPick = bundle.picks
+    .filter((p) => !p.isAutoBuddy && !p.forfeited && p.playerId)
+    .reduce<DraftPick | null>((latest, p) => {
+      if (!latest) return p;
+      return new Date(p.pickedAt).getTime() > new Date(latest.pickedAt).getTime() ? p : latest;
+    }, null);
+  const undoSecondsLeft = lastPrimaryPick
+    ? Math.max(
+        0,
+        Math.ceil(
+          (UNDO_WINDOW_MS -
+            (tickNow + serverDriftRef.current - new Date(lastPrimaryPick.pickedAt).getTime())) /
+            1000,
+        ),
+      )
+    : 0;
+  const canUndo =
+    isCommissioner && draft.status === "active" && !!lastPrimaryPick && undoSecondsLeft > 0;
+  const undonePlayer =
+    lastPrimaryPick?.playerId ? memberById.get(lastPrimaryPick.playerId) : null;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
@@ -302,6 +338,30 @@ export default function DraftRoom() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {canUndo && (
+              <button
+                onClick={() => {
+                  const name =
+                    undonePlayer?.user.firstName ||
+                    undonePlayer?.user.displayName ||
+                    "the last pick";
+                  if (
+                    window.confirm(
+                      `Undo ${name}? You have ${undoSecondsLeft}s left to revert this pick.`,
+                    )
+                  ) {
+                    undoMutation.mutate();
+                  }
+                }}
+                disabled={undoMutation.isPending}
+                className="px-2 py-1.5 hover:bg-muted rounded text-xs font-medium flex items-center gap-1 text-amber-600 dark:text-amber-400 disabled:opacity-50"
+                title={`Undo last pick (${undoSecondsLeft}s left)`}
+                data-testid="button-undo-pick"
+              >
+                <Undo2 className="w-4 h-4" />
+                <span className="font-mono">{undoSecondsLeft}s</span>
+              </button>
+            )}
             {isCommissioner && draft.status === "active" && (
               <button
                 onClick={() => pauseMutation.mutate()}
