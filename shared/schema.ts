@@ -1556,9 +1556,12 @@ export const lineCombinationAssignments = pgTable("line_combination_assignments"
 // Draft status enum
 export const draftStatusEnum = pgEnum("draft_status", [
   "created",
-  "in_progress", 
+  "in_progress",
   "completed",
-  "cancelled"
+  "cancelled",
+  "pending",
+  "active",
+  "paused",
 ]);
 
 // Draft round type enum
@@ -1571,16 +1574,37 @@ export const draftRoundTypeEnum = pgEnum("draft_round_type", [
 export const drafts = pgTable("drafts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  seasonId: varchar("season_id").references(() => seasons.id),
   name: varchar("name").notNull(),
-  status: draftStatusEnum("status").default("created").notNull(),
+  status: draftStatusEnum("status").default("pending").notNull(),
   roundType: draftRoundTypeEnum("round_type").default("snake").notNull(),
+  // Extended draft style: 'snake' | 'linear' | 'auction' | '3rd_round_reversal'
+  draftStyle: varchar("draft_style"),
+  // 'commissioner_assigned' | 'random_draw' | 'included_with_skaters'
+  goalieMethod: varchar("goalie_method").default("included_with_skaters"),
+  // 'auto_pick' | 'halve_next'
+  timerExpiryRule: varchar("timer_expiry_rule").default("auto_pick"),
+  skillRankingEnabled: boolean("skill_ranking_enabled").default(false).notNull(),
+  // 'letters' (A-D) | 'numbers' (1-5)
+  skillScale: varchar("skill_scale"),
+  // jsonb { [userId]: noteText }
+  playerNotes: jsonb("player_notes").default({}),
+  // jsonb { [teamId]: userId } for commissioner-assigned goalies
+  goalieAssignments: jsonb("goalie_assignments").default({}),
+  // jsonb { [teamId]: roundsArray[] } for buddy-forfeited rounds
+  forfeitedRounds: jsonb("forfeited_rounds").default({}),
   currentRound: integer("current_round").default(1).notNull(),
   currentTurn: integer("current_turn").default(1).notNull(),
   totalRounds: integer("total_rounds").default(10).notNull(),
   draftOrder: jsonb("draft_order"), // Array of team IDs in draft order
   timePerPick: integer("time_per_pick").default(120), // seconds
+  // Server-authoritative deadline for current pick
+  currentTurnDeadline: timestamp("current_turn_deadline"),
+  // Halved-timer override (set when prev captain forfeited via halve_next rule)
+  nextTimerOverride: integer("next_timer_override"),
   scheduledAt: timestamp("scheduled_at"),
   startedAt: timestamp("started_at"),
+  lockedAt: timestamp("locked_at"),
   completedAt: timestamp("completed_at"),
   createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1590,15 +1614,39 @@ export const drafts = pgTable("drafts", {
 // Draft picks table
 export const draftPicks = pgTable("draft_picks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  draftId: varchar("draft_id").references(() => drafts.id).notNull(),
+  draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }),
   round: integer("round").notNull(),
   pick: integer("pick").notNull(), // Overall pick number
   pickInRound: integer("pick_in_round").notNull(), // Pick number within round
+  isAutoBuddy: boolean("is_auto_buddy").default(false).notNull(),
+  expiredAutoPick: boolean("expired_auto_pick").default(false).notNull(),
+  forfeited: boolean("forfeited").default(false).notNull(),
   pickedAt: timestamp("picked_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Draft buddy pairs - groups of players linked together via buddy system
+export const draftBuddyPairs = pgTable("draft_buddy_pairs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
+  userIds: text("user_ids").array().notNull(), // 2+ user IDs linked together
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_draft_buddy_pairs_draft").on(table.draftId),
+]);
+
+// Draft chat messages - persisted captain chat during live draft
+export const draftChatMessages = pgTable("draft_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_draft_chat_messages_draft").on(table.draftId),
+]);
 
 // Player import sessions table
 export const playerImports = pgTable("player_imports", {
@@ -2678,6 +2726,33 @@ export const insertDraftPickSchema = createInsertSchema(draftPicks).omit({
   createdAt: true,
 });
 
+export const insertDraftBuddyPairSchema = createInsertSchema(draftBuddyPairs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDraftChatMessageSchema = createInsertSchema(draftChatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Draft setup wizard config schema (used by setup wizard endpoint)
+export const draftSetupConfigSchema = z.object({
+  draftStyle: z.enum(["snake", "linear", "auction", "3rd_round_reversal"]),
+  goalieMethod: z.enum(["commissioner_assigned", "random_draw", "included_with_skaters"]),
+  timerExpiryRule: z.enum(["auto_pick", "halve_next"]),
+  timePerPick: z.number().int().min(15).max(600),
+  totalRounds: z.number().int().min(1).max(30).optional(),
+  skillRankingEnabled: z.boolean(),
+  skillScale: z.enum(["letters", "numbers"]).nullable().optional(),
+  skillLevels: z.record(z.string(), z.string()).optional(), // userId -> tier
+  playerNotes: z.record(z.string(), z.string().max(200)).optional(),
+  buddyPairs: z.array(z.array(z.string()).min(2)).optional(),
+  goalieAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
+  draftOrder: z.array(z.string()).optional(), // teamId order
+});
+export type DraftSetupConfig = z.infer<typeof draftSetupConfigSchema>;
+
 export const insertSeasonSchema = createInsertSchema(seasons).omit({
   id: true,
   createdAt: true,
@@ -3339,6 +3414,10 @@ export type Draft = typeof drafts.$inferSelect;
 export type InsertDraft = z.infer<typeof insertDraftSchema>;
 export type DraftPick = typeof draftPicks.$inferSelect;
 export type InsertDraftPick = z.infer<typeof insertDraftPickSchema>;
+export type DraftBuddyPair = typeof draftBuddyPairs.$inferSelect;
+export type InsertDraftBuddyPair = z.infer<typeof insertDraftBuddyPairSchema>;
+export type DraftChatMessage = typeof draftChatMessages.$inferSelect;
+export type InsertDraftChatMessage = z.infer<typeof insertDraftChatMessageSchema>;
 export type PlayerImport = typeof playerImports.$inferSelect;
 export type InsertPlayerImport = z.infer<typeof insertPlayerImportSchema>;
 

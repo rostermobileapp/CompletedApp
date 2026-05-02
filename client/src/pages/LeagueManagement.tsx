@@ -86,6 +86,7 @@ import { GoogleAddressAutocomplete } from '@/components/GoogleAddressAutocomplet
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
+import { DraftSetupWizard } from '@/components/DraftSetupWizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -710,6 +711,8 @@ export default function LeagueManagement() {
   const [proEndMonth, setProEndMonth] = useState<string>(_ymOffset(5));
   const [showCreateSeason, setShowCreateSeason] = useState(false);
   const [showSeasonProPrompt, setShowSeasonProPrompt] = useState(false);
+  const [showDraftWizard, setShowDraftWizard] = useState(false);
+  const [showDraftAfterSeasonPrompt, setShowDraftAfterSeasonPrompt] = useState(false);
   const [newSeasonStep, setNewSeasonStep] = useState<NewSeasonStep>('close');
   const [closeCurrentSeason, setCloseCurrentSeason] = useState(true);
   const [notReturningMemberIds, setNotReturningMemberIds] = useState<Set<string>>(new Set());
@@ -2549,6 +2552,8 @@ export default function LeagueManagement() {
       if (data?.season?.id) {
         setSelectedSeasonId(data.season.id);
       }
+      // Offer to set up the draft right after a season is created
+      setShowDraftAfterSeasonPrompt(true);
       refetchSeasons();
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
@@ -2733,6 +2738,17 @@ export default function LeagueManagement() {
               <Plus className="w-4 h-4 mr-2 inline" />
               New Season
             </button>
+            {selectedSeasonId && teams.length >= 2 && (
+              <button
+                onClick={() => setShowDraftWizard(true)}
+                className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
+                data-testid="button-setup-draft"
+                title="Set up player draft for this season"
+              >
+                <Crown className="w-4 h-4" />
+                Setup Draft
+              </button>
+            )}
           </div>
         )}
 
@@ -5702,6 +5718,55 @@ export default function LeagueManagement() {
           </div>
         );
       })()}
+      {/* Draft Setup Wizard */}
+      {showDraftWizard && selectedSeasonId && (
+        <DraftSetupWizard
+          leagueId={leagueId}
+          seasonId={selectedSeasonId}
+          teams={teams as any}
+          onClose={() => setShowDraftWizard(false)}
+          onLaunched={(draftId) => {
+            setShowDraftWizard(false);
+            navigate(`/draft/${draftId}`);
+          }}
+        />
+      )}
+
+      {/* Post-Season Draft Prompt */}
+      {showDraftAfterSeasonPrompt && selectedSeasonId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[55] p-4">
+          <div className="bg-background rounded-xl hairline elev-inset max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-amber-500" />
+              <h3 className="text-lg font-bold">Set up the draft?</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Configure draft order, timer, buddies, and player notes for this season — or skip
+              and do it later from the season selector.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDraftAfterSeasonPrompt(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted"
+                data-testid="button-skip-draft-setup"
+              >
+                Maybe later
+              </button>
+              <button
+                onClick={() => {
+                  setShowDraftAfterSeasonPrompt(false);
+                  setShowDraftWizard(true);
+                }}
+                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+                data-testid="button-start-draft-setup"
+              >
+                Set up draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Facility Modal */}
       {showCreateFacility && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

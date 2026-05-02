@@ -45,6 +45,7 @@ import ScrimmageManagement from "@/pages/ScrimmageManagement";
 import InviteGroups from "@/pages/InviteGroups";
 import EditInviteGroup from "@/pages/EditInviteGroup";
 import LeagueManagement from "@/pages/LeagueManagement";
+import DraftRoom from "@/pages/DraftRoom";
 import LeagueList from "@/pages/LeagueList";
 import Calendar from "@/pages/Calendar";
 import GameDetails from "@/pages/GameDetails";
@@ -246,6 +247,7 @@ function Router() {
               <Route path="/invite-groups/new" component={EditInviteGroup} />
               <Route path="/invite-groups/:id" component={EditInviteGroup} />
               <Route path="/league-management" component={LeagueManagement} />
+              <Route path="/draft/:draftId" component={DraftRoom} />
               <Route path="/league/:leagueId/score-verification" component={ScoreVerification} />
               <Route path="/league-list" component={LeagueList} />
               <Route path="/calendar" component={Calendar} />

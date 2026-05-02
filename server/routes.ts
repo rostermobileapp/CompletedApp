@@ -102,6 +102,16 @@ import { startTournamentAccessJob } from "./tournamentAccessJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
 import { sendTeamEventPushNotification } from "./oneSignalNotifications";
+import { registerDraftRoutes, canViewDraft, canChatInDraft } from "./draftRoutes";
+import {
+  setDraftBroadcaster,
+  subscribeToDraft,
+  unsubscribeFromDraft,
+  unsubscribeUserFromAllDrafts,
+  postChat as draftPostChat,
+  getDraftStateBundle,
+  rehydrateActiveDraftTimers,
+} from "./draftEngine";
 
 // Module-level map to store active WebSocket connections by user ID
 // This allows broadcasting from anywhere in routes.ts
@@ -311,6 +321,13 @@ async function applyAdditionalTeamPaymentFromSession(
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Draft tool: setup wizard, draft engine routes, live draft room
+  registerDraftRoutes(app, isAuthenticated);
+  setDraftBroadcaster(broadcastToUser);
+  rehydrateActiveDraftTimers().catch((e) =>
+    console.error("[Draft] Failed to rehydrate active draft timers:", e),
+  );
 
   // Ensure tournaments.stripe_processed_session_ids exists in any deployed environment
   // (idempotent — safe to run on every startup; required for additional-team payment idempotency)
@@ -16929,6 +16946,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             break;
+
+          case 'draft_subscribe':
+            if (!userId || !data.draftId) return;
+            try {
+              const allowed = await canViewDraft(data.draftId, userId);
+              if (!allowed) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Not authorized for this draft' }));
+                return;
+              }
+              subscribeToDraft(data.draftId, userId);
+              const bundle = await getDraftStateBundle(data.draftId);
+              if (bundle) ws.send(JSON.stringify({ type: 'draft_state', payload: bundle }));
+            } catch (err) {
+              console.error('draft_subscribe error:', err);
+            }
+            break;
+
+          case 'draft_unsubscribe':
+            if (!userId || !data.draftId) return;
+            unsubscribeFromDraft(data.draftId, userId);
+            break;
+
+          case 'draft_chat':
+            if (!userId || !data.draftId || !data.body) return;
+            try {
+              const allowed = await canChatInDraft(data.draftId, userId);
+              if (!allowed) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Only captains and commissioner can chat' }));
+                return;
+              }
+              await draftPostChat(data.draftId, userId, String(data.body));
+            } catch (err) {
+              console.error('draft_chat error:', err);
+            }
+            break;
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
@@ -16943,6 +16995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (userId) {
         // Remove connection
         activeConnections.delete(userId);
+        unsubscribeUserFromAllDrafts(userId);
         
         // Update user offline status (wrapped in try-catch to prevent server crash)
         try {
