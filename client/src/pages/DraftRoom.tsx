@@ -25,6 +25,7 @@ import {
   Zap,
   StickyNote,
   Shield,
+  OctagonX,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -346,6 +347,16 @@ export default function DraftRoom() {
     onError: (err: any) =>
       toast({ title: "Failed to cancel", description: err?.message, variant: "destructive" }),
   });
+  const terminateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/terminate`, {});
+      return res.json();
+    },
+    onSuccess: () =>
+      toast({ title: "Draft terminated", description: "Picks so far have been committed to team rosters." }),
+    onError: (err: any) =>
+      toast({ title: "Failed to terminate", description: err?.message, variant: "destructive" }),
+  });
 
   const sendChat = () => {
     const trimmed = chatInput.trim();
@@ -474,6 +485,25 @@ export default function DraftRoom() {
                 data-testid="button-resume-draft"
               >
                 <Play className="w-5 h-5" />
+              </button>
+            )}
+            {isCommissioner && (draft.status === "active" || draft.status === "paused") && (
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Terminate this draft? All picks made so far will be committed to team rosters and the draft will end immediately. This cannot be undone."
+                    )
+                  ) {
+                    terminateMutation.mutate();
+                  }
+                }}
+                disabled={terminateMutation.isPending}
+                className="p-2 hover:bg-red-500/10 text-red-500 rounded disabled:opacity-50"
+                title="Terminate draft early"
+                data-testid="button-terminate-draft"
+              >
+                <OctagonX className="w-5 h-5" />
               </button>
             )}
             {isCommissioner && draft.status === "pending" && (
@@ -992,14 +1022,15 @@ export default function DraftRoom() {
       {/* Chat drawer */}
       {showChat && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 flex items-end"
+          className="fixed inset-0 z-[110] bg-black/40 flex items-end"
           onClick={() => setShowChat(false)}
         >
           <div
-            className="w-full bg-background rounded-t-2xl max-h-[70vh] flex flex-col"
+            className="w-full bg-background rounded-t-2xl flex flex-col"
+            style={{ maxHeight: "70dvh" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-3 border-b border-border flex items-center justify-between">
+            <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
               <h3 className="font-bold">Draft Chat</h3>
               <button
                 onClick={() => setShowChat(false)}
@@ -1009,9 +1040,9 @@ export default function DraftRoom() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
               {bundle.chatMessages.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center">No messages yet.</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No messages yet.</p>
               )}
               {bundle.chatMessages.map((msg) => {
                 const author = memberById.get(msg.userId);
@@ -1026,7 +1057,10 @@ export default function DraftRoom() {
               })}
               <div ref={chatEndRef} />
             </div>
-            <div className="p-3 border-t border-border flex gap-2">
+            <div
+              className="p-3 border-t border-border flex gap-2 shrink-0"
+              style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+            >
               <input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}

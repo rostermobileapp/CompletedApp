@@ -29,6 +29,7 @@ import {
   markCaptainReady,
   cancelDraftToPending,
   computePickingTeam,
+  terminateDraft,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -458,6 +459,29 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     } catch (err) {
       console.error("Cancel lobby error:", err);
       res.status(500).json({ message: "Failed to cancel lobby" });
+    }
+  });
+
+  // === Commissioner terminates the draft early ===
+  // Commits all picks made so far to team memberships and marks the draft
+  // completed, exactly like a natural end-of-rounds completion.
+  app.post("/api/drafts/:draftId/terminate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can terminate the draft" });
+      }
+      if (draft.status === "completed") {
+        return res.status(400).json({ message: "Draft is already completed" });
+      }
+      await terminateDraft(draftId);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Terminate draft error:", err);
+      res.status(500).json({ message: "Failed to terminate draft" });
     }
   });
 

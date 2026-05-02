@@ -387,6 +387,12 @@ async function advanceTurn(draftId: string, resetTimer: boolean) {
   await broadcastState(draftId);
 }
 
+// Public alias used by the /terminate route so the commissioner can end
+// the draft early; produces identical results to a natural completion.
+export async function terminateDraft(draftId: string) {
+  return completeDraft(draftId);
+}
+
 async function completeDraft(draftId: string) {
   clearDraftTimer(draftId);
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
