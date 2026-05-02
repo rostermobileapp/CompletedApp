@@ -141,6 +141,20 @@ export function ActiveDraftsBanner() {
     // each row keeps the countdown UI fresh between server updates.
   });
 
+  // Subscribe to every active draft's WebSocket channel so the banner gets
+  // server-authoritative updates the moment a pick is made, the timer ticks,
+  // or a lobby transitions. Without explicit draft_subscribe, the server
+  // would only broadcast to clients inside the draft room itself, and the
+  // banner would be stale until a manual refetch.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const ids = activeDrafts.map((d) => d.id);
+    ids.forEach((id) => ws.send({ type: "draft_subscribe", draftId: id }));
+    return () => {
+      ids.forEach((id) => ws.send({ type: "draft_unsubscribe", draftId: id }));
+    };
+  }, [ws, isAuthenticated, activeDrafts]);
+
   // Refresh the banner whenever a draft transitions or ticks on the server,
   // so the round / picking captain / deadline stay in sync.
   useEffect(() => {
