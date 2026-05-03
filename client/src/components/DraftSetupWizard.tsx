@@ -244,6 +244,21 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
 
   const saveMutation = useMutation({
     mutationFn: async (launch: boolean) => {
+      const existingStatus = existing?.draft?.status as string | undefined;
+
+      // If the draft is already in-flight (awaiting_captains or active) we
+      // must NOT try to save — the server will reject edits to a started draft.
+      // Just skip straight to the launch callback so the commissioner lands on
+      // the live draft page.
+      if (launch && (existingStatus === "active" || existingStatus === "awaiting_captains")) {
+        return { draft: existing!.draft, alreadyActive: true };
+      }
+
+      // Completed drafts can't be relaunched at all.
+      if (existingStatus === "completed") {
+        throw new Error("This draft has already been completed and cannot be relaunched.");
+      }
+
       const body = {
         draftStyle,
         goalieMethod,
@@ -277,10 +292,19 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       }
       return data;
     },
-    onSuccess: (data, launch) => {
+    onSuccess: (data: any, launch) => {
       queryClient.invalidateQueries({
         queryKey: ["/api/leagues", leagueId, "seasons", seasonId, "draft"],
       });
+      if (data.alreadyActive) {
+        toast({
+          title: "Draft is already running",
+          description: "Taking you to the live draft.",
+        });
+        if (onLaunched) onLaunched(data.draft.id);
+        onClose();
+        return;
+      }
       toast({
         title: launch ? "Draft started!" : "Draft saved",
         description: launch
@@ -991,22 +1015,35 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
             </button>
           ) : (
             <>
-              <button
-                onClick={() => saveMutation.mutate(false)}
-                disabled={saveMutation.isPending}
-                className="flex-1 px-4 py-2 border border-primary text-primary rounded-lg text-sm font-medium disabled:opacity-50"
-                data-testid="button-wizard-save"
-              >
-                {saveMutation.isPending ? "Saving..." : "Save Only"}
-              </button>
-              <button
-                onClick={() => saveMutation.mutate(true)}
-                disabled={saveMutation.isPending}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center justify-center gap-1 disabled:opacity-50"
-                data-testid="button-wizard-launch"
-              >
-                <Snowflake className="w-4 h-4" /> Launch Draft
-              </button>
+              {(() => {
+                const draftStatus = existing?.draft?.status as string | undefined;
+                const isLive =
+                  draftStatus === "active" || draftStatus === "awaiting_captains";
+                const isCompleted = draftStatus === "completed";
+                return (
+                  <>
+                    {!isLive && !isCompleted && (
+                      <button
+                        onClick={() => saveMutation.mutate(false)}
+                        disabled={saveMutation.isPending}
+                        className="flex-1 px-4 py-2 border border-primary text-primary rounded-lg text-sm font-medium disabled:opacity-50"
+                        data-testid="button-wizard-save"
+                      >
+                        {saveMutation.isPending ? "Saving..." : "Save Only"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => saveMutation.mutate(true)}
+                      disabled={saveMutation.isPending || isCompleted}
+                      className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center justify-center gap-1 disabled:opacity-50"
+                      data-testid="button-wizard-launch"
+                    >
+                      <Snowflake className="w-4 h-4" />
+                      {isLive ? "Go to Draft" : isCompleted ? "Draft Completed" : "Launch Draft"}
+                    </button>
+                  </>
+                );
+              })()}
             </>
           )}
         </div>
