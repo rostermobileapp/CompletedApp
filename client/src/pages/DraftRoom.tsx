@@ -413,6 +413,11 @@ export default function DraftRoom() {
     onSuccess: () => {
       setCardUserId(null);
       setPendingPickUserId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+      if (draft?.leagueId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId, "teams"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId, "draft-players"] });
+      }
     },
     onError: (err: any) => {
       setPendingPickUserId(null);
