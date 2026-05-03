@@ -1841,13 +1841,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         ],
         allow_promotion_codes: true,
-        cancel_url: `${appUrl}/subscription`,
         client_reference_id: userId,
         metadata: {
           userId: userId,
         },
       };
 
+      // NOTE: Stripe rejects `cancel_url` whenever `ui_mode: 'embedded'` is set
+      // (Stripe error: "`cancel_url` is not supported with `ui_mode: embedded`").
+      // Only attach it on the hosted-checkout branch.
       const session = embedded
         ? await stripe.checkout.sessions.create({
             ...baseSessionParams,
@@ -1859,6 +1861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         : await stripe.checkout.sessions.create({
             ...baseSessionParams,
+            cancel_url: `${appUrl}/subscription`,
             success_url: `${appUrl}/subscription?success=true`,
           });
 
@@ -1962,7 +1965,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: 1,
           },
         ],
-        cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
         client_reference_id: userId,
         metadata: {
           userId: userId,
@@ -1971,6 +1973,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
+      // Stripe rejects `cancel_url` with `ui_mode: embedded`; only attach it
+      // on the hosted-checkout branch.
       const session = embedded
         ? await stripe.checkout.sessions.create({
             ...baseSessionParams,
@@ -1982,6 +1986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         : await stripe.checkout.sessions.create({
             ...baseSessionParams,
+            cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
             success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
           });
 
@@ -2108,7 +2113,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: additionalTeamCount,
           },
         ],
-        cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
         client_reference_id: userId,
         metadata: {
           userId: userId,
@@ -2118,6 +2122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
+      // Stripe rejects `cancel_url` with `ui_mode: embedded`; only attach it
+      // on the hosted-checkout branch.
       const session = embedded
         ? await stripe.checkout.sessions.create({
             ...baseSessionParams,
@@ -2127,6 +2133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         : await stripe.checkout.sessions.create({
             ...baseSessionParams,
+            cancel_url: `${appUrl}/tournaments/${tournamentId}?payment=cancelled`,
             success_url: `${appUrl}/tournaments/${tournamentId}?payment=success&additional=true&session_id={CHECKOUT_SESSION_ID}`,
           });
 
@@ -2861,7 +2868,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             quantity: 1,
           },
         ],
-        cancel_url: `${appUrl}/league-management?leagueId=${leagueId}&league_pro=cancelled`,
         client_reference_id: userId,
         metadata: {
           type: 'league_pro_bulk',
@@ -2874,6 +2880,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
+      // Stripe rejects `cancel_url` with `ui_mode: embedded`; only attach it
+      // on the hosted-checkout branch.
       const session = embedded
         ? await stripe.checkout.sessions.create({
             ...baseSessionParams,
@@ -2883,6 +2891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         : await stripe.checkout.sessions.create({
             ...baseSessionParams,
+            cancel_url: `${appUrl}/league-management?leagueId=${leagueId}&league_pro=cancelled`,
             success_url: `${appUrl}/league-management?leagueId=${leagueId}&league_pro=success&session_id={CHECKOUT_SESSION_ID}`,
           });
 
