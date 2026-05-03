@@ -393,59 +393,175 @@ export async function terminateDraft(draftId: string) {
   return completeDraft(draftId);
 }
 
-async function completeDraft(draftId: string) {
-  clearDraftTimer(draftId);
+/**
+ * Idempotently assign every drafted player to their team.
+ *
+ * Writes to BOTH stores so the rosters appear everywhere:
+ *  1. `team_memberships` — direct team roster.
+ *  2. `league_memberships.assignedTeamId` — the **authoritative** source the
+ *     league management UI reads from (storage.getTeamsByLeague treats this
+ *     as the priority source). Without this, drafted players showed up
+ *     orphaned at the league level — the bug the user hit.
+ *
+ * Returns the list of (userId, teamId) assignments that were *applied for the
+ * first time* this run, so the caller can fire push notifications without
+ * spamming users on idempotent re-runs.
+ */
+export async function assignDraftedPlayersToTeams(
+  draftId: string,
+): Promise<{ userId: string; teamId: string }[]> {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
-  if (!draft) return;
+  if (!draft) return [];
 
-  // Write all drafted players to team_memberships (idempotent).
   const picks = await db
     .select()
     .from(draftPicks)
     .where(eq(draftPicks.draftId, draftId));
+
+  // (userId, teamId) pairs to assign — drafted picks + commissioner goalies.
+  const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
+  const pairs: { userId: string; teamId: string }[] = [];
   for (const pick of picks) {
     if (!pick.playerId || pick.forfeited) continue;
-    // Check existing membership
-    const existing = await db
-      .select()
-      .from(teamMemberships)
-      .where(and(eq(teamMemberships.teamId, pick.teamId), eq(teamMemberships.userId, pick.playerId)))
-      .limit(1);
-    if (existing.length === 0) {
-      await db.insert(teamMemberships).values({
-        teamId: pick.teamId,
-        userId: pick.playerId,
-        isCaptain: false,
-        status: "approved" as any,
-      });
-    }
+    pairs.push({ userId: pick.playerId, teamId: pick.teamId });
   }
-  // Also write commissioner-assigned goalies
-  const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
   for (const [teamId, userId] of Object.entries(goalieAssignments)) {
     if (!userId) continue;
-    const existing = await db
+    pairs.push({ userId, teamId });
+  }
+
+  const newlyAssigned: { userId: string; teamId: string }[] = [];
+
+  for (const { userId, teamId } of pairs) {
+    // 1) team_memberships — insert if not present.
+    const existingTM = await db
       .select()
       .from(teamMemberships)
       .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, userId)))
       .limit(1);
-    if (existing.length === 0) {
+    let didInsertOrUpdate = false;
+    if (existingTM.length === 0) {
       await db.insert(teamMemberships).values({
         teamId,
         userId,
         isCaptain: false,
         status: "approved" as any,
       });
+      didInsertOrUpdate = true;
     }
+
+    // 2) league_memberships.assignedTeamId — set if not already pointing at
+    //    this team. This is the field the league UI reads as authoritative.
+    const [lm] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, draft.leagueId),
+          eq(leagueMemberships.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (lm && lm.assignedTeamId !== teamId) {
+      await db
+        .update(leagueMemberships)
+        .set({ assignedTeamId: teamId })
+        .where(eq(leagueMemberships.id, lm.id));
+      didInsertOrUpdate = true;
+    }
+
+    if (didInsertOrUpdate) newlyAssigned.push({ userId, teamId });
   }
 
-  await db
-    .update(drafts)
-    .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
-    .where(eq(drafts.id, draftId));
+  return newlyAssigned;
+}
+
+/**
+ * Send a push notification to each newly drafted player congratulating them
+ * on the team they landed on. Best-effort — failures are swallowed per user
+ * so one bad subscription doesn't block the rest.
+ */
+async function notifyDraftedPlayers(
+  pairs: { userId: string; teamId: string }[],
+  leagueId: string,
+) {
+  if (pairs.length === 0) return;
+  // Lazy import to avoid a circular dep with storage at module load time.
+  const { sendPushNotificationToUser } = await import("./oneSignalNotifications");
+  const teamIds = Array.from(new Set(pairs.map((p) => p.teamId)));
+  const teamRows = teamIds.length
+    ? await db.select().from(teams).where(inArray(teams.id, teamIds))
+    : [];
+  const teamNameById = new Map(teamRows.map((t) => [t.id, t.name]));
+
+  await Promise.allSettled(
+    pairs.map(({ userId, teamId }) => {
+      const teamName = teamNameById.get(teamId) || "your new team";
+      return sendPushNotificationToUser({
+        userId,
+        title: "🎉 You've been drafted!",
+        message: `Congratulations — you were drafted to ${teamName}.`,
+        data: { type: "draft_result", leagueId, teamId },
+      }).catch((e) => {
+        console.error(`[Draft] push notify failed for user ${userId}:`, e);
+        return false;
+      });
+    }),
+  );
+}
+
+async function completeDraft(draftId: string) {
+  clearDraftTimer(draftId);
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return;
+
+  // Already completed? Don't re-notify, but still expose a way to re-run
+  // assignment via the public `finalizeDraft` helper below.
+  const wasAlreadyCompleted = draft.status === "completed";
+
+  const newlyAssigned = await assignDraftedPlayersToTeams(draftId);
+
+  if (!wasAlreadyCompleted) {
+    await db
+      .update(drafts)
+      .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(drafts.id, draftId));
+  }
+
+  // Fire-and-forget push notifications for first-time assignments only.
+  notifyDraftedPlayers(newlyAssigned, draft.leagueId).catch((e) =>
+    console.error("[Draft] notifyDraftedPlayers error:", e),
+  );
 
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
+}
+
+/**
+ * Public, idempotent re-run of the assignment + completion flow. Used by the
+ * commissioner-facing "Finalize" button as a safety net in case the automatic
+ * completion left anything unassigned (e.g. data added after completion, or
+ * a legacy completed draft from before this assignment fix shipped).
+ */
+export async function finalizeDraft(draftId: string): Promise<{
+  ok: boolean;
+  assigned: number;
+}> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, assigned: 0 };
+  const newlyAssigned = await assignDraftedPlayersToTeams(draftId);
+  if (draft.status !== "completed") {
+    await db
+      .update(drafts)
+      .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(drafts.id, draftId));
+  }
+  notifyDraftedPlayers(newlyAssigned, draft.leagueId).catch((e) =>
+    console.error("[Draft] notifyDraftedPlayers error:", e),
+  );
+  await broadcastState(draftId);
+  broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
+  return { ok: true, assigned: newlyAssigned.length };
 }
 
 async function applyPick(

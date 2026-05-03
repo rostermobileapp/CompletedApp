@@ -31,6 +31,7 @@ import {
   cancelDraftToPending,
   computePickingTeam,
   terminateDraft,
+  finalizeDraft,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -595,6 +596,28 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     } catch (err) {
       console.error("Reset draft error:", err);
       res.status(500).json({ message: "Failed to reset draft" });
+    }
+  });
+
+  // === Commissioner finalizes a completed (or in-progress) draft ===
+  // Idempotent: re-runs the assign-players-to-teams logic and re-fires push
+  // notifications for anything that wasn't already assigned. Safe to call
+  // multiple times; existing assignments are not duplicated and players who
+  // were already on their team won't receive a second notification.
+  app.post("/api/drafts/:draftId/finalize", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can finalize the draft" });
+      }
+      const result = await finalizeDraft(draftId);
+      res.json(result);
+    } catch (err) {
+      console.error("Finalize draft error:", err);
+      res.status(500).json({ message: "Failed to finalize draft" });
     }
   });
 

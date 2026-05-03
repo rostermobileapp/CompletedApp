@@ -191,6 +191,11 @@ export default function DraftRoom() {
     const offDone = ws.subscribe("draft_completed", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
       toast({ title: "Draft complete!", description: "Rosters have been finalized." });
+      // Refresh league + team rosters so the assigned players show up
+      // immediately in the league management UI.
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/league-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/teams"] });
     });
     const offBuzzer = ws.subscribe("draft_buzzer_extension", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
@@ -509,6 +514,32 @@ export default function DraftRoom() {
     onError: (err: any) =>
       toast({ title: "Failed to start", description: err?.message, variant: "destructive" }),
   });
+  const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const finalizeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/finalize`, {});
+      return res.json();
+    },
+    onSuccess: (data: { ok: boolean; assigned: number }) => {
+      setFinalizeOpen(false);
+      toast({
+        title: "Draft finalized",
+        description:
+          data.assigned > 0
+            ? `${data.assigned} player${data.assigned === 1 ? "" : "s"} assigned and notified.`
+            : "Rosters were already up to date.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+      if (draft?.leagueId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId, "teams"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/user/league-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/teams"] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to finalize", description: err?.message, variant: "destructive" }),
+  });
   const pauseMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/pause`, {});
@@ -820,8 +851,23 @@ export default function DraftRoom() {
           </div>
         )}
         {draft.status === "completed" && (
-          <div className="px-3 pb-2 text-center text-sm font-bold text-emerald-600 dark:text-emerald-400">
-            <Trophy className="inline w-4 h-4 mr-1" /> Draft complete! Rosters finalized.
+          <div className="px-3 pb-2 flex flex-col items-center gap-2">
+            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+              <Trophy className="inline w-4 h-4 mr-1" /> Draft complete! Rosters finalized.
+            </div>
+            {isCommissioner && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setFinalizeOpen(true)}
+                disabled={finalizeMutation.isPending}
+                data-testid="button-finalize-draft"
+              >
+                {finalizeMutation.isPending
+                  ? "Finalizing…"
+                  : "Re-finalize & notify drafted players"}
+              </Button>
+            )}
           </div>
         )}
         {draft.status === "awaiting_captains" && (
@@ -1513,6 +1559,36 @@ export default function DraftRoom() {
               data-testid="button-confirm-pick"
             >
               {pickMutation.isPending ? "Drafting…" : "Draft player"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Finalize confirmation */}
+      <AlertDialog open={finalizeOpen} onOpenChange={setFinalizeOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will assign every drafted player to their team in the
+              league and send each one a push notification congratulating
+              them on their new team. It's safe to run more than once —
+              players already on the right team won't be re-notified.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={finalizeMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                finalizeMutation.mutate();
+              }}
+              disabled={finalizeMutation.isPending}
+              data-testid="button-confirm-finalize"
+            >
+              {finalizeMutation.isPending ? "Finalizing…" : "Finalize & notify"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
