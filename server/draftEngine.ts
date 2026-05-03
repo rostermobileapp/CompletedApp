@@ -824,10 +824,31 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
 }
 
 export async function pauseDraft(draftId: string): Promise<{ ok: boolean }> {
+  // Stop the in-memory timeout/interval so no expiry handler will fire while
+  // paused.
   clearDraftTimer(draftId);
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false } as any;
+
+  // Snapshot the remaining seconds at pause-time and stash it in
+  // `nextTimerOverride` so we can resume from the exact same point. We also
+  // null out `currentTurnDeadline` so the client's `now - deadline` countdown
+  // freezes immediately (otherwise it kept ticking down to 0:00 even though
+  // the server timer was halted).
+  let remainingSec: number | null = null;
+  if (draft.currentTurnDeadline) {
+    const ms = new Date(draft.currentTurnDeadline).getTime() - Date.now();
+    remainingSec = Math.max(1, Math.ceil(ms / 1000));
+  }
+
   await db
     .update(drafts)
-    .set({ status: "paused", updatedAt: new Date() })
+    .set({
+      status: "paused",
+      currentTurnDeadline: null,
+      nextTimerOverride: remainingSec,
+      updatedAt: new Date(),
+    })
     .where(eq(drafts.id, draftId));
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_paused", payload: { draftId } });
@@ -835,11 +856,27 @@ export async function pauseDraft(draftId: string): Promise<{ ok: boolean }> {
 }
 
 export async function resumeDraft(draftId: string): Promise<{ ok: boolean }> {
+  // If we paused mid-turn we have a remaining-seconds snapshot stored in
+  // `nextTimerOverride`. Resume from exactly that, instead of resetting to a
+  // full `timePerPick` window (which would unfairly give the captain on the
+  // clock a brand-new pick window every time the commissioner pauses).
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false } as any;
+  const resumeSec =
+    typeof draft.nextTimerOverride === "number" && draft.nextTimerOverride > 0
+      ? draft.nextTimerOverride
+      : draft.timePerPick || 60;
+  const newDeadline = new Date(Date.now() + resumeSec * 1000);
+
   await db
     .update(drafts)
-    .set({ status: "active", updatedAt: new Date() })
+    .set({
+      status: "active",
+      currentTurnDeadline: newDeadline,
+      nextTimerOverride: null,
+      updatedAt: new Date(),
+    })
     .where(eq(drafts.id, draftId));
-  await setTurnDeadline(draftId);
   await startTurnTimer(draftId);
   await broadcastState(draftId);
   return { ok: true };

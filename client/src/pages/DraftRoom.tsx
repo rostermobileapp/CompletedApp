@@ -55,6 +55,7 @@ interface Draft {
   draftOrder: string[];
   timePerPick: number;
   currentTurnDeadline: string | null;
+  nextTimerOverride?: number | null;
   goalieAssignments: Record<string, string>;
   playerNotes: Record<string, string>;
   skillRankingEnabled: boolean;
@@ -599,9 +600,15 @@ export default function DraftRoom() {
   const deadlineMs = draft.currentTurnDeadline
     ? new Date(draft.currentTurnDeadline).getTime()
     : null;
-  const remainingSec = deadlineMs
-    ? Math.max(0, Math.floor((deadlineMs - tickNow + serverDriftRef.current) / 1000))
-    : 0;
+  // When the draft is paused, the server clears `currentTurnDeadline` and
+  // stashes the remaining seconds in `nextTimerOverride`. Show that frozen
+  // value so the timer visibly *stops* instead of ticking down to 0:00.
+  const remainingSec =
+    draft.status === "paused" && typeof draft.nextTimerOverride === "number"
+      ? Math.max(0, draft.nextTimerOverride)
+      : deadlineMs
+        ? Math.max(0, Math.floor((deadlineMs - tickNow + serverDriftRef.current) / 1000))
+        : 0;
   const totalSec = draft.timePerPick || 60;
   const pct = Math.min(100, Math.max(0, (remainingSec / totalSec) * 100));
   const pickingTeam = bundle.pickingTeamId ? teamById.get(bundle.pickingTeamId) : null;
