@@ -2663,6 +2663,21 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    // Fetch the set of leagueIds where the user is an approved PLAYER member
+    // (i.e. has a leagueMembership record). Being a commissioner of a league
+    // does NOT create a leagueMembership row, so commissioners who are not
+    // also players will have an empty set for their own leagues.
+    const playerLeagueRows = await db
+      .select({ leagueId: leagueMemberships.leagueId })
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.status, "approved")
+        )
+      );
+    const playerLeagueIds = new Set(playerLeagueRows.map(r => r.leagueId));
+
     // Build a map of leagueId -> authoritative assignedTeamId from leagueMemberships
     // This is the source of truth for which team a user is on within each league
     const leagueToAssignedTeam = new Map<string, string>();
@@ -2677,22 +2692,31 @@ export class DatabaseStorage implements IStorage {
     for (const r of teamMembershipResult) teamSeasonMap.set(r.team.id, r.team.seasonId ?? null);
     for (const r of leagueMembershipResult) teamSeasonMap.set(r.team.id, r.team.seasonId ?? null);
 
-    // Filter out teamMembership teams that are superseded by a league assignment.
-    // A team is only considered stale if it is in the SAME season context as the authoritative
-    // assignment. Teams in a different season (e.g., a demo/historical season) are kept so
-    // the user can still select them from the dashboard.
+    // Filter out teamMembership teams that are superseded by a league assignment,
+    // or that belong to a league where the user is NOT an approved player member.
+    //
+    // The second check prevents teams created during draft testing (where the
+    // commissioner picks for all teams and the engine writes teamMembership rows
+    // for the picking user) from appearing in the home dropdown when the
+    // commissioner has no actual player leagueMembership in those leagues.
     const filteredTeamMembershipTeams = teamMembershipResult
       .map(r => r.team)
       .filter(team => {
-        if (!team.leagueId) return true; // Not a league team, always include
+        if (!team.leagueId) return true; // standalone / non-league team, always include
+
+        // Require the user to be an approved player member of the league.
+        // Commissioner-only relationships don't create a leagueMembership row, so
+        // their accidental teamMembership records (e.g. from draft testing) are excluded.
+        if (!playerLeagueIds.has(team.leagueId)) return false;
+
         const authoritative = leagueToAssignedTeam.get(team.leagueId);
-        if (authoritative === undefined) return true; // No league membership for this league, include it
-        if (authoritative === team.id) return true; // Matches current assignment, include it
-        // Allow season-specific teams that belong to a different season than the authoritative
-        // assignment (e.g., user is in both a live season and a demo season of the same league)
+        if (authoritative === undefined) return true; // member of the league, no assigned team — include
+        if (authoritative === team.id) return true; // matches the explicit assignment — include
+        // Allow season-specific teams in a DIFFERENT season than the assigned team
+        // (e.g., historical seasons)
         const authoritativeSeasonId = teamSeasonMap.get(authoritative) ?? null;
         if (team.seasonId !== null && team.seasonId !== authoritativeSeasonId) return true;
-        return false; // Same season context, different team → stale, filter out
+        return false; // Same season, different team → stale, exclude
       });
 
     // Build a set of team IDs that come from the authoritative assignedTeamId source
