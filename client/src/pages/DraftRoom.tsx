@@ -331,15 +331,30 @@ export default function DraftRoom() {
 
   // All members for the carousel — drafted players & excluded goalies are
   // removed entirely so the rolodex always shows the live "remaining pool".
+  // Sorted alphabetically by last name (case-insensitive), with first name
+  // and then email as fallbacks so users without a last name still sort
+  // sensibly instead of all clumping at the top.
   const allMembersForCarousel = useMemo(() => {
     if (!members.length) return [];
     const isExcludedGoalie = (m: any) =>
       draft?.goalieMethod &&
       draft.goalieMethod !== "included_with_skaters" &&
       m.membership.isGoalie;
-    return members.filter(
-      (m: any) => !draftedSet.has(m.user.id) && !isExcludedGoalie(m),
-    );
+    const sortKey = (m: any) =>
+      (
+        m.user.lastName ||
+        m.user.firstName ||
+        m.user.displayName ||
+        m.user.email ||
+        ""
+      )
+        .toString()
+        .trim()
+        .toLowerCase();
+    return members
+      .filter((m: any) => !draftedSet.has(m.user.id) && !isExcludedGoalie(m))
+      .slice()
+      .sort((a: any, b: any) => sortKey(a).localeCompare(sortKey(b)));
   }, [members, draftedSet, draft]);
 
   const pickMutation = useMutation({
@@ -724,12 +739,38 @@ export default function DraftRoom() {
               data-testid="player-carousel"
             >
               {/* Top spacer — lets first card snap to center */}
-              <div style={{ height: "calc(50dvh - 116px)", minHeight: 16 }} aria-hidden="true" />
+              <div style={{ height: "calc(50dvh - 66px)", minHeight: 16 }} aria-hidden="true" />
 
               {allMembersForCarousel.map((m: any) => {
-                const isDrafted = draftedSet.has(m.user.id);
                 const hasBuddy = buddyUserIds.has(m.user.id);
                 const initial = (m.user.firstName?.[0] || m.user.email?.[0] || "?").toUpperCase();
+                // Compute age — prefer user.age, otherwise derive from
+                // dateOfBirth (YYYY-MM-DD or ISO). Fall back to "N/A".
+                let ageDisplay: string = "N/A";
+                if (typeof m.user.age === "number" && m.user.age > 0) {
+                  ageDisplay = String(m.user.age);
+                } else if (m.user.dateOfBirth) {
+                  const dob = new Date(m.user.dateOfBirth);
+                  if (!isNaN(dob.getTime())) {
+                    const now = new Date();
+                    let yrs = now.getFullYear() - dob.getFullYear();
+                    const mDiff = now.getMonth() - dob.getMonth();
+                    if (mDiff < 0 || (mDiff === 0 && now.getDate() < dob.getDate())) yrs--;
+                    if (yrs > 0 && yrs < 130) ageDisplay = String(yrs);
+                  }
+                }
+                // "Shoots" isn't tracked on the user profile yet — always
+                // show the field so the card layout stays consistent and
+                // the user can see when data is missing.
+                const shootsDisplay: string =
+                  (m.user.shoots as string | undefined) ||
+                  (m.membership?.shoots as string | undefined) ||
+                  "N/A";
+                const fullName =
+                  [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") ||
+                  m.user.displayName ||
+                  m.user.email ||
+                  "Unknown";
                 return (
                   <div
                     key={m.user.id}
@@ -737,7 +778,9 @@ export default function DraftRoom() {
                     className="relative px-3"
                     style={{
                       scrollSnapAlign: "center",
-                      height: 200,
+                      // Half the previous height so cards are compact and
+                      // many fit on screen at once.
+                      height: 100,
                       // Default to "off-center" so cards animate into place
                       // before the first scroll event fires.
                       ["--prox" as any]: "1",
@@ -746,21 +789,21 @@ export default function DraftRoom() {
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className="h-full rounded-3xl border-2 border-primary/70 bg-card flex items-center gap-4 px-5 cursor-pointer hover:border-primary"
+                      className="h-full rounded-2xl border-2 border-primary/70 bg-card flex items-center gap-3 px-4 cursor-pointer hover:border-primary"
                       onClick={() => setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
                         // ── Coverflow transform ──
-                        // • scale: 1.0 at center → 0.55 at the edges
-                        //   (much more dramatic than before so the focused card
-                        //   visually dominates).
+                        // • scale: 1.0 at center → 0.55 at the edges so the
+                        //   focused card visually dominates the rolodex.
                         // • translateY: pulls neighbors toward the centered
                         //   card so they overlap underneath it. Sign comes
                         //   from --dir (-1 above center, +1 below center).
-                        //   prox=0 → no shift, prox=1 → up to 90px overlap
-                        //   pulled toward center.
+                        //   With the shorter card height we increase the
+                        //   pull so cards properly stack on top of each
+                        //   other instead of just shrinking with gaps.
                         transform:
-                          "scale(calc(1 - var(--prox, 1) * 0.45)) translateY(calc(var(--prox, 1) * var(--dir, 0) * -90px))",
+                          "scale(calc(1 - var(--prox, 1) * 0.45)) translateY(calc(var(--prox, 1) * var(--dir, 0) * -75px))",
                         opacity:
                           "calc(1 - var(--prox, 1) * 0.75)",
                         transformOrigin: "center center",
@@ -768,11 +811,11 @@ export default function DraftRoom() {
                           "transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out",
                         willChange: "transform, opacity",
                         boxShadow:
-                          "0 calc((1 - var(--prox, 1)) * 30px) calc((1 - var(--prox, 1)) * 60px) -10px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.55))",
+                          "0 calc((1 - var(--prox, 1)) * 24px) calc((1 - var(--prox, 1)) * 48px) -10px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.55))",
                       }}
                     >
                       {/* Avatar */}
-                      <div className="w-14 h-14 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center border border-border">
+                      <div className="w-12 h-12 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center border border-border">
                         {m.user.profileImageUrl ? (
                           <img
                             src={getImageUrl(m.user.profileImageUrl) || ""}
@@ -780,45 +823,43 @@ export default function DraftRoom() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <span className="text-xl font-black text-muted-foreground">{initial}</span>
+                          <span className="text-lg font-black text-muted-foreground">{initial}</span>
                         )}
                       </div>
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="text-2xl font-black leading-tight truncate tracking-tight">
-                          {m.user.firstName || m.user.displayName || m.user.email}
-                          {m.user.lastName && (
-                            <span className="font-normal"> {m.user.lastName}</span>
+                        <div
+                          className="text-lg font-black leading-tight truncate tracking-tight"
+                          data-testid={`player-name-${m.user.id}`}
+                        >
+                          {fullName}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                          <span data-testid={`player-age-${m.user.id}`}>
+                            Age {ageDisplay}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span data-testid={`player-shoots-${m.user.id}`}>
+                            Shoots: {shootsDisplay}
+                          </span>
+                          {m.membership.isGoalie && (
+                            <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded text-[10px] font-bold">
+                              G
+                            </span>
+                          )}
+                          {draft.skillRankingEnabled && m.membership.skillLevel && (
+                            <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded text-[10px] font-bold">
+                              {m.membership.skillLevel}
+                            </span>
+                          )}
+                          {!!(draft.playerNotes || {})[m.user.id] && (
+                            <StickyNote className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                          )}
+                          {hasBuddy && (
+                            <Link2 className="w-3 h-3 text-pink-500 flex-shrink-0" />
                           )}
                         </div>
-                        {isDrafted ? (
-                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
-                            DRAFTED
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {m.user.age && (
-                              <span className="text-sm text-muted-foreground">Age {m.user.age}</span>
-                            )}
-                            {m.membership.isGoalie && (
-                              <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded text-xs font-bold">
-                                G
-                              </span>
-                            )}
-                            {draft.skillRankingEnabled && m.membership.skillLevel && (
-                              <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded text-xs font-bold">
-                                {m.membership.skillLevel}
-                              </span>
-                            )}
-                            {!!(draft.playerNotes || {})[m.user.id] && (
-                              <StickyNote className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                            )}
-                            {hasBuddy && (
-                              <Link2 className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" title="Has draft buddy" />
-                            )}
-                          </div>
-                        )}
                       </div>
 
                       {/* DRAFT button — opens a confirm dialog before picking */}
@@ -829,7 +870,7 @@ export default function DraftRoom() {
                             setPendingPickUserId(m.user.id);
                           }}
                           disabled={pickMutation.isPending}
-                          className="flex-shrink-0 border-2 border-primary text-primary rounded-xl px-4 py-3 font-black text-sm tracking-widest uppercase
+                          className="flex-shrink-0 border-2 border-primary text-primary rounded-lg px-3 py-2 font-black text-xs tracking-widest uppercase
                             hover:bg-primary hover:text-primary-foreground active:bg-primary active:text-primary-foreground
                             transition-colors disabled:opacity-40 disabled:pointer-events-none"
                           data-testid={`button-draft-${m.user.id}`}
@@ -843,7 +884,7 @@ export default function DraftRoom() {
               })}
 
               {/* Bottom spacer */}
-              <div style={{ height: "calc(50dvh - 116px)", minHeight: 16 }} aria-hidden="true" />
+              <div style={{ height: "calc(50dvh - 66px)", minHeight: 16 }} aria-hidden="true" />
             </div>
           )}
 
