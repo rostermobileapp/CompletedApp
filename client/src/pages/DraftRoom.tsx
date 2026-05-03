@@ -231,37 +231,82 @@ export default function DraftRoom() {
     if (activeView !== "players") return;
     const el = carouselRef.current;
     if (!el) return;
+
+    // Cache slot offsetTop/offsetHeight once per layout instead of calling
+    // getBoundingClientRect() on every slot on every scroll frame — that
+    // was the dominant cost (forced layout flush) and made scrolling feel
+    // ~15 Hz even though rAF was firing at the display rate.
+    type SlotEntry = { node: HTMLElement; top: number; mid: number };
+    let cache: SlotEntry[] = [];
     let raf = 0;
+
+    const rebuildCache = () => {
+      const slots = el.querySelectorAll<HTMLElement>("[data-carousel-slot]");
+      const next: SlotEntry[] = new Array(slots.length);
+      for (let i = 0; i < slots.length; i++) {
+        const node = slots[i];
+        const top = node.offsetTop;
+        next[i] = { node, top, mid: top + node.offsetHeight / 2 };
+      }
+      cache = next;
+    };
+
     const update = () => {
       raf = 0;
-      const slots = el.querySelectorAll<HTMLElement>("[data-carousel-slot]");
-      const rect = el.getBoundingClientRect();
-      const centerY = rect.top + rect.height / 2;
-      const maxDist = rect.height / 2;
-      slots.forEach((slot) => {
-        const sRect = slot.getBoundingClientRect();
-        const sCenter = sRect.top + sRect.height / 2;
-        const delta = sCenter - centerY;
-        const dist = Math.min(1, Math.abs(delta) / maxDist);
-        // dir: -1 = above center, +1 = below center, 0 at center
-        const dir = delta === 0 ? 0 : delta < 0 ? -1 : 1;
-        slot.style.setProperty("--prox", String(dist));
-        slot.style.setProperty("--dir", String(dir));
-        // Higher z-index when closer to center so the focused card visually
-        // overlaps its neighbors as they slide under it.
-        slot.style.zIndex = String(Math.round((1 - dist) * 100));
-      });
+      const containerH = el.clientHeight;
+      if (containerH <= 0) return;
+      const scrollMid = el.scrollTop + containerH / 2;
+      const maxDist = containerH / 2;
+      // Only touch slots that could plausibly be visible. Anything further
+      // than ~1.5× the container height away is offscreen and updating it
+      // wastes style writes (and re-paints) every frame.
+      const cutoff = containerH * 1.5;
+      for (let i = 0; i < cache.length; i++) {
+        const s = cache[i];
+        const delta = s.mid - scrollMid;
+        const abs = delta < 0 ? -delta : delta;
+        if (abs > cutoff) continue;
+        const dist = abs >= maxDist ? 1 : abs / maxDist;
+        const dir = delta < 0 ? -1 : delta > 0 ? 1 : 0;
+        const style = s.node.style;
+        // toFixed(3) is plenty for sub-pixel precision and keeps the
+        // generated CSS string short → faster style invalidation.
+        style.setProperty("--prox", dist.toFixed(3));
+        style.setProperty("--dir", dir === 0 ? "0" : dir === 1 ? "1" : "-1");
+        style.zIndex = String(((1 - dist) * 100) | 0);
+      }
     };
+
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(update);
     };
+
+    const onResize = () => {
+      rebuildCache();
+      onScroll();
+    };
+
+    rebuildCache();
     update();
+
     el.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
+
+    // Rebuild the position cache whenever the carousel's child list changes
+    // (player gets drafted → filtered out, or list resorts). Without this
+    // the cached offsetTop values would go stale and the wrong slot would
+    // be marked "centered".
+    const mo = new MutationObserver(() => {
+      rebuildCache();
+      onScroll();
+    });
+    mo.observe(el, { childList: true });
+
     return () => {
       el.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
+      mo.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
   }, [activeView, bundle?.draft?.status]);
@@ -799,19 +844,28 @@ export default function DraftRoom() {
                         // • translateY: pulls neighbors toward the centered
                         //   card so they overlap underneath it. Sign comes
                         //   from --dir (-1 above center, +1 below center).
-                        //   With the shorter card height we increase the
-                        //   pull so cards properly stack on top of each
-                        //   other instead of just shrinking with gaps.
+                        //
+                        // NO `transition` on transform/opacity — the values
+                        // change every scroll frame and any tween would
+                        // make the cards lag the finger/wheel. We rely on
+                        // the rAF loop hitting the display refresh rate
+                        // (60/120 Hz) for buttery-smooth tracking.
+                        // translate3d/scale3d force the GPU compositor.
                         transform:
-                          "scale(calc(1 - var(--prox, 1) * 0.45)) translateY(calc(var(--prox, 1) * var(--dir, 0) * -75px))",
+                          "translate3d(0, calc(var(--prox, 1) * var(--dir, 0) * -75px), 0) scale3d(calc(1 - var(--prox, 1) * 0.45), calc(1 - var(--prox, 1) * 0.45), 1)",
                         opacity:
                           "calc(1 - var(--prox, 1) * 0.75)",
                         transformOrigin: "center center",
-                        transition:
-                          "transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out",
+                        // Cheap, static drop-shadow on a separate filter
+                        // layer is far less expensive per frame than a
+                        // calc()-driven box-shadow recomputation.
+                        filter:
+                          "drop-shadow(0 6px 12px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.45)))",
                         willChange: "transform, opacity",
-                        boxShadow:
-                          "0 calc((1 - var(--prox, 1)) * 24px) calc((1 - var(--prox, 1)) * 48px) -10px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.55))",
+                        // Promote to its own compositor layer so transform
+                        // changes don't trigger paint on neighbors.
+                        backfaceVisibility: "hidden",
+                        transition: "border-color 200ms ease-out",
                       }}
                     >
                       {/* Avatar */}
