@@ -366,10 +366,15 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 {teams.map((team) => {
                   const assignedId = captainAssignments[team.id] || "";
                   const assignedMember = members.find((m) => m.user.id === assignedId);
-                  const filtered = members.filter((m) => {
-                    const q = captainSearch.trim().toLowerCase();
-                    return !q || memberName(m).toLowerCase().includes(q);
-                  });
+                  const filtered = members
+                    .filter((m) => {
+                      const q = captainSearch.trim().toLowerCase();
+                      return !q || memberName(m).toLowerCase().includes(q);
+                    })
+                    .slice()
+                    .sort((a, b) =>
+                      memberName(a).localeCompare(memberName(b), undefined, { sensitivity: "base" }),
+                    );
                   return (
                     <div
                       key={team.id}
