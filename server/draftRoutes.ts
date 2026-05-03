@@ -357,6 +357,16 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const result = await requestCaptainReady(draftId, userId);
       if (!result.ok) return res.status(400).json({ message: result.error });
 
+      // In commissioner pick-mode there are no captains to ready up — the
+      // commissioner runs every pick. Skip the lobby entirely and transition
+      // straight to active. (startDraft's READY gate is satisfied trivially
+      // because the captainIds list is empty.)
+      if (draft.pickMode === "commissioner") {
+        const begun = await startDraft(draftId);
+        if (!begun.ok) return res.status(400).json({ message: begun.error });
+        return res.json({ ok: true, status: "active" });
+      }
+
       // Notify each captain (excluding the commissioner) so they can confirm.
       const [league] = await db.select().from(leagues).where(eq(leagues.id, draft.leagueId));
       const leagueName = league?.name || "your league";
