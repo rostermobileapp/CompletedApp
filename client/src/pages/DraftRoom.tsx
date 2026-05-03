@@ -26,6 +26,8 @@ import {
   StickyNote,
   Shield,
   OctagonX,
+  Link2,
+  List,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -104,6 +106,8 @@ export default function DraftRoom() {
   const [showChat, setShowChat] = useState(false);
   const [cardUserId, setCardUserId] = useState<string | null>(null);
   const [teamPanelId, setTeamPanelId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<"players" | "rosters">("players");
+  const carouselRef = useRef<HTMLDivElement>(null);
   // Pick announcement modal: shown for 4s whenever any captain makes a pick.
   const [lastPick, setLastPick] = useState<{
     teamId: string;
@@ -264,6 +268,28 @@ export default function DraftRoom() {
     return m;
   }, [members]);
 
+  const buddyUserIds = useMemo(() => {
+    const s = new Set<string>();
+    bundle?.buddyPairs.forEach((pair) => pair.userIds.forEach((uid) => s.add(uid)));
+    return s;
+  }, [bundle?.buddyPairs]);
+
+  // All members for the carousel — available first, already-drafted at bottom
+  const allMembersForCarousel = useMemo(() => {
+    if (!members.length) return [];
+    const isExcludedGoalie = (m: any) =>
+      draft?.goalieMethod &&
+      draft.goalieMethod !== "included_with_skaters" &&
+      m.membership.isGoalie;
+    const available = members.filter(
+      (m: any) => !draftedSet.has(m.user.id) && !isExcludedGoalie(m),
+    );
+    const drafted = members.filter(
+      (m: any) => draftedSet.has(m.user.id) || isExcludedGoalie(m),
+    );
+    return [...available, ...drafted];
+  }, [members, draftedSet, draft]);
+
   const pickMutation = useMutation({
     mutationFn: async (playerId: string) => {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/pick`, { playerId });
@@ -407,11 +433,11 @@ export default function DraftRoom() {
     lastPrimaryPick?.playerId ? memberById.get(lastPrimaryPick.playerId) : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-dvh flex flex-col bg-background overflow-hidden">
       {/* Buzzer banner — shown for ~6s after a halve_next timer expiry */}
       {buzzerBanner && (
         <div
-          className="sticky top-0 z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black px-4 py-2 flex items-center gap-2 font-semibold text-sm animate-pulse border-b border-amber-700/40"
+          className="shrink-0 z-40 bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-black px-4 py-2 flex items-center gap-2 font-semibold text-sm animate-pulse border-b border-amber-700/40"
           data-testid="buzzer-banner"
         >
           <Zap className="w-4 h-4 flex-shrink-0" />
@@ -422,7 +448,7 @@ export default function DraftRoom() {
         </div>
       )}
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-background border-b border-border">
+      <div className="shrink-0 z-30 bg-background border-b border-border">
         <div className="flex items-center justify-between p-3 gap-2">
           <button
             onClick={() => setLocation(`/league-management?leagueId=${draft.leagueId}`)}
@@ -601,7 +627,213 @@ export default function DraftRoom() {
         )}
       </div>
 
-      {/* Main content */}
+      {/* Main content — carousel layout for active/paused, scroll layout otherwise */}
+      {(draft.status === "active" || draft.status === "paused") ? (
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Tab bar */}
+          <div className="shrink-0 flex border-b border-border bg-background">
+            <button
+              onClick={() => setActiveView("players")}
+              className={`flex-1 py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                activeView === "players"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-players"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Players ({availablePlayers.length})
+            </button>
+            <button
+              onClick={() => setActiveView("rosters")}
+              className={`flex-1 py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                activeView === "rosters"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-rosters"
+            >
+              <List className="w-3.5 h-3.5" />
+              Rosters
+            </button>
+          </div>
+
+          {/* ── Player Rolodex Carousel ── */}
+          {activeView === "players" && (
+            <div
+              ref={carouselRef}
+              className="flex-1 min-h-0 overflow-y-scroll overscroll-contain"
+              style={{
+                scrollSnapType: "y mandatory",
+                WebkitOverflowScrolling: "touch",
+              }}
+              data-testid="player-carousel"
+            >
+              {/* Top spacer — lets first card snap to center */}
+              <div style={{ height: "calc(50dvh - 104px)", minHeight: 16 }} aria-hidden="true" />
+
+              {allMembersForCarousel.map((m: any) => {
+                const isDrafted = draftedSet.has(m.user.id);
+                const hasBuddy = buddyUserIds.has(m.user.id);
+                const initial = (m.user.firstName?.[0] || m.user.email?.[0] || "?").toUpperCase();
+                return (
+                  <div
+                    key={m.user.id}
+                    className="px-3 py-1.5"
+                    style={{ scrollSnapAlign: "center", willChange: "transform", height: 176 }}
+                    data-testid={`carousel-slot-${m.user.id}`}
+                  >
+                    <div
+                      className={`h-full rounded-2xl border-2 flex items-center gap-4 px-4 transition-all ${
+                        isDrafted
+                          ? "border-border bg-card opacity-35 pointer-events-none"
+                          : "border-border bg-card cursor-pointer active:scale-[0.985] hover:border-primary/50"
+                      }`}
+                      onClick={!isDrafted ? () => setCardUserId(m.user.id) : undefined}
+                      data-testid={`player-card-${m.user.id}`}
+                    >
+                      {/* Avatar */}
+                      <div className="w-14 h-14 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center border border-border">
+                        {m.user.profileImageUrl ? (
+                          <img
+                            src={getImageUrl(m.user.profileImageUrl) || ""}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-xl font-black text-muted-foreground">{initial}</span>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-2xl font-black leading-tight truncate tracking-tight">
+                          {m.user.firstName || m.user.displayName || m.user.email}
+                          {m.user.lastName && (
+                            <span className="font-normal"> {m.user.lastName}</span>
+                          )}
+                        </div>
+                        {isDrafted ? (
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
+                            DRAFTED
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {m.user.age && (
+                              <span className="text-sm text-muted-foreground">Age {m.user.age}</span>
+                            )}
+                            {m.membership.isGoalie && (
+                              <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded text-xs font-bold">
+                                G
+                              </span>
+                            )}
+                            {draft.skillRankingEnabled && m.membership.skillLevel && (
+                              <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded text-xs font-bold">
+                                {m.membership.skillLevel}
+                              </span>
+                            )}
+                            {!!(draft.playerNotes || {})[m.user.id] && (
+                              <StickyNote className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                            )}
+                            {hasBuddy && (
+                              <Link2 className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" title="Has draft buddy" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* DRAFT button — outlined box style, right side */}
+                      {!isDrafted && canPick && draft.status === "active" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pickMutation.mutate(m.user.id);
+                          }}
+                          disabled={pickMutation.isPending}
+                          className="flex-shrink-0 border-2 border-primary text-primary rounded-xl px-4 py-3 font-black text-sm tracking-widest uppercase
+                            hover:bg-primary hover:text-primary-foreground active:bg-primary active:text-primary-foreground
+                            transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                          data-testid={`button-draft-${m.user.id}`}
+                        >
+                          DRAFT
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Bottom spacer */}
+              <div style={{ height: "calc(50dvh - 104px)", minHeight: 16 }} aria-hidden="true" />
+            </div>
+          )}
+
+          {/* ── Rosters tab ── */}
+          {activeView === "rosters" && (
+            <div className="flex-1 overflow-y-auto p-3 pb-6 space-y-2">
+              {(draft.draftOrder || []).map((teamId: string, idx: number) => {
+                const team = teamById.get(teamId);
+                const teamPicks = bundle.picks.filter((p) => p.teamId === teamId);
+                const goalieId = draft.goalieAssignments?.[teamId];
+                const goalie = goalieId ? memberById.get(goalieId) : null;
+                const isPicking = bundle.pickingTeamId === teamId;
+                return (
+                  <button
+                    key={teamId}
+                    onClick={() => setTeamPanelId(teamId)}
+                    className={`w-full text-left p-3 rounded-lg border ${
+                      isPicking ? "border-primary bg-primary/5" : "border-border bg-card"
+                    } hover:border-primary transition-colors`}
+                    data-testid={`team-roster-${teamId}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-bold flex items-center gap-1.5">
+                        <span className="text-muted-foreground text-xs">#{idx + 1}</span>
+                        {team?.name || "Team"}
+                        {isPicking && <Crown className="w-4 h-4 text-amber-500" />}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {teamPicks.filter((p) => !p.forfeited).length} picks
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {goalie && (
+                        <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded text-[11px]">
+                          {goalie.user.firstName || goalie.user.displayName} (G)
+                        </span>
+                      )}
+                      {teamPicks.map((p) => {
+                        if (p.forfeited)
+                          return (
+                            <span key={p.id} className="px-2 py-0.5 bg-muted text-muted-foreground rounded text-[11px] italic">
+                              R{p.round} forfeit
+                            </span>
+                          );
+                        const player = p.playerId ? memberById.get(p.playerId) : null;
+                        return (
+                          <span
+                            key={p.id}
+                            className={`px-2 py-0.5 rounded text-[11px] ${
+                              p.isAutoBuddy
+                                ? "bg-pink-500/15 text-pink-700 dark:text-pink-300"
+                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            }`}
+                            data-testid={`pick-chip-${p.id}`}
+                          >
+                            {player?.user.firstName || player?.user.displayName || "?"}
+                            {p.isAutoBuddy && " ♥"}
+                            {p.expiredAutoPick && " ⏱"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="flex-1 overflow-y-auto p-3 pb-24 space-y-4">
         {/* Captain READY lobby */}
         {draft.status === "awaiting_captains" && (() => {
@@ -731,71 +963,7 @@ export default function DraftRoom() {
           );
         })()}
 
-        {/* Available players (only when active) */}
-        {(draft.status === "active" || draft.status === "paused") && (
-          <section>
-            <h2 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <Users className="w-4 h-4" /> Available Players ({availablePlayers.length})
-              {!canPick && draft.status === "active" && (
-                <span className="ml-auto text-xs text-muted-foreground font-normal">
-                  Waiting for {pickingCaptain?.user.firstName || "captain"}…
-                </span>
-              )}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {availablePlayers.map((m: any) => (
-                <button
-                  key={m.user.id}
-                  onClick={() => setCardUserId(m.user.id)}
-                  className="flex items-center gap-2 p-2 bg-card border border-border rounded-lg hover:border-primary text-left"
-                  data-testid={`player-card-${m.user.id}`}
-                >
-                  {m.user.profileImageUrl ? (
-                    <img
-                      src={getImageUrl(m.user.profileImageUrl) || ""}
-                      alt=""
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                      {(m.user.firstName?.[0] || m.user.email?.[0] || "?").toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium truncate flex items-center gap-1">
-                      <span className="truncate">
-                        {m.user.firstName || m.user.displayName || m.user.email}
-                      </span>
-                      {!!(draft.playerNotes || {})[m.user.id] && (
-                        <StickyNote
-                          className="w-3 h-3 text-amber-500 flex-shrink-0"
-                          data-testid={`note-indicator-${m.user.id}`}
-                        >
-                          <title>Has scouting note</title>
-                        </StickyNote>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground truncate">
-                      {m.user.lastName || ""}
-                      {m.membership.isGoalie && (
-                        <span className="ml-1 px-1 bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded">
-                          G
-                        </span>
-                      )}
-                      {draft.skillRankingEnabled && m.membership.skillLevel && (
-                        <span className="ml-1 px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded font-bold">
-                          {m.membership.skillLevel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Teams + their picks */}
+        {/* Teams + their picks (for non-active states: pending, awaiting_captains, completed) */}
         <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold">Rosters</h2>
@@ -842,10 +1010,7 @@ export default function DraftRoom() {
                     {teamPicks.map((p) => {
                       if (p.forfeited)
                         return (
-                          <span
-                            key={p.id}
-                            className="px-2 py-0.5 bg-muted text-muted-foreground rounded text-[11px] italic"
-                          >
+                          <span key={p.id} className="px-2 py-0.5 bg-muted text-muted-foreground rounded text-[11px] italic">
                             R{p.round} forfeit
                           </span>
                         );
@@ -873,6 +1038,7 @@ export default function DraftRoom() {
           </div>
         </section>
       </div>
+      )}
 
       {/* Team detail slide-up panel */}
       {teamPanelId && (() => {
