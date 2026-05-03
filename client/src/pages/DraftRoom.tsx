@@ -232,51 +232,125 @@ export default function DraftRoom() {
     const el = carouselRef.current;
     if (!el) return;
 
-    // Cache slot offsetTop/offsetHeight once per layout instead of calling
-    // getBoundingClientRect() on every slot on every scroll frame — that
-    // was the dominant cost (forced layout flush) and made scrolling feel
-    // ~15 Hz even though rAF was firing at the display rate.
-    type SlotEntry = { node: HTMLElement; top: number; mid: number };
+    // ── 120Hz-ready scroll loop ──
+    // Three big wins over the previous version:
+    //  1. We write `transform`/`opacity`/`filter` directly as their final
+    //     computed values, bypassing CSS variable + calc() resolution.
+    //     calc() per-property is re-evaluated on every style invalidation
+    //     and was a big chunk of the per-frame cost.
+    //  2. We binary-search for the centered slot from cached `mid` offsets
+    //     and only update slots within a small window (±visibleCount + 2)
+    //     around it. Off-window slots are reset to "edge" state once and
+    //     then left alone — no per-frame writes for distant cards.
+    //  3. We diff against the last value we wrote per slot (`lastProx`) and
+    //     skip the style writes entirely when the change is below visual
+    //     resolution. At 120Hz this cuts mutations roughly in half.
+    type SlotEntry = {
+      node: HTMLElement;
+      mid: number;
+      lastProx: number;
+      lastDir: number;
+      inWindow: boolean;
+    };
     let cache: SlotEntry[] = [];
     let raf = 0;
+    let lastScrollTop = -1;
+
+    const writeSlot = (s: SlotEntry, dist: number, dir: number) => {
+      // Mirror the visual constants from the inline default style.
+      const scale = 1 - dist * 0.45;
+      const ty = dist * dir * -75;
+      const opacity = 1 - dist * 0.75;
+      const shadowAlpha = (1 - dist) * 0.45;
+      const style = s.node.style;
+      // Single-property writes — no calc() resolution.
+      style.transform = `translate3d(0,${ty.toFixed(1)}px,0) scale(${scale.toFixed(3)})`;
+      style.opacity = opacity.toFixed(3);
+      // Drop the filter entirely for far-away cards — drop-shadow is by
+      // far the most expensive style here (it allocates a new texture on
+      // every change). We only want it on the central few cards anyway.
+      style.filter =
+        shadowAlpha > 0.05
+          ? `drop-shadow(0 6px 12px hsl(var(--primary) / ${shadowAlpha.toFixed(2)}))`
+          : "none";
+      // Cap z-index at 30 so the centered card stays below the shadcn
+      // dialog overlay (z-50+).
+      style.zIndex = dist < 0.999 ? String(((1 - dist) * 30) | 0) : "0";
+      s.lastProx = dist;
+      s.lastDir = dir;
+    };
 
     const rebuildCache = () => {
       const slots = el.querySelectorAll<HTMLElement>("[data-carousel-slot]");
       const next: SlotEntry[] = new Array(slots.length);
       for (let i = 0; i < slots.length; i++) {
         const node = slots[i];
-        const top = node.offsetTop;
-        next[i] = { node, top, mid: top + node.offsetHeight / 2 };
+        next[i] = {
+          node,
+          mid: node.offsetTop + node.offsetHeight / 2,
+          lastProx: -1,
+          lastDir: 0,
+          inWindow: false,
+        };
       }
       cache = next;
+      lastScrollTop = -1; // force a recompute next frame
     };
 
     const update = () => {
       raf = 0;
+      const len = cache.length;
+      if (len === 0) return;
       const containerH = el.clientHeight;
       if (containerH <= 0) return;
-      const scrollMid = el.scrollTop + containerH / 2;
+      const scrollTop = el.scrollTop;
+      // Bail when nothing has actually changed since the last write — saves
+      // a full pass when scroll fires spuriously (momentum settling, etc).
+      if (scrollTop === lastScrollTop) return;
+      lastScrollTop = scrollTop;
+
+      const scrollMid = scrollTop + containerH / 2;
       const maxDist = containerH / 2;
-      // Only touch slots that could plausibly be visible. Anything further
-      // than ~1.5× the container height away is offscreen and updating it
-      // wastes style writes (and re-paints) every frame.
-      const cutoff = containerH * 1.5;
-      for (let i = 0; i < cache.length; i++) {
+
+      // Binary search for the slot whose mid is closest to scrollMid.
+      let lo = 0,
+        hi = len - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (cache[mid].mid < scrollMid) lo = mid + 1;
+        else hi = mid;
+      }
+      const centerIdx = lo;
+
+      // ~5 cards span the screen at 100px each on a typical viewport;
+      // pad a bit so cards sliding into view animate smoothly.
+      const windowSize = Math.max(6, Math.ceil(containerH / 100) + 2);
+      const start = Math.max(0, centerIdx - windowSize);
+      const end = Math.min(len - 1, centerIdx + windowSize);
+
+      // Reset any slots that just left the active window — without this
+      // they'd hold stale mid-animation values when scrolling fast.
+      for (let i = 0; i < len; i++) {
+        const s = cache[i];
+        const inNow = i >= start && i <= end;
+        if (s.inWindow && !inNow && s.lastProx < 0.999) {
+          writeSlot(s, 1, 0);
+        }
+        s.inWindow = inNow;
+      }
+
+      // Update only slots in the active window.
+      for (let i = start; i <= end; i++) {
         const s = cache[i];
         const delta = s.mid - scrollMid;
         const abs = delta < 0 ? -delta : delta;
-        if (abs > cutoff) continue;
         const dist = abs >= maxDist ? 1 : abs / maxDist;
         const dir = delta < 0 ? -1 : delta > 0 ? 1 : 0;
-        const style = s.node.style;
-        // toFixed(3) is plenty for sub-pixel precision and keeps the
-        // generated CSS string short → faster style invalidation.
-        style.setProperty("--prox", dist.toFixed(3));
-        style.setProperty("--dir", dir === 0 ? "0" : dir === 1 ? "1" : "-1");
-        // Cap at 30 so even the centered card stays *below* the shadcn
-        // dialog/overlay z-index (z-50). Without this cap the focused card
-        // would punch through and float on top of the pick-confirm dialog.
-        style.zIndex = String(((1 - dist) * 30) | 0);
+        // Skip writes when the change is below visual resolution (≈half a
+        // percent of the dist range). At 120Hz this routinely halves the
+        // number of style mutations during slow scrolls.
+        if (dir === s.lastDir && Math.abs(dist - s.lastProx) < 0.005) continue;
+        writeSlot(s, dist, dir);
       }
     };
 
@@ -296,10 +370,6 @@ export default function DraftRoom() {
     el.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
 
-    // Rebuild the position cache whenever the carousel's child list changes
-    // (player gets drafted → filtered out, or list resorts). Without this
-    // the cached offsetTop values would go stale and the wrong slot would
-    // be marked "centered".
     const mo = new MutationObserver(() => {
       rebuildCache();
       onScroll();
@@ -321,7 +391,12 @@ export default function DraftRoom() {
     enabled: !!draft?.leagueId,
   });
   const { data: members = [] } = useQuery<any[]>({
-    queryKey: ["/api/leagues", draft?.leagueId, "draft-players"],
+    queryKey: [
+      "/api/leagues",
+      draft?.leagueId,
+      "draft-players",
+      ...(draft?.seasonId ? [`?seasonId=${draft.seasonId}`] : []),
+    ],
     enabled: !!draft?.leagueId,
   });
   const { data: league } = useQuery<any>({
@@ -827,6 +902,18 @@ export default function DraftRoom() {
                   (m.user.shoots as string | undefined) ||
                   (m.membership?.shoots as string | undefined) ||
                   "N/A";
+                // Position — prefer the league-membership override (set by
+                // the commissioner per league), then the user's profile
+                // default. Show "—" when unknown so the card stays uniform.
+                const positionDisplay: string =
+                  (m.membership?.position as string | undefined) ||
+                  (m.user.position as string | undefined) ||
+                  "—";
+                // Prior season G/A — provided by the draft-players route
+                // (computed from the most recent prior season in this
+                // league). Defaults to 0/0 when no prior season exists.
+                const priorGoals: number = m.priorStats?.goals ?? 0;
+                const priorAssists: number = m.priorStats?.assists ?? 0;
                 const fullName =
                   [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") ||
                   m.user.displayName ||
@@ -839,13 +926,23 @@ export default function DraftRoom() {
                     className="relative px-3"
                     style={{
                       scrollSnapAlign: "center",
-                      // Half the previous height so cards are compact and
-                      // many fit on screen at once.
                       height: 100,
-                      // Default to "off-center" so cards animate into place
-                      // before the first scroll event fires.
-                      ["--prox" as any]: "1",
-                      ["--dir" as any]: "0",
+                      // Default "off-center" transform — applied directly
+                      // (no CSS vars / calc) so the JS scroll loop can
+                      // overwrite these values every frame with no
+                      // resolution overhead. NO `transition` on transform/
+                      // opacity — they change every frame and any tween
+                      // would make the cards lag the finger/wheel.
+                      transform: "translate3d(0,0,0) scale(0.55)",
+                      opacity: "0.25",
+                      transformOrigin: "center center",
+                      filter: "none",
+                      willChange: "transform, opacity",
+                      backfaceVisibility: "hidden",
+                      // contain isolates layout/paint of each slot from
+                      // its neighbors, so a transform write only touches
+                      // its own compositor layer.
+                      contain: "layout paint",
                     }}
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
@@ -854,33 +951,6 @@ export default function DraftRoom() {
                       onClick={() => setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
-                        // ── Coverflow transform ──
-                        // • scale: 1.0 at center → 0.55 at the edges so the
-                        //   focused card visually dominates the rolodex.
-                        // • translateY: pulls neighbors toward the centered
-                        //   card so they overlap underneath it. Sign comes
-                        //   from --dir (-1 above center, +1 below center).
-                        //
-                        // NO `transition` on transform/opacity — the values
-                        // change every scroll frame and any tween would
-                        // make the cards lag the finger/wheel. We rely on
-                        // the rAF loop hitting the display refresh rate
-                        // (60/120 Hz) for buttery-smooth tracking.
-                        // translate3d/scale3d force the GPU compositor.
-                        transform:
-                          "translate3d(0, calc(var(--prox, 1) * var(--dir, 0) * -75px), 0) scale3d(calc(1 - var(--prox, 1) * 0.45), calc(1 - var(--prox, 1) * 0.45), 1)",
-                        opacity:
-                          "calc(1 - var(--prox, 1) * 0.75)",
-                        transformOrigin: "center center",
-                        // Cheap, static drop-shadow on a separate filter
-                        // layer is far less expensive per frame than a
-                        // calc()-driven box-shadow recomputation.
-                        filter:
-                          "drop-shadow(0 6px 12px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.45)))",
-                        willChange: "transform, opacity",
-                        // Promote to its own compositor layer so transform
-                        // changes don't trigger paint on neighbors.
-                        backfaceVisibility: "hidden",
                         transition: "border-color 200ms ease-out",
                       }}
                     >
@@ -906,12 +976,27 @@ export default function DraftRoom() {
                           {fullName}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                          <span
+                            className="font-bold text-foreground"
+                            data-testid={`player-position-${m.user.id}`}
+                          >
+                            {positionDisplay}
+                          </span>
+                          <span aria-hidden="true">·</span>
                           <span data-testid={`player-age-${m.user.id}`}>
                             Age {ageDisplay}
                           </span>
                           <span aria-hidden="true">·</span>
                           <span data-testid={`player-shoots-${m.user.id}`}>
-                            Shoots: {shootsDisplay}
+                            {shootsDisplay}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span
+                            className="font-semibold text-foreground"
+                            data-testid={`player-prior-stats-${m.user.id}`}
+                            title="Prior season goals & assists"
+                          >
+                            {priorGoals}G {priorAssists}A
                           </span>
                           {m.membership.isGoalie && (
                             <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-600 dark:text-blue-300 rounded text-[10px] font-bold">

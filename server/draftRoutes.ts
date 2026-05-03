@@ -10,10 +10,11 @@ import {
   teams,
   users,
   playerStats,
+  seasons,
   draftSetupConfigSchema,
   type Draft,
 } from "@shared/schema";
-import { eq, and, or, asc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, or, asc, desc, ne, sql, inArray, isNull } from "drizzle-orm";
 import { storage } from "./storage";
 import { broadcastNotificationUpdate } from "./routes";
 import {
@@ -157,7 +158,52 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             eq(leagueMemberships.status, "approved"),
           ),
         );
-      return res.json(rows);
+
+      // ── Attach prior-season stats (goals/assists) per player ──
+      // Resolve "prior season" as the most recently created season in this
+      // league other than the current draft's season. If a `seasonId` query
+      // param is supplied (e.g. the active draft's season), exclude it;
+      // otherwise just use the most recent season.
+      const currentSeasonId = (req.query?.seasonId as string | undefined) || null;
+      const priorSeasonRows = await db
+        .select({ id: seasons.id })
+        .from(seasons)
+        .where(
+          currentSeasonId
+            ? and(eq(seasons.leagueId, leagueId), ne(seasons.id, currentSeasonId))
+            : eq(seasons.leagueId, leagueId),
+        )
+        .orderBy(desc(seasons.createdAt))
+        .limit(1);
+      const priorSeasonId = priorSeasonRows[0]?.id;
+
+      const priorStatsByUser: Record<string, { goals: number; assists: number }> = {};
+      if (priorSeasonId && rows.length) {
+        const userIds = rows.map((r) => r.user.id);
+        const stats = await db
+          .select({
+            userId: playerStats.userId,
+            goals: playerStats.goals,
+            assists: playerStats.assists,
+          })
+          .from(playerStats)
+          .where(
+            and(
+              eq(playerStats.leagueId, leagueId),
+              eq(playerStats.seasonId, priorSeasonId),
+              inArray(playerStats.userId, userIds),
+            ),
+          );
+        for (const s of stats) {
+          priorStatsByUser[s.userId] = { goals: s.goals || 0, assists: s.assists || 0 };
+        }
+      }
+
+      const enriched = rows.map((r) => ({
+        ...r,
+        priorStats: priorStatsByUser[r.user.id] || { goals: 0, assists: 0 },
+      }));
+      return res.json(enriched);
     } catch (err) {
       console.error("List draft players error:", err);
       res.status(500).json({ message: "Failed to fetch players" });
