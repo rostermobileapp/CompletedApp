@@ -1683,6 +1683,7 @@ export default function LeagueManagement() {
         email: playerData.email,
         phoneNumber: playerData.phoneNumber,
         assignedTeamId: playerData.assignedTeamId || null,
+        seasonId: playerData.seasonId || selectedSeasonId || null,
       });
 
       if (!response.ok) {
@@ -1705,6 +1706,7 @@ export default function LeagueManagement() {
         email: '',
         phoneNumber: '',
         assignedTeamId: '',
+        seasonId: '',
       });
       setShowManualAddPlayer(false);
       
@@ -4664,7 +4666,9 @@ export default function LeagueManagement() {
                         return;
                       }
                       const isPlaceholder = selectedPlayer.user?.email?.includes('@placeholder.roster') || 
-                        selectedPlayer.user?.id?.startsWith('placeholder-');
+                        selectedPlayer.user?.id?.startsWith('placeholder-') ||
+                        selectedPlayer.user?.id?.startsWith('placeholder:') ||
+                        (selectedPlayer as any).isPlaceholderPlayer === true;
                       if (isPlaceholder) {
                         toast({
                           title: "Cannot message this player",
@@ -4764,7 +4768,9 @@ export default function LeagueManagement() {
                   <button
                     onClick={async () => {
                       const isPlaceholder = selectedPlayer.user?.email?.includes('@placeholder.roster') || 
-                        selectedPlayer.user?.id?.startsWith('placeholder-');
+                        selectedPlayer.user?.id?.startsWith('placeholder-') ||
+                        selectedPlayer.user?.id?.startsWith('placeholder:') ||
+                        (selectedPlayer as any).isPlaceholderPlayer === true;
                       
                       if (isPlaceholder) {
                         // Check if placeholder has stats before deleting
@@ -7211,7 +7217,9 @@ export default function LeagueManagement() {
                       setApprovalMode('replace');
                       const placeholders = commissionerDisplayMembers.filter((m: LeagueMember) => 
                         m.user?.email?.includes('@placeholder.roster') || 
-                        m.user?.id?.startsWith('placeholder-')
+                        m.user?.id?.startsWith('placeholder-') ||
+                        m.user?.id?.startsWith('placeholder:') ||
+                        (m as any).isPlaceholderPlayer === true
                       );
                       setPlaceholderSearchResults(placeholders);
                     }}
@@ -7234,7 +7242,9 @@ export default function LeagueManagement() {
                         setPlaceholderSearchQuery(e.target.value);
                         const placeholders = commissionerDisplayMembers.filter((m: LeagueMember) => {
                           const isPlaceholder = m.user?.email?.includes('@placeholder.roster') || 
-                            m.user?.id?.startsWith('placeholder-');
+                            m.user?.id?.startsWith('placeholder-') ||
+                            m.user?.id?.startsWith('placeholder:') ||
+                            (m as any).isPlaceholderPlayer === true;
                           if (!isPlaceholder) return false;
                           if (!query) return true;
                           const name = formatUserName(m.user, m).toLowerCase();

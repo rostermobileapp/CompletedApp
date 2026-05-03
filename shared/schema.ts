@@ -481,10 +481,16 @@ export const teamMemberships = pgTable("team_memberships", {
 // Placeholder players table - for players added before they have accounts
 export const placeholderPlayers = pgTable("placeholder_players", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  // teamId is now nullable: league-level adds may not assign a team yet.
+  teamId: varchar("team_id").references(() => teams.id),
+  // leagueId/seasonId let placeholders live at the league level (e.g. created
+  // via "Add Player" in the league Players tab without a team picked).
+  leagueId: varchar("league_id").references(() => leagues.id),
+  seasonId: varchar("season_id").references(() => seasons.id),
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
   email: varchar("email"), // Optional - may not have email yet
+  phoneNumber: varchar("phone_number"),
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

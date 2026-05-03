@@ -353,6 +353,20 @@ export interface IStorage {
   createTeam(team: InsertTeam): Promise<Team>;
   createStandaloneTeam(teamName: string, creatorId: string, photoUrl?: string | null, facilityId?: string | null): Promise<Team>;
   addManualPlayer(teamId: string, firstName: string, lastName: string, email?: string | null, jerseyNumber?: string | null, position?: string | null): Promise<TeamMembership | PlaceholderPlayer>;
+  addLeaguePlaceholderPlayer(input: {
+    leagueId: string;
+    seasonId?: string | null;
+    teamId?: string | null;
+    firstName: string;
+    lastName: string;
+    email?: string | null;
+    phoneNumber?: string | null;
+    position?: string | null;
+    jerseyNumber?: number | null;
+    addedBy?: string | null;
+  }): Promise<PlaceholderPlayer>;
+  claimPlaceholdersForUser(userId: string): Promise<{ claimedCount: number; teamIds: string[]; leagueIds: string[] }>;
+  getLeaguePlaceholderPlayers(leagueId: string): Promise<PlaceholderPlayer[]>;
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
@@ -1079,6 +1093,14 @@ export class DatabaseStorage implements IStorage {
           console.log('[Storage] Incremented user registration count for new authenticated user:', userData.id);
         } catch (countError) {
           console.error('[Storage] Failed to increment user registration count:', countError);
+        }
+
+        // Auto-claim any placeholder_players rows that match this signup's
+        // email — turns commissioner-added stubs into real memberships.
+        try {
+          await this.claimPlaceholdersForUser(user.id);
+        } catch (claimErr) {
+          console.error('[Storage] claimPlaceholdersForUser failed for new user:', claimErr);
         }
       }
 
@@ -2899,6 +2921,149 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return placeholderPlayer;
     }
+  }
+
+  // Insert a placeholder player at the league level (team optional). Used by
+  // the league-level "Add Player" flow and CSV import in place of the old
+  // @placeholder.roster ghost-user pattern. The actual claim happens later
+  // when the real person signs up — see claimPlaceholdersForUser.
+  async addLeaguePlaceholderPlayer(input: {
+    leagueId: string;
+    seasonId?: string | null;
+    teamId?: string | null;
+    firstName: string;
+    lastName: string;
+    email?: string | null;
+    phoneNumber?: string | null;
+    position?: string | null;
+    jerseyNumber?: number | null;
+    addedBy?: string | null;
+  }): Promise<PlaceholderPlayer> {
+    const [row] = await db
+      .insert(placeholderPlayers)
+      .values({
+        leagueId: input.leagueId,
+        seasonId: input.seasonId ?? null,
+        teamId: input.teamId ?? null,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email ?? null,
+        phoneNumber: input.phoneNumber ?? null,
+        position: input.position ?? null,
+        jerseyNumber: input.jerseyNumber ?? null,
+        addedBy: input.addedBy ?? null,
+      })
+      .returning();
+    return row;
+  }
+
+  // Look for placeholder_players rows matching this user (by email) and turn
+  // them into real memberships. Called from upsertUser whenever a brand-new
+  // authenticated user is created. Idempotent: safe to call repeatedly.
+  async claimPlaceholdersForUser(userId: string): Promise<{ claimedCount: number; teamIds: string[]; leagueIds: string[] }> {
+    const user = await this.getUser(userId);
+    if (!user || !user.email) return { claimedCount: 0, teamIds: [], leagueIds: [] };
+    // Only auto-claim by email match — the strongest identifier we have. Name
+    // matching alone is too risky (two "John Smith"s on the same league).
+    const matches = await db
+      .select()
+      .from(placeholderPlayers)
+      .where(sql`LOWER(${placeholderPlayers.email}) = LOWER(${user.email})`);
+    if (matches.length === 0) return { claimedCount: 0, teamIds: [], leagueIds: [] };
+
+    const teamIds = new Set<string>();
+    const leagueIds = new Set<string>();
+    let claimedCount = 0;
+
+    for (const ph of matches) {
+      try {
+        // Materialize a team membership if the placeholder was scoped to a team
+        if (ph.teamId) {
+          const existing = await db
+            .select()
+            .from(teamMemberships)
+            .where(and(eq(teamMemberships.userId, userId), eq(teamMemberships.teamId, ph.teamId)))
+            .limit(1);
+          if (existing.length === 0) {
+            await db.insert(teamMemberships).values({
+              userId,
+              teamId: ph.teamId,
+              position: ph.position || null,
+              jerseyNumber: ph.jerseyNumber ?? null,
+              status: 'approved',
+            });
+          }
+          teamIds.add(ph.teamId);
+        }
+
+        // Materialize a league membership if scoped to a league directly OR
+        // via the team's league.
+        let leagueIdToMaterialize: string | null = ph.leagueId ?? null;
+        if (!leagueIdToMaterialize && ph.teamId) {
+          const [team] = await db.select().from(teams).where(eq(teams.id, ph.teamId)).limit(1);
+          leagueIdToMaterialize = team?.leagueId ?? null;
+        }
+        if (leagueIdToMaterialize) {
+          const existing = await db
+            .select()
+            .from(leagueMemberships)
+            .where(and(
+              eq(leagueMemberships.userId, userId),
+              eq(leagueMemberships.leagueId, leagueIdToMaterialize),
+            ))
+            .limit(1);
+          if (existing.length === 0) {
+            await db.insert(leagueMemberships).values({
+              userId,
+              leagueId: leagueIdToMaterialize,
+              status: 'approved',
+              assignedTeamId: ph.teamId ?? null,
+              displayFirstName: ph.firstName,
+              displayLastName: ph.lastName,
+              position: ph.position ?? null,
+              jerseyNumber: ph.jerseyNumber ?? null,
+              approvedAt: new Date(),
+            });
+          }
+          leagueIds.add(leagueIdToMaterialize);
+        }
+
+        // Move outstanding invoices from the placeholder to the real user.
+        await this.transferInvoicesFromPlaceholderToUser(ph.id, userId);
+        // Retire the placeholder row.
+        await db.delete(placeholderPlayers).where(eq(placeholderPlayers.id, ph.id));
+        claimedCount++;
+      } catch (err) {
+        console.error('[claimPlaceholdersForUser] failed for placeholder', ph.id, err);
+      }
+    }
+
+    if (claimedCount > 0) {
+      console.log(`[claimPlaceholdersForUser] user=${userId} claimed=${claimedCount} teams=${teamIds.size} leagues=${leagueIds.size}`);
+    }
+    return { claimedCount, teamIds: Array.from(teamIds), leagueIds: Array.from(leagueIds) };
+  }
+
+  // Placeholder players that belong to this league: either scoped directly
+  // (leagueId set) or via a team in the league.
+  async getLeaguePlaceholderPlayers(leagueId: string): Promise<PlaceholderPlayer[]> {
+    const rows = await db
+      .select({ ph: placeholderPlayers })
+      .from(placeholderPlayers)
+      .leftJoin(teams, eq(placeholderPlayers.teamId, teams.id))
+      .where(or(
+        eq(placeholderPlayers.leagueId, leagueId),
+        eq(teams.leagueId, leagueId),
+      ));
+    // Dedupe defensively in case both predicates match for a row.
+    const seen = new Set<string>();
+    const out: PlaceholderPlayer[] = [];
+    for (const r of rows) {
+      if (seen.has(r.ph.id)) continue;
+      seen.add(r.ph.id);
+      out.push(r.ph);
+    }
+    return out;
   }
 
   async requestTeamJoinLeague(
@@ -11379,7 +11544,9 @@ export class DatabaseStorage implements IStorage {
       };
     });
 
-    // 2) Team-scoped placeholder players whose team belongs to this league.
+    // 2) Placeholder players for this league: either scoped to the league
+    //    directly (league-level Add Player with no team picked) OR scoped to
+    //    a team that belongs to this league.
     const placeholderRows = await db
       .select({
         id: placeholderPlayers.id,
@@ -11389,8 +11556,11 @@ export class DatabaseStorage implements IStorage {
         teamName: teams.name,
       })
       .from(placeholderPlayers)
-      .innerJoin(teams, eq(placeholderPlayers.teamId, teams.id))
-      .where(eq(teams.leagueId, leagueId));
+      .leftJoin(teams, eq(placeholderPlayers.teamId, teams.id))
+      .where(or(
+        eq(placeholderPlayers.leagueId, leagueId),
+        eq(teams.leagueId, leagueId),
+      ));
 
     const placeholderPlayersList: InvoiceablePlayer[] = placeholderRows.map(r => ({
       type: 'placeholder' as const,

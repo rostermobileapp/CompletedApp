@@ -5613,7 +5613,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const members = await storage.getLeagueMembers(leagueId);
-      res.json(members);
+
+      // Also surface placeholder_players for this league as LeagueMember-shaped
+      // records so they appear on the Players tab. They have no real userId,
+      // so we synthesize one prefixed with "placeholder:" — frontend code that
+      // tries to act on a real user (approve, set captain, etc.) should check
+      // isPlaceholderPlayer.
+      const placeholders = await storage.getLeaguePlaceholderPlayers(leagueId);
+      const placeholderMembers = placeholders.map((ph) => ({
+        id: `placeholder:${ph.id}`,
+        userId: `placeholder:${ph.id}`,
+        leagueId,
+        skillLevel: null,
+        status: 'placeholder',
+        assignedTeamId: ph.teamId ?? undefined,
+        position: ph.position ?? undefined,
+        jerseyNumber: ph.jerseyNumber ?? undefined,
+        displayFirstName: ph.firstName,
+        displayLastName: ph.lastName,
+        isPlaceholderPlayer: true,
+        placeholderPlayerId: ph.id,
+        user: {
+          id: `placeholder:${ph.id}`,
+          firstName: ph.firstName,
+          lastName: ph.lastName,
+          email: ph.email ?? '',
+        },
+      }));
+
+      res.json([...members, ...placeholderMembers]);
     } catch (error) {
       console.error("Error fetching league members:", error);
       res.status(500).json({ message: "Failed to fetch league members" });
@@ -10704,6 +10732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Track teams that need chat syncing (both old and new assignments)
         const teamsToSyncAfterImport = new Set<string>();
+        // Dedupe placeholder_players writes within this CSV batch.
+        const placeholderDedupeKeys = new Set<string>();
 
         // Create placeholder user accounts and league memberships for imported players
         for (const player of validPlayers) {
@@ -10804,15 +10834,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   });
                 }
               } else {
-                // No email provided: create with placeholder email for later matching
-                const uniqueEmail = `${player.firstName.toLowerCase()}.${player.lastName.toLowerCase()}.${Date.now()}@placeholder.roster`;
-                const placeholderUser = await storage.upsertUser({
-                  email: uniqueEmail,
+                // No email provided: create a placeholder_players row instead
+                // of a ghost @placeholder.roster user. When the real person
+                // signs up with the same email later, claimPlaceholdersForUser
+                // turns it into a real membership.
+                //
+                // Dedupe within this CSV batch by name+team so the same
+                // email-less name on multiple rows doesn't multiply.
+                const dedupeKey = `${player.firstName.toLowerCase()}|${player.lastName.toLowerCase()}|${player.teamId || ''}`;
+                if (placeholderDedupeKeys.has(dedupeKey)) {
+                  actualSuccessCount++;
+                  if (player.teamId) teamsToSyncAfterImport.add(player.teamId);
+                  continue;
+                }
+                placeholderDedupeKeys.add(dedupeKey);
+
+                await storage.addLeaguePlaceholderPlayer({
+                  leagueId,
+                  teamId: player.teamId || null,
                   firstName: player.firstName,
                   lastName: player.lastName,
-                  profileImageUrl: null,
+                  position: player.position || null,
+                  jerseyNumber: player.jerseyNumber ?? null,
+                  addedBy: userId,
                 });
-                newUserId = placeholderUser.id;
+                actualSuccessCount++;
+                if (player.teamId) teamsToSyncAfterImport.add(player.teamId);
+                continue; // Skip the leagueMembership insert below
               }
               
               // Create league membership for this user
@@ -10965,11 +11013,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
-      const { firstName, lastName, email, phoneNumber, assignedTeamId } = req.body;
+      const { firstName, lastName, email, phoneNumber, assignedTeamId, seasonId } = req.body;
 
-      // Validate required fields
-      if (!firstName || !lastName || !email) {
-        return res.status(400).json({ message: 'First name, last name, and email are required' });
+      // First+last required; email is now optional (placeholder players don't
+      // need one until the real person signs up).
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First name and last name are required' });
       }
 
       // Check if user has commissioner access to this league
@@ -10990,98 +11039,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Check if user already exists locally
-      let existingLocalUser = await storage.getUserByEmail(email);
-      let newUserId: string;
-      let isNewUser = false; // Track if we're creating a brand new user
+      // If the email matches an existing Roster user, fall back to the
+      // legacy "real-membership" path. Otherwise create a placeholder_players
+      // row — they'll be auto-claimed when the real person signs up.
+      const existingLocalUser = email ? await storage.getUserByEmail(email) : null;
 
       if (existingLocalUser) {
-        // User already exists in Roster, just use their ID
-        newUserId = existingLocalUser.id;
-      } else {
-        // User doesn't exist locally, check Supabase Auth or create
-        let authUser;
-        let authUserExists = false;
-        try {
-          const { data: existingUsers } = await supabase.auth.admin.listUsers();
-          const existingAuthUser = existingUsers?.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-          
-          if (existingAuthUser) {
-            // User exists in Supabase Auth but not in Roster - add them to Roster
-            authUser = existingAuthUser;
-            authUserExists = true;
-          } else {
-            // Create new auth user
-            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-              email,
-              password: Math.random().toString(36).slice(-16), // Temporary password
-              user_metadata: {
-                first_name: firstName,
-                last_name: lastName,
-                phone: phoneNumber || undefined,
-              }
+        const newMembership = await storage.requestLeagueMembership({
+          leagueId,
+          userId: existingLocalUser.id,
+          displayFirstName: firstName,
+          displayLastName: lastName,
+          assignedTeamId: assignedTeamId || undefined,
+        });
+        const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
+
+        if (email) {
+          try {
+            const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
+            await sendWelcomeEmail(email, {
+              playerName: `${firstName} ${lastName}`,
+              leagueName: league.name,
+              teamName,
             });
-            
-            if (createError) {
-              return res.status(400).json({ message: `Failed to create user: ${createError.message}` });
-            }
-            
-            authUser = newUser;
-            isNewUser = true; // Brand new user created
+          } catch (emailError) {
+            console.error(`[ManualAdd] welcome email failed:`, emailError);
           }
-        } catch (error) {
-          console.error('Error managing auth user:', error);
-          return res.status(500).json({ message: 'Failed to process user' });
         }
 
-        // Add user to local Roster database using upsert
-        newUserId = authUser.id;
-        await storage.upsertUser({
-          id: authUser.id,
-          email,
-          firstName,
-          lastName,
-          displayName: `${firstName} ${lastName}`,
+        return res.status(201).json({
+          id: approvedMembership.id,
+          userId: existingLocalUser.id,
+          leagueId,
+          displayFirstName: firstName,
+          displayLastName: lastName,
+          assignedTeamId: assignedTeamId || undefined,
+          status: approvedMembership.status,
+          isPlaceholderPlayer: false,
         });
       }
 
-      // Create league membership
-      const newMembership = await storage.requestLeagueMembership({
+      // Placeholder branch: no Supabase auth user is created. The real user
+      // claims this slot when they sign up (see claimPlaceholdersForUser).
+      const placeholder = await storage.addLeaguePlaceholderPlayer({
         leagueId,
-        userId: newUserId,
-        displayFirstName: firstName,
-        displayLastName: lastName,
-        assignedTeamId: assignedTeamId || undefined,
+        seasonId: seasonId || null,
+        teamId: assignedTeamId || null,
+        firstName,
+        lastName,
+        email: email || null,
+        phoneNumber: phoneNumber || null,
+        addedBy: userId,
       });
 
-      // Auto-approve the membership since it was manually added by commissioner
-      const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
-
-      // Send welcome email when a player is newly added to the league (regardless of whether they're a new system user)
-      // This notifies them that they've been added to a team/league
-      console.log(`[ManualAdd] Sending welcome email to newly added player: ${email}`);
-      try {
-        const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
-        console.log(`[ManualAdd] Team name: ${teamName || 'none'}, League: ${league.name}`);
-        await sendWelcomeEmail(email, {
-          playerName: `${firstName} ${lastName}`,
-          leagueName: league.name,
-          teamName: teamName,
-        });
-        console.log(`[ManualAdd] Welcome email sent successfully to ${email}`);
-      } catch (emailError) {
-        console.error(`[ManualAdd] Failed to send welcome email to ${email}:`, emailError);
-        // Don't fail the operation if email fails
+      // Send a "claim your spot" invite when we have an email.
+      if (email) {
+        try {
+          const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
+          await sendWelcomeEmail(email, {
+            playerName: `${firstName} ${lastName}`,
+            leagueName: league.name,
+            teamName,
+          });
+        } catch (emailError) {
+          console.error(`[ManualAdd] claim invite email failed:`, emailError);
+        }
       }
 
       return res.status(201).json({
-        id: approvedMembership.id,
-        userId: newUserId,
+        id: `placeholder:${placeholder.id}`,
+        placeholderPlayerId: placeholder.id,
         leagueId,
         displayFirstName: firstName,
         displayLastName: lastName,
         assignedTeamId: assignedTeamId || undefined,
-        status: approvedMembership.status,
+        status: 'placeholder',
+        isPlaceholderPlayer: true,
       });
 
     } catch (error) {
