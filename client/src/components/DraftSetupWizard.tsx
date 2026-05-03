@@ -113,6 +113,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     return init;
   });
   const [captainSearch, setCaptainSearch] = useState("");
+  // Pick mode: "captains" (each captain picks for their own team) vs
+  // "commissioner" (the commissioner physically makes every pick on behalf of
+  // all teams). Defaults to "captains" to preserve existing behavior.
+  const [pickMode, setPickMode] = useState<"captains" | "commissioner">("captains");
 
   // Format
   const [draftStyle, setDraftStyle] = useState<DraftStyle>("snake");
@@ -182,6 +186,9 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       if (d.playerNotes && typeof d.playerNotes === "object") setPlayerNotes(d.playerNotes);
       if (d.goalieAssignments) setGoalieAssignments(d.goalieAssignments);
       if (d.captainAssignments) setCaptainAssignments(d.captainAssignments);
+      if (d.pickMode === "captains" || d.pickMode === "commissioner") {
+        setPickMode(d.pickMode);
+      }
       if (Array.isArray(d.draftOrder) && d.draftOrder.length) setDraftOrder(d.draftOrder);
       if (d.totalRounds) {
         setTotalRounds(d.totalRounds);
@@ -240,6 +247,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       const body = {
         draftStyle,
         goalieMethod,
+        pickMode,
         timerExpiryRule,
         timePerPick,
         skillRankingEnabled,
@@ -248,7 +256,13 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         playerNotes,
         buddyPairs: buddyPairs.length ? buddyPairs : undefined,
         goalieAssignments: goalieMethod === "commissioner_assigned" ? goalieAssignments : undefined,
-        captainAssignments: Object.keys(captainAssignments).length ? captainAssignments : undefined,
+        // In commissioner mode there are no captains — never send assignments.
+        captainAssignments:
+          pickMode === "commissioner"
+            ? undefined
+            : Object.keys(captainAssignments).length
+              ? captainAssignments
+              : undefined,
         draftOrder,
         totalRounds,
       };
@@ -269,7 +283,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       });
       toast({
         title: launch ? "Draft started!" : "Draft saved",
-        description: launch ? "Captains can now make their picks." : "Configuration saved.",
+        description: launch
+          ? pickMode === "commissioner"
+            ? "You'll make every pick on behalf of each team."
+            : "Captains can now make their picks."
+          : "Configuration saved.",
       });
       if (launch && onLaunched) onLaunched(data.draft.id);
       onClose();
@@ -345,13 +363,57 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
           {stepId === "captains" && (
             <div className="space-y-4" data-testid="step-captains">
               <h3 className="font-semibold flex items-center gap-2">
-                <Crown className="w-4 h-4" /> Assign Team Captains
+                <Crown className="w-4 h-4" /> Who makes the picks?
               </h3>
-              <p className="text-sm text-muted-foreground">
-                Captains make picks during the draft. Assign one member per team.
-              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(
+                  [
+                    {
+                      v: "captains" as const,
+                      label: "Team Captains",
+                      desc: "Each captain picks for their own team during the draft.",
+                    },
+                    {
+                      v: "commissioner" as const,
+                      label: "Commissioner",
+                      desc: "You make every pick on behalf of all teams.",
+                    },
+                  ]
+                ).map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setPickMode(o.v)}
+                    className={`p-3 rounded-lg border text-left text-sm ${
+                      pickMode === o.v
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted/40"
+                    }`}
+                    data-testid={`option-pick-mode-${o.v}`}
+                  >
+                    <div className="font-medium">{o.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{o.desc}</div>
+                  </button>
+                ))}
+              </div>
 
-              {members.length > 0 && (
+              {pickMode === "commissioner" && (
+                <div
+                  className="p-3 bg-muted/40 border border-border rounded-lg text-sm text-muted-foreground"
+                  data-testid="commissioner-mode-notice"
+                >
+                  You'll physically draft each player for every team. Captain
+                  assignments are not needed and will be cleared.
+                </div>
+              )}
+
+              {pickMode === "captains" && (
+                <p className="text-sm text-muted-foreground">
+                  Captains make picks during the draft. Assign one member per team.
+                </p>
+              )}
+
+              {pickMode === "captains" && members.length > 0 && (
                 <input
                   type="text"
                   value={captainSearch}
@@ -362,6 +424,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 />
               )}
 
+              {pickMode === "captains" && (
               <div className="space-y-2">
                 {teams.map((team) => {
                   const assignedId = captainAssignments[team.id] || "";
@@ -412,8 +475,9 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   );
                 })}
               </div>
+              )}
 
-              {teams.some((t) => !captainAssignments[t.id]) && (
+              {pickMode === "captains" && teams.some((t) => !captainAssignments[t.id]) && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   Teams without a captain can still draft — the commissioner picks for them.
                 </p>

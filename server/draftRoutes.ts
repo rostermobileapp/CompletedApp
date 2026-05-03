@@ -208,6 +208,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
               draftStyle: config.draftStyle,
               roundType: legacyRoundType as any,
               goalieMethod: config.goalieMethod,
+              pickMode: config.pickMode ?? "captains",
               timerExpiryRule: config.timerExpiryRule,
               timePerPick: config.timePerPick,
               skillRankingEnabled: config.skillRankingEnabled,
@@ -231,6 +232,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
               draftStyle: config.draftStyle,
               roundType: legacyRoundType as any,
               goalieMethod: config.goalieMethod,
+              pickMode: config.pickMode ?? "captains",
               timerExpiryRule: config.timerExpiryRule,
               timePerPick: config.timePerPick,
               skillRankingEnabled: config.skillRankingEnabled,
@@ -253,8 +255,15 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           }
         }
 
-        // Apply captain assignments directly to teams (commissioner-trusted, pre-draft)
-        if (config.captainAssignments) {
+        // Apply captain assignments directly to teams (commissioner-trusted, pre-draft).
+        // In commissioner pick-mode, captains are unused — clear any prior assignments
+        // so the awaiting-captains lobby doesn't gate-keep on stale captains.
+        if ((config.pickMode ?? "captains") === "commissioner") {
+          await db
+            .update(teams)
+            .set({ captainId: null })
+            .where(eq(teams.leagueId, leagueId));
+        } else if (config.captainAssignments) {
           for (const [teamId, captainUserId] of Object.entries(config.captainAssignments)) {
             if (captainUserId) {
               await db.update(teams).set({ captainId: captainUserId }).where(eq(teams.id, teamId));

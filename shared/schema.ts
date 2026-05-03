@@ -1589,6 +1589,10 @@ export const drafts = pgTable("drafts", {
   draftStyle: varchar("draft_style"),
   // 'commissioner_assigned' | 'random_draw' | 'included_with_skaters'
   goalieMethod: varchar("goalie_method").default("included_with_skaters"),
+  // Who physically makes picks during the draft.
+  // 'captains'     – each team's captain makes their own picks (default)
+  // 'commissioner' – the commissioner makes every pick on behalf of all teams
+  pickMode: varchar("pick_mode").default("captains").notNull(),
   // 'auto_pick' | 'halve_next'
   timerExpiryRule: varchar("timer_expiry_rule").default("auto_pick"),
   skillRankingEnabled: boolean("skill_ranking_enabled").default(false).notNull(),
@@ -2755,6 +2759,7 @@ export const insertDraftChatMessageSchema = createInsertSchema(draftChatMessages
 export const draftSetupConfigSchema = z.object({
   draftStyle: z.enum(["snake", "linear", "auction", "3rd_round_reversal"]),
   goalieMethod: z.enum(["commissioner_assigned", "random_draw", "included_with_skaters"]),
+  pickMode: z.enum(["captains", "commissioner"]).optional(),
   timerExpiryRule: z.enum(["auto_pick", "halve_next"]),
   timePerPick: z.number().int().min(15).max(600),
   totalRounds: z.number().int().min(1).max(30).optional(),
