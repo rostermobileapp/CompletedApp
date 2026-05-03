@@ -41,10 +41,10 @@ export default function Waitlist() {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   useSeo({
-    title: 'Join the Waitlist | Roster — Launching May 1, 2026',
-    description: 'Get early access to Roster when it launches May 1, 2026. The all-in-one hockey team management app with scheduling, RSVP, stats, and payments. No ads, ever.',
+    title: 'Join the Waitlist | Roster — Launching June 1, 2026',
+    description: 'Get early access to Roster when it launches June 1, 2026. The all-in-one hockey team management app with scheduling, RSVP, stats, and payments. No ads, ever.',
     ogTitle: 'Join the Roster Waitlist',
-    ogDescription: 'Be first in line when Roster launches May 1, 2026. Hockey team management done right.',
+    ogDescription: 'Be first in line when Roster launches June 1, 2026. Hockey team management done right.',
   });
 
   const form = useForm<WaitlistFormValues>({

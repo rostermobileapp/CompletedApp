@@ -297,7 +297,7 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
             Ready to simplify your season?
           </h2>
           <p className="text-gray-500 text-lg mb-8">
-            Launching <span className="text-gray-900 font-semibold">May 1, 2026</span>. Free tier available on day one.
+            Launching <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free tier available on day one.
           </p>
           <button
             onClick={() => setLocation('/waitlist')}

@@ -128,7 +128,7 @@ export default function Pricing() {
     <div className="min-h-screen bg-white text-gray-900" data-testid="pricing-page">
       {/* Launch banner */}
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        🚀 Launching May 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
+        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
       </div>
 
       {/* Header */}
@@ -145,7 +145,7 @@ export default function Pricing() {
           <div className="flex items-center gap-3">
             <button
               className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
-              title="Come back May 1st"
+              title="Come back June 1st"
             >
               Log In
             </button>
@@ -169,7 +169,7 @@ export default function Pricing() {
         <p className="text-gray-500 text-xl max-w-2xl mx-auto mb-3">
           Free to start. No credit card required. No ads on any plan — ever.
         </p>
-        <p className="text-gray-400 text-sm">Launching May 1, 2026 · Join the waitlist for early access</p>
+        <p className="text-gray-400 text-sm">Launching June 1, 2026 · Join the waitlist for early access</p>
       </section>
 
       {/* Billing toggle */}
@@ -362,7 +362,7 @@ export default function Pricing() {
             Ready for your<br /><span className="text-[#3c82f4]">best season yet?</span>
           </h2>
           <p className="text-gray-500 mb-3 text-lg">
-            We launch <span className="text-gray-900 font-semibold">May 1, 2026</span>. Free forever tier on day one.
+            We launch <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free forever tier on day one.
           </p>
           <p className="text-gray-400 text-sm mb-8">No credit card required · No ads on any plan</p>
           <button

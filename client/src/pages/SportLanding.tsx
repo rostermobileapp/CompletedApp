@@ -226,7 +226,7 @@ export default function SportLanding({ sport }: SportLandingProps) {
           </p>
           {config.comingSoon && (
             <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-4 py-2 mb-6 text-sm font-semibold">
-              ⏳ Launching for {config.name} teams May 1, 2026
+              ⏳ Launching for {config.name} teams June 1, 2026
             </div>
           )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -340,7 +340,7 @@ export default function SportLanding({ sport }: SportLandingProps) {
             Ready to get organized?
           </h2>
           <p className="text-gray-500 text-lg mb-8">
-            Launching <span className="text-gray-900 font-semibold">May 1, 2026</span>. Free tier available on day one.
+            Launching <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free tier available on day one.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button

@@ -115,12 +115,12 @@ export default function Landing() {
     <div className="min-h-screen bg-white text-gray-900" data-testid="landing-page">
       {/* Launch date banner — fixed at very top */}
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        🚀 Launching May 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
+        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
       </div>
-      {/* "Come back May 1st" toast */}
+      {/* "Come back June 1st" toast */}
       {loginMessageVisible && (
         <div className="fixed top-[80px] left-1/2 -translate-x-1/2 z-[100] bg-white border border-gray-200 text-gray-900 px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold">
-          🗓️ Come back May 1st — we're not live yet!
+          🗓️ Come back June 1st — we're not live yet!
         </div>
       )}
       {/* Fixed Header */}
@@ -143,7 +143,7 @@ export default function Landing() {
             <button
               onClick={handleLoginClick}
               className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
-              title="Come back May 1st"
+              title="Come back June 1st"
             >
               Log In
             </button>
@@ -209,7 +209,7 @@ export default function Landing() {
               <button
                 onClick={handleLoginClick}
                 className="px-8 py-4 rounded-full border border-gray-300 text-gray-400 cursor-not-allowed font-semibold text-lg"
-                title="Come back May 1st"
+                title="Come back June 1st"
               >
                 Log In
               </button>
@@ -220,8 +220,8 @@ export default function Landing() {
               <button
                 disabled
                 className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50 pl-[4px] pr-[4px]"
-                title="Coming May 1st"
-                aria-label="Download on the App Store - Coming May 1st"
+                title="Coming June 1st"
+                aria-label="Download on the App Store - Coming June 1st"
               >
                 <SiAppstore className="w-7 h-7 text-gray-500" />
                 <div className="text-left">
@@ -233,8 +233,8 @@ export default function Landing() {
                 <button
                   disabled
                   className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50 pl-[4px] pr-[4px]"
-                  title="Coming May 1st"
-                  aria-label="Get it on Google Play - Coming May 1st"
+                  title="Coming June 1st"
+                  aria-label="Get it on Google Play - Coming June 1st"
                 >
                   <SiGoogleplay className="w-6 h-6 text-gray-500" />
                   <div className="text-left">
@@ -600,7 +600,7 @@ export default function Landing() {
             <br />
             <span className="text-[#3c82f4]">best season yet?</span>
           </h2>
-          <p className="text-gray-500 text-xl mb-3">We launch <span className="text-gray-900 font-semibold">May 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
+          <p className="text-gray-500 text-xl mb-3">We launch <span className="text-gray-900 font-semibold">June 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
           <p className="text-gray-400 text-sm mb-8">No credit card required · No ads on any plan</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <button
