@@ -741,11 +741,16 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   if (draft.status === "active") return { ok: true };
   if (draft.status === "completed") return { ok: false, error: "Draft is already completed" };
 
-  // Server-authoritative lifecycle: a draft must pass through the
-  // captain-ready lobby (`awaiting_captains`) before it can become `active`.
-  // Direct `pending → active` transitions are rejected so the READY gate
-  // cannot be bypassed by calling /begin out of order.
-  if (draft.status !== "awaiting_captains") {
+  // Server-authoritative lifecycle: in captain pick-mode, a draft must pass
+  // through the captain-ready lobby (`awaiting_captains`) before it can
+  // become `active` so the READY gate cannot be bypassed. In commissioner
+  // pick-mode, no captains are picking, so we allow a direct
+  // `pending → active` transition and skip the READY gate entirely.
+  const isCommissionerMode = draft.pickMode === "commissioner";
+  if (
+    draft.status !== "awaiting_captains" &&
+    !(isCommissionerMode && draft.status === "pending")
+  ) {
     return {
       ok: false,
       error:
@@ -757,9 +762,10 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   if (!validation.ok) return validation;
   const draftOrder = (draft.draftOrder as string[]) || [];
 
-  // Every captain in draftOrder must have explicitly confirmed READY. The
-  // commissioner cannot bypass this gate.
-  {
+  // Captain READY gate — only enforced in captain pick-mode. In commissioner
+  // mode the commissioner makes every pick, so there's nothing for captains
+  // to ready up for.
+  if (!isCommissionerMode) {
     const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
     const captainIds = teamRows
       .map((t) => t.captainId)
