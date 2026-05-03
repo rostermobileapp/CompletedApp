@@ -45,7 +45,8 @@ import {
   User,
   Search,
   Zap,
-  Snowflake
+  Snowflake,
+  RotateCcw
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema, type LeagueProGrant } from '@shared/schema';
 
@@ -2608,6 +2609,22 @@ export default function LeagueManagement() {
     },
   });
 
+  // Reset a completed/active draft back to pending so setup can start fresh
+  const [showResetDraftConfirm, setShowResetDraftConfirm] = useState(false);
+  const resetDraftMutation = useMutation({
+    mutationFn: async (draftId: string) => {
+      const res = await apiRequest('POST', `/api/drafts/${draftId}/reset`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Draft reset', description: 'The draft has been reset to pending. You can set it up again.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'seasons', selectedSeasonId, 'draft'] });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Failed to reset draft', description: err?.message || 'Please try again.', variant: 'destructive' });
+    },
+  });
+
   // Launch a saved-but-not-started draft directly (without re-opening the wizard)
   const launchDraftMutation = useMutation({
     mutationFn: async (draftId: string) => {
@@ -2795,15 +2812,29 @@ export default function LeagueManagement() {
               <>
                 {/* No draft configured yet (or completed): offer full setup */}
                 {(!existingDraft || existingDraft.status === 'completed') && (
-                  <button
-                    onClick={() => setShowDraftWizard(true)}
-                    className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
-                    data-testid="button-setup-draft"
-                    title="Set up player draft for this season"
-                  >
-                    <Crown className="w-4 h-4" />
-                    Setup Draft
-                  </button>
+                  <>
+                    {existingDraft && existingDraft.status === 'completed' && (
+                      <button
+                        onClick={() => setShowResetDraftConfirm(true)}
+                        disabled={resetDraftMutation.isPending}
+                        className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 text-muted-foreground"
+                        data-testid="button-reset-draft"
+                        title="Reset draft so you can run it again"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reset Draft
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowDraftWizard(true)}
+                      className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
+                      data-testid="button-setup-draft"
+                      title="Set up player draft for this season"
+                    >
+                      <Crown className="w-4 h-4" />
+                      Setup Draft
+                    </button>
+                  </>
                 )}
                 {/* Draft saved but not yet launched: edit config OR launch now */}
                 {existingDraft && existingDraft.status === 'pending' && (
@@ -8012,6 +8043,36 @@ export default function LeagueManagement() {
               data-testid="button-confirm-delete-season"
             >
               {deleteSeasonMutation.isPending ? 'Deleting...' : 'Delete Season'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showResetDraftConfirm}
+        onOpenChange={(open) => { if (!open) setShowResetDraftConfirm(false); }}
+      >
+        <AlertDialogContent data-testid="dialog-confirm-reset-draft">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete all picks from the previous draft run and reset it back to setup. Team rosters built by the draft will be cleared. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (existingDraft) {
+                  resetDraftMutation.mutate(existingDraft.id);
+                  setShowResetDraftConfirm(false);
+                }
+              }}
+              disabled={resetDraftMutation.isPending}
+              className="bg-orange-500 hover:bg-orange-600"
+              data-testid="button-confirm-reset-draft"
+            >
+              {resetDraftMutation.isPending ? 'Resetting...' : 'Reset Draft'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -490,6 +490,68 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     }
   });
 
+  // === Commissioner resets a draft back to pending ===
+  // Works from any status (pending, awaiting_captains, active, paused, completed).
+  // Deletes all picks, removes the teamMembership rows those picks created, and
+  // resets the draft to a clean pending state so setup can start over.
+  app.post("/api/drafts/:draftId/reset", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can reset the draft" });
+      }
+
+      // Collect player IDs from picks so we can clean up teamMemberships
+      const picks = await db
+        .select()
+        .from(draftPicks)
+        .where(eq(draftPicks.draftId, draftId));
+
+      const draftOrder = (draft.draftOrder as string[]) || [];
+
+      // Remove teamMembership rows that were created by the draft for these
+      // teams — only rows that resulted from a draft pick (not pre-existing ones).
+      if (picks.length > 0 && draftOrder.length > 0) {
+        const pickedPlayerIds = [...new Set(picks.map(p => p.playerId).filter(Boolean))] as string[];
+        if (pickedPlayerIds.length > 0) {
+          const { teamMemberships } = await import("@shared/schema");
+          await db
+            .delete(teamMemberships)
+            .where(
+              and(
+                inArray(teamMemberships.teamId, draftOrder),
+                inArray(teamMemberships.userId, pickedPlayerIds),
+              ),
+            );
+        }
+      }
+
+      // Delete all picks for this draft
+      await db.delete(draftPicks).where(eq(draftPicks.draftId, draftId));
+
+      // Reset the draft row to a clean pending state
+      await db
+        .update(drafts)
+        .set({
+          status: "pending",
+          currentPickIndex: 0,
+          captainReadyState: {},
+          completedAt: null,
+          startedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(drafts.id, draftId));
+
+      res.json({ ok: true, status: "pending" });
+    } catch (err) {
+      console.error("Reset draft error:", err);
+      res.status(500).json({ message: "Failed to reset draft" });
+    }
+  });
+
   // === Commissioner terminates the draft early ===
   // Commits all picks made so far to team memberships and marks the draft
   // completed, exactly like a natural end-of-rounds completion.
