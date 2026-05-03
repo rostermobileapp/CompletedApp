@@ -229,6 +229,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
               leagueId,
               seasonId,
               name: `Draft for season ${seasonId.slice(0, 6)}`,
+              status: "pending",
               draftStyle: config.draftStyle,
               roundType: legacyRoundType as any,
               goalieMethod: config.goalieMethod,
