@@ -273,7 +273,10 @@ export default function DraftRoom() {
         // generated CSS string short → faster style invalidation.
         style.setProperty("--prox", dist.toFixed(3));
         style.setProperty("--dir", dir === 0 ? "0" : dir === 1 ? "1" : "-1");
-        style.zIndex = String(((1 - dist) * 100) | 0);
+        // Cap at 30 so even the centered card stays *below* the shadcn
+        // dialog/overlay z-index (z-50). Without this cap the focused card
+        // would punch through and float on top of the pick-confirm dialog.
+        style.zIndex = String(((1 - dist) * 30) | 0);
       }
     };
 
