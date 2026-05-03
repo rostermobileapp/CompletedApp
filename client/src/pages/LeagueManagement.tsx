@@ -958,10 +958,11 @@ export default function LeagueManagement() {
 
   // Scope teams to the currently-selected season so the League Management
   // views show only that season's teams. Teams without a seasonId (legacy
-  // pre-seasons data) are kept visible only when no season is selected.
+  // pre-seasons data) are surfaced in every season view so commissioners can
+  // still see/assign them — otherwise their players would appear unassigned.
   const teams = React.useMemo(() => {
     if (!selectedSeasonId) return allTeams;
-    return allTeams.filter((t: any) => t.seasonId === selectedSeasonId);
+    return allTeams.filter((t: any) => t.seasonId === selectedSeasonId || t.seasonId == null);
   }, [allTeams, selectedSeasonId]);
 
   // Scope and sort games to the currently-selected season.
@@ -2179,14 +2180,24 @@ export default function LeagueManagement() {
   // Team creation mutation
   const createTeamMutation = useMutation({
     mutationFn: async (data: CreateTeamForm) => {
-      const response = await apiRequest('POST', '/api/teams', data);
+      // Stamp the team with the currently-selected season so it actually shows up
+      // in the season-scoped Teams view (the page filters teams by seasonId).
+      const payload = { ...data, leagueId, seasonId: selectedSeasonId || null };
+      const response = await apiRequest('POST', '/api/teams', payload);
       return response.json();
     },
     onSuccess: () => {
       toast({ title: 'Team created successfully' });
       setShowCreateTeam(false);
-      teamForm.reset();
+      teamForm.reset({ name: '', leagueId });
       refetchTeams();
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Failed to create team',
+        description: err?.message || 'Please try again.',
+        variant: 'destructive',
+      });
     },
   });
 
