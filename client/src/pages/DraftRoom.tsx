@@ -783,6 +783,14 @@ export default function DraftRoom() {
               style={{
                 scrollSnapType: "y mandatory",
                 WebkitOverflowScrolling: "touch",
+                // Trap all card z-indexes / GPU compositor layers inside
+                // this scroller's own stacking context. Without this, the
+                // cards (which are compositor-promoted via filter +
+                // will-change: transform) can render *above* a body-level
+                // portaled dialog on iOS Safari regardless of z-index.
+                isolation: "isolate",
+                position: "relative",
+                zIndex: 0,
               }}
               data-testid="player-carousel"
             >
