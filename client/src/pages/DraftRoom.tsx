@@ -211,6 +211,43 @@ export default function DraftRoom() {
     if (showChat) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [bundle?.chatMessages.length, showChat]);
 
+  // ── Vertical coverflow effect ──
+  // Continuously update each carousel slot's --prox CSS variable based on its
+  // distance from the viewport center. The card consumes that variable to
+  // drive scale + opacity, producing a smooth coverflow look where the
+  // centered card is large/bright and cards above/below shrink and dim.
+  useEffect(() => {
+    if (activeView !== "players") return;
+    const el = carouselRef.current;
+    if (!el) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const slots = el.querySelectorAll<HTMLElement>("[data-carousel-slot]");
+      const rect = el.getBoundingClientRect();
+      const centerY = rect.top + rect.height / 2;
+      const maxDist = rect.height / 2;
+      slots.forEach((slot) => {
+        const sRect = slot.getBoundingClientRect();
+        const sCenter = sRect.top + sRect.height / 2;
+        const dist = Math.min(1, Math.abs(sCenter - centerY) / maxDist);
+        slot.style.setProperty("--prox", String(dist));
+      });
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(update);
+    };
+    update();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [activeView, bundle?.draft?.status]);
+
   // League data: teams, members, league
   const draft = bundle?.draft;
   const { data: teams = [] } = useQuery<any[]>({
@@ -670,7 +707,7 @@ export default function DraftRoom() {
               data-testid="player-carousel"
             >
               {/* Top spacer — lets first card snap to center */}
-              <div style={{ height: "calc(50dvh - 104px)", minHeight: 16 }} aria-hidden="true" />
+              <div style={{ height: "calc(50dvh - 116px)", minHeight: 16 }} aria-hidden="true" />
 
               {allMembersForCarousel.map((m: any) => {
                 const isDrafted = draftedSet.has(m.user.id);
@@ -679,18 +716,41 @@ export default function DraftRoom() {
                 return (
                   <div
                     key={m.user.id}
-                    className="px-3 py-1.5"
-                    style={{ scrollSnapAlign: "center", willChange: "transform", height: 176 }}
+                    data-carousel-slot
+                    className="px-3 py-2"
+                    style={{
+                      scrollSnapAlign: "center",
+                      height: 200,
+                      // Default to "off-center" so cards animate into place
+                      // before the first scroll event fires.
+                      ["--prox" as any]: "1",
+                    }}
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className={`h-full rounded-2xl border-2 flex items-center gap-4 px-4 transition-all ${
+                      className={`h-full rounded-3xl border-2 flex items-center gap-4 px-5 shadow-lg ${
                         isDrafted
-                          ? "border-border bg-card opacity-35 pointer-events-none"
-                          : "border-border bg-card cursor-pointer active:scale-[0.985] hover:border-primary/50"
+                          ? "border-border bg-card pointer-events-none"
+                          : "border-primary/60 bg-card cursor-pointer hover:border-primary"
                       }`}
                       onClick={!isDrafted ? () => setCardUserId(m.user.id) : undefined}
                       data-testid={`player-card-${m.user.id}`}
+                      style={{
+                        // Coverflow transform: scale 1.0 at center → 0.72 at edges,
+                        // opacity 1.0 → 0.25. Using calc() so the CSS variable
+                        // updated on the parent slot drives the visuals smoothly.
+                        transform:
+                          "scale(calc(1 - var(--prox, 1) * 0.28))",
+                        opacity:
+                          "calc(1 - var(--prox, 1) * 0.75)",
+                        transformOrigin: "center center",
+                        transition:
+                          "transform 120ms ease-out, opacity 120ms ease-out, border-color 200ms ease-out",
+                        willChange: "transform, opacity",
+                        boxShadow:
+                          "0 calc((1 - var(--prox, 1)) * 24px) calc((1 - var(--prox, 1)) * 40px) -8px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.35))",
+                        ...(isDrafted ? { filter: "grayscale(0.8)" } : {}),
+                      }}
                     >
                       {/* Avatar */}
                       <div className="w-14 h-14 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center border border-border">
@@ -764,7 +824,7 @@ export default function DraftRoom() {
               })}
 
               {/* Bottom spacer */}
-              <div style={{ height: "calc(50dvh - 104px)", minHeight: 16 }} aria-hidden="true" />
+              <div style={{ height: "calc(50dvh - 116px)", minHeight: 16 }} aria-hidden="true" />
             </div>
           )}
 
