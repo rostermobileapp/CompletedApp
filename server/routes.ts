@@ -5304,44 +5304,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Season not found" });
       }
 
-      // Count dependent rows so we can report exactly what's blocking deletion
-      const [gameCountRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(games)
-        .where(eq(games.seasonId, seasonId));
-      const [teamCountRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(teams)
-        .where(eq(teams.seasonId, seasonId));
-      const [tournamentCountRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(tournaments)
-        .where(eq(tournaments.seasonId, seasonId));
-      const [statsCountRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(playerStats)
-        .where(eq(playerStats.seasonId, seasonId));
-
-      const counts = {
-        games: Number(gameCountRow?.count ?? 0),
-        teams: Number(teamCountRow?.count ?? 0),
-        tournaments: Number(tournamentCountRow?.count ?? 0),
-        playerStats: Number(statsCountRow?.count ?? 0),
-      };
-      const total = counts.games + counts.teams + counts.tournaments + counts.playerStats;
-
-      if (total > 0) {
-        const parts: string[] = [];
-        if (counts.games) parts.push(`${counts.games} game${counts.games === 1 ? '' : 's'}`);
-        if (counts.teams) parts.push(`${counts.teams} team${counts.teams === 1 ? '' : 's'}`);
-        if (counts.tournaments) parts.push(`${counts.tournaments} tournament${counts.tournaments === 1 ? '' : 's'}`);
-        if (counts.playerStats) parts.push(`${counts.playerStats} player stat record${counts.playerStats === 1 ? '' : 's'}`);
-        return res.status(409).json({
-          message: `This season still has ${parts.join(', ')}. Remove them before deleting the season.`,
-          counts,
-        });
-      }
-
+      // Cascade-delete: storage.deleteSeason handles removing all dependent
+      // records (teams, games, drafts, tournaments, stats) before deleting
+      // the season row itself so there are no FK violations.
       await storage.deleteSeason(seasonId);
       res.json({ success: true });
     } catch (error) {

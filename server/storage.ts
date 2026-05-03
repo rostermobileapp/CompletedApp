@@ -46,6 +46,8 @@ import {
   lineCombinationAssignments,
   drafts,
   draftPicks,
+  draftBuddyPairs,
+  draftChatMessages,
   tournaments,
   tournamentTeams,
   tournamentMatches,
@@ -2381,7 +2383,104 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSeason(id: string): Promise<void> {
-    // TODO: Implement cascade deletion of related data (teams, games)
+    // Cascade-delete everything that belongs to this season so FK constraints
+    // are satisfied even when the caller hasn't manually cleaned up first.
+
+    // 1. Games → dependent records
+    const seasonGameIds = (
+      await db.select({ id: games.id }).from(games).where(eq(games.seasonId, id))
+    ).map(r => r.id);
+
+    if (seasonGameIds.length > 0) {
+      await db.delete(gameGoals).where(inArray(gameGoals.gameId, seasonGameIds));
+      await db.delete(gamePenalties).where(inArray(gamePenalties.gameId, seasonGameIds));
+      await db.delete(gameScoreSubmissions).where(inArray(gameScoreSubmissions.gameId, seasonGameIds));
+      await db.delete(gameGoalies).where(inArray(gameGoalies.gameId, seasonGameIds));
+      await db.delete(gameStars).where(inArray(gameStars.gameId, seasonGameIds));
+      await db.delete(gameRsvps).where(inArray(gameRsvps.gameId, seasonGameIds));
+      // Duty assignments / exclusions are also per-game
+      await db.delete(dutyAssignments).where(inArray(dutyAssignments.gameId, seasonGameIds));
+      await db.delete(dutyExclusions).where(inArray(dutyExclusions.gameId, seasonGameIds));
+    }
+    await db.delete(games).where(eq(games.seasonId, id));
+
+    // 2. Tournaments → dependent records
+    const seasonTournamentIds = (
+      await db.select({ id: tournaments.id }).from(tournaments).where(eq(tournaments.seasonId, id))
+    ).map(r => r.id);
+
+    if (seasonTournamentIds.length > 0) {
+      const matchIds = (
+        await db
+          .select({ id: tournamentMatches.id })
+          .from(tournamentMatches)
+          .where(inArray(tournamentMatches.tournamentId, seasonTournamentIds))
+      ).map(r => r.id);
+
+      if (matchIds.length > 0) {
+        await db.delete(tournamentMatchRsvps).where(inArray(tournamentMatchRsvps.matchId, matchIds));
+      }
+      await db.delete(tournamentMatches).where(inArray(tournamentMatches.tournamentId, seasonTournamentIds));
+      await db.delete(tournamentTeams).where(inArray(tournamentTeams.tournamentId, seasonTournamentIds));
+      await db.delete(tournamentParticipants).where(inArray(tournamentParticipants.tournamentId, seasonTournamentIds));
+
+      const photoIds = (
+        await db
+          .select({ id: tournamentPhotos.id })
+          .from(tournamentPhotos)
+          .where(inArray(tournamentPhotos.tournamentId, seasonTournamentIds))
+      ).map(r => r.id);
+      if (photoIds.length > 0) {
+        await db.delete(tournamentPhotoTags).where(inArray(tournamentPhotoTags.photoId, photoIds));
+      }
+      await db.delete(tournamentPhotos).where(inArray(tournamentPhotos.tournamentId, seasonTournamentIds));
+    }
+    await db.delete(tournaments).where(eq(tournaments.seasonId, id));
+
+    // 3. Teams → dependent records
+    const seasonTeamIds = (
+      await db.select({ id: teams.id }).from(teams).where(eq(teams.seasonId, id))
+    ).map(r => r.id);
+
+    if (seasonTeamIds.length > 0) {
+      await db.delete(teamMemberships).where(inArray(teamMemberships.teamId, seasonTeamIds));
+      await db.delete(teamLeagueRequests).where(inArray(teamLeagueRequests.teamId, seasonTeamIds));
+      // Clear any league membership assignments pointing at these teams
+      await db
+        .update(leagueMemberships)
+        .set({ assignedTeamId: null })
+        .where(inArray(leagueMemberships.assignedTeamId, seasonTeamIds));
+      // Line combinations per-team
+      const lineCombIds = (
+        await db
+          .select({ id: lineCombinations.id })
+          .from(lineCombinations)
+          .where(inArray(lineCombinations.teamId, seasonTeamIds))
+      ).map(r => r.id);
+      if (lineCombIds.length > 0) {
+        await db.delete(lineCombinationAssignments).where(inArray(lineCombinationAssignments.lineCombinationId, lineCombIds));
+      }
+      await db.delete(lineCombinations).where(inArray(lineCombinations.teamId, seasonTeamIds));
+      await db.delete(dutyTemplates).where(inArray(dutyTemplates.teamId, seasonTeamIds));
+    }
+    await db.delete(teams).where(eq(teams.seasonId, id));
+
+    // 4. Drafts → dependent records
+    const seasonDraftIds = (
+      await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.seasonId, id))
+    ).map(r => r.id);
+
+    if (seasonDraftIds.length > 0) {
+      await db.delete(draftPicks).where(inArray(draftPicks.draftId, seasonDraftIds));
+      await db.delete(draftBuddyPairs).where(inArray(draftBuddyPairs.draftId, seasonDraftIds));
+      await db.delete(draftChatMessages).where(inArray(draftChatMessages.draftId, seasonDraftIds));
+    }
+    await db.delete(drafts).where(eq(drafts.seasonId, id));
+
+    // 5. Player stats for this season
+    await db.delete(playerStats).where(eq(playerStats.seasonId, id));
+
+    // 6. Finally delete the season itself
     await db.delete(seasons).where(eq(seasons.id, id));
   }
 
@@ -2596,6 +2695,9 @@ export class DatabaseStorage implements IStorage {
         return false; // Same season context, different team → stale, filter out
       });
 
+    // Build a set of team IDs that come from the authoritative assignedTeamId source
+    const assignedTeamIds = new Set(leagueMembershipResult.map(r => r.team.id));
+
     // Combine both and deduplicate by team ID
     const allTeams = [
       ...filteredTeamMembershipTeams,
@@ -2603,7 +2705,40 @@ export class DatabaseStorage implements IStorage {
     ];
     
     // Deduplicate teams by ID
-    const uniqueTeams = Array.from(new Map(allTeams.map(team => [team.id, team])).values());
+    const byId = new Map(allTeams.map(team => [team.id, team]));
+    const idDeduped = Array.from(byId.values());
+
+    // Further deduplicate: within the same (leagueId, seasonId) pair, keep at
+    // most ONE team. This prevents a user with teamMembership rows in multiple
+    // teams of the same league+season (e.g., from draft testing) from seeing
+    // all of them in the home dropdown.
+    //
+    // Priority: assignedTeam (from leagueMemberships.assignedTeamId) > others.
+    const leagueSeasonSeen = new Map<string, boolean>(); // key → assignedTeam already stored
+    const uniqueTeams: typeof idDeduped = [];
+    // First pass: insert all assigned teams (they always win the slot)
+    for (const team of idDeduped) {
+      if (!team.leagueId) continue;
+      const key = `${team.leagueId}::${team.seasonId ?? "none"}`;
+      if (assignedTeamIds.has(team.id)) {
+        uniqueTeams.push(team);
+        leagueSeasonSeen.set(key, true);
+      }
+    }
+    // Second pass: insert non-assigned teams only if no assigned team already
+    // occupies the same (leagueId, seasonId) slot.
+    for (const team of idDeduped) {
+      if (!team.leagueId) {
+        uniqueTeams.push(team); // standalone teams always included
+        continue;
+      }
+      if (assignedTeamIds.has(team.id)) continue; // already added
+      const key = `${team.leagueId}::${team.seasonId ?? "none"}`;
+      if (!leagueSeasonSeen.has(key)) {
+        uniqueTeams.push(team);
+        leagueSeasonSeen.set(key, false);
+      }
+    }
 
     // Fetch season metadata for any teams that have a seasonId so the frontend can
     // display each team under its own season label (e.g. "Winter 2025" vs "Demo - Winter 2025")

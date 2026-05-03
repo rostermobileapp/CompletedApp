@@ -7995,7 +7995,7 @@ export default function LeagueManagement() {
             <AlertDialogTitle>Delete Season?</AlertDialogTitle>
             <AlertDialogDescription>
               {seasonToDelete
-                ? `Permanently delete the season "${seasonToDelete.name}"? This cannot be undone. Seasons with games, teams, tournaments, or stats can't be deleted — remove those first.`
+                ? `Permanently delete the season "${seasonToDelete.name}"? This will also delete all teams, games, drafts, tournaments, and stats within this season. This cannot be undone.`
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
