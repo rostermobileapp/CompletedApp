@@ -6,6 +6,16 @@ import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Send,
   Pause,
@@ -107,6 +117,7 @@ export default function DraftRoom() {
   const [cardUserId, setCardUserId] = useState<string | null>(null);
   const [teamPanelId, setTeamPanelId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"players" | "rosters">("players");
+  const [pendingPickUserId, setPendingPickUserId] = useState<string | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   // Pick announcement modal: shown for 4s whenever any captain makes a pick.
   const [lastPick, setLastPick] = useState<{
@@ -230,8 +241,15 @@ export default function DraftRoom() {
       slots.forEach((slot) => {
         const sRect = slot.getBoundingClientRect();
         const sCenter = sRect.top + sRect.height / 2;
-        const dist = Math.min(1, Math.abs(sCenter - centerY) / maxDist);
+        const delta = sCenter - centerY;
+        const dist = Math.min(1, Math.abs(delta) / maxDist);
+        // dir: -1 = above center, +1 = below center, 0 at center
+        const dir = delta === 0 ? 0 : delta < 0 ? -1 : 1;
         slot.style.setProperty("--prox", String(dist));
+        slot.style.setProperty("--dir", String(dir));
+        // Higher z-index when closer to center so the focused card visually
+        // overlaps its neighbors as they slide under it.
+        slot.style.zIndex = String(Math.round((1 - dist) * 100));
       });
     };
     const onScroll = () => {
@@ -311,20 +329,17 @@ export default function DraftRoom() {
     return s;
   }, [bundle?.buddyPairs]);
 
-  // All members for the carousel — available first, already-drafted at bottom
+  // All members for the carousel — drafted players & excluded goalies are
+  // removed entirely so the rolodex always shows the live "remaining pool".
   const allMembersForCarousel = useMemo(() => {
     if (!members.length) return [];
     const isExcludedGoalie = (m: any) =>
       draft?.goalieMethod &&
       draft.goalieMethod !== "included_with_skaters" &&
       m.membership.isGoalie;
-    const available = members.filter(
+    return members.filter(
       (m: any) => !draftedSet.has(m.user.id) && !isExcludedGoalie(m),
     );
-    const drafted = members.filter(
-      (m: any) => draftedSet.has(m.user.id) || isExcludedGoalie(m),
-    );
-    return [...available, ...drafted];
   }, [members, draftedSet, draft]);
 
   const pickMutation = useMutation({
@@ -334,8 +349,10 @@ export default function DraftRoom() {
     },
     onSuccess: () => {
       setCardUserId(null);
+      setPendingPickUserId(null);
     },
     onError: (err: any) => {
+      setPendingPickUserId(null);
       toast({ title: "Pick failed", description: err?.message, variant: "destructive" });
     },
   });
@@ -717,39 +734,41 @@ export default function DraftRoom() {
                   <div
                     key={m.user.id}
                     data-carousel-slot
-                    className="px-3 py-2"
+                    className="relative px-3"
                     style={{
                       scrollSnapAlign: "center",
                       height: 200,
                       // Default to "off-center" so cards animate into place
                       // before the first scroll event fires.
                       ["--prox" as any]: "1",
+                      ["--dir" as any]: "0",
                     }}
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className={`h-full rounded-3xl border-2 flex items-center gap-4 px-5 shadow-lg ${
-                        isDrafted
-                          ? "border-border bg-card pointer-events-none"
-                          : "border-primary/60 bg-card cursor-pointer hover:border-primary"
-                      }`}
-                      onClick={!isDrafted ? () => setCardUserId(m.user.id) : undefined}
+                      className="h-full rounded-3xl border-2 border-primary/70 bg-card flex items-center gap-4 px-5 cursor-pointer hover:border-primary"
+                      onClick={() => setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
-                        // Coverflow transform: scale 1.0 at center → 0.72 at edges,
-                        // opacity 1.0 → 0.25. Using calc() so the CSS variable
-                        // updated on the parent slot drives the visuals smoothly.
+                        // ── Coverflow transform ──
+                        // • scale: 1.0 at center → 0.55 at the edges
+                        //   (much more dramatic than before so the focused card
+                        //   visually dominates).
+                        // • translateY: pulls neighbors toward the centered
+                        //   card so they overlap underneath it. Sign comes
+                        //   from --dir (-1 above center, +1 below center).
+                        //   prox=0 → no shift, prox=1 → up to 90px overlap
+                        //   pulled toward center.
                         transform:
-                          "scale(calc(1 - var(--prox, 1) * 0.28))",
+                          "scale(calc(1 - var(--prox, 1) * 0.45)) translateY(calc(var(--prox, 1) * var(--dir, 0) * -90px))",
                         opacity:
                           "calc(1 - var(--prox, 1) * 0.75)",
                         transformOrigin: "center center",
                         transition:
-                          "transform 120ms ease-out, opacity 120ms ease-out, border-color 200ms ease-out",
+                          "transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out",
                         willChange: "transform, opacity",
                         boxShadow:
-                          "0 calc((1 - var(--prox, 1)) * 24px) calc((1 - var(--prox, 1)) * 40px) -8px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.35))",
-                        ...(isDrafted ? { filter: "grayscale(0.8)" } : {}),
+                          "0 calc((1 - var(--prox, 1)) * 30px) calc((1 - var(--prox, 1)) * 60px) -10px hsl(var(--primary) / calc((1 - var(--prox, 1)) * 0.55))",
                       }}
                     >
                       {/* Avatar */}
@@ -802,12 +821,12 @@ export default function DraftRoom() {
                         )}
                       </div>
 
-                      {/* DRAFT button — outlined box style, right side */}
-                      {!isDrafted && canPick && draft.status === "active" && (
+                      {/* DRAFT button — opens a confirm dialog before picking */}
+                      {canPick && draft.status === "active" && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            pickMutation.mutate(m.user.id);
+                            setPendingPickUserId(m.user.id);
                           }}
                           disabled={pickMutation.isPending}
                           className="flex-shrink-0 border-2 border-primary text-primary rounded-xl px-4 py-3 font-black text-sm tracking-widest uppercase
@@ -1240,10 +1259,61 @@ export default function DraftRoom() {
           userId={cardUserId}
           onClose={() => setCardUserId(null)}
           canPick={canPick && draft.status === "active" && !draftedSet.has(cardUserId)}
-          onPick={() => pickMutation.mutate(cardUserId)}
+          onPick={() => setPendingPickUserId(cardUserId)}
           isPicking={pickMutation.isPending}
         />
       )}
+
+      {/* Pick confirmation dialog */}
+      <AlertDialog
+        open={!!pendingPickUserId}
+        onOpenChange={(open) => {
+          if (!open && !pickMutation.isPending) setPendingPickUserId(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-confirm-pick">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Draft this player?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const m = pendingPickUserId ? memberById.get(pendingPickUserId) : null;
+                const name =
+                  m?.user.firstName ||
+                  m?.user.displayName ||
+                  m?.user.email ||
+                  "this player";
+                const teamName = pickingTeam?.name || "the team on the clock";
+                return (
+                  <>
+                    <span className="font-semibold text-foreground">{name}</span>
+                    {" will be added to "}
+                    <span className="font-semibold text-foreground">{teamName}</span>
+                    {". This pick can be undone for 30 seconds."}
+                  </>
+                );
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={pickMutation.isPending}
+              data-testid="button-cancel-pick"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={pickMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (pendingPickUserId) pickMutation.mutate(pendingPickUserId);
+              }}
+              data-testid="button-confirm-pick"
+            >
+              {pickMutation.isPending ? "Drafting…" : "Draft player"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Chat drawer */}
       {showChat && (
