@@ -178,14 +178,11 @@ export default function DraftRoom() {
     });
     const offChat = ws.subscribe("draft_chat", (data: any) => {
       if (!data.payload || data.payload.draftId !== draftId) return;
-      setBundle((prev) =>
-        prev
-          ? {
-              ...prev,
-              chatMessages: [...prev.chatMessages, data.payload],
-            }
-          : prev,
-      );
+      setBundle((prev) => {
+        if (!prev) return prev;
+        if (prev.chatMessages.some((m) => m.id === data.payload.id)) return prev;
+        return { ...prev, chatMessages: [...prev.chatMessages, data.payload] };
+      });
     });
     const offTick = ws.subscribe("draft_tick", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
@@ -621,7 +618,16 @@ export default function DraftRoom() {
     if (!trimmed || !draftId) return;
     setChatInput("");
     try {
-      await apiRequest("POST", `/api/drafts/${draftId}/chat`, { body: trimmed });
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/chat`, { body: trimmed });
+      const json = await res.json().catch(() => null);
+      const row = json?.message;
+      if (row?.id) {
+        setBundle((prev) => {
+          if (!prev) return prev;
+          if (prev.chatMessages.some((m) => m.id === row.id)) return prev;
+          return { ...prev, chatMessages: [...prev.chatMessages, row] };
+        });
+      }
     } catch (err: any) {
       setChatInput(trimmed);
       toast({

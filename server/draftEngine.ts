@@ -998,12 +998,13 @@ export async function resumeDraft(draftId: string): Promise<{ ok: boolean }> {
 
 export async function postChat(draftId: string, userId: string, body: string) {
   const trimmed = body.trim().slice(0, 500);
-  if (!trimmed) return;
+  if (!trimmed) return null;
   const [row] = await db
     .insert(draftChatMessages)
     .values({ draftId, userId, body: trimmed })
     .returning();
   broadcastToDraft(draftId, { type: "draft_chat", payload: row });
+  return row;
 }
 
 /**

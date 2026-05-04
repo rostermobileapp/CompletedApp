@@ -875,8 +875,8 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       if (!isCommish && !isCaptain) {
         return res.status(403).json({ message: "Only captains and commissioner can chat" });
       }
-      await postChat(draftId, userId, body);
-      res.json({ ok: true });
+      const row = await postChat(draftId, userId, body);
+      res.json({ ok: true, message: row });
     } catch (err) {
       console.error("Post chat error:", err);
       res.status(500).json({ message: "Failed to post chat" });
