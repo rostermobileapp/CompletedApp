@@ -1,0 +1,107 @@
+GOAL
+Add Google Play Billing support to the Roster app for Android devices ONLY. iOS must continue to use Apple StoreKit/RevenueCat exactly as it does today. Web must continue to use Stripe exactly as it does today.
+
+CONTEXT
+- Roster is built on Expo / React Native, wrapped natively via BuildNatively
+- RevenueCat is already integrated for iOS (react-native-purchases SDK)
+- I have already completed all dashboard setup OUTSIDE Replit:
+  - Created service account in Google Cloud Console
+  - Linked service account JSON to RevenueCat
+  - Created 4 subscription products in Google Play Console:
+    - player_pro_monthly
+    - player_pro_yearly
+    - commissioner_monthly
+    - commissioner_yearly
+  - All 4 Google products are linked to existing RevenueCat packages alongside their iOS counterparts
+  - Existing entitlements (player_pro, commissioner) already point to those packages
+- This means RevenueCat will return the correct Google Play products automatically once the SDK is configured with the Android API key
+
+APPROACH
+Extend the existing RevenueCat integration to support Android. Do NOT introduce react-native-iap or any other IAP package. RevenueCat's SDK already wraps Google Play Billing — we just need the Android API key wired up and platform-conditional logic to gate Stripe vs IAP correctly.
+
+BEFORE YOU CHANGE ANY CODE
+1. Read the current RevenueCat initialization code (likely in App.tsx, _layout.tsx, or a Purchases context/provider)
+2. Read the current paywall component
+3. Read the current platform-gating logic that decides Stripe vs IAP
+4. List every file you plan to change and explain WHY for each
+5. WAIT for me to confirm before making any changes
+
+REQUIREMENTS
+
+1. PLATFORM GATING (most critical)
+   - All purchase logic must branch on Platform.OS:
+     - Platform.OS === 'ios' → existing RevenueCat / StoreKit flow (no changes)
+     - Platform.OS === 'android' → RevenueCat / Google Play flow (new)
+     - Platform.OS === 'web' → existing Stripe flow (no changes)
+   - Under no circumstances should Google Play Billing fire on iOS or web
+   - Under no circumstances should Stripe checkout buttons appear in the Android app (Google Play policy violation, same rule as Apple)
+
+2. REVENUECAT INITIALIZATION
+   - Find the existing Purchases.configure() call
+   - Refactor it so the apiKey is selected by platform:
+     - iOS: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY
+     - Android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY
+   - Do NOT hardcode either key
+   - If the existing code only has the iOS key, add the Android branch — do not remove or modify the iOS branch
+   - The Android API key will be added to Replit Secrets by me — just reference the env var
+
+3. PRODUCT FETCHING (should already work, but verify)
+   - The existing Purchases.getOfferings() call is platform-agnostic
+   - Verify the offering rendering code does NOT assume iOS-only product identifiers or hardcoded prices
+   - On Android, the paywall must display prices returned by RevenueCat (which come from Google Play), NOT iOS prices
+
+4. PURCHASE FLOW (should already work, but verify)
+   - The existing Purchases.purchasePackage() call is platform-agnostic
+   - Verify success handling, entitlement check, and Supabase user record update all execute identically on Android
+   - Verify error handling covers Google-specific error codes (e.g., BILLING_UNAVAILABLE, ITEM_UNAVAILABLE, USER_CANCELED)
+
+5. RESTORE PURCHASES
+   - Verify the existing "Restore Purchases" button calls Purchases.restorePurchases() and works on Android
+   - Google Play supports this, but confirm the UI is reachable on Android
+
+6. PAYWALL UI ON ANDROID
+   - Hide all Stripe checkout buttons / "Pay via web" links on Android
+   - Show standard "Subscribe" CTA that triggers the RevenueCat purchase flow
+   - Display: price, billing period, auto-renew disclosure, Restore Purchases link, Terms of Service, Privacy Policy
+   - Reuse the iOS subscription disclosure block — Google Play has the same disclosure requirements as Apple
+
+7. ANDROID MANIFEST
+   - The com.android.vending.BILLING permission should be added automatically by react-native-purchases
+   - Verify it ends up in the merged AndroidManifest.xml after a build
+   - Verify android.package in app.json/app.config.js matches what's registered in Google Play Console (com.rosterapp or whatever the existing value is — do NOT change this)
+
+8. WEBHOOK / BACKEND
+   - The existing RevenueCat webhook → Supabase sync handles entitlement changes regardless of platform
+   - Do NOT modify the webhook handler unless you find a bug where it branches on store === 'APP_STORE' in a way that excludes 'PLAY_STORE'
+   - If you find such a bug, flag it to me before changing it
+
+9. DO NOT TOUCH
+   - iOS StoreKit flow (any code path where Platform.OS === 'ios')
+   - Stripe web flow (any code path where Platform.OS === 'web')
+   - Existing iOS product IDs, App Store Connect config, or RevenueCat iOS app config
+   - The RevenueCat webhook handler (unless step 8 reveals a bug)
+   - app.json/app.config.js android.package value
+   - Any existing Supabase table schemas or RLS policies
+
+10. DO NOT INSTALL
+    - react-native-iap
+    - expo-in-app-purchases
+    - Any other IAP/billing package besides react-native-purchases (which is already installed)
+
+DELIVERABLES
+1. List of every file changed with a one-line description of the change
+2. Confirmation that:
+   - iOS purchase flow is unchanged
+   - Stripe web flow is unchanged
+   - Android branch uses the new EXPO_PUBLIC_REVENUECAT_ANDROID_KEY env var
+3. A new file at /docs/android-billing-testing.md that explains how I will test this on a real Android device:
+   - How to confirm the build was uploaded to the Internal Testing track
+   - How to install via the Play Store testing link on my Android device
+   - What to test: subscribe → confirm entitlement in app → confirm entitlement in Supabase → cancel from Play Store → confirm cancellation propagates
+   - How to read RevenueCat event logs to verify the purchase fired correctly
+   - Common errors to watch for (ITEM_UNAVAILABLE usually means propagation delay; BILLING_UNAVAILABLE usually means tester account isn't set up correctly)
+
+START NOW BY:
+1. Reading the relevant files (RevenueCat init, paywall, platform gating)
+2. Listing the files you plan to change
+3. STOP and wait for my approval before changing anything
