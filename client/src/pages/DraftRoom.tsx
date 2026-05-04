@@ -616,11 +616,20 @@ export default function DraftRoom() {
       toast({ title: "Failed to terminate", description: err?.message, variant: "destructive" }),
   });
 
-  const sendChat = () => {
+  const sendChat = async () => {
     const trimmed = chatInput.trim();
     if (!trimmed || !draftId) return;
-    ws.send({ type: "draft_chat", draftId, body: trimmed });
     setChatInput("");
+    try {
+      await apiRequest("POST", `/api/drafts/${draftId}/chat`, { body: trimmed });
+    } catch (err: any) {
+      setChatInput(trimmed);
+      toast({
+        title: "Couldn't send message",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading || !bundle || !draft) {
@@ -1658,12 +1667,12 @@ export default function DraftRoom() {
       {/* Chat drawer */}
       {showChat && (
         <div
-          className="fixed inset-0 z-[110] bg-black/40 flex items-end"
+          className="fixed inset-0 z-[110] bg-black/40 flex items-start"
           onClick={() => setShowChat(false)}
         >
           <div
-            className="w-full bg-background rounded-t-2xl flex flex-col"
-            style={{ maxHeight: "70dvh" }}
+            className="w-full bg-background rounded-b-2xl flex flex-col"
+            style={{ maxHeight: "70dvh", paddingTop: "env(safe-area-inset-top, 0px)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
@@ -1695,7 +1704,6 @@ export default function DraftRoom() {
             </div>
             <div
               className="p-3 border-t border-border flex gap-2 shrink-0"
-              style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
             >
               <input
                 value={chatInput}
