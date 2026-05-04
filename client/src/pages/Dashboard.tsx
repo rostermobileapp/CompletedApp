@@ -835,20 +835,25 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
 }
 
 // Standings Modal Component
-function StandingsModal({ isOpen, onClose, leagueId, tournamentId }: { 
+function StandingsModal({ isOpen, onClose, leagueId, tournamentId, seasonId }: { 
   isOpen: boolean; 
   onClose: () => void; 
   leagueId?: string | null; 
   tournamentId?: string | null;
+  seasonId?: string | null;
 }) {
   const { canAccessPremiumFeatures } = usePermissions();
   
-  // Fetch league standings
+  // Fetch league standings — scoped to the selected season when available
+  // so the modal mirrors the team/season chosen in the dashboard dropdown.
   const { data: leagueStandings = [], isLoading: isLoadingLeague } = useQuery({
-    queryKey: ['/api/leagues', leagueId, 'standings'],
+    queryKey: ['/api/leagues', leagueId, 'standings', { seasonId: seasonId ?? null }],
     queryFn: async () => {
       if (!leagueId) return [];
-      const response = await apiRequest('GET', `/api/leagues/${leagueId}/standings`);
+      const url = seasonId
+        ? `/api/leagues/${leagueId}/standings?seasonId=${seasonId}`
+        : `/api/leagues/${leagueId}/standings`;
+      const response = await apiRequest('GET', url);
       return response.json();
     },
     enabled: !!leagueId && isOpen,
@@ -3538,6 +3543,13 @@ function DashboardMobile() {
         onClose={() => setShowStandingsModal(false)}
         leagueId={selectedType === 'tournament' ? null : effectiveLeagueId}
         tournamentId={selectedType === 'tournament' ? selectedId : null}
+        seasonId={
+          selectedType === 'team'
+            ? (selectedTeam?.seasonId ?? null)
+            : selectedType === 'league'
+              ? prefetchSeasonId
+              : null
+        }
       />
       {/* Needs Attention Modal */}
       <NeedsAttentionModal 
