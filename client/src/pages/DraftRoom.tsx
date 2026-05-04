@@ -1505,8 +1505,25 @@ export default function DraftRoom() {
       })()}
 
       {/* Card overlay */}
-      {cardUserId && (
+      {cardUserId && (() => {
+        const buddyNames: string[] = [];
+        for (const pair of bundle?.buddyPairs || []) {
+          if (!pair.userIds.includes(cardUserId)) continue;
+          for (const uid of pair.userIds) {
+            if (uid === cardUserId) continue;
+            const bm = memberById.get(uid);
+            if (!bm) continue;
+            const name =
+              [bm.user.firstName, bm.user.lastName].filter(Boolean).join(" ") ||
+              bm.user.displayName ||
+              bm.user.email ||
+              "Player";
+            buddyNames.push(name);
+          }
+        }
+        return (
         <PlayerCardOverlay
+          buddyNames={buddyNames}
           draftId={draftId!}
           userId={cardUserId}
           onClose={() => setCardUserId(null)}
@@ -1514,7 +1531,8 @@ export default function DraftRoom() {
           onPick={() => setPendingPickUserId(cardUserId)}
           isPicking={pickMutation.isPending}
         />
-      )}
+        );
+      })()}
 
       {/* Pick confirmation dialog */}
       <AlertDialog
@@ -1764,6 +1782,7 @@ function PlayerCardOverlay({
   canPick,
   onPick,
   isPicking,
+  buddyNames,
 }: {
   draftId: string;
   userId: string;
@@ -1771,6 +1790,7 @@ function PlayerCardOverlay({
   canPick: boolean;
   onPick: () => void;
   isPicking: boolean;
+  buddyNames: string[];
 }) {
   const { data, isLoading } = useQuery<CardData>({
     queryKey: ["/api/drafts", draftId, "players", userId, "card"],
@@ -1874,6 +1894,23 @@ function PlayerCardOverlay({
                   {data?.note && (
                     <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/30 border-l-2 border-amber-500 text-[11px] italic">
                       {data.note}
+                    </div>
+                  )}
+                  {buddyNames.length > 0 && (
+                    <div
+                      className="mt-2 p-2 bg-pink-50 dark:bg-pink-950/40 border-l-2 border-pink-500 rounded text-[11px] flex items-start gap-1.5"
+                      data-testid="player-card-buddies"
+                    >
+                      <Link2 className="w-3 h-3 mt-0.5 text-pink-600 dark:text-pink-300 flex-shrink-0" />
+                      <div>
+                        <span className="font-bold text-pink-700 dark:text-pink-300">
+                          Buddied with:
+                        </span>{" "}
+                        <span className="text-foreground">{buddyNames.join(", ")}</span>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          Drafting this player auto-adds {buddyNames.length === 1 ? "their buddy" : "their buddies"} to the same team.
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>
