@@ -1544,7 +1544,7 @@ export default function DraftRoom() {
         <AlertDialogContent data-testid="dialog-confirm-pick">
           <AlertDialogHeader>
             <AlertDialogTitle>Draft this player?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription asChild>
               {(() => {
                 const m = pendingPickUserId ? memberById.get(pendingPickUserId) : null;
                 const name =
@@ -1553,13 +1553,53 @@ export default function DraftRoom() {
                   m?.user.email ||
                   "this player";
                 const teamName = pickingTeam?.name || "the team on the clock";
+                // Find any buddies of the player about to be picked.
+                const buddyNames: string[] = [];
+                if (pendingPickUserId) {
+                  for (const pair of bundle?.buddyPairs || []) {
+                    if (!pair.userIds.includes(pendingPickUserId)) continue;
+                    for (const uid of pair.userIds) {
+                      if (uid === pendingPickUserId) continue;
+                      const bm = memberById.get(uid);
+                      if (!bm) continue;
+                      // Skip already-drafted buddies — they won't be re-added.
+                      if (draftedSet.has(uid)) continue;
+                      buddyNames.push(
+                        bm.user.firstName ||
+                          bm.user.displayName ||
+                          bm.user.email ||
+                          "Player",
+                      );
+                    }
+                  }
+                }
                 return (
-                  <>
-                    <span className="font-semibold text-foreground">{name}</span>
-                    {" will be added to "}
-                    <span className="font-semibold text-foreground">{teamName}</span>
-                    {". This pick can be undone for 30 seconds."}
-                  </>
+                  <span className="block space-y-2">
+                    <span className="block">
+                      <span className="font-semibold text-foreground">{name}</span>
+                      {" will be added to "}
+                      <span className="font-semibold text-foreground">{teamName}</span>
+                      {". This pick can be undone for 30 seconds."}
+                    </span>
+                    {buddyNames.length > 0 && (
+                      <span
+                        className="flex items-start gap-2 p-2 rounded-md bg-pink-50 dark:bg-pink-950/40 border border-pink-300 dark:border-pink-800"
+                        data-testid="buddy-warning"
+                      >
+                        <Link2 className="w-4 h-4 mt-0.5 text-pink-600 dark:text-pink-300 flex-shrink-0" />
+                        <span className="block text-foreground text-sm">
+                          <span className="font-bold text-pink-700 dark:text-pink-300">
+                            Heads up — buddy rule:
+                          </span>{" "}
+                          <span className="font-semibold">
+                            {buddyNames.join(" & ")}
+                          </span>{" "}
+                          will be auto-added to {teamName}, and {teamName}'s next
+                          round pick will be skipped.
+                        </span>
+                      </span>
+                    )}
+                  </span>
                 );
               })()}
             </AlertDialogDescription>
