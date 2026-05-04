@@ -115,6 +115,12 @@ export default function DraftRoom() {
   const [tickNow, setTickNow] = useState(Date.now());
   const [chatInput, setChatInput] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const showChatRef = useRef(false);
+  useEffect(() => {
+    showChatRef.current = showChat;
+    if (showChat) setUnreadChatCount(0);
+  }, [showChat]);
   const [cardUserId, setCardUserId] = useState<string | null>(null);
   const [teamPanelId, setTeamPanelId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"players" | "rosters">("players");
@@ -181,6 +187,9 @@ export default function DraftRoom() {
       setBundle((prev) => {
         if (!prev) return prev;
         if (prev.chatMessages.some((m) => m.id === data.payload.id)) return prev;
+        if (!showChatRef.current && data.payload.userId !== user?.id) {
+          setUnreadChatCount((c) => c + 1);
+        }
         return { ...prev, chatMessages: [...prev.chatMessages, data.payload] };
       });
     });
@@ -830,9 +839,12 @@ export default function DraftRoom() {
               data-testid="button-open-chat"
             >
               <MessageCircle className="w-5 h-5" />
-              {bundle.chatMessages.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-primary text-primary-foreground text-[10px] rounded-full px-1 min-w-[16px] text-center">
-                  {bundle.chatMessages.length}
+              {unreadChatCount > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-semibold rounded-full px-1 min-w-[16px] text-center"
+                  data-testid="badge-chat-unread"
+                >
+                  {unreadChatCount}
                 </span>
               )}
             </button>
