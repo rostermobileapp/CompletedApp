@@ -120,7 +120,8 @@ export default function DraftRoom() {
   const [activeView, setActiveView] = useState<"players" | "rosters">("players");
   const [pendingPickUserId, setPendingPickUserId] = useState<string | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
-  // Pick announcement modal: shown for 4s whenever any captain makes a pick.
+  // Pick announcement modal: shown for 2s whenever any captain makes a pick
+  // so every other captain gets a quick "X drafted by Team Y" notice.
   const [lastPick, setLastPick] = useState<{
     teamId: string;
     playerId: string | null;
@@ -130,7 +131,7 @@ export default function DraftRoom() {
   } | null>(null);
   useEffect(() => {
     if (!lastPick) return;
-    const id = setTimeout(() => setLastPick(null), 4000);
+    const id = setTimeout(() => setLastPick(null), 2000);
     return () => clearTimeout(id);
   }, [lastPick]);
 
@@ -171,6 +172,8 @@ export default function DraftRoom() {
     const offPick = ws.subscribe("draft_pick_made", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
       const { teamId, playerId, round, pick, isAutoPick } = data.payload;
+      // Bump `at` so React re-runs the auto-dismiss timer even when the same
+      // (teamId, playerId) pair somehow arrives twice (idempotent ws replays).
       setLastPick({ teamId, playerId: playerId ?? null, round, pick, isAutoPick: !!isAutoPick });
     });
     const offChat = ws.subscribe("draft_chat", (data: any) => {
