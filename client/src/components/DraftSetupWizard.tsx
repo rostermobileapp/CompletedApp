@@ -19,6 +19,7 @@ import {
   Trash2,
   Sparkles,
   Crown,
+  Shuffle,
 } from "lucide-react";
 
 type DraftStyle = "snake" | "linear" | "auction" | "3rd_round_reversal";
@@ -78,9 +79,10 @@ interface Props {
   onLaunched?: (draftId: string) => void;
 }
 
-const STEPS = [
+const ALL_STEPS = [
   { id: "captains", label: "Captains" },
   { id: "goalies", label: "Goalies" },
+  { id: "goalie_assign", label: "Assign Goalies" },
   { id: "format", label: "Format" },
   { id: "timer", label: "Timer" },
   { id: "skill", label: "Skill" },
@@ -89,7 +91,7 @@ const STEPS = [
   { id: "review", label: "Review" },
 ] as const;
 
-type StepId = (typeof STEPS)[number]["id"];
+type StepId = (typeof ALL_STEPS)[number]["id"];
 
 function memberName(m: Member): string {
   const first = m.user.firstName || "";
@@ -102,7 +104,6 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [stepIdx, setStepIdx] = useState(0);
-  const stepId: StepId = STEPS[stepIdx].id;
 
   // Captains
   const [captainAssignments, setCaptainAssignments] = useState<Record<string, string>>(() => {
@@ -242,6 +243,23 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     [members],
   );
 
+  // The "goalie_assign" step only matters when goalies are pulled out of the
+  // skater draft (commissioner picks them OR a random draw decides). When
+  // goalies are drafted with skaters there's nothing to assign in advance.
+  const STEPS = useMemo(
+    () =>
+      ALL_STEPS.filter(
+        (s) => s.id !== "goalie_assign" || goalieMethod !== "included_with_skaters",
+      ),
+    [goalieMethod],
+  );
+  // Clamp stepIdx whenever the visible step list shrinks/grows so we never
+  // render an undefined step.
+  useEffect(() => {
+    setStepIdx((i) => Math.min(i, STEPS.length - 1));
+  }, [STEPS.length]);
+  const stepId: StepId = STEPS[stepIdx].id;
+
   const saveMutation = useMutation({
     mutationFn: async (launch: boolean) => {
       const existingStatus = existing?.draft?.status as string | undefined;
@@ -270,7 +288,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         skillLevels: skillRankingEnabled ? skillLevels : undefined,
         playerNotes,
         buddyPairs: buddyPairs.length ? buddyPairs : undefined,
-        goalieAssignments: goalieMethod === "commissioner_assigned" ? goalieAssignments : undefined,
+        goalieAssignments:
+          goalieMethod === "included_with_skaters" ? undefined : goalieAssignments,
         // In commissioner mode there are no captains — never send assignments.
         captainAssignments:
           pickMode === "commissioner"
@@ -633,35 +652,117 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 </button>
               ))}
 
-              {goalieMethod === "commissioner_assigned" && (
-                <div className="mt-3 space-y-2 border-t border-border pt-3">
-                  <p className="text-sm text-muted-foreground">
-                    Assign one goalie to each team:
-                  </p>
-                  {teams.map((team) => (
-                    <div key={team.id} className="flex items-center gap-2">
-                      <span className="text-sm w-32 truncate">{team.name}</span>
-                      <select
-                        value={goalieAssignments[team.id] || ""}
-                        onChange={(e) =>
-                          setGoalieAssignments((prev) => ({
-                            ...prev,
-                            [team.id]: e.target.value,
-                          }))
-                        }
-                        className="flex-1 p-2 bg-card border border-border rounded text-sm"
-                        data-testid={`select-goalie-${team.id}`}
-                      >
-                        <option value="">— Select goalie —</option>
-                        {goalies.map((g) => (
-                          <option key={g.user.id} value={g.user.id}>
-                            {memberName(g)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+              {goalieMethod !== "included_with_skaters" && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  You'll {goalieMethod === "random_draw" ? "run the random draw" : "pick goalies for each team"}{" "}
+                  on the next step.
+                </p>
+              )}
+            </div>
+          )}
+
+          {stepId === "goalie_assign" && goalieMethod === "commissioner_assigned" && (
+            <div className="space-y-3" data-testid="step-goalie-assign-commissioner">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Assign Goalies to Teams
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Pair one goalie with each team. The draft order will be set on
+                the next step.
+              </p>
+              {goalies.length === 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-700 dark:text-amber-300">
+                  No members are flagged as goalies yet. Mark members as goalies
+                  in League Members first, or switch the goalie method.
                 </div>
+              )}
+              {teams.map((team) => (
+                <div key={team.id} className="flex items-center gap-2">
+                  <span className="text-sm w-32 truncate">{team.name}</span>
+                  <select
+                    value={goalieAssignments[team.id] || ""}
+                    onChange={(e) =>
+                      setGoalieAssignments((prev) => ({
+                        ...prev,
+                        [team.id]: e.target.value,
+                      }))
+                    }
+                    className="flex-1 p-2 bg-card border border-border rounded text-sm"
+                    data-testid={`select-goalie-${team.id}`}
+                  >
+                    <option value="">— Select goalie —</option>
+                    {goalies.map((g) => (
+                      <option key={g.user.id} value={g.user.id}>
+                        {memberName(g)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stepId === "goalie_assign" && goalieMethod === "random_draw" && (
+            <div className="space-y-3" data-testid="step-goalie-assign-random">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Shuffle className="w-4 h-4" /> Random Goalie Draw
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Randomly pair each team with a goalie. You can re-roll until
+                you're happy, then move on to set the draft order.
+              </p>
+              {goalies.length === 0 ? (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm text-amber-700 dark:text-amber-300">
+                  No members are flagged as goalies yet. Mark members as goalies
+                  in League Members first, or switch the goalie method.
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shuffled = [...goalies].sort(() => Math.random() - 0.5);
+                      const next: Record<string, string> = {};
+                      teams.forEach((team, i) => {
+                        if (i < shuffled.length) next[team.id] = shuffled[i].user.id;
+                      });
+                      setGoalieAssignments(next);
+                    }}
+                    className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90"
+                    data-testid="button-run-random-draw"
+                  >
+                    <Shuffle className="w-4 h-4" />
+                    {Object.keys(goalieAssignments).length ? "Re-roll draw" : "Run random draw"}
+                  </button>
+
+                  {Object.keys(goalieAssignments).length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {teams.map((team) => {
+                        const gid = goalieAssignments[team.id];
+                        const g = goalies.find((gg) => gg.user.id === gid);
+                        return (
+                          <div
+                            key={team.id}
+                            className="flex items-center justify-between p-2 bg-card border border-border rounded-lg text-sm"
+                            data-testid={`random-draw-row-${team.id}`}
+                          >
+                            <span className="font-medium truncate">{team.name}</span>
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Shield className="w-3 h-3" />
+                              {g ? memberName(g) : "— unassigned —"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {teams.length > goalies.length && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          Heads up: {teams.length - goalies.length} team(s) won't
+                          get a goalie — there aren't enough goalies in the league.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -967,7 +1068,19 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   value={`${Object.values(captainAssignments).filter(Boolean).length} of ${teams.length} assigned`}
                   onEdit={() => goTo("captains")}
                 />
-                <Row label="Goalies" value={goalieMethodLabel(goalieMethod)} onEdit={() => goTo("goalies")} />
+                <Row
+                  label="Goalies"
+                  value={
+                    goalieMethod === "included_with_skaters"
+                      ? goalieMethodLabel(goalieMethod)
+                      : `${goalieMethodLabel(goalieMethod)} · ${
+                          Object.values(goalieAssignments).filter(Boolean).length
+                        } of ${teams.length} assigned`
+                  }
+                  onEdit={() =>
+                    goTo(goalieMethod === "included_with_skaters" ? "goalies" : "goalie_assign")
+                  }
+                />
                 <Row label="Style" value={draftStyle.replace(/_/g, " ")} onEdit={() => goTo("format")} />
                 <Row label="Rounds" value={`${totalRounds}`} onEdit={() => goTo("format")} />
                 <Row label="Timer" value={`${timePerPick}s · ${timerRuleLabel(timerExpiryRule)}`} onEdit={() => goTo("timer")} />
