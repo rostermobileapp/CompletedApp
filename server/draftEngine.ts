@@ -528,10 +528,9 @@ async function completeDraft(draftId: string) {
       .where(eq(drafts.id, draftId));
   }
 
-  // Fire-and-forget push notifications for first-time assignments only.
-  notifyDraftedPlayers(newlyAssigned, draft.leagueId).catch((e) =>
-    console.error("[Draft] notifyDraftedPlayers error:", e),
-  );
+  // Push notifications to drafted players are intentionally disabled per
+  // commissioner request — players should not be pinged when their pick lands.
+  void newlyAssigned;
 
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
@@ -556,9 +555,8 @@ export async function finalizeDraft(draftId: string): Promise<{
       .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
       .where(eq(drafts.id, draftId));
   }
-  notifyDraftedPlayers(newlyAssigned, draft.leagueId).catch((e) =>
-    console.error("[Draft] notifyDraftedPlayers error:", e),
-  );
+  // Push notifications to drafted players are intentionally disabled per
+  // commissioner request — finalize is now silent for the drafted players.
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
   return { ok: true, assigned: newlyAssigned.length };
