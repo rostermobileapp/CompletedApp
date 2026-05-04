@@ -370,8 +370,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   }, [teams]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[110] p-0 sm:p-4">
-      <div className="bg-background rounded-t-2xl sm:rounded-2xl hairline elev-inset w-full sm:max-w-3xl max-h-[92dvh] sm:max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 flex items-start sm:items-center justify-center z-[110] p-0 sm:p-4">
+      <div className="bg-background rounded-b-2xl sm:rounded-2xl hairline elev-inset w-full sm:max-w-3xl max-h-[100dvh] sm:max-h-[90vh] flex flex-col">
         <div className="p-5 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
