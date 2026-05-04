@@ -13,9 +13,13 @@ import { useIosPlatform } from '@/hooks/useIosPlatform';
 import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
   isBillingSupported,
+  isAndroidBillingSupported,
   getIosProducts,
+  getAndroidProducts,
   purchaseProduct,
+  purchaseProductAndroid,
   restorePurchases,
+  restorePurchasesAndroid,
   getAppAccountToken,
   PRODUCT_PLAYER_PRO,
   PRODUCT_COMMISSIONER,
@@ -56,7 +60,7 @@ export default function Subscription() {
   // cases is `/subscription?success=true[&session_id=...]`.
   const [showRedirectConfirmation, setShowRedirectConfirmation] = useState(false);
 
-  const { isIos, isUsRegion, isReady: platformReady } = useIosPlatform();
+  const { isIos, isAndroid, isUsRegion, isReady: platformReady } = useIosPlatform();
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -78,6 +82,25 @@ export default function Subscription() {
       console.warn('[Subscription] IAP init error:', err);
     });
   }, [platformReady, isIos]);
+
+  // Initialize IAP on Android — same shape as iOS, but talks to Google Play
+  // through the Natively / RevenueCat bridge. The localised price strings
+  // come from Play Console (currency + tax-inclusive).
+  useEffect(() => {
+    if (!platformReady || !isAndroid) return;
+    isAndroidBillingSupported().then(async (supported) => {
+      if (!supported) return;
+      setIapReady(true);
+      const products = await getAndroidProducts();
+      const priceMap: Record<string, string> = {};
+      for (const p of products) {
+        priceMap[p.identifier] = p.priceString;
+      }
+      setIosProductPrices((prev) => ({ ...prev, ...priceMap }));
+    }).catch((err) => {
+      console.warn('[Subscription] Android IAP init error:', err);
+    });
+  }, [platformReady, isAndroid]);
 
   // Auto-sync subscription status on page load
   useEffect(() => {
@@ -145,9 +168,10 @@ export default function Subscription() {
   const commYearlyDisplay = formatPrice(stripePrices?.commissioner_yearly) ?? '...';
 
   // For iOS users, return the price fetched from the App Store (localised + tax-inclusive)
-  // for the selected billing period. For web/Android, return the Stripe price.
+  // for the selected billing period. For Android, return the Google Play price (also
+  // localised + tax-inclusive). For web, return the Stripe price.
   const getPriceDisplay = (tier: 'player_pro' | 'commissioner') => {
-    if (isIos) {
+    if (isIos || isAndroid) {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
@@ -437,6 +461,96 @@ export default function Subscription() {
     }
   };
 
+  // --- Android IAP helpers ---
+  // Mirrors handleIosPurchase but routes through the Natively / RevenueCat
+  // bridge to Google Play Billing and verifies the resulting purchase token
+  // against /api/iap/verify-google. No Stripe involvement on Android.
+  const handleAndroidPurchase = async (tier: 'player_pro' | 'commissioner') => {
+    setIsLoading(true);
+    try {
+      const productId = billingPeriod === 'yearly'
+        ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
+        : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
+
+      const purchase = await purchaseProductAndroid(productId);
+
+      const response = await apiRequest('POST', '/api/iap/verify-google', {
+        purchaseToken: purchase.purchaseToken,
+        productId: purchase.productIdentifier || productId,
+      });
+
+      if (!response.ok) {
+        const data = await response.json() as { message?: string };
+        throw new Error(data.message || 'Purchase completed but role sync failed. Please tap Restore Purchases.');
+      }
+
+      toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      window.location.reload();
+    } catch (error: any) {
+      if (
+        error?.code === 'PURCHASE_CANCELLED' ||
+        error?.message?.toLowerCase().includes('cancel') ||
+        error?.message?.toLowerCase().includes('cancelled')
+      ) {
+        setIsLoading(false);
+        return;
+      }
+      toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
+      setIsLoading(false);
+    }
+  };
+
+  const handleAndroidRestore = async () => {
+    setIsLoading(true);
+    try {
+      const purchases = await restorePurchasesAndroid();
+
+      if (!purchases.length) {
+        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        setIsLoading(false);
+        return;
+      }
+
+      // Try each restored purchase token until one verifies as active. Most
+      // users only have one active sub, but multi-product accounts (e.g. an
+      // upgrade from Player Pro → Commissioner) can have several.
+      let verified = false;
+      let lastError: string | null = null;
+      for (const p of purchases) {
+        try {
+          const response = await apiRequest('POST', '/api/iap/verify-google', {
+            purchaseToken: p.purchaseToken,
+            productId: p.productIdentifier,
+          });
+          const data = await response.json() as { role?: string; message?: string };
+          if (response.ok && data.role && data.role !== 'free_tier') {
+            verified = true;
+            break;
+          }
+          lastError = data.message ?? null;
+        } catch (err: any) {
+          lastError = err?.message ?? 'Verification failed';
+        }
+      }
+
+      if (verified) {
+        toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
+        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+        window.location.reload();
+      } else {
+        toast({
+          title: 'No active subscription',
+          description: lastError ?? 'No active subscription was found to restore.',
+        });
+      }
+    } catch (error: any) {
+      toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- Sync (Stripe fallback for web) ---
   const handleSyncSubscription = async () => {
     setIsLoading(true);
@@ -602,6 +716,11 @@ export default function Subscription() {
                   Manage or cancel your App Store subscription in{' '}
                   <strong>Settings → Apple ID → Subscriptions</strong>.
                 </p>
+              ) : isAndroid ? (
+                <p className="text-sm text-muted-foreground mt-4 text-center">
+                  Manage or cancel your Google Play subscription in{' '}
+                  <strong>Play Store → Profile → Payments &amp; subscriptions → Subscriptions</strong>.
+                </p>
               ) : (
                 <button
                   onClick={handleManageSubscription}
@@ -617,8 +736,9 @@ export default function Subscription() {
                 </button>
               )}
 
-              {/* Cancel — only available via Stripe (non-iOS) */}
-              {!isIos && (
+              {/* Cancel — only available via Stripe (web only). On iOS users
+                  cancel via Settings; on Android via the Play Store. */}
+              {!isIos && !isAndroid && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button
@@ -662,8 +782,8 @@ export default function Subscription() {
           {/* Sync / Restore */}
           {isFree && (
             <div className="flex flex-col gap-2 mt-4">
-              {/* Web: Stripe sync */}
-              {!isIos && (
+              {/* Web: Stripe sync (not shown on iOS or Android — they have native restore) */}
+              {!isIos && !isAndroid && (
                 <button
                   onClick={handleSyncSubscription}
                   disabled={isLoading}
@@ -684,6 +804,21 @@ export default function Subscription() {
                   disabled={isLoading}
                   className="w-full bg-secondary text-secondary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="button-restore-purchases"
+                >
+                  {isLoading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" />Restoring...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" />Restore Purchases</>
+                  )}
+                </button>
+              )}
+              {/* Android: Restore purchases via Google Play */}
+              {isAndroid && (
+                <button
+                  onClick={handleAndroidRestore}
+                  disabled={isLoading}
+                  className="w-full bg-secondary text-secondary-foreground rounded-lg py-3 font-semibold flex items-center justify-center gap-2 hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="button-restore-purchases-android"
                 >
                   {isLoading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" />Restoring...</>
@@ -780,6 +915,7 @@ export default function Subscription() {
               ) : plan.tier === 'free_tier' ? (
                 /* Paid user viewing Free Tier card — manage via platform-appropriate path */
                 (isIos ? (<p className="text-sm text-muted-foreground text-center py-2">Manage via <strong>Settings → Apple ID → Subscriptions</strong>
+                </p>) : isAndroid ? (<p className="text-sm text-muted-foreground text-center py-2">Manage via <strong>Play Store → Subscriptions</strong>
                 </p>) : (<button
                   onClick={handleManageSubscription}
                   disabled={isLoading}
@@ -790,6 +926,21 @@ export default function Subscription() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : null}Manage Subscription
                                     </button>))
+              ) : isAndroid ? (
+                /* Android: Google Play Billing only — Play Store policy
+                   prohibits any external payment links inside the app. */
+                (<button
+                  onClick={() => handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
+                  disabled={isLoading || !iapReady}
+                  className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
+                  data-testid={`button-iap-android-${plan.tier}`}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Subscribe via Google Play'
+                  )}
+                </button>)
               ) : isIos ? (
                 /* iOS: Roster (Stripe) on top dominant, App Store below outlined */
                 (<div className="flex flex-col gap-2">
@@ -847,10 +998,39 @@ export default function Subscription() {
         <p className="text-xs text-muted-foreground text-center">
           {isIos
             ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
+            : isAndroid
+            ? 'Google Play subscriptions auto-renew until cancelled. Cancel anytime via Play Store → Profile → Payments & subscriptions → Subscriptions.'
             : billingPeriod === 'yearly'
             ? 'Subscriptions are billed annually. Cancel anytime through your account settings.'
             : 'Subscriptions are billed monthly. Cancel anytime through your account settings.'}
         </p>
+        {isAndroid && (
+          <>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              * indicates features coming soon
+            </p>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              By subscribing, you agree to the Google Play{' '}
+              <a
+                href="https://play.google.com/about/play-terms/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-primary"
+              >
+                Terms of Service
+              </a>
+              {' '}and our{' '}
+              <a href="/terms-of-service" className="underline text-primary">
+                Terms
+              </a>{' '}
+              and{' '}
+              <a href="/privacy-policy" className="underline text-primary">
+                Privacy Policy
+              </a>
+              .
+            </p>
+          </>
+        )}
         {isIos && (
           <>
             <p className="text-xs text-muted-foreground text-center mt-2">

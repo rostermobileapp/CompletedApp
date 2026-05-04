@@ -1,0 +1,69 @@
+Thanks for catching that — your read is correct. Go with Option A.
+
+CONFIRMED APPROACH
+- Mirror the existing iOS / Natively pattern for Android
+- Use the Natively bridge's Google Play Billing methods (parallel to how iOS uses StoreKit via Natively)
+- Add server-side Google Play receipt verification analogous to /api/iap/verify
+- No RevenueCat SDK, no react-native-iap, no changes to /mobile Expo project
+- Hide Stripe buttons when isAndroid (Play Store policy compliance)
+
+PRODUCT IDs (already created in Google Play Console)
+- player_pro_monthly
+- player_pro_yearly
+- commissioner_monthly
+- commissioner_yearly
+These match the iOS product IDs exactly, so existing entitlement-mapping logic should work with minimal changes.
+
+FILES YOU LISTED FOR OPTION A — APPROVED:
+- client/src/lib/nativePurchases.ts (add Android branch using Natively's Google Play methods)
+- client/src/pages/Subscription.tsx (add isAndroid gating, hide Stripe on Android, Android purchase handler)
+- server/routes.ts (new POST /api/iap/verify-google route)
+- new server/googleIap.ts (Play receipt verification logic)
+- new docs/android-billing-testing.md
+
+ADDITIONAL REQUIREMENTS
+
+1. Google Play receipt verification (server/googleIap.ts)
+   - Use the Google Play Developer API to verify purchase tokens
+   - Authenticate using the service account JSON (already created in Google Cloud Console for the RevenueCat work — we'll reuse it)
+   - The service account JSON should be loaded from an env var, NOT committed to the repo
+   - Env var: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON (I will paste the JSON contents into Replit Secrets)
+   - Verify the purchase is acknowledged; if not, acknowledge it (Google requires acknowledgment within 3 days or the purchase is auto-refunded)
+   - Verify subscription state: ACTIVE, CANCELED, IN_GRACE_PERIOD, etc.
+   - Map subscription state to entitlement state in the database the same way the Apple verification does
+
+2. Subscription.tsx Android branch
+   - When isAndroid: show Subscribe CTA that calls the Natively Google Play purchase method
+   - On successful purchase, send the purchase token to /api/iap/verify-google
+   - On verification success, update local entitlement state
+   - Hide the Stripe checkout button entirely
+   - Show: price (from Google Play product info), billing period, auto-renew disclosure, Restore Purchases link, ToS, Privacy Policy
+
+3. Restore Purchases on Android
+   - Use Natively's Google Play restore method (analogous to iOS restore)
+   - Send any restored purchase tokens to /api/iap/verify-google
+   - Update entitlement state for any active subscriptions found
+
+4. Real-Time Developer Notifications (RTDN)
+   - Google sends subscription lifecycle events (renewal, cancellation, refund) via Cloud Pub/Sub, NOT direct webhooks
+   - For launch, we can rely on app-side verification on each launch + manual entitlement refresh
+   - Add a TODO comment in server/googleIap.ts noting that RTDN should be added post-launch for real-time cancellation/refund handling
+   - Do NOT set up Pub/Sub right now — out of scope
+
+5. Do NOT touch
+   - iOS Natively/StoreKit flow
+   - Stripe web flow (other than hiding the button on Android)
+   - The /mobile Expo project
+   - Existing /api/iap/verify route
+   - Any Supabase schemas
+
+DELIVERABLES
+1. List of every file changed
+2. Confirmation iOS and web flows are unchanged
+3. docs/android-billing-testing.md with:
+   - How to add a Google Play license tester (Play Console → Setup → License testing)
+   - How to install via the Internal Testing track link on a real Android device
+   - Test cases: subscribe → confirm entitlement → cancel from Play Store account → confirm cancellation propagates after app refresh
+   - Common errors: ITEM_UNAVAILABLE (propagation delay or product not active), BILLING_UNAVAILABLE (tester account not configured), service account auth failures
+
+START NOW — you're approved to make the changes. Show me the file list as you go and flag anything else you find that contradicts my assumptions.

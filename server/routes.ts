@@ -3626,6 +3626,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Google Play Billing helpers ───────────────────────────────────────────
+  // Google Play SKU → subscription role mapping (server-side truth).
+  // SKUs in Play Console are unprefixed (the bundle id == package name lives
+  // separately as `packageName`), unlike Apple where productIds carry the
+  // bundle prefix. Keep this map in sync with Play Console product setup.
+  const GOOGLE_PLAY_PRODUCT_ROLES: Record<string, 'commissioner' | 'player_pro'> = {
+    'commissioner_monthly': 'commissioner',
+    'commissioner_yearly': 'commissioner',
+    'player_pro_monthly': 'player_pro',
+    'player_pro_yearly': 'player_pro',
+  };
+
+  // Must match `android.package` in mobile/app.json AND the application id
+  // registered in Play Console. Hard-coded server-side so a compromised
+  // client can't trick us into verifying against a different app.
+  const GOOGLE_PLAY_PACKAGE_NAME = 'com.roster.app';
+
+  // ─── POST /api/iap/verify-google ──────────────────────────────────────────
+  // Called by the Android client after a successful Google Play Billing
+  // purchase. Mirrors /api/iap/verify (Apple) but uses the Play Developer
+  // API to verify the purchase token.
+  //
+  // Body: { purchaseToken: string, productId?: string }
+  // (productId is optional — we use the productId returned by the Play API
+  // as the source of truth for role mapping, but the client value is logged
+  // for debugging when they disagree.)
+  app.post('/api/iap/verify-google', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { purchaseToken, productId: clientProductId } = req.body as {
+        purchaseToken?: string;
+        productId?: string;
+      };
+
+      if (!purchaseToken || typeof purchaseToken !== 'string' || !purchaseToken.trim()) {
+        return res.status(400).json({ message: 'Missing purchaseToken' });
+      }
+
+      const {
+        verifySubscriptionPurchase,
+        acknowledgeSubscriptionPurchase,
+        isSubscriptionEntitled,
+        isGoogleIapConfigured,
+      } = await import('./googleIap');
+
+      if (!isGoogleIapConfigured()) {
+        return res.status(503).json({ message: 'Google Play API not configured on server' });
+      }
+
+      const purchase = await verifySubscriptionPurchase(
+        GOOGLE_PLAY_PACKAGE_NAME,
+        purchaseToken.trim(),
+      );
+
+      if (clientProductId && purchase.productId && clientProductId !== purchase.productId) {
+        console.warn('[GoogleIAP] Client/server productId mismatch', {
+          userId,
+          clientProductId,
+          serverProductId: purchase.productId,
+        });
+      }
+
+      if (!isSubscriptionEntitled(purchase.subscriptionState, purchase.expiryTimeMs)) {
+        return res.status(402).json({
+          message: 'Subscription is not active',
+          state: purchase.subscriptionState,
+        });
+      }
+
+      const newRole = GOOGLE_PLAY_PRODUCT_ROLES[purchase.productId] ?? null;
+      if (!newRole) {
+        return res.status(400).json({
+          message: `Unrecognised product: ${purchase.productId}`,
+        });
+      }
+
+      // Acknowledge the purchase if Google hasn't seen us do so yet. Required
+      // within 3 days of purchase or Google auto-refunds. Idempotent and
+      // non-fatal — failure is logged but does not block role assignment.
+      if (purchase.acknowledgementState !== 'ACKNOWLEDGED') {
+        await acknowledgeSubscriptionPurchase(
+          GOOGLE_PLAY_PACKAGE_NAME,
+          purchase.productId,
+          purchaseToken.trim(),
+        );
+      }
+
+      // Reuse the same role-application path as Apple. We store the Google
+      // Play purchase token in the same `iapOriginalTransactionId` column so
+      // the future RTDN handler (see TODO in server/googleIap.ts) can look
+      // up the user from a Pub/Sub notification payload.
+      await applyIapRole(userId, newRole, purchaseToken.trim());
+
+      console.log(
+        `[GoogleIAP] Verified for user ${userId}: role → ${newRole} (${purchase.productId}, ${purchase.subscriptionState})`,
+      );
+      return res.json({ message: 'IAP verified and role updated', role: newRole });
+    } catch (error: any) {
+      console.error('[GoogleIAP] Verification error:', error);
+      const status = typeof error.status === 'number' ? error.status : 500;
+      res.status(status).json({ message: error.message || 'Google IAP verification failed' });
+    }
+  });
+
   // Supabase storage routes for profile images  
   app.post("/api/profile-images/upload", isAuthenticated, async (req: any, res) => {
     try {
