@@ -1,0 +1,92 @@
+GOAL
+Update the subscription paywall buttons and pricing display to be platform-compliant for iOS, Android, and web. We need to:
+1. Show price savings information without putting "save" language in the CTA itself (reduces App Store / Play Store anti-steering review risk)
+2. Hide the "Subscribe via Roster" external payment button entirely on Android (Google Play policy — we are not enrolled in User Choice Billing)
+3. Keep the existing iOS dual-button layout (Subscribe via Roster + Subscribe via App Store)
+4. Keep the existing web Stripe-only flow
+
+CONTEXT
+- File to edit: client/src/pages/Subscription.tsx (and any sub-components it uses for the subscription card UI)
+- Platform detection already exists at client/src/hooks/useIosPlatform.ts (exposes isIos, isAndroid, isUsRegion)
+- Current state on iOS: shows "Subscribe via Roster" (Stripe checkout) and "Subscribe via App Store" (StoreKit via Natively)
+- Current state on Android: shows "Subscribe via Roster" (Stripe) — THIS IS A POLICY VIOLATION and must be removed
+- Current state on web: shows Stripe checkout
+- I have NOT yet implemented the Android Google Play Billing flow (separate workstream). For now, on Android, the paywall should show the Google Play subscribe button as a placeholder/disabled state OR simply show "Coming soon to Google Play" messaging. DO NOT show the Stripe button on Android under any circumstance.
+
+REQUIREMENTS
+
+1. PRICING DISPLAY (all platforms)
+   For each subscription tier card (Player Pro, Commissioner), show pricing in a side-by-side comparison format that lets users see the price difference WITHOUT using the word "save" in the CTA button itself.
+
+   Format options (pick whichever fits the existing card UI cleanest):
+   
+   Option A — price tag next to button:
+   [Subscribe via Roster]   $8.49/mo
+   [Subscribe via App Store] $9.99/mo
+   
+   Option B — small label above each button:
+   "Best price"
+   [Subscribe via Roster]
+   [Subscribe via App Store]
+   
+   Use Option A. It's the most informational and least promotional, which is the safest under both Apple and Google review.
+
+2. BUTTON LABELS
+   - Roster web checkout button: "Subscribe via Roster" (DO NOT change to "Subscribe & Save" — anti-steering risk)
+   - Apple StoreKit button: "Subscribe via App Store"
+   - Google Play button (when Android flow ships): "Subscribe via Google Play"
+   
+   The blue/primary visual treatment can stay on the Roster button on iOS and web. On Android, the Google Play button should be the primary blue button.
+
+3. PLATFORM-CONDITIONAL RENDERING
+   Use the existing isIos / isAndroid hooks to conditionally render:
+   
+   - isIos === true:
+     - Show "Subscribe via Roster" button (Stripe flow) — primary blue
+     - Show "Subscribe via App Store" button (existing StoreKit/Natively flow) — secondary
+     - Show price comparison next to each button
+   
+   - isAndroid === true:
+     - HIDE "Subscribe via Roster" button entirely — do not render it
+     - HIDE the Stripe checkout flow entirely
+     - Show "Subscribe via Google Play" button as a placeholder (disabled state with text "Coming soon" OR a working button if Android billing is already wired up — check the current state of the codebase)
+     - DO NOT show any external payment links or web checkout options
+     - DO NOT show iOS App Store buttons either (those don't apply on Android)
+   
+   - Web (not isIos and not isAndroid):
+     - Show "Subscribe via Roster" button (Stripe flow) — primary blue
+     - DO NOT show App Store or Google Play buttons
+     - Existing behavior, no changes
+
+4. PRICE DATA
+   - Pull the iOS App Store price from wherever it currently lives in the codebase (likely from the Natively product info response or a constants file)
+   - Pull the Roster/Stripe price from wherever it currently lives (likely a constants file or Stripe product config)
+   - Do NOT hardcode prices in the component. If they're hardcoded today, leave that pattern alone for this PR but flag it
+   - For Android, Google Play prices come from Google Play product info — for now, if Android billing isn't wired up yet, use the same display price as iOS as a placeholder
+
+5. ACCESSIBILITY
+   - Make sure the price labels are readable to screen readers
+   - The price labels should be associated with their corresponding button (use aria-describedby or similar)
+
+6. DO NOT TOUCH
+   - The actual purchase flow logic (Stripe checkout call, StoreKit call, etc.) — only changing UI labels and conditional rendering
+   - useIosPlatform.ts hook
+   - Any server-side code
+   - The web subscription flow for non-mobile users
+   - Pricing values themselves
+
+DELIVERABLES
+1. Updated Subscription.tsx with platform-conditional button rendering
+2. Updated subscription card sub-components if needed
+3. List of every file changed
+4. Screenshots or descriptions of what each platform now shows:
+   - iOS: dual buttons with price labels, Roster blue/primary, App Store secondary
+   - Android: single Google Play button (or coming-soon placeholder), no Stripe button visible
+   - Web: Stripe button only, no platform-specific buttons
+5. Confirmation that no Stripe checkout button can be reached on Android by any code path
+
+START BY:
+1. Reading Subscription.tsx and any subscription card sub-components
+2. Reading useIosPlatform.ts to confirm the platform-detection API
+3. Listing the files you plan to change
+4. WAIT for me to confirm before making changes
