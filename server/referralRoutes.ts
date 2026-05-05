@@ -64,6 +64,7 @@ async function getSettings(): Promise<Record<string, string>> {
     admin_notification_email: "roster.mobile.app@gmail.com",
     approval_email_template: "",
     rejection_email_template: "",
+    magic_link_email_template: "",
   };
   const result = { ...defaults };
   for (const r of rows) result[r.key] = r.value;
@@ -207,6 +208,29 @@ async function getReferralDocumentSignedUrl(filePath: string, expiresIn = 3600):
   return data.signedUrl;
 }
 
+// ─── Typed enum value helpers ─────────────────────────────────────────────────
+
+const PARTNER_STATUSES = ['pending', 'approved', 'rejected'] as const;
+type ReferralPartnerStatus = typeof PARTNER_STATUSES[number];
+
+const CONVERSION_STATUSES = ['active', 'cancelled', 'refunded'] as const;
+type ReferralConversionStatus = typeof CONVERSION_STATUSES[number];
+
+const PLATFORMS = ['ios', 'android', 'web'] as const;
+type ReferralPlatform = typeof PLATFORMS[number];
+
+function isPartnerStatus(v: string): v is ReferralPartnerStatus {
+  return (PARTNER_STATUSES as readonly string[]).includes(v);
+}
+
+function isConversionStatus(v: string): v is ReferralConversionStatus {
+  return (CONVERSION_STATUSES as readonly string[]).includes(v);
+}
+
+function isPlatform(v: string): v is ReferralPlatform {
+  return (PLATFORMS as readonly string[]).includes(v);
+}
+
 // ─── Route registration ───────────────────────────────────────────────────────
 
 export function registerReferralRoutes(app: Express) {
@@ -235,18 +259,22 @@ export function registerReferralRoutes(app: Express) {
   // ── Public: submit application ────────────────────────────────────────────
   app.post(
     "/api/referral/apply",
-    (req: any, res: any, next: any) => {
-      referralUpload.single("proofDocument")(req, res, (err: any) => {
+    (req: Request, res: Response, next: NextFunction) => {
+      referralUpload.single("proofDocument")(req, res, (err: unknown) => {
         if (err instanceof multer.MulterError) {
           return res.status(400).json({ message: err.message });
         }
-        if (err) return res.status(400).json({ message: err.message || "Upload error" });
+        if (err) {
+          const msg = err instanceof Error ? err.message : "Upload error";
+          return res.status(400).json({ message: msg });
+        }
         next();
       });
     },
-    async (req: any, res) => {
+    async (req: Request, res: Response) => {
+      const multerReq = req as Request & { file?: Express.Multer.File };
       try {
-        const { orgName, contactName, email, orgType, hockeyAffiliation } = req.body;
+        const { orgName, contactName, email, orgType, hockeyAffiliation } = multerReq.body;
         if (!orgName || !contactName || !email) {
           return res.status(400).json({ message: "orgName, contactName, and email are required" });
         }
@@ -269,11 +297,11 @@ export function registerReferralRoutes(app: Express) {
 
         // Upload proof document if provided
         let proofDocumentPath: string | null = null;
-        if (req.file) {
+        if (multerReq.file) {
           proofDocumentPath = await uploadReferralDocument(
-            req.file.buffer,
-            req.file.mimetype,
-            req.file.originalname
+            multerReq.file.buffer,
+            multerReq.file.mimetype,
+            multerReq.file.originalname
           );
         }
 
@@ -340,7 +368,12 @@ export function registerReferralRoutes(app: Express) {
 
       const appUrl = getAppUrl();
       const magicLink = `${appUrl}/referral-program/portal/auth?token=${token}`;
-      await sendMagicLinkEmail(email, { contactName: partner.contactName, magicLink });
+      const magicLinkSettings = await getSettings();
+      await sendMagicLinkEmail(
+        email,
+        { contactName: partner.contactName, magicLink },
+        magicLinkSettings.magic_link_email_template || undefined,
+      );
 
       res.json({ message: "If this email is registered, a login link has been sent." });
     } catch (err) {
@@ -399,7 +432,7 @@ export function registerReferralRoutes(app: Express) {
   });
 
   // ── Partner portal: me ────────────────────────────────────────────────────
-  app.get("/api/referral/portal/me", requirePartnerAuth, async (req: any, res) => {
+  app.get("/api/referral/portal/me", requirePartnerAuth, async (req: Request, res: Response) => {
     try {
       const partnerId = req.referralPartnerId!;
       const [partner] = await db
@@ -637,7 +670,10 @@ export function registerReferralRoutes(app: Express) {
       const { status, search } = req.query as Record<string, string>;
       const conditions = [];
       if (status && status !== "all") {
-        conditions.push(eq(referralPartners.status, status as any));
+        if (!isPartnerStatus(status)) {
+          return res.status(400).json({ message: `Invalid status. Allowed: ${PARTNER_STATUSES.join(", ")}` });
+        }
+        conditions.push(eq(referralPartners.status, status));
       }
       if (search) {
         conditions.push(
@@ -699,11 +735,12 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPartners.id, req.params.id))
         .returning();
 
-      await sendPartnerApprovalEmail(partner.email, {
-        orgName: partner.orgName,
-        contactName: partner.contactName,
-        referralCode,
-      });
+      const approvalSettings = await getSettings();
+      await sendPartnerApprovalEmail(
+        partner.email,
+        { orgName: partner.orgName, contactName: partner.contactName, referralCode },
+        approvalSettings.approval_email_template || undefined,
+      );
 
       res.json({ success: true, referralCode, partner: updated });
     } catch (err) {
@@ -731,11 +768,12 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPartners.id, req.params.id))
         .returning();
 
-      await sendPartnerRejectionEmail(partner.email, {
-        orgName: partner.orgName,
-        contactName: partner.contactName,
-        reason,
-      });
+      const rejectionSettings = await getSettings();
+      await sendPartnerRejectionEmail(
+        partner.email,
+        { orgName: partner.orgName, contactName: partner.contactName, reason },
+        rejectionSettings.rejection_email_template || undefined,
+      );
 
       res.json({ success: true, partner: updated });
     } catch (err) {
@@ -801,19 +839,18 @@ export function registerReferralRoutes(app: Express) {
   app.get("/api/admin/referrals/partners", requireAdminAuth, async (req, res) => {
     try {
       const { search } = req.query as Record<string, string>;
-      const conditions = [eq(referralPartners.status, "approved")];
-      if (search) {
-        conditions.push(
-          or(
+      const baseCondition = eq(referralPartners.status, "approved");
+      const searchCondition = search
+        ? or(
             ilike(referralPartners.orgName, `%${search}%`),
             ilike(referralPartners.referralCode, `%${search}%`),
-          ) as any
-        );
-      }
+          )
+        : undefined;
+      const whereClause = searchCondition ? and(baseCondition, searchCondition) : baseCondition;
       const partners = await db
         .select()
         .from(referralPartners)
-        .where(and(...conditions))
+        .where(whereClause)
         .orderBy(desc(referralPartners.approvedAt));
 
       const settings = await getSettings();
@@ -981,8 +1018,18 @@ export function registerReferralRoutes(app: Express) {
 
       const conditions = [];
       if (partnerId) conditions.push(eq(referralConversions.partnerId, partnerId));
-      if (platform) conditions.push(eq(referralConversions.platform, platform as any));
-      if (status) conditions.push(eq(referralConversions.status, status as any));
+      if (platform) {
+        if (!isPlatform(platform)) {
+          return res.status(400).json({ message: `Invalid platform. Allowed: ${PLATFORMS.join(", ")}` });
+        }
+        conditions.push(eq(referralConversions.platform, platform));
+      }
+      if (status) {
+        if (!isConversionStatus(status)) {
+          return res.status(400).json({ message: `Invalid status. Allowed: ${CONVERSION_STATUSES.join(", ")}` });
+        }
+        conditions.push(eq(referralConversions.status, status));
+      }
       if (from) conditions.push(gte(referralConversions.convertedAt, new Date(from)));
       if (to) conditions.push(lte(referralConversions.convertedAt, new Date(to)));
 
@@ -1157,6 +1204,7 @@ export function registerReferralRoutes(app: Express) {
         "admin_notification_email",
         "approval_email_template",
         "rejection_email_template",
+        "magic_link_email_template",
       ];
       for (const key of Object.keys(req.body)) {
         if (!allowed.includes(key)) continue;
@@ -1251,45 +1299,55 @@ export function registerReferralRoutes(app: Express) {
       }
 
       if (eventType === "CANCELLATION" || eventType === "REFUND") {
-        const newStatus = eventType === "REFUND" ? "refunded" : "cancelled";
+        const newStatus: ReferralConversionStatus = eventType === "REFUND" ? "refunded" : "cancelled";
 
-        // Try to find by event_id first, then fallback to userId + code
+        // CANCELLATION/REFUND events have their own unique event.id — it is NOT
+        // the same as the INITIAL_PURCHASE event id we stored. The most reliable
+        // way to find the original conversion is by the subscriber's app_user_id,
+        // which is stable across all events for that user.
         let updated = false;
-        if (eventId) {
-          const [existing] = await db
-            .select({ id: referralConversions.id })
-            .from(referralConversions)
-            .where(eq(referralConversions.revenuecatEventId, eventId))
-            .limit(1);
-          if (existing) {
-            await db
-              .update(referralConversions)
-              .set({ status: newStatus as any, updatedAt: new Date() })
-              .where(eq(referralConversions.id, existing.id));
-            updated = true;
-          }
-        }
 
-        if (!updated && appUserId && referralCode) {
-          const [partner] = await db
-            .select({ id: referralPartners.id })
-            .from(referralPartners)
-            .where(eq(referralPartners.referralCode, referralCode))
-            .limit(1);
-          if (partner) {
-            await db
+        if (appUserId) {
+          // Build a where clause: always filter by userId; narrow by referralCode
+          // (via partnerId) when available, since a user could theoretically have
+          // multiple referral-tracked subscriptions on different codes.
+          if (referralCode) {
+            const [partner] = await db
+              .select({ id: referralPartners.id })
+              .from(referralPartners)
+              .where(eq(referralPartners.referralCode, referralCode))
+              .limit(1);
+            if (partner) {
+              const result = await db
+                .update(referralConversions)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(and(
+                  eq(referralConversions.userId, appUserId),
+                  eq(referralConversions.partnerId, partner.id),
+                  eq(referralConversions.status, "active"),
+                ))
+                .returning({ id: referralConversions.id });
+              updated = result.length > 0;
+            }
+          }
+
+          // Fallback: no referral code in event — update by userId alone.
+          // This handles stores (e.g. Apple) that strip subscriber attributes
+          // from cancellation/refund payloads.
+          if (!updated) {
+            const result = await db
               .update(referralConversions)
-              .set({ status: newStatus as any, updatedAt: new Date() })
+              .set({ status: newStatus, updatedAt: new Date() })
               .where(and(
                 eq(referralConversions.userId, appUserId),
-                eq(referralConversions.partnerId, partner.id),
                 eq(referralConversions.status, "active"),
-              ));
-            updated = true;
+              ))
+              .returning({ id: referralConversions.id });
+            updated = result.length > 0;
           }
         }
 
-        console.log(`[RCWebhook] ${eventType} — updated=${updated}`);
+        console.log(`[RCWebhook] ${eventType} — userId=${appUserId} updated=${updated}`);
         return res.json({ processed: true, updated });
       }
 

@@ -27,6 +27,25 @@ Roster, LLC &nbsp;·&nbsp; <a href="${getAppUrl()}" style="color:#3b82f6;text-de
 </html>`;
 }
 
+/**
+ * Interpolate {{variable}} placeholders in a template string.
+ * Variables not present in `vars` are left as-is.
+ */
+function interpolate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+}
+
+/**
+ * Convert plain-text template (with line breaks) to minimal HTML body.
+ * If the caller provides a custom template it is expected to be plain text;
+ * the hardcoded fallbacks are already HTML fragments.
+ */
+function templateToHtml(text: string): string {
+  return `<div style="color:#374151;font-size:15px;line-height:24px;">${
+    text.replace(/\n/g, '<br>')
+  }</div>`;
+}
+
 export async function sendNewApplicationAdminEmail(
   adminEmail: string,
   data: { orgName: string; contactName: string; email: string; orgType?: string }
@@ -58,20 +77,38 @@ export async function sendNewApplicationAdminEmail(
   }
 }
 
+/**
+ * Send approval email to partner.
+ * If `customTemplate` is provided and non-empty, it is used as the email body
+ * (plain text with {{variable}} interpolation). Otherwise the default branded
+ * HTML template is used.
+ *
+ * Supported template variables:
+ *   {{contactName}}, {{orgName}}, {{referralCode}}, {{loginUrl}}, {{portalUrl}}
+ */
 export async function sendPartnerApprovalEmail(
   toEmail: string,
-  data: { orgName: string; contactName: string; referralCode: string }
+  data: { orgName: string; contactName: string; referralCode: string },
+  customTemplate?: string
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     const appUrl = getAppUrl();
     const portalUrl = `${appUrl}/referral-program/portal`;
     const loginUrl = `${appUrl}/referral-program/portal/login`;
-    await client.emails.send({
-      from: fromEmail,
-      to: toEmail,
-      subject: `Your Referral Partnership Has Been Approved — ${data.orgName}`,
-      html: emailWrapper(`
+
+    let html: string;
+    if (customTemplate && customTemplate.trim()) {
+      const vars: Record<string, string> = {
+        contactName: data.contactName,
+        orgName: data.orgName,
+        referralCode: data.referralCode,
+        loginUrl,
+        portalUrl,
+      };
+      html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
+    } else {
+      html = emailWrapper(`
         <h2 style="margin:0 0 8px 0;color:#111827;font-size:20px;">Welcome to the Roster Referral Program!</h2>
         <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, congratulations! Your application for <strong>${data.orgName}</strong> has been approved.</p>
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:24px;margin-bottom:24px;text-align:center;">
@@ -82,12 +119,19 @@ export async function sendPartnerApprovalEmail(
         <ol style="margin:0 0 24px 0;padding-left:24px;color:#374151;font-size:14px;line-height:24px;">
           <li>Share your code <strong>${data.referralCode}</strong> with your organization members and hockey community</li>
           <li>When someone signs up for Roster and enters your code during onboarding, the conversion is automatically tracked</li>
-          <li>Earn 10% of net revenue for every active subscriber you refer</li>
+          <li>Earn commissions on net revenue for every active subscriber you refer</li>
           <li>View your stats and payout history in your partner portal</li>
         </ol>
         <a href="${loginUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Access Your Partner Portal</a>
         <p style="margin:20px 0 0 0;font-size:13px;color:#6b7280;">Partner portal: <a href="${portalUrl}" style="color:#3b82f6;">${portalUrl}</a></p>
-      `),
+      `);
+    }
+
+    await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Your Referral Partnership Has Been Approved — ${data.orgName}`,
+      html,
     });
     console.log(`[ReferralEmail] Sent approval email to ${toEmail}`);
   } catch (err) {
@@ -95,17 +139,32 @@ export async function sendPartnerApprovalEmail(
   }
 }
 
+/**
+ * Send rejection email to partner.
+ * If `customTemplate` is provided and non-empty, it is used as the email body
+ * (plain text with {{variable}} interpolation).
+ *
+ * Supported template variables:
+ *   {{contactName}}, {{orgName}}, {{reason}}
+ */
 export async function sendPartnerRejectionEmail(
   toEmail: string,
-  data: { orgName: string; contactName: string; reason: string }
+  data: { orgName: string; contactName: string; reason: string },
+  customTemplate?: string
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    await client.emails.send({
-      from: fromEmail,
-      to: toEmail,
-      subject: `Update on Your Referral Partner Application — ${data.orgName}`,
-      html: emailWrapper(`
+
+    let html: string;
+    if (customTemplate && customTemplate.trim()) {
+      const vars: Record<string, string> = {
+        contactName: data.contactName,
+        orgName: data.orgName,
+        reason: data.reason,
+      };
+      html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
+    } else {
+      html = emailWrapper(`
         <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Application Status Update</h2>
         <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, thank you for your interest in the Roster Referral Program.</p>
         <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:24px;">After reviewing your application for <strong>${data.orgName}</strong>, we're unable to approve it at this time.</p>
@@ -113,7 +172,14 @@ export async function sendPartnerRejectionEmail(
           <p style="margin:0;font-size:14px;color:#374151;"><strong>Reason:</strong> ${data.reason}</p>
         </div>
         <p style="margin:0;font-size:14px;color:#6b7280;line-height:22px;">If you believe this was made in error or have questions, please contact us at <a href="mailto:roster.mobile.app@gmail.com" style="color:#3b82f6;">roster.mobile.app@gmail.com</a>.</p>
-      `),
+      `);
+    }
+
+    await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: `Update on Your Referral Partner Application — ${data.orgName}`,
+      html,
     });
     console.log(`[ReferralEmail] Sent rejection email to ${toEmail}`);
   } catch (err) {
@@ -121,17 +187,30 @@ export async function sendPartnerRejectionEmail(
   }
 }
 
+/**
+ * Send magic-link login email to a partner.
+ * If `customTemplate` is provided and non-empty, it is used as the email body.
+ *
+ * Supported template variables:
+ *   {{contactName}}, {{magicLink}}
+ */
 export async function sendMagicLinkEmail(
   toEmail: string,
-  data: { contactName: string; magicLink: string }
+  data: { contactName: string; magicLink: string },
+  customTemplate?: string
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    await client.emails.send({
-      from: fromEmail,
-      to: toEmail,
-      subject: 'Your Roster Partner Portal Login Link',
-      html: emailWrapper(`
+
+    let html: string;
+    if (customTemplate && customTemplate.trim()) {
+      const vars: Record<string, string> = {
+        contactName: data.contactName,
+        magicLink: data.magicLink,
+      };
+      html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
+    } else {
+      html = emailWrapper(`
         <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Sign In to Your Partner Portal</h2>
         <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, click the button below to sign in to your Roster Referral Partner Portal.</p>
         <div style="text-align:center;margin:32px 0;">
@@ -139,7 +218,14 @@ export async function sendMagicLinkEmail(
         </div>
         <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-align:center;">This link expires in 1 hour and can only be used once.</p>
         <p style="margin:0;font-size:13px;color:#6b7280;text-align:center;">If you didn't request this, you can safely ignore this email.</p>
-      `),
+      `);
+    }
+
+    await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: 'Your Roster Partner Portal Login Link',
+      html,
     });
     console.log(`[ReferralEmail] Sent magic link email to ${toEmail}`);
   } catch (err) {
