@@ -107,6 +107,43 @@ export default function Subscription() {
     });
   }, [platformReady, isAndroid]);
 
+  // Silently check for pending purchases (e.g. promo code redeemed in the
+  // Play Store outside the app) as soon as the billing bridge is confirmed
+  // live. Mirrors the manual Restore flow but shows no toast on "nothing
+  // found" — only surfaces a toast if an unacknowledged subscription is
+  // discovered and activated.
+  useEffect(() => {
+    if (!isAndroid || !iapReady) return;
+    (async () => {
+      try {
+        const purchases = await restorePurchasesAndroid();
+        if (!purchases.length) return;
+        let verified = false;
+        for (const p of purchases) {
+          try {
+            const response = await apiRequest('POST', '/api/iap/verify-google', {
+              purchaseToken: p.purchaseToken,
+              productId: p.productIdentifier,
+            });
+            const data = await response.json() as { role?: string; message?: string };
+            if (response.ok && data.role && data.role !== 'free_tier') {
+              verified = true;
+              break;
+            }
+          } catch {
+            // ignore individual token failures silently
+          }
+        }
+        if (verified) {
+          toast({ title: 'Subscription activated!', description: 'Your subscription has been applied to your account.' });
+          queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+        }
+      } catch {
+        // silent — don't surface auto-check errors to the user
+      }
+    })();
+  }, [isAndroid, iapReady]);
+
   // Auto-sync subscription status on page load
   useEffect(() => {
     const syncSubscription = async () => {
@@ -504,6 +541,16 @@ export default function Subscription() {
 
       if (!response.ok) {
         throw new Error((serverJson as any).message || 'Purchase completed but role sync failed. Please tap Restore Purchases.');
+      }
+
+      // 202 = promo code accepted, payment pending — not yet activated
+      if (response.status === 202) {
+        toast({
+          title: 'Promo code accepted!',
+          description: (serverJson as any).message ?? 'Your subscription will activate once payment is confirmed — check back in a few minutes.',
+        });
+        setIsLoading(false);
+        return;
       }
 
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
@@ -1033,6 +1080,15 @@ export default function Subscription() {
                           </span>
                         )}
                       </div>
+                      {iapReady && (
+                        <button
+                          onClick={() => window.open('https://play.google.com/redeem', '_system')}
+                          className="text-xs text-primary underline text-left mt-1 hover:text-primary/80"
+                          data-testid={`button-android-promo-${plan.tier}`}
+                        >
+                          Have a promo code?
+                        </button>
+                      )}
                     </div>
                   );
                 })()

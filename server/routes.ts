@@ -3693,6 +3693,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Promo code accepted but payment not yet processed — the subscription
+      // transitions through PENDING briefly before becoming ACTIVE. Return a
+      // friendly 202 so the client can surface a clear message instead of
+      // treating this as a hard error.
+      if (purchase.subscriptionState === 'SUBSCRIPTION_STATE_PENDING') {
+        console.log(`[GoogleIAP] Purchase PENDING for user ${userId} — promo code likely awaiting payment confirmation`);
+        return res.status(202).json({
+          message: 'Your promo code was accepted. Your subscription will activate once payment is confirmed — this usually takes a few minutes. Come back to this page shortly and it will update automatically.',
+          state: purchase.subscriptionState,
+        });
+      }
+
       if (!isSubscriptionEntitled(purchase.subscriptionState, purchase.expiryTimeMs)) {
         return res.status(402).json({
           message: 'Subscription is not active',
