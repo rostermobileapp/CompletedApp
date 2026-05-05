@@ -898,10 +898,7 @@ export default function Subscription() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Yearly&nbsp;
-              <span className={`text-xs font-bold ${billingPeriod === 'yearly' ? 'text-white/90' : 'text-green-500'}`}>
-                Save up to 23%
-              </span>
+              Yearly · <span className={`text-xs font-bold ${billingPeriod === 'yearly' ? 'text-white/90' : 'text-green-500'}`}>Save up to 23%</span>
             </button>
           </div>
         </div>
