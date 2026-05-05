@@ -467,12 +467,20 @@ export default function Subscription() {
   // against /api/iap/verify-google. No Stripe involvement on Android.
   const handleAndroidPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
+    console.log('[Subscription/Android] Purchase tapped', {
+      tier,
+      billingPeriod,
+      iapReady,
+      iosProductPricesKeys: Object.keys(iosProductPrices),
+    });
     try {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
 
+      console.log('[Subscription/Android] Calling purchaseProductAndroid for', productId);
       const purchase = await purchaseProductAndroid(productId);
+      console.log('[Subscription/Android] Got purchase result, verifying with server', purchase);
 
       const response = await apiRequest('POST', '/api/iap/verify-google', {
         purchaseToken: purchase.purchaseToken,
@@ -488,6 +496,7 @@ export default function Subscription() {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
     } catch (error: any) {
+      console.error('[Subscription/Android] Purchase error:', error);
       if (
         error?.code === 'PURCHASE_CANCELLED' ||
         error?.message?.toLowerCase().includes('cancel') ||
@@ -496,7 +505,16 @@ export default function Subscription() {
         setIsLoading(false);
         return;
       }
-      toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
+      // Surface bridge timeouts with a more helpful message
+      const msg = error?.message || 'Something went wrong. Please try again.';
+      const isBridgeTimeout = msg.includes('NATIVELY_TIMEOUT');
+      toast({
+        title: 'Purchase failed',
+        description: isBridgeTimeout
+          ? 'Google Play didn\'t respond. The Play Billing service may not be set up in this build yet — try Subscribe via Roster instead, or contact support.'
+          : msg,
+        variant: 'destructive',
+      });
       setIsLoading(false);
     }
   };
@@ -927,40 +945,79 @@ export default function Subscription() {
                   ) : null}Manage Subscription
                                     </button>))
               ) : isAndroid ? (
-                /* Android: Google Play Billing only — Play Store policy
-                   prohibits any external payment links inside the app. */
+                /* Android: Roster (Stripe) on top dominant, Google Play below
+                   outlined — same dual-button layout as iOS. */
                 (() => {
-                  const playPriceId = `price-google-${plan.tier}-${index}`;
+                  const stripePriceStr = billingPeriod === 'yearly'
+                    ? (plan.tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay)
+                    : (plan.tier === 'player_pro' ? proMonthlyDisplay : commMonthlyDisplay);
                   const playPrice = iosProductPrices[
                     billingPeriod === 'yearly'
                       ? (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
                       : (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER)
                   ];
+                  const stripePriceId = `price-android-stripe-${plan.tier}-${index}`;
+                  const playPriceId = `price-google-${plan.tier}-${index}`;
+                  const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
                   return (
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                        disabled={isLoading || !iapReady}
-                        aria-describedby={playPrice ? playPriceId : undefined}
-                        className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2"
-                        data-testid={`button-iap-android-${plan.tier}`}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Subscribe via Google Play'
-                        )}
-                      </button>
-                      {playPrice && (
-                        <span
-                          id={playPriceId}
-                          aria-label={`Google Play price ${playPrice} per ${billingPeriod === 'yearly' ? 'year' : 'month'}`}
-                          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
-                          data-testid={`price-google-${plan.tier}`}
-                        >
-                          {playPrice}/{billingPeriod === 'yearly' ? 'yr' : 'mo'}
-                        </span>
+                    <div className="flex flex-col gap-2">
+                      {isUsRegion && (
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
+                            disabled={isLoading || pricesLoading}
+                            aria-describedby={stripePriceStr && stripePriceStr !== '...' ? stripePriceId : undefined}
+                            className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
+                            data-testid={`button-stripe-${plan.tier}`}
+                          >
+                            {(isLoading || pricesLoading) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <span className="flex items-center gap-2">
+                                <span>Subscribe via</span>
+                                <img src={rosterLogo} alt="Roster" className="h-6 object-contain" />
+                              </span>
+                            )}
+                          </button>
+                          {stripePriceStr && stripePriceStr !== '...' && (
+                            <span
+                              id={stripePriceId}
+                              aria-label={`Roster price ${stripePriceStr} per ${billingPeriod === 'yearly' ? 'year' : 'month'}`}
+                              className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+                              data-testid={`price-android-stripe-${plan.tier}`}
+                            >
+                              {stripePriceStr}/{periodSuffix}
+                            </span>
+                          )}
+                        </div>
                       )}
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
+                          disabled={isLoading || !iapReady}
+                          aria-describedby={playPrice ? playPriceId : undefined}
+                          className="flex-1 py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
+                          data-testid={`button-iap-android-${plan.tier}`}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : !iapReady ? (
+                            'Google Play unavailable'
+                          ) : (
+                            'Subscribe via Google Play'
+                          )}
+                        </button>
+                        {playPrice && (
+                          <span
+                            id={playPriceId}
+                            aria-label={`Google Play price ${playPrice} per ${billingPeriod === 'yearly' ? 'year' : 'month'}`}
+                            className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+                            data-testid={`price-google-${plan.tier}`}
+                          >
+                            {playPrice}/{periodSuffix}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })()

@@ -281,7 +281,23 @@ function extractProductId(data: any, fallback?: string): string {
 export async function purchaseProductAndroid(
   packageId: string,
 ): Promise<AndroidPurchaseResult> {
-  const data = await toPromise<any>((cb) => np.purchasePackage(packageId, cb));
+  console.log('[IAP/Android] purchasePackage() →', packageId, {
+    hasAgent: typeof (window as any).$agent !== 'undefined',
+    hasNatively: !!(window as any).natively,
+    hasPurchasePackage: typeof (np as any).purchasePackage === 'function',
+    ua: navigator.userAgent,
+  });
+
+  // 60s timeout — enough for the Google Play sheet to come up and the user to
+  // tap "Subscribe", but short enough that a non-responding bridge doesn't
+  // hang the UI indefinitely. (Default toPromise timeout is 15s which is too
+  // tight for an interactive purchase sheet.)
+  const data = await toPromise<any>(
+    (cb) => np.purchasePackage(packageId, cb),
+    60_000,
+  );
+
+  console.log('[IAP/Android] purchasePackage() callback fired with:', data);
 
   if (!data) {
     throw new Error('No response from Google Play. Please try again.');
