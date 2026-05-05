@@ -142,7 +142,14 @@ declare global {
   }
 }
 
-/** Simple in-memory session store using signed tokens stored in cookies */
+/**
+ * In-memory session stores for admin and partner sessions.
+ *
+ * NOTE: Sessions are lost on server restart and will not work across multiple
+ * instances (horizontal scaling). For production with multiple replicas, replace
+ * these with a durable store (e.g. Redis, Postgres, or the existing session
+ * infrastructure). Single-instance deployments are not affected.
+ */
 const adminSessions = new Set<string>();
 const partnerSessions = new Map<string, string>(); // token -> partnerId
 
@@ -274,7 +281,10 @@ export function registerReferralRoutes(app: Express) {
     async (req: Request, res: Response) => {
       const multerReq = req as Request & { file?: Express.Multer.File };
       try {
-        const { orgName, contactName, email, orgType, hockeyAffiliation } = multerReq.body;
+        const { orgName, contactName, orgType, hockeyAffiliation } = multerReq.body;
+        // Normalize email: lowercase + trim to ensure consistent lookups and
+        // prevent duplicate applications from bypassing the uniqueness check.
+        const email = (multerReq.body.email as string || "").toLowerCase().trim();
         if (!orgName || !contactName || !email) {
           return res.status(400).json({ message: "orgName, contactName, and email are required" });
         }
@@ -1360,20 +1370,24 @@ export function registerReferralRoutes(app: Express) {
           }
 
           // Fallback: stores (e.g. Apple) may strip subscriber_attributes from
-          // CANCEL/REFUND payloads, leaving referralCode empty. Update by userId alone.
+          // CANCEL/REFUND payloads, leaving referralCode empty. Narrow by tier
+          // (productId) when available to avoid updating unintended conversions.
           if (!updated) {
-            const result = await db
-              .update(referralConversions)
-              .set({
-                status: newStatus,
-                revenuecatEventId: eventId || null,
-                updatedAt: new Date(),
-              })
-              .where(and(
-                eq(referralConversions.userId, appUserId),
-                eq(referralConversions.status, "active"),
-              ))
-              .returning({ id: referralConversions.id });
+            const fallbackConditions = [
+              eq(referralConversions.userId, appUserId),
+              eq(referralConversions.status, "active"),
+            ] as const;
+            const result = productId
+              ? await db
+                  .update(referralConversions)
+                  .set({ status: newStatus, revenuecatEventId: eventId || null, updatedAt: new Date() })
+                  .where(and(...fallbackConditions, eq(referralConversions.tier, productId)))
+                  .returning({ id: referralConversions.id })
+              : await db
+                  .update(referralConversions)
+                  .set({ status: newStatus, revenuecatEventId: eventId || null, updatedAt: new Date() })
+                  .where(and(...fallbackConditions))
+                  .returning({ id: referralConversions.id });
             updated = result.length > 0;
           }
         }
