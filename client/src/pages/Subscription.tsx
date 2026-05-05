@@ -637,31 +637,6 @@ export default function Subscription() {
         successMessage="Updating your account…"
       />
 
-      {/* ── TEMPORARY DEBUG BANNER — remove after Android platform detection confirmed ── */}
-      {debugInfo && (
-        <div style={{
-          background: '#FFD700',
-          color: '#000',
-          padding: '12px 16px',
-          fontSize: '13px',
-          fontFamily: 'monospace',
-          lineHeight: '1.8',
-          wordBreak: 'break-all',
-          zIndex: 9999,
-          borderBottom: '2px solid #B8860B',
-        }}>
-          <strong style={{ fontSize: '15px' }}>🔍 Platform Debug</strong><br />
-          <strong>isIos:</strong> {String(debugInfo.isIos)} &nbsp;
-          <strong>isAndroid:</strong> {String(debugInfo.isAndroid)} &nbsp;
-          <strong>isUsRegion:</strong> {String(debugInfo.isUsRegion)} &nbsp;
-          <strong>iapReady:</strong> {String(debugInfo.iapReady)}<br />
-          <strong>$agent:</strong> {String(debugInfo.hasAgent)} &nbsp;
-          <strong>window.natively:</strong> {String(debugInfo.hasNatively)} &nbsp;
-          <strong>Capacitor:</strong> {String(debugInfo.hasCapacitor)}<br />
-          <strong>UA:</strong> {debugInfo.ua}
-        </div>
-      )}
-      {/* ── END DEBUG BANNER ── */}
       {/* Confirmation shown after a redirect-based Stripe success returns to
          this page (billing-portal upgrade or 3DS fallback). Visually mirrors
          the embedded modal's success state so both flows feel consistent. */}
