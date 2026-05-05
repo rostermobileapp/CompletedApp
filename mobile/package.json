@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "expo": "~54.0.25",
-    "expo-status-bar": "~3.0.8",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "expo-router": "~5.0.0",
