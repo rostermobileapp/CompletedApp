@@ -57,15 +57,19 @@ export async function isBillingSupported(): Promise<boolean> {
 
 /**
  * Returns true when running inside the Natively native Android shell.
- * The same `$agent` global is injected on Android, but we additionally
- * gate on the "Natively/Android" UA so we never confuse iOS with Android.
+ *
+ * Matches the same belt-and-suspenders logic as isNativelyAndroidApp() in
+ * useIosPlatform.ts — checks for exact "Natively/Android" UA first, then
+ * falls back to generic "android" UA + $agent for BuildNatively variants
+ * whose UA token differs slightly (e.g. "NativelyAndroid", space instead of
+ * slash, or no Natively token at all but $agent still injected on Android).
  */
 export async function isAndroidBillingSupported(): Promise<boolean> {
   const ua = navigator.userAgent;
-  return (
-    ua.includes('Natively/Android') &&
-    typeof (window as any).$agent !== 'undefined'
-  );
+  const hasAgent = typeof (window as any).$agent !== 'undefined';
+  if (ua.includes('Natively/Android') && hasAgent) return true;
+  if (ua.toLowerCase().includes('android') && hasAgent) return true;
+  return false;
 }
 
 export interface NativelyProductPrice {

@@ -69,6 +69,7 @@ export default function Subscription() {
     isIos,
     isAndroid,
     isUsRegion,
+    iapReady,
     hasAgent: typeof (window as any).$agent !== 'undefined',
     hasNatively: !!(window as any).natively,
     hasCapacitor: !!(window as any).Capacitor,
@@ -99,17 +100,42 @@ export default function Subscription() {
   // Initialize IAP on Android — same shape as iOS, but talks to Google Play
   // through the Natively / RevenueCat bridge. The localised price strings
   // come from Play Console (currency + tax-inclusive).
+  //
+  // IMPORTANT: setIapReady(true) is intentionally deferred until AFTER at
+  // least one product price returns successfully. This means:
+  //   - RevenueCat IS configured + SKUs active  → prices load → button enables
+  //   - RevenueCat NOT configured / SKUs missing → prices time out → button
+  //     stays disabled with "Google Play unavailable" instead of enabling and
+  //     then silently hanging for 60 s on every purchase tap.
   useEffect(() => {
     if (!platformReady || !isAndroid) return;
     isAndroidBillingSupported().then(async (supported) => {
+      console.log('[Subscription] Android billing supported:', supported, {
+        ua: navigator.userAgent,
+        hasAgent: typeof (window as any).$agent !== 'undefined',
+      });
       if (!supported) return;
-      setIapReady(true);
+
+      console.log('[Subscription] Fetching Android product prices…');
       const products = await getAndroidProducts();
+      console.log('[Subscription] Android products returned:', products.length, products);
+
+      if (products.length === 0) {
+        // RevenueCat bridge is not responding (API key missing in BuildNatively,
+        // or SKUs not configured in RevenueCat dashboard). Leave iapReady false
+        // so the button shows "Google Play unavailable" rather than spinning.
+        console.warn('[Subscription] Android: 0 products returned — RevenueCat likely not configured for Android. Configure the Android API key in BuildNatively and add SKUs in RevenueCat dashboard.');
+        return;
+      }
+
       const priceMap: Record<string, string> = {};
       for (const p of products) {
         priceMap[p.identifier] = p.priceString;
       }
       setIosProductPrices((prev) => ({ ...prev, ...priceMap }));
+      // Only enable the button once we know RevenueCat is live and responding.
+      setIapReady(true);
+      console.log('[Subscription] Android IAP ready. Price map:', priceMap);
     }).catch((err) => {
       console.warn('[Subscription] Android IAP init error:', err);
     });
@@ -661,7 +687,8 @@ export default function Subscription() {
           <strong style={{ fontSize: '15px' }}>🔍 Platform Debug</strong><br />
           <strong>isIos:</strong> {String(debugInfo.isIos)} &nbsp;
           <strong>isAndroid:</strong> {String(debugInfo.isAndroid)} &nbsp;
-          <strong>isUsRegion:</strong> {String(debugInfo.isUsRegion)}<br />
+          <strong>isUsRegion:</strong> {String(debugInfo.isUsRegion)} &nbsp;
+          <strong>iapReady:</strong> {String(debugInfo.iapReady)}<br />
           <strong>$agent:</strong> {String(debugInfo.hasAgent)} &nbsp;
           <strong>window.natively:</strong> {String(debugInfo.hasNatively)} &nbsp;
           <strong>Capacitor:</strong> {String(debugInfo.hasCapacitor)}<br />
