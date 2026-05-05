@@ -1,0 +1,38 @@
+The Android billing changes aren't working correctly. Two issues observed on a real Android device (Samsung, installed via Play Store Internal Testing):
+
+1. The Stripe "Subscribe via Roster" button is STILL VISIBLE on Android — it should be hidden when isAndroid === true
+2. The "Pay via Google Play" button shows a spinner forever and never launches the Google Play purchase sheet
+
+Diagnose both issues. I suspect the root cause is that isAndroid is not being detected correctly inside the Natively WebView wrapper, which would explain both symptoms.
+
+REQUIRED DEBUG OUTPUT
+Add a temporary visible debug banner at the top of client/src/pages/Subscription.tsx that displays:
+- isIos value
+- isAndroid value
+- isUsRegion value  
+- navigator.userAgent string
+- Whether window.Capacitor exists
+- Whether window.Natively exists (or whatever the Natively bridge global is called)
+
+Make it a yellow banner with large readable text. This banner should ONLY render in non-production builds OR only on this page. I will remove it after debugging.
+
+ALSO ADD
+- Wrap the Android Google Play purchase handler in client/src/lib/nativePurchases.ts with try/catch
+- Display any caught error in a visible toast/alert with the full error message and stack trace
+- Add console.log statements at every step:
+  - "Step 1: handleAndroidPurchase called with productId=[id]"
+  - "Step 2: Calling Natively Google Play purchase method"
+  - "Step 3: Natively responded: [JSON.stringify(response)]"
+  - "Step 4: Sending receipt to /api/iap/verify-google"
+  - "Step 5: Server response: [response]"
+
+INVESTIGATE
+1. Look at the useIosPlatform.ts hook — does the isAndroid detection logic actually work inside a Natively WebView wrapper, or was it written for Capacitor only?
+2. Look at the Natively bridge call in nativePurchases.ts — verify the actual method name being called for Google Play. Cross-reference Natively's documentation if needed.
+3. Confirm the conditional rendering in Subscription.tsx actually checks isAndroid and hides the Stripe button when true.
+
+DELIVERABLES
+1. List of files changed
+2. Description of what you found broken
+3. Confirmation that debug output is added so I can see what's happening on my device
+4. Any uncertainty about Natively's Google Play Billing API surface — flag it explicitly so I can check Natively docs

@@ -22,17 +22,39 @@ function isNativelyIosApp(): boolean {
   // Check 1 & 2: explicit Natively UA strings
   if (ua.includes('Natively/iOS') || ua.includes('Natively/iPadOS')) return true;
   // Check 3: $agent is the native bridge marker used by the Natively SDK itself
-  // (see NativelyInfo.browserInfo → isNativeApp). If it's defined and not Android → iOS.
-  if (typeof (window as any).$agent !== 'undefined' && !ua.includes('Natively/Android')) return true;
+  // (see NativelyInfo.browserInfo → isNativeApp). If it's defined and NOT Android → iOS.
+  // We call isNativelyAndroidApp() here (instead of a bare UA string check) so
+  // the full belt-and-suspenders Android detection is used, preventing Android
+  // devices from being misidentified as iOS when the UA uses a slightly
+  // different Natively token (e.g. "NativelyAndroid" vs "Natively/Android").
+  if (typeof (window as any).$agent !== 'undefined' && !isNativelyAndroidApp()) return true;
   return false;
 }
 
 /**
  * Returns true when running inside the Natively Android native app shell.
- * Natively sets a custom user-agent containing "Natively/Android" for Android builds.
+ *
+ * Detection order (belt-and-suspenders):
+ *   1. UA contains "Natively/Android"  — primary signal from the Natively shell
+ *   2. UA contains "Android" (generic) AND window.$agent is defined
+ *      — fallback for BuildNatively builds whose UA omits the slash or uses a
+ *        slightly different token (e.g. "NativelyAndroid", "Natively Android").
+ *        $agent is only injected by the Natively native bridge, never in a
+ *        plain mobile browser, so the conjunction is safe.
+ *
+ * IMPORTANT: this function must be evaluated BEFORE isNativelyIosApp() so
+ * the iOS $agent fallback check can safely call isNativelyAndroidApp() to
+ * exclude Android devices.
  */
 function isNativelyAndroidApp(): boolean {
-  return navigator.userAgent.includes('Natively/Android');
+  const ua = navigator.userAgent;
+  if (ua.includes('Natively/Android')) return true;
+  // Belt-and-suspenders: any Android UA + $agent bridge injected = Natively Android
+  if (
+    ua.toLowerCase().includes('android') &&
+    typeof (window as any).$agent !== 'undefined'
+  ) return true;
+  return false;
 }
 
 function getCapacitorPlatform(): string {

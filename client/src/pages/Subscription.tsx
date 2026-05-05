@@ -62,6 +62,19 @@ export default function Subscription() {
 
   const { isIos, isAndroid, isUsRegion, isReady: platformReady } = useIosPlatform();
 
+  // ─── TEMPORARY DEBUG BANNER ───────────────────────────────────────────────
+  // Remove once Android platform detection is confirmed working on device.
+  const debugInfo = typeof window !== 'undefined' ? {
+    ua: navigator.userAgent,
+    isIos,
+    isAndroid,
+    isUsRegion,
+    hasAgent: typeof (window as any).$agent !== 'undefined',
+    hasNatively: !!(window as any).natively,
+    hasCapacitor: !!(window as any).Capacitor,
+  } : null;
+  // ──────────────────────────────────────────────────────────────────────────
+
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
@@ -467,36 +480,45 @@ export default function Subscription() {
   // against /api/iap/verify-google. No Stripe involvement on Android.
   const handleAndroidPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
-    console.log('[Subscription/Android] Purchase tapped', {
-      tier,
+    console.log(`Step 1: handleAndroidPurchase called with tier=${tier}`, {
       billingPeriod,
       iapReady,
+      isAndroid,
+      isIos,
       iosProductPricesKeys: Object.keys(iosProductPrices),
+      ua: navigator.userAgent,
+      hasAgent: typeof (window as any).$agent !== 'undefined',
     });
     try {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
 
-      console.log('[Subscription/Android] Calling purchaseProductAndroid for', productId);
+      console.log(`Step 2: Calling Natively Google Play purchase method for productId=${productId}`);
       const purchase = await purchaseProductAndroid(productId);
-      console.log('[Subscription/Android] Got purchase result, verifying with server', purchase);
+      console.log(`Step 3: Natively responded: ${JSON.stringify(purchase)}`);
 
+      console.log(`Step 4: Sending receipt to /api/iap/verify-google`, {
+        purchaseToken: purchase.purchaseToken?.slice(0, 20) + '…',
+        productId: purchase.productIdentifier || productId,
+      });
       const response = await apiRequest('POST', '/api/iap/verify-google', {
         purchaseToken: purchase.purchaseToken,
         productId: purchase.productIdentifier || productId,
       });
 
+      const serverJson = await response.json().catch(() => ({}));
+      console.log(`Step 5: Server response: status=${response.status}`, serverJson);
+
       if (!response.ok) {
-        const data = await response.json() as { message?: string };
-        throw new Error(data.message || 'Purchase completed but role sync failed. Please tap Restore Purchases.');
+        throw new Error((serverJson as any).message || 'Purchase completed but role sync failed. Please tap Restore Purchases.');
       }
 
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       window.location.reload();
     } catch (error: any) {
-      console.error('[Subscription/Android] Purchase error:', error);
+      console.error('[Subscription/Android] Purchase error:', error?.message, error?.stack);
       if (
         error?.code === 'PURCHASE_CANCELLED' ||
         error?.message?.toLowerCase().includes('cancel') ||
@@ -622,6 +644,31 @@ export default function Subscription() {
         successHeadline="Subscription active"
         successMessage="Updating your account…"
       />
+
+      {/* ── TEMPORARY DEBUG BANNER — remove after Android platform detection confirmed ── */}
+      {debugInfo && (
+        <div style={{
+          background: '#FFD700',
+          color: '#000',
+          padding: '12px 16px',
+          fontSize: '13px',
+          fontFamily: 'monospace',
+          lineHeight: '1.8',
+          wordBreak: 'break-all',
+          zIndex: 9999,
+          borderBottom: '2px solid #B8860B',
+        }}>
+          <strong style={{ fontSize: '15px' }}>🔍 Platform Debug</strong><br />
+          <strong>isIos:</strong> {String(debugInfo.isIos)} &nbsp;
+          <strong>isAndroid:</strong> {String(debugInfo.isAndroid)} &nbsp;
+          <strong>isUsRegion:</strong> {String(debugInfo.isUsRegion)}<br />
+          <strong>$agent:</strong> {String(debugInfo.hasAgent)} &nbsp;
+          <strong>window.natively:</strong> {String(debugInfo.hasNatively)} &nbsp;
+          <strong>Capacitor:</strong> {String(debugInfo.hasCapacitor)}<br />
+          <strong>UA:</strong> {debugInfo.ua}
+        </div>
+      )}
+      {/* ── END DEBUG BANNER ── */}
       {/* Confirmation shown after a redirect-based Stripe success returns to
          this page (billing-portal upgrade or 3DS fallback). Visually mirrors
          the embedded modal's success state so both flows feel consistent. */}
