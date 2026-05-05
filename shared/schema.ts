@@ -3855,3 +3855,121 @@ export const insertRsvpReminderSentSchema = createInsertSchema(rsvpRemindersSent
 
 export type RsvpReminderSent = typeof rsvpRemindersSent.$inferSelect;
 export type InsertRsvpReminderSent = z.infer<typeof insertRsvpReminderSentSchema>;
+
+// ─── Referral Program ────────────────────────────────────────────────────────
+
+export const referralPartnerStatusEnum = pgEnum("referral_partner_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const referralPlatformEnum = pgEnum("referral_platform", [
+  "ios",
+  "android",
+  "web",
+]);
+
+export const referralConversionStatusEnum = pgEnum("referral_conversion_status", [
+  "active",
+  "cancelled",
+  "refunded",
+]);
+
+// Referral partners — organizations that refer new subscribers
+export const referralPartners = pgTable("referral_partners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgName: varchar("org_name", { length: 255 }).notNull(),
+  contactName: varchar("contact_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  orgType: varchar("org_type", { length: 100 }),
+  hockeyAffiliation: text("hockey_affiliation"),
+  proofDocumentPath: text("proof_document_path"),
+  status: referralPartnerStatusEnum("status").default("pending").notNull(),
+  referralCode: varchar("referral_code", { length: 20 }).unique(),
+  payoutRate: decimal("payout_rate", { precision: 5, scale: 4 }).default("0.10").notNull(),
+  adminNotes: text("admin_notes"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_referral_partners_status").on(table.status),
+  index("idx_referral_partners_code").on(table.referralCode),
+]);
+
+export const insertReferralPartnerSchema = createInsertSchema(referralPartners).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type ReferralPartner = typeof referralPartners.$inferSelect;
+export type InsertReferralPartner = z.infer<typeof insertReferralPartnerSchema>;
+
+// Magic link tokens for partner portal auth
+export const referralMagicLinks = pgTable("referral_magic_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerId: varchar("partner_id").references(() => referralPartners.id, { onDelete: "cascade" }).notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_referral_magic_links_token").on(table.token),
+  index("idx_referral_magic_links_partner").on(table.partnerId),
+]);
+
+export type ReferralMagicLink = typeof referralMagicLinks.$inferSelect;
+
+// Referral conversions — tracks each subscriber referred by a partner
+export const referralConversions = pgTable("referral_conversions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerId: varchar("partner_id").references(() => referralPartners.id, { onDelete: "cascade" }).notNull(),
+  referralCode: varchar("referral_code", { length: 20 }).notNull(),
+  userId: varchar("user_id"),
+  revenuecatEventId: varchar("revenuecat_event_id", { length: 255 }).unique(),
+  tier: varchar("tier", { length: 100 }),
+  platform: referralPlatformEnum("platform"),
+  grossPriceCents: integer("gross_price_cents").notNull().default(0),
+  status: referralConversionStatusEnum("status").default("active").notNull(),
+  convertedAt: timestamp("converted_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_referral_conversions_partner").on(table.partnerId),
+  index("idx_referral_conversions_status").on(table.status),
+  index("idx_referral_conversions_converted_at").on(table.convertedAt),
+]);
+
+export const insertReferralConversionSchema = createInsertSchema(referralConversions).omit({
+  id: true, convertedAt: true, updatedAt: true,
+});
+export type ReferralConversion = typeof referralConversions.$inferSelect;
+export type InsertReferralConversion = z.infer<typeof insertReferralConversionSchema>;
+
+// Payout records — manual log of payouts issued to partners
+export const referralPayouts = pgTable("referral_payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  partnerId: varchar("partner_id").references(() => referralPartners.id, { onDelete: "cascade" }).notNull(),
+  quarter: varchar("quarter", { length: 10 }).notNull(), // e.g. "2025-Q2"
+  amountCents: integer("amount_cents").notNull(),
+  method: varchar("method", { length: 100 }),
+  reference: varchar("reference", { length: 255 }),
+  notes: text("notes"),
+  paidAt: timestamp("paid_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_referral_payouts_partner").on(table.partnerId),
+  index("idx_referral_payouts_quarter").on(table.quarter),
+]);
+
+export const insertReferralPayoutSchema = createInsertSchema(referralPayouts).omit({
+  id: true, createdAt: true,
+});
+export type ReferralPayout = typeof referralPayouts.$inferSelect;
+export type InsertReferralPayout = z.infer<typeof insertReferralPayoutSchema>;
+
+// Settings — key/value store for admin-editable referral program settings
+export const referralSettings = pgTable("referral_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ReferralSetting = typeof referralSettings.$inferSelect;
