@@ -367,7 +367,9 @@ export function registerReferralRoutes(app: Express) {
       });
 
       const appUrl = getAppUrl();
-      const magicLink = `${appUrl}/referral-program/portal/auth?token=${token}`;
+      // Link targets the backend auth endpoint directly; that endpoint sets
+      // the session cookie and redirects the browser to the partner portal.
+      const magicLink = `${appUrl}/api/referral/portal/auth?token=${token}`;
       const magicLinkSettings = await getSettings();
       await sendMagicLinkEmail(
         email,
@@ -416,7 +418,15 @@ export function registerReferralRoutes(app: Express) {
       partnerSessions.set(sessionToken, partner.id);
       res.cookie("roster_partner_session", sessionToken, SESSION_COOKIE_OPTIONS);
 
-      res.json({ success: true, partnerId: partner.id });
+      // Redirect the browser to the partner portal page so clicking the email
+      // link lands the user on the portal UI (not a raw JSON response).
+      // Accept header check: if the caller explicitly wants JSON (API client),
+      // return JSON; otherwise redirect to the portal page.
+      const wantsJson = (req.headers.accept || "").includes("application/json");
+      if (wantsJson) {
+        return res.json({ success: true, partnerId: partner.id });
+      }
+      return res.redirect(302, `${getAppUrl()}/referral-program/portal`);
     } catch (err) {
       console.error("[Referral] portal/auth error:", err);
       res.status(500).json({ message: "Authentication failed" });
@@ -1301,16 +1311,29 @@ export function registerReferralRoutes(app: Express) {
       if (eventType === "CANCELLATION" || eventType === "REFUND") {
         const newStatus: ReferralConversionStatus = eventType === "REFUND" ? "refunded" : "cancelled";
 
-        // CANCELLATION/REFUND events have their own unique event.id — it is NOT
-        // the same as the INITIAL_PURCHASE event id we stored. The most reliable
-        // way to find the original conversion is by the subscriber's app_user_id,
-        // which is stable across all events for that user.
+        // ── Idempotency check: has this exact event already been processed? ──
+        // For CANCEL/REFUND we store the event ID in revenuecatEventId on the
+        // conversion row when we process it. Checking for it before processing
+        // prevents duplicate updates if RevenueCat retries the webhook.
+        if (eventId) {
+          const [alreadyProcessed] = await db
+            .select({ id: referralConversions.id })
+            .from(referralConversions)
+            .where(eq(referralConversions.revenuecatEventId, eventId))
+            .limit(1);
+          if (alreadyProcessed) {
+            console.log(`[RCWebhook] ${eventType} already processed (${eventId})`);
+            return res.json({ processed: false, reason: "duplicate" });
+          }
+        }
+
+        // ── Correlate to the original conversion via app_user_id ─────────────
+        // CANCEL/REFUND events carry a new unique event.id, not the purchase id.
+        // app_user_id is stable across all events for the same subscriber.
         let updated = false;
 
         if (appUserId) {
-          // Build a where clause: always filter by userId; narrow by referralCode
-          // (via partnerId) when available, since a user could theoretically have
-          // multiple referral-tracked subscriptions on different codes.
+          // Prefer narrowing by referralCode (via partnerId) when available.
           if (referralCode) {
             const [partner] = await db
               .select({ id: referralPartners.id })
@@ -1320,7 +1343,12 @@ export function registerReferralRoutes(app: Express) {
             if (partner) {
               const result = await db
                 .update(referralConversions)
-                .set({ status: newStatus, updatedAt: new Date() })
+                .set({
+                  status: newStatus,
+                  // Overwrite with this event's ID for idempotency on future retries.
+                  revenuecatEventId: eventId || null,
+                  updatedAt: new Date(),
+                })
                 .where(and(
                   eq(referralConversions.userId, appUserId),
                   eq(referralConversions.partnerId, partner.id),
@@ -1331,13 +1359,16 @@ export function registerReferralRoutes(app: Express) {
             }
           }
 
-          // Fallback: no referral code in event — update by userId alone.
-          // This handles stores (e.g. Apple) that strip subscriber attributes
-          // from cancellation/refund payloads.
+          // Fallback: stores (e.g. Apple) may strip subscriber_attributes from
+          // CANCEL/REFUND payloads, leaving referralCode empty. Update by userId alone.
           if (!updated) {
             const result = await db
               .update(referralConversions)
-              .set({ status: newStatus, updatedAt: new Date() })
+              .set({
+                status: newStatus,
+                revenuecatEventId: eventId || null,
+                updatedAt: new Date(),
+              })
               .where(and(
                 eq(referralConversions.userId, appUserId),
                 eq(referralConversions.status, "active"),

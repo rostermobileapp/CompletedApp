@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { warmCityGeoCache } from "./storage";
+import { initReferralDb } from "./referralDbInit";
 
 const app = express();
 
@@ -75,6 +76,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize referral program tables before registering routes.
+  await initReferralDb();
+
   const server = await registerRoutes(app);
 
   // Pre-warm the city geo cache from existing DB records so the first heatmap
