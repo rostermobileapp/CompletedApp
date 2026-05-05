@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useOneSignal } from './hooks/useOneSignal';
 
 const API_BASE_URL = 'https://www.roster-app.com';
@@ -128,7 +128,7 @@ export default function App() {
         <SafeAreaView style={styles.container}>
           <ActivityIndicator size="large" color="#0066cc" />
           <Text style={styles.loadingText}>Loading...</Text>
-          <StatusBar style="light" />
+          <SystemBars style="light" />
         </SafeAreaView>
       </SafeAreaProvider>
     );
@@ -182,7 +182,7 @@ export default function App() {
         </TouchableOpacity>
       )}
 
-        <StatusBar style="light" />
+        <SystemBars style="light" />
       </SafeAreaView>
     </SafeAreaProvider>
   );
