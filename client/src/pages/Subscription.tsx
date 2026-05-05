@@ -1048,10 +1048,10 @@ export default function Subscription() {
                   Current Plan
                 </button>
               ) : plan.tier === 'free_tier' ? (
-                /* Paid user viewing Free Tier card — manage via platform-appropriate path */
-                (isIos ? (<p className="text-sm text-muted-foreground text-center py-2">Manage via <strong>Settings → Apple ID → Subscriptions</strong>
-                </p>) : isAndroid ? (<p className="text-sm text-muted-foreground text-center py-2">Manage via <strong>Play Store → Profile → Payments &amp; subscriptions</strong>
-                </p>) : (<button
+                /* Paid user viewing Free Tier card — only web shows a Manage button.
+                   On iOS/Android, downgrading is done via the store (already
+                   communicated in the footer), so the card has no CTA here. */
+                (isIos || isAndroid ? null : (<button
                   onClick={handleManageSubscription}
                   disabled={isLoading}
                   className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
@@ -1078,42 +1078,12 @@ export default function Subscription() {
                   const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
                   return (
                     <div className="flex flex-col gap-2">
-                      {isUsRegion && (
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
-                            disabled={isLoading || pricesLoading}
-                            aria-describedby={stripePriceStr && stripePriceStr !== '...' ? stripePriceId : undefined}
-                            className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
-                            data-testid={`button-stripe-${plan.tier}`}
-                          >
-                            {(isLoading || pricesLoading) ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <span className="flex items-center gap-2">
-                                <span>Subscribe via</span>
-                                <img src={rosterLogo} alt="Roster" className="h-6 object-contain" />
-                              </span>
-                            )}
-                          </button>
-                          {stripePriceStr && stripePriceStr !== '...' && (
-                            <span
-                              id={stripePriceId}
-                              aria-label={`Roster price ${stripePriceStr} per ${billingPeriod === 'yearly' ? 'year' : 'month'}`}
-                              className="text-sm font-medium text-muted-foreground whitespace-nowrap"
-                              data-testid={`price-android-stripe-${plan.tier}`}
-                            >
-                              {stripePriceStr}/{periodSuffix}
-                            </span>
-                          )}
-                        </div>
-                      )}
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
                           disabled={isLoading || !iapReady}
                           aria-describedby={playPrice ? playPriceId : undefined}
-                          className="flex-1 py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
+                          className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
                           data-testid={`button-iap-android-${plan.tier}`}
                         >
                           {isLoading ? (
@@ -1135,6 +1105,9 @@ export default function Subscription() {
                           </span>
                         )}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Manage via <strong>Play Store → Profile → Payments &amp; subscriptions</strong>
+                      </p>
                       <button
                         onClick={() => window.open('https://play.google.com/redeem', '_system')}
                         className="text-xs text-primary underline text-left mt-1 hover:text-primary/80"
@@ -1164,42 +1137,12 @@ export default function Subscription() {
                   const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
                   return (
                     <div className="flex flex-col gap-2">
-                      {isUsRegion && (
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
-                            disabled={isLoading || pricesLoading}
-                            aria-describedby={stripePriceStr ? stripePriceId : undefined}
-                            className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
-                            data-testid={`button-stripe-${plan.tier}`}
-                          >
-                            {(isLoading || pricesLoading) ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <span className="flex items-center gap-2">
-                                <span>Subscribe via</span>
-                                <img src={rosterLogo} alt="Roster" className="h-6 object-contain" />
-                              </span>
-                            )}
-                          </button>
-                          {stripePriceStr && stripePriceStr !== '...' && (
-                            <span
-                              id={stripePriceId}
-                              aria-label={`Roster price ${stripePriceStr} per ${billingPeriod === 'yearly' ? 'year' : 'month'}`}
-                              className="text-sm font-medium text-muted-foreground whitespace-nowrap"
-                              data-testid={`price-stripe-${plan.tier}`}
-                            >
-                              {stripePriceStr}/{periodSuffix}
-                            </span>
-                          )}
-                        </div>
-                      )}
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => handleIosPurchase(plan.tier as 'player_pro' | 'commissioner')}
                           disabled={isLoading || !iapReady}
                           aria-describedby={appStorePrice ? appStorePriceId : undefined}
-                          className="flex-1 py-3 rounded-lg font-semibold bg-transparent border border-gray-400 text-foreground hover:bg-muted disabled:opacity-50 flex items-center justify-center"
+                          className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
                           data-testid={`button-iap-${plan.tier}`}
                         >
                           {isLoading ? (
@@ -1219,6 +1162,9 @@ export default function Subscription() {
                           </span>
                         )}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Manage via <strong>Settings → Apple ID → Subscriptions</strong>
+                      </p>
                     </div>
                   );
                 })()
