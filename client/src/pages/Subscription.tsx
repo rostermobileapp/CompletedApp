@@ -1080,15 +1080,13 @@ export default function Subscription() {
                           </span>
                         )}
                       </div>
-                      {iapReady && (
-                        <button
-                          onClick={() => window.open('https://play.google.com/redeem', '_system')}
-                          className="text-xs text-primary underline text-left mt-1 hover:text-primary/80"
-                          data-testid={`button-android-promo-${plan.tier}`}
-                        >
-                          Have a promo code?
-                        </button>
-                      )}
+                      <button
+                        onClick={() => window.open('https://play.google.com/redeem', '_system')}
+                        className="text-xs text-primary underline text-left mt-1 hover:text-primary/80"
+                        data-testid={`button-android-promo-${plan.tier}`}
+                      >
+                        Have a promo code?
+                      </button>
                     </div>
                   );
                 })()
