@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useOneSignal } from './hooks/useOneSignal';
 
 const API_BASE_URL = 'https://www.roster-app.com';
@@ -123,17 +124,20 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#0066cc" />
-        <Text style={styles.loadingText}>Loading...</Text>
-        <StatusBar style="light" backgroundColor="#000000" />
-      </View>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
+          <ActivityIndicator size="large" color="#0066cc" />
+          <Text style={styles.loadingText}>Loading...</Text>
+          <StatusBar style="light" />
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Roster App</Text>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.title}>Roster App</Text>
       
       <View style={styles.statusCard}>
         <Text style={styles.sectionTitle}>User Status</Text>
@@ -178,8 +182,9 @@ export default function App() {
         </TouchableOpacity>
       )}
 
-      <StatusBar style="light" backgroundColor="#000000" />
-    </View>
+        <StatusBar style="light" />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

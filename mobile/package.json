@@ -25,6 +25,7 @@
     "zod": "^3.24.1",
     "nanoid": "^5.0.9",
     "date-fns": "^4.1.0",
+    "react-native-edge-to-edge": "^1.6.0",
     "react-native-svg": "16.0.0",
     "react-native-onesignal": "^5.2.0",
     "onesignal-expo-plugin": "^2.0.0",
