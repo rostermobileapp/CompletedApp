@@ -71,7 +71,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // and React's first render.  Calling the methods directly (as before) meant
     // the trigger was sometimes queued inside the shim but never drained because
     // notify() had already fired before the CDN script reset window.natively.
-    const bgColor = effectiveTheme === 'dark' ? '#000000' : '#ffffff';
+    // Match the App Background Color to bg-card (the bottom nav's background)
+    // so the native gesture-nav strip below the WebView is the same color as
+    // the bottom nav — making the gap invisible without viewport-fit=cover.
+    // Light: hsl(0 0% 96%) = #f5f5f5  |  Dark: hsl(240 10% 6%) ≈ #0e0e11
+    const bgColor = effectiveTheme === 'dark' ? '#0e0e11' : '#f5f5f5';
     // Status bar icons on this device are always white, so keep style 'Dark'
     // (white icons) regardless of app theme. The App Background Color fills
     // the Safe Area space and will match the theme automatically via bgColor.
