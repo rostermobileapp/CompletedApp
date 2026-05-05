@@ -355,8 +355,7 @@ export function registerReferralRoutes(app: Express) {
         .limit(1);
 
       if (!partner) {
-        // Don't reveal whether email exists
-        return res.json({ message: "If this email is registered, a login link has been sent." });
+        return res.status(404).json({ message: "No partner account found for this email. Please check for typos or apply to become a partner." });
       }
       if (partner.status !== "approved") {
         return res.status(403).json({

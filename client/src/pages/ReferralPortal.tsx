@@ -13,30 +13,35 @@ interface PartnerMe {
     contactName: string;
     referralCode: string;
     payoutRate: number;
-    platformFeePercent: number;
   };
   stats: {
     totalConversions: number;
-    activeSubscribers: number;
-    byTier: Record<string, number>;
-    byPlatform: Record<string, number>;
-    estimatedQuarterlyEarnings: number;
+    tierBreakdown: Record<string, number>;
+    platformBreakdown: Record<string, number>;
+  };
+  quarterEstimate: {
+    quarter: string;
+    conversions: number;
+    grossCents: number;
+    platformFeePercent: number;
+    payoutRate: number;
+    estimatedPayoutCents: number;
   };
   conversions: Array<{
     id: string;
     convertedAt: string;
-    tier: string;
-    platform: string;
-    grossPrice: number;
-    netContribution: number;
-    estimatedEarnings: number;
+    tier: string | null;
+    platform: string | null;
+    grossPriceCents: number | null;
+    netContributionCents: number | null;
+    estimatedEarningsCents: number | null;
     status: string;
   }>;
   payouts: Array<{
     id: string;
     periodStart: string;
     periodEnd: string;
-    totalEarnings: number;
+    amountCents: number;
     status: string;
     paidAt: string | null;
   }>;
@@ -109,8 +114,8 @@ export default function ReferralPortal() {
         throw new Error('Unauthorized');
       }
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error((d as any).message || 'Failed to load portal');
+        const d: { message?: string } = await res.json().catch(() => ({}));
+        throw new Error(d.message || 'Failed to load portal');
       }
       return res.json();
     },
@@ -148,12 +153,16 @@ export default function ReferralPortal() {
     );
   }
 
-  const { partner, stats, conversions, payouts } = data!;
+  const { partner, stats, quarterEstimate, conversions, payouts } = data!;
   const totalConvPages = Math.max(1, Math.ceil(conversions.length / CONVERSIONS_PER_PAGE));
   const convSlice = conversions.slice((convPage - 1) * CONVERSIONS_PER_PAGE, convPage * CONVERSIONS_PER_PAGE);
-  const quarterlyEst = stats.estimatedQuarterlyEarnings ?? 0;
+  const quarterlyEst = (quarterEstimate.estimatedPayoutCents ?? 0) / 100;
+  const platformFeePercent = quarterEstimate.platformFeePercent ?? 15;
 
-  function fmt(n: number) {
+  function fmt(cents: number) {
+    return `$${(cents / 100).toFixed(2)}`;
+  }
+  function fmtDollars(n: number) {
     return `$${n.toFixed(2)}`;
   }
   function fmtDate(s: string) {
@@ -194,10 +203,10 @@ export default function ReferralPortal() {
         {/* Stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Referred" value={stats.totalConversions} icon={Users} sub="all time" />
-          <StatCard label="Active Subscribers" value={stats.activeSubscribers} icon={TrendingUp} sub="currently active" />
+          <StatCard label="Active This Quarter" value={quarterEstimate.conversions} icon={TrendingUp} sub="active subscriptions" />
           <StatCard
             label="Est. Quarterly Payout"
-            value={fmt(quarterlyEst)}
+            value={fmtDollars(quarterlyEst)}
             icon={DollarSign}
             sub={`${partner.payoutRate}% payout rate`}
           />
@@ -210,13 +219,13 @@ export default function ReferralPortal() {
         </div>
 
         {/* Breakdown cards */}
-        {(Object.keys(stats.byTier ?? {}).length > 0 || Object.keys(stats.byPlatform ?? {}).length > 0) && (
+        {(Object.keys(stats.tierBreakdown ?? {}).length > 0 || Object.keys(stats.platformBreakdown ?? {}).length > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.keys(stats.byTier ?? {}).length > 0 && (
+            {Object.keys(stats.tierBreakdown ?? {}).length > 0 && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4">By Subscription Tier</h3>
                 <div className="space-y-2">
-                  {Object.entries(stats.byTier).map(([tier, count]) => (
+                  {Object.entries(stats.tierBreakdown).map(([tier, count]) => (
                     <div key={tier} className="flex items-center justify-between text-sm">
                       <span className="capitalize text-gray-700">{tier.replace(/_/g, ' ')}</span>
                       <span className="font-semibold text-gray-900">{count}</span>
@@ -225,14 +234,14 @@ export default function ReferralPortal() {
                 </div>
               </div>
             )}
-            {Object.keys(stats.byPlatform ?? {}).length > 0 && (
+            {Object.keys(stats.platformBreakdown ?? {}).length > 0 && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4">By Platform</h3>
                 <div className="space-y-2">
-                  {Object.entries(stats.byPlatform).map(([platform, count]) => (
+                  {Object.entries(stats.platformBreakdown).map(([platform, count]) => (
                     <div key={platform} className="flex items-center justify-between text-sm">
                       <span className="capitalize text-gray-700">{platform}</span>
-                      <span className="font-semibold text-gray-900">{count as number}</span>
+                      <span className="font-semibold text-gray-900">{count}</span>
                     </div>
                   ))}
                 </div>
@@ -244,9 +253,10 @@ export default function ReferralPortal() {
         {/* Quarterly payout estimate card */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-700 mb-1">Estimated Quarterly Payout</h3>
-          <p className="text-3xl font-black text-[#3c82f4] mb-2">{fmt(quarterlyEst)}</p>
+          <p className="text-3xl font-black text-[#3c82f4] mb-2">{fmtDollars(quarterlyEst)}</p>
           <p className="text-xs text-gray-400 mb-3">
-            Calculated as: (active subscribers × avg monthly subscription price × {100 - partner.platformFeePercent}% net) × {partner.payoutRate}% payout rate × 3 months.
+            Calculated as: gross revenue × {100 - platformFeePercent}% net × {partner.payoutRate}% payout rate.
+            Based on {quarterEstimate.conversions} active subscription{quarterEstimate.conversions !== 1 ? 's' : ''} this quarter.
             Payouts are made quarterly and are subject to final review.
           </p>
           <p className="text-xs text-gray-300 italic">
@@ -280,7 +290,7 @@ export default function ReferralPortal() {
                       <td className="px-5 py-3 text-gray-700">
                         {fmtDate(p.periodStart)} – {fmtDate(p.periodEnd)}
                       </td>
-                      <td className="px-5 py-3 text-right font-semibold text-gray-900">{fmt(p.totalEarnings)}</td>
+                      <td className="px-5 py-3 text-right font-semibold text-gray-900">{fmt(p.amountCents)}</td>
                       <td className="px-5 py-3 text-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           p.status === 'paid' ? 'bg-green-100 text-green-700' :
@@ -332,10 +342,10 @@ export default function ReferralPortal() {
                         <td className="px-5 py-3 text-gray-700">{fmtDate(c.convertedAt)}</td>
                         <td className="px-5 py-3 text-gray-700 capitalize">{c.tier?.replace(/_/g, ' ') || '—'}</td>
                         <td className="px-5 py-3 text-gray-700 capitalize">{c.platform || '—'}</td>
-                        <td className="px-5 py-3 text-right text-gray-700">{c.grossPrice != null ? fmt(c.grossPrice) : '—'}</td>
-                        <td className="px-5 py-3 text-right text-gray-700">{c.netContribution != null ? fmt(c.netContribution) : '—'}</td>
+                        <td className="px-5 py-3 text-right text-gray-700">{c.grossPriceCents != null ? fmt(c.grossPriceCents) : '—'}</td>
+                        <td className="px-5 py-3 text-right text-gray-700">{c.netContributionCents != null ? fmt(c.netContributionCents) : '—'}</td>
                         <td className="px-5 py-3 text-right font-semibold text-[#3c82f4]">
-                          {c.estimatedEarnings != null ? fmt(c.estimatedEarnings) : '—'}
+                          {c.estimatedEarningsCents != null ? fmt(c.estimatedEarningsCents) : '—'}
                         </td>
                         <td className="px-5 py-3 text-center">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${

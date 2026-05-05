@@ -173,6 +173,48 @@ export interface NativelyTransaction {
 }
 
 /**
+ * Set RevenueCat subscriber attributes via the raw Natively bridge before a
+ * purchase. Used to attach the referral code so revenue can be attributed to
+ * the referring partner. This is a best-effort, fire-and-forget call — it
+ * never throws so it cannot block the purchase flow.
+ *
+ * RevenueCat bridge event: "purchases_setattributes" (undocumented in Natively
+ * but consistent with the naming convention used by other purchases_* events).
+ */
+export function setSubscriberAttributes(attributes: Record<string, string>): void {
+  try {
+    const ctx = (window as any).natively;
+    if (ctx && typeof ctx.trigger === 'function') {
+      ctx.trigger(
+        `attr_${Date.now()}`,
+        3,
+        undefined,
+        'purchases_setattributes',
+        { attributes },
+      );
+    }
+  } catch {
+    // silent — attribute setting should never break the purchase flow
+  }
+}
+
+/**
+ * Read the pending referral code from localStorage and push it to RevenueCat
+ * as a subscriber attribute. Called once before any purchase so attribution
+ * is recorded regardless of when the user enters the paywall.
+ */
+function applyPendingReferralAttribute(): void {
+  try {
+    const code = localStorage.getItem('pendingReferralCode');
+    if (code) {
+      setSubscriberAttributes({ referral_code: code });
+    }
+  } catch {
+    // ignore localStorage errors in restricted contexts
+  }
+}
+
+/**
  * Purchase a subscription via the Natively StoreKit bridge.
  *
  * Natively callback shape (from Natively docs):
@@ -185,6 +227,7 @@ export async function purchaseProduct(
   packageId: string,
   _appAccountToken?: string
 ): Promise<NativelyTransaction> {
+  applyPendingReferralAttribute();
   const data = await toPromise<any>((cb) => np.purchasePackage(packageId, cb));
 
   if (!data) {
@@ -285,6 +328,7 @@ function extractProductId(data: any, fallback?: string): string {
 export async function purchaseProductAndroid(
   packageId: string,
 ): Promise<AndroidPurchaseResult> {
+  applyPendingReferralAttribute();
   console.log('[IAP/Android] purchasePackage() →', packageId, {
     hasAgent: typeof (window as any).$agent !== 'undefined',
     hasNatively: !!(window as any).natively,
