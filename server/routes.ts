@@ -3638,10 +3638,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     'player_pro_yearly': 'player_pro',
   };
 
-  // Must match `android.package` in mobile/app.json AND the application id
-  // registered in Play Console. Hard-coded server-side so a compromised
-  // client can't trick us into verifying against a different app.
-  const GOOGLE_PLAY_PACKAGE_NAME = 'com.roster.app';
+  // Must match the application id registered in Play Console (this is the
+  // package name BuildNatively assigned to the Android shell, NOT the iOS
+  // bundle id and NOT the placeholder in mobile/app.json — that Expo stub is
+  // unused for production Android builds).
+  // Server-side only so a compromised client can't trick us into verifying
+  // against a different app. Override via env if BuildNatively re-issues a
+  // new package name on a future rebuild.
+  const GOOGLE_PLAY_PACKAGE_NAME =
+    process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.aFFhvtIzJvyF.natively';
 
   // ─── POST /api/iap/verify-google ──────────────────────────────────────────
   // Called by the Android client after a successful Google Play Billing
