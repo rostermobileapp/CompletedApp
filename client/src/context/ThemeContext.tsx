@@ -33,19 +33,46 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else {
       root.classList.remove('dark');
     }
-    // Keep the iOS / Android browser chrome (status bar / URL bar safe area)
-    // matched to the active theme so we don't get a white strip on top of a
-    // dark app. iOS Safari and Android Chrome both read <meta name="theme-color">.
-    const themeColor = effectiveTheme === 'dark' ? '#000000' : '#ffffff';
-    let metaThemeColor = document.querySelector(
-      'meta[name="theme-color"]'
-    ) as HTMLMetaElement | null;
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.name = 'theme-color';
-      document.head.appendChild(metaThemeColor);
+
+    // When running inside the Natively native shell (Android in particular),
+    // the system status bar is owned by the native shell, not the web view.
+    // Without this, the Android status bar stays white in dark mode (the
+    // shell's default), producing a visible white strip above the dark app.
+    // The Natively SDK exposes runtime controls — drive them off the active
+    // theme so the Android (and iOS) shell match what the user sees.
+    //   - setAppBackgroundColor: paints the area under the (transparent on
+    //     Android 15 edge-to-edge) status bar so it visually matches the app.
+    //   - setAppStatusBarStyle: 'light' = light status-bar icons on a dark
+    //     background, 'dark' = dark icons on a light background.
+    // The npm `natively` shim is also present in the browser preview where
+    // these calls safely no-op, so no native-only guard is needed.
+    const bgColor = effectiveTheme === 'dark' ? '#000000' : '#ffffff';
+    const barStyle = effectiveTheme === 'dark' ? 'light' : 'dark';
+    const applyNativelyTheme = () => {
+      const nat = (window as any).natively;
+      if (!nat) return false;
+      try {
+        nat.setAppBackgroundColor?.(bgColor);
+        nat.setAppStatusBarStyle?.(barStyle);
+        return true;
+      } catch (err) {
+        console.warn('[Theme] Natively theme sync failed:', err);
+        return false;
+      }
+    };
+    if (!applyNativelyTheme()) {
+      // The Natively CDN script loads asynchronously; if the bridge isn't
+      // ready yet, retry briefly so the very first render still gets themed.
+      let attempts = 0;
+      const interval = window.setInterval(() => {
+        attempts += 1;
+        if (applyNativelyTheme() || attempts >= 20) {
+          window.clearInterval(interval);
+        }
+      }, 150);
+      return () => window.clearInterval(interval);
     }
-    metaThemeColor.content = themeColor;
+
     // Only persist a user-driven preference, not the desktop override, so
     // resizing back down to mobile restores the previous choice.
     if (!isDesktopWeb) {
