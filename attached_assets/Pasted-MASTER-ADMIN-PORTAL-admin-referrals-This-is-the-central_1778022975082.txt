@@ -1,0 +1,155 @@
+MASTER ADMIN PORTAL — /admin/referrals
+This is the central control panel for Tobin. Protected route — require password authentication via environment variable ADMIN_PASSWORD (or use existing admin auth pattern in this project). Session should persist via secure cookie.
+The portal should have a top navigation with the following tabs/sections:
+1. Dashboard (default landing view)
+High-level overview showing:
+
+Total active referral partners (approved count)
+Pending applications count (with badge/highlight if > 0)
+Total conversions all-time
+Total conversions this quarter
+Total gross revenue attributed to referrals this quarter
+Total estimated payouts owed this quarter (across all partners)
+Total payouts issued YTD
+Top 5 performing partners (by conversion count, current quarter)
+Recent activity feed: last 10 events (new applications, approvals, conversions)
+
+2. Applications
+Table of all applications with filters (Status: All / Pending / Approved / Rejected) and search by org name or email.
+Columns: Org Name, Contact, Email, Org Type, Hockey Affiliation (truncated), Status, Applied Date, Actions
+For each application:
+
+"View Details" — expands a row or opens a modal showing full application info, including the hockey affiliation full text and admin notes field (editable)
+"View Document" — generates signed URL from Supabase Storage, opens proof document in new tab
+For pending applications:
+
+"Approve" button: sets status to 'approved', sets approved_at timestamp, auto-generates unique referral code (format: first 4 letters of org name uppercased + 4 random digits, e.g. HPIB2847), saves code, sends approval email to org contact with their code and portal login instructions
+"Reject" button: opens modal to enter rejection reason, sets status to 'rejected', sends rejection email with reason
+
+
+For approved partners:
+
+"Revoke Access" button: changes status to 'rejected' with reason, invalidates referral code (prevents future conversions but keeps historical data)
+"Edit Payout Rate" — adjust individual partner's payout percentage if needed
+"Edit Admin Notes" — internal notes only visible to you
+
+
+
+3. All Partners
+Detailed table of approved partners only.
+Columns: Org Name, Referral Code, Approved Date, Active Conversions, Quarter Conversions, Quarter Net Revenue, Estimated Quarter Payout, Last Conversion Date, Actions
+Sortable by any column. Search by org name or code.
+Click any partner row to view their full partner detail page (see section 4).
+4. Partner Detail View — /admin/referrals/partner/:id
+Comprehensive view of a single partner showing everything you need to know:
+
+Partner info card (name, contact, email, code, status, approved date, payout rate)
+Performance metrics: total conversions, this quarter, last quarter, lifetime gross revenue, lifetime estimated payouts
+Full conversion history table with all rows from referral_conversions for this partner
+Payout history table with all rows from referral_payouts for this partner
+"Record Payout" button — opens form to log a payout you've issued (quarter, amount, method, reference, notes)
+Admin notes editor (text area, auto-saves)
+"Send Message" button — opens compose modal to send a custom email to the partner
+
+5. Conversions
+Master view of all conversions across all partners. Table with columns: Date, Partner (Org Name), Code, User ID, Tier, Platform, Gross Price, Net (after 15%), Estimated Payout, Status.
+Filters: Date range, Partner, Platform, Status (active/refunded/cancelled).
+Export to CSV button — exports filtered results.
+6. Payouts
+Two views toggleable at the top:
+Owed View:
+Calculates what you owe each partner for the current quarter (or any selectable quarter). Table: Partner, Conversions This Quarter, Net Revenue, Payout Rate, Amount Owed, Last Payout Date, Action ("Record Payout").
+History View:
+All recorded payouts across all partners. Columns: Date Paid, Partner, Quarter, Amount, Method, Reference. Export to CSV.
+7. Settings
+
+Default payout rate (currently 10% — editable global default for new partners)
+Platform fee percentage (currently 15% — editable for calculations)
+Admin notification email (currently roster.mobile.app@gmail.com)
+Approval/rejection email templates (editable)
+
+
+MAGIC LINK AUTH FOR ORG PORTAL
+Build login page at /referral-program/portal/login.
+
+Single email input with "Send Login Link" button
+On submit: look up email in referral_partners, generate secure random token, store in magic_link_token with 1-hour expiry, send email with magic link URL
+Magic link lands at /referral-program/portal/auth?token=XXXX, validates token and expiry, sets secure session, redirects to /referral-program/portal
+Only approved partners can log in — show clear error if pending or rejected
+
+
+ORGANIZATION PORTAL — /referral-program/portal
+Auth-protected. Shows logged-in org's data only.
+Your Referral Code
+Large, copyable format with copy-to-clipboard button.
+Referral Stats
+
+Total referred subscribers
+Breakdown by subscription tier
+Breakdown by platform
+
+Estimated Quarterly Payout
+
+Conversions in current quarter
+Total gross revenue
+Minus 15% platform fee = net revenue
+Times 10% payout rate = estimated payout
+Display: "Estimated Q[X] [YEAR] Payout: $XX.XX"
+Disclaimer: "Estimates based on active subscriptions at time of calculation. Final payouts issued by Roster, LLC and may vary based on refunds, chargebacks, or cancellations."
+
+Payout History
+Table showing past payouts they've received from referral_payouts.
+Conversion History Table
+Columns: Date, Subscription Tier, Platform, Gross Price, Net Contribution, Your Estimated Earnings. Paginated, most recent first.
+
+REVENUECAT WEBHOOK HANDLER
+POST endpoint at /api/webhooks/revenuecat-referral on existing backend.
+On receiving INITIAL_PURCHASE event:
+
+Extract app_user_id, product_id, price, store, and subscriber attributes
+Look up referral_code subscriber attribute
+If exists, look up in referral_partners, confirm status = 'approved'
+If valid, insert row into referral_conversions
+Use revenuecat_event_id to deduplicate — skip if already processed
+Platform mapping: 'apple' → 'ios', 'google' → 'android', 'stripe' → 'web'
+
+Also handle CANCELLATION and REFUND events — update the corresponding referral_conversions row's status field accordingly so payout calculations stay accurate.
+Secure webhook by validating RevenueCat authorization header against environment variable REVENUECAT_WEBHOOK_SECRET.
+
+APP ONBOARDING INTEGRATION
+In existing Roster onboarding flow, add optional referral code field:
+
+Label: "Referred by an organization? Enter their code (optional)"
+On entry: validate code via /api/referral/validate-code?code=XXXX
+If valid: show green checkmark and org name ("Referred by HPIB ✓")
+If invalid: show error "Code not recognized"
+Save code to user profile in users.referral_code
+Call Purchases.setAttributes({ referral_code: "HPIB2847" }) on the RevenueCat SDK so it's attached to the subscriber before any purchase happens
+
+
+EMAIL TEMPLATES
+Use existing email sender. Send:
+
+New application notification (to you) — subject: "New Referral Partner Application — [Org Name]"
+Application approved (to partner) — includes referral code, magic link to portal, quick start guide
+Application rejected (to partner) — includes rejection reason
+Magic login link (to partner) — secure login link, 1-hour expiry note
+
+
+DELIVERABLES CHECKLIST
+Before considering this complete, verify:
+
+ Supabase tables created with correct schemas
+ Storage bucket created with private access
+ Public landing page at /referral-program styled to match site
+ Application form with file upload working end-to-end
+ Master admin portal with all 7 sections functional
+ Magic link auth flow working
+ Org portal showing accurate stats and payout estimates
+ RevenueCat webhook handler processing INITIAL_PURCHASE, CANCELLATION, and REFUND events
+ Onboarding integration sets referral code on user and on RevenueCat subscriber
+ All email notifications sending correctly
+ Admin route protected via password
+ Org portal route protected via magic link session
+
+Build this in logical order: schema first, then admin portal, then public-facing pages, then webhook integration, then app onboarding integration. Test each piece before moving to the next.
