@@ -33,6 +33,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else {
       root.classList.remove('dark');
     }
+    // Keep the iOS / Android browser chrome (status bar / URL bar safe area)
+    // matched to the active theme so we don't get a white strip on top of a
+    // dark app. iOS Safari and Android Chrome both read <meta name="theme-color">.
+    const themeColor = effectiveTheme === 'dark' ? '#000000' : '#ffffff';
+    let metaThemeColor = document.querySelector(
+      'meta[name="theme-color"]'
+    ) as HTMLMetaElement | null;
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.name = 'theme-color';
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.content = themeColor;
     // Only persist a user-driven preference, not the desktop override, so
     // resizing back down to mobile restores the previous choice.
     if (!isDesktopWeb) {
