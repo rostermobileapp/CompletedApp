@@ -34,43 +34,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.classList.remove('dark');
     }
 
-    // Sync the Natively native shell's safe-area background and status-bar
-    // icon color to the active theme. Without this, the Safe Area strip
-    // above the WebView stays at its dashboard default (white) and the
-    // status-bar icons stay at their dashboard default style — producing
-    // invisible white-on-white icons in light mode (or a jarring white
-    // strip in dark mode). Values verified against BuildNatively docs:
-    // https://docs.buildnatively.com/natively-platform/appearance/style#status-bar-style
-    //   - 'Dark'  = dark theme  = white/light status-bar icons (use on dark bg)
-    //   - 'Light' = light theme = dark/black status-bar icons (use on light bg)
-    // Values are capitalized — lowercase variants are silently ignored.
-    // The npm `natively` shim is also present in the desktop browser preview
-    // where these calls safely no-op, so no native-only guard is needed.
+    // Sync the Natively native shell's background color and status-bar icon
+    // style to the active theme so they match the app in both light and dark
+    // modes. Values from BuildNatively docs (capitalized, case-sensitive):
+    //   'Dark'  → white/light icons  (use when app background is dark)
+    //   'Light' → dark/black icons   (use when app background is light)
+    // We use natively.addObserver() rather than calling the methods directly:
+    // addObserver() runs immediately if the native bridge is already injected,
+    // or queues the call until the bridge fires notify() — correctly handling
+    // the race between the async CDN script, the native bridge initialisation,
+    // and React's first render.  Calling the methods directly (as before) meant
+    // the trigger was sometimes queued inside the shim but never drained because
+    // notify() had already fired before the CDN script reset window.natively.
     const bgColor = effectiveTheme === 'dark' ? '#000000' : '#ffffff';
     const barStyle = effectiveTheme === 'dark' ? 'Dark' : 'Light';
-    const applyNativelyTheme = () => {
-      const nat = (window as any).natively;
-      if (!nat) return false;
+    const nat = (window as any).natively;
+    if (nat) {
       try {
-        nat.setAppBackgroundColor?.(bgColor);
-        nat.setAppStatusBarStyle?.(barStyle);
-        return true;
+        nat.addObserver(() => {
+          console.log('[Theme] Natively sync — theme:', effectiveTheme, '| barStyle:', barStyle, '| bgColor:', bgColor);
+          nat.setAppBackgroundColor?.(bgColor);
+          nat.setAppStatusBarStyle?.(barStyle);
+        });
       } catch (err) {
-        console.warn('[Theme] Natively theme sync failed:', err);
-        return false;
+        console.warn('[Theme] Natively addObserver failed:', err);
       }
-    };
-    let intervalId: number | undefined;
-    if (!applyNativelyTheme()) {
-      // The Natively CDN script loads asynchronously; if the bridge isn't
-      // ready yet, retry briefly so the very first render still gets themed.
-      let attempts = 0;
-      intervalId = window.setInterval(() => {
-        attempts += 1;
-        if (applyNativelyTheme() || attempts >= 20) {
-          window.clearInterval(intervalId);
-        }
-      }, 150);
     }
 
     // Only persist a user-driven preference, not the desktop override, so
@@ -79,9 +67,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('theme', theme);
     }
 
-    return () => {
-      if (intervalId !== undefined) window.clearInterval(intervalId);
-    };
   }, [effectiveTheme, theme, isDesktopWeb]);
 
   const toggleTheme = () => {
