@@ -72,7 +72,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // the trigger was sometimes queued inside the shim but never drained because
     // notify() had already fired before the CDN script reset window.natively.
     const bgColor = effectiveTheme === 'dark' ? '#000000' : '#ffffff';
-    const barStyle = effectiveTheme === 'dark' ? 'Dark' : 'Light';
+    // Status bar icons on this device are always white, so keep style 'Dark'
+    // (white icons) regardless of app theme. The App Background Color fills
+    // the Safe Area space and will match the theme automatically via bgColor.
+    const barStyle = 'Dark';
     const nat = (window as any).natively;
     if (nat) {
       try {
