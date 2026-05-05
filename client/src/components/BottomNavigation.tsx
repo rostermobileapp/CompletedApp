@@ -119,7 +119,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
       className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-[100]" 
       data-testid="bottom-navigation" 
       style={{ 
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: 'var(--native-inset-bottom, env(safe-area-inset-bottom, 0px))',
         minHeight: '60px'
       }}
     >

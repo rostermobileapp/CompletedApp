@@ -26,6 +26,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // the native (Capacitor/Natively) wrappers keep their stored preference.
   const effectiveTheme: Theme = isDesktopWeb ? 'light' : theme;
 
+  // One-time: ask the Natively native bridge for the actual system inset
+  // sizes (status-bar height at top, gesture-nav height at bottom) and bake
+  // them into CSS custom properties so the layout can push content clear of
+  // the system bars without relying on env(safe-area-inset-*), which returns
+  // 0 inside a Natively WebView when Safe Area is disabled in the dashboard.
+  useEffect(() => {
+    const nat = (window as any).natively;
+    if (!nat) return;
+    try {
+      nat.addObserver(() => {
+        nat.getInsets((insets: { top?: number; bottom?: number; left?: number; right?: number }) => {
+          const top = insets?.top ?? 0;
+          const bottom = insets?.bottom ?? 0;
+          console.log('[Theme] Natively insets — top:', top, 'bottom:', bottom);
+          const root = document.documentElement;
+          root.style.setProperty('--native-inset-top', `${top}px`);
+          root.style.setProperty('--native-inset-bottom', `${bottom}px`);
+        });
+      });
+    } catch (err) {
+      console.warn('[Theme] Natively getInsets failed:', err);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount — insets don't change during a session
+
   useEffect(() => {
     const root = document.documentElement;
     if (effectiveTheme === 'dark') {

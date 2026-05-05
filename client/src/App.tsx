@@ -305,7 +305,7 @@ function Router() {
             <PageTransition>{routesSwitch}</PageTransition>
           </DesktopAppShell>
         ) : (
-          <div className="min-h-screen w-full bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="min-h-screen w-full bg-background" style={{ paddingTop: 'var(--native-inset-top, 0px)' }}>
             <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
               <SlideOutMenu />
               <ActiveDraftsBanner />
