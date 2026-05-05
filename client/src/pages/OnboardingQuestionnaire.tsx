@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
 const TOTAL_STEPS = 9;
@@ -25,6 +25,7 @@ interface QuestionnaireState {
   features: string[];
   otherSports: string[];
   otherSportCustom: string;
+  referralCode: string;
 }
 
 const GOALS = [
@@ -93,7 +94,11 @@ export default function OnboardingQuestionnaire() {
     features: [],
     otherSports: [],
     otherSportCustom: '',
+    referralCode: '',
   });
+  const [referralStatus, setReferralStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  const [referralOrgName, setReferralOrgName] = useState('');
+  const referralTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [processingDone, setProcessingDone] = useState(false);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -553,6 +558,66 @@ export default function OnboardingQuestionnaire() {
                   className="mt-3 w-full px-4 py-2.5 rounded-xl border-2 border-[#3c82f4] bg-blue-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
                   autoFocus
                 />
+              )}
+            </div>
+
+            {/* Referral code field */}
+            <div className="mb-6">
+              <p className="text-sm font-semibold text-gray-700 mb-1">Referred by an organization? <span className="font-normal text-gray-400">(optional)</span></p>
+              <p className="text-xs text-gray-400 mb-2">Enter the code your hockey association or league gave you.</p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={state.referralCode}
+                  onChange={e => {
+                    const code = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    setState(prev => ({ ...prev, referralCode: code }));
+                    setReferralStatus('idle');
+                    setReferralOrgName('');
+                    if (referralTimerRef.current) clearTimeout(referralTimerRef.current);
+                    if (code.length >= 3) {
+                      setReferralStatus('checking');
+                      referralTimerRef.current = setTimeout(async () => {
+                        try {
+                          const res = await fetch(`/api/referral/validate-code?code=${encodeURIComponent(code)}`);
+                          const data = await res.json();
+                          if (res.ok && data.valid) {
+                            setReferralStatus('valid');
+                            setReferralOrgName(data.orgName || '');
+                            // Persist for native RevenueCat subscriber attributes
+                            try { localStorage.setItem('pendingReferralCode', code); } catch {}
+                          } else {
+                            setReferralStatus('invalid');
+                          }
+                        } catch {
+                          setReferralStatus('idle');
+                        }
+                      }, 600);
+                    }
+                  }}
+                  placeholder="e.g. GCHA2024"
+                  maxLength={20}
+                  className={`w-full px-4 py-3 pr-10 border-2 rounded-xl text-sm font-mono uppercase tracking-widest focus:outline-none transition-colors ${
+                    referralStatus === 'valid'
+                      ? 'border-green-400 bg-green-50 text-green-900'
+                      : referralStatus === 'invalid'
+                      ? 'border-red-300 bg-red-50 text-red-900'
+                      : 'border-gray-200 bg-white text-gray-900 focus:border-[#3c82f4]'
+                  }`}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {referralStatus === 'checking' && (
+                    <div className="w-4 h-4 border-2 border-[#3c82f4] border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {referralStatus === 'valid' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                  {referralStatus === 'invalid' && <XCircle className="w-5 h-5 text-red-400" />}
+                </div>
+              </div>
+              {referralStatus === 'valid' && referralOrgName && (
+                <p className="text-xs text-green-600 font-medium mt-1.5">✓ Verified — {referralOrgName}</p>
+              )}
+              {referralStatus === 'invalid' && (
+                <p className="text-xs text-red-500 mt-1.5">Code not recognized. Double-check and try again.</p>
               )}
             </div>
 

@@ -82,6 +82,10 @@ import TeamView from "@/pages/TeamView";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
+import ReferralProgram from "@/pages/ReferralProgram";
+import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
+import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
+import ReferralPortal from "@/pages/ReferralPortal";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -200,6 +204,10 @@ function Router() {
           <Route path="/support" component={Support} />
           <Route path="/facilities" component={FacilityBrowse} />
           <Route path="/facilities/:id" component={FacilityDetail} />
+          <Route path="/referral-program/portal/auth" component={ReferralPortalAuth} />
+          <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
+          <Route path="/referral-program/portal" component={ReferralPortal} />
+          <Route path="/referral-program" component={ReferralProgram} />
           <Route component={Landing} />
         </Switch>
       </>
@@ -284,6 +292,10 @@ function Router() {
               <Route path="/media/tournament/:id" component={MediaGalleryPage} />
               <Route path="/media/league/:id" component={MediaGalleryPage} />
               <Route path="/media/team/:id" component={MediaGalleryPage} />
+              <Route path="/referral-program/portal/auth" component={ReferralPortalAuth} />
+              <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
+              <Route path="/referral-program/portal" component={ReferralPortal} />
+              <Route path="/referral-program" component={ReferralProgram} />
               <Route path="/privacy" component={Privacy} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />

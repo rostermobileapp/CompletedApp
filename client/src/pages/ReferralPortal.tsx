@@ -1,0 +1,389 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, Link } from 'wouter';
+import {
+  Copy, Check, LogOut, TrendingUp, Users, DollarSign,
+  ChevronLeft, ChevronRight, Loader2, AlertCircle,
+} from 'lucide-react';
+import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
+
+interface PartnerMe {
+  partner: {
+    orgName: string;
+    contactName: string;
+    referralCode: string;
+    payoutRate: number;
+    platformFeePercent: number;
+  };
+  stats: {
+    totalConversions: number;
+    activeSubscribers: number;
+    byTier: Record<string, number>;
+    byPlatform: Record<string, number>;
+    estimatedQuarterlyEarnings: number;
+  };
+  conversions: Array<{
+    id: string;
+    convertedAt: string;
+    tier: string;
+    platform: string;
+    grossPrice: number;
+    netContribution: number;
+    estimatedEarnings: number;
+    status: string;
+  }>;
+  payouts: Array<{
+    id: string;
+    periodStart: string;
+    periodEnd: string;
+    totalEarnings: number;
+    status: string;
+    paidAt: string | null;
+  }>;
+}
+
+const CONVERSIONS_PER_PAGE = 10;
+
+function StatCard({ label, value, icon: Icon, sub }: {
+  label: string;
+  value: string | number;
+  icon: typeof TrendingUp;
+  sub?: string;
+}) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-9 h-9 rounded-xl bg-[#3c82f4]/10 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-[#3c82f4]" />
+        </div>
+        <span className="text-sm font-medium text-gray-500">{label}</span>
+      </div>
+      <p className="text-2xl font-black text-gray-900">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+function CopyableCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-[#3c82f4]/10 to-blue-50 border border-[#3c82f4]/20 rounded-2xl p-6">
+      <p className="text-sm font-semibold text-gray-600 mb-3">Your Referral Code</p>
+      <div className="flex items-center gap-3">
+        <span className="text-3xl font-black tracking-widest text-[#3c82f4] font-mono flex-1">
+          {code}
+        </span>
+        <button
+          onClick={copy}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3c82f4] text-white text-sm font-semibold hover:bg-[#3c82f4]/90 transition-colors"
+        >
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      <p className="text-xs text-gray-400 mt-3">
+        Share this code with players signing up for Roster. Earnings are tracked automatically.
+      </p>
+    </div>
+  );
+}
+
+export default function ReferralPortal() {
+  const [, setLocation] = useLocation();
+  const [convPage, setConvPage] = useState(1);
+
+  const { data, isLoading, isError, error } = useQuery<PartnerMe>({
+    queryKey: ['/api/referral/portal/me'],
+    queryFn: async () => {
+      const res = await fetch('/api/referral/portal/me', { credentials: 'include' });
+      if (res.status === 401) {
+        setLocation('/referral-program/portal/login');
+        throw new Error('Unauthorized');
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as any).message || 'Failed to load portal');
+      }
+      return res.json();
+    },
+    retry: false,
+    staleTime: 30000,
+  });
+
+  async function handleLogout() {
+    await fetch('/api/referral/portal/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    setLocation('/referral-program/portal/login');
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#3c82f4] animate-spin" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    const msg = (error as Error)?.message;
+    if (msg === 'Unauthorized') return null;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white border border-red-200 rounded-2xl p-8 text-center max-w-sm">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <p className="font-semibold text-gray-900 mb-2">Failed to load portal</p>
+          <p className="text-sm text-gray-500 mb-4">{msg}</p>
+          <Link href="/referral-program/portal/login" className="text-sm text-[#3c82f4] hover:underline">
+            Sign in again
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { partner, stats, conversions, payouts } = data!;
+  const totalConvPages = Math.max(1, Math.ceil(conversions.length / CONVERSIONS_PER_PAGE));
+  const convSlice = conversions.slice((convPage - 1) * CONVERSIONS_PER_PAGE, convPage * CONVERSIONS_PER_PAGE);
+  const quarterlyEst = stats.estimatedQuarterlyEarnings ?? 0;
+
+  function fmt(n: number) {
+    return `$${n.toFixed(2)}`;
+  }
+  function fmtDate(s: string) {
+    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={rosterLightLogo} alt="Roster" className="h-7 object-contain" />
+            <span className="text-sm text-gray-400">Partner Portal</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 hidden sm:block">{partner.orgName}</span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              <LogOut className="w-4 h-4" /> Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+        {/* Welcome + code */}
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 mb-1">
+            Welcome back, {partner.contactName.split(' ')[0]}
+          </h1>
+          <p className="text-sm text-gray-500 mb-5">Here's your referral program overview.</p>
+          <CopyableCode code={partner.referralCode} />
+        </div>
+
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Total Referred" value={stats.totalConversions} icon={Users} sub="all time" />
+          <StatCard label="Active Subscribers" value={stats.activeSubscribers} icon={TrendingUp} sub="currently active" />
+          <StatCard
+            label="Est. Quarterly Payout"
+            value={fmt(quarterlyEst)}
+            icon={DollarSign}
+            sub={`${partner.payoutRate}% payout rate`}
+          />
+          <StatCard
+            label="Payout Rate"
+            value={`${partner.payoutRate}%`}
+            icon={TrendingUp}
+            sub="of net revenue"
+          />
+        </div>
+
+        {/* Breakdown cards */}
+        {(Object.keys(stats.byTier ?? {}).length > 0 || Object.keys(stats.byPlatform ?? {}).length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.keys(stats.byTier ?? {}).length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">By Subscription Tier</h3>
+                <div className="space-y-2">
+                  {Object.entries(stats.byTier).map(([tier, count]) => (
+                    <div key={tier} className="flex items-center justify-between text-sm">
+                      <span className="capitalize text-gray-700">{tier.replace(/_/g, ' ')}</span>
+                      <span className="font-semibold text-gray-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Object.keys(stats.byPlatform ?? {}).length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">By Platform</h3>
+                <div className="space-y-2">
+                  {Object.entries(stats.byPlatform).map(([platform, count]) => (
+                    <div key={platform} className="flex items-center justify-between text-sm">
+                      <span className="capitalize text-gray-700">{platform}</span>
+                      <span className="font-semibold text-gray-900">{count as number}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quarterly payout estimate card */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-gray-700 mb-1">Estimated Quarterly Payout</h3>
+          <p className="text-3xl font-black text-[#3c82f4] mb-2">{fmt(quarterlyEst)}</p>
+          <p className="text-xs text-gray-400 mb-3">
+            Calculated as: (active subscribers × avg monthly subscription price × {100 - partner.platformFeePercent}% net) × {partner.payoutRate}% payout rate × 3 months.
+            Payouts are made quarterly and are subject to final review.
+          </p>
+          <p className="text-xs text-gray-300 italic">
+            Disclaimer: Estimated earnings are approximate. Actual payouts may differ due to refunds, chargebacks, or adjustments.
+          </p>
+        </div>
+
+        {/* Payout history */}
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700">Payout History</h3>
+          </div>
+          {payouts.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">
+              No payouts yet. Your first payout will appear here after the first quarter.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-5 py-3 font-semibold text-gray-600">Period</th>
+                    <th className="text-right px-5 py-3 font-semibold text-gray-600">Amount</th>
+                    <th className="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
+                    <th className="text-right px-5 py-3 font-semibold text-gray-600">Paid On</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {payouts.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3 text-gray-700">
+                        {fmtDate(p.periodStart)} – {fmtDate(p.periodEnd)}
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold text-gray-900">{fmt(p.totalEarnings)}</td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          p.status === 'paid' ? 'bg-green-100 text-green-700' :
+                          p.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right text-gray-500">
+                        {p.paidAt ? fmtDate(p.paidAt) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Conversion history */}
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700">Conversion History</h3>
+            <span className="text-xs text-gray-400">{conversions.length} total</span>
+          </div>
+          {conversions.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">
+              No conversions yet. Share your referral code to start earning.
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left px-5 py-3 font-semibold text-gray-600">Date</th>
+                      <th className="text-left px-5 py-3 font-semibold text-gray-600">Tier</th>
+                      <th className="text-left px-5 py-3 font-semibold text-gray-600">Platform</th>
+                      <th className="text-right px-5 py-3 font-semibold text-gray-600">Gross</th>
+                      <th className="text-right px-5 py-3 font-semibold text-gray-600">Net</th>
+                      <th className="text-right px-5 py-3 font-semibold text-gray-600">Est. Earnings</th>
+                      <th className="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {convSlice.map(c => (
+                      <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-5 py-3 text-gray-700">{fmtDate(c.convertedAt)}</td>
+                        <td className="px-5 py-3 text-gray-700 capitalize">{c.tier?.replace(/_/g, ' ') || '—'}</td>
+                        <td className="px-5 py-3 text-gray-700 capitalize">{c.platform || '—'}</td>
+                        <td className="px-5 py-3 text-right text-gray-700">{c.grossPrice != null ? fmt(c.grossPrice) : '—'}</td>
+                        <td className="px-5 py-3 text-right text-gray-700">{c.netContribution != null ? fmt(c.netContribution) : '—'}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-[#3c82f4]">
+                          {c.estimatedEarnings != null ? fmt(c.estimatedEarnings) : '—'}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            c.status === 'active' ? 'bg-green-100 text-green-700' :
+                            c.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                            c.status === 'refunded' ? 'bg-orange-100 text-orange-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {c.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalConvPages > 1 && (
+                <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    Page {convPage} of {totalConvPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConvPage(p => Math.max(1, p - 1))}
+                      disabled={convPage === 1}
+                      className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setConvPage(p => Math.min(totalConvPages, p + 1))}
+                      disabled={convPage === totalConvPages}
+                      className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-gray-300 pb-4">
+          Questions? Contact us at{' '}
+          <a href="mailto:support@rosterapp.co" className="text-[#3c82f4] hover:underline">support@rosterapp.co</a>
+        </p>
+      </div>
+    </div>
+  );
+}

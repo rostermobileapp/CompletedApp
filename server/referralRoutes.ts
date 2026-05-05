@@ -379,7 +379,7 @@ export function registerReferralRoutes(app: Express) {
       const appUrl = getAppUrl();
       // Link targets the backend auth endpoint directly; that endpoint sets
       // the session cookie and redirects the browser to the partner portal.
-      const magicLink = `${appUrl}/api/referral/portal/auth?token=${token}`;
+      const magicLink = `${appUrl}/referral-program/portal/auth?token=${token}`;
       const magicLinkSettings = await getSettings();
       await sendMagicLinkEmail(
         email,
