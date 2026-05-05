@@ -1,0 +1,97 @@
+GOAL
+Restrict the "Subscribe via Roster" (Stripe checkout) button to DESKTOP BROWSER users only. Hide it everywhere else.
+
+PLATFORM-SPECIFIC PAYWALL BEHAVIOR — final state
+
+iOS (Natively WebView wrapper):
+- Show: "Subscribe via App Store" only
+- Hide: "Subscribe via Roster" button
+- Hide: Any external payment links
+
+Android (Natively WebView wrapper):
+- Show: "Subscribe via Google Play" only
+- Hide: "Subscribe via Roster" button
+- Hide: Any external payment links
+
+Mobile web browser (user opens roster website on phone Chrome/Safari, NOT in the wrapped app):
+- Show: "Subscribe via Roster" button only
+- This is desktop-class web checkout, just on a small screen — Stripe is allowed
+
+Desktop browser (Chrome/Safari/Firefox on Mac/Windows/Linux):
+- Show: "Subscribe via Roster" button only
+- Existing behavior — no changes
+
+WHY THIS MATTERS
+- Apple App Store and Google Play both restrict external payment links inside their wrapped apps
+- Showing "Subscribe via Roster" inside the iOS or Android app is a policy violation that risks app removal
+- Web users (mobile or desktop) are not subject to App Store / Play Store rules — Stripe is fine there
+
+DETECTION LOGIC
+The existing useIosPlatform.ts hook detects isIos and isAndroid based on the Natively WebView wrapper. Use this hook as the source of truth.
+
+Logic should be:
+- If isIos === true → wrapped iOS app → hide Roster button
+- If isAndroid === true → wrapped Android app → hide Roster button
+- If neither → web browser (mobile or desktop) → show Roster button
+
+Do NOT branch on screen size, viewport width, or user-agent mobile detection. The distinction is wrapped-app vs web-browser, not mobile vs desktop. A user on Chrome on their iPhone should see the Roster button. A user inside the iOS wrapped app should not.
+
+UX REQUIREMENTS — make this smooth
+
+1. Layout consistency
+   - Don't leave a gap or empty space where the hidden button used to be
+   - The remaining single button should be styled as the primary CTA (currently the App Store / Google Play buttons are secondary outline-style — promote them to primary blue when they're the only option)
+
+2. Single-button card layout
+   - When only one subscribe button is shown, center it and make it visually prominent
+   - The price next to the button can either move directly under the button or stay inline — pick whichever looks cleaner with one button instead of two
+
+3. Free Tier card cleanup
+   - Currently the Free Tier card shows "Manage via Play Store → Profile → Payments & subscriptions"
+   - This text should NOT appear on the Free Tier card at all (free users have nothing to manage)
+   - This text SHOULD appear on the paid tier cards (Player Pro, Commissioner) ONLY when the user is on iOS or Android, with platform-correct wording:
+     - iOS: "Manage via App Store → Settings → Subscriptions"
+     - Android: "Manage via Play Store → Profile → Payments & subscriptions"
+     - Web: do not show this text — web users manage via the Roster account settings page
+   - Place this text below the subscribe button on each paid tier card, in small gray text
+
+4. Pricing display when only one button shows
+   - On iOS: the App Store price is the only price — show it as the headline price on the card. Remove any reference to the Roster web price.
+   - On Android: the Google Play price is the only price — show it as the headline price on the card. Remove any reference to the Roster web price.
+   - On web: show only the Roster web price as the headline. Remove any App Store / Google Play comparison.
+   - In other words: each platform shows ONE price — the one the user can actually pay. No price comparisons across stores.
+
+5. Card uniformity
+   - Both Player Pro and Commissioner cards should follow the exact same pattern
+   - Same button styling, same placement, same management text below
+   - Test that the cards still look balanced when only one button is rendered
+
+FILES TO TOUCH
+- client/src/pages/Subscription.tsx (main paywall component)
+- Any subscription card sub-components used by Subscription.tsx
+- Possibly client/src/hooks/useIosPlatform.ts ONLY if the existing detection logic doesn't reliably differentiate "wrapped app" from "mobile web browser"
+
+DO NOT TOUCH
+- The actual Stripe checkout flow code
+- The actual App Store StoreKit / Natively call code
+- The actual Google Play purchase code (whatever state it's in)
+- useIosPlatform.ts unless the detection logic itself is broken
+- Server-side code
+- Any pricing values or product IDs
+- The rest of the Subscription page (navigation, billing toggle, account section, etc.)
+
+DELIVERABLES
+1. List of every file changed with one-line description
+2. Confirmation of what each platform now shows:
+   - iOS app: only "Subscribe via App Store" + iOS management text below
+   - Android app: only "Subscribe via Google Play" + Android management text below
+   - Mobile web browser: only "Subscribe via Roster" (Stripe)
+   - Desktop browser: only "Subscribe via Roster" (Stripe)
+3. Confirmation that the Stripe checkout cannot be reached by any code path inside the iOS or Android wrapped apps
+4. Any concerns about edge cases — e.g., users who somehow land on a stale build, users on uncommon devices
+
+START BY:
+1. Reading Subscription.tsx and the subscription card components
+2. Reading useIosPlatform.ts to confirm the detection logic differentiates wrapped-app from web-browser correctly
+3. Listing the files you plan to change
+4. WAIT for me to confirm before making changes
