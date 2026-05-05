@@ -3,7 +3,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, CheckCircle2, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import rosterLogo from '@assets/Roster-10_1775764992636.png';
 import { useLocation } from 'wouter';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -53,6 +53,18 @@ export default function Subscription() {
     tier: 'player_pro' | 'commissioner';
   } | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  // Ref tracking the promo-code pending poll so it can be cleared on unmount
+  const pendingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pendingPollRef.current !== null) {
+        clearInterval(pendingPollRef.current);
+        pendingPollRef.current = null;
+      }
+    };
+  }, []);
 
   // Confirmation shown when the user returns from a redirect-based Stripe
   // flow (billing-portal upgrade for existing subscribers, or any 3DS
@@ -543,13 +555,56 @@ export default function Subscription() {
         throw new Error((serverJson as any).message || 'Purchase completed but role sync failed. Please tap Restore Purchases.');
       }
 
-      // 202 = promo code accepted, payment pending — not yet activated
+      // 202 = promo code accepted, payment pending — not yet activated.
+      // Start a lightweight poll (every 30 s, max 10 attempts) that silently
+      // re-runs restorePurchasesAndroid() + verify-google. The first active
+      // response stops the poll, invalidates the user query, and shows a
+      // success toast so the page upgrades automatically.
       if (response.status === 202) {
         toast({
           title: 'Promo code accepted!',
           description: (serverJson as any).message ?? 'Your subscription will activate once payment is confirmed — check back in a few minutes.',
         });
         setIsLoading(false);
+
+        // Clear any existing poll before starting a new one
+        if (pendingPollRef.current !== null) {
+          clearInterval(pendingPollRef.current);
+        }
+        let attempts = 0;
+        const MAX_ATTEMPTS = 10;
+        pendingPollRef.current = setInterval(async () => {
+          attempts += 1;
+          try {
+            const purchases = await restorePurchasesAndroid();
+            for (const p of purchases) {
+              try {
+                const pollResponse = await apiRequest('POST', '/api/iap/verify-google', {
+                  purchaseToken: p.purchaseToken,
+                  productId: p.productIdentifier,
+                });
+                if (pollResponse.status === 202) continue;
+                const pollData = await pollResponse.json().catch(() => ({})) as { role?: string };
+                if (pollResponse.ok && pollData.role && pollData.role !== 'free_tier') {
+                  clearInterval(pendingPollRef.current!);
+                  pendingPollRef.current = null;
+                  queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+                  toast({ title: 'Subscription activated!', description: 'Your subscription has been applied to your account.' });
+                  return;
+                }
+              } catch {
+                // ignore individual token failures
+              }
+            }
+          } catch {
+            // silent — don't surface poll errors
+          }
+          if (attempts >= MAX_ATTEMPTS) {
+            clearInterval(pendingPollRef.current!);
+            pendingPollRef.current = null;
+          }
+        }, 30_000);
+
         return;
       }
 
