@@ -164,7 +164,7 @@ export default function ReferralProgram() {
               {
                 step: '01',
                 title: 'Apply',
-                desc: 'Fill out a short application telling us about your organization. We review it within 3–5 business days.',
+                  desc: 'Fill out a short application telling us about your organization. We review within 2 weeks.',
               },
               {
                 step: '02',
