@@ -798,10 +798,11 @@ export default function Profile() {
       {(() => {
         const currentPartnerId = (user as any)?.referralPartnerId as string | null | undefined;
         const currentOther = (user as any)?.referralSourceOther as string | null | undefined;
-        const isLocked = !!currentPartnerId;
-        const lockedPartner = isLocked
-          ? approvedPartners.find((p) => p.id === currentPartnerId)
+        const lockedPartner = currentPartnerId
+          ? approvedPartners.find((p) => p.id === currentPartnerId) ?? null
           : null;
+        // Only lock if the partner ID is set AND the partner still exists (not deleted by admin)
+        const isLocked = !!currentPartnerId && !!lockedPartner;
 
         const handleSave = () => {
           if (referralPickerId === 'other') {

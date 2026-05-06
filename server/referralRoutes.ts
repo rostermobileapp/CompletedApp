@@ -938,6 +938,8 @@ export function registerReferralRoutes(app: Express) {
       await db.delete(referralConversions).where(eq(referralConversions.partnerId, req.params.id));
       await db.delete(referralPayouts).where(eq(referralPayouts.partnerId, req.params.id));
       await db.delete(referralMagicLinks).where(eq(referralMagicLinks.partnerId, req.params.id));
+      // Clear referral attribution on any users who had this partner set
+      await db.update(users).set({ referralPartnerId: null }).where(eq(users.referralPartnerId, req.params.id));
       const [deleted] = await db
         .delete(referralPartners)
         .where(eq(referralPartners.id, req.params.id))
