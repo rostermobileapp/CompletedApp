@@ -178,7 +178,7 @@ export default function ReferralProgram() {
             <br /><br />
             No selling required — just share the app you already use.
             <br /><br />
-            Choose a good cause and track your referrals!
+            <span className="text-[#3c82f4]">Choose a good cause and track your referrals!</span>
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
