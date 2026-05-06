@@ -68,7 +68,7 @@ export async function sendNewApplicationAdminEmail(
             ${data.orgType ? `<tr><td style="padding:6px 0;font-size:14px;color:#6b7280;">Org Type</td><td style="padding:6px 0;font-size:14px;color:#111827;">${data.orgType}</td></tr>` : ''}
           </table>
         </div>
-        <a href="${appUrl}/admin/referrals" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Review Application</a>
+        <a href="https://www.roster-app.com/admin/referrals/login" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Review Application</a>
       `),
     });
     console.log(`[ReferralEmail] Sent new application admin notification for ${data.orgName}`);
