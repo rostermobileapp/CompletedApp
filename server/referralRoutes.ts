@@ -18,6 +18,7 @@ import {
 } from "@shared/schema";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
+import bcrypt from "bcryptjs";
 import multer from "multer";
 import {
   sendNewApplicationAdminEmail,
@@ -426,18 +427,67 @@ export function registerReferralRoutes(app: Express) {
       partnerSessions.set(sessionToken, partner.id);
       res.cookie("roster_partner_session", sessionToken, SESSION_COOKIE_OPTIONS);
 
-      // Redirect the browser to the partner portal page so clicking the email
-      // link lands the user on the portal UI (not a raw JSON response).
+      const needsPassword = !partner.passwordHash;
+
       // Accept header check: if the caller explicitly wants JSON (API client),
       // return JSON; otherwise redirect to the portal page.
       const wantsJson = (req.headers.accept || "").includes("application/json");
       if (wantsJson) {
-        return res.json({ success: true, partnerId: partner.id });
+        return res.json({ success: true, partnerId: partner.id, needsPassword });
       }
-      return res.redirect(302, `${getAppUrl()}/referral-program/portal`);
+      const dest = needsPassword
+        ? `${getAppUrl()}/referral-program/portal/set-password`
+        : `${getAppUrl()}/referral-program/portal`;
+      return res.redirect(302, dest);
     } catch (err) {
       console.error("[Referral] portal/auth error:", err);
       res.status(500).json({ message: "Authentication failed" });
+    }
+  });
+
+  // ── Partner portal: set password (requires active session) ───────────────
+  app.post("/api/referral/portal/set-password", requirePartnerAuth, async (req: Request, res: Response) => {
+    const { password } = req.body;
+    if (!password || typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+    try {
+      const partnerId = (req as any).partnerId as string;
+      const hash = await bcrypt.hash(password, 12);
+      await db
+        .update(referralPartners)
+        .set({ passwordHash: hash, updatedAt: new Date() })
+        .where(eq(referralPartners.id, partnerId));
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("[Referral] set-password error:", err);
+      return res.status(500).json({ message: "Failed to set password" });
+    }
+  });
+
+  // ── Partner portal: login with email + password ───────────────────────────
+  app.post("/api/referral/portal/login", async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ message: "Email and password are required" });
+    try {
+      const [partner] = await db
+        .select()
+        .from(referralPartners)
+        .where(and(eq(referralPartners.email, (email as string).toLowerCase().trim()), eq(referralPartners.status, "approved")))
+        .limit(1);
+      if (!partner || !partner.passwordHash) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      const valid = await bcrypt.compare(password as string, partner.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Invalid email or password" });
+
+      const sessionToken = generateSessionToken();
+      partnerSessions.set(sessionToken, partner.id);
+      res.cookie("roster_partner_session", sessionToken, SESSION_COOKIE_OPTIONS);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("[Referral] password-login error:", err);
+      return res.status(500).json({ message: "Login failed" });
     }
   });
 

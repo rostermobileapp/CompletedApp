@@ -27,7 +27,11 @@ export default function ReferralPortalAuth() {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          setLocation('/referral-program/portal');
+          if (data.needsPassword) {
+            setLocation('/referral-program/portal/set-password');
+          } else {
+            setLocation('/referral-program/portal');
+          }
         } else {
           setErrorMsg(data.message || 'This link has expired or is invalid. Please request a new one.');
           setStatus('error');

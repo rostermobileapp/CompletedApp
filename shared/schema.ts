@@ -3889,6 +3889,7 @@ export const referralPartners = pgTable("referral_partners", {
   referralCode: varchar("referral_code", { length: 20 }).unique(),
   payoutRate: decimal("payout_rate", { precision: 5, scale: 4 }).default("0.10").notNull(),
   adminNotes: text("admin_notes"),
+  passwordHash: text("password_hash"),
   approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
