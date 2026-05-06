@@ -375,10 +375,9 @@ export function registerReferralRoutes(app: Express) {
         expiresAt,
       });
 
-      const appUrl = getAppUrl();
       // Link targets the backend auth endpoint directly; that endpoint sets
       // the session cookie and redirects the browser to the partner portal.
-      const magicLink = `${appUrl}/referral-program/portal/auth?token=${token}`;
+      const magicLink = `https://www.roster-app.com/referral-program/portal/auth?token=${token}`;
       const magicLinkSettings = await getSettings();
       await sendMagicLinkEmail(
         email,
