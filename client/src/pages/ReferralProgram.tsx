@@ -301,7 +301,7 @@ export default function ReferralProgram() {
               <div className="bg-white rounded-xl border border-[#3c82f4]/20 p-5 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Estimated quarterly donation</p>
                 <p className="text-4xl font-black text-[#3c82f4]">
-                  ${(referrals * 5.51 * 3).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  ${(referrals * 5.51 * 3 * 0.10).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </p>
                 <p className="text-xs text-gray-400 mt-2">back to your community every quarter</p>
               </div>
