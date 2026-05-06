@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, Link } from 'wouter';
 import {
-  Copy, Check, LogOut, TrendingUp, Users, DollarSign,
+  LogOut, TrendingUp, Users, DollarSign,
   ChevronLeft, ChevronRight, Loader2, AlertCircle, Search, Download,
 } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
@@ -99,37 +99,6 @@ function StatCard({ label, value, icon: Icon, sub }: {
   );
 }
 
-function CopyableCode({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-
-  function copy() {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
-  return (
-    <div className="bg-gradient-to-br from-[#3c82f4]/10 to-blue-50 border border-[#3c82f4]/20 rounded-2xl p-6">
-      <p className="text-sm font-semibold text-gray-600 mb-3">Your Referral Code</p>
-      <div className="flex items-center gap-3">
-        <span className="text-3xl font-black tracking-widest text-[#3c82f4] font-mono flex-1">
-          {code}
-        </span>
-        <button
-          onClick={copy}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#3c82f4] text-white text-sm font-semibold hover:bg-[#3c82f4]/90 transition-colors"
-        >
-          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      </div>
-      <p className="text-xs text-gray-400 mt-3">
-        Share this code with players signing up for Roster. Earnings are tracked automatically.
-      </p>
-    </div>
-  );
-}
 
 export default function ReferralPortal() {
   const [, setLocation] = useLocation();
@@ -222,13 +191,12 @@ export default function ReferralPortal() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-        {/* Welcome + code */}
+        {/* Welcome */}
         <div>
           <h1 className="text-2xl font-black text-gray-900 mb-1">
             Welcome back, {partner.contactName.split(' ')[0]}
           </h1>
-          <p className="text-sm text-gray-500 mb-5">Here's your referral program overview.</p>
-          <CopyableCode code={partner.referralCode} />
+          <p className="text-sm text-gray-500">Here's your referral program overview.</p>
         </div>
 
         {/* Stat cards */}
@@ -466,7 +434,7 @@ export default function ReferralPortal() {
           </div>
           {conversions.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-gray-400">
-              No conversions yet. Share your referral code to start earning.
+              No conversions yet.
             </div>
           ) : (
             <>

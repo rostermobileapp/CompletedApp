@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, UserCheck, RefreshCw, Settings,
   ArrowRightLeft, DollarSign, LogOut, Search, ChevronUp, ChevronDown,
   ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText, Ban,
-  Download, Calendar, PauseCircle, Trash2, Pencil, Check, X, MailCheck, Link
+  Download, Calendar, PauseCircle, Trash2, MailCheck, Link
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -201,7 +201,6 @@ function DashboardTab() {
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left pb-2 text-gray-500 font-medium">Org</th>
-                  <th className="text-left pb-2 text-gray-500 font-medium">Code</th>
                   <th className="text-right pb-2 text-gray-500 font-medium">Conversions</th>
                 </tr>
               </thead>
@@ -209,7 +208,6 @@ function DashboardTab() {
                 {data.top5Partners.map((p) => (
                   <tr key={p.id} className="border-b border-gray-50 last:border-0">
                     <td className="py-1.5 font-medium text-gray-800">{p.orgName}</td>
-                    <td className="py-1.5 font-mono text-xs text-gray-500">{p.referralCode}</td>
                     <td className="py-1.5 text-right font-semibold text-blue-600">{p.quarterConversions}</td>
                   </tr>
                 ))}
@@ -260,9 +258,6 @@ function ApplicationsTab() {
   const [newRate, setNewRate] = useState("");
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [editNotes, setEditNotes] = useState("");
-  const [editCodeModal, setEditCodeModal] = useState<Partner | null>(null);
-  const [newCode, setNewCode] = useState("");
-  const [savingCode, setSavingCode] = useState(false);
   const [deleteModal, setDeleteModal] = useState<Partner | null>(null);
   const [resendRejectionModal, setResendRejectionModal] = useState<Partner | null>(null);
   const [resendRejectionReason, setResendRejectionReason] = useState("");
@@ -337,25 +332,6 @@ function ApplicationsTab() {
     }
   }
 
-  async function saveReferralCode() {
-    if (!editCodeModal) return;
-    const code = newCode.trim().toUpperCase();
-    if (!code) { toast({ title: "Code cannot be empty", variant: "destructive" }); return; }
-    setSavingCode(true);
-    const res = await adminFetch(`/api/admin/referrals/partners/${editCodeModal.id}/referral-code`, {
-      method: "PATCH",
-      body: JSON.stringify({ referralCode: code }),
-    });
-    setSavingCode(false);
-    if (res.ok) {
-      toast({ title: "Referral code updated" });
-      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
-      setEditCodeModal(null);
-    } else {
-      const d = await res.json();
-      toast({ title: d.message || "Failed to update code", variant: "destructive" });
-    }
-  }
 
   async function deletePartner(id: string) {
     const res = await adminFetch(`/api/admin/referrals/partners/${id}`, { method: "DELETE" });
@@ -514,9 +490,6 @@ function ApplicationsTab() {
                         )}
                         {app.status === "approved" && (
                           <>
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setEditCodeModal(app); setNewCode(app.referralCode || ""); }}>
-                              <Pencil className="w-3 h-3 mr-1" />Code
-                            </Button>
                             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setPayoutRateModal(app); setNewRate(app.payoutRate); }}>
                               <DollarSign className="w-3 h-3 mr-1" />Rate
                             </Button>
@@ -563,12 +536,6 @@ function ApplicationsTab() {
                   <Label className="text-gray-500">Hockey Affiliation</Label>
                   <p className="mt-0.5">{selected.hockeyAffiliation || "—"}</p>
                 </div>
-                {selected.referralCode && (
-                  <div>
-                    <Label className="text-gray-500">Referral Code</Label>
-                    <p className="mt-0.5 font-mono font-bold text-blue-600">{selected.referralCode}</p>
-                  </div>
-                )}
                 <div><Label className="text-gray-500">Payout Rate</Label><p className="mt-0.5">{(parseFloat(selected.payoutRate) * 100).toFixed(0)}%</p></div>
                 <div><Label className="text-gray-500">Applied</Label><p className="mt-0.5">{fmtDate(selected.createdAt)}</p></div>
                 {selected.approvedAt && (
@@ -610,9 +577,6 @@ function ApplicationsTab() {
                     </Button>
                     <Button variant="outline" disabled={resendingEmail === `login-${selected.id}`} onClick={() => resendLogin(selected.id)}>
                       {resendingEmail === `login-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Link className="w-4 h-4 mr-2" />}Send Password Reset
-                    </Button>
-                    <Button variant="outline" onClick={() => { setEditCodeModal(selected); setNewCode(selected.referralCode || ""); setSelected(null); }}>
-                      <Pencil className="w-4 h-4 mr-2" />Edit Code
                     </Button>
                     <Button variant="outline" onClick={() => { setPayoutRateModal(selected); setNewRate(selected.payoutRate); setSelected(null); }}>
                       <DollarSign className="w-4 h-4 mr-2" />Edit Payout Rate
@@ -687,35 +651,6 @@ function ApplicationsTab() {
               onClick={resendRejection}
             >
               {resendingEmail ? <><RefreshCw className="w-3 h-3 animate-spin mr-1.5" />Sending…</> : <><MailCheck className="w-4 h-4 mr-1.5" />Send Email</>}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit referral code modal */}
-      <Dialog open={!!editCodeModal} onOpenChange={() => setEditCodeModal(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Referral Code — {editCodeModal?.orgName}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>New Referral Code (3–16 alphanumeric characters)</Label>
-            <Input
-              className="font-mono uppercase"
-              value={newCode}
-              onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-              maxLength={16}
-              placeholder="e.g. MYCOURT25"
-              onKeyDown={(e) => { if (e.key === "Enter") saveReferralCode(); }}
-            />
-            <p className="text-xs text-gray-400">Letters and numbers only. Will be stored in UPPERCASE.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditCodeModal(null)}>Cancel</Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" disabled={savingCode} onClick={saveReferralCode}>
-              {savingCode ? <><RefreshCw className="w-3 h-3 animate-spin mr-1.5" />Saving…</> : <>
-                <Check className="w-4 h-4 mr-1.5" />Save Code
-              </>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -832,7 +767,6 @@ function AllPartnersTab() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <Th col="orgName" label="Org Name" />
-                  <Th col="referralCode" label="Code" />
                   <Th col="approvedAt" label="Approved" />
                   <Th col="activeConversions" label="Active Conv." />
                   <Th col="quarterConversions" label="Qtr Conv." />
@@ -853,7 +787,6 @@ function AllPartnersTab() {
                     onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}
                   >
                     <td className="px-4 py-3 font-medium text-gray-800">{p.orgName}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-blue-600">{p.referralCode ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{fmtDate(p.approvedAt)}</td>
                     <td className="px-4 py-3 text-center">{p.activeConversions ?? 0}</td>
                     <td className="px-4 py-3 text-center">{p.quarterConversions ?? 0}</td>
@@ -972,7 +905,6 @@ function ConversionsTab() {
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Date</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Partner</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Code</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">User ID</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Tier</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Platform</th>
@@ -987,7 +919,6 @@ function ConversionsTab() {
                   <tr key={c.id} className="border-b border-gray-50 last:border-0">
                     <td className="px-4 py-2.5 text-xs text-gray-400">{fmtDate(c.convertedAt)}</td>
                     <td className="px-4 py-2.5 font-medium text-gray-700">{c.partnerOrgName}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{c.referralCode}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-gray-400 hidden md:table-cell">{c.userId || "—"}</td>
                     <td className="px-4 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{c.tier || "—"}</td>
                     <td className="px-4 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{c.platform || "—"}</td>
@@ -1106,7 +1037,6 @@ function PayoutsTab() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">Partner</th>
-                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Code</th>
                     <th className="text-right px-4 py-3 text-gray-500 font-medium">Conv.</th>
                     <th className="text-right px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Gross Rev.</th>
                     <th className="text-right px-4 py-3 text-gray-500 font-medium">Rate</th>
@@ -1119,7 +1049,6 @@ function PayoutsTab() {
                   {(owed?.rows ?? []).map((row) => (
                     <tr key={row.partner.id} className="border-b border-gray-50 last:border-0">
                       <td className="px-4 py-2.5 font-medium text-gray-800">{row.partner.orgName}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-blue-600 hidden sm:table-cell">{row.partner.referralCode}</td>
                       <td className="px-4 py-2.5 text-right">{row.quarterConversions}</td>
                       <td className="px-4 py-2.5 text-right hidden md:table-cell">{fmt$(row.grossRevenueCents)}</td>
                       <td className="px-4 py-2.5 text-right">{(row.payoutRate * 100).toFixed(0)}%</td>
@@ -1485,7 +1414,7 @@ function ReportsTab() {
               <SelectItem value="all">All Partners</SelectItem>
               {(partners ?? []).map((p) => (
                 <SelectItem key={p.id} value={p.id}>
-                  {p.orgName} {p.referralCode ? `(${p.referralCode})` : ""}
+                  {p.orgName}
                 </SelectItem>
               ))}
             </SelectContent>
