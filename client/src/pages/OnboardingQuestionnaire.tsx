@@ -574,6 +574,8 @@ export default function OnboardingQuestionnaire() {
                     setState(prev => ({ ...prev, referralCode: code }));
                     setReferralStatus('idle');
                     setReferralOrgName('');
+                    // Clear stored code immediately when field changes to non-valid state
+                    try { localStorage.removeItem('pendingReferralCode'); } catch {}
                     if (referralTimerRef.current) clearTimeout(referralTimerRef.current);
                     if (code.length >= 3) {
                       setReferralStatus('checking');
@@ -588,6 +590,8 @@ export default function OnboardingQuestionnaire() {
                             try { localStorage.setItem('pendingReferralCode', code); } catch {}
                           } else {
                             setReferralStatus('invalid');
+                            // Ensure no stale code survives a failed validation
+                            try { localStorage.removeItem('pendingReferralCode'); } catch {}
                           }
                         } catch {
                           setReferralStatus('idle');
@@ -623,18 +627,36 @@ export default function OnboardingQuestionnaire() {
 
             <button
               onClick={async () => {
+                const saves: Promise<void>[] = [];
+
                 if (state.otherSports.length > 0) {
-                  try {
-                    await fetch('/api/onboarding-sport-poll', {
+                  saves.push(
+                    fetch('/api/onboarding-sport-poll', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         sports: state.otherSports,
                         otherSportText: state.otherSports.includes('other') ? state.otherSportCustom || null : null,
                       }),
-                    });
-                  } catch (_) {}
+                    }).then(() => {}).catch(() => {})
+                  );
                 }
+
+                // Persist validated referral code to user profile (authenticated users only)
+                if (referralStatus === 'valid' && state.referralCode) {
+                  saves.push(
+                    fetch('/api/user/onboarding', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({
+                        onboardingProgress: { referralCode: state.referralCode },
+                      }),
+                    }).then(() => {}).catch(() => {})
+                  );
+                }
+
+                await Promise.all(saves);
                 goTo('processing');
               }}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
