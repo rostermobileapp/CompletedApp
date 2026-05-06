@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
@@ -921,25 +921,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
       if (role !== undefined) updateData.role = role;
 
-      // Referral tracking — upsert/delete referral_user_links
+      // Referral tracking — replace or clear referral_user_links for this user
       if (clearReferral) {
         updateData.referralPartnerId = null;
         updateData.referralSourceOther = null;
         updateData.referralCode = null;
         await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
       } else if (referralPartnerId) {
-        updateData.referralPartnerId = referralPartnerId;
-        if (referralSourceOther !== undefined) updateData.referralSourceOther = referralSourceOther;
-        // Upsert into referral_user_links (ignore if already exists for this partner/user pair)
-        await db
-          .insert(referralUserLinks)
-          .values({
+        // Look up the partner to get their referral code (for backward compat + RC attributes)
+        const [partnerRow] = await db
+          .select({ id: referralPartners.id, referralCode: referralPartners.referralCode })
+          .from(referralPartners)
+          .where(eq(referralPartners.id, referralPartnerId))
+          .limit(1);
+
+        if (partnerRow) {
+          updateData.referralPartnerId = referralPartnerId;
+          updateData.referralCode = partnerRow.referralCode || null;
+          if (referralSourceOther !== undefined) updateData.referralSourceOther = referralSourceOther;
+          // Delete any prior link for this user (handles partner switches), then insert fresh
+          await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
+          await db.insert(referralUserLinks).values({
             userId,
             referralPartnerId,
             referralSourceOther: referralSourceOther || null,
             isPaid: false,
-          })
-          .onConflictDoNothing();
+          });
+        }
       } else if (referralCode !== undefined) {
         updateData.referralCode = referralCode;
       }

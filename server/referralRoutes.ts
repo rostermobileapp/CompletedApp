@@ -15,6 +15,7 @@ import {
   referralMagicLinks,
   referralSettings,
   referralUserLinks,
+  users,
   type ReferralPartner,
 } from "@shared/schema";
 import { createClient } from "@supabase/supabase-js";
@@ -1832,12 +1833,32 @@ export function registerReferralRoutes(app: Express) {
           }
         }
 
-        // Mark user link as no longer paid
+        // Mark user link as no longer paid, matching by (userId, referralPartnerId) for precision
         if (appUserId) {
-          await db
-            .update(referralUserLinks)
-            .set({ isPaid: false })
-            .where(eq(referralUserLinks.userId, appUserId));
+          // Look up the user's current referralPartnerId to narrow the update
+          const [userRow] = await db
+            .select({ referralPartnerId: users.referralPartnerId })
+            .from(users)
+            .where(eq(users.id, appUserId))
+            .limit(1);
+
+          if (userRow?.referralPartnerId) {
+            await db
+              .update(referralUserLinks)
+              .set({ isPaid: false })
+              .where(
+                and(
+                  eq(referralUserLinks.userId, appUserId),
+                  eq(referralUserLinks.referralPartnerId, userRow.referralPartnerId),
+                )
+              );
+          } else {
+            // Fallback: update all links for this user if no specific partner recorded
+            await db
+              .update(referralUserLinks)
+              .set({ isPaid: false })
+              .where(eq(referralUserLinks.userId, appUserId));
+          }
         }
 
         console.log(`[RCWebhook] ${eventType} — userId=${appUserId} updated=${updated}`);

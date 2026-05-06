@@ -587,13 +587,13 @@ export default function OnboardingQuestionnaire() {
                 <option value="other">Other</option>
               </select>
               {state.referralPartnerId === 'other' && (
-                <input
-                  type="text"
+                <textarea
                   value={state.referralOtherText}
                   onChange={e => setState(prev => ({ ...prev, referralOtherText: e.target.value }))}
-                  placeholder="Who referred you?"
-                  maxLength={120}
-                  className="mt-2 w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#3c82f4] transition-colors"
+                  placeholder="Who referred you? (e.g. organization name, coach's name)"
+                  maxLength={200}
+                  rows={2}
+                  className="mt-2 w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#3c82f4] transition-colors resize-none"
                   autoFocus
                 />
               )}
@@ -629,7 +629,35 @@ export default function OnboardingQuestionnaire() {
                         referralPartnerId: hasRealPartner ? state.referralPartnerId : undefined,
                         referralSourceOther: hasOther ? (state.referralOtherText || 'other') : undefined,
                       }),
-                    }).then(() => {}).catch(() => {})
+                    }).then(async (res) => {
+                      if (res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        // Persist to localStorage for native RevenueCat subscriber attributes
+                        try {
+                          if (data.referralPartnerId) {
+                            localStorage.setItem('pendingReferralPartnerId', data.referralPartnerId);
+                          }
+                          if (data.referralCode) {
+                            localStorage.setItem('pendingReferralCode', data.referralCode);
+                          }
+                        } catch {}
+                      }
+                    }).catch(() => {})
+                  );
+                } else if (isAuthenticated && !state.referralPartnerId) {
+                  // Explicit "None" selection — clear any prior referral
+                  saves.push(
+                    fetch('/api/user/onboarding', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ clearReferral: true }),
+                    }).then(() => {
+                      try {
+                        localStorage.removeItem('pendingReferralPartnerId');
+                        localStorage.removeItem('pendingReferralCode');
+                      } catch {}
+                    }).catch(() => {})
                   );
                 }
 

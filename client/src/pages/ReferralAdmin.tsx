@@ -79,6 +79,9 @@ interface Partner {
   quarterNetRevenueCents?: number;
   estimatedQuarterPayoutCents?: number;
   lastConversionDate?: string | null;
+  totalReferred?: number;
+  totalPaidUsers?: number;
+  conversionRate?: number;
 }
 
 interface Conversion {
@@ -857,9 +860,9 @@ function AllPartnersTab() {
                     <td className="px-4 py-3">{p.quarterNetRevenueCents !== undefined ? fmt$(p.quarterNetRevenueCents) : "—"}</td>
                     <td className="px-4 py-3">{p.estimatedQuarterPayoutCents !== undefined ? fmt$(p.estimatedQuarterPayoutCents) : "—"}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{fmtDate(p.lastConversionDate)}</td>
-                    <td className="px-4 py-3 text-center">{(p as any).totalReferred ?? 0}</td>
-                    <td className="px-4 py-3 text-center">{(p as any).totalPaidUsers ?? 0}</td>
-                    <td className="px-4 py-3 text-center">{(p as any).conversionRate ?? 0}%</td>
+                    <td className="px-4 py-3 text-center">{p.totalReferred ?? 0}</td>
+                    <td className="px-4 py-3 text-center">{p.totalPaidUsers ?? 0}</td>
+                    <td className="px-4 py-3 text-center">{p.conversionRate ?? 0}%</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}>
                         <ExternalLink className="w-3 h-3 mr-1" />Detail

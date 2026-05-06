@@ -233,13 +233,13 @@ export default function ReferralPortal() {
         </div>
 
         {/* Breakdown cards */}
-        {(Object.keys(stats.tierBreakdown ?? {}).length > 0 || Object.keys(stats.platformBreakdown ?? {}).length > 0) && (
+        {(Object.keys(stats.tierBreakdownLinks ?? stats.tierBreakdown ?? {}).length > 0 || Object.keys(stats.platformBreakdown ?? {}).length > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.keys(stats.tierBreakdown ?? {}).length > 0 && (
+            {Object.keys(stats.tierBreakdownLinks ?? stats.tierBreakdown ?? {}).length > 0 && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4">By Subscription Tier</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Paid Users by Tier</h3>
                 <div className="space-y-2">
-                  {Object.entries(stats.tierBreakdown).map(([tier, count]) => (
+                  {Object.entries(stats.tierBreakdownLinks ?? stats.tierBreakdown ?? {}).map(([tier, count]) => (
                     <div key={tier} className="flex items-center justify-between text-sm">
                       <span className="capitalize text-gray-700">{tier.replace(/_/g, ' ')}</span>
                       <span className="font-semibold text-gray-900">{count}</span>
