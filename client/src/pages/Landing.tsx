@@ -125,22 +125,22 @@ export default function Landing() {
       )}
       {/* Fixed Header */}
       <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
-        <div className="max-w-7xl mx-auto px-6 py-0 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-6 py-0 grid grid-cols-3 items-center">
           <nav className="hidden md:flex flex-wrap items-center gap-6 text-sm">
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
-            <a href="#how-it-works" className="text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
-            <a href="#features" className="text-gray-500 hover:text-gray-900 transition-colors">Features</a>
             <Link href="/pricing" className="text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
             <Link href="/about" className="text-gray-500 hover:text-gray-900 transition-colors">About</Link>
             <Link href="/referral-program" className="text-gray-500 hover:text-gray-900 transition-colors">Partners</Link>
           </nav>
-          <img
-            src={rosterLightLogo}
-            alt="Roster"
-            className="h-10 object-contain"
-            data-testid="logo-image"
-          />
-          <div className="flex items-center gap-3">
+          <div className="flex justify-center">
+            <img
+              src={rosterLightLogo}
+              alt="Roster"
+              className="h-10 object-contain"
+              data-testid="logo-image"
+            />
+          </div>
+          <div className="flex items-center gap-3 justify-end">
             <button
               onClick={handleLoginClick}
               className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
@@ -169,8 +169,6 @@ export default function Landing() {
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-6 py-4 space-y-3">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
-              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">How It Works</a>
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</a>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
               <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">About</Link>
               <Link href="/referral-program" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Partners</Link>
