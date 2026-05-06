@@ -268,7 +268,7 @@ export default function ReferralProgram() {
           <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 border border-[#3c82f4]/20 rounded-2xl p-8 text-left mb-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
               <div>
-                <p className="text-4xl font-black text-[#3c82f4] mb-1">~70%</p>
+                <p className="text-4xl font-black text-[#3c82f4] mb-1">~85%</p>
                 <p className="text-sm text-gray-600 font-medium">Net revenue after app store fee</p>
               </div>
               <div className="flex items-center justify-center text-3xl text-gray-300 font-light">×</div>
