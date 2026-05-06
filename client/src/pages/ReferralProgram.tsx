@@ -408,21 +408,6 @@ export default function ReferralProgram() {
           )}
         </div>
       </section>
-      {/* Final CTA */}
-      <section className="py-20 px-6 bg-gradient-to-b from-blue-50 to-white text-center">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Ready to grow hockey <span className="text-[#3c82f4]">and earn?</span>
-          </h2>
-          <p className="text-gray-500 text-lg mb-8">Apply today — it's free, it's simple, and your players already want Roster.</p>
-          <button
-            onClick={scrollToApply}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[#3c82f4] text-white text-lg font-semibold hover:bg-[#3c82f4]/90 transition-colors shadow-lg shadow-blue-200"
-          >
-            Apply Now <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
-      </section>
       {/* Footer */}
       <footer className="border-t border-gray-200 py-8 px-6 bg-white">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
