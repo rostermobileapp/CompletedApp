@@ -118,6 +118,12 @@ export default function Profile() {
           if (attrs['referral_partner_id']) localStorage.setItem('pendingReferralPartnerId', attrs['referral_partner_id']);
           if (attrs['referral_code']) localStorage.setItem('pendingReferralCode', attrs['referral_code']);
         } catch {}
+      } else {
+        // clearReferral or "other" path — remove any stale pending attribution
+        try {
+          localStorage.removeItem('pendingReferralPartnerId');
+          localStorage.removeItem('pendingReferralCode');
+        } catch {}
       }
       toast({ title: 'Referral saved' });
     },
@@ -841,7 +847,12 @@ export default function Profile() {
                     value={referralPickerId}
                     onValueChange={(val) => {
                       setReferralPickerId(val);
-                      if (val !== 'other') setReferralOtherText('');
+                      if (val === 'other') {
+                        // Prepopulate with existing value so user doesn't have to retype
+                        setReferralOtherText(currentOther || '');
+                      } else {
+                        setReferralOtherText('');
+                      }
                     }}
                   >
                     <SelectTrigger className="w-full" data-testid="select-referral-partner">
