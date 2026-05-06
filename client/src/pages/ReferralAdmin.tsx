@@ -25,13 +25,21 @@ async function adminFetch(path: string, opts?: RequestInit) {
 }
 
 function useAdminQuery<T>(key: string[], path: string, enabled = true) {
+  const [, navigate] = useLocation();
   return useQuery<T>({
     queryKey: key,
     enabled,
     staleTime: 30_000,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message === "UNAUTHORIZED") return false;
+      return failureCount < 2;
+    },
     queryFn: async () => {
       const res = await adminFetch(path);
-      if (res.status === 401) throw new Error("UNAUTHORIZED");
+      if (res.status === 401) {
+        navigate("/admin/referrals/login");
+        throw new Error("UNAUTHORIZED");
+      }
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<T>;
     },
@@ -700,6 +708,10 @@ function ConversionsTab() {
     p.set("exportCsv", "true");
     try {
       const res = await adminFetch(`/api/admin/referrals/conversions?${p}`);
+      if (!res.ok) {
+        toast({ title: "Export failed", description: `Server error ${res.status}`, variant: "destructive" });
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -838,6 +850,10 @@ function PayoutsTab() {
   async function exportHistory() {
     try {
       const res = await adminFetch("/api/admin/referrals/payouts/history?exportCsv=true");
+      if (!res.ok) {
+        toast({ title: "Export failed", description: `Server error ${res.status}`, variant: "destructive" });
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
