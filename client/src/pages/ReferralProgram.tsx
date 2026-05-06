@@ -170,9 +170,9 @@ export default function ReferralProgram() {
             🤝 Partner Program
           </span>
           <h1 className="text-4xl md:text-6xl font-black text-gray-900 leading-tight mb-5">
-            Earn revenue by
+            Roster gives back
             <br />
-            <span className="text-[#3c82f4]">growing hockey.</span>
+            <span className="text-[#3c82f4]">to our community.</span>
           </h1>
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
             Refer your players to Roster and earn a quarterly payout for every active subscription tied to your organization's code. No selling required — just share the app you already use.
