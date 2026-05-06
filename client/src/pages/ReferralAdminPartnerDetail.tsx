@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, RefreshCw, DollarSign, Send, AlertCircle,
-  Ban, Mail, Pencil, Check, X, Trash2, PauseCircle, MailCheck, Search, Download
+  Ban, Mail, Trash2, PauseCircle, MailCheck, Search, Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,11 +156,6 @@ export default function ReferralAdminPartnerDetail() {
   const [payoutForm, setPayoutForm] = useState({ quarter: "", amountCents: "", method: "", reference: "", notes: "" });
   const [msgForm, setMsgForm] = useState({ subject: "", body: "" });
 
-  // Inline referral code editing
-  const [editingCode, setEditingCode] = useState(false);
-  const [codeInput, setCodeInput] = useState("");
-  const [savingCode, setSavingCode] = useState(false);
-
   // Delete confirmation dialog
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -200,25 +195,6 @@ export default function ReferralAdminPartnerDetail() {
     });
     toast({ title: "Notes saved" });
     qc.invalidateQueries({ queryKey: ["admin-referrals-partner", id] });
-  }
-
-  async function saveReferralCode() {
-    const code = codeInput.trim().toUpperCase();
-    if (!code) { toast({ title: "Code cannot be empty", variant: "destructive" }); return; }
-    setSavingCode(true);
-    const res = await adminFetch(`/api/admin/referrals/partners/${id}/referral-code`, {
-      method: "PATCH",
-      body: JSON.stringify({ referralCode: code }),
-    });
-    setSavingCode(false);
-    if (res.ok) {
-      toast({ title: "Referral code updated" });
-      qc.invalidateQueries({ queryKey: ["admin-referrals-partner", id] });
-      setEditingCode(false);
-    } else {
-      const d = await res.json();
-      toast({ title: d.message || "Failed to update code", variant: "destructive" });
-    }
   }
 
   async function resendWelcome() {
@@ -380,43 +356,7 @@ export default function ReferralAdminPartnerDetail() {
               {partner.status}
             </span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            {/* Referral Code — inline editable */}
-            <div>
-              <Label className="text-gray-400 text-xs">Referral Code</Label>
-              {editingCode ? (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <Input
-                    value={codeInput}
-                    onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                    className="h-7 text-sm font-mono uppercase w-28 px-2"
-                    maxLength={16}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveReferralCode();
-                      if (e.key === "Escape") setEditingCode(false);
-                    }}
-                  />
-                  <Button size="icon" className="h-7 w-7 bg-green-600 hover:bg-green-700 text-white" disabled={savingCode} onClick={saveReferralCode}>
-                    {savingCode ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCode(false)}>
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <p className="font-mono font-bold text-blue-600">{partner.referralCode || "—"}</p>
-                  <button
-                    className="text-gray-300 hover:text-gray-500 transition-colors"
-                    title="Edit referral code"
-                    onClick={() => { setCodeInput(partner.referralCode || ""); setEditingCode(true); }}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div><Label className="text-gray-400 text-xs">Payout Rate</Label><p className="font-semibold mt-0.5">{(parseFloat(partner.payoutRate) * 100).toFixed(0)}%</p></div>
             <div><Label className="text-gray-400 text-xs">Approved</Label><p className="mt-0.5">{fmtDate(partner.approvedAt)}</p></div>
             <div><Label className="text-gray-400 text-xs">Applied</Label><p className="mt-0.5">{fmtDate(partner.createdAt)}</p></div>
