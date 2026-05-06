@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Link } from 'wouter';
 import { ArrowRight, Upload, X, Loader2, CheckCircle, Menu } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
+import communityPhoto from '@assets/Gemini_Generated_Image_pqx22upqx22upqx2_1778033123205.png';
 
 
 const ORG_TYPES = [
@@ -189,10 +190,12 @@ export default function ReferralProgram() {
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            {/* Photo frame */}
-            <div className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-gray-300 bg-white flex items-center justify-center text-gray-300 text-sm">
-              Photo coming soon
-            </div>
+            {/* Photo */}
+            <img
+              src={communityPhoto}
+              alt="Hockey community charity event"
+              className="w-full rounded-2xl object-cover shadow-md"
+            />
             {/* Copy */}
             <div>
               <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-6 leading-tight">
