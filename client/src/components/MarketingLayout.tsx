@@ -106,6 +106,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
             <Link href="/pricing" className="text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
             <Link href="/about" className="text-gray-500 hover:text-gray-900 transition-colors">About</Link>
+            <Link href="/referral-program" className="text-gray-500 hover:text-gray-900 transition-colors">Partners</Link>
           </nav>
           <Link href="/">
             <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain cursor-pointer" />
@@ -139,6 +140,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
               <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">About</Link>
+              <Link href="/referral-program" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Partners</Link>
             </div>
           </div>
         )}
@@ -173,6 +175,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
                 <ul className="space-y-2 text-gray-500">
                   <li><Link href="/about" className="hover:text-gray-900 transition-colors">About</Link></li>
                   <li><Link href="/support" className="hover:text-gray-900 transition-colors">Support</Link></li>
+                  <li><Link href="/referral-program" className="hover:text-gray-900 transition-colors">Partner Program</Link></li>
                   <li><Link href="/privacy-policy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link></li>
                   <li><Link href="/terms-of-service" className="hover:text-gray-900 transition-colors">Terms of Service</Link></li>
                 </ul>
