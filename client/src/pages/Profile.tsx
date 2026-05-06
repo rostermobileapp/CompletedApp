@@ -15,7 +15,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock } from 'lucide-react';
+import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -80,10 +81,49 @@ export default function Profile() {
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
   const isDesktopWeb = useIsDesktopWeb();
 
+  // Referral section local state
+  const [referralPickerId, setReferralPickerId] = useState('');
+  const [referralOtherText, setReferralOtherText] = useState('');
+
   // Fetch full user profile from database (includes displayId)
   const { data: user } = useQuery({
     queryKey: ['/api/user'],
     enabled: !!supabaseUser,
+  });
+
+  // Fetch approved referral partners for the dropdown
+  const { data: approvedPartners = [] } = useQuery<{ id: string; orgName: string; referralCode?: string }[]>({
+    queryKey: ['/api/referral/approved-partners'],
+    enabled: !!supabaseUser,
+  });
+
+  const saveReferralMutation = useMutation({
+    mutationFn: async (payload: { referralPartnerId?: string; referralSourceOther?: string; clearReferral?: boolean }) => {
+      const response = await apiRequest('PATCH', '/api/user/onboarding', payload);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to save referral');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      // Push to RevenueCat subscriber attributes + localStorage for purchase-time pickup
+      const attrs: Record<string, string> = {};
+      if (data.referralPartnerId) attrs['referral_partner_id'] = data.referralPartnerId;
+      if (data.referralCode) attrs['referral_code'] = data.referralCode;
+      if (Object.keys(attrs).length > 0) {
+        setSubscriberAttributes(attrs);
+        try {
+          if (attrs['referral_partner_id']) localStorage.setItem('pendingReferralPartnerId', attrs['referral_partner_id']);
+          if (attrs['referral_code']) localStorage.setItem('pendingReferralCode', attrs['referral_code']);
+        } catch {}
+      }
+      toast({ title: 'Referral saved' });
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || 'Failed to save referral', variant: 'destructive' });
+    },
   });
 
   const form = useForm<ProfileForm>({
@@ -748,6 +788,102 @@ export default function Profile() {
           </FeatureLockOverlay>
         </div>
       </div>
+      {/* Referral Partner */}
+      {(() => {
+        const currentPartnerId = (user as any)?.referralPartnerId as string | null | undefined;
+        const currentOther = (user as any)?.referralSourceOther as string | null | undefined;
+        const isLocked = !!currentPartnerId;
+        const lockedPartner = isLocked
+          ? approvedPartners.find((p) => p.id === currentPartnerId)
+          : null;
+
+        const handleSave = () => {
+          if (referralPickerId === 'other') {
+            saveReferralMutation.mutate({ referralSourceOther: referralOtherText.trim() || 'other' });
+          } else if (referralPickerId === 'none' || referralPickerId === '') {
+            saveReferralMutation.mutate({ clearReferral: true });
+          } else {
+            saveReferralMutation.mutate({ referralPartnerId: referralPickerId });
+          }
+        };
+
+        return (
+          <div className="px-6 mb-6">
+            <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
+              <div className="flex items-center justify-between mb-4 pt-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold" data-testid="text-referral-title">Who referred you?</h2>
+                  {isLocked && <Lock className="w-4 h-4 text-muted-foreground" />}
+                </div>
+              </div>
+
+              {isLocked ? (
+                <div className="space-y-2 pb-4" data-testid="referral-locked-state">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Partner:</span>
+                    <span className="font-medium" data-testid="text-referral-partner-name">
+                      {lockedPartner ? lockedPartner.orgName : currentPartnerId}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Your referral partner is locked and cannot be changed.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 pb-4" data-testid="referral-editable-state">
+                  {currentOther && (
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">Current:</span>
+                      <span>{currentOther}</span>
+                    </div>
+                  )}
+                  <Select
+                    value={referralPickerId}
+                    onValueChange={(val) => {
+                      setReferralPickerId(val);
+                      if (val !== 'other') setReferralOtherText('');
+                    }}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-referral-partner">
+                      <SelectValue placeholder="Select who referred you" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {approvedPartners.map((p) => (
+                        <SelectItem key={p.id} value={p.id} data-testid={`option-partner-${p.id}`}>
+                          {p.orgName}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="none">None / Not sure</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {referralPickerId === 'other' && (
+                    <input
+                      value={referralOtherText}
+                      onChange={(e) => setReferralOtherText(e.target.value)}
+                      placeholder="How did you hear about us?"
+                      className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      data-testid="input-referral-other"
+                    />
+                  )}
+
+                  <button
+                    onClick={handleSave}
+                    disabled={saveReferralMutation.isPending || referralPickerId === ''}
+                    className="w-full bg-primary text-primary-foreground rounded-lg py-2 flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                    data-testid="button-save-referral"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saveReferralMutation.isPending ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* League Management */}
       {userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && (
         <div className="px-6 mb-6">
