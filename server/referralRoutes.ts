@@ -1101,6 +1101,80 @@ export function registerReferralRoutes(app: Express) {
     }
   });
 
+  // ── Admin: resend welcome (approval) email ────────────────────────────────
+  app.post("/api/admin/referrals/partners/:id/resend-welcome", requireAdminAuth, async (req, res) => {
+    try {
+      const [partner] = await db
+        .select()
+        .from(referralPartners)
+        .where(eq(referralPartners.id, req.params.id))
+        .limit(1);
+      if (!partner) return res.status(404).json({ message: "Partner not found" });
+      const settings = await getSettings();
+      await sendPartnerApprovalEmail(
+        partner.email,
+        { orgName: partner.orgName, contactName: partner.contactName, referralCode: partner.referralCode || "" },
+        settings.approval_email_template || undefined,
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Referral] admin/resend-welcome error:", err);
+      res.status(500).json({ message: "Failed to resend welcome email" });
+    }
+  });
+
+  // ── Admin: resend rejection email ─────────────────────────────────────────
+  app.post("/api/admin/referrals/partners/:id/resend-rejection", requireAdminAuth, async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const [partner] = await db
+        .select()
+        .from(referralPartners)
+        .where(eq(referralPartners.id, req.params.id))
+        .limit(1);
+      if (!partner) return res.status(404).json({ message: "Partner not found" });
+      const settings = await getSettings();
+      await sendPartnerRejectionEmail(
+        partner.email,
+        { orgName: partner.orgName, contactName: partner.contactName, reason: reason || "Your application did not meet our current criteria." },
+        settings.rejection_email_template || undefined,
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Referral] admin/resend-rejection error:", err);
+      res.status(500).json({ message: "Failed to resend rejection email" });
+    }
+  });
+
+  // ── Admin: resend login (magic link) email ────────────────────────────────
+  app.post("/api/admin/referrals/partners/:id/resend-login", requireAdminAuth, async (req, res) => {
+    try {
+      const [partner] = await db
+        .select()
+        .from(referralPartners)
+        .where(eq(referralPartners.id, req.params.id))
+        .limit(1);
+      if (!partner) return res.status(404).json({ message: "Partner not found" });
+      if (partner.status !== "approved") {
+        return res.status(400).json({ message: "Login links can only be sent to approved partners" });
+      }
+      const token = randomBytes(48).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await db.insert(referralMagicLinks).values({ partnerId: partner.id, token, expiresAt });
+      const magicLink = `https://www.roster-app.com/referral-program/portal/auth?token=${token}`;
+      const settings = await getSettings();
+      await sendMagicLinkEmail(
+        partner.email,
+        { contactName: partner.contactName, magicLink },
+        settings.magic_link_email_template || undefined,
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Referral] admin/resend-login error:", err);
+      res.status(500).json({ message: "Failed to send login link" });
+    }
+  });
+
   // ── Admin: all conversions ────────────────────────────────────────────────
   app.get("/api/admin/referrals/conversions", requireAdminAuth, async (req, res) => {
     try {

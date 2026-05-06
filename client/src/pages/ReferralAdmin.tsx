@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, UserCheck, RefreshCw, Settings,
   ArrowRightLeft, DollarSign, LogOut, Search, ChevronUp, ChevronDown,
   ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText, Ban,
-  Download, Calendar, PauseCircle, Trash2, Pencil, Check, X
+  Download, Calendar, PauseCircle, Trash2, Pencil, Check, X, MailCheck, Link
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -261,6 +261,9 @@ function ApplicationsTab() {
   const [newCode, setNewCode] = useState("");
   const [savingCode, setSavingCode] = useState(false);
   const [deleteModal, setDeleteModal] = useState<Partner | null>(null);
+  const [resendRejectionModal, setResendRejectionModal] = useState<Partner | null>(null);
+  const [resendRejectionReason, setResendRejectionReason] = useState("");
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -362,6 +365,40 @@ function ApplicationsTab() {
     } else {
       const d = await res.json();
       toast({ title: d.message || "Failed to delete", variant: "destructive" });
+    }
+  }
+
+  async function resendWelcome(id: string) {
+    setResendingEmail(`welcome-${id}`);
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/resend-welcome`, { method: "POST" });
+    setResendingEmail(null);
+    if (res.ok) toast({ title: "Welcome email resent!" });
+    else { const d = await res.json(); toast({ title: d.message || "Failed", variant: "destructive" }); }
+  }
+
+  async function resendLogin(id: string) {
+    setResendingEmail(`login-${id}`);
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/resend-login`, { method: "POST" });
+    setResendingEmail(null);
+    if (res.ok) toast({ title: "Login link sent!" });
+    else { const d = await res.json(); toast({ title: d.message || "Failed", variant: "destructive" }); }
+  }
+
+  async function resendRejection() {
+    if (!resendRejectionModal) return;
+    setResendingEmail(`rejection-${resendRejectionModal.id}`);
+    const res = await adminFetch(`/api/admin/referrals/partners/${resendRejectionModal.id}/resend-rejection`, {
+      method: "POST",
+      body: JSON.stringify({ reason: resendRejectionReason.trim() || undefined }),
+    });
+    setResendingEmail(null);
+    if (res.ok) {
+      toast({ title: "Rejection email resent!" });
+      setResendRejectionModal(null);
+      setResendRejectionReason("");
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed", variant: "destructive" });
     }
   }
 
@@ -565,6 +602,12 @@ function ApplicationsTab() {
                 )}
                 {selected.status === "approved" && (
                   <>
+                    <Button variant="outline" disabled={resendingEmail === `welcome-${selected.id}`} onClick={() => resendWelcome(selected.id)}>
+                      {resendingEmail === `welcome-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <MailCheck className="w-4 h-4 mr-2" />}Resend Welcome
+                    </Button>
+                    <Button variant="outline" disabled={resendingEmail === `login-${selected.id}`} onClick={() => resendLogin(selected.id)}>
+                      {resendingEmail === `login-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Link className="w-4 h-4 mr-2" />}Send Login Link
+                    </Button>
                     <Button variant="outline" onClick={() => { setEditCodeModal(selected); setNewCode(selected.referralCode || ""); setSelected(null); }}>
                       <Pencil className="w-4 h-4 mr-2" />Edit Code
                     </Button>
@@ -578,6 +621,11 @@ function ApplicationsTab() {
                       <Trash2 className="w-4 h-4 mr-2" />Delete Partner
                     </Button>
                   </>
+                )}
+                {(selected.status === "rejected" || selected.status === "suspended") && (
+                  <Button variant="outline" disabled={resendingEmail === `rejection-${selected.id}`} onClick={() => { setResendRejectionModal(selected); setSelected(null); }}>
+                    {resendingEmail === `rejection-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <MailCheck className="w-4 h-4 mr-2" />}Resend Rejection Email
+                  </Button>
                 )}
               </div>
             </div>
@@ -604,6 +652,38 @@ function ApplicationsTab() {
             <Button variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Button>
             <Button variant="destructive" disabled={!rejectReason.trim()} onClick={() => rejectModal && reject(rejectModal.id)}>
               Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resend rejection email modal */}
+      <Dialog open={!!resendRejectionModal} onOpenChange={() => setResendRejectionModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resend Rejection Email — {resendRejectionModal?.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-gray-500">Optionally update the rejection reason before resending. Leave blank to use the default message.</p>
+            <div>
+              <Label>Rejection Reason</Label>
+              <Textarea
+                className="mt-1"
+                rows={3}
+                value={resendRejectionReason}
+                onChange={(e) => setResendRejectionReason(e.target.value)}
+                placeholder="Your application did not meet our current criteria."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResendRejectionModal(null)}>Cancel</Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={!!resendingEmail}
+              onClick={resendRejection}
+            >
+              {resendingEmail ? <><RefreshCw className="w-3 h-3 animate-spin mr-1.5" />Sending…</> : <><MailCheck className="w-4 h-4 mr-1.5" />Send Email</>}
             </Button>
           </DialogFooter>
         </DialogContent>

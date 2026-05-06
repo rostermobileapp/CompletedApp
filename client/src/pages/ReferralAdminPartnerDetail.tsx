@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, RefreshCw, DollarSign, Send, AlertCircle,
-  Ban, Mail, Pencil, Check, X, Trash2, PauseCircle
+  Ban, Mail, Pencil, Check, X, Trash2, PauseCircle, MailCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,6 +134,13 @@ export default function ReferralAdminPartnerDetail() {
   // Delete confirmation dialog
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
+  // Resend email state
+  const [resendingWelcome, setResendingWelcome] = useState(false);
+  const [resendingLogin, setResendingLogin] = useState(false);
+  const [resendRejectionOpen, setResendRejectionOpen] = useState(false);
+  const [resendRejectionReason, setResendRejectionReason] = useState("");
+  const [resendingRejection, setResendingRejection] = useState(false);
+
   // Auth guard - redirect to login page if not authed
   useEffect(() => {
     adminFetch("/api/admin/referrals/check-auth").then((res) => {
@@ -178,6 +185,39 @@ export default function ReferralAdminPartnerDetail() {
     } else {
       const d = await res.json();
       toast({ title: d.message || "Failed to update code", variant: "destructive" });
+    }
+  }
+
+  async function resendWelcome() {
+    setResendingWelcome(true);
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/resend-welcome`, { method: "POST" });
+    setResendingWelcome(false);
+    if (res.ok) toast({ title: "Welcome email resent!" });
+    else { const d = await res.json(); toast({ title: d.message || "Failed", variant: "destructive" }); }
+  }
+
+  async function resendLogin() {
+    setResendingLogin(true);
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/resend-login`, { method: "POST" });
+    setResendingLogin(false);
+    if (res.ok) toast({ title: "Login link sent!" });
+    else { const d = await res.json(); toast({ title: d.message || "Failed", variant: "destructive" }); }
+  }
+
+  async function resendRejection() {
+    setResendingRejection(true);
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/resend-rejection`, {
+      method: "POST",
+      body: JSON.stringify({ reason: resendRejectionReason.trim() || undefined }),
+    });
+    setResendingRejection(false);
+    if (res.ok) {
+      toast({ title: "Rejection email resent!" });
+      setResendRejectionOpen(false);
+      setResendRejectionReason("");
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed", variant: "destructive" });
     }
   }
 
@@ -356,6 +396,12 @@ export default function ReferralAdminPartnerDetail() {
           <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2 flex-wrap">
             {partner.status === "approved" && (
               <>
+                <Button size="sm" variant="outline" disabled={resendingWelcome} onClick={resendWelcome}>
+                  {resendingWelcome ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> : <MailCheck className="w-4 h-4 mr-1.5" />}Resend Welcome
+                </Button>
+                <Button size="sm" variant="outline" disabled={resendingLogin} onClick={resendLogin}>
+                  {resendingLogin ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> : <Mail className="w-4 h-4 mr-1.5" />}Send Login Link
+                </Button>
                 <Button size="sm" variant="outline" className="text-orange-600 border-orange-200 hover:bg-orange-50" onClick={suspend}>
                   <PauseCircle className="w-4 h-4 mr-1.5" />Suspend & Archive
                 </Button>
@@ -364,8 +410,13 @@ export default function ReferralAdminPartnerDetail() {
                 </Button>
               </>
             )}
+            {(partner.status === "rejected" || partner.status === "suspended") && (
+              <Button size="sm" variant="outline" onClick={() => setResendRejectionOpen(true)}>
+                <MailCheck className="w-4 h-4 mr-1.5" />Resend Rejection Email
+              </Button>
+            )}
             {partner.status === "suspended" && (
-              <p className="text-xs text-orange-600 flex items-center gap-1.5">
+              <p className="text-xs text-orange-600 flex items-center gap-1.5 w-full">
                 <PauseCircle className="w-4 h-4" />This partner is suspended — their referral code is inactive and they cannot log in.
               </p>
             )}
@@ -539,6 +590,34 @@ export default function ReferralAdminPartnerDetail() {
             <Button variant="ghost" onClick={() => setMessageModal(false)}>Cancel</Button>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={sendMessage}>
               <Send className="w-4 h-4 mr-1.5" />Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resend rejection email modal */}
+      <Dialog open={resendRejectionOpen} onOpenChange={setResendRejectionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resend Rejection Email — {partner.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-gray-500">Optionally update the rejection reason before resending. Leave blank to use the default message.</p>
+            <div>
+              <Label>Rejection Reason</Label>
+              <Textarea
+                className="mt-1"
+                rows={3}
+                value={resendRejectionReason}
+                onChange={(e) => setResendRejectionReason(e.target.value)}
+                placeholder="Your application did not meet our current criteria."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResendRejectionOpen(false)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" disabled={resendingRejection} onClick={resendRejection}>
+              {resendingRejection ? <><RefreshCw className="w-3 h-3 animate-spin mr-1.5" />Sending…</> : <><MailCheck className="w-4 h-4 mr-1.5" />Send Email</>}
             </Button>
           </DialogFooter>
         </DialogContent>
