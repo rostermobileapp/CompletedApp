@@ -1,32 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   LayoutDashboard, Users, UserCheck, RefreshCw, Settings,
   ArrowRightLeft, DollarSign, LogOut, Search, ChevronUp, ChevronDown,
-  ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText,
-  X, Send, Pencil, Ban
+  ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText, Ban
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// ── Admin fetch helper ──────────────────────────────────────────────────────
-const API = "";
+// ── Admin fetch (cookie-based auth) ─────────────────────────────────────────
 async function adminFetch(path: string, opts?: RequestInit) {
-  const res = await fetch(`${API}${path}`, {
+  return fetch(path, {
     ...opts,
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) },
   });
-  return res;
 }
 
 function useAdminQuery<T>(key: string[], path: string, enabled = true) {
@@ -43,7 +38,7 @@ function useAdminQuery<T>(key: string[], path: string, enabled = true) {
   });
 }
 
-// ── Types ───────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 interface DashboardData {
   activePartners: number;
   pendingApplications: number;
@@ -87,6 +82,7 @@ interface Conversion {
   platform: string | null;
   grossPriceCents: number | null;
   netCents: number;
+  estimatedPayoutCents: number;
   status: string;
   convertedAt: string;
 }
@@ -122,7 +118,7 @@ interface AdminSettings {
   magic_link_email_template: string | null;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const fmt$ = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString() : "—";
@@ -131,6 +127,8 @@ const statusColor = (s: string) =>
   s === "pending"  ? "bg-yellow-100 text-yellow-800" :
   s === "active"   ? "bg-blue-100 text-blue-800" :
   "bg-red-100 text-red-800";
+const truncate = (s: string | null | undefined, n = 20) =>
+  s && s.length > n ? s.slice(0, n) + "…" : (s ?? "—");
 
 function StatCard({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
   return (
@@ -142,70 +140,20 @@ function StatCard({ title, value, sub }: { title: string; value: string | number
   );
 }
 
-// ── Login form ───────────────────────────────────────────────────────────────
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setErr("");
-    setLoading(true);
-    try {
-      const res = await adminFetch("/api/admin/referrals/auth", {
-        method: "POST",
-        body: JSON.stringify({ password: pw }),
-      });
-      if (res.ok) {
-        onSuccess();
-      } else {
-        const d = await res.json().catch(() => ({}));
-        setErr(d.message || "Invalid password");
-      }
-    } catch {
-      setErr("Network error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
+function LoadingSpinner() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mx-auto mb-3">
-            <Settings className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-900">Admin Portal</h1>
-          <p className="text-sm text-gray-500 mt-1">Referral Partner Management</p>
-        </div>
-        {err && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{err}</AlertDescription>
-          </Alert>
-        )}
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <Label htmlFor="pw" className="text-gray-700">Admin Password</Label>
-            <Input
-              id="pw"
-              type="password"
-              value={pw}
-              onChange={(e) => setPw(e.target.value)}
-              placeholder="Enter password"
-              className="mt-1"
-              autoFocus
-            />
-          </div>
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
-            Sign In
-          </Button>
-        </form>
-      </div>
+    <div className="flex items-center justify-center py-12">
+      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
     </div>
+  );
+}
+
+function ErrorMsg({ msg }: { msg: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription>{msg}</AlertDescription>
+    </Alert>
   );
 }
 
@@ -298,7 +246,6 @@ function ApplicationsTab() {
   const [rejectReason, setRejectReason] = useState("");
   const [payoutRateModal, setPayoutRateModal] = useState<Partner | null>(null);
   const [newRate, setNewRate] = useState("");
-  const [docUrl, setDocUrl] = useState<string | null>(null);
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [editNotes, setEditNotes] = useState("");
 
@@ -317,55 +264,43 @@ function ApplicationsTab() {
   );
 
   async function approve(id: string) {
-    try {
-      const res = await adminFetch(`/api/admin/referrals/applications/${id}/approve`, { method: "POST" });
-      const d = await res.json();
-      if (res.ok) {
-        toast({ title: "Approved!", description: `Referral code: ${d.referralCode}` });
-        qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
-        qc.invalidateQueries({ queryKey: ["admin-referrals-dashboard"] });
-        setSelected(null);
-      } else {
-        toast({ title: "Error", description: d.message, variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    const res = await adminFetch(`/api/admin/referrals/applications/${id}/approve`, { method: "POST" });
+    const d = await res.json();
+    if (res.ok) {
+      toast({ title: "Approved!", description: `Referral code: ${d.referralCode}` });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-dashboard"] });
+      setSelected(null);
+    } else {
+      toast({ title: "Error", description: d.message, variant: "destructive" });
     }
   }
 
   async function reject(id: string) {
     if (!rejectReason.trim()) return;
-    try {
-      const res = await adminFetch(`/api/admin/referrals/applications/${id}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ reason: rejectReason }),
-      });
-      const d = await res.json();
-      if (res.ok) {
-        toast({ title: "Rejected", description: "Application rejected and email sent." });
-        qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
-        setRejectModal(null);
-        setRejectReason("");
-        setSelected(null);
-      } else {
-        toast({ title: "Error", description: d.message, variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    const res = await adminFetch(`/api/admin/referrals/applications/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason: rejectReason }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      toast({ title: "Rejected", description: "Application rejected and email sent." });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      setRejectModal(null);
+      setRejectReason("");
+      setSelected(null);
+    } else {
+      toast({ title: "Error", description: d.message, variant: "destructive" });
     }
   }
 
   async function revoke(id: string) {
     if (!confirm("Revoke access for this partner?")) return;
-    try {
-      const res = await adminFetch(`/api/admin/referrals/partners/${id}/revoke`, { method: "POST" });
-      if (res.ok) {
-        toast({ title: "Access revoked" });
-        qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
-        setSelected(null);
-      }
-    } catch {
-      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/revoke`, { method: "POST" });
+    if (res.ok) {
+      toast({ title: "Access revoked" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      setSelected(null);
     }
   }
 
@@ -395,19 +330,13 @@ function ApplicationsTab() {
 
   async function viewDoc(id: string) {
     setLoadingDoc(true);
-    setDocUrl(null);
-    try {
-      const res = await adminFetch(`/api/admin/referrals/applications/${id}/document`);
-      if (res.ok) {
-        const d = await res.json();
-        window.open(d.url, "_blank");
-      } else {
-        toast({ title: "No document found", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error loading document", variant: "destructive" });
-    } finally {
-      setLoadingDoc(false);
+    const res = await adminFetch(`/api/admin/referrals/applications/${id}/document`);
+    setLoadingDoc(false);
+    if (res.ok) {
+      const d = await res.json();
+      window.open(d.url, "_blank");
+    } else {
+      toast({ title: "No document found", variant: "destructive" });
     }
   }
 
@@ -416,12 +345,15 @@ function ApplicationsTab() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input placeholder="Search org name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input
+            placeholder="Search org name or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
@@ -438,9 +370,10 @@ function ApplicationsTab() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Org Name</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Contact</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Contact</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Email</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Type</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden xl:table-cell">Hockey Affil.</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Applied</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Actions</th>
@@ -450,9 +383,12 @@ function ApplicationsTab() {
                 {(apps ?? []).map((app) => (
                   <tr key={app.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                     <td className="px-4 py-3 font-medium text-gray-800">{app.orgName}</td>
-                    <td className="px-4 py-3 text-gray-600">{app.contactName}</td>
+                    <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{app.contactName}</td>
                     <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{app.email}</td>
                     <td className="px-4 py-3 text-gray-500 hidden lg:table-cell">{app.orgType}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden xl:table-cell" title={app.hockeyAffiliation ?? ""}>
+                      {truncate(app.hockeyAffiliation, 22)}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(app.status)}`}>
                         {app.status}
@@ -488,8 +424,8 @@ function ApplicationsTab() {
                     </td>
                   </tr>
                 ))}
-                {!isLoading && (apps ?? []).length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No applications found.</td></tr>
+                {(apps ?? []).length === 0 && (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No applications found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -509,14 +445,21 @@ function ApplicationsTab() {
                 <div><Label className="text-gray-500">Contact</Label><p className="mt-0.5">{selected.contactName}</p></div>
                 <div><Label className="text-gray-500">Email</Label><p className="mt-0.5">{selected.email}</p></div>
                 <div><Label className="text-gray-500">Org Type</Label><p className="mt-0.5">{selected.orgType}</p></div>
-                <div><Label className="text-gray-500">Status</Label>
+                <div>
+                  <Label className="text-gray-500">Status</Label>
                   <span className={`inline-flex mt-0.5 items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(selected.status)}`}>
                     {selected.status}
                   </span>
                 </div>
-                <div className="col-span-2"><Label className="text-gray-500">Hockey Affiliation</Label><p className="mt-0.5">{selected.hockeyAffiliation || "—"}</p></div>
+                <div className="col-span-2">
+                  <Label className="text-gray-500">Hockey Affiliation</Label>
+                  <p className="mt-0.5">{selected.hockeyAffiliation || "—"}</p>
+                </div>
                 {selected.referralCode && (
-                  <div><Label className="text-gray-500">Referral Code</Label><p className="mt-0.5 font-mono font-bold text-blue-600">{selected.referralCode}</p></div>
+                  <div>
+                    <Label className="text-gray-500">Referral Code</Label>
+                    <p className="mt-0.5 font-mono font-bold text-blue-600">{selected.referralCode}</p>
+                  </div>
                 )}
                 <div><Label className="text-gray-500">Payout Rate</Label><p className="mt-0.5">{(parseFloat(selected.payoutRate) * 100).toFixed(0)}%</p></div>
                 <div><Label className="text-gray-500">Applied</Label><p className="mt-0.5">{fmtDate(selected.createdAt)}</p></div>
@@ -576,7 +519,12 @@ function ApplicationsTab() {
           </DialogHeader>
           <div className="space-y-3">
             <Label>Rejection Reason <span className="text-red-500">*</span></Label>
-            <Textarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Explain why the application was rejected…" />
+            <Textarea
+              rows={3}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Explain why the application was rejected…"
+            />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Button>
@@ -649,7 +597,10 @@ function AllPartnersTab() {
 
   function Th({ col, label }: { col: keyof Partner; label: string }) {
     return (
-      <th className="text-left px-4 py-3 text-gray-500 font-medium cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort(col)}>
+      <th
+        className="text-left px-4 py-3 text-gray-500 font-medium cursor-pointer hover:text-gray-800 select-none"
+        onClick={() => toggleSort(col)}
+      >
         {label}<SortIcon col={col} />
       </th>
     );
@@ -659,7 +610,12 @@ function AllPartnersTab() {
     <div className="space-y-4">
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input placeholder="Search org or code…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <Input
+          placeholder="Search org or code…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {isLoading ? <LoadingSpinner /> : (
@@ -681,7 +637,11 @@ function AllPartnersTab() {
               </thead>
               <tbody>
                 {sorted.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-blue-50/30 cursor-pointer" onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}>
+                  <tr
+                    key={p.id}
+                    className="border-b border-gray-50 last:border-0 hover:bg-blue-50/30 cursor-pointer"
+                    onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}
+                  >
                     <td className="px-4 py-3 font-medium text-gray-800">{p.orgName}</td>
                     <td className="px-4 py-3 font-mono text-xs text-blue-600">{p.referralCode ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{fmtDate(p.approvedAt)}</td>
@@ -782,11 +742,9 @@ function ConversionsTab() {
             <SelectItem value="refunded">Refunded</SelectItem>
           </SelectContent>
         </Select>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-36" placeholder="From" />
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-36" placeholder="To" />
-        <Button variant="outline" size="sm" onClick={exportCsv}>
-          Export CSV
-        </Button>
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-36" />
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-36" />
+        <Button variant="outline" size="sm" onClick={exportCsv}>Export CSV</Button>
       </div>
 
       {isLoading ? <LoadingSpinner /> : (
@@ -803,6 +761,7 @@ function ConversionsTab() {
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Platform</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">Gross</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Net</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Est. Payout</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
                 </tr>
               </thead>
@@ -817,13 +776,14 @@ function ConversionsTab() {
                     <td className="px-4 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{c.platform || "—"}</td>
                     <td className="px-4 py-2.5 text-right">{c.grossPriceCents != null ? fmt$(c.grossPriceCents) : "—"}</td>
                     <td className="px-4 py-2.5 text-right hidden md:table-cell">{fmt$(c.netCents)}</td>
+                    <td className="px-4 py-2.5 text-right hidden lg:table-cell text-blue-600">{fmt$(c.estimatedPayoutCents)}</td>
                     <td className="px-4 py-2.5">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(c.status)}`}>{c.status}</span>
                     </td>
                   </tr>
                 ))}
                 {(conversions ?? []).length === 0 && (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No conversions found.</td></tr>
+                  <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">No conversions found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -891,12 +851,20 @@ function PayoutsTab() {
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <Button variant={view === "owed" ? "default" : "outline"} size="sm" onClick={() => setView("owed")}
-          className={view === "owed" ? "bg-blue-600 text-white" : ""}>
+        <Button
+          variant={view === "owed" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView("owed")}
+          className={view === "owed" ? "bg-blue-600 text-white" : ""}
+        >
           Owed
         </Button>
-        <Button variant={view === "history" ? "default" : "outline"} size="sm" onClick={() => setView("history")}
-          className={view === "history" ? "bg-blue-600 text-white" : ""}>
+        <Button
+          variant={view === "history" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView("history")}
+          className={view === "history" ? "bg-blue-600 text-white" : ""}
+        >
           History
         </Button>
         {view === "history" && (
@@ -907,7 +875,11 @@ function PayoutsTab() {
       {view === "owed" && (
         owedLoading ? <LoadingSpinner /> : (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {owed && <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm font-medium text-blue-700">Quarter: {owed.quarter}</div>}
+            {owed && (
+              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm font-medium text-blue-700">
+                Quarter: {owed.quarter}
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -933,10 +905,14 @@ function PayoutsTab() {
                       <td className="px-4 py-2.5 text-right font-semibold text-blue-700">{fmt$(row.amountOwedCents)}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-400 hidden lg:table-cell">{fmtDate(row.lastPayoutDate)}</td>
                       <td className="px-4 py-2.5">
-                        <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
-                          setRecordModal(row);
-                          setForm({ quarter: owed?.quarter || "", amountCents: (row.amountOwedCents / 100).toFixed(2), method: "", reference: "", notes: "" });
-                        }}>
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => {
+                            setRecordModal(row);
+                            setForm({ quarter: owed?.quarter || "", amountCents: (row.amountOwedCents / 100).toFixed(2), method: "", reference: "", notes: "" });
+                          }}
+                        >
                           Record Payout
                         </Button>
                       </td>
@@ -1063,50 +1039,74 @@ function SettingsTab() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <Label>Default Payout Rate (0–1)</Label>
-            <Input className="mt-1" type="number" step="0.01" min="0" max="1"
+            <Input
+              className="mt-1"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
               value={form.default_payout_rate}
-              onChange={(e) => setForm((f) => f ? { ...f, default_payout_rate: e.target.value } : f)} />
+              onChange={(e) => setForm((f) => f ? { ...f, default_payout_rate: e.target.value } : f)}
+            />
             <p className="text-xs text-gray-400 mt-0.5">e.g. 0.20 = 20%</p>
           </div>
           <div>
             <Label>Platform Fee %</Label>
-            <Input className="mt-1" type="number" step="0.1" min="0" max="100"
+            <Input
+              className="mt-1"
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
               value={form.platform_fee_percent}
-              onChange={(e) => setForm((f) => f ? { ...f, platform_fee_percent: e.target.value } : f)} />
+              onChange={(e) => setForm((f) => f ? { ...f, platform_fee_percent: e.target.value } : f)}
+            />
             <p className="text-xs text-gray-400 mt-0.5">e.g. 15 = 15%</p>
           </div>
           <div className="sm:col-span-2">
             <Label>Admin Notification Email</Label>
-            <Input className="mt-1" type="email"
+            <Input
+              className="mt-1"
+              type="email"
               value={form.admin_notification_email}
-              onChange={(e) => setForm((f) => f ? { ...f, admin_notification_email: e.target.value } : f)} />
+              onChange={(e) => setForm((f) => f ? { ...f, admin_notification_email: e.target.value } : f)}
+            />
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
         <h3 className="font-semibold text-gray-800">Email Templates</h3>
-        <p className="text-xs text-gray-500">Leave blank to use the system defaults.</p>
+        <p className="text-xs text-gray-500">Leave blank to use system defaults.</p>
         <div>
           <Label>Approval Email Template</Label>
-          <Textarea className="mt-1 font-mono text-xs" rows={6}
+          <Textarea
+            className="mt-1 font-mono text-xs"
+            rows={6}
             value={form.approval_email_template || ""}
             onChange={(e) => setForm((f) => f ? { ...f, approval_email_template: e.target.value } : f)}
-            placeholder="Hi {{contactName}}, Congratulations! Your referral code is: {{referralCode}}…" />
+            placeholder="Hi {{contactName}}, Congratulations! Your referral code is: {{referralCode}}…"
+          />
         </div>
         <div>
           <Label>Rejection Email Template</Label>
-          <Textarea className="mt-1 font-mono text-xs" rows={6}
+          <Textarea
+            className="mt-1 font-mono text-xs"
+            rows={6}
             value={form.rejection_email_template || ""}
             onChange={(e) => setForm((f) => f ? { ...f, rejection_email_template: e.target.value } : f)}
-            placeholder="Hi {{contactName}}, Unfortunately we were unable to approve your application…" />
+            placeholder="Hi {{contactName}}, Unfortunately we were unable to approve your application…"
+          />
         </div>
         <div>
           <Label>Magic Link Email Template</Label>
-          <Textarea className="mt-1 font-mono text-xs" rows={6}
+          <Textarea
+            className="mt-1 font-mono text-xs"
+            rows={6}
             value={form.magic_link_email_template || ""}
             onChange={(e) => setForm((f) => f ? { ...f, magic_link_email_template: e.target.value } : f)}
-            placeholder="Hi {{contactName}}, Click the link to access your partner portal: {{link}}…" />
+            placeholder="Hi {{contactName}}, Click the link to access your partner portal: {{link}}…"
+          />
         </div>
       </div>
 
@@ -1117,54 +1117,41 @@ function SettingsTab() {
   );
 }
 
-// ── Shared helpers ───────────────────────────────────────────────────────────
-function LoadingSpinner() {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-    </div>
-  );
-}
-function ErrorMsg({ msg }: { msg: string }) {
-  return (
-    <Alert variant="destructive">
-      <AlertCircle className="h-4 w-4" />
-      <AlertDescription>{msg}</AlertDescription>
-    </Alert>
-  );
-}
-
-// ── Tab config ───────────────────────────────────────────────────────────────
+// ── Tab config (6 nav tabs + Partner Detail as a separate route) ─────────────
 const TABS = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { id: "applications", label: "Applications", icon: FileText },
-  { id: "partners", label: "All Partners", icon: UserCheck },
-  { id: "conversions", label: "Conversions", icon: ArrowRightLeft },
-  { id: "payouts", label: "Payouts", icon: DollarSign },
-  { id: "settings", label: "Settings", icon: Settings },
+  { id: "partners",     label: "All Partners", icon: UserCheck },
+  { id: "conversions",  label: "Conversions",  icon: ArrowRightLeft },
+  { id: "payouts",      label: "Payouts",      icon: DollarSign },
+  { id: "settings",     label: "Settings",     icon: Settings },
 ] as const;
 
 type TabId = typeof TABS[number]["id"];
 
 // ── Main portal ──────────────────────────────────────────────────────────────
 export default function ReferralAdmin() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
 
-  // Check auth on mount
   useEffect(() => {
     adminFetch("/api/admin/referrals/check-auth").then((res) => {
-      setAuthed(res.ok);
-    }).catch(() => setAuthed(false));
+      if (res.ok) {
+        setAuthed(true);
+      } else {
+        navigate("/admin/referrals/login");
+      }
+    }).catch(() => navigate("/admin/referrals/login"));
   }, []);
 
   async function logout() {
     await adminFetch("/api/admin/referrals/logout", { method: "POST" });
     qc.clear();
-    setAuthed(false);
     toast({ title: "Logged out" });
+    navigate("/admin/referrals/login");
   }
 
   if (authed === null) {
@@ -1175,13 +1162,8 @@ export default function ReferralAdmin() {
     );
   }
 
-  if (!authed) {
-    return <LoginForm onSuccess={() => setAuthed(true)} />;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1194,7 +1176,6 @@ export default function ReferralAdmin() {
             <LogOut className="w-4 h-4 mr-1.5" />Logout
           </Button>
         </div>
-        {/* Tab nav */}
         <div className="max-w-7xl mx-auto px-4 flex gap-0 overflow-x-auto">
           {TABS.map((tab) => {
             const Icon = tab.icon;
@@ -1216,14 +1197,13 @@ export default function ReferralAdmin() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === "dashboard" && <DashboardTab />}
+        {activeTab === "dashboard"    && <DashboardTab />}
         {activeTab === "applications" && <ApplicationsTab />}
-        {activeTab === "partners" && <AllPartnersTab />}
-        {activeTab === "conversions" && <ConversionsTab />}
-        {activeTab === "payouts" && <PayoutsTab />}
-        {activeTab === "settings" && <SettingsTab />}
+        {activeTab === "partners"     && <AllPartnersTab />}
+        {activeTab === "conversions"  && <ConversionsTab />}
+        {activeTab === "payouts"      && <PayoutsTab />}
+        {activeTab === "settings"     && <SettingsTab />}
       </main>
     </div>
   );

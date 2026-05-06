@@ -125,10 +125,10 @@ export default function ReferralAdminPartnerDetail() {
   const [payoutForm, setPayoutForm] = useState({ quarter: "", amountCents: "", method: "", reference: "", notes: "" });
   const [msgForm, setMsgForm] = useState({ subject: "", body: "" });
 
-  // Auth guard - redirect if not authed
+  // Auth guard - redirect to login page if not authed
   useEffect(() => {
     adminFetch("/api/admin/referrals/check-auth").then((res) => {
-      if (!res.ok) navigate("/admin/referrals");
+      if (!res.ok) navigate("/admin/referrals/login");
     });
   }, []);
 
