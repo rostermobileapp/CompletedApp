@@ -127,7 +127,7 @@ export default function ReferralProgram() {
             🤝 Partner Program
           </span>
           <h1 className="text-4xl md:text-6xl font-black text-gray-900 leading-tight mb-5">
-            Roster gives back
+            We give back
             <br />
             <span className="text-[#3c82f4]">to our community.</span>
           </h1>
