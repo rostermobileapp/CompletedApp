@@ -278,7 +278,7 @@ export default function ReferralProgram() {
               </div>
             </div>
             <div className="mt-6 pt-6 border-t border-[#3c82f4]/10 text-sm text-gray-500">
-              <p className="mb-1"><span className="font-semibold text-gray-700">Example:</span> A player subscribes to Player Pro at $6.49/month. After a 30% app store fee, net = ~$4.54. At a 15% payout rate, you'd earn ~$0.68/month per active subscriber.</p>
+              <p className="mb-1"><span className="font-semibold text-gray-700">Example:</span> A player subscribes to Player Pro at $6.49/month. After a 15% app store fee, net = ~$5.52. At a 15% payout rate, you'd earn ~$0.68/month per active subscriber.</p>
               <p className="text-xs text-gray-400 mt-2 italic">Actual payout rates are confirmed during approval and visible in your partner portal.</p>
             </div>
           </div>
