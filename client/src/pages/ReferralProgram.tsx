@@ -162,7 +162,6 @@ export default function ReferralProgram() {
           </div>
         )}
       </header>
-
       {/* Hero */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white text-center">
         <div className="max-w-3xl mx-auto">
@@ -174,9 +173,7 @@ export default function ReferralProgram() {
             <br />
             <span className="text-[#3c82f4]">to our community.</span>
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-            Refer your players to Roster and earn a quarterly payout for every active subscription tied to your organization's code. No selling required — just share the app you already use.
-          </p>
+          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">Refer players to our platform and Roster will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization's code. No selling required — just share the app you already use.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={scrollToApply}
@@ -193,7 +190,6 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
-
       {/* How it works */}
       <section className="py-20 px-6 bg-white" id="how-it-works">
         <div className="max-w-5xl mx-auto">
@@ -228,7 +224,6 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
-
       {/* Benefits */}
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
@@ -257,7 +252,6 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
-
       {/* Payout structure */}
       <section className="py-20 px-6 bg-white" id="payouts">
         <div className="max-w-4xl mx-auto text-center">
@@ -284,7 +278,6 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
-
       {/* FAQ */}
       <section className="py-20 px-6 bg-gray-50" id="faq">
         <div className="max-w-3xl mx-auto">
@@ -296,7 +289,6 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
-
       {/* Application Form */}
       <section className="py-20 px-6 bg-white" id="apply" ref={applyRef}>
         <div className="max-w-2xl mx-auto">
@@ -441,7 +433,6 @@ export default function ReferralProgram() {
           )}
         </div>
       </section>
-
       {/* Final CTA */}
       <section className="py-20 px-6 bg-gradient-to-b from-blue-50 to-white text-center">
         <div className="max-w-2xl mx-auto">
@@ -457,7 +448,6 @@ export default function ReferralProgram() {
           </button>
         </div>
       </section>
-
       {/* Footer */}
       <footer className="border-t border-gray-200 py-8 px-6 bg-white">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
