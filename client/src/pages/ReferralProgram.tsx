@@ -153,7 +153,7 @@ export default function ReferralProgram() {
         </div>
       </section>
       {/* How it works */}
-      <section className="py-20 px-6 bg-white" id="how-it-works">
+      <section className="py-20 px-6 bg-white pt-[20px] pb-[20px]" id="how-it-works">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-3">How It Works</h2>
