@@ -541,9 +541,10 @@ export function registerReferralRoutes(app: Express) {
   // ── Admin: login ──────────────────────────────────────────────────────────
   app.post("/api/admin/referrals/auth", (req, res) => {
     const { password } = req.body;
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
     if (!adminPassword) return res.status(503).json({ message: "Admin auth not configured" });
-    if (!password || password !== adminPassword) {
+    const submitted = (password || "").trim();
+    if (!submitted || submitted !== adminPassword) {
       return res.status(401).json({ message: "Invalid password" });
     }
     const token = generateSessionToken();
