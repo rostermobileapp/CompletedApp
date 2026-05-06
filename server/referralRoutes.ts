@@ -824,6 +824,7 @@ export function registerReferralRoutes(app: Express) {
         approvalSettings.approval_email_template || undefined,
       );
 
+      approvedPartnersCache = null;
       res.json({ success: true, referralCode, partner: updated });
     } catch (err) {
       console.error("[Referral] admin/approve error:", err);
@@ -945,6 +946,7 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPartners.id, req.params.id))
         .returning();
       if (!deleted) return res.status(404).json({ message: "Partner not found" });
+      approvedPartnersCache = null;
       res.json({ success: true });
     } catch (err) {
       console.error("[Referral] admin/delete-partner error:", err);
