@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link } from 'wouter';
-import { Check, ArrowRight, Upload, X, Loader2, CheckCircle, Menu } from 'lucide-react';
+import { ArrowRight, Upload, X, Loader2, CheckCircle, Menu } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
 
@@ -185,31 +185,31 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
-      {/* Benefits */}
+      {/* Why we do this */}
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Why Partner With Roster?</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { title: 'Passive recurring income', desc: 'Earn every month a referred subscriber stays active — not just on first purchase.' },
-              { title: 'No sales required', desc: 'Share an app your players actually want. No cold calls, no quotas, no pressure.' },
-              { title: 'Full visibility', desc: 'Your partner portal shows every conversion, your referral code, payout estimates, and history.' },
-              { title: 'Built for hockey', desc: 'Roster is the all-in-one platform your players are already asking for. Your code just makes it official.' },
-              { title: 'Quarterly payouts', desc: 'Payments go out every quarter via bank transfer. Minimum $25 threshold.' },
-              { title: 'Zero cost to join', desc: 'Applying and participating is completely free. We pay you, not the other way around.' },
-            ].map(b => (
-              <div key={b.title} className="flex items-start gap-4 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Check className="w-4 h-4 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm mb-0.5">{b.title}</p>
-                  <p className="text-gray-500 text-sm">{b.desc}</p>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            {/* Photo frame */}
+            <div className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-gray-300 bg-white flex items-center justify-center text-gray-300 text-sm">
+              Photo coming soon
+            </div>
+            {/* Copy */}
+            <div>
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-6 leading-tight">
+                Hockey takes care<br />of its own.
+              </h2>
+              <div className="space-y-4 text-gray-600 leading-relaxed">
+                <p>
+                  We look within when we need help. We look within when we hire. We leave our fights on the ice so we can be family in the locker room. When someone falls, we pick them up. When someone steps up, we follow.
+                </p>
+                <p>
+                  Roster was built by a player, for players — and now we want to give back to the organizations holding this community together.
+                </p>
+                <p className="text-gray-900 font-semibold">
+                  Every paying subscriber you refer puts 10% of net revenue back into your cause. That's our way of saying thanks to the people who spread the passion for our beautiful game.
+                </p>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
