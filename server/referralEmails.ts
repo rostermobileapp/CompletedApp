@@ -111,16 +111,13 @@ export async function sendPartnerApprovalEmail(
       html = emailWrapper(`
         <h2 style="margin:0 0 8px 0;color:#111827;font-size:20px;">Welcome to the Roster Referral Program!</h2>
         <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, congratulations! Your application for <strong>${data.orgName}</strong> has been approved.</p>
-        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:24px;margin-bottom:24px;text-align:center;">
-          <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Referral Code</p>
-          <p style="margin:0;font-size:36px;font-weight:700;color:#16a34a;letter-spacing:4px;">${data.referralCode}</p>
-        </div>
-        <h3 style="margin:0 0 12px 0;color:#111827;font-size:16px;">Quick Start Guide</h3>
+        <h3 style="margin:0 0 12px 0;color:#111827;font-size:16px;">Getting Started</h3>
         <ol style="margin:0 0 24px 0;padding-left:24px;color:#374151;font-size:14px;line-height:24px;">
-          <li>Share your code <strong>${data.referralCode}</strong> with your organization members and hockey community</li>
+          <li>Log in to your partner portal to find your unique referral code</li>
+          <li>Share your code with your organization members and hockey community</li>
           <li>When someone signs up for Roster and enters your code during onboarding, the conversion is automatically tracked</li>
           <li>Earn commissions on net revenue for every active subscriber you refer</li>
-          <li>View your stats and payout history in your partner portal</li>
+          <li>View your stats and payout history anytime in your portal</li>
         </ol>
         <a href="${loginUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Access Your Partner Portal</a>
         <p style="margin:20px 0 0 0;font-size:13px;color:#6b7280;">Partner portal: <a href="${portalUrl}" style="color:#3b82f6;">${portalUrl}</a></p>
