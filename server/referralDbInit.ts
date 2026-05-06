@@ -162,6 +162,12 @@ export async function initReferralDb(): Promise<void> {
       END $$;
     `);
 
+    // Add conversion_type column if missing (tracks initial_purchase / renewal / claim)
+    await db.execute(sql`
+      ALTER TABLE referral_conversions
+        ADD COLUMN IF NOT EXISTS conversion_type VARCHAR(20) DEFAULT 'initial_purchase';
+    `);
+
     console.log('[Init] Referral program tables ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure referral program tables:', err);

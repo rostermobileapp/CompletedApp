@@ -54,6 +54,7 @@ interface PartnerMe {
   conversions: Array<{
     id: string;
     convertedAt: string;
+    conversionType: string | null;
     tier: string | null;
     platform: string | null;
     grossPriceCents: number | null;
@@ -474,10 +475,11 @@ export default function ReferralPortal() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="text-left px-5 py-3 font-semibold text-gray-600">Date</th>
+                      <th className="text-left px-5 py-3 font-semibold text-gray-600">Type</th>
                       <th className="text-left px-5 py-3 font-semibold text-gray-600">Tier</th>
-                      <th className="text-left px-5 py-3 font-semibold text-gray-600">Platform</th>
+                      <th className="text-left px-5 py-3 font-semibold text-gray-600 hidden sm:table-cell">Platform</th>
                       <th className="text-right px-5 py-3 font-semibold text-gray-600">Gross</th>
-                      <th className="text-right px-5 py-3 font-semibold text-gray-600">Net</th>
+                      <th className="text-right px-5 py-3 font-semibold text-gray-600 hidden md:table-cell">Net</th>
                       <th className="text-right px-5 py-3 font-semibold text-gray-600">Est. Earnings</th>
                       <th className="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
                     </tr>
@@ -485,13 +487,22 @@ export default function ReferralPortal() {
                   <tbody className="divide-y divide-gray-100">
                     {convSlice.map(c => (
                       <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-3 text-gray-700">{fmtDate(c.convertedAt)}</td>
-                        <td className="px-5 py-3 text-gray-700 capitalize">{c.tier?.replace(/_/g, ' ') || '—'}</td>
-                        <td className="px-5 py-3 text-gray-700 capitalize">{c.platform || '—'}</td>
-                        <td className="px-5 py-3 text-right text-gray-700">{c.grossPriceCents != null ? fmt(c.grossPriceCents) : '—'}</td>
-                        <td className="px-5 py-3 text-right text-gray-700">{c.netContributionCents != null ? fmt(c.netContributionCents) : '—'}</td>
+                        <td className="px-5 py-3 text-gray-700 whitespace-nowrap">{fmtDate(c.convertedAt)}</td>
+                        <td className="px-5 py-3">
+                          {c.conversionType === 'renewal' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Renewal</span>
+                          ) : c.conversionType === 'claim' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Claim</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Initial</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-gray-700">{formatRole(c.tier)}</td>
+                        <td className="px-5 py-3 text-gray-700 capitalize hidden sm:table-cell">{c.platform || '—'}</td>
+                        <td className="px-5 py-3 text-right text-gray-700">{c.grossPriceCents ? fmt(c.grossPriceCents) : <span className="text-gray-400 text-xs">—</span>}</td>
+                        <td className="px-5 py-3 text-right text-gray-700 hidden md:table-cell">{c.netContributionCents ? fmt(c.netContributionCents) : <span className="text-gray-400 text-xs">—</span>}</td>
                         <td className="px-5 py-3 text-right font-semibold text-[#3c82f4]">
-                          {c.estimatedEarningsCents != null ? fmt(c.estimatedEarningsCents) : '—'}
+                          {c.estimatedEarningsCents ? fmt(c.estimatedEarningsCents) : <span className="text-gray-400 text-xs font-normal">—</span>}
                         </td>
                         <td className="px-5 py-3 text-center">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${

@@ -67,6 +67,7 @@ interface Conversion {
   id: string;
   referralCode: string;
   userId: string | null;
+  conversionType: string | null;
   tier: string | null;
   platform: string | null;
   grossPriceCents: number | null;
@@ -616,6 +617,7 @@ export default function ReferralAdminPartnerDetail() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Date</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Type</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">User ID</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Tier</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Platform</th>
@@ -626,18 +628,27 @@ export default function ReferralAdminPartnerDetail() {
               <tbody>
                 {conversions.map((c) => (
                   <tr key={c.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-4 py-2.5 text-xs text-gray-400">{fmtDate(c.convertedAt)}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{fmtDate(c.convertedAt)}</td>
+                    <td className="px-4 py-2.5">
+                      {c.conversionType === 'renewal' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Renewal</span>
+                      ) : c.conversionType === 'claim' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Claim</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Initial</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-gray-400 hidden sm:table-cell">{c.userId || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-600">{c.tier || "—"}</td>
-                    <td className="px-4 py-2.5 text-gray-500 hidden md:table-cell">{c.platform || "—"}</td>
-                    <td className="px-4 py-2.5 text-right">{c.grossPriceCents != null ? fmt$(c.grossPriceCents) : "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-600">{formatRole(c.tier)}</td>
+                    <td className="px-4 py-2.5 text-gray-500 capitalize hidden md:table-cell">{c.platform || "—"}</td>
+                    <td className="px-4 py-2.5 text-right">{c.grossPriceCents ? fmt$(c.grossPriceCents) : <span className="text-gray-400">—</span>}</td>
                     <td className="px-4 py-2.5">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(c.status)}`}>{c.status}</span>
                     </td>
                   </tr>
                 ))}
                 {conversions.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No conversions yet.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No conversions yet.</td></tr>
                 )}
               </tbody>
             </table>

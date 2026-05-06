@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
@@ -965,6 +965,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             referralPartnerId,
             isPaid: false,
           });
+          // If the user is already a paid subscriber, immediately claim them for this partner
+          const [userRecord] = await db
+            .select({ role: users.role })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+          const isPaidRole = userRecord?.role === 'commissioner' || userRecord?.role === 'player_pro';
+          if (isPaidRole) {
+            const paidTier = userRecord.role === 'commissioner' ? 'commissioner' : 'player_pro';
+            await db.insert(referralConversions).values({
+              partnerId: referralPartnerId,
+              referralCode: partnerRow.referralCode || '',
+              userId,
+              conversionType: 'claim',
+              tier: paidTier,
+              platform: 'web',
+              grossPriceCents: 0,
+              status: 'active',
+            });
+            await db
+              .update(referralUserLinks)
+              .set({ isPaid: true, paidTier, paidAt: new Date() })
+              .where(and(
+                eq(referralUserLinks.userId, userId),
+                eq(referralUserLinks.referralPartnerId, referralPartnerId),
+              ));
+          }
         }
       } else if (referralSourceOther !== undefined) {
         // "Other" selected — save free-text attribution, remove links and partner fields

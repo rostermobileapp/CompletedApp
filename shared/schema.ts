@@ -3930,6 +3930,7 @@ export const referralConversions = pgTable("referral_conversions", {
   referralCode: varchar("referral_code", { length: 20 }).notNull(),
   userId: varchar("user_id"),
   revenuecatEventId: varchar("revenuecat_event_id", { length: 255 }).unique(),
+  conversionType: varchar("conversion_type", { length: 20 }).default("initial_purchase"),
   tier: varchar("tier", { length: 100 }),
   platform: referralPlatformEnum("platform"),
   grossPriceCents: integer("gross_price_cents").notNull().default(0),

@@ -1796,6 +1796,85 @@ export function registerReferralRoutes(app: Express) {
         return res.json({ processed: true });
       }
 
+      if (eventType === "RENEWAL") {
+        // Find the partner — first via referralCode in subscriber attributes,
+        // then fall back to the user's saved referralPartnerId in our DB.
+        let renewalPartner: typeof referralPartners.$inferSelect | null = null;
+
+        if (referralCode) {
+          const [p] = await db
+            .select()
+            .from(referralPartners)
+            .where(and(eq(referralPartners.referralCode, referralCode), eq(referralPartners.status, "approved")))
+            .limit(1);
+          if (p) renewalPartner = p;
+        }
+
+        if (!renewalPartner && appUserId) {
+          const [userRow] = await db
+            .select({ referralPartnerId: users.referralPartnerId })
+            .from(users)
+            .where(eq(users.id, appUserId))
+            .limit(1);
+          if (userRow?.referralPartnerId) {
+            const [p] = await db
+              .select()
+              .from(referralPartners)
+              .where(and(eq(referralPartners.id, userRow.referralPartnerId), eq(referralPartners.status, "approved")))
+              .limit(1);
+            if (p) renewalPartner = p;
+          }
+        }
+
+        if (!renewalPartner) {
+          console.log(`[RCWebhook] RENEWAL — no referral partner found for userId=${appUserId}, code=${referralCode}`);
+          return res.json({ processed: false, reason: "no_referral_partner" });
+        }
+
+        // Deduplicate by eventId
+        if (eventId) {
+          const [existing] = await db
+            .select({ id: referralConversions.id })
+            .from(referralConversions)
+            .where(eq(referralConversions.revenuecatEventId, eventId))
+            .limit(1);
+          if (existing) {
+            console.log(`[RCWebhook] RENEWAL already processed (${eventId})`);
+            return res.json({ processed: false, reason: "duplicate" });
+          }
+        }
+
+        // Record a new conversion row for this billing period
+        await db.insert(referralConversions).values({
+          partnerId: renewalPartner.id,
+          referralCode: referralCode || renewalPartner.referralCode || '',
+          userId: appUserId || null,
+          revenuecatEventId: eventId || null,
+          conversionType: 'renewal',
+          tier: productId || null,
+          platform,
+          grossPriceCents: priceCents,
+          status: "active",
+        });
+
+        // Ensure userLink stays marked as paid
+        const paidTier = productId
+          ? productId.toLowerCase().includes("commissioner") ? "commissioner" : "player_pro"
+          : null;
+        if (appUserId) {
+          await db
+            .update(referralUserLinks)
+            .set({ isPaid: true, paidTier, paidAt: new Date() })
+            .where(and(
+              eq(referralUserLinks.userId, appUserId),
+              eq(referralUserLinks.referralPartnerId, renewalPartner.id),
+            ));
+        }
+
+        console.log(`[RCWebhook] RENEWAL recorded for ${renewalPartner.referralCode} — ${productId} $${(priceCents / 100).toFixed(2)}`);
+        return res.json({ processed: true });
+      }
+
       if (eventType === "CANCELLATION" || eventType === "REFUND") {
         const newStatus: ReferralConversionStatus = eventType === "REFUND" ? "refunded" : "cancelled";
 
