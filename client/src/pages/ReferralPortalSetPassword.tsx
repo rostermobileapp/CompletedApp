@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Lock, Eye, EyeOff, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Link } from 'wouter';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
@@ -120,7 +120,6 @@ export default function ReferralPortalSetPassword() {
               <div>
                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1">New Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     id="password"
                     type={showPw ? 'text' : 'password'}
@@ -128,7 +127,7 @@ export default function ReferralPortalSetPassword() {
                     onChange={e => { setPassword(e.target.value); setSubmitStatus('idle'); }}
                     placeholder="At least 8 characters"
                     required
-                    className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
+                    className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
                   />
                   <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -138,7 +137,6 @@ export default function ReferralPortalSetPassword() {
               <div>
                 <label htmlFor="confirm" className="block text-sm font-semibold text-gray-700 mb-1">Confirm Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     id="confirm"
                     type={showConfirm ? 'text' : 'password'}
@@ -146,7 +144,7 @@ export default function ReferralPortalSetPassword() {
                     onChange={e => { setConfirm(e.target.value); setSubmitStatus('idle'); }}
                     placeholder="Re-enter your password"
                     required
-                    className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
+                    className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
                   />
                   <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

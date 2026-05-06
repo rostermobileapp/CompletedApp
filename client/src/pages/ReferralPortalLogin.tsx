@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
 export default function ReferralPortalLogin() {
@@ -67,7 +67,6 @@ export default function ReferralPortalLogin() {
             <div>
               <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   id="password"
                   type={showPw ? 'text' : 'password'}
@@ -75,7 +74,7 @@ export default function ReferralPortalLogin() {
                   onChange={e => { setPassword(e.target.value); setStatus('idle'); }}
                   placeholder="Your password"
                   required
-                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
+                  className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
                 />
                 <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
