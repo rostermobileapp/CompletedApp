@@ -146,6 +146,22 @@ export async function initReferralDb(): Promise<void> {
         ADD COLUMN IF NOT EXISTS referral_source_other TEXT;
     `);
 
+    // Add FK constraint from users.referral_partner_id → referral_partners.id if missing
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'fk_users_referral_partner_id'
+        ) THEN
+          ALTER TABLE users
+            ADD CONSTRAINT fk_users_referral_partner_id
+            FOREIGN KEY (referral_partner_id)
+            REFERENCES referral_partners(id)
+            ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `);
+
     console.log('[Init] Referral program tables ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure referral program tables:', err);

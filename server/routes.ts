@@ -933,7 +933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [partnerRow] = await db
           .select({ id: referralPartners.id, referralCode: referralPartners.referralCode })
           .from(referralPartners)
-          .where(eq(referralPartners.id, referralPartnerId))
+          .where(and(eq(referralPartners.id, referralPartnerId), eq(referralPartners.status, 'approved')))
           .limit(1);
 
         if (partnerRow) {

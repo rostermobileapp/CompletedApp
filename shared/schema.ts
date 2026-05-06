@@ -286,7 +286,7 @@ export const users = pgTable("users", {
   selectedFacilityId: varchar("selected_facility_id"),
   // Referral attribution (set during onboarding)
   referralCode: varchar("referral_code", { length: 20 }),
-  referralPartnerId: varchar("referral_partner_id"),
+  referralPartnerId: varchar("referral_partner_id").references(() => referralPartners.id, { onDelete: 'set null' }),
   referralSourceOther: text("referral_source_other"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

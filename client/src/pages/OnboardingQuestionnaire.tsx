@@ -581,11 +581,11 @@ export default function OnboardingQuestionnaire() {
                 }}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:border-[#3c82f4] transition-colors appearance-none"
               >
-                <option value="">— None —</option>
                 {approvedPartners.map(p => (
                   <option key={p.id} value={p.id}>{p.orgName}</option>
                 ))}
                 <option value="other">Other</option>
+                <option value="">— None —</option>
               </select>
               {state.referralPartnerId === 'other' && (
                 <textarea
