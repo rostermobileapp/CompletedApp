@@ -88,13 +88,14 @@ export async function sendNewApplicationAdminEmail(
  */
 export async function sendPartnerApprovalEmail(
   toEmail: string,
-  data: { orgName: string; contactName: string; referralCode: string },
+  data: { orgName: string; contactName: string; referralCode: string; setupLink?: string },
   customTemplate?: string
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     const portalUrl = `https://www.roster-app.com/referral-program/portal`;
     const loginUrl = `https://www.roster-app.com/referral-program/portal/login`;
+    const setupLink = data.setupLink || loginUrl;
 
     let html: string;
     if (customTemplate && customTemplate.trim()) {
@@ -104,6 +105,7 @@ export async function sendPartnerApprovalEmail(
         referralCode: data.referralCode,
         loginUrl,
         portalUrl,
+        setupLink,
       };
       html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
     } else {
@@ -112,14 +114,17 @@ export async function sendPartnerApprovalEmail(
         <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, congratulations! Your application for <strong>${data.orgName}</strong> has been approved.</p>
         <h3 style="margin:0 0 12px 0;color:#111827;font-size:16px;">Getting Started</h3>
         <ol style="margin:0 0 24px 0;padding-left:24px;color:#374151;font-size:14px;line-height:24px;">
-          <li>Log in to your partner portal to find your unique referral code</li>
-          <li>Share your code with your organization members and hockey community</li>
+          <li><strong>Create your password</strong> using the button below — this link is valid for 24 hours</li>
+          <li>Share your referral code with your organization members and hockey community</li>
           <li>When someone signs up for Roster and enters your code during onboarding, the conversion is automatically tracked</li>
           <li>Earn commissions on net revenue for every active subscriber you refer</li>
           <li>View your stats and payout history anytime in your portal</li>
         </ol>
-        <a href="${loginUrl}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:14px;">Access Your Partner Portal</a>
-        <p style="margin:20px 0 0 0;font-size:13px;color:#6b7280;">Partner portal: <a href="${portalUrl}" style="color:#3b82f6;">${portalUrl}</a></p>
+        <div style="text-align:center;margin:32px 0;">
+          <a href="${setupLink}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:16px;">Create Your Password</a>
+        </div>
+        <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-align:center;">This link expires in 24 hours. After setting your password you can sign in anytime at:</p>
+        <p style="margin:0;font-size:13px;text-align:center;"><a href="${loginUrl}" style="color:#3b82f6;">${loginUrl}</a></p>
       `);
     }
 
@@ -184,49 +189,34 @@ export async function sendPartnerRejectionEmail(
 }
 
 /**
- * Send magic-link login email to a partner.
- * If `customTemplate` is provided and non-empty, it is used as the email body.
- *
- * Supported template variables:
- *   {{contactName}}, {{magicLink}}
+ * Send a password reset / setup email to a partner.
  */
-export async function sendMagicLinkEmail(
+export async function sendPasswordResetEmail(
   toEmail: string,
-  data: { contactName: string; magicLink: string },
-  customTemplate?: string
+  data: { contactName: string; resetLink: string }
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-
-    let html: string;
-    if (customTemplate && customTemplate.trim()) {
-      const vars: Record<string, string> = {
-        contactName: data.contactName,
-        magicLink: data.magicLink,
-        link: data.magicLink,
-      };
-      html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
-    } else {
-      html = emailWrapper(`
-        <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Sign In to Your Partner Portal</h2>
-        <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, click the button below to sign in to your Roster Referral Partner Portal.</p>
-        <div style="text-align:center;margin:32px 0;">
-          <a href="${data.magicLink}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:16px;">Sign In to Portal</a>
-        </div>
-        <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-align:center;">This link expires in 1 hour and can only be used once.</p>
-        <p style="margin:0;font-size:13px;color:#6b7280;text-align:center;">If you didn't request this, you can safely ignore this email.</p>
-      `);
-    }
-
+    const loginUrl = `https://www.roster-app.com/referral-program/portal/login`;
+    const html = emailWrapper(`
+      <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Reset Your Partner Portal Password</h2>
+      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${data.contactName}, click the button below to set a new password for your Roster Partner Portal.</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${data.resetLink}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:16px;">Set New Password</a>
+      </div>
+      <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-align:center;">This link expires in 1 hour and can only be used once.</p>
+      <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-align:center;">If you didn't request this, you can safely ignore this email.</p>
+      <p style="margin:16px 0 0 0;font-size:13px;text-align:center;color:#6b7280;">Sign in at: <a href="${loginUrl}" style="color:#3b82f6;">${loginUrl}</a></p>
+    `);
     await client.emails.send({
       from: fromEmail,
       to: toEmail,
-      subject: 'Your Roster Partner Portal Login Link',
+      subject: 'Reset Your Roster Partner Portal Password',
       html,
     });
-    console.log(`[ReferralEmail] Sent magic link email to ${toEmail}`);
+    console.log(`[ReferralEmail] Sent password reset email to ${toEmail}`);
   } catch (err) {
-    console.error('[ReferralEmail] Failed to send magic link email:', err);
+    console.error('[ReferralEmail] Failed to send password reset email:', err);
   }
 }
 

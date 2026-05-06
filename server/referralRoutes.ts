@@ -24,7 +24,7 @@ import {
   sendNewApplicationAdminEmail,
   sendPartnerApprovalEmail,
   sendPartnerRejectionEmail,
-  sendMagicLinkEmail,
+  sendPasswordResetEmail,
   sendPartnerCustomEmail,
 } from "./referralEmails";
 
@@ -344,57 +344,33 @@ export function registerReferralRoutes(app: Express) {
     }
   );
 
-  // ── Partner portal: request magic link ────────────────────────────────────
-  app.post("/api/referral/portal/request-link", async (req, res) => {
+  // ── Partner portal: forgot password ──────────────────────────────────────
+  app.post("/api/referral/portal/forgot-password", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "email is required" });
     try {
       const [partner] = await db
         .select()
         .from(referralPartners)
-        .where(eq(referralPartners.email, email.toLowerCase().trim()))
+        .where(and(eq(referralPartners.email, (email as string).toLowerCase().trim()), eq(referralPartners.status, "approved")))
         .limit(1);
-
-      if (!partner) {
-        return res.status(404).json({ message: "No partner account found for this email. Please check for typos or apply to become a partner." });
+      // Always return success to avoid leaking whether email is registered
+      if (partner) {
+        const token = randomBytes(48).toString("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        await db.insert(referralMagicLinks).values({ partnerId: partner.id, token, expiresAt });
+        const resetLink = `https://www.roster-app.com/referral-program/portal/set-password?token=${token}`;
+        await sendPasswordResetEmail(partner.email, { contactName: partner.contactName, resetLink });
       }
-      if (partner.status !== "approved") {
-        return res.status(403).json({
-          message:
-            partner.status === "pending"
-              ? "Your application is still pending review."
-              : "Your partner account is not active.",
-        });
-      }
-
-      // Generate token
-      const token = randomBytes(48).toString("hex");
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-      await db.insert(referralMagicLinks).values({
-        partnerId: partner.id,
-        token,
-        expiresAt,
-      });
-
-      // Link targets the backend auth endpoint directly; that endpoint sets
-      // the session cookie and redirects the browser to the partner portal.
-      const magicLink = `https://www.roster-app.com/referral-program/portal/auth?token=${token}`;
-      const magicLinkSettings = await getSettings();
-      await sendMagicLinkEmail(
-        email,
-        { contactName: partner.contactName, magicLink },
-        magicLinkSettings.magic_link_email_template || undefined,
-      );
-
-      res.json({ message: "If this email is registered, a login link has been sent." });
+      res.json({ success: true });
     } catch (err) {
-      console.error("[Referral] request-link error:", err);
-      res.status(500).json({ message: "Failed to send login link" });
+      console.error("[Referral] forgot-password error:", err);
+      res.status(500).json({ message: "Failed to send reset email" });
     }
   });
 
-  // ── Partner portal: validate magic link token ─────────────────────────────
-  app.get("/api/referral/portal/auth", async (req, res) => {
+  // ── Partner portal: validate reset token (peek — does not consume it) ────
+  app.get("/api/referral/portal/validate-reset-token", async (req, res) => {
     const token = (req.query.token as string || "").trim();
     if (!token) return res.status(400).json({ message: "token is required" });
     try {
@@ -403,12 +379,30 @@ export function registerReferralRoutes(app: Express) {
         .from(referralMagicLinks)
         .where(eq(referralMagicLinks.token, token))
         .limit(1);
+      if (!link || link.usedAt || new Date() > link.expiresAt) {
+        return res.status(401).json({ message: "Invalid or expired token" });
+      }
+      return res.json({ valid: true });
+    } catch (err) {
+      return res.status(500).json({ message: "Validation failed" });
+    }
+  });
 
-      if (!link) return res.status(401).json({ message: "Invalid or expired link" });
-      if (link.usedAt) return res.status(401).json({ message: "Link already used" });
-      if (new Date() > link.expiresAt) return res.status(401).json({ message: "Link has expired" });
-
-      // Verify partner is still approved
+  // ── Partner portal: set password via reset token ──────────────────────────
+  app.post("/api/referral/portal/set-password", async (req, res) => {
+    const { token, password } = req.body;
+    if (!token || !password || typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ message: "Valid token and password (min 8 characters) are required" });
+    }
+    try {
+      const [link] = await db
+        .select()
+        .from(referralMagicLinks)
+        .where(eq(referralMagicLinks.token, token as string))
+        .limit(1);
+      if (!link || link.usedAt || new Date() > link.expiresAt) {
+        return res.status(401).json({ message: "This link has expired or already been used. Please request a new one." });
+      }
       const [partner] = await db
         .select()
         .from(referralPartners)
@@ -416,48 +410,15 @@ export function registerReferralRoutes(app: Express) {
         .limit(1);
       if (!partner) return res.status(403).json({ message: "Partner account is not active" });
 
-      // Mark token used
-      await db
-        .update(referralMagicLinks)
-        .set({ usedAt: new Date() })
-        .where(eq(referralMagicLinks.id, link.id));
+      // Mark token used and save password hash in one go
+      const hash = await bcrypt.hash(password, 12);
+      await db.update(referralMagicLinks).set({ usedAt: new Date() }).where(eq(referralMagicLinks.id, link.id));
+      await db.update(referralPartners).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(referralPartners.id, partner.id));
 
-      // Issue session cookie
+      // Issue session so they land directly in the portal
       const sessionToken = generateSessionToken();
       partnerSessions.set(sessionToken, partner.id);
       res.cookie("roster_partner_session", sessionToken, SESSION_COOKIE_OPTIONS);
-
-      const needsPassword = !partner.passwordHash;
-
-      // Accept header check: if the caller explicitly wants JSON (API client),
-      // return JSON; otherwise redirect to the portal page.
-      const wantsJson = (req.headers.accept || "").includes("application/json");
-      if (wantsJson) {
-        return res.json({ success: true, partnerId: partner.id, needsPassword });
-      }
-      const dest = needsPassword
-        ? `${getAppUrl()}/referral-program/portal/set-password`
-        : `${getAppUrl()}/referral-program/portal`;
-      return res.redirect(302, dest);
-    } catch (err) {
-      console.error("[Referral] portal/auth error:", err);
-      res.status(500).json({ message: "Authentication failed" });
-    }
-  });
-
-  // ── Partner portal: set password (requires active session) ───────────────
-  app.post("/api/referral/portal/set-password", requirePartnerAuth, async (req: Request, res: Response) => {
-    const { password } = req.body;
-    if (!password || typeof password !== "string" || password.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters" });
-    }
-    try {
-      const partnerId = (req as any).partnerId as string;
-      const hash = await bcrypt.hash(password, 12);
-      await db
-        .update(referralPartners)
-        .set({ passwordHash: hash, updatedAt: new Date() })
-        .where(eq(referralPartners.id, partnerId));
       return res.json({ success: true });
     } catch (err) {
       console.error("[Referral] set-password error:", err);
@@ -804,10 +765,18 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPartners.id, req.params.id))
         .returning();
 
+      // Generate a one-time password setup token (24h) included in the approval email
+      const setupToken = randomBytes(48).toString("hex");
+      await db.insert(referralMagicLinks).values({
+        partnerId: updated.id,
+        token: setupToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+      const setupLink = `https://www.roster-app.com/referral-program/portal/set-password?token=${setupToken}`;
       const approvalSettings = await getSettings();
       await sendPartnerApprovalEmail(
         partner.email,
-        { orgName: partner.orgName, contactName: partner.contactName, referralCode },
+        { orgName: partner.orgName, contactName: partner.contactName, referralCode, setupLink },
         approvalSettings.approval_email_template || undefined,
       );
 
@@ -1159,10 +1128,18 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPartners.id, req.params.id))
         .limit(1);
       if (!partner) return res.status(404).json({ message: "Partner not found" });
+      // Generate a fresh password setup token (24h) to include in the welcome email
+      const setupToken = randomBytes(48).toString("hex");
+      await db.insert(referralMagicLinks).values({
+        partnerId: partner.id,
+        token: setupToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+      const setupLink = `https://www.roster-app.com/referral-program/portal/set-password?token=${setupToken}`;
       const settings = await getSettings();
       await sendPartnerApprovalEmail(
         partner.email,
-        { orgName: partner.orgName, contactName: partner.contactName, referralCode: partner.referralCode || "" },
+        { orgName: partner.orgName, contactName: partner.contactName, referralCode: partner.referralCode || "", setupLink },
         settings.approval_email_template || undefined,
       );
       res.json({ success: true });
@@ -1195,7 +1172,7 @@ export function registerReferralRoutes(app: Express) {
     }
   });
 
-  // ── Admin: resend login (magic link) email ────────────────────────────────
+  // ── Admin: send password reset email ─────────────────────────────────────
   app.post("/api/admin/referrals/partners/:id/resend-login", requireAdminAuth, async (req, res) => {
     try {
       const [partner] = await db
@@ -1205,22 +1182,17 @@ export function registerReferralRoutes(app: Express) {
         .limit(1);
       if (!partner) return res.status(404).json({ message: "Partner not found" });
       if (partner.status !== "approved") {
-        return res.status(400).json({ message: "Login links can only be sent to approved partners" });
+        return res.status(400).json({ message: "Password reset links can only be sent to approved partners" });
       }
       const token = randomBytes(48).toString("hex");
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
       await db.insert(referralMagicLinks).values({ partnerId: partner.id, token, expiresAt });
-      const magicLink = `https://www.roster-app.com/referral-program/portal/auth?token=${token}`;
-      const settings = await getSettings();
-      await sendMagicLinkEmail(
-        partner.email,
-        { contactName: partner.contactName, magicLink },
-        settings.magic_link_email_template || undefined,
-      );
+      const resetLink = `https://www.roster-app.com/referral-program/portal/set-password?token=${token}`;
+      await sendPasswordResetEmail(partner.email, { contactName: partner.contactName, resetLink });
       res.json({ success: true });
     } catch (err) {
       console.error("[Referral] admin/resend-login error:", err);
-      res.status(500).json({ message: "Failed to send login link" });
+      res.status(500).json({ message: "Failed to send password reset email" });
     }
   });
 

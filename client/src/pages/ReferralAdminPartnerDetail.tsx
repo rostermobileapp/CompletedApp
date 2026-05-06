@@ -400,7 +400,7 @@ export default function ReferralAdminPartnerDetail() {
                   {resendingWelcome ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> : <MailCheck className="w-4 h-4 mr-1.5" />}Resend Welcome
                 </Button>
                 <Button size="sm" variant="outline" disabled={resendingLogin} onClick={resendLogin}>
-                  {resendingLogin ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> : <Mail className="w-4 h-4 mr-1.5" />}Send Login Link
+                  {resendingLogin ? <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> : <Mail className="w-4 h-4 mr-1.5" />}Send Password Reset
                 </Button>
                 <Button size="sm" variant="outline" className="text-orange-600 border-orange-200 hover:bg-orange-50" onClick={suspend}>
                   <PauseCircle className="w-4 h-4 mr-1.5" />Suspend & Archive

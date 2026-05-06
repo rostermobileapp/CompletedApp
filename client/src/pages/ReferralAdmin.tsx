@@ -606,7 +606,7 @@ function ApplicationsTab() {
                       {resendingEmail === `welcome-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <MailCheck className="w-4 h-4 mr-2" />}Resend Welcome
                     </Button>
                     <Button variant="outline" disabled={resendingEmail === `login-${selected.id}`} onClick={() => resendLogin(selected.id)}>
-                      {resendingEmail === `login-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Link className="w-4 h-4 mr-2" />}Send Login Link
+                      {resendingEmail === `login-${selected.id}` ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Link className="w-4 h-4 mr-2" />}Send Password Reset
                     </Button>
                     <Button variant="outline" onClick={() => { setEditCodeModal(selected); setNewCode(selected.referralCode || ""); setSelected(null); }}>
                       <Pencil className="w-4 h-4 mr-2" />Edit Code

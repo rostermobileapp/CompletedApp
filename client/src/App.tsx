@@ -86,6 +86,7 @@ import ReferralProgram from "@/pages/ReferralProgram";
 import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
 import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
 import ReferralPortalSetPassword from "@/pages/ReferralPortalSetPassword";
+import ReferralPortalForgotPassword from "@/pages/ReferralPortalForgotPassword";
 import ReferralPortal from "@/pages/ReferralPortal";
 import ReferralAdmin from "@/pages/ReferralAdmin";
 import ReferralAdminLogin from "@/pages/ReferralAdminLogin";
@@ -210,6 +211,7 @@ function Router() {
           <Route path="/facilities/:id" component={FacilityDetail} />
           <Route path="/referral-program/portal/auth" component={ReferralPortalAuth} />
           <Route path="/referral-program/portal/set-password" component={ReferralPortalSetPassword} />
+          <Route path="/referral-program/portal/forgot-password" component={ReferralPortalForgotPassword} />
           <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
           <Route path="/referral-program/portal" component={ReferralPortal} />
           <Route path="/referral-program" component={ReferralProgram} />
@@ -302,6 +304,7 @@ function Router() {
               <Route path="/media/team/:id" component={MediaGalleryPage} />
               <Route path="/referral-program/portal/auth" component={ReferralPortalAuth} />
               <Route path="/referral-program/portal/set-password" component={ReferralPortalSetPassword} />
+              <Route path="/referral-program/portal/forgot-password" component={ReferralPortalForgotPassword} />
               <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
               <Route path="/referral-program/portal" component={ReferralPortal} />
               <Route path="/referral-program" component={ReferralProgram} />
