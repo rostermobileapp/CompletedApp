@@ -532,16 +532,29 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPayouts.partnerId, partnerId))
         .orderBy(desc(referralPayouts.paidAt));
 
-      // Referral user links stats
-      const userLinks = await db
-        .select()
+      // Referral user links stats — join users for name/email/role
+      const userLinksDetailed = await db
+        .select({
+          id: referralUserLinks.id,
+          userId: referralUserLinks.userId,
+          isPaid: referralUserLinks.isPaid,
+          paidTier: referralUserLinks.paidTier,
+          linkedAt: referralUserLinks.linkedAt,
+          paidAt: referralUserLinks.paidAt,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          role: users.role,
+        })
         .from(referralUserLinks)
-        .where(eq(referralUserLinks.referralPartnerId, partnerId));
-      const totalReferred = userLinks.length;
-      const totalPaid = userLinks.filter((l) => l.isPaid).length;
+        .leftJoin(users, eq(referralUserLinks.userId, users.id))
+        .where(eq(referralUserLinks.referralPartnerId, partnerId))
+        .orderBy(desc(referralUserLinks.linkedAt));
+      const totalReferred = userLinksDetailed.length;
+      const totalPaid = userLinksDetailed.filter((l) => l.isPaid).length;
       const conversionRate = totalReferred > 0 ? Math.round((totalPaid / totalReferred) * 1000) / 10 : 0;
       const tierBreakdownLinks: Record<string, number> = {};
-      for (const l of userLinks.filter((l) => l.isPaid && l.paidTier)) {
+      for (const l of userLinksDetailed.filter((l) => l.isPaid && l.paidTier)) {
         const t = l.paidTier!;
         tierBreakdownLinks[t] = (tierBreakdownLinks[t] || 0) + 1;
       }
@@ -564,6 +577,13 @@ export function registerReferralRoutes(app: Express) {
           totalPaid,
           conversionRate,
           tierBreakdownLinks,
+        },
+        userLinks: {
+          total: totalReferred,
+          paid: totalPaid,
+          free: totalReferred - totalPaid,
+          conversionRate,
+          rows: userLinksDetailed,
         },
         quarterEstimate: {
           quarter: q,
@@ -1128,6 +1148,7 @@ export function registerReferralRoutes(app: Express) {
           firstName: users.firstName,
           lastName: users.lastName,
           email: users.email,
+          role: users.role,
         })
         .from(referralUserLinks)
         .leftJoin(users, eq(referralUserLinks.userId, users.id))

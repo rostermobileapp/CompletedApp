@@ -95,6 +95,12 @@ interface UserLink {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
+  role: string | null;
+}
+
+function formatRole(role: string | null | undefined): string {
+  if (!role) return '—';
+  return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 interface UserLinks {
@@ -566,7 +572,7 @@ export default function ReferralAdminPartnerDetail() {
                             {l.isPaid ? 'Paid' : 'Free'}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600 capitalize">{l.paidTier ? l.paidTier.replace(/_/g, ' ') : '—'}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{formatRole(l.role)}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{fmtDate(l.paidAt)}</td>
                       </tr>
                     )})}

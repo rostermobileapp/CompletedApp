@@ -3,9 +3,22 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation, Link } from 'wouter';
 import {
   Copy, Check, LogOut, TrendingUp, Users, DollarSign,
-  ChevronLeft, ChevronRight, Loader2, AlertCircle,
+  ChevronLeft, ChevronRight, Loader2, AlertCircle, Search, Download,
 } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
+
+interface UserLink {
+  id: string;
+  userId: string;
+  isPaid: boolean;
+  paidTier: string | null;
+  linkedAt: string;
+  paidAt: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  role: string | null;
+}
 
 interface PartnerMe {
   partner: {
@@ -22,6 +35,13 @@ interface PartnerMe {
     totalPaid: number;
     conversionRate: number;
     tierBreakdownLinks: Record<string, number>;
+  };
+  userLinks: {
+    total: number;
+    paid: number;
+    free: number;
+    conversionRate: number;
+    rows: UserLink[];
   };
   quarterEstimate: {
     quarter: string;
@@ -49,6 +69,11 @@ interface PartnerMe {
     status: string;
     paidAt: string | null;
   }>;
+}
+
+function formatRole(role: string | null | undefined): string {
+  if (!role) return '—';
+  return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 const CONVERSIONS_PER_PAGE = 10;
@@ -108,6 +133,7 @@ function CopyableCode({ code }: { code: string }) {
 export default function ReferralPortal() {
   const [, setLocation] = useLocation();
   const [convPage, setConvPage] = useState(1);
+  const [userLinkSearch, setUserLinkSearch] = useState('');
 
   const { data, isLoading, isError, error } = useQuery<PartnerMe>({
     queryKey: ['/api/referral/portal/me'],
@@ -157,7 +183,7 @@ export default function ReferralPortal() {
     );
   }
 
-  const { partner, stats, quarterEstimate, conversions, payouts } = data!;
+  const { partner, stats, userLinks, quarterEstimate, conversions, payouts } = data!;
   const totalConvPages = Math.max(1, Math.ceil(conversions.length / CONVERSIONS_PER_PAGE));
   const convSlice = conversions.slice((convPage - 1) * CONVERSIONS_PER_PAGE, convPage * CONVERSIONS_PER_PAGE);
   const quarterlyEst = (quarterEstimate.estimatedPayoutCents ?? 0) / 100;
@@ -231,6 +257,112 @@ export default function ReferralPortal() {
             sub="this quarter"
           />
         </div>
+
+        {/* Referred Users */}
+        {userLinks && (
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+              <h3 className="text-sm font-semibold text-gray-700">Referred Users ({userLinks.total})</h3>
+              <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
+                <span>Paid: <strong className="text-gray-900">{userLinks.paid}</strong></span>
+                <span>Free: <strong className="text-gray-900">{userLinks.free}</strong></span>
+                <span>Conv.: <strong className="text-gray-900">{userLinks.conversionRate}%</strong></span>
+                <button
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  onClick={() => {
+                    const header = "Name,Email,Status,Tier,Linked At,Paid At";
+                    const lines = userLinks.rows.map(l =>
+                      [
+                        [l.firstName, l.lastName].filter(Boolean).join(' ') || '',
+                        l.email ?? '',
+                        l.isPaid ? 'Paid' : 'Free',
+                        formatRole(l.role),
+                        l.linkedAt ?? '',
+                        l.paidAt ?? '',
+                      ].join(',')
+                    );
+                    const csv = [header, ...lines].join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `referred-users.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="w-3 h-3" />Export CSV
+                </button>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-b border-gray-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={userLinkSearch}
+                  onChange={e => setUserLinkSearch(e.target.value)}
+                  placeholder="Filter by name, email, or tier…"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#3c82f4]"
+                />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Linked</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Name</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Email</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Tier</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Paid At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {userLinks.rows
+                    .filter(l => {
+                      if (!userLinkSearch.trim()) return true;
+                      const q = userLinkSearch.toLowerCase();
+                      const fullName = [l.firstName, l.lastName].filter(Boolean).join(' ').toLowerCase();
+                      return (
+                        fullName.includes(q) ||
+                        (l.email ?? '').toLowerCase().includes(q) ||
+                        formatRole(l.role).toLowerCase().includes(q)
+                      );
+                    })
+                    .map(l => {
+                      const fullName = [l.firstName, l.lastName].filter(Boolean).join(' ') || '—';
+                      return (
+                        <tr key={l.id} className="border-b border-gray-50 last:border-0">
+                          <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{fmtDate(l.linkedAt)}</td>
+                          <td className="px-4 py-2.5 text-sm text-gray-800 font-medium">{fullName}</td>
+                          <td className="px-4 py-2.5 text-sm text-gray-500 hidden sm:table-cell">{l.email ?? '—'}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${l.isPaid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                              {l.isPaid ? 'Paid' : 'Free'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-600">{formatRole(l.role)}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{l.paidAt ? fmtDate(l.paidAt) : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  {userLinks.rows.filter(l => {
+                    if (!userLinkSearch.trim()) return true;
+                    const q = userLinkSearch.toLowerCase();
+                    const fullName = [l.firstName, l.lastName].filter(Boolean).join(' ').toLowerCase();
+                    return fullName.includes(q) || (l.email ?? '').toLowerCase().includes(q) || formatRole(l.role).toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                      {userLinkSearch ? 'No users match your search.' : 'No referred users yet.'}
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Breakdown cards */}
         {(Object.keys(stats.tierBreakdownLinks ?? stats.tierBreakdown ?? {}).length > 0 || Object.keys(stats.platformBreakdown ?? {}).length > 0) && (
