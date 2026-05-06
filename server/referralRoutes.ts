@@ -1111,10 +1111,22 @@ export function registerReferralRoutes(app: Express) {
       const lifetimeEstimatedPayout = calcPayoutEstimate(lifetimeGross, platformFeePercent, payoutRate);
       const qGross = qConversions.reduce((s, c) => s + (c.grossPriceCents || 0), 0);
 
-      // User links for this partner
+      // User links for this partner — join users to get name + email
       const partnerUserLinks = await db
-        .select()
+        .select({
+          id: referralUserLinks.id,
+          userId: referralUserLinks.userId,
+          referralPartnerId: referralUserLinks.referralPartnerId,
+          isPaid: referralUserLinks.isPaid,
+          paidTier: referralUserLinks.paidTier,
+          linkedAt: referralUserLinks.linkedAt,
+          paidAt: referralUserLinks.paidAt,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
         .from(referralUserLinks)
+        .leftJoin(users, eq(referralUserLinks.userId, users.id))
         .where(eq(referralUserLinks.referralPartnerId, partner.id))
         .orderBy(desc(referralUserLinks.linkedAt));
 

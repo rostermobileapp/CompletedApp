@@ -92,6 +92,9 @@ interface UserLink {
   paidTier: string | null;
   linkedAt: string;
   paidAt: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
 }
 
 interface UserLinks {
@@ -482,10 +485,11 @@ export default function ReferralAdminPartnerDetail() {
                   className="h-8 text-xs gap-1"
                   onClick={() => {
                     const rows = userLinks.rows;
-                    const header = "User ID,Status,Tier,Linked At,Paid At";
+                    const header = "Name,Email,Status,Tier,Linked At,Paid At";
                     const lines = rows.map(l =>
                       [
-                        l.userId,
+                        [l.firstName, l.lastName].filter(Boolean).join(' ') || '',
+                        l.email ?? '',
                         l.isPaid ? "Paid" : "Free",
                         l.paidTier ?? "",
                         l.linkedAt ?? "",
@@ -514,7 +518,7 @@ export default function ReferralAdminPartnerDetail() {
                   type="text"
                   value={userLinkSearch}
                   onChange={e => setUserLinkSearch(e.target.value)}
-                  placeholder="Filter by user ID or tier…"
+                  placeholder="Filter by name, email, or tier…"
                   className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
                 />
               </div>
@@ -531,7 +535,8 @@ export default function ReferralAdminPartnerDetail() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">Linked</th>
-                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">User ID</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Name</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Email</th>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">Tier</th>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Paid At</th>
@@ -542,30 +547,36 @@ export default function ReferralAdminPartnerDetail() {
                     .filter(l => {
                       if (!userLinkSearch.trim()) return true;
                       const q = userLinkSearch.toLowerCase();
+                      const fullName = [l.firstName, l.lastName].filter(Boolean).join(' ').toLowerCase();
                       return (
-                        l.userId?.toLowerCase().includes(q) ||
+                        fullName.includes(q) ||
+                        (l.email ?? "").toLowerCase().includes(q) ||
                         (l.paidTier ?? "").toLowerCase().includes(q)
                       );
                     })
-                    .map((l) => (
-                    <tr key={l.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-4 py-2.5 text-xs text-gray-400">{fmtDate(l.linkedAt)}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-400 hidden sm:table-cell">{l.userId}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${l.isPaid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
-                          {l.isPaid ? 'Paid' : 'Free'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-gray-600 capitalize">{l.paidTier ? l.paidTier.replace(/_/g, ' ') : '—'}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{fmtDate(l.paidAt)}</td>
-                    </tr>
-                  ))}
+                    .map((l) => {
+                      const fullName = [l.firstName, l.lastName].filter(Boolean).join(' ') || '—';
+                      return (
+                      <tr key={l.id} className="border-b border-gray-50 last:border-0">
+                        <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{fmtDate(l.linkedAt)}</td>
+                        <td className="px-4 py-2.5 text-sm text-gray-800 font-medium">{fullName}</td>
+                        <td className="px-4 py-2.5 text-sm text-gray-500 hidden sm:table-cell">{l.email ?? '—'}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${l.isPaid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {l.isPaid ? 'Paid' : 'Free'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-600 capitalize">{l.paidTier ? l.paidTier.replace(/_/g, ' ') : '—'}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{fmtDate(l.paidAt)}</td>
+                      </tr>
+                    )})}
                   {userLinks.rows.filter(l => {
                     if (!userLinkSearch.trim()) return true;
                     const q = userLinkSearch.toLowerCase();
-                    return l.userId?.toLowerCase().includes(q) || (l.paidTier ?? "").toLowerCase().includes(q);
+                    const fullName = [l.firstName, l.lastName].filter(Boolean).join(' ').toLowerCase();
+                    return fullName.includes(q) || (l.email ?? "").toLowerCase().includes(q) || (l.paidTier ?? "").toLowerCase().includes(q);
                   }).length === 0 && (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                       {userLinkSearch ? "No users match your search." : "No referred users yet."}
                     </td></tr>
                   )}
