@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Settings, RefreshCw, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,9 @@ export default function ReferralAdminLogin() {
             Sign In
           </Button>
         </form>
+        <p className="text-center text-xs text-gray-400 mt-5">
+          <Link href="/" className="hover:text-gray-600 transition-colors">← Back to Home</Link>
+        </p>
       </div>
     </div>
   );
