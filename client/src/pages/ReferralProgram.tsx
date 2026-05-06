@@ -220,9 +220,7 @@ export default function ReferralProgram() {
       <section className="py-20 px-6 bg-white pt-[20px] pb-[20px]" id="payouts">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Payout Structure</h2>
-          <p className="text-gray-500 text-lg mb-10 max-w-2xl mx-auto">
-            Your payout is a percentage of the net subscription revenue — that's the subscription price after app store fees are deducted.
-          </p>
+          <p className="text-gray-500 text-lg mb-10 max-w-2xl mx-auto">Our donation in your name is a percentage of the net subscription revenue — that's the subscription price after app store fees are deducted.</p>
           <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 border border-[#3c82f4]/20 rounded-2xl p-8 text-left mb-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
               <div>
