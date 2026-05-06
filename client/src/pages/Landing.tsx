@@ -195,9 +195,7 @@ export default function Landing() {
               <br />
               <span className="text-[#3c82f4]">more hockey</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-8">
-              Built for hockey. Scheduling, RSVPs, rosters, stats, payments, and messaging — all in one place. No ads. Ever.
-            </p>
+            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-8">Built purely for hockey. Scheduling, RSVPs, rosters, stats, payments, messaging, smart brackets— all in one place. No ads. Ever.</p>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
