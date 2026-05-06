@@ -86,6 +86,8 @@ import ReferralProgram from "@/pages/ReferralProgram";
 import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
 import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
 import ReferralPortal from "@/pages/ReferralPortal";
+import ReferralAdmin from "@/pages/ReferralAdmin";
+import ReferralAdminPartnerDetail from "@/pages/ReferralAdminPartnerDetail";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -208,6 +210,8 @@ function Router() {
           <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
           <Route path="/referral-program/portal" component={ReferralPortal} />
           <Route path="/referral-program" component={ReferralProgram} />
+          <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
+          <Route path="/admin/referrals" component={ReferralAdmin} />
           <Route component={Landing} />
         </Switch>
       </>
@@ -296,6 +300,8 @@ function Router() {
               <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
               <Route path="/referral-program/portal" component={ReferralPortal} />
               <Route path="/referral-program" component={ReferralProgram} />
+              <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
+              <Route path="/admin/referrals" component={ReferralAdmin} />
               <Route path="/privacy" component={Privacy} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />

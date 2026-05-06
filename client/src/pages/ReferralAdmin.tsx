@@ -1,0 +1,1230 @@
+import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import {
+  LayoutDashboard, Users, UserCheck, RefreshCw, Settings,
+  ArrowRightLeft, DollarSign, LogOut, Search, ChevronUp, ChevronDown,
+  ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText,
+  X, Send, Pencil, Ban
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+// ── Admin fetch helper ──────────────────────────────────────────────────────
+const API = "";
+async function adminFetch(path: string, opts?: RequestInit) {
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+  });
+  return res;
+}
+
+function useAdminQuery<T>(key: string[], path: string, enabled = true) {
+  return useQuery<T>({
+    queryKey: key,
+    enabled,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const res = await adminFetch(path);
+      if (res.status === 401) throw new Error("UNAUTHORIZED");
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<T>;
+    },
+  });
+}
+
+// ── Types ───────────────────────────────────────────────────────────────────
+interface DashboardData {
+  activePartners: number;
+  pendingApplications: number;
+  totalConversionsAllTime: number;
+  quarterConversions: number;
+  quarterGrossRevenueCents: number;
+  quarterEstimatedPayoutsOwedCents: number;
+  ytdPayoutsIssuedCents: number;
+  top5Partners: { id: string; orgName: string; referralCode: string; quarterConversions: number }[];
+  recentActivity: { type: string; label: string; at: string }[];
+}
+
+interface Partner {
+  id: string;
+  orgName: string;
+  contactName: string;
+  email: string;
+  orgType: string;
+  hockeyAffiliation: string | null;
+  status: string;
+  referralCode: string | null;
+  payoutRate: string;
+  adminNotes: string | null;
+  proofDocumentPath: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+  activeConversions?: number;
+  quarterConversions?: number;
+  quarterNetRevenueCents?: number;
+  estimatedQuarterPayoutCents?: number;
+  lastConversionDate?: string | null;
+}
+
+interface Conversion {
+  id: string;
+  partnerId: string;
+  partnerOrgName: string;
+  referralCode: string;
+  userId: string | null;
+  tier: string | null;
+  platform: string | null;
+  grossPriceCents: number | null;
+  netCents: number;
+  status: string;
+  convertedAt: string;
+}
+
+interface PayoutHistory {
+  id: string;
+  partnerId: string;
+  partnerOrgName: string;
+  quarter: string;
+  amountCents: number;
+  method: string | null;
+  reference: string | null;
+  notes: string | null;
+  paidAt: string;
+}
+
+interface PayoutOwed {
+  partner: { id: string; orgName: string; referralCode: string; payoutRate: string };
+  quarterConversions: number;
+  grossRevenueCents: number;
+  netRevenueCents: number;
+  payoutRate: number;
+  amountOwedCents: number;
+  lastPayoutDate: string | null;
+}
+
+interface AdminSettings {
+  default_payout_rate: string;
+  platform_fee_percent: string;
+  admin_notification_email: string;
+  approval_email_template: string | null;
+  rejection_email_template: string | null;
+  magic_link_email_template: string | null;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const fmt$ = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const fmtDate = (d: string | null | undefined) =>
+  d ? new Date(d).toLocaleDateString() : "—";
+const statusColor = (s: string) =>
+  s === "approved" ? "bg-green-100 text-green-800" :
+  s === "pending"  ? "bg-yellow-100 text-yellow-800" :
+  s === "active"   ? "bg-blue-100 text-blue-800" :
+  "bg-red-100 text-red-800";
+
+function StatCard({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">{title}</p>
+      <p className="text-2xl font-bold text-gray-900">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Login form ───────────────────────────────────────────────────────────────
+function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/referrals/auth", {
+        method: "POST",
+        body: JSON.stringify({ password: pw }),
+      });
+      if (res.ok) {
+        onSuccess();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.message || "Invalid password");
+      }
+    } catch {
+      setErr("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mx-auto mb-3">
+            <Settings className="w-6 h-6 text-white" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">Admin Portal</h1>
+          <p className="text-sm text-gray-500 mt-1">Referral Partner Management</p>
+        </div>
+        {err && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{err}</AlertDescription>
+          </Alert>
+        )}
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <Label htmlFor="pw" className="text-gray-700">Admin Password</Label>
+            <Input
+              id="pw"
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="Enter password"
+              className="mt-1"
+              autoFocus
+            />
+          </div>
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
+            {loading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+            Sign In
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard Tab ────────────────────────────────────────────────────────────
+function DashboardTab() {
+  const { data, isLoading, error } = useAdminQuery<DashboardData>(
+    ["admin-referrals-dashboard"],
+    "/api/admin/referrals/dashboard"
+  );
+
+  if (isLoading) return <LoadingSpinner />;
+  if (error || !data) return <ErrorMsg msg={String(error)} />;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard title="Active Partners" value={data.activePartners} />
+        <StatCard title="Pending Applications" value={data.pendingApplications} sub="Awaiting review" />
+        <StatCard title="All-Time Conversions" value={data.totalConversionsAllTime} />
+        <StatCard title="Quarter Conversions" value={data.quarterConversions} />
+        <StatCard title="Quarter Gross Revenue" value={fmt$(data.quarterGrossRevenueCents)} />
+        <StatCard title="Est. Payouts Owed" value={fmt$(data.quarterEstimatedPayoutsOwedCents)} sub="This quarter" />
+        <StatCard title="YTD Payouts Issued" value={fmt$(data.ytdPayoutsIssuedCents)} />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <h3 className="font-semibold text-gray-800 mb-3">Top 5 Partners — This Quarter</h3>
+          {data.top5Partners.length === 0 ? (
+            <p className="text-sm text-gray-400">No conversions this quarter yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left pb-2 text-gray-500 font-medium">Org</th>
+                  <th className="text-left pb-2 text-gray-500 font-medium">Code</th>
+                  <th className="text-right pb-2 text-gray-500 font-medium">Conversions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.top5Partners.map((p) => (
+                  <tr key={p.id} className="border-b border-gray-50 last:border-0">
+                    <td className="py-1.5 font-medium text-gray-800">{p.orgName}</td>
+                    <td className="py-1.5 font-mono text-xs text-gray-500">{p.referralCode}</td>
+                    <td className="py-1.5 text-right font-semibold text-blue-600">{p.quarterConversions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <h3 className="font-semibold text-gray-800 mb-3">Recent Activity</h3>
+          {data.recentActivity.length === 0 ? (
+            <p className="text-sm text-gray-400">No recent activity.</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.recentActivity.map((a, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <span className={`mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold
+                    ${a.type === "conversion" ? "bg-blue-100 text-blue-700" :
+                      a.type === "approval" ? "bg-green-100 text-green-700" :
+                      "bg-yellow-100 text-yellow-700"}`}>
+                    {a.type === "conversion" ? "C" : a.type === "approval" ? "✓" : "A"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-gray-700 truncate">{a.label}</p>
+                    <p className="text-xs text-gray-400">{fmtDate(a.at)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Applications Tab ─────────────────────────────────────────────────────────
+function ApplicationsTab() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selected, setSelected] = useState<Partner | null>(null);
+  const [rejectModal, setRejectModal] = useState<Partner | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [payoutRateModal, setPayoutRateModal] = useState<Partner | null>(null);
+  const [newRate, setNewRate] = useState("");
+  const [docUrl, setDocUrl] = useState<string | null>(null);
+  const [loadingDoc, setLoadingDoc] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const params = new URLSearchParams();
+  if (statusFilter !== "all") params.set("status", statusFilter);
+  if (debouncedSearch) params.set("search", debouncedSearch);
+
+  const { data: apps, isLoading } = useAdminQuery<Partner[]>(
+    ["admin-referrals-applications", statusFilter, debouncedSearch],
+    `/api/admin/referrals/applications?${params}`
+  );
+
+  async function approve(id: string) {
+    try {
+      const res = await adminFetch(`/api/admin/referrals/applications/${id}/approve`, { method: "POST" });
+      const d = await res.json();
+      if (res.ok) {
+        toast({ title: "Approved!", description: `Referral code: ${d.referralCode}` });
+        qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+        qc.invalidateQueries({ queryKey: ["admin-referrals-dashboard"] });
+        setSelected(null);
+      } else {
+        toast({ title: "Error", description: d.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    }
+  }
+
+  async function reject(id: string) {
+    if (!rejectReason.trim()) return;
+    try {
+      const res = await adminFetch(`/api/admin/referrals/applications/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason: rejectReason }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        toast({ title: "Rejected", description: "Application rejected and email sent." });
+        qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+        setRejectModal(null);
+        setRejectReason("");
+        setSelected(null);
+      } else {
+        toast({ title: "Error", description: d.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    }
+  }
+
+  async function revoke(id: string) {
+    if (!confirm("Revoke access for this partner?")) return;
+    try {
+      const res = await adminFetch(`/api/admin/referrals/partners/${id}/revoke`, { method: "POST" });
+      if (res.ok) {
+        toast({ title: "Access revoked" });
+        qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+        setSelected(null);
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" });
+    }
+  }
+
+  async function saveNotes(id: string, notes: string) {
+    await adminFetch(`/api/admin/referrals/partners/${id}/notes`, {
+      method: "PATCH",
+      body: JSON.stringify({ adminNotes: notes }),
+    });
+  }
+
+  async function savePayoutRate(id: string) {
+    const rate = parseFloat(newRate);
+    if (isNaN(rate) || rate < 0 || rate > 1) {
+      toast({ title: "Invalid rate", description: "Enter a decimal between 0 and 1 (e.g. 0.20)", variant: "destructive" });
+      return;
+    }
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/payout-rate`, {
+      method: "PATCH",
+      body: JSON.stringify({ payoutRate: rate }),
+    });
+    if (res.ok) {
+      toast({ title: "Payout rate updated" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      setPayoutRateModal(null);
+    }
+  }
+
+  async function viewDoc(id: string) {
+    setLoadingDoc(true);
+    setDocUrl(null);
+    try {
+      const res = await adminFetch(`/api/admin/referrals/applications/${id}/document`);
+      if (res.ok) {
+        const d = await res.json();
+        window.open(d.url, "_blank");
+      } else {
+        toast({ title: "No document found", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error loading document", variant: "destructive" });
+    } finally {
+      setLoadingDoc(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input placeholder="Search org name or email…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? <LoadingSpinner /> : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Org Name</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Contact</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Email</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Type</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Applied</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(apps ?? []).map((app) => (
+                  <tr key={app.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                    <td className="px-4 py-3 font-medium text-gray-800">{app.orgName}</td>
+                    <td className="px-4 py-3 text-gray-600">{app.contactName}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{app.email}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden lg:table-cell">{app.orgType}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(app.status)}`}>
+                        {app.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 hidden sm:table-cell text-xs">{fmtDate(app.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setSelected(app); setEditNotes(app.adminNotes || ""); }}>
+                          <Eye className="w-3 h-3 mr-1" />Details
+                        </Button>
+                        {app.status === "pending" && (
+                          <>
+                            <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => approve(app.id)}>
+                              <CheckCircle className="w-3 h-3 mr-1" />Approve
+                            </Button>
+                            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => setRejectModal(app)}>
+                              <XCircle className="w-3 h-3 mr-1" />Reject
+                            </Button>
+                          </>
+                        )}
+                        {app.status === "approved" && (
+                          <>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setPayoutRateModal(app); setNewRate(app.payoutRate); }}>
+                              <DollarSign className="w-3 h-3 mr-1" />Rate
+                            </Button>
+                            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => revoke(app.id)}>
+                              <Ban className="w-3 h-3 mr-1" />Revoke
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!isLoading && (apps ?? []).length === 0 && (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No applications found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Detail modal */}
+      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selected?.orgName}</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-gray-500">Contact</Label><p className="mt-0.5">{selected.contactName}</p></div>
+                <div><Label className="text-gray-500">Email</Label><p className="mt-0.5">{selected.email}</p></div>
+                <div><Label className="text-gray-500">Org Type</Label><p className="mt-0.5">{selected.orgType}</p></div>
+                <div><Label className="text-gray-500">Status</Label>
+                  <span className={`inline-flex mt-0.5 items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(selected.status)}`}>
+                    {selected.status}
+                  </span>
+                </div>
+                <div className="col-span-2"><Label className="text-gray-500">Hockey Affiliation</Label><p className="mt-0.5">{selected.hockeyAffiliation || "—"}</p></div>
+                {selected.referralCode && (
+                  <div><Label className="text-gray-500">Referral Code</Label><p className="mt-0.5 font-mono font-bold text-blue-600">{selected.referralCode}</p></div>
+                )}
+                <div><Label className="text-gray-500">Payout Rate</Label><p className="mt-0.5">{(parseFloat(selected.payoutRate) * 100).toFixed(0)}%</p></div>
+                <div><Label className="text-gray-500">Applied</Label><p className="mt-0.5">{fmtDate(selected.createdAt)}</p></div>
+                {selected.approvedAt && (
+                  <div><Label className="text-gray-500">Approved</Label><p className="mt-0.5">{fmtDate(selected.approvedAt)}</p></div>
+                )}
+              </div>
+              {selected.proofDocumentPath && (
+                <Button variant="outline" size="sm" disabled={loadingDoc} onClick={() => viewDoc(selected.id)}>
+                  <FileText className="w-4 h-4 mr-2" />View Document
+                  {loadingDoc && <RefreshCw className="w-3 h-3 ml-2 animate-spin" />}
+                </Button>
+              )}
+              <div>
+                <Label className="text-gray-500">Admin Notes</Label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  onBlur={() => saveNotes(selected.id, editNotes)}
+                  placeholder="Internal notes (auto-saved on blur)…"
+                />
+              </div>
+              <div className="flex gap-2 flex-wrap pt-2">
+                {selected.status === "pending" && (
+                  <>
+                    <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => approve(selected.id)}>
+                      <CheckCircle className="w-4 h-4 mr-2" />Approve
+                    </Button>
+                    <Button variant="destructive" onClick={() => { setRejectModal(selected); setSelected(null); }}>
+                      <XCircle className="w-4 h-4 mr-2" />Reject
+                    </Button>
+                  </>
+                )}
+                {selected.status === "approved" && (
+                  <>
+                    <Button variant="outline" onClick={() => { setPayoutRateModal(selected); setNewRate(selected.payoutRate); setSelected(null); }}>
+                      <DollarSign className="w-4 h-4 mr-2" />Edit Payout Rate
+                    </Button>
+                    <Button variant="destructive" onClick={() => revoke(selected.id)}>
+                      <Ban className="w-4 h-4 mr-2" />Revoke Access
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject modal */}
+      <Dialog open={!!rejectModal} onOpenChange={() => setRejectModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Application — {rejectModal?.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Rejection Reason <span className="text-red-500">*</span></Label>
+            <Textarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Explain why the application was rejected…" />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Button>
+            <Button variant="destructive" disabled={!rejectReason.trim()} onClick={() => rejectModal && reject(rejectModal.id)}>
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payout rate modal */}
+      <Dialog open={!!payoutRateModal} onOpenChange={() => setPayoutRateModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Payout Rate — {payoutRateModal?.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Payout Rate (0–1 decimal, e.g. 0.20 = 20%)</Label>
+            <Input type="number" step="0.01" min="0" max="1" value={newRate} onChange={(e) => setNewRate(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPayoutRateModal(null)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => payoutRateModal && savePayoutRate(payoutRateModal.id)}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── All Partners Tab ─────────────────────────────────────────────────────────
+function AllPartnersTab() {
+  const [, navigate] = useLocation();
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortCol, setSortCol] = useState<keyof Partner>("approvedAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const params = new URLSearchParams();
+  if (debouncedSearch) params.set("search", debouncedSearch);
+
+  const { data: partners, isLoading } = useAdminQuery<Partner[]>(
+    ["admin-referrals-partners", debouncedSearch],
+    `/api/admin/referrals/partners?${params}`
+  );
+
+  function toggleSort(col: keyof Partner) {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("desc"); }
+  }
+
+  const sorted = [...(partners ?? [])].sort((a, b) => {
+    const av = a[sortCol] ?? 0;
+    const bv = b[sortCol] ?? 0;
+    const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  function SortIcon({ col }: { col: keyof Partner }) {
+    if (sortCol !== col) return null;
+    return sortDir === "asc" ? <ChevronUp className="inline w-3 h-3 ml-0.5" /> : <ChevronDown className="inline w-3 h-3 ml-0.5" />;
+  }
+
+  function Th({ col, label }: { col: keyof Partner; label: string }) {
+    return (
+      <th className="text-left px-4 py-3 text-gray-500 font-medium cursor-pointer hover:text-gray-800 select-none" onClick={() => toggleSort(col)}>
+        {label}<SortIcon col={col} />
+      </th>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input placeholder="Search org or code…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      </div>
+
+      {isLoading ? <LoadingSpinner /> : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <Th col="orgName" label="Org Name" />
+                  <Th col="referralCode" label="Code" />
+                  <Th col="approvedAt" label="Approved" />
+                  <Th col="activeConversions" label="Active Conv." />
+                  <Th col="quarterConversions" label="Qtr Conv." />
+                  <Th col="quarterNetRevenueCents" label="Qtr Net Rev." />
+                  <Th col="estimatedQuarterPayoutCents" label="Est. Payout" />
+                  <Th col="lastConversionDate" label="Last Conv." />
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((p) => (
+                  <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-blue-50/30 cursor-pointer" onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}>
+                    <td className="px-4 py-3 font-medium text-gray-800">{p.orgName}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-blue-600">{p.referralCode ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{fmtDate(p.approvedAt)}</td>
+                    <td className="px-4 py-3 text-center">{p.activeConversions ?? 0}</td>
+                    <td className="px-4 py-3 text-center">{p.quarterConversions ?? 0}</td>
+                    <td className="px-4 py-3">{p.quarterNetRevenueCents !== undefined ? fmt$(p.quarterNetRevenueCents) : "—"}</td>
+                    <td className="px-4 py-3">{p.estimatedQuarterPayoutCents !== undefined ? fmt$(p.estimatedQuarterPayoutCents) : "—"}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{fmtDate(p.lastConversionDate)}</td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}>
+                        <ExternalLink className="w-3 h-3 mr-1" />Detail
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {sorted.length === 0 && (
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No approved partners yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Conversions Tab ──────────────────────────────────────────────────────────
+function ConversionsTab() {
+  const { toast } = useToast();
+  const [partnerId, setPartnerId] = useState("");
+  const [platform, setPlatform] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const params = new URLSearchParams();
+  if (partnerId) params.set("partnerId", partnerId);
+  if (platform !== "all") params.set("platform", platform);
+  if (status !== "all") params.set("status", status);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+
+  const { data: conversions, isLoading } = useAdminQuery<Conversion[]>(
+    ["admin-referrals-conversions", partnerId, platform, status, from, to],
+    `/api/admin/referrals/conversions?${params}`
+  );
+
+  const { data: partners } = useAdminQuery<Partner[]>(
+    ["admin-referrals-partners-list"],
+    `/api/admin/referrals/partners`
+  );
+
+  async function exportCsv() {
+    const p = new URLSearchParams(params);
+    p.set("exportCsv", "true");
+    try {
+      const res = await adminFetch(`/api/admin/referrals/conversions?${p}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "referral-conversions.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <Select value={partnerId || "all"} onValueChange={(v) => setPartnerId(v === "all" ? "" : v)}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="All Partners" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Partners</SelectItem>
+            {(partners ?? []).map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.orgName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={platform} onValueChange={setPlatform}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Platforms</SelectItem>
+            <SelectItem value="ios">iOS</SelectItem>
+            <SelectItem value="android">Android</SelectItem>
+            <SelectItem value="web">Web</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="churned">Churned</SelectItem>
+            <SelectItem value="refunded">Refunded</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-36" placeholder="From" />
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-36" placeholder="To" />
+        <Button variant="outline" size="sm" onClick={exportCsv}>
+          Export CSV
+        </Button>
+      </div>
+
+      {isLoading ? <LoadingSpinner /> : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Date</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Partner</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Code</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">User ID</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Tier</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Platform</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">Gross</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Net</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(conversions ?? []).map((c) => (
+                  <tr key={c.id} className="border-b border-gray-50 last:border-0">
+                    <td className="px-4 py-2.5 text-xs text-gray-400">{fmtDate(c.convertedAt)}</td>
+                    <td className="px-4 py-2.5 font-medium text-gray-700">{c.partnerOrgName}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{c.referralCode}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-gray-400 hidden md:table-cell">{c.userId || "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{c.tier || "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-500 hidden sm:table-cell">{c.platform || "—"}</td>
+                    <td className="px-4 py-2.5 text-right">{c.grossPriceCents != null ? fmt$(c.grossPriceCents) : "—"}</td>
+                    <td className="px-4 py-2.5 text-right hidden md:table-cell">{fmt$(c.netCents)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(c.status)}`}>{c.status}</span>
+                    </td>
+                  </tr>
+                ))}
+                {(conversions ?? []).length === 0 && (
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No conversions found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Payouts Tab ──────────────────────────────────────────────────────────────
+function PayoutsTab() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [view, setView] = useState<"owed" | "history">("owed");
+  const [recordModal, setRecordModal] = useState<PayoutOwed | null>(null);
+  const [form, setForm] = useState({ quarter: "", amountCents: "", method: "", reference: "", notes: "" });
+
+  const { data: owed, isLoading: owedLoading } = useAdminQuery<{ quarter: string; rows: PayoutOwed[] }>(
+    ["admin-referrals-payouts-owed"],
+    "/api/admin/referrals/payouts/owed",
+    view === "owed"
+  );
+
+  const { data: history, isLoading: histLoading } = useAdminQuery<PayoutHistory[]>(
+    ["admin-referrals-payouts-history"],
+    "/api/admin/referrals/payouts/history",
+    view === "history"
+  );
+
+  async function recordPayout() {
+    if (!recordModal) return;
+    if (!form.quarter || !form.amountCents) {
+      toast({ title: "Quarter and amount are required", variant: "destructive" }); return;
+    }
+    const res = await adminFetch(`/api/admin/referrals/partners/${recordModal.partner.id}/payouts`, {
+      method: "POST",
+      body: JSON.stringify({ ...form, amountCents: Math.round(parseFloat(form.amountCents) * 100) }),
+    });
+    if (res.ok) {
+      toast({ title: "Payout recorded!" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-payouts-owed"] });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-payouts-history"] });
+      setRecordModal(null);
+      setForm({ quarter: "", amountCents: "", method: "", reference: "", notes: "" });
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed", variant: "destructive" });
+    }
+  }
+
+  async function exportHistory() {
+    try {
+      const res = await adminFetch("/api/admin/referrals/payouts/history?exportCsv=true");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "referral-payouts.csv"; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Button variant={view === "owed" ? "default" : "outline"} size="sm" onClick={() => setView("owed")}
+          className={view === "owed" ? "bg-blue-600 text-white" : ""}>
+          Owed
+        </Button>
+        <Button variant={view === "history" ? "default" : "outline"} size="sm" onClick={() => setView("history")}
+          className={view === "history" ? "bg-blue-600 text-white" : ""}>
+          History
+        </Button>
+        {view === "history" && (
+          <Button variant="outline" size="sm" onClick={exportHistory} className="ml-auto">Export CSV</Button>
+        )}
+      </div>
+
+      {view === "owed" && (
+        owedLoading ? <LoadingSpinner /> : (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {owed && <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 text-sm font-medium text-blue-700">Quarter: {owed.quarter}</div>}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Partner</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">Code</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Conv.</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Gross Rev.</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Rate</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Owed</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Last Payout</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(owed?.rows ?? []).map((row) => (
+                    <tr key={row.partner.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-4 py-2.5 font-medium text-gray-800">{row.partner.orgName}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-blue-600 hidden sm:table-cell">{row.partner.referralCode}</td>
+                      <td className="px-4 py-2.5 text-right">{row.quarterConversions}</td>
+                      <td className="px-4 py-2.5 text-right hidden md:table-cell">{fmt$(row.grossRevenueCents)}</td>
+                      <td className="px-4 py-2.5 text-right">{(row.payoutRate * 100).toFixed(0)}%</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-blue-700">{fmt$(row.amountOwedCents)}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-400 hidden lg:table-cell">{fmtDate(row.lastPayoutDate)}</td>
+                      <td className="px-4 py-2.5">
+                        <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={() => {
+                          setRecordModal(row);
+                          setForm({ quarter: owed?.quarter || "", amountCents: (row.amountOwedCents / 100).toFixed(2), method: "", reference: "", notes: "" });
+                        }}>
+                          Record Payout
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {(owed?.rows ?? []).length === 0 && (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No partners found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      )}
+
+      {view === "history" && (
+        histLoading ? <LoadingSpinner /> : (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Date Paid</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Partner</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Quarter</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Amount</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Method</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Reference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(history ?? []).map((p) => (
+                    <tr key={p.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-4 py-2.5 text-xs text-gray-400">{fmtDate(p.paidAt)}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-700">{p.partnerOrgName}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{p.quarter}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-green-700">{fmt$(p.amountCents)}</td>
+                      <td className="px-4 py-2.5 text-gray-500 hidden md:table-cell">{p.method || "—"}</td>
+                      <td className="px-4 py-2.5 text-gray-400 font-mono text-xs hidden lg:table-cell">{p.reference || "—"}</td>
+                    </tr>
+                  ))}
+                  {(history ?? []).length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No payouts recorded yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Record Payout modal */}
+      <Dialog open={!!recordModal} onOpenChange={() => setRecordModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payout — {recordModal?.partner.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div>
+              <Label>Quarter <span className="text-red-500">*</span></Label>
+              <Input className="mt-1" value={form.quarter} onChange={(e) => setForm((f) => ({ ...f, quarter: e.target.value }))} placeholder="e.g. 2025-Q1" />
+            </div>
+            <div>
+              <Label>Amount ($) <span className="text-red-500">*</span></Label>
+              <Input className="mt-1" type="number" step="0.01" value={form.amountCents} onChange={(e) => setForm((f) => ({ ...f, amountCents: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Method</Label>
+              <Input className="mt-1" value={form.method} onChange={(e) => setForm((f) => ({ ...f, method: e.target.value }))} placeholder="e.g. PayPal, Check, Wire" />
+            </div>
+            <div>
+              <Label>Reference #</Label>
+              <Input className="mt-1" value={form.reference} onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Transaction ID or check number" />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea className="mt-1" rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRecordModal(null)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={recordPayout}>Record</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Settings Tab ─────────────────────────────────────────────────────────────
+function SettingsTab() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data: settings, isLoading } = useAdminQuery<AdminSettings>(
+    ["admin-referrals-settings"],
+    "/api/admin/referrals/settings"
+  );
+  const [form, setForm] = useState<AdminSettings | null>(null);
+
+  useEffect(() => {
+    if (settings && !form) setForm(settings);
+  }, [settings]);
+
+  async function save() {
+    if (!form) return;
+    const res = await adminFetch("/api/admin/referrals/settings", {
+      method: "PATCH",
+      body: JSON.stringify(form),
+    });
+    if (res.ok) {
+      toast({ title: "Settings saved!" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-settings"] });
+    } else {
+      toast({ title: "Save failed", variant: "destructive" });
+    }
+  }
+
+  if (isLoading || !form) return <LoadingSpinner />;
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <h3 className="font-semibold text-gray-800">Program Settings</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label>Default Payout Rate (0–1)</Label>
+            <Input className="mt-1" type="number" step="0.01" min="0" max="1"
+              value={form.default_payout_rate}
+              onChange={(e) => setForm((f) => f ? { ...f, default_payout_rate: e.target.value } : f)} />
+            <p className="text-xs text-gray-400 mt-0.5">e.g. 0.20 = 20%</p>
+          </div>
+          <div>
+            <Label>Platform Fee %</Label>
+            <Input className="mt-1" type="number" step="0.1" min="0" max="100"
+              value={form.platform_fee_percent}
+              onChange={(e) => setForm((f) => f ? { ...f, platform_fee_percent: e.target.value } : f)} />
+            <p className="text-xs text-gray-400 mt-0.5">e.g. 15 = 15%</p>
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Admin Notification Email</Label>
+            <Input className="mt-1" type="email"
+              value={form.admin_notification_email}
+              onChange={(e) => setForm((f) => f ? { ...f, admin_notification_email: e.target.value } : f)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <h3 className="font-semibold text-gray-800">Email Templates</h3>
+        <p className="text-xs text-gray-500">Leave blank to use the system defaults.</p>
+        <div>
+          <Label>Approval Email Template</Label>
+          <Textarea className="mt-1 font-mono text-xs" rows={6}
+            value={form.approval_email_template || ""}
+            onChange={(e) => setForm((f) => f ? { ...f, approval_email_template: e.target.value } : f)}
+            placeholder="Hi {{contactName}}, Congratulations! Your referral code is: {{referralCode}}…" />
+        </div>
+        <div>
+          <Label>Rejection Email Template</Label>
+          <Textarea className="mt-1 font-mono text-xs" rows={6}
+            value={form.rejection_email_template || ""}
+            onChange={(e) => setForm((f) => f ? { ...f, rejection_email_template: e.target.value } : f)}
+            placeholder="Hi {{contactName}}, Unfortunately we were unable to approve your application…" />
+        </div>
+        <div>
+          <Label>Magic Link Email Template</Label>
+          <Textarea className="mt-1 font-mono text-xs" rows={6}
+            value={form.magic_link_email_template || ""}
+            onChange={(e) => setForm((f) => f ? { ...f, magic_link_email_template: e.target.value } : f)}
+            placeholder="Hi {{contactName}}, Click the link to access your partner portal: {{link}}…" />
+        </div>
+      </div>
+
+      <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={save}>
+        Save Settings
+      </Button>
+    </div>
+  );
+}
+
+// ── Shared helpers ───────────────────────────────────────────────────────────
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+    </div>
+  );
+}
+function ErrorMsg({ msg }: { msg: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription>{msg}</AlertDescription>
+    </Alert>
+  );
+}
+
+// ── Tab config ───────────────────────────────────────────────────────────────
+const TABS = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "applications", label: "Applications", icon: FileText },
+  { id: "partners", label: "All Partners", icon: UserCheck },
+  { id: "conversions", label: "Conversions", icon: ArrowRightLeft },
+  { id: "payouts", label: "Payouts", icon: DollarSign },
+  { id: "settings", label: "Settings", icon: Settings },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
+
+// ── Main portal ──────────────────────────────────────────────────────────────
+export default function ReferralAdmin() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
+
+  // Check auth on mount
+  useEffect(() => {
+    adminFetch("/api/admin/referrals/check-auth").then((res) => {
+      setAuthed(res.ok);
+    }).catch(() => setAuthed(false));
+  }, []);
+
+  async function logout() {
+    await adminFetch("/api/admin/referrals/logout", { method: "POST" });
+    qc.clear();
+    setAuthed(false);
+    toast({ title: "Logged out" });
+  }
+
+  if (authed === null) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return <LoginForm onSuccess={() => setAuthed(true)} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Users className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-gray-900">Referral Admin</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={logout} className="text-gray-500 hover:text-gray-800">
+            <LogOut className="w-4 h-4 mr-1.5" />Logout
+          </Button>
+        </div>
+        {/* Tab nav */}
+        <div className="max-w-7xl mx-auto px-4 flex gap-0 overflow-x-auto">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {activeTab === "dashboard" && <DashboardTab />}
+        {activeTab === "applications" && <ApplicationsTab />}
+        {activeTab === "partners" && <AllPartnersTab />}
+        {activeTab === "conversions" && <ConversionsTab />}
+        {activeTab === "payouts" && <PayoutsTab />}
+        {activeTab === "settings" && <SettingsTab />}
+      </main>
+    </div>
+  );
+}
