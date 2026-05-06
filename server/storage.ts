@@ -880,6 +880,9 @@ export class DatabaseStorage implements IStorage {
         competitive_level as "competitiveLevel",
         roster_use_case as "rosterUseCase",
         selected_facility_id as "selectedFacilityId",
+        referral_partner_id as "referralPartnerId",
+        referral_source_other as "referralSourceOther",
+        referral_code as "referralCode",
         last_updated as "lastUpdated", 
         created_at as "createdAt", 
         updated_at as "updatedAt"
