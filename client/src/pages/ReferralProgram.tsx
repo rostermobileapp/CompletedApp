@@ -242,7 +242,7 @@ export default function ReferralProgram() {
               <input
                 type="range"
                 min={100}
-                max={1000}
+                max={5000}
                 step={10}
                 value={referrals}
                 onChange={e => setReferrals(Number(e.target.value))}
@@ -251,7 +251,7 @@ export default function ReferralProgram() {
               />
               <div className="flex items-center justify-between text-xs text-gray-400 -mt-4 mb-6">
                 <span>100</span>
-                <span>1,000</span>
+                <span>5,000</span>
               </div>
               <div className="bg-white rounded-xl border border-[#3c82f4]/20 p-5 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Estimated quarterly donation</p>
