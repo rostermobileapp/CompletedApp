@@ -119,7 +119,7 @@ export default function ReferralProgram() {
         )}
       </header>
       {/* Hero */}
-      <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white text-center">
+      <section className="py-20 px-6 bg-gradient-to-b from-blue-50/60 to-white text-center pt-[40px] pb-[40px]">
         <div className="max-w-3xl mx-auto">
           <span className="inline-flex items-center gap-2 bg-[#3c82f4]/10 text-[#3c82f4] text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
             🤝 Partner Program
