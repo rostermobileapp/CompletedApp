@@ -62,6 +62,7 @@ const ORG_TYPES = [
 export default function ReferralProgram() {
   const applyRef = useRef<HTMLDivElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [referrals, setReferrals] = useState(300);
   const [form, setForm] = useState({
     orgName: '',
     contactName: '',
@@ -277,9 +278,34 @@ export default function ReferralProgram() {
                 <p className="text-sm text-gray-600 font-medium">Goes back to the community</p>
               </div>
             </div>
-            <div className="mt-6 pt-6 border-t border-[#3c82f4]/10 text-sm text-gray-500">
-              <p className="mb-1"><span className="font-semibold text-gray-700">Example:</span> A player subscribes to Player Pro at $6.49/month. After a 15% app store fee, net = ~$5.52. At a 15% payout rate, you'd earn ~$0.68/month per active subscriber.</p>
-              <p className="text-xs text-gray-400 mt-2 italic">Actual payout rates are confirmed during approval and visible in your partner portal.</p>
+            <div className="mt-6 pt-6 border-t border-[#3c82f4]/10">
+              <p className="text-sm font-semibold text-gray-700 mb-4 text-center">See your community impact</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-500">Referrals</span>
+                <span className="text-sm font-bold text-gray-900">{referrals.toLocaleString()} players</span>
+              </div>
+              <input
+                type="range"
+                min={100}
+                max={1000}
+                step={10}
+                value={referrals}
+                onChange={e => setReferrals(Number(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer mb-6"
+                style={{ accentColor: '#3c82f4' }}
+              />
+              <div className="flex items-center justify-between text-xs text-gray-400 -mt-4 mb-6">
+                <span>100</span>
+                <span>1,000</span>
+              </div>
+              <div className="bg-white rounded-xl border border-[#3c82f4]/20 p-5 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Estimated quarterly donation</p>
+                <p className="text-4xl font-black text-[#3c82f4]">
+                  ${(referrals * 5.51 * 3).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">back to your community every quarter</p>
+              </div>
+              <p className="text-xs text-gray-400 mt-3 italic text-center">Based on $6.49/mo Player Pro · $5.51 net after store fees · paid quarterly</p>
             </div>
           </div>
         </div>
