@@ -273,7 +273,7 @@ export default function ReferralProgram() {
               </div>
               <div className="flex items-center justify-center text-3xl text-gray-300 font-light">×</div>
               <div>
-                <p className="text-4xl font-black text-[#3c82f4] mb-1">Your rate</p>
+                <p className="text-4xl font-black text-[#3c82f4] mb-1">10%</p>
                 <p className="text-sm text-gray-600 font-medium">Set during your approval</p>
               </div>
             </div>
