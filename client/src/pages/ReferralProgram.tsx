@@ -91,7 +91,8 @@ export default function ReferralProgram() {
             <a href="#how-it-works" className="text-gray-500 hover:text-gray-900 transition-colors">How It Works</a>
             <a href="#payouts" className="text-gray-500 hover:text-gray-900 transition-colors">Payouts</a>
             <a href="#faq" className="text-gray-500 hover:text-gray-900 transition-colors">FAQ</a>
-            <Link href="/admin/referrals/login" className="text-gray-500 hover:text-gray-900 transition-colors">Partner Login</Link>
+            <Link href="/referral-program/portal/login" className="text-gray-500 hover:text-gray-900 transition-colors">Partner Login</Link>
+            <Link href="/admin/referrals/login" className="text-gray-400 hover:text-gray-600 transition-colors text-xs">Admin</Link>
           </nav>
           <div className="flex items-center gap-3">
             <button
@@ -113,7 +114,8 @@ export default function ReferralProgram() {
             <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600">How It Works</a>
             <a href="#payouts" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600">Payouts</a>
             <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="block text-gray-600">FAQ</a>
-            <Link href="/admin/referrals/login" className="block text-gray-600">Partner Login</Link>
+            <Link href="/referral-program/portal/login" className="block text-gray-600">Partner Login</Link>
+            <Link href="/admin/referrals/login" className="block text-gray-400 text-xs">Admin</Link>
             <button onClick={() => { setMobileMenuOpen(false); scrollToApply(); }} className="w-full py-2 rounded-full bg-[#3c82f4] text-white font-semibold">Apply Now</button>
           </div>
         )}
@@ -282,7 +284,7 @@ export default function ReferralProgram() {
               </p>
               <p className="text-sm text-gray-400">
                 Already approved?{' '}
-                <Link href="/admin/referrals/login" className="text-[#3c82f4] hover:underline">Sign in to your portal</Link>
+                <Link href="/referral-program/portal/login" className="text-[#3c82f4] hover:underline">Sign in to your portal</Link>
               </p>
             </div>
           ) : (
