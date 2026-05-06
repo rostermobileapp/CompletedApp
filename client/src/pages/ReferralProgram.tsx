@@ -268,7 +268,7 @@ export default function ReferralProgram() {
         </div>
       </section>
       {/* Application Form */}
-      <section className="py-20 px-6 bg-white" id="apply" ref={applyRef}>
+      <section className="py-20 px-6 bg-white pt-[20px] pb-[20px]" id="apply" ref={applyRef}>
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Apply to Become a Partner</h2>
