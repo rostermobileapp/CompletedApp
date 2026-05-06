@@ -1,54 +1,8 @@
 import { useState, useRef } from 'react';
 import { Link } from 'wouter';
-import { Check, ChevronDown, ChevronUp, ArrowRight, Upload, X, Loader2, CheckCircle, Menu } from 'lucide-react';
+import { Check, ArrowRight, Upload, X, Loader2, CheckCircle, Menu } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
-const FAQ = [
-  {
-    q: 'Who is eligible to become a referral partner?',
-    a: 'Any hockey association, arena, league organization, or sports media outlet with an active player community. We review each application manually to ensure quality partnerships.',
-  },
-  {
-    q: 'How does the payout work?',
-    a: 'You earn a percentage of the net subscription revenue from every player who signs up using your referral code. Payouts are made quarterly via bank transfer or check, with a minimum threshold of $25.',
-  },
-  {
-    q: 'What counts as net revenue?',
-    a: 'Net revenue is the subscription price minus the app store fee (typically 15–30% depending on the platform). Your payout is calculated on net revenue, not gross.',
-  },
-  {
-    q: 'How do players use my referral code?',
-    a: 'When players sign up for Roster, they can enter your referral code in the onboarding flow. The code links their subscription to your account automatically.',
-  },
-  {
-    q: 'How long does approval take?',
-    a: 'Most applications are reviewed within 3–5 business days. You\'ll receive an email with the decision and, if approved, your unique referral code.',
-  },
-  {
-    q: 'Can I see who signed up using my code?',
-    a: 'Yes. Your partner portal shows a full conversion history — dates, subscription tiers, and estimated earnings for each referral.',
-  },
-];
-
-function FAQItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full text-left px-5 py-4 flex items-center justify-between gap-4 hover:bg-gray-50 transition-colors"
-      >
-        <span className="font-semibold text-gray-900 text-sm">{q}</span>
-        {open ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-      </button>
-      {open && (
-        <div className="px-5 pb-4 text-sm text-gray-600 leading-relaxed border-t border-gray-100">
-          <div className="pt-3">{a}</div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 const ORG_TYPES = [
   'Hockey Association / Club',
@@ -307,17 +261,6 @@ export default function ReferralProgram() {
               </div>
               <p className="text-xs text-gray-400 mt-3 italic text-center">Based on $6.49/mo Player Pro · $5.51 net after store fees · paid quarterly</p>
             </div>
-          </div>
-        </div>
-      </section>
-      {/* FAQ */}
-      <section className="py-20 px-6 bg-gray-50" id="faq">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Frequently Asked Questions</h2>
-          </div>
-          <div className="space-y-3">
-            {FAQ.map(item => <FAQItem key={item.q} {...item} />)}
           </div>
         </div>
       </section>
