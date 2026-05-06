@@ -93,9 +93,8 @@ export async function sendPartnerApprovalEmail(
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    const appUrl = getAppUrl();
-    const portalUrl = `${appUrl}/referral-program/portal`;
-    const loginUrl = `${appUrl}/referral-program/portal/login`;
+    const portalUrl = `https://www.roster-app.com/referral-program/portal`;
+    const loginUrl = `https://www.roster-app.com/referral-program/portal/login`;
 
     let html: string;
     if (customTemplate && customTemplate.trim()) {
