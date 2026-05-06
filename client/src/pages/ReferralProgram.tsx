@@ -174,7 +174,7 @@ export default function ReferralProgram() {
               {
                 step: '03',
                 title: 'Earn',
-                desc: 'Every player who subscribes using your code earns you a percentage of their monthly subscription — paid quarterly.',
+                  desc: 'Every player who subscribes using your referral code, earns 10% of the net revenue for your chosen cause - paid quarterly.',
               },
             ].map(item => (
               <div key={item.step} className="relative bg-white border border-gray-200 rounded-2xl p-7 shadow-sm hover:border-[#3c82f4]/40 hover:shadow-md transition-all">
