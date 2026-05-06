@@ -1,0 +1,136 @@
+ROSTER ONBOARDING — REFERRAL ATTRIBUTION DROPDOWN
+Add a new step to the existing new user onboarding workflow that captures referral attribution. This replaces any text-input referral code field that may already be in the onboarding flow.
+
+ONBOARDING STEP UI
+Add a new step (or insert into existing step) with the question:
+"Who referred you to Roster?"
+Display a single dropdown/select component with the following options, in this order:
+
+Approved Partners — pulled dynamically from the referral_partners table where status = 'approved', sorted alphabetically by org_name. Display the org name only (not the referral code).
+Other — when selected, reveals an optional text input field below the dropdown labeled "How did you hear about us?" (free text, max 200 characters)
+None — default selection, no further action required
+
+The dropdown should be optional but visible — users can select "None" and proceed.
+Add a "Continue" button at the bottom that saves the selection and advances to the next onboarding step.
+
+DATA HANDLING
+Update the users table to ensure these columns exist (add if missing):
+
+referral_partner_id (uuid, nullable, foreign key → referral_partners.id)
+referral_source_other (text, nullable — stores the free-text input when "Other" is selected)
+
+When the user submits the onboarding step:
+If an approved Partner is selected:
+
+Save referral_partner_id to the user's record in users table
+Also save the partner's referral_code to the existing users.referral_code column for backward compatibility with the existing webhook handler
+Call Purchases.setAttributes({ referral_code: "[CODE]", referral_partner_id: "[UUID]" }) on the RevenueCat SDK so the attribution is attached to the subscriber before any future purchase
+Insert a tracking row into a new referral_user_links table (see schema below) — this captures ALL referred users, not just paid ones
+
+If "Other" is selected:
+
+Save the free-text response to users.referral_source_other
+Leave referral_partner_id and referral_code null
+No RevenueCat attribute needed
+
+If "None" is selected:
+
+No data saved to referral fields
+Proceed normally
+
+
+NEW SUPABASE TABLE — referral_user_links
+This table tracks every user linked to a partner, regardless of paid status. This is separate from referral_conversions, which only tracks paying subscribers.
+
+id (uuid, primary key)
+referral_partner_id (uuid, foreign key → referral_partners.id)
+user_id (text, not null — Roster user ID)
+linked_at (timestamp, default now())
+is_paid (boolean, default false — updated when the user becomes a paying subscriber)
+paid_tier (text, nullable — 'player_pro' or 'commissioner', set when user converts)
+paid_at (timestamp, nullable)
+
+Create a unique constraint on (referral_partner_id, user_id) to prevent duplicates.
+
+UPDATE REVENUECAT WEBHOOK HANDLER
+Modify the existing /api/webhooks/revenuecat-referral endpoint:
+When an INITIAL_PURCHASE event is received for a user with a referral code:
+
+Insert into referral_conversions (existing behavior — keep this)
+ALSO update the matching row in referral_user_links to set is_paid = true, paid_tier = the appropriate tier ('player_pro' or 'commissioner'), and paid_at = current timestamp
+Use the user_id and referral_partner_id to find the matching row
+
+When a CANCELLATION or REFUND event is received:
+
+Update the referral_conversions row's status field as before
+Update the matching referral_user_links row to set is_paid = false (the user is no longer paying)
+
+
+UPDATE ORGANIZATION PORTAL — /referral-program/portal
+Add new metrics to the partner's portal dashboard. The existing "Referral Stats" section should now show:
+Referral Stats (updated)
+
+Total Referred Users: count of rows in referral_user_links for this partner (all users who selected this org during onboarding, regardless of paid status)
+Total Paid Subscribers: count of rows in referral_user_links where is_paid = true for this partner
+Conversion Rate: Paid Subscribers ÷ Total Referred Users, displayed as a percentage
+Breakdown by Paid Tier:
+
+Player Pro subscribers: count
+Commissioner subscribers: count
+
+
+Breakdown by Platform (existing — keep this)
+
+The "Estimated Quarterly Payout" section remains unchanged — payouts are still calculated only on paid conversions.
+
+UPDATE MASTER ADMIN PORTAL — /admin/referrals
+In the All Partners table, add new columns:
+
+Total Referred Users (from referral_user_links)
+Total Paid Users (from referral_user_links where is_paid = true)
+Conversion Rate (%)
+
+In the Partner Detail View (/admin/referrals/partner/:id), add a new section above the existing conversion history:
+Referred Users Overview
+
+Total referred users (all-time)
+Paid users by tier (Player Pro count, Commissioner count)
+Free users (referred but not yet paying)
+Conversion rate
+
+Add a sub-table showing all referred users with columns: User ID, Linked Date, Paid Status, Tier (if paid), Paid Date (if paid). Searchable and exportable to CSV.
+
+API ENDPOINT — DROPDOWN DATA
+Create a public API endpoint:
+GET /api/referral/approved-partners
+Returns a JSON array of all approved partners with only the data needed for the dropdown:
+json[
+  { "id": "uuid", "org_name": "HPIB" },
+  { "id": "uuid", "org_name": "USA Hockey Foundation" }
+]
+Sorted alphabetically by org_name. Cache this endpoint for 5 minutes since it doesn't change often.
+The onboarding screen should call this endpoint to populate the dropdown dynamically — do NOT hardcode the partner list.
+
+EDGE CASES TO HANDLE
+
+If the approved partner list is empty, the dropdown should still show "Other" and "None" options
+If the API call to fetch partners fails, gracefully fall back to showing only "Other" and "None" so onboarding doesn't break
+If a user goes back and changes their selection during onboarding, properly clean up the previous selection (delete the old referral_user_links row, clear the old referral_code and referral_partner_id fields)
+If a partner is later revoked (status changed from 'approved' to 'rejected'), do NOT delete historical referral_user_links rows — keep the data for accuracy
+
+
+DELIVERABLES CHECKLIST
+
+ New onboarding step with dropdown UI
+ Dropdown dynamically populates from /api/referral/approved-partners
+ "Other" option reveals optional text input
+ User selection saves correctly to users table and referral_user_links table
+ RevenueCat attributes set correctly on selection of approved partner
+ referral_user_links table created with proper constraints
+ Webhook handler updated to mark is_paid = true on conversions
+ Organization portal shows total referred users + paid users + conversion rate
+ Admin portal shows new metrics in All Partners table and Partner Detail View
+ Tier breakdown (Player Pro vs Commissioner) displays correctly in both portals
+ All edge cases handled gracefully
+
+Build in this order: schema updates → API endpoint → onboarding UI → webhook updates → portal display updates. Test each piece end-to-end before moving on.
