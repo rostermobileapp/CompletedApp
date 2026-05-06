@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap } from 'lucide-react';
@@ -632,15 +633,18 @@ export default function OnboardingQuestionnaire() {
                     }).then(async (res) => {
                       if (res.ok) {
                         const data = await res.json().catch(() => ({}));
-                        // Persist to localStorage for native RevenueCat subscriber attributes
-                        try {
-                          if (data.referralPartnerId) {
-                            localStorage.setItem('pendingReferralPartnerId', data.referralPartnerId);
-                          }
-                          if (data.referralCode) {
-                            localStorage.setItem('pendingReferralCode', data.referralCode);
-                          }
-                        } catch {}
+                        const attrs: Record<string, string> = {};
+                        if (data.referralPartnerId) attrs['referral_partner_id'] = data.referralPartnerId;
+                        if (data.referralCode) attrs['referral_code'] = data.referralCode;
+                        if (Object.keys(attrs).length > 0) {
+                          // Push to RevenueCat subscriber attributes via native bridge (no-op in browser)
+                          setSubscriberAttributes(attrs);
+                          // Also persist to localStorage so the next purchase call picks it up
+                          try {
+                            if (attrs['referral_partner_id']) localStorage.setItem('pendingReferralPartnerId', attrs['referral_partner_id']);
+                            if (attrs['referral_code']) localStorage.setItem('pendingReferralCode', attrs['referral_code']);
+                          } catch {}
+                        }
                       }
                     }).catch(() => {})
                   );

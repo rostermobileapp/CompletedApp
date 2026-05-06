@@ -921,14 +921,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
       if (role !== undefined) updateData.role = role;
 
-      // Referral tracking — replace or clear referral_user_links for this user
+      // Referral tracking — explicit state machine for partner / other / none transitions
       if (clearReferral) {
+        // Explicit "None" selected — wipe all referral fields and remove any link rows
         updateData.referralPartnerId = null;
         updateData.referralSourceOther = null;
         updateData.referralCode = null;
         await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
       } else if (referralPartnerId) {
-        // Look up the partner to get their referral code (for backward compat + RC attributes)
+        // Real partner selected — look up partner code, replace link row, clear "other" text
         const [partnerRow] = await db
           .select({ id: referralPartners.id, referralCode: referralPartners.referralCode })
           .from(referralPartners)
@@ -938,16 +939,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (partnerRow) {
           updateData.referralPartnerId = referralPartnerId;
           updateData.referralCode = partnerRow.referralCode || null;
-          if (referralSourceOther !== undefined) updateData.referralSourceOther = referralSourceOther;
-          // Delete any prior link for this user (handles partner switches), then insert fresh
+          updateData.referralSourceOther = null; // clear any stale "other" text
+          // Delete prior link(s) for this user (handles partner switches), then insert fresh
           await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
           await db.insert(referralUserLinks).values({
             userId,
             referralPartnerId,
-            referralSourceOther: referralSourceOther || null,
             isPaid: false,
           });
         }
+      } else if (referralSourceOther !== undefined) {
+        // "Other" selected — save free-text attribution, remove links and partner fields
+        updateData.referralSourceOther = referralSourceOther;
+        updateData.referralPartnerId = null;
+        updateData.referralCode = null;
+        await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
       } else if (referralCode !== undefined) {
         updateData.referralCode = referralCode;
       }

@@ -1796,7 +1796,6 @@ export function registerReferralRoutes(app: Express) {
                 .update(referralConversions)
                 .set({
                   status: newStatus,
-                  // Overwrite with this event's ID for idempotency on future retries.
                   revenuecatEventId: eventId || null,
                   updatedAt: new Date(),
                 })
@@ -1805,8 +1804,18 @@ export function registerReferralRoutes(app: Express) {
                   eq(referralConversions.partnerId, partner.id),
                   eq(referralConversions.status, "active"),
                 ))
-                .returning({ id: referralConversions.id });
+                .returning({ id: referralConversions.id, partnerId: referralConversions.partnerId });
               updated = result.length > 0;
+              // Mark the exact (userId, partnerId) link as no longer paid
+              if (result[0]?.partnerId) {
+                await db
+                  .update(referralUserLinks)
+                  .set({ isPaid: false })
+                  .where(and(
+                    eq(referralUserLinks.userId, appUserId),
+                    eq(referralUserLinks.referralPartnerId, result[0].partnerId),
+                  ));
+              }
             }
           }
 
@@ -1823,41 +1832,30 @@ export function registerReferralRoutes(app: Express) {
                   .update(referralConversions)
                   .set({ status: newStatus, revenuecatEventId: eventId || null, updatedAt: new Date() })
                   .where(and(...fallbackConditions, eq(referralConversions.tier, productId)))
-                  .returning({ id: referralConversions.id })
+                  .returning({ id: referralConversions.id, partnerId: referralConversions.partnerId })
               : await db
                   .update(referralConversions)
                   .set({ status: newStatus, revenuecatEventId: eventId || null, updatedAt: new Date() })
                   .where(and(...fallbackConditions))
-                  .returning({ id: referralConversions.id });
+                  .returning({ id: referralConversions.id, partnerId: referralConversions.partnerId });
             updated = result.length > 0;
-          }
-        }
-
-        // Mark user link as no longer paid, matching by (userId, referralPartnerId) for precision
-        if (appUserId) {
-          // Look up the user's current referralPartnerId to narrow the update
-          const [userRow] = await db
-            .select({ referralPartnerId: users.referralPartnerId })
-            .from(users)
-            .where(eq(users.id, appUserId))
-            .limit(1);
-
-          if (userRow?.referralPartnerId) {
-            await db
-              .update(referralUserLinks)
-              .set({ isPaid: false })
-              .where(
-                and(
+            // Use the resolved partnerId from the conversion record to target the exact link
+            const resolvedPartnerId = result[0]?.partnerId;
+            if (appUserId && resolvedPartnerId) {
+              await db
+                .update(referralUserLinks)
+                .set({ isPaid: false })
+                .where(and(
                   eq(referralUserLinks.userId, appUserId),
-                  eq(referralUserLinks.referralPartnerId, userRow.referralPartnerId),
-                )
-              );
-          } else {
-            // Fallback: update all links for this user if no specific partner recorded
-            await db
-              .update(referralUserLinks)
-              .set({ isPaid: false })
-              .where(eq(referralUserLinks.userId, appUserId));
+                  eq(referralUserLinks.referralPartnerId, resolvedPartnerId),
+                ));
+            } else if (appUserId) {
+              // Last-resort fallback: no partner context at all — update all links for user
+              await db
+                .update(referralUserLinks)
+                .set({ isPaid: false })
+                .where(eq(referralUserLinks.userId, appUserId));
+            }
           }
         }
 

@@ -88,7 +88,6 @@ interface UserLink {
   id: string;
   userId: string;
   referralPartnerId: string;
-  referralSourceOther: string | null;
   isPaid: boolean;
   paidTier: string | null;
   linkedAt: string;
@@ -483,7 +482,7 @@ export default function ReferralAdminPartnerDetail() {
                   className="h-8 text-xs gap-1"
                   onClick={() => {
                     const rows = userLinks.rows;
-                    const header = "User ID,Status,Tier,Linked At,Paid At,Source/Other";
+                    const header = "User ID,Status,Tier,Linked At,Paid At";
                     const lines = rows.map(l =>
                       [
                         l.userId,
@@ -491,7 +490,6 @@ export default function ReferralAdminPartnerDetail() {
                         l.paidTier ?? "",
                         l.linkedAt ?? "",
                         l.paidAt ?? "",
-                        (l.referralSourceOther ?? "").replace(/,/g, ";"),
                       ].join(",")
                     );
                     const csv = [header, ...lines].join("\n");
@@ -537,7 +535,6 @@ export default function ReferralAdminPartnerDetail() {
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">Tier</th>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Paid At</th>
-                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Source / Other</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -561,7 +558,6 @@ export default function ReferralAdminPartnerDetail() {
                       </td>
                       <td className="px-4 py-2.5 text-gray-600 capitalize">{l.paidTier ? l.paidTier.replace(/_/g, ' ') : '—'}</td>
                       <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{fmtDate(l.paidAt)}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-400 hidden lg:table-cell">{l.referralSourceOther || '—'}</td>
                     </tr>
                   ))}
                   {userLinks.rows.filter(l => {
@@ -569,7 +565,7 @@ export default function ReferralAdminPartnerDetail() {
                     const q = userLinkSearch.toLowerCase();
                     return l.userId?.toLowerCase().includes(q) || (l.paidTier ?? "").toLowerCase().includes(q);
                   }).length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                       {userLinkSearch ? "No users match your search." : "No referred users yet."}
                     </td></tr>
                   )}
