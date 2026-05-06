@@ -1298,19 +1298,21 @@ function SettingsTab() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
         <h3 className="font-semibold text-gray-800">Email Templates</h3>
-        <p className="text-xs text-gray-500">Leave blank to use system defaults.</p>
+        <p className="text-xs text-gray-500">Leave blank to use system defaults. Templates support plain text with <code className="bg-gray-100 px-1 rounded">{"{{variable}}"}</code> placeholders and HTML tags.</p>
         <div>
           <Label>Approval Email Template</Label>
+          <p className="text-xs text-gray-400 mb-1">Variables: <code className="bg-gray-100 px-1 rounded">{"{{contactName}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{orgName}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{referralCode}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{setupLink}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{portalUrl}}"}</code> — <strong>include {"{{setupLink}}"} so partners can set their password</strong></p>
           <Textarea
             className="mt-1 font-mono text-xs"
-            rows={6}
+            rows={8}
             value={form.approval_email_template || ""}
             onChange={(e) => setForm((f) => f ? { ...f, approval_email_template: e.target.value } : f)}
-            placeholder="Hi {{contactName}}, Congratulations! Your referral code is: {{referralCode}}…"
+            placeholder={"Hi {{contactName}}, your referral code is {{referralCode}}. Set up your password: {{setupLink}}"}
           />
         </div>
         <div>
           <Label>Rejection Email Template</Label>
+          <p className="text-xs text-gray-400 mb-1">Variables: <code className="bg-gray-100 px-1 rounded">{"{{contactName}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{orgName}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{reason}}"}</code></p>
           <Textarea
             className="mt-1 font-mono text-xs"
             rows={6}
@@ -1321,6 +1323,7 @@ function SettingsTab() {
         </div>
         <div>
           <Label>Magic Link Email Template</Label>
+          <p className="text-xs text-gray-400 mb-1">Variables: <code className="bg-gray-100 px-1 rounded">{"{{contactName}}"}</code> <code className="bg-gray-100 px-1 rounded">{"{{link}}"}</code></p>
           <Textarea
             className="mt-1 font-mono text-xs"
             rows={6}
