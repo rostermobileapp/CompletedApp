@@ -18,6 +18,10 @@ interface PartnerMe {
     totalConversions: number;
     tierBreakdown: Record<string, number>;
     platformBreakdown: Record<string, number>;
+    totalReferred: number;
+    totalPaid: number;
+    conversionRate: number;
+    tierBreakdownLinks: Record<string, number>;
   };
   quarterEstimate: {
     quarter: string;
@@ -202,8 +206,18 @@ export default function ReferralPortal() {
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Referred" value={stats.totalConversions} icon={Users} sub="all time" />
-          <StatCard label="Active This Quarter" value={quarterEstimate.conversions} icon={TrendingUp} sub="active subscriptions" />
+          <StatCard
+            label="Users Referred"
+            value={stats.totalReferred ?? 0}
+            icon={Users}
+            sub="signed up with your code"
+          />
+          <StatCard
+            label="Converted to Paid"
+            value={stats.totalPaid ?? 0}
+            icon={TrendingUp}
+            sub={`${stats.conversionRate ?? 0}% conversion rate`}
+          />
           <StatCard
             label="Est. Quarterly Payout"
             value={fmtDollars(quarterlyEst)}
@@ -211,10 +225,10 @@ export default function ReferralPortal() {
             sub={`${partner.payoutRate}% payout rate`}
           />
           <StatCard
-            label="Payout Rate"
-            value={`${partner.payoutRate}%`}
+            label="Active Subscriptions"
+            value={stats.totalConversions}
             icon={TrendingUp}
-            sub="of net revenue"
+            sub="this quarter"
           />
         </div>
 

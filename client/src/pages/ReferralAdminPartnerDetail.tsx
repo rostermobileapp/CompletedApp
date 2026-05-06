@@ -84,9 +84,30 @@ interface Payout {
   paidAt: string;
 }
 
+interface UserLink {
+  id: string;
+  userId: string;
+  referralPartnerId: string;
+  referralSourceOther: string | null;
+  isPaid: boolean;
+  paidTier: string | null;
+  linkedAt: string;
+  paidAt: string | null;
+}
+
+interface UserLinks {
+  total: number;
+  paid: number;
+  free: number;
+  conversionRate: number;
+  tierBreakdown: Record<string, number>;
+  rows: UserLink[];
+}
+
 interface PartnerDetail {
   partner: Partner;
   metrics: Metrics;
+  userLinks: UserLinks;
   conversions: Conversion[];
   payouts: Payout[];
 }
@@ -310,7 +331,7 @@ export default function ReferralAdminPartnerDetail() {
     );
   }
 
-  const { partner, metrics, conversions, payouts } = data;
+  const { partner, metrics, userLinks, conversions, payouts } = data;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -441,6 +462,60 @@ export default function ReferralAdminPartnerDetail() {
           <MetricCard title="Est. Qtr Payout" value={fmt$(metrics.quarterEstimatedPayoutCents)} />
           <MetricCard title="Lifetime Est. Payout" value={fmt$(metrics.lifetimeEstimatedPayoutCents)} />
         </div>
+
+        {/* Referred Users Overview */}
+        {userLinks && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Referred Users ({userLinks.total})</h3>
+              <div className="flex gap-4 text-sm text-gray-500">
+                <span>Paid: <strong className="text-gray-900">{userLinks.paid}</strong></span>
+                <span>Free: <strong className="text-gray-900">{userLinks.free}</strong></span>
+                <span>Conv.: <strong className="text-gray-900">{userLinks.conversionRate}%</strong></span>
+              </div>
+            </div>
+            {Object.keys(userLinks.tierBreakdown ?? {}).length > 0 && (
+              <div className="px-5 py-3 border-b border-gray-50 flex flex-wrap gap-4 text-sm text-gray-500">
+                {Object.entries(userLinks.tierBreakdown).map(([t, n]) => (
+                  <span key={t}><span className="capitalize">{t.replace(/_/g, ' ')}</span>: <strong className="text-gray-900">{n}</strong></span>
+                ))}
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Linked</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden sm:table-cell">User ID</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium">Tier</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden md:table-cell">Paid At</th>
+                    <th className="text-left px-4 py-3 text-gray-500 font-medium hidden lg:table-cell">Source / Other</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {userLinks.rows.map((l) => (
+                    <tr key={l.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-4 py-2.5 text-xs text-gray-400">{fmtDate(l.linkedAt)}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-400 hidden sm:table-cell">{l.userId}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${l.isPaid ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                          {l.isPaid ? 'Paid' : 'Free'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600 capitalize">{l.paidTier ? l.paidTier.replace(/_/g, ' ') : '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-400 hidden md:table-cell">{fmtDate(l.paidAt)}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-400 hidden lg:table-cell">{l.referralSourceOther || '—'}</td>
+                    </tr>
+                  ))}
+                  {userLinks.rows.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No referred users yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Admin Notes */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
 const TOTAL_STEPS = 9;
@@ -26,6 +26,8 @@ interface QuestionnaireState {
   otherSports: string[];
   otherSportCustom: string;
   referralCode: string;
+  referralPartnerId: string;
+  referralOtherText: string;
 }
 
 const GOALS = [
@@ -95,10 +97,15 @@ export default function OnboardingQuestionnaire() {
     otherSports: [],
     otherSportCustom: '',
     referralCode: '',
+    referralPartnerId: '',
+    referralOtherText: '',
   });
-  const [referralStatus, setReferralStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
-  const [referralOrgName, setReferralOrgName] = useState('');
-  const referralTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: approvedPartners = [] } = useQuery<Array<{ id: string; orgName: string }>>({
+    queryKey: ['/api/referral/approved-partners'],
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
   const [processingDone, setProcessingDone] = useState(false);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -561,67 +568,34 @@ export default function OnboardingQuestionnaire() {
               )}
             </div>
 
-            {/* Referral code field */}
+            {/* Who referred you dropdown */}
             <div className="mb-6">
-              <p className="text-sm font-semibold text-gray-700 mb-1">Referred by an organization? <span className="font-normal text-gray-400">(optional)</span></p>
-              <p className="text-xs text-gray-400 mb-2">Enter the code your hockey association or league gave you.</p>
-              <div className="relative">
+              <p className="text-sm font-semibold text-gray-700 mb-1">Who referred you to Roster? <span className="font-normal text-gray-400">(optional)</span></p>
+              <p className="text-xs text-gray-400 mb-2">Select your hockey association or partner organization.</p>
+              <select
+                value={state.referralPartnerId}
+                onChange={e => {
+                  const val = e.target.value;
+                  setState(prev => ({ ...prev, referralPartnerId: val, referralOtherText: val !== 'other' ? '' : prev.referralOtherText }));
+                }}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:border-[#3c82f4] transition-colors appearance-none"
+              >
+                <option value="">— None —</option>
+                {approvedPartners.map(p => (
+                  <option key={p.id} value={p.id}>{p.orgName}</option>
+                ))}
+                <option value="other">Other</option>
+              </select>
+              {state.referralPartnerId === 'other' && (
                 <input
                   type="text"
-                  value={state.referralCode}
-                  onChange={e => {
-                    const code = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                    setState(prev => ({ ...prev, referralCode: code }));
-                    setReferralStatus('idle');
-                    setReferralOrgName('');
-                    // Clear stored code immediately when field changes to non-valid state
-                    try { localStorage.removeItem('pendingReferralCode'); } catch {}
-                    if (referralTimerRef.current) clearTimeout(referralTimerRef.current);
-                    if (code.length >= 3) {
-                      setReferralStatus('checking');
-                      referralTimerRef.current = setTimeout(async () => {
-                        try {
-                          const res = await fetch(`/api/referral/validate-code?code=${encodeURIComponent(code)}`);
-                          const data = await res.json();
-                          if (res.ok && data.valid) {
-                            setReferralStatus('valid');
-                            setReferralOrgName(data.orgName || '');
-                            // Persist for native RevenueCat subscriber attributes
-                            try { localStorage.setItem('pendingReferralCode', code); } catch {}
-                          } else {
-                            setReferralStatus('invalid');
-                            // Ensure no stale code survives a failed validation
-                            try { localStorage.removeItem('pendingReferralCode'); } catch {}
-                          }
-                        } catch {
-                          setReferralStatus('idle');
-                        }
-                      }, 600);
-                    }
-                  }}
-                  placeholder="e.g. GCHA2024"
-                  maxLength={20}
-                  className={`w-full px-4 py-3 pr-10 border-2 rounded-xl text-sm font-mono uppercase tracking-widest focus:outline-none transition-colors ${
-                    referralStatus === 'valid'
-                      ? 'border-green-400 bg-green-50 text-green-900'
-                      : referralStatus === 'invalid'
-                      ? 'border-red-300 bg-red-50 text-red-900'
-                      : 'border-gray-200 bg-white text-gray-900 focus:border-[#3c82f4]'
-                  }`}
+                  value={state.referralOtherText}
+                  onChange={e => setState(prev => ({ ...prev, referralOtherText: e.target.value }))}
+                  placeholder="Who referred you?"
+                  maxLength={120}
+                  className="mt-2 w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#3c82f4] transition-colors"
+                  autoFocus
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {referralStatus === 'checking' && (
-                    <div className="w-4 h-4 border-2 border-[#3c82f4] border-t-transparent rounded-full animate-spin" />
-                  )}
-                  {referralStatus === 'valid' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
-                  {referralStatus === 'invalid' && <XCircle className="w-5 h-5 text-red-400" />}
-                </div>
-              </div>
-              {referralStatus === 'valid' && referralOrgName && (
-                <p className="text-xs text-green-600 font-medium mt-1.5">✓ Verified — {referralOrgName}</p>
-              )}
-              {referralStatus === 'invalid' && (
-                <p className="text-xs text-red-500 mt-1.5">Code not recognized. Double-check and try again.</p>
               )}
             </div>
 
@@ -642,15 +616,18 @@ export default function OnboardingQuestionnaire() {
                   );
                 }
 
-                // Persist validated referral code to user profile (authenticated users only)
-                if (referralStatus === 'valid' && state.referralCode) {
+                // Persist referral selection to user profile (authenticated users only)
+                const hasRealPartner = state.referralPartnerId && state.referralPartnerId !== 'other';
+                const hasOther = state.referralPartnerId === 'other';
+                if (isAuthenticated && (hasRealPartner || hasOther)) {
                   saves.push(
                     fetch('/api/user/onboarding', {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       credentials: 'include',
                       body: JSON.stringify({
-                        onboardingProgress: { referralCode: state.referralCode },
+                        referralPartnerId: hasRealPartner ? state.referralPartnerId : undefined,
+                        referralSourceOther: hasOther ? (state.referralOtherText || 'other') : undefined,
                       }),
                     }).then(() => {}).catch(() => {})
                   );

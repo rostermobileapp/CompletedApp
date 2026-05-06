@@ -836,6 +836,9 @@ function AllPartnersTab() {
                   <Th col="quarterNetRevenueCents" label="Qtr Net Rev." />
                   <Th col="estimatedQuarterPayoutCents" label="Est. Payout" />
                   <Th col="lastConversionDate" label="Last Conv." />
+                  <Th col={"totalReferred" as keyof Partner} label="Referred" />
+                  <Th col={"totalPaidUsers" as keyof Partner} label="Paid" />
+                  <Th col={"conversionRate" as keyof Partner} label="Conv.%" />
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -854,6 +857,9 @@ function AllPartnersTab() {
                     <td className="px-4 py-3">{p.quarterNetRevenueCents !== undefined ? fmt$(p.quarterNetRevenueCents) : "—"}</td>
                     <td className="px-4 py-3">{p.estimatedQuarterPayoutCents !== undefined ? fmt$(p.estimatedQuarterPayoutCents) : "—"}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{fmtDate(p.lastConversionDate)}</td>
+                    <td className="px-4 py-3 text-center">{(p as any).totalReferred ?? 0}</td>
+                    <td className="px-4 py-3 text-center">{(p as any).totalPaidUsers ?? 0}</td>
+                    <td className="px-4 py-3 text-center">{(p as any).conversionRate ?? 0}%</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate(`/admin/referrals/partner/${p.id}`)}>
                         <ExternalLink className="w-3 h-3 mr-1" />Detail
@@ -862,7 +868,7 @@ function AllPartnersTab() {
                   </tr>
                 ))}
                 {sorted.length === 0 && (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No approved partners yet.</td></tr>
+                  <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">No approved partners yet.</td></tr>
                 )}
               </tbody>
             </table>

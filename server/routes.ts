@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
@@ -896,6 +896,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onboardingProgress,
         onboardingCompleted,
         role,
+        referralPartnerId,
+        referralSourceOther,
+        referralCode,
+        clearReferral,
       } = req.body;
 
       const updateData: any = {};
@@ -916,6 +920,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (onboardingProgress !== undefined) updateData.onboardingProgress = onboardingProgress;
       if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
       if (role !== undefined) updateData.role = role;
+
+      // Referral tracking — upsert/delete referral_user_links
+      if (clearReferral) {
+        updateData.referralPartnerId = null;
+        updateData.referralSourceOther = null;
+        updateData.referralCode = null;
+        await db.delete(referralUserLinks).where(eq(referralUserLinks.userId, userId));
+      } else if (referralPartnerId) {
+        updateData.referralPartnerId = referralPartnerId;
+        if (referralSourceOther !== undefined) updateData.referralSourceOther = referralSourceOther;
+        // Upsert into referral_user_links (ignore if already exists for this partner/user pair)
+        await db
+          .insert(referralUserLinks)
+          .values({
+            userId,
+            referralPartnerId,
+            referralSourceOther: referralSourceOther || null,
+            isPaid: false,
+          })
+          .onConflictDoNothing();
+      } else if (referralCode !== undefined) {
+        updateData.referralCode = referralCode;
+      }
 
       const user = await storage.updateUserOnboarding(userId, updateData);
       res.json(user);

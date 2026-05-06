@@ -284,6 +284,10 @@ export const users = pgTable("users", {
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   onboardingProgress: jsonb("onboarding_progress"),
   selectedFacilityId: varchar("selected_facility_id"),
+  // Referral attribution (set during onboarding)
+  referralCode: varchar("referral_code", { length: 20 }),
+  referralPartnerId: varchar("referral_partner_id"),
+  referralSourceOther: text("referral_source_other"),
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -3965,6 +3969,28 @@ export const insertReferralPayoutSchema = createInsertSchema(referralPayouts).om
 });
 export type ReferralPayout = typeof referralPayouts.$inferSelect;
 export type InsertReferralPayout = z.infer<typeof insertReferralPayoutSchema>;
+
+// Referral user links — tracks every user attributed to a partner at onboarding
+// (separate from referral_conversions which only tracks paying subscribers)
+export const referralUserLinks = pgTable("referral_user_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referralPartnerId: varchar("referral_partner_id").references(() => referralPartners.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").notNull(),
+  linkedAt: timestamp("linked_at").defaultNow().notNull(),
+  isPaid: boolean("is_paid").default(false).notNull(),
+  paidTier: varchar("paid_tier", { length: 50 }),
+  paidAt: timestamp("paid_at"),
+}, (table) => [
+  index("idx_referral_user_links_partner").on(table.referralPartnerId),
+  index("idx_referral_user_links_user").on(table.userId),
+  unique("uq_referral_user_links_partner_user").on(table.referralPartnerId, table.userId),
+]);
+
+export const insertReferralUserLinkSchema = createInsertSchema(referralUserLinks).omit({
+  id: true, linkedAt: true,
+});
+export type ReferralUserLink = typeof referralUserLinks.$inferSelect;
+export type InsertReferralUserLink = z.infer<typeof insertReferralUserLinkSchema>;
 
 // Settings — key/value store for admin-editable referral program settings
 export const referralSettings = pgTable("referral_settings", {

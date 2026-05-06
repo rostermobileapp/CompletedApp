@@ -112,6 +112,40 @@ export async function initReferralDb(): Promise<void> {
       )
     `);
 
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS referral_user_links (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        referral_partner_id VARCHAR NOT NULL REFERENCES referral_partners(id) ON DELETE CASCADE,
+        user_id VARCHAR NOT NULL,
+        linked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        is_paid BOOLEAN NOT NULL DEFAULT FALSE,
+        paid_tier VARCHAR(50),
+        paid_at TIMESTAMP
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_referral_user_links_partner ON referral_user_links(referral_partner_id);
+      CREATE INDEX IF NOT EXISTS idx_referral_user_links_user ON referral_user_links(user_id);
+    `);
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'uq_referral_user_links_partner_user'
+        ) THEN
+          ALTER TABLE referral_user_links
+            ADD CONSTRAINT uq_referral_user_links_partner_user UNIQUE (referral_partner_id, user_id);
+        END IF;
+      END $$;
+    `);
+
+    // Add referral attribution columns to users if missing
+    await db.execute(sql`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS referral_code VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS referral_partner_id VARCHAR,
+        ADD COLUMN IF NOT EXISTS referral_source_other TEXT;
+    `);
+
     console.log('[Init] Referral program tables ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure referral program tables:', err);

@@ -14,6 +14,7 @@ import {
   referralPayouts,
   referralMagicLinks,
   referralSettings,
+  referralUserLinks,
   type ReferralPartner,
 } from "@shared/schema";
 import { createClient } from "@supabase/supabase-js";
@@ -264,6 +265,30 @@ export function registerReferralRoutes(app: Express) {
     }
   });
 
+  // ── Public: approved partners list (for onboarding dropdown) ─────────────
+  // Simple in-process cache: 5-minute TTL
+  let approvedPartnersCache: { data: { id: string; orgName: string }[]; expiresAt: number } | null = null;
+
+  app.get("/api/referral/approved-partners", async (_req, res) => {
+    try {
+      const now = Date.now();
+      if (approvedPartnersCache && approvedPartnersCache.expiresAt > now) {
+        return res.json(approvedPartnersCache.data);
+      }
+      const rows = await db
+        .select({ id: referralPartners.id, orgName: referralPartners.orgName })
+        .from(referralPartners)
+        .where(eq(referralPartners.status, "approved"))
+        .orderBy(referralPartners.orgName);
+      const data = rows.map((r) => ({ id: r.id, orgName: r.orgName }));
+      approvedPartnersCache = { data, expiresAt: now + 5 * 60 * 1000 };
+      res.json(data);
+    } catch (err) {
+      console.error("[Referral] approved-partners error:", err);
+      res.status(500).json({ message: "Internal error" });
+    }
+  });
+
   // ── Public: submit application ────────────────────────────────────────────
   app.post(
     "/api/referral/apply",
@@ -506,6 +531,20 @@ export function registerReferralRoutes(app: Express) {
         .where(eq(referralPayouts.partnerId, partnerId))
         .orderBy(desc(referralPayouts.paidAt));
 
+      // Referral user links stats
+      const userLinks = await db
+        .select()
+        .from(referralUserLinks)
+        .where(eq(referralUserLinks.referralPartnerId, partnerId));
+      const totalReferred = userLinks.length;
+      const totalPaid = userLinks.filter((l) => l.isPaid).length;
+      const conversionRate = totalReferred > 0 ? Math.round((totalPaid / totalReferred) * 1000) / 10 : 0;
+      const tierBreakdownLinks: Record<string, number> = {};
+      for (const l of userLinks.filter((l) => l.isPaid && l.paidTier)) {
+        const t = l.paidTier!;
+        tierBreakdownLinks[t] = (tierBreakdownLinks[t] || 0) + 1;
+      }
+
       res.json({
         partner: {
           id: partner.id,
@@ -520,6 +559,10 @@ export function registerReferralRoutes(app: Express) {
           totalConversions: conversions.filter((c) => c.status === "active").length,
           tierBreakdown,
           platformBreakdown,
+          totalReferred,
+          totalPaid,
+          conversionRate,
+          tierBreakdownLinks,
         },
         quarterEstimate: {
           quarter: q,
@@ -981,6 +1024,16 @@ export function registerReferralRoutes(app: Express) {
             (a, b) => new Date(b.convertedAt).getTime() - new Date(a.convertedAt).getTime()
           );
 
+          const userLinksRows = await db
+            .select()
+            .from(referralUserLinks)
+            .where(eq(referralUserLinks.referralPartnerId, p.id));
+          const totalReferred = userLinksRows.length;
+          const totalPaidUsers = userLinksRows.filter((l) => l.isPaid).length;
+          const conversionRate = totalReferred > 0
+            ? Math.round((totalPaidUsers / totalReferred) * 1000) / 10
+            : 0;
+
           return {
             ...p,
             activeConversions: conversions.length,
@@ -993,6 +1046,9 @@ export function registerReferralRoutes(app: Express) {
               parseFloat(p.payoutRate as string)
             ),
             lastConversionDate: lastConversion?.convertedAt || null,
+            totalReferred,
+            totalPaidUsers,
+            conversionRate,
           };
         })
       );
@@ -1054,6 +1110,23 @@ export function registerReferralRoutes(app: Express) {
       const lifetimeEstimatedPayout = calcPayoutEstimate(lifetimeGross, platformFeePercent, payoutRate);
       const qGross = qConversions.reduce((s, c) => s + (c.grossPriceCents || 0), 0);
 
+      // User links for this partner
+      const partnerUserLinks = await db
+        .select()
+        .from(referralUserLinks)
+        .where(eq(referralUserLinks.referralPartnerId, partner.id))
+        .orderBy(desc(referralUserLinks.linkedAt));
+
+      const ulTotalReferred = partnerUserLinks.length;
+      const ulTotalPaid = partnerUserLinks.filter((l) => l.isPaid).length;
+      const ulFree = ulTotalReferred - ulTotalPaid;
+      const ulConversionRate = ulTotalReferred > 0 ? Math.round((ulTotalPaid / ulTotalReferred) * 1000) / 10 : 0;
+      const ulTierBreakdown: Record<string, number> = {};
+      for (const l of partnerUserLinks.filter((l) => l.isPaid && l.paidTier)) {
+        const t = l.paidTier!;
+        ulTierBreakdown[t] = (ulTierBreakdown[t] || 0) + 1;
+      }
+
       res.json({
         partner,
         metrics: {
@@ -1064,6 +1137,14 @@ export function registerReferralRoutes(app: Express) {
           lifetimeEstimatedPayoutCents: lifetimeEstimatedPayout,
           quarterGrossCents: qGross,
           quarterEstimatedPayoutCents: calcPayoutEstimate(qGross, platformFeePercent, payoutRate),
+        },
+        userLinks: {
+          total: ulTotalReferred,
+          paid: ulTotalPaid,
+          free: ulFree,
+          conversionRate: ulConversionRate,
+          tierBreakdown: ulTierBreakdown,
+          rows: partnerUserLinks,
         },
         conversions: allConversions,
         payouts,
@@ -1655,6 +1736,24 @@ export function registerReferralRoutes(app: Express) {
           status: "active",
         });
 
+        // Derive a clean paid tier label from productId
+        const paidTier = productId
+          ? productId.toLowerCase().includes("commissioner") ? "commissioner" : "player_pro"
+          : null;
+
+        // Mark the user link as paid if one exists
+        if (appUserId) {
+          await db
+            .update(referralUserLinks)
+            .set({ isPaid: true, paidTier, paidAt: new Date() })
+            .where(
+              and(
+                eq(referralUserLinks.userId, appUserId),
+                eq(referralUserLinks.referralPartnerId, partner.id),
+              )
+            );
+        }
+
         console.log(`[RCWebhook] Recorded conversion for ${referralCode} — ${productId} $${(priceCents / 100).toFixed(2)}`);
         return res.json({ processed: true });
       }
@@ -1731,6 +1830,14 @@ export function registerReferralRoutes(app: Express) {
                   .returning({ id: referralConversions.id });
             updated = result.length > 0;
           }
+        }
+
+        // Mark user link as no longer paid
+        if (appUserId) {
+          await db
+            .update(referralUserLinks)
+            .set({ isPaid: false })
+            .where(eq(referralUserLinks.userId, appUserId));
         }
 
         console.log(`[RCWebhook] ${eventType} — userId=${appUserId} updated=${updated}`);
