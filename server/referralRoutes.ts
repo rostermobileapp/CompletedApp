@@ -7,7 +7,7 @@
  */
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, count, sum } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, count, sum, ne } from "drizzle-orm";
 import {
   referralPartners,
   referralConversions,
@@ -217,7 +217,7 @@ async function getReferralDocumentSignedUrl(filePath: string, expiresIn = 3600):
 
 // ─── Typed enum value helpers ─────────────────────────────────────────────────
 
-const PARTNER_STATUSES = ['pending', 'approved', 'rejected'] as const;
+const PARTNER_STATUSES = ['pending', 'approved', 'rejected', 'suspended'] as const;
 type ReferralPartnerStatus = typeof PARTNER_STATUSES[number];
 
 const CONVERSION_STATUSES = ['active', 'cancelled', 'refunded'] as const;
@@ -815,6 +815,76 @@ export function registerReferralRoutes(app: Express) {
     } catch (err) {
       console.error("[Referral] admin/revoke error:", err);
       res.status(500).json({ message: "Failed to revoke access" });
+    }
+  });
+
+  // ── Admin: edit referral code ─────────────────────────────────────────────
+  app.patch("/api/admin/referrals/partners/:id/referral-code", requireAdminAuth, async (req, res) => {
+    try {
+      const { referralCode } = req.body;
+      if (!referralCode || typeof referralCode !== "string") {
+        return res.status(400).json({ message: "referralCode is required" });
+      }
+      const code = referralCode.toUpperCase().trim();
+      if (!/^[A-Z0-9]{3,16}$/.test(code)) {
+        return res.status(400).json({ message: "Code must be 3–16 alphanumeric characters" });
+      }
+      const [existing] = await db
+        .select({ id: referralPartners.id })
+        .from(referralPartners)
+        .where(and(eq(referralPartners.referralCode, code), ne(referralPartners.id, req.params.id)))
+        .limit(1);
+      if (existing) return res.status(409).json({ message: "This referral code is already in use" });
+      const [updated] = await db
+        .update(referralPartners)
+        .set({ referralCode: code, updatedAt: new Date() })
+        .where(eq(referralPartners.id, req.params.id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Partner not found" });
+      res.json({ success: true, referralCode: code, partner: updated });
+    } catch (err) {
+      console.error("[Referral] admin/referral-code error:", err);
+      res.status(500).json({ message: "Failed to update referral code" });
+    }
+  });
+
+  // ── Admin: suspend partner ────────────────────────────────────────────────
+  app.post("/api/admin/referrals/partners/:id/suspend", requireAdminAuth, async (req, res) => {
+    try {
+      for (const [token, pid] of partnerSessions.entries()) {
+        if (pid === req.params.id) partnerSessions.delete(token);
+      }
+      const [updated] = await db
+        .update(referralPartners)
+        .set({ status: "suspended", updatedAt: new Date() })
+        .where(eq(referralPartners.id, req.params.id))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Partner not found" });
+      res.json({ success: true, partner: updated });
+    } catch (err) {
+      console.error("[Referral] admin/suspend error:", err);
+      res.status(500).json({ message: "Failed to suspend partner" });
+    }
+  });
+
+  // ── Admin: delete partner ─────────────────────────────────────────────────
+  app.delete("/api/admin/referrals/partners/:id", requireAdminAuth, async (req, res) => {
+    try {
+      for (const [token, pid] of partnerSessions.entries()) {
+        if (pid === req.params.id) partnerSessions.delete(token);
+      }
+      await db.delete(referralConversions).where(eq(referralConversions.partnerId, req.params.id));
+      await db.delete(referralPayouts).where(eq(referralPayouts.partnerId, req.params.id));
+      await db.delete(referralMagicLinks).where(eq(referralMagicLinks.partnerId, req.params.id));
+      const [deleted] = await db
+        .delete(referralPartners)
+        .where(eq(referralPartners.id, req.params.id))
+        .returning();
+      if (!deleted) return res.status(404).json({ message: "Partner not found" });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[Referral] admin/delete-partner error:", err);
+      res.status(500).json({ message: "Failed to delete partner" });
     }
   });
 

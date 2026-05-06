@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, RefreshCw, DollarSign, Send, AlertCircle,
-  CheckCircle, Ban, Mail
+  Ban, Mail, Pencil, Check, X, Trash2, PauseCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,9 +96,10 @@ const fmt$ = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString() : "—";
 const statusColor = (s: string) =>
-  s === "approved" ? "bg-green-100 text-green-800" :
-  s === "active"   ? "bg-blue-100 text-blue-800" :
-  s === "pending"  ? "bg-yellow-100 text-yellow-800" :
+  s === "approved"  ? "bg-green-100 text-green-800" :
+  s === "active"    ? "bg-blue-100 text-blue-800" :
+  s === "pending"   ? "bg-yellow-100 text-yellow-800" :
+  s === "suspended" ? "bg-orange-100 text-orange-800" :
   "bg-red-100 text-red-800";
 
 function MetricCard({ title, value, sub }: { title: string; value: string | number; sub?: string }) {
@@ -124,6 +125,14 @@ export default function ReferralAdminPartnerDetail() {
   const [messageModal, setMessageModal] = useState(false);
   const [payoutForm, setPayoutForm] = useState({ quarter: "", amountCents: "", method: "", reference: "", notes: "" });
   const [msgForm, setMsgForm] = useState({ subject: "", body: "" });
+
+  // Inline referral code editing
+  const [editingCode, setEditingCode] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [savingCode, setSavingCode] = useState(false);
+
+  // Delete confirmation dialog
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Auth guard - redirect to login page if not authed
   useEffect(() => {
@@ -153,13 +162,56 @@ export default function ReferralAdminPartnerDetail() {
     qc.invalidateQueries({ queryKey: ["admin-referrals-partner", id] });
   }
 
+  async function saveReferralCode() {
+    const code = codeInput.trim().toUpperCase();
+    if (!code) { toast({ title: "Code cannot be empty", variant: "destructive" }); return; }
+    setSavingCode(true);
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/referral-code`, {
+      method: "PATCH",
+      body: JSON.stringify({ referralCode: code }),
+    });
+    setSavingCode(false);
+    if (res.ok) {
+      toast({ title: "Referral code updated" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-partner", id] });
+      setEditingCode(false);
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed to update code", variant: "destructive" });
+    }
+  }
+
   async function revoke() {
-    if (!confirm("Revoke access for this partner?")) return;
+    if (!confirm("Revoke access for this partner? They will no longer be able to log in.")) return;
     const res = await adminFetch(`/api/admin/referrals/partners/${id}/revoke`, { method: "POST" });
     if (res.ok) {
       toast({ title: "Access revoked" });
       qc.invalidateQueries({ queryKey: ["admin-referrals-partner", id] });
     }
+  }
+
+  async function suspend() {
+    if (!confirm("Suspend and archive this partner? Their referral code will stop working and they will lose portal access.")) return;
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/suspend`, { method: "POST" });
+    if (res.ok) {
+      toast({ title: "Partner suspended & archived" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-partner", id] });
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed to suspend", variant: "destructive" });
+    }
+  }
+
+  async function deletePartner() {
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast({ title: "Partner deleted" });
+      navigate("/admin/referrals");
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed to delete", variant: "destructive" });
+    }
+    setDeleteConfirmOpen(false);
   }
 
   async function recordPayout() {
@@ -256,7 +308,42 @@ export default function ReferralAdminPartnerDetail() {
             </span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><Label className="text-gray-400 text-xs">Referral Code</Label><p className="font-mono font-bold text-blue-600 mt-0.5">{partner.referralCode || "—"}</p></div>
+            {/* Referral Code — inline editable */}
+            <div>
+              <Label className="text-gray-400 text-xs">Referral Code</Label>
+              {editingCode ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Input
+                    value={codeInput}
+                    onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                    className="h-7 text-sm font-mono uppercase w-28 px-2"
+                    maxLength={16}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveReferralCode();
+                      if (e.key === "Escape") setEditingCode(false);
+                    }}
+                  />
+                  <Button size="icon" className="h-7 w-7 bg-green-600 hover:bg-green-700 text-white" disabled={savingCode} onClick={saveReferralCode}>
+                    {savingCode ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCode(false)}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <p className="font-mono font-bold text-blue-600">{partner.referralCode || "—"}</p>
+                  <button
+                    className="text-gray-300 hover:text-gray-500 transition-colors"
+                    title="Edit referral code"
+                    onClick={() => { setCodeInput(partner.referralCode || ""); setEditingCode(true); }}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
             <div><Label className="text-gray-400 text-xs">Payout Rate</Label><p className="font-semibold mt-0.5">{(parseFloat(partner.payoutRate) * 100).toFixed(0)}%</p></div>
             <div><Label className="text-gray-400 text-xs">Approved</Label><p className="mt-0.5">{fmtDate(partner.approvedAt)}</p></div>
             <div><Label className="text-gray-400 text-xs">Applied</Label><p className="mt-0.5">{fmtDate(partner.createdAt)}</p></div>
@@ -264,13 +351,33 @@ export default function ReferralAdminPartnerDetail() {
               <div className="col-span-2 md:col-span-4"><Label className="text-gray-400 text-xs">Hockey Affiliation</Label><p className="mt-0.5">{partner.hockeyAffiliation}</p></div>
             )}
           </div>
-          {partner.status === "approved" && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <Button size="sm" variant="destructive" onClick={revoke}>
-                <Ban className="w-4 h-4 mr-1.5" />Revoke Access
-              </Button>
-            </div>
-          )}
+
+          {/* Action buttons */}
+          <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2 flex-wrap">
+            {partner.status === "approved" && (
+              <>
+                <Button size="sm" variant="outline" className="text-orange-600 border-orange-200 hover:bg-orange-50" onClick={suspend}>
+                  <PauseCircle className="w-4 h-4 mr-1.5" />Suspend & Archive
+                </Button>
+                <Button size="sm" variant="outline" onClick={revoke}>
+                  <Ban className="w-4 h-4 mr-1.5" />Revoke Access
+                </Button>
+              </>
+            )}
+            {partner.status === "suspended" && (
+              <p className="text-xs text-orange-600 flex items-center gap-1.5">
+                <PauseCircle className="w-4 h-4" />This partner is suspended — their referral code is inactive and they cannot log in.
+              </p>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 ml-auto"
+              onClick={() => setDeleteConfirmOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />Delete Partner
+            </Button>
+          </div>
         </div>
 
         {/* Metrics */}
@@ -432,6 +539,27 @@ export default function ReferralAdminPartnerDetail() {
             <Button variant="ghost" onClick={() => setMessageModal(false)}>Cancel</Button>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={sendMessage}>
               <Send className="w-4 h-4 mr-1.5" />Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation modal */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Partner — {partner.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-gray-700">
+              This will <strong>permanently delete</strong> this partner along with all their conversion history and payout records. This action cannot be undone.
+            </p>
+            <p className="text-gray-500">Are you sure you want to proceed?</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={deletePartner}>
+              <Trash2 className="w-4 h-4 mr-1.5" />Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>

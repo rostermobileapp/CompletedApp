@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, UserCheck, RefreshCw, Settings,
   ArrowRightLeft, DollarSign, LogOut, Search, ChevronUp, ChevronDown,
   ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText, Ban,
-  Download, Calendar
+  Download, Calendar, PauseCircle, Trash2, Pencil, Check, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -257,6 +257,10 @@ function ApplicationsTab() {
   const [newRate, setNewRate] = useState("");
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [editNotes, setEditNotes] = useState("");
+  const [editCodeModal, setEditCodeModal] = useState<Partner | null>(null);
+  const [newCode, setNewCode] = useState("");
+  const [savingCode, setSavingCode] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<Partner | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -310,6 +314,54 @@ function ApplicationsTab() {
       toast({ title: "Access revoked" });
       qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
       setSelected(null);
+    }
+  }
+
+  async function suspend(id: string) {
+    if (!confirm("Suspend and archive this partner? Their referral code will stop working and they will lose portal access.")) return;
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}/suspend`, { method: "POST" });
+    if (res.ok) {
+      toast({ title: "Partner suspended & archived" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-dashboard"] });
+      setSelected(null);
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed to suspend", variant: "destructive" });
+    }
+  }
+
+  async function saveReferralCode() {
+    if (!editCodeModal) return;
+    const code = newCode.trim().toUpperCase();
+    if (!code) { toast({ title: "Code cannot be empty", variant: "destructive" }); return; }
+    setSavingCode(true);
+    const res = await adminFetch(`/api/admin/referrals/partners/${editCodeModal.id}/referral-code`, {
+      method: "PATCH",
+      body: JSON.stringify({ referralCode: code }),
+    });
+    setSavingCode(false);
+    if (res.ok) {
+      toast({ title: "Referral code updated" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      setEditCodeModal(null);
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed to update code", variant: "destructive" });
+    }
+  }
+
+  async function deletePartner(id: string) {
+    const res = await adminFetch(`/api/admin/referrals/partners/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast({ title: "Partner deleted" });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-applications"] });
+      qc.invalidateQueries({ queryKey: ["admin-referrals-dashboard"] });
+      setDeleteModal(null);
+      setSelected(null);
+    } else {
+      const d = await res.json();
+      toast({ title: d.message || "Failed to delete", variant: "destructive" });
     }
   }
 
@@ -368,6 +420,7 @@ function ApplicationsTab() {
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -421,11 +474,17 @@ function ApplicationsTab() {
                         )}
                         {app.status === "approved" && (
                           <>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setEditCodeModal(app); setNewCode(app.referralCode || ""); }}>
+                              <Pencil className="w-3 h-3 mr-1" />Code
+                            </Button>
                             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setPayoutRateModal(app); setNewRate(app.payoutRate); }}>
                               <DollarSign className="w-3 h-3 mr-1" />Rate
                             </Button>
-                            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => revoke(app.id)}>
-                              <Ban className="w-3 h-3 mr-1" />Revoke
+                            <Button size="sm" variant="outline" className="h-7 text-xs text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => suspend(app.id)}>
+                              <PauseCircle className="w-3 h-3 mr-1" />Suspend
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => setDeleteModal(app)}>
+                              <Trash2 className="w-3 h-3 mr-1" />Delete
                             </Button>
                           </>
                         )}
@@ -506,11 +565,17 @@ function ApplicationsTab() {
                 )}
                 {selected.status === "approved" && (
                   <>
+                    <Button variant="outline" onClick={() => { setEditCodeModal(selected); setNewCode(selected.referralCode || ""); setSelected(null); }}>
+                      <Pencil className="w-4 h-4 mr-2" />Edit Code
+                    </Button>
                     <Button variant="outline" onClick={() => { setPayoutRateModal(selected); setNewRate(selected.payoutRate); setSelected(null); }}>
                       <DollarSign className="w-4 h-4 mr-2" />Edit Payout Rate
                     </Button>
-                    <Button variant="destructive" onClick={() => revoke(selected.id)}>
-                      <Ban className="w-4 h-4 mr-2" />Revoke Access
+                    <Button variant="outline" className="text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => suspend(selected.id)}>
+                      <PauseCircle className="w-4 h-4 mr-2" />Suspend & Archive
+                    </Button>
+                    <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setDeleteModal(selected); setSelected(null); }}>
+                      <Trash2 className="w-4 h-4 mr-2" />Delete Partner
                     </Button>
                   </>
                 )}
@@ -539,6 +604,56 @@ function ApplicationsTab() {
             <Button variant="ghost" onClick={() => setRejectModal(null)}>Cancel</Button>
             <Button variant="destructive" disabled={!rejectReason.trim()} onClick={() => rejectModal && reject(rejectModal.id)}>
               Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit referral code modal */}
+      <Dialog open={!!editCodeModal} onOpenChange={() => setEditCodeModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Referral Code — {editCodeModal?.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>New Referral Code (3–16 alphanumeric characters)</Label>
+            <Input
+              className="font-mono uppercase"
+              value={newCode}
+              onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+              maxLength={16}
+              placeholder="e.g. MYCOURT25"
+              onKeyDown={(e) => { if (e.key === "Enter") saveReferralCode(); }}
+            />
+            <p className="text-xs text-gray-400">Letters and numbers only. Will be stored in UPPERCASE.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditCodeModal(null)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" disabled={savingCode} onClick={saveReferralCode}>
+              {savingCode ? <><RefreshCw className="w-3 h-3 animate-spin mr-1.5" />Saving…</> : <>
+                <Check className="w-4 h-4 mr-1.5" />Save Code
+              </>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete partner confirmation modal */}
+      <Dialog open={!!deleteModal} onOpenChange={() => setDeleteModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Partner — {deleteModal?.orgName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-gray-700">
+              This will <strong>permanently delete</strong> this partner along with all their conversion history and payout records. This action cannot be undone.
+            </p>
+            <p className="text-gray-500">Are you sure you want to proceed?</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteModal(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteModal && deletePartner(deleteModal.id)}>
+              <Trash2 className="w-4 h-4 mr-1.5" />Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>

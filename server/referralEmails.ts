@@ -207,6 +207,7 @@ export async function sendMagicLinkEmail(
       const vars: Record<string, string> = {
         contactName: data.contactName,
         magicLink: data.magicLink,
+        link: data.magicLink,
       };
       html = emailWrapper(templateToHtml(interpolate(customTemplate, vars)));
     } else {
