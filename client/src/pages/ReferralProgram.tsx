@@ -169,7 +169,7 @@ export default function ReferralProgram() {
               {
                 step: '02',
                 title: 'In-App Referral',
-                desc: 'Once approved, you receive a unique referral code and access to your partner portal.',
+                desc: 'Once approved, you will be a referral option for each user',
               },
               {
                 step: '03',
