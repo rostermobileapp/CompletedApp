@@ -921,8 +921,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
       if (role !== undefined) updateData.role = role;
 
-      // Referral lock enforcement — once referral_partner_id is set it cannot be changed
-      if (referralPartnerId || clearReferral) {
+      // Referral lock enforcement — once referral_partner_id is set it cannot be changed.
+      // Block ALL referral-mutating payloads (partner change, other, or clear) when partner is locked,
+      // because the "other" and "clearReferral" state-machine branches also null out referralPartnerId.
+      if (referralPartnerId || clearReferral || referralSourceOther !== undefined) {
         const [existingUser] = await db
           .select({ referralPartnerId: users.referralPartnerId })
           .from(users)
