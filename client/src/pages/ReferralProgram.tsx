@@ -174,7 +174,9 @@ export default function ReferralProgram() {
             <span className="text-[#3c82f4]">to our community.</span>
           </h1>
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-            Refer players to our platform and Roster will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization's code. No selling required — just share the app you already use.
+            Refer players to our platform and Roster will donate 10% of our net subscription proceeds every quarter for every active subscription tied to your organization's code.
+            <br /><br />
+            No selling required — just share the app you already use.
             <br /><br />
             Choose a good cause and track your referrals!
           </p>
