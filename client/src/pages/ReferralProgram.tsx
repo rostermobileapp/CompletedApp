@@ -360,7 +360,7 @@ export default function ReferralProgram() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Proof Document <span className="text-gray-400 font-normal">(optional — helps us approve faster)</span>
                 </label>
-                <p className="text-xs text-gray-400 mb-2">Letterhead, website screenshot, or other org verification. JPEG, PNG, or PDF. Max 10 MB.</p>
+                <p className="text-xs text-gray-400 mb-2">Accepted: IRS Determination Letter, Articles of Incorporation, IRS Form 990, Bylaws, or EIN Confirmation Letter. JPEG, PNG, or PDF. Max 10 MB.</p>
                 {file ? (
                   <div className="flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl bg-gray-50">
                     <span className="text-sm text-gray-700 flex-1 truncate">{file.name}</span>
