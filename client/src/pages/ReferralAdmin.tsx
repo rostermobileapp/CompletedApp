@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   LayoutDashboard, Users, UserCheck, RefreshCw, Settings,
   ArrowRightLeft, DollarSign, LogOut, Search, ChevronUp, ChevronDown,
-  ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText, Ban
+  ExternalLink, CheckCircle, XCircle, Eye, AlertCircle, FileText, Ban,
+  Download, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1133,13 +1134,230 @@ function SettingsTab() {
   );
 }
 
-// ── Tab config (6 nav tabs + Partner Detail as a separate route) ─────────────
+// ── Reports Tab ──────────────────────────────────────────────────────────────
+function ReportsTab() {
+  const { toast } = useToast();
+  const { data: partners } = useAdminQuery<Partner[]>(
+    ["admin-referrals-partners-report"],
+    "/api/admin/referrals/partners"
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+  const firstOfYear = `${new Date().getFullYear()}-01-01`;
+
+  const [from, setFrom] = useState(firstOfYear);
+  const [to, setTo] = useState(today);
+  const [partnerId, setPartnerId] = useState("all");
+  const [sections, setSections] = useState<string[]>(["partners", "conversions", "payouts"]);
+  const [loading, setLoading] = useState(false);
+
+  const SECTION_OPTIONS = [
+    { id: "partners",    label: "Partners Summary",  desc: "All approved partners with stats for the date range" },
+    { id: "conversions", label: "Conversions",        desc: "Every subscription conversion with revenue & payout columns" },
+    { id: "payouts",     label: "Payouts History",    desc: "All recorded partner payouts in the date range" },
+  ];
+
+  function toggleSection(id: string) {
+    setSections((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  }
+
+  function setPreset(preset: "ytd" | "q1" | "q2" | "q3" | "q4" | "last30" | "last90") {
+    const now = new Date();
+    const yr = now.getFullYear();
+    if (preset === "ytd") { setFrom(`${yr}-01-01`); setTo(today); }
+    else if (preset === "last30") {
+      const d = new Date(); d.setDate(d.getDate() - 30);
+      setFrom(d.toISOString().slice(0, 10)); setTo(today);
+    }
+    else if (preset === "last90") {
+      const d = new Date(); d.setDate(d.getDate() - 90);
+      setFrom(d.toISOString().slice(0, 10)); setTo(today);
+    }
+    else {
+      const qMap: Record<string, [string, string]> = {
+        q1: [`${yr}-01-01`, `${yr}-03-31`],
+        q2: [`${yr}-04-01`, `${yr}-06-30`],
+        q3: [`${yr}-07-01`, `${yr}-09-30`],
+        q4: [`${yr}-10-01`, `${yr}-12-31`],
+      };
+      setFrom(qMap[preset][0]); setTo(qMap[preset][1]);
+    }
+  }
+
+  async function downloadReport() {
+    if (sections.length === 0) {
+      toast({ title: "Select at least one section", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      if (partnerId !== "all") params.set("partnerId", partnerId);
+      params.set("sections", sections.join(","));
+
+      const res = await adminFetch(`/api/admin/referrals/reports/export?${params}`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast({ title: "Export failed", description: d.message || `Error ${res.status}`, variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const partnerLabel = partnerId !== "all"
+        ? `-${(partners ?? []).find((p) => p.id === partnerId)?.orgName?.replace(/\s+/g, "-") || partnerId}`
+        : "";
+      a.href = url;
+      a.download = `referral-report${partnerLabel}-${from}-to-${to}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Report downloaded!" });
+    } catch {
+      toast({ title: "Export failed", description: "Network error", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
+        <h3 className="font-semibold text-gray-800 text-base">Generate CSV Report</h3>
+        <p className="text-sm text-gray-500 -mt-3">
+          Download a multi-section spreadsheet covering partners, conversions, and payouts — all in one file.
+        </p>
+
+        {/* Date range */}
+        <div>
+          <Label className="flex items-center gap-1.5 text-gray-700 mb-2">
+            <Calendar className="w-3.5 h-3.5" />Date Range
+          </Label>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {[
+              { label: "Last 30 days", id: "last30" },
+              { label: "Last 90 days", id: "last90" },
+              { label: "YTD", id: "ytd" },
+              { label: "Q1", id: "q1" },
+              { label: "Q2", id: "q2" },
+              { label: "Q3", id: "q3" },
+              { label: "Q4", id: "q4" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPreset(p.id as Parameters<typeof setPreset>[0])}
+                className="px-3 py-1 text-xs font-medium rounded-full border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <Label className="text-xs text-gray-500">From</Label>
+              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1" />
+            </div>
+            <div className="flex-1">
+              <Label className="text-xs text-gray-500">To</Label>
+              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+        </div>
+
+        {/* Partner filter */}
+        <div>
+          <Label className="text-gray-700 mb-2 block">Partner Filter</Label>
+          <Select value={partnerId} onValueChange={setPartnerId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All Partners" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Partners</SelectItem>
+              {(partners ?? []).map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.orgName} {p.referralCode ? `(${p.referralCode})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-400 mt-1">Leave as "All Partners" to include every partner in the report.</p>
+        </div>
+
+        {/* Section toggles */}
+        <div>
+          <Label className="text-gray-700 mb-2 block">Sections to Include</Label>
+          <div className="space-y-2">
+            {SECTION_OPTIONS.map((opt) => {
+              const checked = sections.includes(opt.id);
+              return (
+                <label
+                  key={opt.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    checked ? "border-blue-300 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleSection(opt.id)}
+                    className="mt-0.5 h-4 w-4 rounded accent-blue-600"
+                  />
+                  <div>
+                    <p className={`text-sm font-medium ${checked ? "text-blue-700" : "text-gray-700"}`}>{opt.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <Button
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+          disabled={loading || sections.length === 0}
+          onClick={downloadReport}
+        >
+          {loading
+            ? <><RefreshCw className="w-4 h-4 animate-spin mr-2" />Generating…</>
+            : <><Download className="w-4 h-4 mr-2" />Download CSV Report</>
+          }
+        </Button>
+      </div>
+
+      {/* Format reference */}
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-3">
+        <h4 className="text-sm font-semibold text-gray-700">Report Format</h4>
+        <ul className="space-y-2 text-xs text-gray-500">
+          <li className="flex gap-2">
+            <span className="font-mono text-blue-600 flex-shrink-0">Partners</span>
+            <span>Org name, contact, email, referral code, payout rate, conversion count & revenue for the date range, estimated payout</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-blue-600 flex-shrink-0">Conversions</span>
+            <span>Date, partner, referral code, user ID, subscription tier, platform, gross/net revenue, estimated payout, status</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-blue-600 flex-shrink-0">Payouts</span>
+            <span>Date paid, partner, quarter, amount, payment method, reference number, notes</span>
+          </li>
+        </ul>
+        <p className="text-xs text-gray-400 pt-1">Sections appear sequentially in the CSV with headers between each. Open in Excel or Google Sheets.</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab config (7 tabs: 6 + Reports) ─────────────────────────────────────────
 const TABS = [
   { id: "dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { id: "applications", label: "Applications", icon: FileText },
   { id: "partners",     label: "All Partners", icon: UserCheck },
   { id: "conversions",  label: "Conversions",  icon: ArrowRightLeft },
   { id: "payouts",      label: "Payouts",      icon: DollarSign },
+  { id: "reports",      label: "Reports",      icon: Download },
   { id: "settings",     label: "Settings",     icon: Settings },
 ] as const;
 
@@ -1219,6 +1437,7 @@ export default function ReferralAdmin() {
         {activeTab === "partners"     && <AllPartnersTab />}
         {activeTab === "conversions"  && <ConversionsTab />}
         {activeTab === "payouts"      && <PayoutsTab />}
+        {activeTab === "reports"      && <ReportsTab />}
         {activeTab === "settings"     && <SettingsTab />}
       </main>
     </div>

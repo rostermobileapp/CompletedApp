@@ -1206,6 +1206,182 @@ export function registerReferralRoutes(app: Express) {
     }
   });
 
+  // ── Admin: comprehensive report export ───────────────────────────────────
+  app.get("/api/admin/referrals/reports/export", requireAdminAuth, async (req, res) => {
+    try {
+      const { from, to, partnerId, sections = "all" } = req.query as Record<string, string>;
+
+      const dateFrom = from ? new Date(from) : null;
+      const dateTo = to ? new Date(new Date(to).setHours(23, 59, 59, 999)) : null;
+
+      const settings = await getSettings();
+      const platformFeePercent = parseFloat(settings.platform_fee_percent || "15");
+
+      const filename = `referral-report-${from || "all"}-to-${to || "all"}.csv`;
+      const lines: string[] = [];
+
+      const includeSections = sections === "all"
+        ? ["partners", "conversions", "payouts"]
+        : sections.split(",").map((s) => s.trim());
+
+      // ── Section 1: Partners Summary ─────────────────────────────────────
+      if (includeSections.includes("partners")) {
+        const partnerConditions = [eq(referralPartners.status, "approved")];
+        if (partnerId) partnerConditions.push(eq(referralPartners.id, partnerId));
+        const partners = await db
+          .select()
+          .from(referralPartners)
+          .where(and(...partnerConditions))
+          .orderBy(desc(referralPartners.approvedAt));
+
+        lines.push("SECTION: PARTNERS SUMMARY");
+        lines.push(
+          "Org Name,Contact Name,Email,Type,Hockey Affiliation,Status,Referral Code," +
+          "Payout Rate,Applied Date,Approved Date,Total Conversions (Date Range)," +
+          "Gross Revenue in Range ($),Est. Payout in Range ($)"
+        );
+
+        for (const p of partners) {
+          const convConditions = [
+            eq(referralConversions.partnerId, p.id),
+          ];
+          if (dateFrom) convConditions.push(gte(referralConversions.convertedAt, dateFrom));
+          if (dateTo) convConditions.push(lte(referralConversions.convertedAt, dateTo));
+          const convs = await db
+            .select()
+            .from(referralConversions)
+            .where(and(...convConditions));
+          const gross = convs.reduce((s, c) => s + (c.grossPriceCents || 0), 0);
+          const estPayout = calcPayoutEstimate(gross, platformFeePercent, parseFloat(p.payoutRate as string));
+
+          lines.push(
+            [
+              `"${p.orgName}"`,
+              `"${p.contactName}"`,
+              `"${p.email}"`,
+              `"${p.orgType}"`,
+              `"${p.hockeyAffiliation || ""}"`,
+              p.status,
+              p.referralCode || "",
+              `${(parseFloat(p.payoutRate as string) * 100).toFixed(0)}%`,
+              p.createdAt ? new Date(p.createdAt).toISOString().slice(0, 10) : "",
+              p.approvedAt ? new Date(p.approvedAt).toISOString().slice(0, 10) : "",
+              convs.length,
+              (gross / 100).toFixed(2),
+              (estPayout / 100).toFixed(2),
+            ].join(",")
+          );
+        }
+        lines.push("");
+      }
+
+      // ── Section 2: Conversions ──────────────────────────────────────────
+      if (includeSections.includes("conversions")) {
+        const convConditions: ReturnType<typeof eq>[] = [];
+        if (partnerId) convConditions.push(eq(referralConversions.partnerId, partnerId));
+        if (dateFrom) convConditions.push(gte(referralConversions.convertedAt, dateFrom));
+        if (dateTo) convConditions.push(lte(referralConversions.convertedAt, dateTo));
+
+        const conversions = await db
+          .select()
+          .from(referralConversions)
+          .where(convConditions.length > 0 ? and(...convConditions) : undefined)
+          .orderBy(desc(referralConversions.convertedAt));
+
+        const partnerIds = [...new Set(conversions.map((c) => c.partnerId))];
+        const partnersMap: Record<string, { name: string; rate: string }> = {};
+        if (partnerIds.length > 0) {
+          const ps = await db
+            .select({ id: referralPartners.id, orgName: referralPartners.orgName, payoutRate: referralPartners.payoutRate })
+            .from(referralPartners)
+            .where(inArray(referralPartners.id, partnerIds));
+          for (const p of ps) partnersMap[p.id] = { name: p.orgName, rate: p.payoutRate as string };
+        }
+
+        lines.push("SECTION: CONVERSIONS");
+        lines.push("Date,Partner,Referral Code,User ID,Tier,Platform,Gross ($),Net ($),Est. Payout ($),Status");
+        for (const c of conversions) {
+          const partner = partnersMap[c.partnerId];
+          const gross = c.grossPriceCents || 0;
+          const net = Math.round(gross * (1 - platformFeePercent / 100));
+          const rate = partner ? parseFloat(partner.rate) : 0;
+          const estPayout = calcPayoutEstimate(gross, platformFeePercent, rate);
+          lines.push(
+            [
+              new Date(c.convertedAt).toISOString().slice(0, 10),
+              `"${partner?.name || "Unknown"}"`,
+              c.referralCode,
+              c.userId || "",
+              c.tier || "",
+              c.platform || "",
+              (gross / 100).toFixed(2),
+              (net / 100).toFixed(2),
+              (estPayout / 100).toFixed(2),
+              c.status,
+            ].join(",")
+          );
+        }
+        lines.push("");
+      }
+
+      // ── Section 3: Payouts ──────────────────────────────────────────────
+      if (includeSections.includes("payouts")) {
+        const payoutConditions: ReturnType<typeof eq>[] = [];
+        if (partnerId) payoutConditions.push(eq(referralPayouts.partnerId, partnerId));
+        if (dateFrom) payoutConditions.push(gte(referralPayouts.paidAt, dateFrom));
+        if (dateTo) payoutConditions.push(lte(referralPayouts.paidAt, dateTo));
+
+        const payouts = await db
+          .select()
+          .from(referralPayouts)
+          .where(payoutConditions.length > 0 ? and(...payoutConditions) : undefined)
+          .orderBy(desc(referralPayouts.paidAt));
+
+        const partnerIds2 = [...new Set(payouts.map((p) => p.partnerId))];
+        const partnersMap2: Record<string, string> = {};
+        if (partnerIds2.length > 0) {
+          const ps = await db
+            .select({ id: referralPartners.id, orgName: referralPartners.orgName })
+            .from(referralPartners)
+            .where(inArray(referralPartners.id, partnerIds2));
+          for (const p of ps) partnersMap2[p.id] = p.orgName;
+        }
+
+        lines.push("SECTION: PAYOUTS");
+        lines.push("Date Paid,Partner,Quarter,Amount ($),Method,Reference,Notes");
+        for (const p of payouts) {
+          lines.push(
+            [
+              new Date(p.paidAt).toISOString().slice(0, 10),
+              `"${partnersMap2[p.partnerId] || "Unknown"}"`,
+              p.quarter,
+              (p.amountCents / 100).toFixed(2),
+              `"${p.method || ""}"`,
+              `"${p.reference || ""}"`,
+              `"${(p.notes || "").replace(/"/g, "'")}"`,
+            ].join(",")
+          );
+        }
+        lines.push("");
+      }
+
+      // ── Metadata footer ─────────────────────────────────────────────────
+      lines.push(`Generated: ${new Date().toISOString()}`);
+      lines.push(`Date Range: ${from || "All time"} to ${to || "All time"}`);
+      if (partnerId) {
+        const [p] = await db.select({ orgName: referralPartners.orgName }).from(referralPartners).where(eq(referralPartners.id, partnerId));
+        if (p) lines.push(`Partner Filter: ${p.orgName}`);
+      }
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.send(lines.join("\n"));
+    } catch (err) {
+      console.error("[Referral] admin/reports/export error:", err);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
   // ── Admin: settings ───────────────────────────────────────────────────────
   app.get("/api/admin/referrals/settings", requireAdminAuth, async (_req, res) => {
     try {
