@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aFFhvtIzJvyF.natively",
+      "sha256_cert_fingerprints": [
+        "47:9C:63:12:D8:32:C9:8B:EB:A2:11:6D:0B:7D:C6:14:A6:5F:46:DD:CD:A3:46:D1:CE:CB:47:25:BA:13:14:CB",
+        "44:0C:AC:E3:43:32:D8:8F:8B:99:05:38:9B:17:3C:56:B6:B8:B2:C4:AE:ED:1A:18:5E:F7:A4:4A:77:2C:6D:A3"
+      ]
+    }
+  }
+]

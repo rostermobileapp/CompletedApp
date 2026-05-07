@@ -9,6 +9,10 @@
       "destination": "https://completedapp-production.up.railway.app/api/:path*"
     },
     {
+      "source": "/.well-known/:file*",
+      "destination": "/.well-known/:file*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
@@ -30,6 +34,12 @@
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
         }
+      ]
+    },
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
       ]
     }
   ]
