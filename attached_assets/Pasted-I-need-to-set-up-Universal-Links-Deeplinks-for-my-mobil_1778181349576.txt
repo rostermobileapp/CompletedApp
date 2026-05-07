@@ -1,0 +1,56 @@
+I need to set up Universal Links / Deeplinks for my mobile app. This requires hosting two specific files on my website at specific paths so Apple and Google can verify domain ownership. My domain is roster-app.com and it also serves at www.roster-app.com.
+Please do the following:
+1. Create a .well-known directory inside the public/ folder at the project root. If public/ doesn't exist, create it.
+2. Inside public/.well-known/, create two files:
+File 1: assetlinks.json — with this exact content:
+json[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aFFhvtIzJvyF.natively",
+      "sha256_cert_fingerprints": [
+        "47:9C:63:12:D8:32:C9:8B:EB:A2:11:6D:0B:7D:C6:14:A6:5F:46:DD:CD:A3:46:D1:CE:CB:47:25:BA:13:14:CB",
+        "44:0C:AC:E3:43:32:D8:8F:8B:99:05:38:9B:17:3C:56:B6:B8:B2:C4:AE:ED:1A:18:5E:F7:A4:4A:77:2C:6D:A3"
+      ]
+    }
+  }
+]
+File 2: apple-app-site-association — with no file extension at all (not .json, not .txt, just apple-app-site-association) — with this exact content:
+json{
+  "applinks": {
+    "apps": [],
+    "details": [{
+      "appID": "3MF4A8F7C3.com.VSYXwIOXHTNx.Roster",
+      "paths": ["*"]
+    }]
+  }
+}
+3. Update or create vercel.json at the project root to ensure the apple-app-site-association file is served with the correct Content-Type: application/json header. If vercel.json already exists, merge this in without removing existing config:
+json{
+  "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
+    }
+  ]
+}
+4. Verify domain configuration in Vercel. Both roster-app.com and www.roster-app.com serve the site. Apple and Google do NOT follow redirects when validating these files, so the .well-known files must be reachable directly (status 200, no redirects) on whichever domain is configured as the canonical one in Vercel. If one redirects to the other, confirm the .well-known paths are accessible on BOTH variants without redirect, OR confirm which is canonical so I know which to register in BuildNatively.
+5. Make sure neither file is excluded by .gitignore or .vercelignore. Files and folders starting with a dot (like .well-known) are sometimes ignored by default — explicitly allow them if needed.
+6. Commit and push to GitHub so Vercel auto-deploys.
+7. After deploy, confirm the following URLs all return the file contents (status 200, no redirects, correct Content-Type):
+
+https://roster-app.com/.well-known/assetlinks.json
+https://roster-app.com/.well-known/apple-app-site-association
+https://www.roster-app.com/.well-known/assetlinks.json
+https://www.roster-app.com/.well-known/apple-app-site-association
+
+For each URL, report back: HTTP status code, Content-Type header, and whether any redirect occurred. The apple-app-site-association file must serve as application/json.
+Important constraints:
+
+Do NOT modify any other files in the project
+Do NOT change the contents of either file — they must be byte-exact as provided above
+The apple-app-site-association file must have NO file extension
+The .well-known folder must start with a literal dot
