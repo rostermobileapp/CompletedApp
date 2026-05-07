@@ -1,0 +1,32 @@
+Yep — that's exactly the redirect/fallback issue I was worried about. Look at what came back: it's your full index.html (the React app shell), not the JSON file. That means Vercel's catch-all is intercepting the request before serving the actual file.
+Replit's claim that the rewrite would handle this didn't pan out. Either the rewrite order isn't right, or the file isn't actually deployed where it should be.
+Let me give you a diagnostic prompt to send back to Replit so we can figure out exactly what's wrong.
+
+Prompt for Replit:
+The universal links setup is not working. When I visit https://www.roster-app.com/.well-known/apple-app-site-association, the server returns the contents of index.html (the React app shell) instead of the apple-app-site-association file. This means Vercel's catch-all rewrite to /index.html is intercepting .well-known paths before serving the actual files.
+Please diagnose and fix:
+1. Confirm both files actually exist in the deployed build:
+
+Verify public/.well-known/assetlinks.json exists and has the correct content
+Verify public/.well-known/apple-app-site-association exists, has NO file extension, and has the correct content
+Run a directory listing of public/.well-known/ and show me the output
+
+2. Show me the current full contents of vercel.json so I can see the exact rewrite/route ordering. The .well-known rule MUST come before the catch-all /(.*) → /index.html rule. In Vercel, rule order matters — first match wins.
+3. Verify the build output. When Vercel builds the project, does the contents of public/ actually get included in the deployed output? Some build configs (especially Vite-based ones) require files to be in public/ to be copied to dist/ automatically — confirm this is happening for files inside .well-known too. Sometimes dotfolders get skipped during the build copy step even if they're not in .gitignore.
+4. Test against the actual deployed site:
+Run these curl commands from the shell and report back the FULL output (status code, all headers, and body) for each:
+curl -I https://www.roster-app.com/.well-known/assetlinks.json
+curl -I https://www.roster-app.com/.well-known/apple-app-site-association
+curl -I https://roster-app.com/.well-known/assetlinks.json
+curl -I https://roster-app.com/.well-known/apple-app-site-association
+Then run the same with -i (lowercase, fetches body too) on the apple-app-site-association URLs:
+curl -i https://www.roster-app.com/.well-known/apple-app-site-association
+curl -i https://roster-app.com/.well-known/apple-app-site-association
+5. Based on what you find, fix the issue. The most likely fixes are:
+
+Reordering the vercel.json rewrites so .well-known is matched first
+Adding an explicit rewrite/route exception for /.well-known/*
+Ensuring the build process copies the .well-known folder into the deployed output (might need a vite-plugin-static-copy or equivalent if using Vite)
+Adding the files to a different location that Vercel serves directly (e.g., a top-level static/ or moving config)
+
+Do not change the file contents. Only fix routing/build/deploy issues. Report what was wrong and what you changed.
