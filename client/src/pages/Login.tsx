@@ -1,14 +1,3 @@
-/**
- * Login.tsx
- * Combined sign-in / sign-up screen.
- * Providers handled: email/password (unchanged), Google OAuth, Apple Sign-In (iOS native only).
- *
- * Apple Sign-In security note: BuildNatively's Apple SDK does not return a verifiable
- * Apple identity token, so the /api/auth/apple-bridge endpoint trusts client-supplied
- * identity data. Rate limiting is applied server-side. This is a known limitation;
- * migrating to Apple's native iOS SDK (which returns a real ID token) is future work.
- */
-
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -20,11 +9,8 @@ import { X, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import rosterModalLogo from '@assets/Dark_Mode_Logo_1768422401788.png';
 import { EmailVerificationModal } from '@/components/EmailVerificationModal';
-import { useIosPlatform } from '@/hooks/useIosPlatform';
 
 const rosterLogo = '/roster-logo-transparent.png';
-
-const OAUTH_REDIRECT = 'https://www.roster-app.com/auth/callback';
 
 export default function Login() {
   const [showForm, setShowForm] = useState(false);
@@ -33,19 +19,11 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [showVerification, setShowVerification] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const [emailTaken, setEmailTaken] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { isIos } = useIosPlatform();
-  // Show the Apple button only in the actual Natively iOS native shell — confirmed by the
-  // NativelyAppleSignInService class being injected into window by the bridge at runtime.
-  // This is stricter than isIos alone (which includes the ?ios=1 dev-preview override).
-  const isNativeAppleAvailable =
-    isIos && typeof (window as Window & { NativelyAppleSignInService?: unknown }).NativelyAppleSignInService !== 'undefined';
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -139,83 +117,6 @@ export default function Login() {
       description: 'Your account is now active. You are signed in.',
     });
     setLocation('/app');
-  };
-
-  const handleGoogleSignIn = async () => {
-    setSocialLoading('google');
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: OAUTH_REDIRECT },
-      });
-      if (error) throw error;
-    } catch (error: unknown) {
-      toast({
-        variant: 'destructive',
-        title: 'Google sign-in failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
-      });
-      setSocialLoading(null);
-    }
-  };
-
-  const handleAppleSignIn = async () => {
-    setSocialLoading('apple');
-    try {
-      const appleService = new window.NativelyAppleSignInService();
-      appleService.signin(async (resp) => {
-        if (!resp.status) {
-          toast({
-            variant: 'destructive',
-            title: 'Apple sign-in failed',
-            description: resp.message || 'Apple sign-in was cancelled or failed.',
-          });
-          setSocialLoading(null);
-          return;
-        }
-
-        try {
-          const res = await fetch('/api/auth/apple-bridge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: resp.email,
-              subject: resp.subject,
-              givenname: resp.givenname,
-              familyname: resp.familyname,
-            }),
-          });
-
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.message || 'Apple bridge request failed');
-          }
-
-          const { access_token, refresh_token } = await res.json();
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
-          if (sessionError) throw sessionError;
-
-          setLocation('/app');
-        } catch (bridgeError: unknown) {
-          toast({
-            variant: 'destructive',
-            title: 'Apple sign-in failed',
-            description: bridgeError instanceof Error ? bridgeError.message : 'An error occurred',
-          });
-          setSocialLoading(null);
-        }
-      });
-    } catch (error: unknown) {
-      toast({
-        variant: 'destructive',
-        title: 'Apple sign-in failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
-      });
-      setSocialLoading(null);
-    }
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -388,52 +289,6 @@ export default function Login() {
                     {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
                   </Button>
 
-                  <div className="flex items-center gap-3 py-1">
-                    <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-gray-400 font-medium">or</span>
-                    <div className="flex-1 h-px bg-gray-200" />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    disabled={socialLoading !== null}
-                    className="w-full min-h-[48px] flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-xl font-semibold text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
-                    data-testid="button-google"
-                  >
-                    {socialLoading === 'google' ? (
-                      <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                    ) : (
-                      <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M47.532 24.5528C47.532 22.9214 47.3997 21.2811 47.1175 19.6761H24.48V28.9181H37.4434C36.9055 31.8988 35.177 34.5356 32.6461 36.2111V42.2078H40.3801C44.9217 38.0278 47.532 31.8547 47.532 24.5528Z" fill="#4285F4"/>
-                        <path d="M24.48 48.0016C30.9529 48.0016 36.4116 45.8764 40.3888 42.2078L32.6549 36.2111C30.5031 37.675 27.7252 38.5039 24.4888 38.5039C18.2275 38.5039 12.9187 34.2798 11.0139 28.6006H3.03296V34.7825C7.10718 42.8868 15.4056 48.0016 24.48 48.0016Z" fill="#34A853"/>
-                        <path d="M11.0051 28.6006C9.99973 25.6199 9.99973 22.3922 11.0051 19.4115V13.2296H3.03298C-0.371021 20.0112 -0.371021 28.0009 3.03298 34.7825L11.0051 28.6006Z" fill="#FBBC04"/>
-                        <path d="M24.48 9.49932C27.9016 9.44641 31.2086 10.7339 33.6866 13.0973L40.5387 6.24523C36.2 2.17101 30.4414 -0.068932 24.48 0.00161733C15.4055 0.00161733 7.10718 5.11644 3.03296 13.2296L11.005 19.4115C12.901 13.7235 18.2187 9.49932 24.48 9.49932Z" fill="#EA4335"/>
-                      </svg>
-                    )}
-                    Continue with Google
-                  </button>
-
-                  {isNativeAppleAvailable && (
-                    <button
-                      type="button"
-                      onClick={handleAppleSignIn}
-                      disabled={socialLoading !== null}
-                      className="w-full min-h-[48px] flex items-center justify-center gap-3 bg-black rounded-xl font-semibold text-sm text-white hover:bg-gray-900 transition-colors disabled:opacity-60"
-                      data-testid="button-apple"
-                    >
-                      {socialLoading === 'apple' ? (
-                        <div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M14.9455 11.4637C14.9273 9.27616 16.7546 8.21775 16.8364 8.16934C15.8 6.64471 14.1818 6.43653 13.6091 6.41925C12.2182 6.27471 10.8727 7.23289 10.1636 7.23289C9.44 7.23289 8.33636 6.43289 7.16364 6.45744C5.63636 6.48198 4.21818 7.34016 3.43636 8.69289C1.83636 11.4432 3.01818 15.4923 4.54545 17.7195C5.31818 18.8105 6.21818 20.0341 7.41818 19.9914C8.58182 19.9441 9.02727 19.2287 10.4364 19.2287C11.8364 19.2287 12.2455 19.9914 13.4636 19.9623C14.7182 19.9432 15.4909 18.8614 16.2364 17.7623C17.1273 16.5023 17.4909 15.2696 17.5 15.2078C17.4727 15.1987 14.9636 14.2305 14.9455 11.4637Z" fill="white"/>
-                          <path d="M12.7273 4.81835C13.3545 4.04744 13.7818 2.98744 13.6636 1.91016C12.7636 1.95198 11.6273 2.53471 10.9727 3.28744C10.3909 3.95562 9.87273 5.05198 10.0091 6.08198C11.0182 6.15562 12.0818 5.57471 12.7273 4.81835Z" fill="white"/>
-                        </svg>
-                      )}
-                      Sign in with Apple
-                    </button>
-                  )}
-                  
                   <div className="text-center">
                     <button
                       type="button"
