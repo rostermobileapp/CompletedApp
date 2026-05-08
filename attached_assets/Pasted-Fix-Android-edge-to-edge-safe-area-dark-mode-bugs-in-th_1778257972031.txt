@@ -1,0 +1,70 @@
+Fix Android edge-to-edge / safe-area / dark-mode bugs in the web app
+Three symptoms on Samsung Android devices (wrapped via Natively.io):
+
+Status bar fades behind app content — OS clock/battery icons render against the dark app background and become invisible
+On refresh, a larger-than-normal buffer appears at the bottom of the screen, then resizes
+App never reacts to system light/dark mode changes
+
+Root cause: viewport meta tag is missing viewport-fit=cover, so env(safe-area-inset-*) values return 0px. Existing safe-area CSS in index.css is silently doing nothing. There's also no color-scheme declaration, so the WebView treats the app as light-only.
+Make exactly these three changes — do not modify anything else.
+
+Change 1: client/index.html
+Find this line:
+html<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+Replace it with:
+html<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+
+Change 2: client/src/index.css — add color-scheme declarations
+In the :root { ... } block, add this line as the first property inside the block (right after the opening brace):
+csscolor-scheme: light dark;
+In the .dark { ... } block, add this line as the first property inside the block (right after the opening brace):
+csscolor-scheme: dark;
+
+Change 3: client/src/index.css — fix root layout inset handling
+Find this exact block:
+csshtml, body, #root {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+}
+Replace it with:
+csshtml, body {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+}
+
+#root {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  box-sizing: border-box;
+}
+
+Do not change:
+
+Any other CSS rules, animations, tokens, or utility classes
+Any TypeScript or React files
+app.json, mobile/ folder contents, or anything in the Expo project
+The existing .safe-area-bottom class or the @supports (padding-bottom: env(...)) block — leave those in place even though they'll now work correctly via the viewport fix
+
+After making the changes, do not run a build or deploy. Just confirm the three edits were applied and stop.
