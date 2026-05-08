@@ -369,43 +369,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const fullName = [givenname, familyname].filter(Boolean).join(' ') || email.split('@')[0];
 
-        // Look for an existing user by email
-        const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
-        if (listError) throw listError;
+        // Attempt to create the user. For first-time Apple sign-ins this creates a
+        // new pre-confirmed account. For returning users Supabase will return a
+        // "User already registered" / 422 error — that is expected and safe to ignore.
+        // This avoids a paginated full-list scan (listUsers is paginated and would miss
+        // users on pages beyond the default page size).
+        const { error: createError } = await supabase.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: {
+            full_name: fullName,
+            first_name: givenname || '',
+            last_name: familyname || '',
+            apple_subject: subject,
+          },
+        });
 
-        const existingUser = listData?.users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
-
-        let userId: string;
-
-        if (existingUser) {
-          userId = existingUser.id;
-          // Update metadata to include apple_subject if not already set
-          if (!existingUser.user_metadata?.apple_subject) {
-            await supabase.auth.admin.updateUserById(userId, {
-              user_metadata: {
-                ...existingUser.user_metadata,
-                apple_subject: subject,
-              },
-            });
-          }
-        } else {
-          // Create a new pre-confirmed user
-          const { data: newData, error: createError } = await supabase.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: {
-              full_name: fullName,
-              first_name: givenname || '',
-              last_name: familyname || '',
-              apple_subject: subject,
-            },
-          });
-          if (createError) throw createError;
-          if (!newData?.user) throw new Error('Failed to create user');
-          userId = newData.user.id;
+        if (createError) {
+          const msg = createError.message?.toLowerCase() ?? '';
+          const isAlreadyExists =
+            msg.includes('already') ||
+            msg.includes('duplicate') ||
+            (createError as any).status === 422;
+          if (!isAlreadyExists) throw createError;
+          // else: existing user — fall through to generateLink below
         }
 
-        // Generate a magic link to obtain a session
+        // Generate a magic link to obtain a session — works for both new and existing users
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
           email,
