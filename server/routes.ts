@@ -323,6 +323,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // ─── Apple Sign-In Bridge ──────────────────────────────────────────────────
+  //
+  // POST /api/auth/apple-bridge
+  //
+  // BuildNatively's Apple SDK does NOT return a verifiable Apple identity token,
+  // so this endpoint trusts whatever identity the client sends. It is protected
+  // only by rate limiting (10 requests/minute per IP). This is a known security
+  // limitation — future work: switch to Apple's native iOS SDK which returns a
+  // real identity token that can be verified with supabase.auth.signInWithIdToken().
+  //
+  // Flow:
+  //   1. Look up an existing Supabase user by email.
+  //   2. If found, generate a magic-link token and exchange it for a session.
+  //   3. If not found, create a new user (email_confirm: true) then do the same.
+  //   4. Return { access_token, refresh_token } for the client to call setSession().
+  {
+    const appleRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+    app.post('/api/auth/apple-bridge', async (req: any, res) => {
+      const ip: string = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+      const now = Date.now();
+      const window = 60_000;
+      const limit = 10;
+
+      const entry = appleRateLimit.get(ip);
+      if (entry) {
+        if (now < entry.resetAt) {
+          if (entry.count >= limit) {
+            return res.status(429).json({ message: 'Too many requests. Please try again in a minute.' });
+          }
+          entry.count++;
+        } else {
+          appleRateLimit.set(ip, { count: 1, resetAt: now + window });
+        }
+      } else {
+        appleRateLimit.set(ip, { count: 1, resetAt: now + window });
+      }
+
+      const { email, subject, givenname, familyname } = req.body || {};
+      if (!email || !subject) {
+        return res.status(400).json({ message: 'email and subject are required' });
+      }
+
+      try {
+        const fullName = [givenname, familyname].filter(Boolean).join(' ') || email.split('@')[0];
+
+        // Look for an existing user by email
+        const { data: listData, error: listError } = await supabase.auth.admin.listUsers();
+        if (listError) throw listError;
+
+        const existingUser = listData?.users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+
+        let userId: string;
+
+        if (existingUser) {
+          userId = existingUser.id;
+          // Update metadata to include apple_subject if not already set
+          if (!existingUser.user_metadata?.apple_subject) {
+            await supabase.auth.admin.updateUserById(userId, {
+              user_metadata: {
+                ...existingUser.user_metadata,
+                apple_subject: subject,
+              },
+            });
+          }
+        } else {
+          // Create a new pre-confirmed user
+          const { data: newData, error: createError } = await supabase.auth.admin.createUser({
+            email,
+            email_confirm: true,
+            user_metadata: {
+              full_name: fullName,
+              first_name: givenname || '',
+              last_name: familyname || '',
+              apple_subject: subject,
+            },
+          });
+          if (createError) throw createError;
+          if (!newData?.user) throw new Error('Failed to create user');
+          userId = newData.user.id;
+        }
+
+        // Generate a magic link to obtain a session
+        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+          options: { redirectTo: 'https://www.roster-app.com/app' },
+        });
+        if (linkError) throw linkError;
+
+        const hashed_token = linkData?.properties?.hashed_token;
+        if (!hashed_token) throw new Error('Failed to generate sign-in link');
+
+        // Exchange the hashed token for a real session
+        const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
+          type: 'magiclink',
+          token_hash: hashed_token,
+        });
+        if (sessionError) throw sessionError;
+        if (!sessionData?.session) throw new Error('No session returned from OTP verification');
+
+        return res.json({
+          access_token: sessionData.session.access_token,
+          refresh_token: sessionData.session.refresh_token,
+        });
+      } catch (err: any) {
+        console.error('[AppleBridge] Error:', err?.message || err);
+        return res.status(500).json({ message: err?.message || 'Apple sign-in failed' });
+      }
+    });
+  }
+
   // Draft tool: setup wizard, draft engine routes, live draft room
   registerDraftRoutes(app, isAuthenticated);
   setDraftBroadcaster(broadcastToUser);
