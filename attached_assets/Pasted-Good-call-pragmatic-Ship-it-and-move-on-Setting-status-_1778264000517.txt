@@ -1,0 +1,55 @@
+Good call — pragmatic. Ship it and move on. Setting status bar to "None" is fine; it sidesteps the icon color / theme reactivity fight entirely. Yeah, the OS clock/battery won't be visible while the app is open, but for a hockey app that's a perfectly normal mobile pattern (lots of full-screen apps do this).
+Here's the prompt for Replit. Two changes only — undoing Change 3 from the previous prompt while keeping Changes 1 and 2 (viewport tag and color-scheme) in place because those are still correct.
+
+Revert root padding changes in client/src/index.css
+Previous edits to handle safe-area insets in CSS conflicted with the native wrapper's own safe-area handling, causing inconsistent padding across navigation events. Reverting CSS-side padding so the Natively wrapper can handle insets natively.
+Make exactly this one change. Do not touch anything else.
+
+Change: client/src/index.css — revert the #root block
+Find this exact block:
+csshtml, body {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+}
+
+#root {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  box-sizing: border-box;
+}
+Replace it with:
+csshtml, body, #root {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+}
+
+Do not change:
+
+The viewport meta tag in client/index.html (leave viewport-fit=cover in place)
+The color-scheme: light dark in :root or color-scheme: dark in .dark (leave those in place)
+Any other CSS, components, or files
+The existing .safe-area-bottom class or @supports block
+
+After making the change, do not run a build or deploy. Just confirm the edit was applied.
