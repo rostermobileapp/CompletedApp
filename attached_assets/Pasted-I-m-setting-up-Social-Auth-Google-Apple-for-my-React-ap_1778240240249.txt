@@ -1,0 +1,106 @@
+I'm setting up Social Auth (Google + Apple) for my React app, which uses Supabase Auth and is wrapped as a native mobile app via BuildNatively (Natively.io). My existing email/password sign-in must continue to work unchanged. Account linking by email is already enabled in Supabase, so users with the same email across providers should merge into one account.
+Please do the following in phases. Stop after each phase and report what you did before continuing.
+Phase 1: Discovery (do this first, report back before changing any code)
+
+Find and report the file paths for:
+
+The existing sign-in screen
+The existing sign-up screen (if separate)
+Where @supabase/supabase-js client is initialized (e.g., supabase.ts or supabaseClient.ts)
+The main app router (likely App.tsx or wherever React Router / Wouter / etc. is configured)
+
+
+Confirm which router library is in use and which version.
+Confirm the existing email/password auth code style so the new social buttons match the existing conventions (function components, hooks usage, error handling style, button styling library/Tailwind classes, etc.).
+Stop here and report findings before proceeding.
+
+Phase 2: Add Google Sign-In (cross-platform via Supabase OAuth)
+
+Add a "Sign in with Google" button to BOTH the sign-in and sign-up screens. Style it according to Google's brand guidelines (white background, Google "G" logo, "Sign in with Google" or "Continue with Google" text). Do NOT remove or alter existing email/password fields.
+The button should call:
+
+javascript   await supabase.auth.signInWithOAuth({
+     provider: 'google',
+     options: {
+       redirectTo: 'https://www.roster-app.com/auth/callback'
+     }
+   });
+
+Handle errors gracefully (toast/alert/inline error) using the existing error pattern in the app.
+
+Phase 3: Add OAuth Callback Handler
+
+Create a new route at /auth/callback that:
+
+On mount, calls supabase.auth.exchangeCodeForSession(window.location.href) to complete the OAuth flow
+On success, redirects the user to the main app's home/dashboard page
+On failure, redirects to the sign-in screen with an error message
+Shows a loading spinner while processing
+
+
+Register this route in the router and ensure it's accessible without authentication (it's the post-auth landing page).
+
+Phase 4: Add Sign In with Apple (iOS native only)
+
+Add a "Sign in with Apple" button to BOTH sign-in and sign-up screens. Match Apple's design guidelines (black button with white Apple logo and "Sign in with Apple" text).
+The button should be visible ONLY on iOS native (use BuildNatively's browser detection):
+
+javascript   const browserInfo = window.natively?.browserInfo();
+   const isIOSNative = browserInfo?.isIOSApp === true;
+Hide the button on Android, web, and any non-iOS native platform.
+
+On click, call BuildNatively's native Apple Sign In:
+
+javascript   const appleService = new window.NativelyAppleSignInService();
+   appleService.signin(async function(resp) {
+     if (!resp.status) {
+       // handle error: resp.message
+       return;
+     }
+     // resp.email, resp.subject, resp.givenname, resp.familyname, resp.initial
+     // POST these to our backend bridge endpoint (Phase 5)
+   });
+Phase 5: Backend Bridge for Apple Sign In
+BuildNatively's Apple SDK does NOT return a raw Apple identity token, so we cannot use supabase.auth.signInWithIdToken() directly. Instead, create a backend endpoint that uses the Supabase admin API to create or sign in the user:
+
+Create a new backend route: POST /api/auth/apple-bridge
+The route accepts: { email, subject, givenname, familyname, initial } from the request body.
+Use the Supabase service role client (admin client) on the backend (NEVER expose the service role key to the frontend) to:
+
+Look up an existing user by email using supabase.auth.admin.listUsers() filtered by email
+If user exists: generate a magic-link-style session token and return it
+If user doesn't exist: create a new user via supabase.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name, apple_subject } }), then generate a session
+Return a session payload (access_token, refresh_token) the frontend can use to call supabase.auth.setSession()
+
+
+The frontend Apple callback should then:
+
+POST to /api/auth/apple-bridge with the response data
+Receive the session payload
+Call supabase.auth.setSession({ access_token, refresh_token }) to log the user in
+Redirect to the main app
+
+
+
+⚠️ Security note: Because BuildNatively's flow doesn't pass a verifiable token, this bridge endpoint trusts whatever the client sends. To mitigate, the bridge should be rate-limited. For initial launch, document this as a known limitation in code comments. We may revisit this later by switching to Apple's native iOS SDK that returns a real ID token.
+Phase 6: Verify email/password is untouched
+
+Confirm existing supabase.auth.signInWithPassword() and supabase.auth.signUp() calls are unchanged.
+Run a quick smoke test: existing sign-in flow should still work end-to-end.
+
+Phase 7: Documentation
+In a comment block at the top of each new or modified file, briefly note:
+
+What the file does
+Which provider(s) it handles
+The known security caveat for the Apple bridge (where applicable)
+
+Constraints
+
+Do NOT remove or modify email/password sign-in functionality
+Do NOT change unrelated files
+Preserve existing styling conventions
+Do NOT commit any secrets (service role key, API keys) — they should already be in environment variables
+Do NOT push to GitHub yet — show me the diff first so I can review
+
+Stop after each Phase and report what you did. Do not run all phases without checking in.
