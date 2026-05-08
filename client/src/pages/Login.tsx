@@ -105,11 +105,11 @@ export default function Login() {
         });
         setLocation('/app');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'An error occurred',
+        description: error instanceof Error ? error.message : 'An error occurred',
       });
     } finally {
       setLoading(false);
@@ -143,11 +143,11 @@ export default function Login() {
         options: { redirectTo: OAUTH_REDIRECT },
       });
       if (error) throw error;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: 'destructive',
         title: 'Google sign-in failed',
-        description: error.message || 'An error occurred',
+        description: error instanceof Error ? error.message : 'An error occurred',
       });
       setSocialLoading(null);
     }
@@ -193,20 +193,20 @@ export default function Login() {
           if (sessionError) throw sessionError;
 
           setLocation('/app');
-        } catch (bridgeError: any) {
+        } catch (bridgeError: unknown) {
           toast({
             variant: 'destructive',
             title: 'Apple sign-in failed',
-            description: bridgeError.message || 'An error occurred',
+            description: bridgeError instanceof Error ? bridgeError.message : 'An error occurred',
           });
           setSocialLoading(null);
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: 'destructive',
         title: 'Apple sign-in failed',
-        description: error.message || 'An error occurred',
+        description: error instanceof Error ? error.message : 'An error occurred',
       });
       setSocialLoading(null);
     }

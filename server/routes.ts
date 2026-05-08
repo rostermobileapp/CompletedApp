@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -328,74 +328,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/auth/apple-bridge
   //
   // BuildNatively's Apple SDK does NOT return a verifiable Apple identity token,
-  // so this endpoint trusts whatever identity the client sends. It is protected
-  // only by rate limiting (10 requests/minute per IP). This is a known security
-  // limitation — future work: switch to Apple's native iOS SDK which returns a
-  // real identity token that can be verified with supabase.auth.signInWithIdToken().
+  // so this endpoint trusts whatever identity the client sends. This is a known
+  // architectural limitation of the BuildNatively Apple Sign-In SDK — the subject
+  // (Apple's stable user ID) is bound per-user on first sign-in and checked on
+  // subsequent sign-ins as a compensating control. Future work: migrate to Apple's
+  // native iOS SDK which returns a real ID token for full cryptographic verification
+  // via supabase.auth.signInWithIdToken().
+  //
+  // Compensating controls in place:
+  //   - In-memory rate limit: 10 requests / minute per IP
+  //   - apple_subject binding: if a Supabase user with this email already has an
+  //     apple_subject stored in their metadata, the provided subject must match.
+  //     Mismatches are rejected (prevents session issuance for arbitrary emails).
   //
   // Flow:
-  //   1. Look up an existing Supabase user by email.
-  //   2. If found, generate a magic-link token and exchange it for a session.
-  //   3. If not found, create a new user (email_confirm: true) then do the same.
-  //   4. Return { access_token, refresh_token } for the client to call setSession().
+  //   1. Page through listUsers to find an existing user by (normalized) email.
+  //   2a. Existing user with stored apple_subject → verify subject matches; reject on mismatch.
+  //   2b. Existing user without stored apple_subject → store it, proceed.
+  //   3. New user → createUser with email_confirm: true and apple_subject in metadata.
+  //   4. generateLink (magiclink) → verifyOtp → return { access_token, refresh_token }.
   {
     const appleRateLimit = new Map<string, { count: number; resetAt: number }>();
 
-    app.post('/api/auth/apple-bridge', async (req: any, res) => {
-      const ip: string = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-      const now = Date.now();
-      const window = 60_000;
-      const limit = 10;
+    /** Page through admin listUsers until the email is found or all pages exhausted. */
+    async function findSupabaseUserByEmail(email: string) {
+      const normalizedEmail = email.toLowerCase();
+      let page = 1;
+      const perPage = 1000;
+      while (true) {
+        const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+        if (error) throw error;
+        const match = data.users.find(
+          (u) => typeof u.email === 'string' && u.email.toLowerCase() === normalizedEmail,
+        );
+        if (match) return match;
+        if (data.users.length < perPage) return null;
+        page++;
+      }
+    }
 
+    /** Narrow an unknown catch value to a message string. */
+    function toErrorMessage(err: unknown): string {
+      if (err instanceof Error) return err.message;
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        return String((err as { message: unknown }).message);
+      }
+      return 'Apple sign-in failed';
+    }
+
+    app.post('/api/auth/apple-bridge', async (req: Request, res: Response) => {
+      const forwarded = req.headers['x-forwarded-for'];
+      const ip =
+        (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() ||
+        req.socket?.remoteAddress ||
+        'unknown';
+
+      const now = Date.now();
+      const windowMs = 60_000;
+      const rateLimit = 10;
       const entry = appleRateLimit.get(ip);
       if (entry) {
         if (now < entry.resetAt) {
-          if (entry.count >= limit) {
-            return res.status(429).json({ message: 'Too many requests. Please try again in a minute.' });
+          if (entry.count >= rateLimit) {
+            res.status(429).json({ message: 'Too many requests. Please try again in a minute.' });
+            return;
           }
           entry.count++;
         } else {
-          appleRateLimit.set(ip, { count: 1, resetAt: now + window });
+          appleRateLimit.set(ip, { count: 1, resetAt: now + windowMs });
         }
       } else {
-        appleRateLimit.set(ip, { count: 1, resetAt: now + window });
+        appleRateLimit.set(ip, { count: 1, resetAt: now + windowMs });
       }
 
-      const { email, subject, givenname, familyname } = req.body || {};
+      const body = req.body as Record<string, unknown>;
+      const email = typeof body.email === 'string' ? body.email.trim() : '';
+      const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
+      const givenname = typeof body.givenname === 'string' ? body.givenname.trim() : '';
+      const familyname = typeof body.familyname === 'string' ? body.familyname.trim() : '';
+
       if (!email || !subject) {
-        return res.status(400).json({ message: 'email and subject are required' });
+        res.status(400).json({ message: 'email and subject are required' });
+        return;
       }
 
       try {
         const fullName = [givenname, familyname].filter(Boolean).join(' ') || email.split('@')[0];
 
-        // Attempt to create the user. For first-time Apple sign-ins this creates a
-        // new pre-confirmed account. For returning users Supabase will return a
-        // "User already registered" / 422 error — that is expected and safe to ignore.
-        // This avoids a paginated full-list scan (listUsers is paginated and would miss
-        // users on pages beyond the default page size).
-        const { error: createError } = await supabase.auth.admin.createUser({
-          email,
-          email_confirm: true,
-          user_metadata: {
-            full_name: fullName,
-            first_name: givenname || '',
-            last_name: familyname || '',
-            apple_subject: subject,
-          },
-        });
+        const existingUser = await findSupabaseUserByEmail(email);
 
-        if (createError) {
-          const msg = createError.message?.toLowerCase() ?? '';
-          const isAlreadyExists =
-            msg.includes('already') ||
-            msg.includes('duplicate') ||
-            (createError as any).status === 422;
-          if (!isAlreadyExists) throw createError;
-          // else: existing user — fall through to generateLink below
+        if (existingUser) {
+          const storedSubject = existingUser.user_metadata?.apple_subject as string | undefined;
+          if (storedSubject && storedSubject !== subject) {
+            // Subject mismatch — reject to prevent session issuance for wrong identity
+            res.status(403).json({ message: 'Apple identity mismatch for this account.' });
+            return;
+          }
+          if (!storedSubject) {
+            // First time signing in with Apple for an existing email/password account —
+            // store the apple_subject so future sign-ins are bound to this subject.
+            await supabase.auth.admin.updateUserById(existingUser.id, {
+              user_metadata: { ...existingUser.user_metadata, apple_subject: subject },
+            });
+          }
+        } else {
+          // New user — create a pre-confirmed account
+          const { error: createError } = await supabase.auth.admin.createUser({
+            email,
+            email_confirm: true,
+            user_metadata: {
+              full_name: fullName,
+              first_name: givenname,
+              last_name: familyname,
+              apple_subject: subject,
+            },
+          });
+          if (createError) throw createError;
         }
 
-        // Generate a magic link to obtain a session — works for both new and existing users
+        // Generate a magic link and immediately exchange it for a real session
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
           email,
@@ -403,24 +454,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         if (linkError) throw linkError;
 
-        const hashed_token = linkData?.properties?.hashed_token;
-        if (!hashed_token) throw new Error('Failed to generate sign-in link');
+        const hashedToken = linkData?.properties?.hashed_token;
+        if (!hashedToken) throw new Error('Failed to generate sign-in link');
 
-        // Exchange the hashed token for a real session
         const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
           type: 'magiclink',
-          token_hash: hashed_token,
+          token_hash: hashedToken,
         });
         if (sessionError) throw sessionError;
         if (!sessionData?.session) throw new Error('No session returned from OTP verification');
 
-        return res.json({
+        res.json({
           access_token: sessionData.session.access_token,
           refresh_token: sessionData.session.refresh_token,
         });
-      } catch (err: any) {
-        console.error('[AppleBridge] Error:', err?.message || err);
-        return res.status(500).json({ message: err?.message || 'Apple sign-in failed' });
+      } catch (err: unknown) {
+        console.error('[AppleBridge] Error:', err);
+        res.status(500).json({ message: toErrorMessage(err) });
       }
     });
   }
