@@ -86,6 +86,7 @@
 }
 
 :root {
+  color-scheme: light dark;
   --background: 0 0% 100%;
   --foreground: 0 0% 13%;
   --card: 0 0% 96%;
@@ -143,6 +144,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: 240 10% 3.9%;
   --foreground: 0 0% 98%;
   --card: 240 10% 6%;
@@ -279,7 +281,7 @@
     background: transparent;
   }
 
-  html, body, #root {
+  html, body {
     overflow-x: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -288,6 +290,22 @@
     width: 100%;
     position: relative;
     background-color: hsl(var(--background));
+  }
+
+  #root {
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    position: relative;
+    background-color: hsl(var(--background));
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    box-sizing: border-box;
   }
 
   html {
