@@ -419,18 +419,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingUser) {
           const storedSubject = existingUser.user_metadata?.apple_subject as string | undefined;
+
           if (storedSubject && storedSubject !== subject) {
-            // Subject mismatch — reject to prevent session issuance for wrong identity
+            // The stored Apple subject does not match — reject outright to prevent
+            // session issuance for the wrong identity.
             res.status(403).json({ message: 'Apple identity mismatch for this account.' });
             return;
           }
+
           if (!storedSubject) {
-            // First time signing in with Apple for an existing email/password account —
-            // store the apple_subject so future sign-ins are bound to this subject.
-            await supabase.auth.admin.updateUserById(existingUser.id, {
-              user_metadata: { ...existingUser.user_metadata, apple_subject: subject },
+            // The account exists but was created through a different provider (e.g.
+            // email/password). Without a verifiable Apple ID token we cannot safely
+            // assert that the Apple user is the same person — auto-linking would be an
+            // account-takeover vector. Require the user to sign in via their existing
+            // provider first and then link Apple from account settings.
+            res.status(409).json({
+              message:
+                'An account with this email already exists. Please sign in with your email and password, then link Apple Sign-In from your profile settings.',
             });
+            return;
           }
+
+          // Existing Apple-linked user with matching subject — proceed to session issuance.
         } else {
           // New user — create a pre-confirmed account
           const { error: createError } = await supabase.auth.admin.createUser({

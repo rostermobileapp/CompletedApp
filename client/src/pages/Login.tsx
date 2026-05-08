@@ -40,6 +40,12 @@ export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { isIos } = useIosPlatform();
+  // Show the Apple button only in the actual Natively iOS native shell — confirmed by the
+  // NativelyAppleSignInService class being injected into window by the bridge at runtime.
+  // This is stricter than isIos alone (which includes the ?ios=1 dev-preview override).
+  const isNativeAppleAvailable =
+    isIos && typeof (window as Window & { NativelyAppleSignInService?: unknown }).NativelyAppleSignInService !== 'undefined';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -408,7 +414,7 @@ export default function Login() {
                     Continue with Google
                   </button>
 
-                  {isIos && (
+                  {isNativeAppleAvailable && (
                     <button
                       type="button"
                       onClick={handleAppleSignIn}
