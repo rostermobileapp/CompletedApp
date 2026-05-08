@@ -1,0 +1,61 @@
+I'm rolling back the Google and Apple social auth changes from Task #165 because the BuildNatively platform doesn't fully support the Android Google OAuth flow. I want to revert to my original email/password-only auth setup.
+Critical: Email/password sign-in and sign-up must remain fully functional. Only remove the social auth additions.
+Please do the following in phases. Stop after each phase and report back before continuing.
+Phase 1: Discovery
+
+Identify all files added or modified in Task #165:
+
+client/src/pages/AuthCallback.tsx (new)
+client/src/natively.d.ts (new)
+client/src/pages/Login.tsx (modified)
+client/src/App.tsx (modified)
+server/routes.ts (modified)
+Any sign-up screen file that was modified
+Any other files touched by the social auth work
+
+
+For each modified file, identify the specific code blocks that were added (Google button, Apple button, platform detection helpers, route registration, apple-bridge endpoint, etc.).
+Stop and report findings before changing anything.
+
+Phase 2: Remove social auth code
+
+Delete client/src/pages/AuthCallback.tsx
+Delete client/src/natively.d.ts
+In client/src/pages/Login.tsx:
+
+Remove the "Continue with Google" button and its handler
+Remove the "Sign in with Apple" button and its handler
+Remove platform detection helpers (isIOSNative, browserInfo() calls) if not used elsewhere
+Remove unused imports
+Leave email/password fields and logic untouched
+
+
+Apply the same removals to the sign-up screen if it has the buttons.
+In client/src/App.tsx:
+
+Remove the /auth/callback route registration
+Remove the import of AuthCallback
+
+
+In server/routes.ts:
+
+Remove the POST /api/auth/apple-bridge endpoint and its rate-limiting logic
+Remove any imports / helpers used only by that endpoint
+
+
+
+Phase 3: Verify
+
+Confirm email/password sign-in still works (no broken imports, no syntax errors).
+Confirm email/password sign-up still works.
+Run any existing tests / type checks / lints.
+
+Phase 4: Diff for review
+Show me the full diff before pushing to GitHub. Do NOT push or commit until I've reviewed.
+Constraints
+
+Do NOT touch universal links configuration (public/.well-known/ files, vercel.json redirects, etc.)
+Do NOT modify the Supabase client initialization
+Do NOT modify any database / RLS code
+Do NOT push to GitHub until I review the diff
+If you find any leftover references to Google/Apple auth that aren't in the files listed above, flag them rather than removing blindly
