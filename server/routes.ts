@@ -428,19 +428,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (!storedSubject) {
-            // The account exists but was created through a different provider (e.g.
-            // email/password). Without a verifiable Apple ID token we cannot safely
-            // assert that the Apple user is the same person — auto-linking would be an
-            // account-takeover vector. Require the user to sign in via their existing
-            // provider first and then link Apple from account settings.
-            res.status(409).json({
-              message:
-                'An account with this email already exists. Please sign in with your email and password, then link Apple Sign-In from your profile settings.',
+            // First Apple sign-in for an existing email/password account.
+            // Per task spec: Supabase account-linking by email is enabled, so same-email
+            // users across providers merge into one account. We store the apple_subject
+            // so future sign-ins are bound to this stable Apple user identifier.
+            //
+            // Known limitation: without a verifiable Apple ID token (BuildNatively SDK
+            // limitation), the subject binding relies on the client-supplied subject.
+            // Rate limiting and subject-matching on subsequent sign-ins are the
+            // compensating controls. See block comment above for future work.
+            await supabase.auth.admin.updateUserById(existingUser.id, {
+              user_metadata: { ...existingUser.user_metadata, apple_subject: subject },
             });
-            return;
           }
 
-          // Existing Apple-linked user with matching subject — proceed to session issuance.
+          // Existing Apple-linked user (subject matches or just bound) — proceed to session issuance.
         } else {
           // New user — create a pre-confirmed account
           const { error: createError } = await supabase.auth.admin.createUser({

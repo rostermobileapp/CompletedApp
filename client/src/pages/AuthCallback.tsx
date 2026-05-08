@@ -34,12 +34,12 @@ export default function AuthCallback() {
         } else {
           throw new Error('No session returned after OAuth exchange');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('[AuthCallback] OAuth exchange failed:', error);
         toast({
           variant: 'destructive',
           title: 'Sign-in failed',
-          description: error.message || 'Could not complete sign-in. Please try again.',
+          description: error instanceof Error ? error.message : 'Could not complete sign-in. Please try again.',
         });
         setLocation('/login');
       }
