@@ -1932,13 +1932,18 @@ function DashboardMobile() {
     if (!team) return 'Select Team';
     
     // If team is not in a league, just show team name
-    if (!team.leagueId) {
+    if (!team.leagueId && !team.membershipLeagueId) {
       return team.name;
     }
     
+    // Prefer the league ID from the membership record (source of truth for which
+    // league the user actually belongs to) over the team's raw leagueId, which can
+    // differ if a team was migrated or mis-assigned.
+    const effectiveLeagueId = team.membershipLeagueId ?? team.leagueId;
+    
     // If team is in a league, show "LeagueName: TeamName" with season if available
     const league = Array.isArray(userLeagues) 
-      ? userLeagues.find(l => l.id === team.leagueId) 
+      ? userLeagues.find(l => l.id === effectiveLeagueId) 
       : null;
     
     if (league) {
@@ -3750,7 +3755,7 @@ function DashboardMobile() {
                 name="venue"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Venue (Optional)</FormLabel>
+                    <FormLabel>Rink (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Game location" {...field} data-testid="input-game-venue" />
                     </FormControl>

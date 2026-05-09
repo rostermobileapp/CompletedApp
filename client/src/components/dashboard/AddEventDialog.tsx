@@ -594,7 +594,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                 name="venue"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Venue (Optional)</FormLabel>
+                    <FormLabel>Rink (Optional)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Game location"

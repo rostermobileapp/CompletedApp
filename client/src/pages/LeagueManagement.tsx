@@ -4127,11 +4127,11 @@ export default function LeagueManagement() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Venue (optional)</label>
+                      <label className="block text-sm font-medium mb-2">Rink (optional)</label>
                       <input
                         {...gameForm.register('venue')}
                         className="w-full p-3 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="Game venue"
+                        placeholder="Rink name"
                         data-testid="input-venue"
                       />
                     </div>
@@ -4257,7 +4257,7 @@ export default function LeagueManagement() {
                               <th className="text-left p-3 text-sm font-semibold">Home Team</th>
                               <th className="text-center p-3 text-sm font-semibold">Score</th>
                               <th className="text-left p-3 text-sm font-semibold">Away Team</th>
-                              <th className="text-left p-3 text-sm font-semibold">Venue</th>
+                              <th className="text-left p-3 text-sm font-semibold">Rink</th>
                               <th className="text-center p-3 text-sm font-semibold">Status</th>
                             </tr>
                           </thead>
@@ -4471,7 +4471,7 @@ export default function LeagueManagement() {
                                   )}
                                 </div>
                               </div>
-                              {/* Venue (if present) */}
+                              {/* Rink (if present) */}
                               {game.venue && (
                                 <div className="text-center text-xs text-muted-foreground mt-2 pt-2 border-t">
                                   📍 {game.venue}

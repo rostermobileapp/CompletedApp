@@ -2782,6 +2782,15 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
+    // Build a reverse lookup: teamId → the league the user's membership is in.
+    // leagueToAssignedTeam is leagueId → teamId; we invert it here.
+    // This is the authoritative source for which league a team should be
+    // displayed under, even if teams.leagueId points somewhere else.
+    const teamIdToMembershipLeagueId = new Map<string, string>();
+    for (const [leagueId, teamId] of leagueToAssignedTeam.entries()) {
+      teamIdToMembershipLeagueId.set(teamId, leagueId);
+    }
+
     return uniqueTeams.map(team => {
       const info = team.seasonId ? seasonInfoMap[team.seasonId] : undefined;
       return {
@@ -2792,6 +2801,9 @@ export class DatabaseStorage implements IStorage {
         // "active" so legacy teams keep showing in the main dropdown.
         seasonIsActive: info ? info.isActive : null,
         seasonStartDate: info ? info.startDate : null,
+        // The league the user is actually a member of for this team.
+        // Preferred over team.leagueId on the frontend for display purposes.
+        membershipLeagueId: teamIdToMembershipLeagueId.get(team.id) ?? null,
       };
     });
   }

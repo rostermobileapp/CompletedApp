@@ -1076,12 +1076,12 @@ export default function CreateScrimmage() {
         <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[8px] mb-[8px]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
-            Venue Information
+            Rink Information
           </h3>
           
           <div className="space-y-4">
             <div>
-              <Label htmlFor="venue">Venue</Label>
+              <Label htmlFor="venue">Rink</Label>
               {facilitiesLoading ? (
                 <div className="h-10 bg-muted rounded-md animate-pulse" />
               ) : allFacilities.length > 0 ? (
@@ -1109,7 +1109,7 @@ export default function CreateScrimmage() {
                 <Input
                   id="venue"
                   {...form.register('venue')}
-                  placeholder="Enter venue location (e.g., Ice Rink, Sports Complex)"
+                  placeholder="Enter rink name (e.g., Metro Ice Center)"
                   data-testid="input-venue"
                 />
               )}

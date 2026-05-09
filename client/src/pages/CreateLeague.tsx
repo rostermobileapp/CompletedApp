@@ -320,7 +320,7 @@ export default function CreateLeague() {
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] mt-[4px]">
             <div className="flex items-center gap-2 mb-4">
               <MapPin className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">Location & Venue</h3>
+              <h3 className="text-lg font-semibold">Location & Rink</h3>
             </div>
             
             <div className="space-y-4">
@@ -338,7 +338,7 @@ export default function CreateLeague() {
 
               <div>
                 <label className="block text-sm font-medium mb-2" data-testid="label-rink-name">
-                  Rink/Venue Name
+                  Rink Name
                 </label>
                 <input
                   {...form.register('rinkName')}
@@ -350,13 +350,13 @@ export default function CreateLeague() {
 
               <div>
                 <label className="block text-sm font-medium mb-2" data-testid="label-rink-address">
-                  Venue Address
+                  Rink Address
                 </label>
                 <textarea
                   {...form.register('rinkAddress')}
                   className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   rows={2}
-                  placeholder="Full address of the venue"
+                  placeholder="Full address of the rink"
                   data-testid="textarea-rink-address"
                 />
               </div>
