@@ -1,0 +1,54 @@
+Revert root padding changes in client/src/index.css
+Earlier CSS edits added padding-top / padding-bottom to #root using env(safe-area-inset-*) to handle status bar and navigation bar insets. This conflicted with the Natively native wrapper's own safe-area handling and caused inconsistent top padding across navigation events (padding present on initial load, missing after navigating away and back to a screen).
+The Natively wrapper will now handle insets at the native level via its Safe Area dashboard setting. CSS-side padding on #root needs to be removed.
+Make exactly this one change. Do not touch anything else.
+
+Change: client/src/index.css — revert the #root block
+Find this exact block:
+csshtml, body {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+}
+
+#root {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  box-sizing: border-box;
+}
+Replace it with:
+csshtml, body, #root {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  position: relative;
+  background-color: hsl(var(--background));
+}
+
+Do not change:
+
+The viewport meta tag in client/index.html (leave viewport-fit=cover in place)
+The color-scheme: light dark in :root or color-scheme: dark in .dark (leave those in place)
+client/src/contexts/ThemeContext.tsx or any theme-related logic — leave that file completely untouched
+Any other CSS rules, components, hooks, or files
+The existing .safe-area-bottom class or @supports block
+
+After making the change, do not run a build or deploy. Just confirm the edit was applied and stop.
