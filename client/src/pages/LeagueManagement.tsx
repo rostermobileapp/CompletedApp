@@ -4474,7 +4474,7 @@ export default function LeagueManagement() {
                               {/* Rink (if present) */}
                               {game.venue && (
                                 <div className="text-center text-xs text-muted-foreground mt-2 pt-2 border-t">
-                                  📍 {game.venue}
+                                  📍 Rink: {game.venue}
                                 </div>
                               )}
                             </div>

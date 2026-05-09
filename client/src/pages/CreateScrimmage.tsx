@@ -1072,7 +1072,7 @@ export default function CreateScrimmage() {
           </div>
         </div>
 
-        {/* Venue Information */}
+        {/* Rink Information */}
         <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[8px] mb-[8px]">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
