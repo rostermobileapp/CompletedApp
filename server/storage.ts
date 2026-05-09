@@ -373,7 +373,7 @@ export interface IStorage {
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
   searchTeams(search?: string): Promise<(Team & { league?: League | null })[]>;
-  getUserTeams(userId: string): Promise<Team[]>;
+  getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null; membershipLeagueId?: string | null })[]>;
   getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]>;
   getTeamsWhereCaptain(userId: string): Promise<{ id: string; name: string }[]>;
   updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team>;
