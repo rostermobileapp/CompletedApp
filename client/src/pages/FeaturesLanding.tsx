@@ -657,7 +657,7 @@ export default function FeaturesLanding() {
           </FadeUp>
 
           {/* 3-col: left cards | phone | right cards */}
-          <div className="hidden lg:grid lg:grid-cols-[240px_auto_240px] gap-6 items-center">
+          <div className="hidden md:grid md:grid-cols-[200px_auto_200px] gap-6 items-center">
 
             {/* Left cards */}
             <div className="flex flex-col gap-4">
@@ -734,7 +734,7 @@ export default function FeaturesLanding() {
           </div>
 
           {/* Mobile fallback: phone + cards stacked */}
-          <div className="lg:hidden flex flex-col items-center gap-8">
+          <div className="md:hidden flex flex-col items-center gap-8">
             <div className="relative" style={{ width: 240 }}>
               <div className="absolute inset-0 rounded-[3rem] bg-[#3c82f4]/15 blur-2xl scale-110" />
               <div className="relative bg-gray-900 rounded-[3rem] p-3 shadow-2xl border border-gray-200">
