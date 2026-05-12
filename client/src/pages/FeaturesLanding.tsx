@@ -679,39 +679,6 @@ export default function FeaturesLanding() {
         </div>
       </section>
 
-      {/* ── QUICK-HIT GRID ───────────────────────────────────── */}
-      <section className="py-24 px-6 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <FadeUp>
-            <h2
-              className="font-bold text-gray-900 text-center mb-4"
-              style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
-            >
-              A few more things you'll notice on day one.
-            </h2>
-            <p className="text-center text-gray-500 text-lg max-w-xl mx-auto mb-16">
-              Small details that make a real difference when you're in the rink at 10pm.
-            </p>
-          </FadeUp>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {GRID_FEATURES.map((f, i) => {
-              const Icon = f.icon;
-              return (
-                <FadeUp key={f.headline} delay={i * 0.08}>
-                  <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-[#3c82f4]/40 hover:shadow-sm transition-all h-full">
-                    <div className="w-10 h-10 rounded-xl bg-[#3c82f4]/10 border border-[#3c82f4]/20 flex items-center justify-center mb-4">
-                      <Icon className="w-5 h-5 text-[#3c82f4]" />
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900 mb-2">{f.headline}</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed">{f.body}</p>
-                  </div>
-                </FadeUp>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ── HOW IT WORKS ─────────────────────────────────────── */}
       <section className="py-24 px-6 bg-white">
         <div className="max-w-5xl mx-auto">
