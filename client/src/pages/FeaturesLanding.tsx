@@ -313,8 +313,8 @@ const LEAGUE_CALLOUTS = [
     headline: 'Live in-game scorekeeping.',
     body: 'Goals, assists, penalties, saves — all tracked as the game happens. Stats update for every player on every team, automatically. Your league finally has season-long leaderboards that actually mean something.',
     icon: ClipboardList,
-    color: 'bg-green-50 border-green-100',
-    iconColor: 'text-green-600',
+    color: 'bg-blue-50 border-blue-100',
+    iconColor: 'text-[#3c82f4]',
   },
   {
     id: 'messaging',
@@ -322,8 +322,8 @@ const LEAGUE_CALLOUTS = [
     headline: 'All communication, one place.',
     body: 'Schedules, lineups, payments, announcements, captain chats — all inside Roster. Your players already check the app for their next game. Why would you message them somewhere else?',
     icon: MessageSquare,
-    color: 'bg-purple-50 border-purple-100',
-    iconColor: 'text-purple-600',
+    color: 'bg-blue-50 border-blue-100',
+    iconColor: 'text-[#3c82f4]',
   },
   {
     id: 'registration',
@@ -331,8 +331,8 @@ const LEAGUE_CALLOUTS = [
     headline: 'Registration, payments, waivers.',
     body: 'Players sign up, pay their league dues, and sign the waiver in one flow. You see who\'s in, who\'s paid, and who\'s still on the fence — without a spreadsheet in sight.',
     icon: CreditCard,
-    color: 'bg-orange-50 border-orange-100',
-    iconColor: 'text-orange-500',
+    color: 'bg-blue-50 border-blue-100',
+    iconColor: 'text-[#3c82f4]',
   },
 ];
 
