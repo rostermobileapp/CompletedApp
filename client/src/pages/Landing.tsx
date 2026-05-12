@@ -126,7 +126,7 @@ export default function Landing() {
       {/* Fixed Header */}
       <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
         <div className="max-w-7xl mx-auto px-6 py-0 grid grid-cols-3 items-center">
-          <nav className="hidden md:flex flex-wrap items-center gap-6 text-sm">
+          <nav className="hidden md:flex items-center gap-4 text-sm whitespace-nowrap">
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
             <Link href="/features" className="text-gray-500 hover:text-gray-900 transition-colors">Features</Link>
             <Link href="/pricing" className="text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
