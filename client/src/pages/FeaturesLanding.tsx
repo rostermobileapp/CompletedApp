@@ -517,44 +517,6 @@ export default function FeaturesLanding() {
         </div>
       </section>
 
-      {/* ── PROBLEM ──────────────────────────────────────────── */}
-      <section id="problem" className="py-24 px-6 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <FadeUp>
-            <h2
-              className="font-bold text-gray-900 text-center mb-6"
-              style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
-            >
-              Hockey deserves better than a group text
-              <br className="hidden sm:block" /> and a Google Sheet.
-            </h2>
-          </FadeUp>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
-            {[
-              {
-                title: 'Running a league is complicated.',
-                body: 'Juggling rinks, refs, registration, payments, brackets, standings, and 100 captains who all want answers right now. Most tools solve half the problem and call it a day.',
-              },
-              {
-                title: 'Hockey isn\'t a side project.',
-                body: 'Generic sports apps treat hockey like a checkbox. Wrong language, wrong format, wrong assumptions. Roster was built for the way hockey leagues actually run.',
-              },
-              {
-                title: 'Everything connected.',
-                body: 'One app, with everything connected — scores, standings, communication, payments — and language that sounds like the locker room instead of a B2B sales pitch.',
-              },
-            ].map((item, i) => (
-              <FadeUp key={item.title} delay={i * 0.1}>
-                <div className="bg-gray-50 rounded-2xl p-7 h-full">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">{item.title}</h3>
-                  <p className="text-gray-500 leading-relaxed">{item.body}</p>
-                </div>
-              </FadeUp>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-6xl mx-auto">
