@@ -1625,6 +1625,9 @@ export const drafts = pgTable("drafts", {
   // Per-user ready acknowledgement during the awaiting_captains lobby.
   // Shape: { [userId]: true }
   captainReadyState: jsonb("captain_ready_state").default({}),
+  // Set when all captains are ready; clients show a 30-second countdown to this timestamp.
+  // Cleared when the draft starts or the lobby is cancelled.
+  launchAt: timestamp("launch_at"),
   scheduledAt: timestamp("scheduled_at"),
   startedAt: timestamp("started_at"),
   lockedAt: timestamp("locked_at"),

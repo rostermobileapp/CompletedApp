@@ -21,6 +21,9 @@ export const UNDO_WINDOW_MS = 30_000;
 // In-memory map of active draft timers (draftId -> setTimeout handle)
 const activeTimers = new Map<string, NodeJS.Timeout>();
 
+// In-memory map of "all captains ready" auto-launch timers (draftId -> setTimeout handle)
+const launchTimers = new Map<string, NodeJS.Timeout>();
+
 // In-memory map of subscribed users per draft (draftId -> Set<userId>)
 const draftSubscribers = new Map<string, Set<string>>();
 
@@ -811,11 +814,14 @@ export async function cancelDraftToPending(
   if (draft.status !== "awaiting_captains") {
     return { ok: false, error: "Draft is not in the captain-ready lobby" };
   }
+  // Cancel any pending auto-launch timer before resetting status
+  cancelLaunchTimer(draftId);
   await db
     .update(drafts)
     .set({
       status: "pending",
       captainReadyState: {},
+      launchAt: null,
       updatedAt: new Date(),
     })
     .where(eq(drafts.id, draftId));
@@ -825,7 +831,22 @@ export async function cancelDraftToPending(
 }
 
 /**
+ * Cancel any pending auto-launch timer for a draft (call before lobby cancel
+ * or early begin so the timer doesn't fire late).
+ */
+function cancelLaunchTimer(draftId: string) {
+  const t = launchTimers.get(draftId);
+  if (t) clearTimeout(t);
+  launchTimers.delete(draftId);
+}
+
+const LAUNCH_COUNTDOWN_MS = 30_000;
+
+/**
  * Mark a captain as ready in the awaiting_captains lobby. Idempotent.
+ * When the last captain marks ready a 30-second countdown is broadcast to all
+ * clients via `draft_all_ready`, and the server automatically calls
+ * startDraft after 30 seconds (commissioner can still begin early).
  */
 export async function markCaptainReady(
   draftId: string,
@@ -838,14 +859,54 @@ export async function markCaptainReady(
   }
   const ready = ((draft.captainReadyState as Record<string, boolean>) || {});
   if (ready[userId]) {
+    // Already ready — re-broadcast in case they missed a prior update
+    await broadcastState(draftId);
     return { ok: true };
   }
   ready[userId] = true;
-  await db
-    .update(drafts)
-    .set({ captainReadyState: ready, updatedAt: new Date() })
-    .where(eq(drafts.id, draftId));
-  await broadcastState(draftId);
+
+  // Check whether every captain in the draft is now ready
+  const draftOrder = (draft.draftOrder as string[]) || [];
+  const teamRows =
+    draftOrder.length > 0
+      ? await db.select().from(teams).where(inArray(teams.id, draftOrder))
+      : [];
+  const captainIds = teamRows
+    .map((t) => t.captainId)
+    .filter((x): x is string => !!x);
+  const allReady =
+    captainIds.length > 0 && captainIds.every((cid) => ready[cid]);
+
+  if (allReady) {
+    // Stamp a launchAt timestamp so any client that joins mid-countdown
+    // still sees the correct target from the DB bundle.
+    const launchAt = new Date(Date.now() + LAUNCH_COUNTDOWN_MS);
+    await db
+      .update(drafts)
+      .set({ captainReadyState: ready, launchAt, updatedAt: new Date() })
+      .where(eq(drafts.id, draftId));
+    await broadcastState(draftId);
+    broadcastToDraft(draftId, {
+      type: "draft_all_ready",
+      payload: { draftId, launchAt: launchAt.getTime() },
+    });
+    // Cancel any existing timer before scheduling a new one (idempotent)
+    cancelLaunchTimer(draftId);
+    launchTimers.set(
+      draftId,
+      setTimeout(async () => {
+        launchTimers.delete(draftId);
+        await startDraft(draftId);
+      }, LAUNCH_COUNTDOWN_MS),
+    );
+  } else {
+    await db
+      .update(drafts)
+      .set({ captainReadyState: ready, updatedAt: new Date() })
+      .where(eq(drafts.id, draftId));
+    await broadcastState(draftId);
+  }
+
   return { ok: true };
 }
 
@@ -920,6 +981,9 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
     }
   }
 
+  // Cancel any pending auto-launch timer — commissioner may begin early
+  cancelLaunchTimer(draftId);
+
   await db
     .update(drafts)
     .set({
@@ -927,6 +991,7 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
       startedAt: draft.startedAt || new Date(),
       currentRound: 1,
       currentTurn: 1,
+      launchAt: null,
       updatedAt: new Date(),
     })
     .where(eq(drafts.id, draftId));
@@ -1127,19 +1192,47 @@ export async function undoLastPick(
   return { ok: true };
 }
 
-// Restart timers for any draft in 'active' status (called on server boot)
+// Restart timers for any draft in 'active' or 'awaiting_captains' status (called on server boot)
 export async function rehydrateActiveDraftTimers() {
-  const active = await db.select().from(drafts).where(eq(drafts.status, "active"));
+  const active = await db
+    .select()
+    .from(drafts)
+    .where(inArray(drafts.status, ["active", "awaiting_captains"]));
+
   for (const draft of active) {
-    if (draft.currentTurnDeadline && new Date(draft.currentTurnDeadline).getTime() > Date.now()) {
-      await startTurnTimer(draft.id);
-    } else if (draft.currentTurnDeadline) {
-      // Timer already expired during downtime — force expiry handler now
-      handleTimerExpired(draft.id).catch((e) => console.error("Rehydrate expiry error:", e));
-    } else {
-      // No deadline set; set one and start
-      await setTurnDeadline(draft.id);
-      await startTurnTimer(draft.id);
+    // Rehydrate the "all captains ready" countdown for lobbies that were mid-countdown
+    if (draft.status === "awaiting_captains" && draft.launchAt) {
+      const msRemaining = new Date(draft.launchAt).getTime() - Date.now();
+      if (msRemaining > 0) {
+        // Still time left — resume the auto-launch timer from where it was
+        cancelLaunchTimer(draft.id);
+        launchTimers.set(
+          draft.id,
+          setTimeout(async () => {
+            launchTimers.delete(draft.id);
+            await startDraft(draft.id);
+          }, msRemaining),
+        );
+      } else {
+        // Countdown already elapsed during downtime — fire immediately
+        startDraft(draft.id).catch((e) =>
+          console.error("[Draft] Rehydrate launch error:", e),
+        );
+      }
+    }
+
+    // Rehydrate turn timers for active drafts
+    if (draft.status === "active") {
+      if (draft.currentTurnDeadline && new Date(draft.currentTurnDeadline).getTime() > Date.now()) {
+        await startTurnTimer(draft.id);
+      } else if (draft.currentTurnDeadline) {
+        // Timer already expired during downtime — force expiry handler now
+        handleTimerExpired(draft.id).catch((e) => console.error("Rehydrate expiry error:", e));
+      } else {
+        // No deadline set; set one and start
+        await setTurnDeadline(draft.id);
+        await startTurnTimer(draft.id);
+      }
     }
   }
 }

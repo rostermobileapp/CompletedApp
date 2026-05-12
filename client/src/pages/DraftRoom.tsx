@@ -66,6 +66,7 @@ interface Draft {
     halvedNextTurn?: Record<string, boolean>;
   } | null;
   timerExpiryRule?: "auto_pick" | "halve_next" | null;
+  launchAt?: string | null;
 }
 
 interface DraftPick {
@@ -141,6 +142,10 @@ export default function DraftRoom() {
     return () => clearTimeout(id);
   }, [lastPick]);
 
+  // "All captains ready" launch countdown — ms timestamp when the draft auto-starts.
+  // Set from the bundle (for late-joining clients) and from the draft_all_ready WS event.
+  const [launchAt, setLaunchAt] = useState<number | null>(null);
+
   // In-room buzzer banner: shown for ~6s when the engine fires
   // draft_buzzer_extension on this draft.
   const [buzzerBanner, setBuzzerBanner] = useState<{ at: number } | null>(null);
@@ -162,6 +167,13 @@ export default function DraftRoom() {
     if (initialBundle) {
       setBundle(initialBundle);
       serverDriftRef.current = Date.now() - initialBundle.serverTime;
+      // Hydrate launchAt for clients that join mid-countdown
+      if (initialBundle.draft?.launchAt) {
+        const ms = new Date(initialBundle.draft.launchAt).getTime();
+        setLaunchAt(ms > Date.now() ? ms : null);
+      } else {
+        setLaunchAt(null);
+      }
     }
   }, [initialBundle]);
 
@@ -221,8 +233,15 @@ export default function DraftRoom() {
       if (data.payload?.draftId !== draftId) return;
       queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
     });
+    const offAllReady = ws.subscribe("draft_all_ready", (data: any) => {
+      if (data.payload?.draftId !== draftId) return;
+      // Kick off the simultaneous countdown on all clients
+      setLaunchAt(data.payload.launchAt as number);
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+    });
     const offLobbyCancel = ws.subscribe("draft_lobby_cancelled", (data: any) => {
       if (data.payload?.draftId !== draftId) return;
+      setLaunchAt(null);
       queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
     });
     return () => {
@@ -234,6 +253,7 @@ export default function DraftRoom() {
       offDone();
       offBuzzer();
       offAwaitingCaptains();
+      offAllReady();
       offLobbyCancel();
     };
   }, [draftId, ws, toast]);
@@ -832,6 +852,7 @@ export default function DraftRoom() {
               // surface a clearer hint instead of a permanently disabled button.
               const noCaptains = captainIds.length === 0;
               const allReady = noCaptains || captainIds.every((cid) => ready[cid]);
+              const countingDown = launchAt != null;
               return (
                 <button
                   onClick={() => beginMutation.mutate()}
@@ -841,12 +862,15 @@ export default function DraftRoom() {
                   title={
                     noCaptains
                       ? "No captains assigned — assign captains in setup if you need a captain-ready lobby"
-                      : allReady
-                        ? "All captains are ready — begin the draft"
-                        : "Waiting for all captains to confirm READY"
+                      : countingDown
+                        ? "Skip the countdown and begin the draft now"
+                        : allReady
+                          ? "All captains are ready — begin the draft"
+                          : "Waiting for all captains to confirm READY"
                   }
                 >
-                  <Snowflake className="w-4 h-4" /> Begin
+                  <Snowflake className="w-4 h-4" />
+                  {countingDown ? "Begin now" : "Begin"}
                 </button>
               );
             })()}
@@ -1223,27 +1247,68 @@ export default function DraftRoom() {
           const readyCount = captainTeams.filter(
             (t: any) => t.captainId && ready[t.captainId],
           ).length;
+          // Countdown seconds remaining (driven by the existing tickNow 1-sec interval)
+          const secsLeft = launchAt
+            ? Math.max(0, Math.ceil((launchAt - tickNow) / 1000))
+            : null;
+          // SVG ring progress (0–1)
+          const RING_R = 44;
+          const RING_CIRC = 2 * Math.PI * RING_R;
+          const ringProgress = secsLeft != null ? secsLeft / 30 : 0;
+          const strokeDash = ringProgress * RING_CIRC;
+
           return (
             <section
               className="space-y-3"
               data-testid="section-awaiting-captains"
             >
-              <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-4 text-center">
-                <Zap className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                <h2 className="text-lg font-bold mb-1">
-                  Draft starting soon
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  All captains must confirm they're at the keyboard before the
-                  draft begins. Once everyone is ready, the commissioner will
-                  start the clock.
-                </p>
-                <div className="text-xs text-muted-foreground mt-2 font-medium">
-                  {readyCount} of {captainTeams.length} captains ready
+              {/* Countdown ring shown once all captains are ready */}
+              {secsLeft != null ? (
+                <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-5 text-center">
+                  <div className="relative w-28 h-28 mx-auto mb-3">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                      {/* Track */}
+                      <circle cx="50" cy="50" r={RING_R} fill="none" stroke="currentColor"
+                        strokeWidth="8" className="text-emerald-500/20" />
+                      {/* Progress arc */}
+                      <circle cx="50" cy="50" r={RING_R} fill="none" stroke="currentColor"
+                        strokeWidth="8" strokeLinecap="round"
+                        className="text-emerald-500 transition-all duration-1000 ease-linear"
+                        strokeDasharray={`${strokeDash} ${RING_CIRC}`} />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-extrabold tabular-nums text-emerald-600 dark:text-emerald-300">
+                        {secsLeft}
+                      </span>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                        sec
+                      </span>
+                    </div>
+                  </div>
+                  <h2 className="text-lg font-bold mb-1 text-emerald-700 dark:text-emerald-300">
+                    Everyone's ready!
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Draft begins automatically when the countdown hits zero.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-4 text-center">
+                  <Zap className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                  <h2 className="text-lg font-bold mb-1">
+                    Draft starting soon
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    All captains must confirm they're at the keyboard before the
+                    draft begins.
+                  </p>
+                  <div className="text-xs text-muted-foreground mt-2 font-medium">
+                    {readyCount} of {captainTeams.length} captains ready
+                  </div>
+                </div>
+              )}
 
-              {!!myCaptainTeam && !meReady && (
+              {!!myCaptainTeam && !meReady && secsLeft == null && (
                 <button
                   onClick={() => captainReadyMutation.mutate()}
                   disabled={captainReadyMutation.isPending}
@@ -1254,13 +1319,13 @@ export default function DraftRoom() {
                   I'm ready — let's draft!
                 </button>
               )}
-              {!!myCaptainTeam && meReady && (
+              {!!myCaptainTeam && (meReady || secsLeft != null) && (
                 <div
                   className="w-full px-4 py-3 bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-emerald-700 dark:text-emerald-300 text-center font-medium flex items-center justify-center gap-2"
                   data-testid="status-captain-ready"
                 >
                   <CheckCircle2 className="w-5 h-5" />
-                  You're ready. Waiting on the others...
+                  {secsLeft != null ? "Draft is launching!" : "You're ready. Waiting on the others..."}
                 </div>
               )}
 

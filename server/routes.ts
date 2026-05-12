@@ -326,6 +326,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Draft tool: setup wizard, draft engine routes, live draft room
   registerDraftRoutes(app, isAuthenticated);
   setDraftBroadcaster(broadcastToUser);
+
+  // Ensure launch_at column exists (idempotent — safe on every startup)
+  try {
+    await db.execute(sql`
+      ALTER TABLE drafts
+      ADD COLUMN IF NOT EXISTS launch_at TIMESTAMP
+    `);
+  } catch (e: any) {
+    console.error("[Draft] Failed to ensure launch_at column:", e?.message);
+  }
+
   rehydrateActiveDraftTimers().catch((e) =>
     console.error("[Draft] Failed to rehydrate active draft timers:", e),
   );
