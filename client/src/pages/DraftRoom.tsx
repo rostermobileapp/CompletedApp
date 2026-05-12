@@ -215,6 +215,16 @@ export default function DraftRoom() {
           "The captain on the clock got a 30-second extension — but their next pick's timer will be halved.",
       });
     });
+    // When the draft transitions to the captain-ready lobby, force a re-fetch
+    // so captains who are already on the page see the lobby immediately.
+    const offAwaitingCaptains = ws.subscribe("draft_awaiting_captains", (data: any) => {
+      if (data.payload?.draftId !== draftId) return;
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+    });
+    const offLobbyCancel = ws.subscribe("draft_lobby_cancelled", (data: any) => {
+      if (data.payload?.draftId !== draftId) return;
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+    });
     return () => {
       ws.send({ type: "draft_unsubscribe", draftId });
       offState();
@@ -223,6 +233,8 @@ export default function DraftRoom() {
       offTick();
       offDone();
       offBuzzer();
+      offAwaitingCaptains();
+      offLobbyCancel();
     };
   }, [draftId, ws, toast]);
 
@@ -576,6 +588,11 @@ export default function DraftRoom() {
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/captain-ready`, {});
       return res.json();
+    },
+    onSuccess: () => {
+      // Force a re-fetch so the UI updates even if the WebSocket update
+      // doesn't arrive (e.g. the captain just landed via push notification).
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
     },
     onError: (err: any) =>
       toast({ title: "Failed to ready up", description: err?.message, variant: "destructive" }),
