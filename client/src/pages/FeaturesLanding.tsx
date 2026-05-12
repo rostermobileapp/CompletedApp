@@ -657,25 +657,27 @@ export default function FeaturesLanding() {
           </FadeUp>
 
           {/* 3-col: left cards | phone | right cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-8 items-center">
+          <div className="hidden lg:grid lg:grid-cols-[240px_auto_240px] gap-6 items-center">
 
             {/* Left cards */}
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {[
                 {
                   title: 'Captain READY lobby',
-                  body: 'Captains get notified, join the lobby, and hit READY. The commissioner starts the clock when everyone\'s in. It feels like tip-off.',
+                  body: 'Captains get notified, join the lobby, and hit READY. The commissioner starts the clock when everyone\'s in.',
                 },
                 {
                   title: 'Live pick clock',
-                  body: 'Each captain gets their time on the clock. Run out? The buzzer rule kicks in — 30-second extension, then an auto-pick. No one holds up the room.',
+                  body: 'Each captain gets their time on the clock. Run out? 30-second extension, then an auto-pick. No one holds up the room.',
                 },
               ].map((item, i) => (
                 <FadeUp key={item.title} delay={i * 0.08}>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#3c82f4] mb-3" />
-                    <h3 className="text-gray-900 font-bold text-sm mb-1.5">{item.title}</h3>
-                    <p className="text-gray-500 text-xs leading-relaxed">{item.body}</p>
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 aspect-square flex flex-col justify-between">
+                    <div className="w-2 h-2 rounded-full bg-[#3c82f4]" />
+                    <div>
+                      <h3 className="text-gray-900 font-bold text-sm mb-2">{item.title}</h3>
+                      <p className="text-gray-500 text-xs leading-relaxed">{item.body}</p>
+                    </div>
                   </div>
                 </FadeUp>
               ))}
@@ -706,28 +708,62 @@ export default function FeaturesLanding() {
             </FadeUp>
 
             {/* Right cards */}
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {[
                 {
                   title: 'Buddy system',
-                  body: 'Want to stay on the same line as your D-partner? Set up buddy groups before the draft so the algorithm can try to keep you together.',
+                  body: 'Want to stay on the same line as your D-partner? Set up buddy groups so the algorithm can try to keep you together.',
                 },
                 {
                   title: 'Goalies first',
-                  body: 'Draft goalies in a separate round before the skaters. Because finding a goalie last-minute is a whole thing and everyone knows it.',
+                  body: 'Draft goalies in a separate round before the skaters. Because finding a goalie last-minute is a whole thing.',
                 },
               ].map((item, i) => (
                 <FadeUp key={item.title} delay={i * 0.08 + 0.16}>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#3c82f4] mb-3" />
-                    <h3 className="text-gray-900 font-bold text-sm mb-1.5">{item.title}</h3>
-                    <p className="text-gray-500 text-xs leading-relaxed">{item.body}</p>
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 aspect-square flex flex-col justify-between">
+                    <div className="w-2 h-2 rounded-full bg-[#3c82f4]" />
+                    <div>
+                      <h3 className="text-gray-900 font-bold text-sm mb-2">{item.title}</h3>
+                      <p className="text-gray-500 text-xs leading-relaxed">{item.body}</p>
+                    </div>
                   </div>
                 </FadeUp>
               ))}
             </div>
 
           </div>
+
+          {/* Mobile fallback: phone + cards stacked */}
+          <div className="lg:hidden flex flex-col items-center gap-8">
+            <div className="relative" style={{ width: 240 }}>
+              <div className="absolute inset-0 rounded-[3rem] bg-[#3c82f4]/15 blur-2xl scale-110" />
+              <div className="relative bg-gray-900 rounded-[3rem] p-3 shadow-2xl border border-gray-200">
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-20 h-6 bg-gray-900 rounded-full z-10 flex items-center justify-center">
+                  <div className="w-10 h-2.5 bg-gray-800 rounded-full" />
+                </div>
+                <div className="bg-black rounded-[2.4rem] overflow-hidden" style={{ aspectRatio: '9/19.5' }}>
+                  <video src="/draft-demo.mp4" autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 w-full">
+              {[
+                { title: 'Captain READY lobby', body: 'Captains join the lobby and hit READY. The commissioner starts when everyone\'s in.' },
+                { title: 'Live pick clock', body: '30-second extension on expiry, then auto-pick. No one holds up the room.' },
+                { title: 'Buddy system', body: 'Set up buddy groups so the algorithm keeps linemates together.' },
+                { title: 'Goalies first', body: 'Draft goalies in a separate round before skaters.' },
+              ].map((item) => (
+                <div key={item.title} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col gap-3">
+                  <div className="w-2 h-2 rounded-full bg-[#3c82f4]" />
+                  <div>
+                    <h3 className="text-gray-900 font-bold text-sm mb-1">{item.title}</h3>
+                    <p className="text-gray-500 text-xs leading-relaxed">{item.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </section>
 
