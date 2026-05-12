@@ -675,6 +675,7 @@ export default function FeaturesLanding() {
         <div className="h-14" />{/* spacer */}
         <div className="max-w-6xl mx-auto">
           <FadeUp>
+            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center mb-3">League Management</p>
             <h2
               className="font-bold text-gray-900 text-center mb-4"
               style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
