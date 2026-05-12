@@ -2907,7 +2907,7 @@ export class DatabaseStorage implements IStorage {
         uniqueTeamId,
         creatorId,
         leagueId: null, // Standalone team has no league
-        captainId: creatorId, // Creator is also the captain
+        captainId: null, // Captain must be manually assigned
         logoUrl: photoUrl || null,
         facilityId: facilityId || null,
       })

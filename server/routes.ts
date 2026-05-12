@@ -6330,10 +6330,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamData = insertTeamSchema.parse(req.body);
       const team = await storage.createTeam({
         ...teamData,
-        captainId: userId,
+        captainId: null,
       });
 
-      // Automatically add the creator as an approved team member (captain)
+      // Automatically add the creator as an approved team member
       // so the team shows up in their team selector and they have full access.
       // Idempotent: skip if a membership row already exists for this user/team
       // pair (e.g. on retry).
