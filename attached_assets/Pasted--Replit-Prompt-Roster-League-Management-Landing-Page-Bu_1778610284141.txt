@@ -1,0 +1,191 @@
+# Replit Prompt: Roster League Management Landing Page
+
+Build a new single-scroll landing page at the route `/features` for Roster (roster-app.com). This is a high-conversion marketing page targeting hockey league commissioners, ops directors, and multi-team operators. The tone is confident, hockey-native, and modern. No mention of competitors — let the features speak for themselves.
+
+## Design system
+
+Match the existing Roster brand and design tokens already in the codebase. If anything below conflicts with the established design system, defer to the existing tokens.
+
+- **Vibe:** light, clean, modern — match the existing Roster landing page theme exactly. Same background tones, same accent color usage, same button styles, same section dividers. This page should feel like a natural extension of the homepage, not a separate template. Pull existing component styles directly where possible.
+- **Type:** existing Roster font stack, generous line-height, large display sizes for section headers (clamp(2.5rem, 5vw, 4.5rem))
+- **Layout:** max-width ~1200px content container, with full-bleed background sections where it makes sense
+- **Imagery:** real screenshots from the Roster app where possible (live bracket view, standings updating, in-game scorekeeping screen, league dashboard). Use placeholder image divs labeled clearly (e.g., `<!-- IMAGE: live bracket on iPhone -->`) where I'll drop assets later.
+
+## Section-by-section animation strategy
+
+Use Framer Motion (or equivalent) with scroll-triggered animations. Keep them tasteful — every section should feel intentional, never gimmicky.
+
+- **Fade + slide-up** on text blocks as they enter viewport (translateY 24px → 0, opacity 0 → 1, 600ms ease-out)
+- **Staggered children** for feature lists (80ms delay per item)
+- **Parallax** on hero phone mockup and feature screenshots (subtle, ~15% offset on scroll)
+- **Number counter** animation when stats scroll into view
+- **Sticky scroll** section for the "League Management" feature deep-dive — the phone mockup pins while feature callouts scroll past
+- **Reduced-motion respect**: all animations gated behind `prefers-reduced-motion`
+
+---
+
+## Page structure (top to bottom)
+
+### 1. Hero
+
+**Headline (H1):**
+> Built for the people who actually run the league.
+
+**Subhead:**
+> Roster is the league management platform built by a beer league captain who got tired of spreadsheets, group texts, and apps that treat hockey like an afterthought.
+
+**Primary CTA:** "Start your league free" → /start-league
+**Secondary CTA:** "See how it works" → smooth-scroll to section 2
+
+**Visual:** Phone mockup showing the Roster league dashboard. Parallax on scroll. Subtle floating animation on idle (translateY ±4px, 4s ease-in-out infinite).
+
+**Trust bar below CTAs:** "iOS · Android · Web — everything syncs in real time"
+
+---
+
+### 2. The problem (light section, sets up the rest)
+
+**Section header:**
+> Hockey deserves better than a group text and a Google Sheet.
+
+**Three-column intro text (no bullets, short prose):**
+
+Running a league means juggling rinks, refs, registration, payments, brackets, standings, and 100 captains who all want answers right now. Most tools either treat hockey like a side project or solve half the problem and call it a day.
+
+Roster was built for the way leagues actually run — in one app, with everything connected, and language that sounds like the locker room instead of a B2B sales pitch.
+
+---
+
+### 3. Tournaments (the big one — first feature section)
+
+**Eyebrow:** TOURNAMENTS
+**Section header:**
+> Run a tournament that doesn't take a month to set up.
+
+**Layout:** Two-column on desktop, stacked on mobile. Left = copy + feature list. Right = screenshot/visual.
+
+**Feature blocks (each with its own small icon — use Lucide icons):**
+
+**Smart Bracket Creator**
+Drop in your teams, pick your format, and Roster builds the bracket in seconds. Single elim, double elim, round robin into playoffs — it knows what you're trying to do.
+
+**Brackets that advance themselves**
+Score a game, the winner moves on. No commissioner sitting in the rink office updating a bracket on a clipboard. The next matchup is already on the schedule before the zamboni hits the ice.
+
+**Tournaments as a side hustle**
+Running a one-off tournament? Use Roster for just that weekend at $10/team. A lot of captains start here, then bring their whole league over.
+
+**Visual:** Animated bracket SVG that "fills in" as the section scrolls into view — winners advance line by line with a 200ms stagger. This is the wow moment of the page.
+
+---
+
+### 4. League Management (second big feature section)
+
+**Eyebrow:** LEAGUE MANAGEMENT
+**Section header:**
+> Everything happens in the app. Not in your text messages.
+
+**Sticky scroll treatment:** A phone mockup pins on one side while four feature callouts scroll past on the other. Each callout has its own screenshot that swaps inside the phone frame as it becomes active.
+
+**Callout 1 — Real-time standings**
+Score the game in the app and standings update instantly. Players check the table from the parking lot. No waiting for someone to manually enter results on Sunday night.
+
+**Callout 2 — Live in-game scorekeeping**
+Goals, assists, penalties, saves — all tracked as the game happens. Stats update for every player on every team, automatically. Your league finally has season-long leaderboards that actually mean something.
+
+**Callout 3 — All communication, one place**
+Schedules, lineups, payments, announcements, captain chats — all inside Roster. Your players already check the app for their next game. Why would you message them somewhere else? Instagram doesn't text you. Roster doesn't either.
+
+**Callout 4 — Registration, payments, waivers**
+Players sign up, pay their league dues, and sign the waiver in one flow. You see who's in, who's paid, and who's still on the fence — without a spreadsheet in sight.
+
+---
+
+### 5. Animated stats / trust band
+
+Full-bleed section, accent background. Three large numbers that count up on scroll-into-view:
+
+- **Built in Ohio.** (no number, just text)
+- **Hockey-first.** Every feature, every word, every screen.
+- **Captain-built.** Roster was built by someone who's still running a beer league bench.
+
+(If you have real numbers — teams onboarded, games scored, brackets generated — swap those in instead. Be honest about scale; pre-launch is fine to leave as the qualitative version above.)
+
+---
+
+### 6. What sets Roster apart (quick-hit grid)
+
+**Section header:**
+> A few more things you'll notice on day one.
+
+**3x2 grid of small feature cards** (each with icon, headline, 1-2 sentence body). Stagger fade-in.
+
+- **One app, every role** — Captain, player, commissioner, ref — same app, different view. Nobody downloads three things.
+- **Speaks hockey** — Sin bin, sheet, barn, beer league. The language fits.
+- **iOS, Android, Web** — Real native apps. Real web dashboard. Everything in sync.
+- **Stats that actually update** — Goals scored at 9pm show up in the leaderboard at 9:01.
+- **Built for adults** — No parent permissions, no jersey-number drama. Designed for adult rec hockey.
+- **Real human support** — You can email the founder. Often you'll get a reply that night.
+
+---
+
+### 7. How it works (3 steps, hockey-flavored)
+
+**Section header:**
+> Three steps to a better-run league.
+
+**Step 1 — Drop in your teams**
+Add your teams, captains, and schedule. Import from a spreadsheet or build it in the app.
+
+**Step 2 — Open registration**
+Send one link. Players register, pay, and sign the waiver. You're done.
+
+**Step 3 — Drop the puck**
+Score games as they happen. Standings update. Brackets advance. You watch hockey instead of doing admin.
+
+---
+
+### 8. Pricing teaser
+
+**Section header:**
+> Simple pricing. No nickel-and-diming.
+
+Short paragraph linking to full pricing page. Mention the $10/team tournament option as the easy "try it out" entry point.
+
+**CTA:** "See pricing" → /pricing
+
+---
+
+### 9. Final CTA
+
+Full-bleed, centered.
+
+**Headline:**
+> Ready to run a league worth playing in?
+
+**Subhead:**
+> Set up takes about 15 minutes. Your captains will notice the difference at the first game.
+
+**Buttons:** "Start your league free" (primary) · "Talk to the founder" (secondary, mailto:)
+
+---
+
+## Technical notes
+
+- Build as a new route in the existing Replit project structure — same component library, same auth shell (though this is a public marketing page, no auth required)
+- Ensure mobile-first responsive: hero stacks, sticky-scroll section degrades to vertical stack on mobile
+- Lazy-load below-the-fold images
+- Add proper meta tags for the page: title "Roster — Features Built for Hockey Leagues", meta description "Built by a beer league captain. Roster is the all-in-one league management platform for adult recreational hockey — tournaments, scorekeeping, standings, and registration in one app."
+- Open Graph image: use a Roster brand asset
+- Make sure the page links from the main nav (add "Features" to the header navigation, or update the existing Features link to point here if one exists)
+- Internal links: hero CTA → /start-league, pricing teaser → /pricing
+- Confirm the page passes Lighthouse: target 90+ on performance, 100 on accessibility
+
+## What NOT to do
+
+- No competitor names anywhere on the page
+- No "we're better than X" comparisons
+- No corporate sports-tech jargon ("solutions," "ecosystem," "best-in-class")
+- No emojis in body copy
+- No fake testimonials — leave testimonial blocks out entirely until real ones exist
+- No claims of scale that aren't real (don't fake user counts)
