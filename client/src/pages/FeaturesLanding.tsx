@@ -772,25 +772,6 @@ export default function FeaturesLanding() {
         </div>
       </section>
 
-      {/* ── PRICING TEASER ───────────────────────────────────── */}
-      <section className="py-16 px-6 bg-blue-50/60 border-y border-blue-100">
-        <div className="max-w-3xl mx-auto text-center">
-          <FadeUp>
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Simple pricing. No nickel-and-diming.</h2>
-            <p className="text-gray-500 text-lg mb-6 leading-relaxed">
-              Free to start — no credit card required. Running a one-off tournament?
-              Try Roster for just <span className="font-semibold text-gray-900">$10/team</span> with no commitment. That's the easiest way to see what it can do before you bring your full league over.
-            </p>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-2 text-[#3c82f4] font-semibold hover:underline underline-offset-4 transition-colors text-lg"
-            >
-              See full pricing <ArrowRight className="w-4 h-4" />
-            </Link>
-          </FadeUp>
-        </div>
-      </section>
-
       {/* ── FOOTER ───────────────────────────────────────────── */}
       <footer className="border-t border-gray-200 py-12 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
