@@ -102,6 +102,8 @@ interface DraftStateBundle {
   chatMessages: ChatMsg[];
   pickingTeamId: string | null;
   serverTime: number;
+  /** Fresh team data (id, name, captainId) for every team in draftOrder. */
+  draftOrderTeams?: { id: string; name: string; captainId: string | null }[];
 }
 
 export default function DraftRoom() {
@@ -873,8 +875,10 @@ export default function DraftRoom() {
             )}
             {isCommissioner && draft.status === "awaiting_captains" && (() => {
               const ready = (draft.captainReadyState || {}) as Record<string, boolean>;
-              const captainIds = teams
-                .filter((t: any) => draft.draftOrder.includes(t.id))
+              // Prefer server-authoritative team data from the bundle; fall back to the
+              // separate teams cache only if the bundle predates this feature.
+              const lobbyTeams = bundle?.draftOrderTeams ?? teams.filter((t: any) => draft.draftOrder.includes(t.id));
+              const captainIds = lobbyTeams
                 .map((t: any) => t.captainId)
                 .filter(Boolean) as string[];
               // Match server logic: when there are no captains assigned the
@@ -1268,7 +1272,12 @@ export default function DraftRoom() {
         {/* Captain READY lobby */}
         {draft.status === "awaiting_captains" && (() => {
           const ready = (draft.captainReadyState || {}) as Record<string, boolean>;
-          const captainTeams = teams.filter((t: any) =>
+          // Prefer server-authoritative team data shipped with every draft_state
+          // broadcast. This avoids the race where a captain opens the page from a
+          // push notification and the separate /teams cache hasn't resolved yet,
+          // which caused myCaptainTeam to be falsy and the "I'm Ready" button to
+          // never render for non-first captains.
+          const captainTeams = bundle?.draftOrderTeams ?? teams.filter((t: any) =>
             draft.draftOrder.includes(t.id),
           );
           const meReady = !!user && !!ready[user.id];

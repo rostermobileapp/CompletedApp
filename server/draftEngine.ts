@@ -145,6 +145,8 @@ export interface DraftStateBundle {
   chatMessages: { id: string; userId: string; body: string; createdAt: Date }[];
   pickingTeamId: string | null;
   serverTime: number;
+  /** Teams in the draft order, with fresh captainId values from the DB. */
+  draftOrderTeams: { id: string; name: string; captainId: string | null }[];
 }
 
 export async function getDraftStateBundle(draftId: string): Promise<DraftStateBundle | null> {
@@ -174,6 +176,18 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
       ? computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style)
       : null;
 
+  // Always include the teams from draftOrder with fresh captainId from the DB.
+  // Clients use this to determine myCaptainTeam reliably without depending on
+  // a separate, possibly-stale teams cache.
+  const draftOrderTeams: { id: string; name: string; captainId: string | null }[] =
+    draftOrder.length > 0
+      ? (await db
+          .select({ id: teams.id, name: teams.name, captainId: teams.captainId })
+          .from(teams)
+          .where(inArray(teams.id, draftOrder)))
+          .map((t) => ({ id: t.id, name: t.name, captainId: t.captainId ?? null }))
+      : [];
+
   return {
     draft,
     picks,
@@ -181,6 +195,7 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
     chatMessages,
     pickingTeamId,
     serverTime: Date.now(),
+    draftOrderTeams,
   };
 }
 
