@@ -2640,6 +2640,19 @@ export default function LeagueManagement() {
       toast({ title: 'Failed to launch draft', description: err?.message || 'Please try again.', variant: 'destructive' });
     },
   });
+  const deleteDraftMutation = useMutation({
+    mutationFn: async (draftId: string) => {
+      const res = await apiRequest('DELETE', `/api/drafts/${draftId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Draft deleted' });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'seasons', selectedSeasonId, 'draft'] });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Failed to delete draft', description: err?.message || 'Please try again.', variant: 'destructive' });
+    },
+  });
 
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   // All users now have commissioner access to manage leagues
@@ -2840,6 +2853,20 @@ export default function LeagueManagement() {
                 {existingDraft && existingDraft.status === 'pending' && (
                   <>
                     <button
+                      onClick={() => {
+                        if (window.confirm('Delete this draft? All setup (captain assignments, buddy pairs, player notes) will be permanently removed. This cannot be undone.')) {
+                          deleteDraftMutation.mutate(existingDraft.id);
+                        }
+                      }}
+                      disabled={deleteDraftMutation.isPending}
+                      className="px-4 py-2 bg-card border border-red-500/40 hover:bg-red-500/10 text-red-500 rounded-lg text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                      data-testid="button-delete-draft"
+                      title="Delete this draft"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Draft
+                    </button>
+                    <button
                       onClick={() => setShowDraftWizard(true)}
                       className="px-4 py-2 bg-card border border-border hover:bg-muted rounded-lg text-sm font-medium flex items-center gap-1.5"
                       data-testid="button-edit-draft"
@@ -3029,6 +3056,20 @@ export default function LeagueManagement() {
                   )}
                   {existingDraft && existingDraft.status === 'pending' && (
                     <>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Delete this draft? All setup will be permanently removed. This cannot be undone.')) {
+                            deleteDraftMutation.mutate(existingDraft.id);
+                          }
+                        }}
+                        disabled={deleteDraftMutation.isPending}
+                        className="px-3 py-1.5 bg-card border border-red-500/40 hover:bg-red-500/10 text-red-500 rounded-md text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                        data-testid="button-delete-draft-players-tab"
+                        title="Delete this draft"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
                       <button
                         onClick={() => setShowDraftWizard(true)}
                         className="px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-xs font-medium"
@@ -3558,6 +3599,20 @@ export default function LeagueManagement() {
                   )}
                   {existingDraft && existingDraft.status === 'pending' && (
                     <>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Delete this draft? All setup will be permanently removed. This cannot be undone.')) {
+                            deleteDraftMutation.mutate(existingDraft.id);
+                          }
+                        }}
+                        disabled={deleteDraftMutation.isPending}
+                        className="px-3 py-1.5 bg-card border border-red-500/40 hover:bg-red-500/10 text-red-500 rounded-md text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                        data-testid="button-delete-draft-teams-tab"
+                        title="Delete this draft"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
                       <button
                         onClick={() => setShowDraftWizard(true)}
                         className="px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-xs font-medium"
