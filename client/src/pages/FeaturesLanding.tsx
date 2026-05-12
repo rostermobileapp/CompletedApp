@@ -606,7 +606,7 @@ export default function FeaturesLanding() {
                 {
                   icon: CreditCard,
                   title: 'Running a solo tournament?',
-                  body: 'Running a one-off tournament? Use Roster for just that weekend at $10/team. A lot of captains start here, then bring their whole league over.',
+                  body: 'Running a one-off tournament? Use Roster for just that weekend at $10/team. Every player gets full paid access for the whole tournament.',
                 },
               ].map((item, i) => {
                 const Icon = item.icon;
