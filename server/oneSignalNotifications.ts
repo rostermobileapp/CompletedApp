@@ -610,3 +610,20 @@ export async function sendPhotoTagPushNotification(
     },
   });
 }
+
+export async function sendDraftStartingPushNotification(
+  captainId: string,
+  commishName: string,
+  leagueName: string,
+  draftId: string
+): Promise<boolean> {
+  return sendPushNotificationToUser({
+    userId: captainId,
+    title: `⚡ Draft starting soon`,
+    message: `${commishName} is starting the ${leagueName} draft — tap to get ready.`,
+    data: {
+      type: 'draft_starting',
+      draftId,
+    },
+  });
+}

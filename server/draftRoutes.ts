@@ -18,6 +18,7 @@ import {
 import { eq, and, or, asc, desc, ne, sql, inArray, isNull } from "drizzle-orm";
 import { storage } from "./storage";
 import { broadcastNotificationUpdate } from "./routes";
+import { sendDraftStartingPushNotification } from "./oneSignalNotifications";
 import {
   startDraft,
   pauseDraft,
@@ -468,6 +469,9 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             actionText: "Open draft",
           });
           broadcastNotificationUpdate(captainUserId);
+          sendDraftStartingPushNotification(captainUserId, commishName, leagueName, draftId).catch(
+            (e) => console.error("[draft] push notification failed for captain", captainUserId, e),
+          );
         } catch (e) {
           console.error("[draft] failed to notify captain", captainUserId, e);
         }
