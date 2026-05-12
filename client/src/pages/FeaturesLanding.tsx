@@ -633,6 +633,92 @@ export default function FeaturesLanding() {
         </div>
       </section>
 
+      {/* ── DRAFT NIGHT ──────────────────────────────────────── */}
+      <section className="pt-0 pb-24 px-6 bg-gray-900">
+        {/* Sticky section label */}
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-gray-900/95 backdrop-blur-md border-b border-white/10 py-3.5 mb-8">
+          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Draft Night</p>
+        </div>
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            {/* Left: copy */}
+            <FadeUp>
+              <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase mb-4">Exclusive to Roster</p>
+              <h2
+                className="font-bold text-white mb-6"
+                style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
+              >
+                No other app has this.
+                <br />
+                <span className="text-gray-400">Not one.</span>
+              </h2>
+              <p className="text-gray-300 text-lg leading-relaxed mb-10">
+                If you want draft night to feel like an event — a real moment your players actually look forward to — Roster is the only way to do it.
+              </p>
+              <div className="space-y-6">
+                {[
+                  {
+                    title: 'Captain READY lobby',
+                    body: 'Captains get notified, join the lobby, and hit READY. The commissioner starts the clock when everyone\'s in. It feels like tip-off.',
+                  },
+                  {
+                    title: 'Live pick clock',
+                    body: 'Each captain gets their time on the clock. Run out? The buzzer rule kicks in — 30-second extension, then an auto-pick. No one holds up the room.',
+                  },
+                  {
+                    title: 'Buddy system',
+                    body: 'Want to stay on the same line as your D-partner? Set up buddy groups before the draft so the algorithm can try to keep you together.',
+                  },
+                  {
+                    title: 'Goalies first',
+                    body: 'Draft goalies in a separate round before the skaters. Because finding a goalie last-minute is a whole thing and everyone knows it.',
+                  },
+                ].map((item, i) => (
+                  <FadeUp key={item.title} delay={i * 0.08}>
+                    <div className="flex gap-4">
+                      <div className="w-1.5 rounded-full bg-[#3c82f4] flex-shrink-0 mt-1 self-stretch" />
+                      <div>
+                        <h3 className="text-white font-bold mb-1">{item.title}</h3>
+                        <p className="text-gray-400 text-sm leading-relaxed">{item.body}</p>
+                      </div>
+                    </div>
+                  </FadeUp>
+                ))}
+              </div>
+            </FadeUp>
+
+            {/* Right: phone mockup with video */}
+            <FadeUp delay={0.15}>
+              <div className="flex justify-center">
+                {/* Phone outer shell */}
+                <div className="relative" style={{ width: 270 }}>
+                  {/* Glow behind phone */}
+                  <div className="absolute inset-0 rounded-[3rem] bg-[#3c82f4]/20 blur-2xl scale-110" />
+                  {/* Phone body */}
+                  <div className="relative bg-gray-950 rounded-[3rem] p-3 shadow-2xl border border-white/10">
+                    {/* Notch */}
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 w-20 h-6 bg-gray-950 rounded-full z-10 flex items-center justify-center">
+                      <div className="w-10 h-2.5 bg-gray-900 rounded-full" />
+                    </div>
+                    {/* Screen */}
+                    <div className="bg-black rounded-[2.4rem] overflow-hidden" style={{ aspectRatio: '9/19.5' }}>
+                      <video
+                        src="/draft-demo.mp4"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </FadeUp>
+          </div>
+        </div>
+      </section>
+
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-white">
         {/* Sticky section label */}
