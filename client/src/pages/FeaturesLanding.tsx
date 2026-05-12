@@ -574,12 +574,13 @@ export default function FeaturesLanding() {
       </header>
 
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-gray-50">
+      <section className="pt-0 pb-24 px-6 bg-gray-50">
+        {/* Full-width sticky section banner */}
+        <div className="sticky top-[80px] z-[30] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-16">
+          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Tournaments</p>
+        </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
-            <p className="sticky top-[96px] z-20 mx-auto w-fit rounded-full border border-[#3c82f4]/20 bg-white/90 px-4 py-2 text-sm font-bold tracking-[0.28em] text-[#3c82f4] uppercase text-center backdrop-blur-md shadow-sm mb-5">
-              Tournaments
-            </p>
             <h2
               className="font-bold text-gray-900 text-center mb-4"
               style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}
@@ -641,10 +642,13 @@ export default function FeaturesLanding() {
       </section>
 
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
-      <section className="py-24 px-6 bg-white">
+      <section className="pt-0 pb-24 px-6 bg-white">
+        {/* Full-width sticky section banner — same top as Tournaments so it slides in and replaces it */}
+        <div className="sticky top-[80px] z-[30] -mx-6 bg-white/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-16">
+          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">League Management</p>
+        </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
-            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center mb-3">League Management</p>
             <h2
               className="font-bold text-gray-900 text-center mb-4"
               style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
