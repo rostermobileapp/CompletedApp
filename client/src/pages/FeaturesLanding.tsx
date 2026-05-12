@@ -304,8 +304,6 @@ const LEAGUE_CALLOUTS = [
     headline: 'Real-time standings.',
     body: 'Score the game in the app and standings update instantly. Players check the table from the parking lot. No waiting for someone to manually enter results on Sunday night.',
     icon: BarChart2,
-    color: 'bg-blue-50 border-blue-100',
-    iconColor: 'text-[#3c82f4]',
   },
   {
     id: 'scorekeeping',
@@ -313,8 +311,6 @@ const LEAGUE_CALLOUTS = [
     headline: 'Live in-game scorekeeping.',
     body: 'Goals, assists, penalties, saves — all tracked as the game happens. Stats update for every player on every team, automatically. Your league finally has season-long leaderboards that actually mean something.',
     icon: ClipboardList,
-    color: 'bg-blue-50 border-blue-100',
-    iconColor: 'text-[#3c82f4]',
   },
   {
     id: 'messaging',
@@ -322,8 +318,6 @@ const LEAGUE_CALLOUTS = [
     headline: 'All communication, one place.',
     body: 'Schedules, lineups, payments, announcements, captain chats — all inside Roster. Your players already check the app for their next game. Why would you message them somewhere else?',
     icon: MessageSquare,
-    color: 'bg-blue-50 border-blue-100',
-    iconColor: 'text-[#3c82f4]',
   },
   {
     id: 'registration',
@@ -331,8 +325,6 @@ const LEAGUE_CALLOUTS = [
     headline: 'Registration, payments, waivers.',
     body: 'Players sign up, pay their league dues, and sign the waiver in one flow. You see who\'s in, who\'s paid, and who\'s still on the fence — without a spreadsheet in sight.',
     icon: CreditCard,
-    color: 'bg-blue-50 border-blue-100',
-    iconColor: 'text-[#3c82f4]',
   },
 ];
 
@@ -377,10 +369,10 @@ function StickyLeagueSection() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={reduced ? undefined : { opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3 }}
-                  className={`w-full rounded-2xl p-6 border ${LEAGUE_CALLOUTS[active].color} flex flex-col gap-3 items-center text-center`}
+                  className="w-full rounded-2xl p-6 border bg-blue-50 border-blue-100 flex flex-col gap-3 items-center text-center"
                 >
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${LEAGUE_CALLOUTS[active].color}`}>
-                    <ActiveIcon className={`w-6 h-6 ${LEAGUE_CALLOUTS[active].iconColor}`} />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-50 border-blue-100">
+                    <ActiveIcon className="w-6 h-6 text-[#3c82f4]" />
                   </div>
                   <p className="text-xs font-semibold text-gray-700">{LEAGUE_CALLOUTS[active].eyebrow}</p>
                   <p className="text-xs text-gray-500 leading-relaxed">{LEAGUE_CALLOUTS[active].headline}</p>
@@ -421,10 +413,10 @@ function StickyLeagueSection() {
           const Icon = c.icon;
           return (
             <FadeUp key={c.id} delay={i * 0.1}>
-              <div className={`rounded-2xl p-6 border ${c.color}`}>
+              <div className="rounded-2xl p-6 border bg-blue-50 border-blue-100">
                 <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white`}>
-                    <Icon className={`w-5 h-5 ${c.iconColor}`} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white">
+                    <Icon className="w-5 h-5 text-[#3c82f4]" />
                   </div>
                   <div>
                     <p className="text-xs font-bold tracking-widest text-gray-400 uppercase mb-1">{c.eyebrow}</p>
