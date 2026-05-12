@@ -605,7 +605,7 @@ export default function FeaturesLanding() {
                 },
                 {
                   icon: CreditCard,
-                  title: 'Tournaments as a side hustle',
+                  title: 'Running a solo tournament?',
                   body: 'Running a one-off tournament? Use Roster for just that weekend at $10/team. A lot of captains start here, then bring their whole league over.',
                 },
               ].map((item, i) => {
