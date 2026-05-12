@@ -176,16 +176,17 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
       ? computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style)
       : null;
 
-  // Always include the teams from draftOrder with fresh captainId from the DB.
-  // Clients use this to determine myCaptainTeam reliably without depending on
-  // a separate, possibly-stale teams cache.
+  // Always include the teams from draftOrder with authoritative captainId from
+  // draft.captainAssignments (persisted on the draft record). This eliminates
+  // any dependency on teams.captainId being up-to-date.
+  const captainAssignmentsMap = (draft.captainAssignments as Record<string, string>) || {};
   const draftOrderTeams: { id: string; name: string; captainId: string | null }[] =
     draftOrder.length > 0
       ? (await db
-          .select({ id: teams.id, name: teams.name, captainId: teams.captainId })
+          .select({ id: teams.id, name: teams.name })
           .from(teams)
           .where(inArray(teams.id, draftOrder)))
-          .map((t) => ({ id: t.id, name: t.name, captainId: t.captainId ?? null }))
+          .map((t) => ({ id: t.id, name: t.name, captainId: captainAssignmentsMap[t.id] ?? null }))
       : [];
 
   return {
@@ -881,19 +882,15 @@ export async function markCaptainReady(
   ready[userId] = true;
 
   // Check whether every team in the draft has a captain AND every captain is ready.
-  // We require ALL teams to have a captainId — if any team is missing a captain
-  // assignment the countdown must NOT fire (prevents a single assigned captain from
-  // accidentally triggering the countdown when others haven't been assigned yet).
+  // Use draft.captainAssignments as the authoritative source — it's always
+  // in sync with what the wizard saved, avoiding any stale teams.captainId values.
   const draftOrder = (draft.draftOrder as string[]) || [];
-  const teamRows =
-    draftOrder.length > 0
-      ? await db.select().from(teams).where(inArray(teams.id, draftOrder))
-      : [];
-  const captainIds = teamRows
-    .map((t) => t.captainId)
+  const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+  const captainIds = draftOrder
+    .map((teamId) => captainAssignments[teamId])
     .filter((x): x is string => !!x);
   const allTeamsHaveCaptains =
-    teamRows.length > 0 && teamRows.every((t) => !!t.captainId);
+    draftOrder.length > 0 && draftOrder.every((teamId) => !!captainAssignments[teamId]);
   const allReady =
     allTeamsHaveCaptains && captainIds.every((cid) => ready[cid]);
 
@@ -961,9 +958,9 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   // mode the commissioner makes every pick, so there's nothing for captains
   // to ready up for.
   if (!isCommissionerMode) {
-    const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
-    const captainIds = teamRows
-      .map((t) => t.captainId)
+    const captainAssignmentsForStart = (draft.captainAssignments as Record<string, string>) || {};
+    const captainIds = draftOrder
+      .map((teamId) => captainAssignmentsForStart[teamId])
       .filter((x): x is string => !!x);
     const ready = (draft.captainReadyState as Record<string, boolean>) || {};
     const notReady = captainIds.filter((cid) => !ready[cid]);

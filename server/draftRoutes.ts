@@ -53,10 +53,10 @@ async function isLeagueCommissioner(leagueId: string, userId: string): Promise<b
 async function isCaptainInDraft(draftId: string, userId: string): Promise<boolean> {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return false;
-  const draftOrder = (draft.draftOrder as string[]) || [];
-  if (draftOrder.length === 0) return false;
-  const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
-  return teamRows.some((t) => t.captainId === userId);
+  // Use draft.captainAssignments as the authoritative source — this is
+  // persisted on the draft record and never accidentally cleared by team edits.
+  const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+  return Object.values(captainAssignments).includes(userId);
 }
 
 /**
@@ -297,6 +297,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
               skillScale: config.skillScale ?? null,
               playerNotes: config.playerNotes ?? {},
               goalieAssignments: config.goalieAssignments ?? {},
+              captainAssignments: config.captainAssignments ?? {},
               draftOrder,
               totalRounds,
               updatedAt: new Date(),
@@ -322,6 +323,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
               skillScale: config.skillScale ?? null,
               playerNotes: config.playerNotes ?? {},
               goalieAssignments: config.goalieAssignments ?? {},
+              captainAssignments: config.captainAssignments ?? {},
               draftOrder,
               totalRounds,
               createdBy: userId,

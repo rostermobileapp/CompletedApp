@@ -1606,6 +1606,8 @@ export const drafts = pgTable("drafts", {
   playerNotes: jsonb("player_notes").default({}),
   // jsonb { [teamId]: userId } for commissioner-assigned goalies
   goalieAssignments: jsonb("goalie_assignments").default({}),
+  // jsonb { [teamId]: userId } captain assignments set via the setup wizard
+  captainAssignments: jsonb("captain_assignments").default({}),
   // jsonb { [teamId]: roundsArray[] } for buddy-forfeited rounds
   forfeitedRounds: jsonb("forfeited_rounds").default({}),
   currentRound: integer("current_round").default(1).notNull(),

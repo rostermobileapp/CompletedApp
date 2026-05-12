@@ -57,6 +57,7 @@ interface Draft {
   currentTurnDeadline: string | null;
   nextTimerOverride?: number | null;
   goalieAssignments: Record<string, string>;
+  captainAssignments?: Record<string, string> | null;
   playerNotes: Record<string, string>;
   skillRankingEnabled: boolean;
   skillScale: string | null;
