@@ -7,6 +7,7 @@ import {
   draftChatMessages,
   leagues,
   leagueMemberships,
+  placeholderPlayers,
   teams,
   users,
   playerStats,
@@ -204,7 +205,40 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         ...r,
         priorStats: priorStatsByUser[r.user.id] || { goals: 0, assists: 0 },
       }));
-      return res.json(enriched);
+
+      // ── Include placeholder players (free agents without accounts) ──
+      // Fetch all placeholder_players for this league (both team-assigned and
+      // free agents) so they appear in the buddy system and the draft room's
+      // player carousel, matching the behaviour of GET /api/leagues/:id/members.
+      const placeholders = await storage.getLeaguePlaceholderPlayers(leagueId);
+      const placeholderRows = placeholders.map((ph) => ({
+        membership: {
+          id: `placeholder:${ph.id}`,
+          userId: `placeholder:${ph.id}`,
+          leagueId,
+          status: "placeholder" as const,
+          isGoalie: false,
+          isSkater: true,
+          skillLevel: null,
+          assignedTeamId: ph.teamId ?? null,
+          displayFirstName: ph.firstName,
+          displayLastName: ph.lastName,
+          jerseyNumber: ph.jerseyNumber ?? null,
+          position: ph.position ?? null,
+        },
+        user: {
+          id: `placeholder:${ph.id}`,
+          firstName: ph.firstName,
+          lastName: ph.lastName,
+          displayName: null,
+          email: ph.email ?? null,
+          profileImageUrl: null,
+        },
+        priorStats: { goals: 0, assists: 0 },
+        isPlaceholderPlayer: true,
+      }));
+
+      return res.json([...enriched, ...placeholderRows]);
     } catch (err) {
       console.error("List draft players error:", err);
       res.status(500).json({ message: "Failed to fetch players" });
