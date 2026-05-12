@@ -721,66 +721,6 @@ export default function FeaturesLanding() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ─────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <FadeUp>
-            <h2
-              className="font-bold text-gray-900 text-center mb-4"
-              style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
-            >
-              Three steps to a better-run league.
-            </h2>
-            <p className="text-center text-gray-500 text-lg max-w-xl mx-auto mb-16">
-              Setup takes about 15 minutes. Your captains will notice the difference at the first game.
-            </p>
-          </FadeUp>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                step: '01',
-                icon: Users,
-                title: 'Drop in your teams',
-                body: 'Add your teams, captains, and schedule. Import from a spreadsheet or build it in the app.',
-              },
-              {
-                step: '02',
-                icon: Globe,
-                title: 'Open registration',
-                body: 'Send one link. Players register, pay, and sign the waiver. You\'re done.',
-              },
-              {
-                step: '03',
-                icon: Trophy,
-                title: 'Drop the puck',
-                body: 'Score games as they happen. Standings update. Brackets advance. You watch hockey instead of doing admin.',
-              },
-            ].map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <FadeUp key={item.step} delay={i * 0.1}>
-                  <div className="relative">
-                    {i < 2 && (
-                      <div className="hidden md:block absolute top-10 left-[60%] w-full h-px bg-gradient-to-r from-[#3c82f4]/30 to-transparent z-0" />
-                    )}
-                    <div className="relative z-10 bg-white border border-gray-200 rounded-2xl p-8 hover:border-[#3c82f4]/40 hover:shadow-md transition-all shadow-sm h-full flex flex-col">
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-xl bg-[#3c82f4]/10 border border-[#3c82f4]/20 flex items-center justify-center flex-shrink-0">
-                          <Icon className="w-6 h-6 text-[#3c82f4]" />
-                        </div>
-                        <span className="text-5xl font-black text-gray-200 leading-none mt-1">{item.step}</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>
-                      <p className="text-gray-500 leading-relaxed flex-1">{item.body}</p>
-                    </div>
-                  </div>
-                </FadeUp>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ── FOOTER ───────────────────────────────────────────── */}
       <footer className="border-t border-gray-200 py-12 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
