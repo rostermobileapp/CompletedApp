@@ -605,7 +605,10 @@ export default function FeaturesLanding() {
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sentinel — marks where Tournaments section begins for the fixed banner */}
         <div ref={tournamentsStartRef} />
-        <div className="h-14" />{/* spacer so content doesn't hide under the banner */}
+        {/* Sticky section label */}
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-8">
+          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Tournaments</p>
+        </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
             <h2
@@ -672,10 +675,12 @@ export default function FeaturesLanding() {
       <section className="pt-0 pb-24 px-6 bg-white">
         {/* Sentinel — marks where League Management begins */}
         <div ref={leagueStartRef} />
-        <div className="h-14" />{/* spacer */}
+        {/* Sticky section label */}
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-white/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-8">
+          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">League Management</p>
+        </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
-            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center mb-3">League Management</p>
             <h2
               className="font-bold text-gray-900 text-center mb-4"
               style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
