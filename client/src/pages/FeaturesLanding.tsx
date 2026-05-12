@@ -494,22 +494,6 @@ export default function FeaturesLanding() {
           style={{ transform: `translateY(${scrollY * 0.3}px)` }}
         />
         <div className="max-w-5xl mx-auto relative z-10 text-center">
-          <FadeUp>
-            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase mb-4">For commissioners, ops directors, and multi-team operators</p>
-            <h1
-              className="font-bold leading-tight tracking-tight text-gray-900 mb-6"
-              style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}
-            >
-              Built for the people who
-              <br />
-              <span className="text-[#3c82f4]">actually run the league.</span>
-            </h1>
-            <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Roster is the league management platform built by a beer league captain who got tired
-              of spreadsheets, group texts, and apps that treat hockey like an afterthought.
-            </p>
-          </FadeUp>
-
           <FadeUp delay={0.15}>
             <p className="text-xs text-gray-400">iOS · Android · Web — everything syncs in real time</p>
           </FadeUp>
