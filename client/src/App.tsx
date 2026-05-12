@@ -82,6 +82,7 @@ import TeamView from "@/pages/TeamView";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
+import FeaturesLanding from "@/pages/FeaturesLanding";
 import ReferralProgram from "@/pages/ReferralProgram";
 import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
 import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
@@ -192,6 +193,7 @@ function Router() {
         <ScrollToTop />
         <Switch>
           <Route path="/" component={Landing} />
+          <Route path="/features" component={FeaturesLanding} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/about" component={About} />
           <Route path="/hockey">{() => <SportLanding sport="hockey" />}</Route>

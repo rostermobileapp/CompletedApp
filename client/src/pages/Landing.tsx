@@ -128,6 +128,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 py-0 grid grid-cols-3 items-center">
           <nav className="hidden md:flex flex-wrap items-center gap-6 text-sm">
             <Link href="/" className="text-gray-500 hover:text-gray-900 transition-colors">Home</Link>
+            <Link href="/features" className="text-gray-500 hover:text-gray-900 transition-colors">Features</Link>
             <Link href="/pricing" className="text-gray-500 hover:text-gray-900 transition-colors">Pricing</Link>
             <Link href="/about" className="text-gray-500 hover:text-gray-900 transition-colors">About</Link>
             <Link href="/referral-program" className="text-gray-500 hover:text-gray-900 transition-colors">Partners</Link>
@@ -169,6 +170,7 @@ export default function Landing() {
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-6 py-4 space-y-3">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
+              <Link href="/features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
               <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">About</Link>
               <Link href="/referral-program" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Partners</Link>
