@@ -511,20 +511,6 @@ export default function FeaturesLanding() {
           </FadeUp>
 
           <FadeUp delay={0.15}>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
-              <button
-                onClick={() => setLocation('/waitlist')}
-                className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
-              >
-                Start your league free
-              </button>
-              <button
-                onClick={handleSeeHowItWorks}
-                className="flex items-center gap-2 px-8 py-4 rounded-full border border-gray-300 text-gray-700 hover:border-gray-400 transition-colors font-semibold text-lg"
-              >
-                See how it works <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
             <p className="text-xs text-gray-400">iOS · Android · Web — everything syncs in real time</p>
           </FadeUp>
 
