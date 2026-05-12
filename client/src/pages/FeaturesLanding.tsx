@@ -484,39 +484,6 @@ export default function FeaturesLanding() {
         )}
       </header>
 
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section
-        className="relative overflow-hidden bg-gradient-to-b from-blue-50/60 to-white px-6 pb-24"
-        style={{ paddingTop: 'calc(40px + 64px + 40px)' }}
-      >
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/5 via-transparent to-transparent pointer-events-none"
-          style={{ transform: `translateY(${scrollY * 0.3}px)` }}
-        />
-        <div className="max-w-5xl mx-auto relative z-10 text-center">
-          <FadeUp delay={0.15}>
-            <p className="text-xs text-gray-400">iOS · Android · Web — everything syncs in real time</p>
-          </FadeUp>
-
-          <FadeUp delay={0.25}>
-            <div
-              className="mt-14 mx-auto max-w-xs"
-              style={{
-                transform: `translateY(${scrollY * -0.12}px)`,
-                animation: 'features-float 4s ease-in-out infinite',
-              }}
-            >
-              <img
-                src={appPreviewImage}
-                alt="Roster league dashboard on mobile"
-                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100"
-                loading="eager"
-              />
-            </div>
-          </FadeUp>
-        </div>
-      </section>
-
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-6xl mx-auto">
