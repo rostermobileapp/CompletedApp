@@ -577,10 +577,12 @@ export default function FeaturesLanding() {
       <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <FadeUp>
-            <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center mb-3">Tournaments</p>
+            <p className="sticky top-[96px] z-20 mx-auto w-fit rounded-full border border-[#3c82f4]/20 bg-white/90 px-4 py-2 text-sm font-bold tracking-[0.28em] text-[#3c82f4] uppercase text-center backdrop-blur-md shadow-sm mb-5">
+              Tournaments
+            </p>
             <h2
               className="font-bold text-gray-900 text-center mb-4"
-              style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)' }}
+              style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}
             >
               Run a tournament that doesn't take a month to set up.
             </h2>
