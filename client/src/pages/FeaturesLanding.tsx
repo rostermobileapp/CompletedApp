@@ -707,6 +707,12 @@ export default function FeaturesLanding() {
                 title: 'Open registration',
                 body: 'Send one link. Players register, pay, and sign the waiver. You\'re done.',
               },
+              {
+                step: '03',
+                icon: Trophy,
+                title: 'Drop the puck',
+                body: 'Score games as they happen. Standings update. Brackets advance. You watch hockey instead of doing admin.',
+              },
             ].map((item, i) => {
               const Icon = item.icon;
               return (
