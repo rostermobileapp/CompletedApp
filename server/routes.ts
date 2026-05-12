@@ -17205,7 +17205,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               subscribeToDraft(data.draftId, userId);
               const bundle = await getDraftStateBundle(data.draftId);
-              if (bundle) ws.send(JSON.stringify({ type: 'draft_state', payload: bundle }));
+              if (bundle) {
+                // Personalize the bundle with myCaptainTeamId so the client
+                // doesn't have to match UUIDs (avoids migrated-account mismatches).
+                const captainAssignments = (bundle.draft.captainAssignments as Record<string, string>) || {};
+                const captainEntry = Object.entries(captainAssignments).find(([, captId]) => captId === userId);
+                const personalizedBundle = { ...bundle, myCaptainTeamId: captainEntry?.[0] ?? null };
+                ws.send(JSON.stringify({ type: 'draft_state', payload: personalizedBundle }));
+              }
             } catch (err) {
               console.error('draft_subscribe error:', err);
             }

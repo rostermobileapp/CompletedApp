@@ -133,7 +133,13 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       }
       const bundle = await getDraftStateBundle(draftId);
       if (!bundle) return res.status(404).json({ message: "Draft not found" });
-      return res.json(bundle);
+      // Compute which team this viewer captains using the verified JWT sub directly.
+      // This avoids UUID mismatches where users.id differs from the Supabase JWT sub
+      // (e.g. accounts migrated from CSV import). The server knows the exact sub;
+      // the client comparison (t.captainId === user.id) can silently fail for those users.
+      const captainAssignments = (bundle.draft.captainAssignments as Record<string, string>) || {};
+      const captainEntry = Object.entries(captainAssignments).find(([, captId]) => captId === userId);
+      return res.json({ ...bundle, myCaptainTeamId: captainEntry?.[0] ?? null });
     } catch (err) {
       console.error("GET draft state error:", err);
       res.status(500).json({ message: "Failed to fetch draft state" });
@@ -531,10 +537,10 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         return res.status(400).json({ message: "Draft is not in the captain-ready lobby" });
       }
       const draftOrder = (draft.draftOrder as string[]) || [];
-      const teamRows = await db.select().from(teams).where(inArray(teams.id, draftOrder));
       const ready = (draft.captainReadyState as Record<string, boolean>) || {};
-      const pendingCaptains = teamRows
-        .map((t) => t.captainId)
+      const captainAssignmentsForResend = (draft.captainAssignments as Record<string, string>) || {};
+      const pendingCaptains = draftOrder
+        .map((teamId) => captainAssignmentsForResend[teamId])
         .filter((x): x is string => !!x && !ready[x] && x !== userId);
 
       const [league] = await db.select().from(leagues).where(eq(leagues.id, draft.leagueId));

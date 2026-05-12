@@ -105,6 +105,12 @@ interface DraftStateBundle {
   serverTime: number;
   /** Fresh team data (id, name, captainId) for every team in draftOrder. */
   draftOrderTeams?: { id: string; name: string; captainId: string | null }[];
+  /**
+   * Server-computed team ID for which the requesting viewer is the captain.
+   * Only present on the initial REST load (not on WS broadcasts).
+   * Avoids UUID mismatches where users.id ≠ Supabase JWT sub.
+   */
+  myCaptainTeamId?: string | null;
 }
 
 export default function DraftRoom() {
@@ -116,6 +122,9 @@ export default function DraftRoom() {
   const ws = useWebSocket();
 
   const [bundle, setBundle] = useState<DraftStateBundle | null>(null);
+  // Server-computed captain team ID — set once from the REST load and preserved
+  // through subsequent WS bundle replacements (WS bundles are not personalized).
+  const [myCaptainTeamId, setMyCaptainTeamId] = useState<string | null>(null);
   const [tickNow, setTickNow] = useState(Date.now());
   const [chatInput, setChatInput] = useState("");
   const [showChat, setShowChat] = useState(false);
@@ -170,6 +179,11 @@ export default function DraftRoom() {
     if (initialBundle) {
       setBundle(initialBundle);
       serverDriftRef.current = Date.now() - initialBundle.serverTime;
+      // Capture the server-computed captain team ID (only present on REST loads).
+      // We store it in separate state so WS bundle replacements don't erase it.
+      if (initialBundle.myCaptainTeamId !== undefined) {
+        setMyCaptainTeamId(initialBundle.myCaptainTeamId ?? null);
+      }
       // Hydrate launchAt for clients that join mid-countdown
       if (initialBundle.draft?.launchAt) {
         const ms = new Date(initialBundle.draft.launchAt).getTime();
@@ -188,6 +202,11 @@ export default function DraftRoom() {
       if (data.payload?.draft?.id === draftId) {
         setBundle(data.payload);
         serverDriftRef.current = Date.now() - data.payload.serverTime;
+        // Capture myCaptainTeamId when present (personalized draft_subscribe response).
+        // WS broadcasts don't carry it, so only update state when it's explicitly set.
+        if (data.payload.myCaptainTeamId !== undefined) {
+          setMyCaptainTeamId(data.payload.myCaptainTeamId ?? null);
+        }
       }
     });
     const offPick = ws.subscribe("draft_pick_made", (data: any) => {
@@ -1282,9 +1301,13 @@ export default function DraftRoom() {
             draft.draftOrder.includes(t.id),
           );
           const meReady = !!user && !!ready[user.id];
-          const myCaptainTeam = !!user && captainTeams.find(
-            (t: any) => t.captainId === user.id,
-          );
+          // Prefer the server-computed myCaptainTeamId (set from the REST load using
+          // the verified JWT sub). This handles cases where users.id ≠ Supabase JWT
+          // sub (e.g. accounts migrated from CSV import). Fall back to the local
+          // user.id comparison only when the server value hasn't arrived yet.
+          const myCaptainTeam = myCaptainTeamId
+            ? captainTeams.find((t: any) => t.id === myCaptainTeamId)
+            : (!!user && captainTeams.find((t: any) => t.captainId === user.id));
           const readyCount = captainTeams.filter(
             (t: any) => t.captainId && ready[t.captainId],
           ).length;
