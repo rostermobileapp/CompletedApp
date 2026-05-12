@@ -568,7 +568,7 @@ export default function FeaturesLanding() {
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-16">
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-20">
           <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Tournaments</p>
         </div>
         <div className="max-w-6xl mx-auto">
