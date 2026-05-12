@@ -346,10 +346,20 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             .update(teams)
             .set({ captainId: null })
             .where(eq(teams.leagueId, leagueId));
-        } else if (config.captainAssignments) {
-          for (const [teamId, captainUserId] of Object.entries(config.captainAssignments)) {
+        } else {
+          // Captain mode: apply the submitted assignments. Also explicitly CLEAR
+          // captainId for any team in draftOrder that was NOT given an assignment —
+          // this prevents stale assignments from causing allReady to fire before
+          // every team's captain has had a chance to confirm.
+          const assignments = config.captainAssignments ?? {};
+          const draftOrderIds = (draftRow.draftOrder as string[]) || [];
+          for (const teamId of draftOrderIds) {
+            const captainUserId = assignments[teamId];
             if (captainUserId) {
               await db.update(teams).set({ captainId: captainUserId }).where(eq(teams.id, teamId));
+            } else {
+              // No captain selected for this team — clear any stale assignment
+              await db.update(teams).set({ captainId: null }).where(eq(teams.id, teamId));
             }
           }
         }

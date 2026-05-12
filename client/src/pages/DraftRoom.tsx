@@ -1308,7 +1308,7 @@ export default function DraftRoom() {
                 </div>
               )}
 
-              {!!myCaptainTeam && !meReady && secsLeft == null && (
+              {!!myCaptainTeam && !meReady && (
                 <button
                   onClick={() => captainReadyMutation.mutate()}
                   disabled={captainReadyMutation.isPending}
@@ -1319,7 +1319,7 @@ export default function DraftRoom() {
                   I'm ready — let's draft!
                 </button>
               )}
-              {!!myCaptainTeam && (meReady || secsLeft != null) && (
+              {!!myCaptainTeam && meReady && (
                 <div
                   className="w-full px-4 py-3 bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-emerald-700 dark:text-emerald-300 text-center font-medium flex items-center justify-center gap-2"
                   data-testid="status-captain-ready"
@@ -1362,6 +1362,7 @@ export default function DraftRoom() {
                     ? memberById.get(t.captainId)
                     : null;
                   const isReady = !!t.captainId && !!ready[t.captainId];
+                  const noCaptain = !t.captainId;
                   return (
                     <div
                       key={t.id}
@@ -1372,15 +1373,22 @@ export default function DraftRoom() {
                         <div className="text-sm font-medium truncate">
                           {t.name}
                         </div>
-                        <div className="text-xs text-muted-foreground truncate">
+                        <div className={`text-xs truncate ${noCaptain ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}>
                           {cap
                             ? `${cap.user.firstName || ""} ${cap.user.lastName || ""}`.trim() ||
                               cap.user.displayName ||
                               cap.user.email
-                            : "No captain assigned"}
+                            : "⚠ No captain assigned — go back to setup"}
                         </div>
                       </div>
-                      {isReady ? (
+                      {noCaptain ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                          data-testid={`status-no-captain-${t.id}`}
+                        >
+                          <Zap className="w-3.5 h-3.5" /> Unassigned
+                        </span>
+                      ) : isReady ? (
                         <span
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                           data-testid={`status-ready-${t.id}`}

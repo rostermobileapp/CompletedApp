@@ -865,7 +865,10 @@ export async function markCaptainReady(
   }
   ready[userId] = true;
 
-  // Check whether every captain in the draft is now ready
+  // Check whether every team in the draft has a captain AND every captain is ready.
+  // We require ALL teams to have a captainId — if any team is missing a captain
+  // assignment the countdown must NOT fire (prevents a single assigned captain from
+  // accidentally triggering the countdown when others haven't been assigned yet).
   const draftOrder = (draft.draftOrder as string[]) || [];
   const teamRows =
     draftOrder.length > 0
@@ -874,8 +877,10 @@ export async function markCaptainReady(
   const captainIds = teamRows
     .map((t) => t.captainId)
     .filter((x): x is string => !!x);
+  const allTeamsHaveCaptains =
+    teamRows.length > 0 && teamRows.every((t) => !!t.captainId);
   const allReady =
-    captainIds.length > 0 && captainIds.every((cid) => ready[cid]);
+    allTeamsHaveCaptains && captainIds.every((cid) => ready[cid]);
 
   if (allReady) {
     // Stamp a launchAt timestamp so any client that joins mid-countdown
