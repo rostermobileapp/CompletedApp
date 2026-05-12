@@ -510,6 +510,30 @@ const GRID_FEATURES = [
 export default function FeaturesLanding() {
   const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeSectionBanner, setActiveSectionBanner] = useState<null | 'tournaments' | 'league'>(null);
+
+  const tournamentsStartRef = useRef<HTMLDivElement>(null);
+  const leagueStartRef = useRef<HTMLDivElement>(null);
+  const leagueEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const HEADER_H = 82; // px below which the banner activates
+    function update() {
+      const tTop = tournamentsStartRef.current?.getBoundingClientRect().top ?? Infinity;
+      const lTop = leagueStartRef.current?.getBoundingClientRect().top ?? Infinity;
+      const lBot = leagueEndRef.current?.getBoundingClientRect().top ?? Infinity;
+      if (lTop <= HEADER_H && lBot > HEADER_H) {
+        setActiveSectionBanner('league');
+      } else if (tTop <= HEADER_H && lTop > HEADER_H) {
+        setActiveSectionBanner('tournaments');
+      } else {
+        setActiveSectionBanner(null);
+      }
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+    return () => window.removeEventListener('scroll', update);
+  }, []);
 
   useSeo({
     title: 'Roster — Features Built for Hockey Leagues',
@@ -520,6 +544,18 @@ export default function FeaturesLanding() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
+      {/* Section label fixed banner — Tournaments / League Management */}
+      <div
+        className={`fixed left-0 right-0 z-[30] border-b border-[#3c82f4]/20 py-3.5 backdrop-blur-md transition-all duration-200 ${
+          activeSectionBanner ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        } ${activeSectionBanner === 'league' ? 'bg-white/95' : 'bg-gray-50/95'}`}
+        style={{ top: 80 }}
+      >
+        <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">
+          {activeSectionBanner === 'league' ? 'League Management' : 'Tournaments'}
+        </p>
+      </div>
+
       {/* Launch banner */}
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
         Launching June 1, 2026 —{' '}
@@ -575,10 +611,9 @@ export default function FeaturesLanding() {
 
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
-        {/* Full-width sticky section banner */}
-        <div className="sticky top-[80px] z-[30] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-16">
-          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Tournaments</p>
-        </div>
+        {/* Sentinel — marks where Tournaments section begins for the fixed banner */}
+        <div ref={tournamentsStartRef} />
+        <div className="h-14" />{/* spacer so content doesn't hide under the banner */}
         <div className="max-w-6xl mx-auto">
           <FadeUp>
             <h2
@@ -643,10 +678,9 @@ export default function FeaturesLanding() {
 
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-white">
-        {/* Full-width sticky section banner — same top as Tournaments so it slides in and replaces it */}
-        <div className="sticky top-[80px] z-[30] -mx-6 bg-white/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-16">
-          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">League Management</p>
-        </div>
+        {/* Sentinel — marks where League Management begins */}
+        <div ref={leagueStartRef} />
+        <div className="h-14" />{/* spacer */}
         <div className="max-w-6xl mx-auto">
           <FadeUp>
             <h2
@@ -663,6 +697,8 @@ export default function FeaturesLanding() {
           </FadeUp>
           <StickyLeagueSection />
         </div>
+        {/* Sentinel — marks end of League Management section */}
+        <div ref={leagueEndRef} />
       </section>
 
       {/* ── STATS / TRUST BAND ───────────────────────────────── */}
