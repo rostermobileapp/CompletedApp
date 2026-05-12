@@ -791,38 +791,6 @@ export default function FeaturesLanding() {
         </div>
       </section>
 
-      {/* ── FINAL CTA ────────────────────────────────────────── */}
-      <section className="py-28 px-6 bg-gradient-to-b from-white to-blue-50">
-        <div className="max-w-3xl mx-auto text-center">
-          <FadeUp>
-            <h2
-              className="font-bold text-gray-900 mb-5"
-              style={{ fontSize: 'clamp(2.2rem, 4.5vw, 4rem)' }}
-            >
-              Ready to run a league worth playing in?
-            </h2>
-            <p className="text-gray-500 text-xl mb-2">
-              Set up takes about 15 minutes. Your captains will notice the difference at the first game.
-            </p>
-            <p className="text-gray-400 text-sm mb-10">No credit card required · Free forever tier available</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() => setLocation('/waitlist')}
-                className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
-              >
-                Start your league free
-              </button>
-              <a
-                href="mailto:hello@roster-app.com"
-                className="px-8 py-4 rounded-full border border-gray-300 text-gray-700 hover:border-gray-400 hover:text-gray-900 transition-colors font-semibold text-lg"
-              >
-                Talk to the founder
-              </a>
-            </div>
-          </FadeUp>
-        </div>
-      </section>
-
       {/* ── FOOTER ───────────────────────────────────────────── */}
       <footer className="border-t border-gray-200 py-12 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
