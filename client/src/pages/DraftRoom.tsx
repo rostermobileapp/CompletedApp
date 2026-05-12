@@ -658,6 +658,18 @@ export default function DraftRoom() {
     onError: (err: any) =>
       toast({ title: "Failed to terminate", description: err?.message, variant: "destructive" }),
   });
+  const deleteDraftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/drafts/${draftId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Draft deleted" });
+      setLocation("/");
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to delete draft", description: err?.message, variant: "destructive" }),
+  });
 
   const sendChat = async () => {
     const trimmed = chatInput.trim();
@@ -832,13 +844,32 @@ export default function DraftRoom() {
               </button>
             )}
             {isCommissioner && draft.status === "pending" && (
-              <button
-                onClick={() => startMutation.mutate()}
-                className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm font-medium flex items-center gap-1"
-                data-testid="button-start-draft"
-              >
-                <Snowflake className="w-4 h-4" /> Start
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Delete this draft? All setup (captain assignments, buddy pairs, player notes) will be permanently removed. This cannot be undone."
+                      )
+                    ) {
+                      deleteDraftMutation.mutate();
+                    }
+                  }}
+                  disabled={deleteDraftMutation.isPending}
+                  className="p-2 hover:bg-red-500/10 text-red-500 rounded disabled:opacity-50"
+                  title="Delete this draft"
+                  data-testid="button-delete-draft"
+                >
+                  <OctagonX className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => startMutation.mutate()}
+                  className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm font-medium flex items-center gap-1"
+                  data-testid="button-start-draft"
+                >
+                  <Snowflake className="w-4 h-4" /> Start
+                </button>
+              </>
             )}
             {isCommissioner && draft.status === "awaiting_captains" && (() => {
               const ready = (draft.captainReadyState || {}) as Record<string, boolean>;

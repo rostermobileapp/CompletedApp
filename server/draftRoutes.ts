@@ -669,6 +669,34 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     }
   });
 
+  // === Commissioner deletes a pending draft ===
+  // Only allowed while the draft is still in `pending` status (not yet started).
+  // Removes all associated buddy pairs, picks, and the draft record itself.
+  app.delete("/api/drafts/:draftId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can delete the draft" });
+      }
+      if (draft.status !== "pending") {
+        return res
+          .status(400)
+          .json({ message: "Only pending drafts can be deleted. Use Terminate to end an in-progress draft." });
+      }
+      // Remove child rows then the draft itself
+      await db.delete(draftBuddyPairs).where(eq(draftBuddyPairs.draftId, draftId));
+      await db.delete(draftPicks).where(eq(draftPicks.draftId, draftId));
+      await db.delete(drafts).where(eq(drafts.id, draftId));
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Delete draft error:", err);
+      res.status(500).json({ message: "Failed to delete draft" });
+    }
+  });
+
   // === Commissioner terminates the draft early ===
   // Commits all picks made so far to team memberships and marks the draft
   // completed, exactly like a natural end-of-rounds completion.
