@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 import { ArrowRight, Upload, X, Loader2, CheckCircle, Menu } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 import communityPhoto from '@assets/Gemini_Generated_Image_pqx22upqx22upqx2_1778033123205.png';
+import hpibLogo from '@assets/download_1778693026886.png';
 
 
 const ORG_TYPES = [
@@ -186,6 +187,18 @@ export default function ReferralProgram() {
           </div>
         </div>
       </section>
+      {/* Current Partners */}
+      <section className="py-8 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="relative bg-white border border-gray-200 rounded-2xl p-7 shadow-sm flex flex-col justify-start">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-5">Current Partners</p>
+              <img src={hpibLogo} alt="Hockey Players in Business" className="h-12 object-contain object-left" />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Why we do this */}
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
