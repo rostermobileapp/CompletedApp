@@ -342,13 +342,15 @@ function StickyLeagueSection() {
       if (!phone || !sections?.length) return;
 
       const phoneRect = phone.getBoundingClientRect();
+      // phone is inside a hidden lg:grid — skip if not rendered
+      if (phoneRect.height === 0) return;
+
       const phoneCenter = phoneRect.top + phoneRect.height / 2;
 
       let closestIdx = 0;
       let closestDist = Infinity;
       sections.forEach((s) => {
         const rect = s.getBoundingClientRect();
-        // compare the top of the section heading to the phone center
         const dist = Math.abs(rect.top - phoneCenter);
         if (dist < closestDist) {
           closestDist = dist;
@@ -359,7 +361,7 @@ function StickyLeagueSection() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    // don't call on mount — leave useState(0) as the default until user scrolls
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
