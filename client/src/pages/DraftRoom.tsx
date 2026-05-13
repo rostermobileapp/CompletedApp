@@ -329,6 +329,7 @@ export default function DraftRoom() {
       mid: number;
       lastProx: number;
       lastDir: number;
+      lastZi: number;
       inWindow: boolean;
     };
     let cache: SlotEntry[] = [];
@@ -340,21 +341,23 @@ export default function DraftRoom() {
       const scale = 1 - dist * 0.45;
       const ty = dist * dir * -75;
       const opacity = 1 - dist * 0.75;
-      const shadowAlpha = (1 - dist) * 0.45;
       const style = s.node.style;
       // Single-property writes — no calc() resolution.
-      style.transform = `translate3d(0,${ty.toFixed(1)}px,0) scale(${scale.toFixed(3)})`;
+      // scale3d is explicit 3D → guaranteed GPU compositor path.
+      style.transform = `translate3d(0,${ty.toFixed(1)}px,0) scale3d(${scale.toFixed(3)},${scale.toFixed(3)},1)`;
       style.opacity = opacity.toFixed(3);
-      // Drop the filter entirely for far-away cards — drop-shadow is by
-      // far the most expensive style here (it allocates a new texture on
-      // every change). We only want it on the central few cards anyway.
-      style.filter =
-        shadowAlpha > 0.05
-          ? `drop-shadow(0 6px 12px hsl(var(--primary) / ${shadowAlpha.toFixed(2)}))`
-          : "none";
-      // Cap z-index at 30 so the centered card stays below the shadcn
-      // dialog overlay (z-50+).
-      style.zIndex = dist < 0.999 ? String(((1 - dist) * 30) | 0) : "0";
+      // NOTE: filter/drop-shadow intentionally removed — it forces a new
+      // off-screen GPU texture allocation on every change and is the single
+      // biggest source of frame drops. Visual depth comes from scale +
+      // opacity + the static box-shadow on the inner card instead.
+      //
+      // Only write z-index when the integer bucket actually changes — it
+      // can trigger stacking-context recalculations even on composited layers.
+      const zi = dist < 0.999 ? ((1 - dist) * 30) | 0 : 0;
+      if (zi !== s.lastZi) {
+        style.zIndex = String(zi);
+        s.lastZi = zi;
+      }
       s.lastProx = dist;
       s.lastDir = dir;
     };
@@ -369,6 +372,7 @@ export default function DraftRoom() {
           mid: node.offsetTop + node.offsetHeight / 2,
           lastProx: -1,
           lastDir: 0,
+          lastZi: -1,
           inWindow: false,
         };
       }
@@ -1070,12 +1074,16 @@ export default function DraftRoom() {
                 WebkitOverflowScrolling: "touch",
                 // Trap all card z-indexes / GPU compositor layers inside
                 // this scroller's own stacking context. Without this, the
-                // cards (which are compositor-promoted via filter +
-                // will-change: transform) can render *above* a body-level
-                // portaled dialog on iOS Safari regardless of z-index.
+                // cards can render *above* a body-level portaled dialog on
+                // iOS Safari regardless of z-index.
                 isolation: "isolate",
                 position: "relative",
                 zIndex: 0,
+                // Promote the scroller itself to a GPU compositor layer so
+                // scroll events and JS-driven style writes both land on the
+                // same layer — eliminates layer-upload jank on fast flicks.
+                willChange: "scroll-position",
+                transform: "translateZ(0)",
               }}
               data-testid="player-carousel"
             >
@@ -1138,10 +1146,9 @@ export default function DraftRoom() {
                       // resolution overhead. NO `transition` on transform/
                       // opacity — they change every frame and any tween
                       // would make the cards lag the finger/wheel.
-                      transform: "translate3d(0,0,0) scale(0.55)",
+                      transform: "translate3d(0,0,0) scale3d(0.55,0.55,1)",
                       opacity: "0.25",
                       transformOrigin: "center center",
-                      filter: "none",
                       willChange: "transform, opacity",
                       backfaceVisibility: "hidden",
                       // contain isolates layout/paint of each slot from
@@ -1157,6 +1164,12 @@ export default function DraftRoom() {
                       data-testid={`player-card-${m.user.id}`}
                       style={{
                         transition: "border-color 200ms ease-out",
+                        // Static box-shadow replaces the animated drop-shadow
+                        // filter. box-shadow composites cheaply on the GPU
+                        // layer without requiring a per-frame off-screen
+                        // texture blit. It naturally fades with the slot's
+                        // animated opacity.
+                        boxShadow: "0 6px 20px -4px rgba(0,0,0,0.35)",
                       }}
                     >
                       {/* Avatar */}
