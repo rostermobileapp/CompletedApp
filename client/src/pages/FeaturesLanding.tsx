@@ -23,8 +23,10 @@ function useReducedMotion() {
 
 // ---------- Communication slideshow ----------
 const COMM_SLIDES = [
-  { src: '/messaging-preview.png', alt: 'Team chat messaging' },
   { src: '/messaging-preview-2.png', alt: 'Team chat with GIF' },
+  { src: '/messaging-comm-wall.png', alt: 'League wall announcements' },
+  { src: '/messaging-comm-events.png', alt: 'Team event RSVP' },
+  { src: '/messaging-comm-push.png', alt: 'Push notification reminder' },
 ];
 
 function CommSlideshow({ isActive }: { isActive: boolean }) {
@@ -41,7 +43,7 @@ function CommSlideshow({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     if (!isActive) return;
-    const id = setInterval(advance, 2600);
+    const id = setInterval(advance, 2000);
     return () => clearInterval(id);
   }, [isActive, advance]);
 
