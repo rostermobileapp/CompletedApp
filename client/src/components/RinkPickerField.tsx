@@ -350,7 +350,8 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
             setShowDropdown(true);
           }}
           onFocus={() => { if (query.trim()) setShowDropdown(true); }}
-          className="w-full pl-12 pr-10 py-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+          className="w-full pr-10 py-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+          style={{ paddingLeft: '2.5rem' }}
           placeholder="Search for a rink…"
           autoComplete="off"
         />
