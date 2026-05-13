@@ -342,24 +342,26 @@ function StickyLeagueSection() {
       if (!phone || !sections?.length) return;
 
       const phoneRect = phone.getBoundingClientRect();
-      // phone is inside a hidden lg:grid — skip if not rendered
-      if (phoneRect.height === 0) return;
+      // Skip if phone column isn't rendered (viewport < lg)
+      if (!phoneRect.width) return;
 
       const phoneCenter = phoneRect.top + phoneRect.height / 2;
 
-      // Use the last section whose top has scrolled up to (or past) the phone center
+      // Measure the actual heading elements, not the container tops
+      const headings = sectionRef.current?.querySelectorAll('[data-heading]');
+      if (!headings?.length) return;
+
       let activeIdx = 0;
-      sections.forEach((s) => {
-        const rect = s.getBoundingClientRect();
+      headings.forEach((h) => {
+        const rect = h.getBoundingClientRect();
         if (rect.top <= phoneCenter) {
-          activeIdx = Number((s as HTMLElement).dataset.callout);
+          activeIdx = Number((h as HTMLElement).dataset.heading);
         }
       });
       setActive(activeIdx);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    // don't call on mount — leave useState(0) as the default until user scrolls
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -421,7 +423,7 @@ function StickyLeagueSection() {
               <div key={c.id} data-callout={i} className="min-h-[40vh] flex flex-col justify-center">
                 <FadeUp>
                   <p className="text-xs font-bold tracking-widest text-gray-400 uppercase mb-3">{c.eyebrow}</p>
-                  <h3 className="text-3xl font-bold text-gray-900 mb-4">{c.headline}</h3>
+                  <h3 data-heading={i} className="text-3xl font-bold text-gray-900 mb-4">{c.headline}</h3>
                   <p className="text-lg text-gray-500 leading-relaxed max-w-md">{c.body}</p>
                 </FadeUp>
               </div>
