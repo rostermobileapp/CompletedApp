@@ -115,7 +115,7 @@ export default function Landing() {
     <div className="min-h-screen bg-white text-gray-900" data-testid="landing-page">
       {/* Launch date banner — fixed at very top */}
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
+        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist</button>
       </div>
       {/* "Come back June 1st" toast */}
       {loginMessageVisible && (
