@@ -554,19 +554,8 @@ export default function FeaturesLanding() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      {/* Launch banner */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        Launching June 1, 2026 —{' '}
-        <button
-          onClick={() => setLocation('/waitlist')}
-          className="underline underline-offset-2 hover:no-underline font-bold"
-        >
-          Join the waitlist for early access
-        </button>
-      </div>
-
       {/* Sticky header */}
-      <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
+      <header className="fixed top-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-0 grid grid-cols-3 items-center">
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
             <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
@@ -579,6 +568,10 @@ export default function FeaturesLanding() {
             <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" />
           </div>
           <div className="flex items-center gap-3 justify-end">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-[#3c82f4] bg-[#3c82f4]/8 border border-[#3c82f4]/20 rounded-full px-3 py-1 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#3c82f4] animate-pulse" />
+              June 1st Launch
+            </span>
             <button
               onClick={() => setLocation('/waitlist')}
               className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-xs sm:text-sm"
@@ -610,7 +603,7 @@ export default function FeaturesLanding() {
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 py-1 mb-20" style={{ backgroundColor: '#3c82f4' }}>
+        <div className="sticky top-[40px] z-[25] -mx-6 py-1 mb-20" style={{ backgroundColor: '#3c82f4' }}>
           <p className="text-xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>Tournaments</p>
         </div>
         <div className="max-w-6xl mx-auto">
@@ -678,7 +671,7 @@ export default function FeaturesLanding() {
       {/* ── DRAFT NIGHT ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 py-1 mb-8" style={{ backgroundColor: '#3c82f4' }}>
+        <div className="sticky top-[40px] z-[25] -mx-6 py-1 mb-8" style={{ backgroundColor: '#3c82f4' }}>
           <p className="text-xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>Draft Night</p>
         </div>
         <div className="max-w-6xl mx-auto">
@@ -812,7 +805,7 @@ export default function FeaturesLanding() {
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-white">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 py-1 mb-8" style={{ backgroundColor: '#3c82f4' }}>
+        <div className="sticky top-[40px] z-[25] -mx-6 py-1 mb-8" style={{ backgroundColor: '#3c82f4' }}>
           <p className="text-xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>League Management</p>
         </div>
         <div className="max-w-6xl mx-auto">
