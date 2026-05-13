@@ -831,7 +831,7 @@ export default function FeaturesLanding() {
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 text-center">
             <FadeUp>
-              <div className="text-4xl md:text-5xl font-black text-white mb-2">Built Local.</div>
+              <div className="text-4xl md:text-5xl font-black text-white mb-2">Built Local</div>
               <div className="text-blue-200 text-sm font-medium">No private equity money. Just the product of a Colorado born player.</div>
             </FadeUp>
             <FadeUp delay={0.1}>
