@@ -332,24 +332,35 @@ function StickyLeagueSection() {
   const [active, setActive] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
+  const phoneRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
 
   useEffect(() => {
-    const sections = sectionRef.current?.querySelectorAll('[data-callout]');
-    if (!sections) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            const idx = Number((e.target as HTMLElement).dataset.callout);
-            setActive(idx);
-          }
-        });
-      },
-      { rootMargin: '-55% 0px -30% 0px', threshold: 0 }
-    );
-    sections.forEach(s => obs.observe(s));
-    return () => obs.disconnect();
+    const handleScroll = () => {
+      const phone = phoneRef.current;
+      const sections = sectionRef.current?.querySelectorAll('[data-callout]');
+      if (!phone || !sections?.length) return;
+
+      const phoneRect = phone.getBoundingClientRect();
+      const phoneCenter = phoneRect.top + phoneRect.height / 2;
+
+      let closestIdx = 0;
+      let closestDist = Infinity;
+      sections.forEach((s) => {
+        const rect = s.getBoundingClientRect();
+        // compare the top of the section heading to the phone center
+        const dist = Math.abs(rect.top - phoneCenter);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIdx = Number((s as HTMLElement).dataset.callout);
+        }
+      });
+      setActive(closestIdx);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const ActiveIcon = LEAGUE_CALLOUTS[active].icon;
@@ -360,7 +371,7 @@ function StickyLeagueSection() {
       <div className="hidden lg:grid lg:grid-cols-2 lg:gap-16 lg:items-start">
         {/* Sticky phone mockup */}
         <div className="sticky top-32 self-start">
-          <div className="bg-gray-900 rounded-[2.5rem] p-3 shadow-2xl mx-auto max-w-[260px]">
+          <div ref={phoneRef} className="bg-gray-900 rounded-[2.5rem] p-3 shadow-2xl mx-auto max-w-[260px]">
             <div className={`bg-gray-800 rounded-[2rem] overflow-hidden aspect-[9/19] flex flex-col items-center justify-center ${active === 0 ? '' : 'p-4'}`}>
               <AnimatePresence mode="wait">
                 <motion.div
