@@ -23,6 +23,7 @@ function useReducedMotion() {
 
 // ---------- Communication slideshow ----------
 const COMM_SLIDES = [
+  { src: '/messaging-comm-chat.png', alt: 'Team chat messaging' },
   { src: '/messaging-comm-wall.png', alt: 'League wall announcements' },
   { src: '/messaging-comm-events.png', alt: 'Team event RSVP' },
   { src: '/messaging-comm-push.png', alt: 'Push notification reminder' },
