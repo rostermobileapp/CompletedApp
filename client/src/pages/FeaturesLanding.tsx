@@ -347,17 +347,15 @@ function StickyLeagueSection() {
 
       const phoneCenter = phoneRect.top + phoneRect.height / 2;
 
-      let closestIdx = 0;
-      let closestDist = Infinity;
+      // Use the last section whose top has scrolled up to (or past) the phone center
+      let activeIdx = 0;
       sections.forEach((s) => {
         const rect = s.getBoundingClientRect();
-        const dist = Math.abs(rect.top - phoneCenter);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestIdx = Number((s as HTMLElement).dataset.callout);
+        if (rect.top <= phoneCenter) {
+          activeIdx = Number((s as HTMLElement).dataset.callout);
         }
       });
-      setActive(closestIdx);
+      setActive(activeIdx);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
