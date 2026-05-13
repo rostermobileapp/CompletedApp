@@ -127,7 +127,7 @@ function BracketCard({
 
 function AnimatedBracket() {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
+  const inView = useInView(ref, { once: true, margin: '-200px' });
   const reduced = useReducedMotion();
   // stage -1 = not started, 0–6 = sequence steps
   const [stage, setStage] = useState(-1);
