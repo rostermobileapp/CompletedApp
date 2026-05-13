@@ -404,6 +404,8 @@ function StickyLeagueSection() {
                     >
                       {active === 0 ? (
                         <img src="/standings-preview.png" alt="League Standings" className="w-full h-full object-cover object-top" />
+                      ) : active === 1 ? (
+                        <img src="/scorekeeper-preview.png" alt="Live Scorekeeping" className="w-full h-full object-cover object-top" />
                       ) : (
                         <div className="w-full h-full p-5 pt-12 bg-blue-50 flex flex-col gap-3 items-center justify-center text-center">
                           <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white shadow-sm">
