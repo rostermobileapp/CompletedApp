@@ -568,8 +568,8 @@ export default function FeaturesLanding() {
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-20">
-          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Tournaments</p>
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-[#3c82f4] py-3.5 mb-20">
+          <p className="text-xs font-bold tracking-widest text-gray-900 uppercase text-center">Tournaments</p>
         </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
@@ -636,8 +636,8 @@ export default function FeaturesLanding() {
       {/* ── DRAFT NIGHT ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-gray-50/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-8">
-          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">Draft Night</p>
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-[#3c82f4] py-3.5 mb-8">
+          <p className="text-xs font-bold tracking-widest text-gray-900 uppercase text-center">Draft Night</p>
         </div>
         <div className="max-w-6xl mx-auto">
           {/* Heading — centered above the 3-col layout */}
@@ -770,8 +770,8 @@ export default function FeaturesLanding() {
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-white">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-white/95 backdrop-blur-md border-b border-[#3c82f4]/20 py-3.5 mb-8">
-          <p className="text-xs font-bold tracking-widest text-[#3c82f4] uppercase text-center">League Management</p>
+        <div className="sticky top-[80px] z-[25] -mx-6 bg-[#3c82f4] py-3.5 mb-8">
+          <p className="text-xs font-bold tracking-widest text-gray-900 uppercase text-center">League Management</p>
         </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
