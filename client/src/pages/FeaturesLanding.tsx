@@ -336,33 +336,25 @@ function StickyLeagueSection() {
   const reduced = useReducedMotion();
 
   useEffect(() => {
-    const handleScroll = () => {
-      const phone = phoneRef.current;
-      const sections = sectionRef.current?.querySelectorAll('[data-callout]');
-      if (!phone || !sections?.length) return;
+    const headings = sectionRef.current?.querySelectorAll('[data-heading]');
+    if (!headings?.length) return;
 
-      const phoneRect = phone.getBoundingClientRect();
-      // Skip if phone column isn't rendered (viewport < lg)
-      if (!phoneRect.width) return;
+    // Observe the h3 headings directly — they're small elements so the trigger
+    // fires precisely when the heading text crosses the phone-centre band.
+    // Phone is sticky at top-32 (~128px) with ~550px height → centre ≈ 50% vp.
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            setActive(Number((e.target as HTMLElement).dataset.heading ?? '0'));
+          }
+        });
+      },
+      { rootMargin: '-45% 0px -45% 0px', threshold: 0 }
+    );
 
-      const phoneCenter = phoneRect.top + phoneRect.height / 2;
-
-      // Measure the actual heading elements, not the container tops
-      const headings = sectionRef.current?.querySelectorAll('[data-heading]');
-      if (!headings?.length) return;
-
-      let activeIdx = 0;
-      headings.forEach((h) => {
-        const rect = h.getBoundingClientRect();
-        if (rect.top <= phoneCenter) {
-          activeIdx = Number((h as HTMLElement).dataset.heading);
-        }
-      });
-      setActive(activeIdx);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    headings.forEach((h) => obs.observe(h));
+    return () => obs.disconnect();
   }, []);
 
   const ActiveIcon = LEAGUE_CALLOUTS[active].icon;
