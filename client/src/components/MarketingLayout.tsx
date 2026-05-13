@@ -104,6 +104,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
         <div className="max-w-7xl mx-auto px-6 py-0 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
             <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
+            <Link href="/features" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Features</Link>
             <Link href="/pricing" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Pricing</Link>
             <Link href="/about" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">About</Link>
             <Link href="/referral-program" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Partners</Link>
@@ -138,6 +139,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-6 py-4 space-y-3">
               <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Home</Link>
+              <Link href="/features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Features</Link>
               <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Pricing</Link>
               <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">About</Link>
               <Link href="/referral-program" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-600 hover:text-gray-900 transition-colors">Partners</Link>

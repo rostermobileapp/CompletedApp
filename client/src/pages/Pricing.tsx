@@ -134,10 +134,12 @@ export default function Pricing() {
       {/* Header */}
       <header className="fixed top-10 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/#how-it-works" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">How It Works</Link>
-            <Link href="/#features" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Features</Link>
-            <Link href="/pricing" className="text-sm text-[#3c82f4] font-semibold transition-colors">Pricing</Link>
+          <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
+            <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
+            <Link href="/features" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Features</Link>
+            <Link href="/pricing" className="px-3 py-2 rounded-lg text-[#3c82f4] bg-[#3c82f4]/8 font-semibold">Pricing</Link>
+            <Link href="/about" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">About</Link>
+            <Link href="/referral-program" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Partners</Link>
           </nav>
           <Link href="/">
             <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain cursor-pointer" />
