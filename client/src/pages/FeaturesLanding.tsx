@@ -568,7 +568,7 @@ export default function FeaturesLanding() {
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-[#3c82f4] py-3.5 mb-20">
+        <div className="sticky top-[80px] z-[25] -mx-6 py-3.5 mb-20" style={{ backgroundColor: '#3c82f4' }}>
           <p className="text-xs font-bold tracking-widest text-gray-900 uppercase text-center">Tournaments</p>
         </div>
         <div className="max-w-6xl mx-auto">
@@ -636,7 +636,7 @@ export default function FeaturesLanding() {
       {/* ── DRAFT NIGHT ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-[#3c82f4] py-3.5 mb-8">
+        <div className="sticky top-[80px] z-[25] -mx-6 py-3.5 mb-8" style={{ backgroundColor: '#3c82f4' }}>
           <p className="text-xs font-bold tracking-widest text-gray-900 uppercase text-center">Draft Night</p>
         </div>
         <div className="max-w-6xl mx-auto">
@@ -770,7 +770,7 @@ export default function FeaturesLanding() {
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-white">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 bg-[#3c82f4] py-3.5 mb-8">
+        <div className="sticky top-[80px] z-[25] -mx-6 py-3.5 mb-8" style={{ backgroundColor: '#3c82f4' }}>
           <p className="text-xs font-bold tracking-widest text-gray-900 uppercase text-center">League Management</p>
         </div>
         <div className="max-w-6xl mx-auto">
