@@ -584,9 +584,9 @@ export default function FeaturesLanding() {
             </p>
           </FadeUp>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            {/* Left: features */}
-            <div className="space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] gap-16 items-center">
+            {/* Left: features — shrinks to fit, bracket never shrinks */}
+            <div className="space-y-10 min-w-0">
               {[
                 {
                   icon: Trophy,
