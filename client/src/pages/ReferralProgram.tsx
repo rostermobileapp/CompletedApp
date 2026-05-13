@@ -188,11 +188,13 @@ export default function ReferralProgram() {
         </div>
       </section>
       {/* Current Partners */}
-      <section className="py-8 px-6 bg-white">
+      <section className="py-8 px-6 bg-gray-50 border-y border-gray-200">
         <div className="max-w-5xl mx-auto">
-          <div className="bg-white border border-gray-200 rounded-2xl p-7 shadow-sm flex flex-col justify-start">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-5">Current Partners</p>
-            <img src={hpibLogo} alt="Hockey Players in Business" className="h-12 object-contain object-left" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-5 text-center">Current Partners</p>
+          <div className="flex flex-wrap gap-4">
+            <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 shadow-sm inline-flex items-center justify-center">
+              <img src={hpibLogo} alt="Hockey Players in Business" className="h-14 object-contain" />
+            </div>
           </div>
         </div>
       </section>
