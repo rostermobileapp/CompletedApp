@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import {
@@ -19,6 +19,78 @@ function useReducedMotion() {
     return () => mq.removeEventListener('change', listener);
   }, []);
   return reduced;
+}
+
+// ---------- Communication slideshow ----------
+const COMM_SLIDES = [
+  { src: '/messaging-preview.png', alt: 'Team chat messaging' },
+  { src: '/messaging-preview-2.png', alt: 'Team chat with GIF' },
+];
+
+function CommSlideshow({ isActive }: { isActive: boolean }) {
+  const [index, setIndex] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const reduced = typeof window !== 'undefined'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+
+  const advance = useCallback(() => {
+    setDirection(1);
+    setIndex((i) => (i + 1) % COMM_SLIDES.length);
+  }, []);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const id = setInterval(advance, 2600);
+    return () => clearInterval(id);
+  }, [isActive, advance]);
+
+  // Reset to first slide when this section becomes inactive
+  useEffect(() => {
+    if (!isActive) {
+      setIndex(0);
+      setDirection(1);
+    }
+  }, [isActive]);
+
+  const variants = {
+    enter: (d: number) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
+    center: { x: 0, opacity: 1 },
+    exit: (d: number) => ({ x: d > 0 ? '-100%' : '100%', opacity: 0 }),
+  };
+
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      <AnimatePresence initial={false} custom={direction} mode="popLayout">
+        <motion.img
+          key={index}
+          src={COMM_SLIDES[index].src}
+          alt={COMM_SLIDES[index].alt}
+          custom={direction}
+          variants={reduced ? undefined : variants}
+          initial={reduced ? false : 'enter'}
+          animate="center"
+          exit={reduced ? undefined : 'exit'}
+          transition={{ type: 'spring', stiffness: 300, damping: 32, mass: 0.8 }}
+          className="absolute inset-0 w-full h-full object-cover object-top"
+        />
+      </AnimatePresence>
+      {/* Dot indicators */}
+      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
+        {COMM_SLIDES.map((_, i) => (
+          <div
+            key={i}
+            className="rounded-full transition-all duration-300"
+            style={{
+              width: i === index ? 20 : 6,
+              height: 6,
+              background: i === index ? '#3c82f4' : 'rgba(255,255,255,0.5)',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function FadeUp({
@@ -407,7 +479,7 @@ function StickyLeagueSection() {
                       ) : active === 1 ? (
                         <img src="/scorekeeper-preview.png" alt="Live Scorekeeping" className="w-full h-full object-cover object-top" />
                       ) : active === 2 ? (
-                        <img src="/messaging-preview.png" alt="Team Messaging" className="w-full h-full object-cover object-top" />
+                        <CommSlideshow isActive={active === 2} />
                       ) : active === 3 ? (
                         <img src="/payments-preview.png" alt="Registration & Payments" className="w-full h-full object-cover object-top" />
                       ) : (
