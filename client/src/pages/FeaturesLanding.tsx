@@ -840,7 +840,7 @@ export default function FeaturesLanding() {
             </FadeUp>
             <FadeUp delay={0.2}>
               <div className="text-4xl md:text-5xl font-black text-white mb-2">Community</div>
-              <div className="text-blue-200 text-sm font-medium">Roster was built by someone who's still running a beer league bench.</div>
+              <div className="text-blue-200 text-sm font-medium">A portion of proceeds go back to grow the game.</div>
             </FadeUp>
           </div>
         </div>
