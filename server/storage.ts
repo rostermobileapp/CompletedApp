@@ -720,7 +720,7 @@ export interface IStorage {
   // Facility operations
   createFacility(facility: InsertFacility): Promise<Facility>;
   getFacility(id: string): Promise<Facility | undefined>;
-  getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string }): Promise<Facility[]>;
+  getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string; address?: string }): Promise<Facility[]>;
   findFacilityByAddress(address: string): Promise<Facility | undefined>;
   updateFacility(id: string, updates: Partial<InsertFacility>): Promise<Facility>;
   deleteFacility(id: string): Promise<void>;
@@ -11837,16 +11837,18 @@ export class DatabaseStorage implements IStorage {
 
   async findFacilityByAddress(address: string): Promise<Facility | undefined> {
     if (!address?.trim()) return undefined;
-    const normalized = address.trim();
+    // Normalize: strip all non-alphanumeric/space chars and collapse whitespace for comparison
     const [facility] = await db
       .select()
       .from(facilities)
-      .where(ilike(facilities.address, normalized))
+      .where(
+        sql`lower(regexp_replace(${facilities.address}, '[^a-zA-Z0-9 ]', '', 'g')) = lower(regexp_replace(${address.trim()}, '[^a-zA-Z0-9 ]', '', 'g'))`
+      )
       .limit(1);
     return facility;
   }
 
-  async getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string }): Promise<Facility[]> {
+  async getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string; address?: string }): Promise<Facility[]> {
     const conditions = [];
     if (options?.sport) {
       conditions.push(sql`${facilities.sports} @> ARRAY[${options.sport}]::sport[]`);
@@ -11864,6 +11866,12 @@ export class DatabaseStorage implements IStorage {
           ilike(facilities.city, `%${options.search}%`),
           ilike(facilities.state, `%${options.search}%`)
         )!
+      );
+    }
+    if (options?.address) {
+      // Normalized address match: strip punctuation, collapse whitespace, case-insensitive
+      conditions.push(
+        sql`lower(regexp_replace(${facilities.address}, '[^a-zA-Z0-9 ]', '', 'g')) = lower(regexp_replace(${options.address.trim()}, '[^a-zA-Z0-9 ]', '', 'g'))`
       );
     }
     

@@ -184,10 +184,9 @@ export function RinkPickerField({ onSelect }: Props) {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(target) &&
-        addingDropdownRef.current && !addingDropdownRef.current.contains(target)
-      ) {
+      const insideSearch = dropdownRef.current?.contains(target) ?? false;
+      const insideAdding = addingDropdownRef.current?.contains(target) ?? false;
+      if (!insideSearch && !insideAdding) {
         setShowDropdown(false);
         setShowAddressSuggestions(false);
       }

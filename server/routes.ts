@@ -18154,8 +18154,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // List all facilities (public - no auth required)
   app.get('/api/facilities', async (req: any, res) => {
     try {
-      const { sport, city, state, search } = req.query;
-      const facilities = await storage.getAllFacilities({ sport, city, state, search });
+      const { sport, city, state, search, address } = req.query;
+      const facilities = await storage.getAllFacilities({ sport, city, state, search, address });
       res.json(facilities);
     } catch (error) {
       console.error("Error fetching facilities:", error);
