@@ -585,8 +585,8 @@ export default function FeaturesLanding() {
       {/* ── TOURNAMENTS ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 py-3.5 mb-20" style={{ backgroundColor: '#3c82f4' }}>
-          <p className="text-2xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>Tournaments</p>
+        <div className="sticky top-[80px] z-[25] -mx-6 py-1 mb-20" style={{ backgroundColor: '#3c82f4' }}>
+          <p className="text-xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>Tournaments</p>
         </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
@@ -653,8 +653,8 @@ export default function FeaturesLanding() {
       {/* ── DRAFT NIGHT ──────────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-gray-50">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 py-3.5 mb-8" style={{ backgroundColor: '#3c82f4' }}>
-          <p className="text-2xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>Draft Night</p>
+        <div className="sticky top-[80px] z-[25] -mx-6 py-1 mb-8" style={{ backgroundColor: '#3c82f4' }}>
+          <p className="text-xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>Draft Night</p>
         </div>
         <div className="max-w-6xl mx-auto">
           {/* Heading — centered above the 3-col layout */}
@@ -787,8 +787,8 @@ export default function FeaturesLanding() {
       {/* ── LEAGUE MANAGEMENT ────────────────────────────────── */}
       <section className="pt-0 pb-24 px-6 bg-white">
         {/* Sticky section label */}
-        <div className="sticky top-[80px] z-[25] -mx-6 py-3.5 mb-8" style={{ backgroundColor: '#3c82f4' }}>
-          <p className="text-2xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>League Management</p>
+        <div className="sticky top-[80px] z-[25] -mx-6 py-1 mb-8" style={{ backgroundColor: '#3c82f4' }}>
+          <p className="text-xl font-bold text-gray-900 uppercase text-center" style={{ letterSpacing: '0.2em' }}>League Management</p>
         </div>
         <div className="max-w-6xl mx-auto">
           <FadeUp>
