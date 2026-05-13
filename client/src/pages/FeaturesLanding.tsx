@@ -836,7 +836,7 @@ export default function FeaturesLanding() {
             </FadeUp>
             <FadeUp delay={0.1}>
               <div className="text-4xl md:text-5xl font-black text-white mb-2">Hockey Only</div>
-              <div className="text-blue-200 text-sm font-medium">Every feature, every word, every screen.</div>
+              <div className="text-blue-200 text-sm font-medium">Jack-of-all-trades is a master of none.</div>
             </FadeUp>
             <FadeUp delay={0.2}>
               <div className="text-4xl md:text-5xl font-black text-white mb-2">Captain-built.</div>
