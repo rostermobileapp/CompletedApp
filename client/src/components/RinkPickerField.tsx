@@ -20,18 +20,25 @@ export interface RinkSelection {
 
 interface Props {
   onSelect: (data: RinkSelection | null) => void;
+  initialSelection?: { facilityId: string; name: string; address: string };
 }
 
 function formatAddress(f: Facility) {
   return [f.address, f.city, f.state, f.zipCode].filter(Boolean).join(', ') || '';
 }
 
-export function RinkPickerField({ onSelect }: Props) {
-  const [mode, setMode] = useState<'idle' | 'searching' | 'selected' | 'adding'>('idle');
+export function RinkPickerField({ onSelect, initialSelection }: Props) {
+  const [mode, setMode] = useState<'idle' | 'searching' | 'selected' | 'adding'>(
+    initialSelection ? 'selected' : 'idle'
+  );
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selected, setSelected] = useState<Facility | null>(null);
+  const [selected, setSelected] = useState<Facility | null>(
+    initialSelection
+      ? { id: initialSelection.facilityId, name: initialSelection.name, address: initialSelection.address }
+      : null
+  );
 
   const [newName, setNewName] = useState('');
   const [newAddress, setNewAddress] = useState('');
