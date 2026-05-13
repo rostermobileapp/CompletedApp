@@ -523,27 +523,52 @@ function StickyLeagueSection() {
         </div>
       </div>
 
-      {/* Mobile: simple stack */}
-      <div className="lg:hidden space-y-8">
-        {LEAGUE_CALLOUTS.map((c, i) => {
-          const Icon = c.icon;
-          return (
-            <FadeUp key={c.id} delay={i * 0.1}>
-              <div className="rounded-2xl p-6 border bg-blue-50 border-blue-100">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white">
-                    <Icon className="w-5 h-5 text-[#3c82f4]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold tracking-widest text-gray-400 uppercase mb-1">{c.eyebrow}</p>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{c.headline}</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed">{c.body}</p>
+      {/* Mobile: phone mockup + text for each feature */}
+      <div className="lg:hidden space-y-16">
+        {LEAGUE_CALLOUTS.map((c, i) => (
+          <FadeUp key={c.id} delay={i * 0.08}>
+            <div className="flex flex-col items-center gap-6">
+              {/* Mini phone mockup */}
+              <div className="relative mx-auto" style={{ width: 190 }}>
+                {/* Side buttons */}
+                <div className="absolute" style={{ left: -2.5, top: 70, width: 2.5, height: 20, background: '#3a3a3c', borderRadius: '2px 0 0 2px' }} />
+                <div className="absolute" style={{ left: -2.5, top: 102, width: 2.5, height: 32, background: '#3a3a3c', borderRadius: '2px 0 0 2px' }} />
+                <div className="absolute" style={{ left: -2.5, top: 146, width: 2.5, height: 32, background: '#3a3a3c', borderRadius: '2px 0 0 2px' }} />
+                <div className="absolute" style={{ right: -2.5, top: 114, width: 2.5, height: 48, background: '#3a3a3c', borderRadius: '0 2px 2px 0' }} />
+                {/* Frame */}
+                <div style={{
+                  background: 'linear-gradient(160deg, #2c2c2e 0%, #1c1c1e 50%, #2c2c2e 100%)',
+                  borderRadius: 38,
+                  padding: 2.5,
+                  boxShadow: '0 0 0 0.5px #555, inset 0 0 0 0.5px #444, 0 24px 48px -12px rgba(0,0,0,0.75), 0 6px 18px -4px rgba(0,0,0,0.4)',
+                }}>
+                  <div style={{ background: '#000', borderRadius: 36, overflow: 'hidden', aspectRatio: '9/19.5', position: 'relative' }}>
+                    {/* Dynamic Island */}
+                    <div style={{ position: 'absolute', top: 9, left: '50%', transform: 'translateX(-50%)', width: 64, height: 20, background: '#000', borderRadius: 14, border: '1px solid #1a1a1a', zIndex: 10 }} />
+                    {/* Screen content */}
+                    <div className="w-full h-full">
+                      {i === 0 ? (
+                        <img src="/standings-preview.png" alt="League Standings" className="w-full h-full object-cover object-top" />
+                      ) : i === 1 ? (
+                        <img src="/scorekeeper-preview.png" alt="Live Scorekeeping" className="w-full h-full object-cover object-top" />
+                      ) : i === 2 ? (
+                        <CommSlideshow isActive={true} />
+                      ) : (
+                        <img src="/payments-preview.png" alt="Registration & Payments" className="w-full h-full object-cover object-top" />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </FadeUp>
-          );
-        })}
+              {/* Text */}
+              <div className="text-center px-4">
+                <p className="text-xs font-bold tracking-widest text-gray-400 uppercase mb-2">{c.eyebrow}</p>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">{c.headline}</h3>
+                <p className="text-gray-500 leading-relaxed max-w-xs mx-auto">{c.body}</p>
+              </div>
+            </div>
+          </FadeUp>
+        ))}
       </div>
     </div>
   );
