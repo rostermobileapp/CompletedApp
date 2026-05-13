@@ -721,6 +721,7 @@ export interface IStorage {
   createFacility(facility: InsertFacility): Promise<Facility>;
   getFacility(id: string): Promise<Facility | undefined>;
   getAllFacilities(options?: { sport?: string; city?: string; state?: string; search?: string }): Promise<Facility[]>;
+  findFacilityByAddress(address: string): Promise<Facility | undefined>;
   updateFacility(id: string, updates: Partial<InsertFacility>): Promise<Facility>;
   deleteFacility(id: string): Promise<void>;
   
@@ -11831,6 +11832,17 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(facilities)
       .where(eq(facilities.id, id));
+    return facility;
+  }
+
+  async findFacilityByAddress(address: string): Promise<Facility | undefined> {
+    if (!address?.trim()) return undefined;
+    const normalized = address.trim();
+    const [facility] = await db
+      .select()
+      .from(facilities)
+      .where(ilike(facilities.address, normalized))
+      .limit(1);
     return facility;
   }
 

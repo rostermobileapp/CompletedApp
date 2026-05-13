@@ -18183,7 +18183,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create facility (authenticated users only)
   app.post('/api/facilities', isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = createFacilityRequestSchema.parse(req.body);
+      const { bypassAddressCheck, ...bodyData } = req.body;
+      const validatedData = createFacilityRequestSchema.parse(bodyData);
+
+      // Address duplicate guard (skip if caller explicitly bypassed)
+      if (!bypassAddressCheck && validatedData.address) {
+        const existing = await storage.findFacilityByAddress(validatedData.address);
+        if (existing) {
+          return res.status(409).json({
+            message: "A rink with this address already exists",
+            existingFacility: existing,
+          });
+        }
+      }
+
       const facility = await storage.createFacility(validatedData);
       res.status(201).json(facility);
     } catch (error) {

@@ -6,6 +6,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Crown, MapPin, Calendar, Globe, Monitor, Snowflake } from 'lucide-react';
+import { RinkPickerField } from '@/components/RinkPickerField';
+import type { RinkSelection } from '@/components/RinkPickerField';
 import { useLocation } from 'wouter';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { insertLeagueSchema } from '@shared/schema';
@@ -61,6 +63,7 @@ export default function CreateLeague() {
   const isMobile = useIsMobile();
   const isDesktopWeb = useIsDesktopWeb();
   const [createdLeague, setCreatedLeague] = useState<{ id: string; name: string } | null>(null);
+  const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(null);
 
   const form = useForm<CreateLeagueForm>({
     resolver: zodResolver(createLeagueSchema),
@@ -106,7 +109,12 @@ export default function CreateLeague() {
   });
 
   const onSubmit = (data: CreateLeagueForm) => {
-    createLeagueMutation.mutate(data);
+    createLeagueMutation.mutate({
+      ...data,
+      rinkName: selectedRink?.name || data.rinkName || undefined,
+      rinkAddress: selectedRink?.address || data.rinkAddress || undefined,
+      facilityId: selectedRink?.facilityId || undefined,
+    });
   };
 
   if (isMobile) {
@@ -337,27 +345,11 @@ export default function CreateLeague() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2" data-testid="label-rink-name">
-                  Rink Name
+                <label className="block text-sm font-medium mb-2" data-testid="label-rink-picker">
+                  Rink
                 </label>
-                <input
-                  {...form.register('rinkName')}
-                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g., Metro Ice Center"
-                  data-testid="input-rink-name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" data-testid="label-rink-address">
-                  Rink Address
-                </label>
-                <textarea
-                  {...form.register('rinkAddress')}
-                  className="w-full p-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  rows={2}
-                  placeholder="Full address of the rink"
-                  data-testid="textarea-rink-address"
+                <RinkPickerField
+                  onSelect={(rink) => setSelectedRink(rink)}
                 />
               </div>
             </div>
