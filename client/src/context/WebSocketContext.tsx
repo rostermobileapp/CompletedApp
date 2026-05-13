@@ -8,6 +8,7 @@ interface WebSocketContextValue {
   send: (data: any) => void;
   subscribe: (eventType: string, handler: WebSocketEventHandler) => () => void;
   isConnected: () => boolean;
+  onConnected: (fn: () => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
@@ -22,6 +23,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const connectionTokenRef = useRef(0);
   const listenersRef = useRef<Map<string, Set<WebSocketEventHandler>>>(new Map());
+  const connectListenersRef = useRef<Set<() => void>>(new Set());
 
   const { data: userData } = useQuery<{ id: string }>({
     queryKey: ['/api/user'],
@@ -47,6 +49,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   const isConnected = useCallback(() => {
     return wsRef.current?.readyState === WebSocket.OPEN || false;
+  }, []);
+
+  const onConnected = useCallback((fn: () => void) => {
+    connectListenersRef.current.add(fn);
+    return () => {
+      connectListenersRef.current.delete(fn);
+    };
   }, []);
 
   useEffect(() => {
@@ -123,6 +132,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           type: 'authenticate',
           userId: userId
         }));
+
+        // Fire all registered connect listeners so subscribers can re-register
+        // server-side subscriptions (e.g. draft_subscribe) after a reconnect.
+        connectListenersRef.current.forEach(fn => {
+          try { fn(); } catch (e) { /* ignore */ }
+        });
       };
 
       websocket.onmessage = (event) => {
@@ -222,7 +237,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   }, [userId]);
 
   return (
-    <WebSocketContext.Provider value={{ send, subscribe, isConnected }}>
+    <WebSocketContext.Provider value={{ send, subscribe, isConnected, onConnected }}>
       {children}
     </WebSocketContext.Provider>
   );

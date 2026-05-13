@@ -169,10 +169,13 @@ export default function DraftRoom() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const serverDriftRef = useRef(0);
 
-  // Initial fetch
+  // Initial fetch — poll every 5 s as a fallback safety net so late-joiners
+  // and mobile browsers that backgrounded the app stay in sync even if their
+  // WS subscription was briefly lost.
   const { data: initialBundle, isLoading } = useQuery<DraftStateBundle>({
     queryKey: ["/api/drafts", draftId],
     enabled: !!draftId,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -194,10 +197,16 @@ export default function DraftRoom() {
     }
   }, [initialBundle]);
 
-  // Subscribe to draft on WebSocket
+  // Subscribe to draft on WebSocket — and re-subscribe on every reconnect so
+  // captains who opened the page before the WS handshake completed (e.g. via
+  // push notification) still receive real-time updates.
   useEffect(() => {
     if (!draftId) return;
     ws.send({ type: "draft_subscribe", draftId });
+    // Re-send subscription any time the WS reconnects (fires after onopen)
+    const offReconnect = ws.onConnected(() => {
+      ws.send({ type: "draft_subscribe", draftId });
+    });
     const offState = ws.subscribe("draft_state", (data: any) => {
       if (data.payload?.draft?.id === draftId) {
         setBundle(data.payload);
@@ -268,6 +277,7 @@ export default function DraftRoom() {
     });
     return () => {
       ws.send({ type: "draft_unsubscribe", draftId });
+      offReconnect();
       offState();
       offPick();
       offChat();
@@ -478,7 +488,12 @@ export default function DraftRoom() {
     if (!user || !teams.length) return null;
     return teams.find((t: any) => t.captainId === user.id);
   }, [user, teams]);
-  const isCaptainOfPickingTeam = !!myTeam && bundle?.pickingTeamId === myTeam.id;
+  // Use the server-computed myCaptainTeamId (set from the verified JWT sub) as
+  // the authoritative check for "is it my turn to pick". This handles accounts
+  // where users.id !== Supabase JWT sub (e.g. CSV-migrated accounts) where the
+  // local t.captainId === user.id comparison silently fails.
+  const isCaptainOfPickingTeam =
+    !!myCaptainTeamId && bundle?.pickingTeamId === myCaptainTeamId;
   const canPick = isCommissioner || isCaptainOfPickingTeam;
 
   // Available players (those not yet picked & not assigned as goalies)
@@ -946,6 +961,17 @@ export default function DraftRoom() {
             </button>
           </div>
         </div>
+
+        {/* YOUR TURN banner — shown only to the captain who is on the clock */}
+        {draft.status === "active" && isCaptainOfPickingTeam && (
+          <div
+            className="mx-3 mb-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground flex items-center justify-center gap-2 font-black text-sm tracking-wide animate-pulse"
+            data-testid="banner-your-turn"
+          >
+            <Crown className="w-4 h-4 flex-shrink-0" />
+            IT'S YOUR TURN TO PICK!
+          </div>
+        )}
 
         {/* Timer bar */}
         {draft.status === "active" && (
