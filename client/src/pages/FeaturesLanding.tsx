@@ -346,7 +346,7 @@ function StickyLeagueSection() {
           }
         });
       },
-      { rootMargin: '-40% 0px -40% 0px', threshold: 0 }
+      { rootMargin: '-55% 0px -30% 0px', threshold: 0 }
     );
     sections.forEach(s => obs.observe(s));
     return () => obs.disconnect();
@@ -361,7 +361,7 @@ function StickyLeagueSection() {
         {/* Sticky phone mockup */}
         <div className="sticky top-32 self-start">
           <div className="bg-gray-900 rounded-[2.5rem] p-3 shadow-2xl mx-auto max-w-[260px]">
-            <div className="bg-gray-800 rounded-[2rem] overflow-hidden aspect-[9/19] flex flex-col items-center justify-center p-4">
+            <div className={`bg-gray-800 rounded-[2rem] overflow-hidden aspect-[9/19] flex flex-col items-center justify-center ${active === 0 ? '' : 'p-4'}`}>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={active}
@@ -369,23 +369,35 @@ function StickyLeagueSection() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={reduced ? undefined : { opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3 }}
-                  className="w-full rounded-2xl p-6 border bg-blue-50 border-blue-100 flex flex-col gap-3 items-center text-center"
+                  className="w-full h-full overflow-hidden"
                 >
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-50 border-blue-100">
-                    <ActiveIcon className="w-6 h-6 text-[#3c82f4]" />
-                  </div>
-                  <p className="text-xs font-semibold text-gray-700">{LEAGUE_CALLOUTS[active].eyebrow}</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{LEAGUE_CALLOUTS[active].headline}</p>
-                  <div className="flex gap-1 mt-2">
-                    {LEAGUE_CALLOUTS.map((_, i) => (
-                      <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === active ? 'w-6 bg-[#3c82f4]' : 'w-1.5 bg-gray-600'}`} />
-                    ))}
-                  </div>
+                  {active === 0 ? (
+                    <img
+                      src="/standings-preview.png"
+                      alt="League Standings"
+                      className="w-full h-full object-cover object-top"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-2xl p-6 border bg-blue-50 border-blue-100 flex flex-col gap-3 items-center justify-center text-center">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-50 border-blue-100">
+                        <ActiveIcon className="w-6 h-6 text-[#3c82f4]" />
+                      </div>
+                      <p className="text-xs font-semibold text-gray-700">{LEAGUE_CALLOUTS[active].eyebrow}</p>
+                      <p className="text-xs text-gray-500 leading-relaxed">{LEAGUE_CALLOUTS[active].headline}</p>
+                      <div className="flex gap-1 mt-2">
+                        {LEAGUE_CALLOUTS.map((_, i) => (
+                          <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === active ? 'w-6 bg-[#3c82f4]' : 'w-1.5 bg-gray-600'}`} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               </AnimatePresence>
-              <div className="mt-3 text-center">
-                <p className="text-gray-500 text-[10px]">Live preview</p>
-              </div>
+              {active !== 0 && (
+                <div className="mt-3 text-center">
+                  <p className="text-gray-500 text-[10px]">Live preview</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
