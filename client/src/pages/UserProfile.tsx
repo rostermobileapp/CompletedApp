@@ -172,7 +172,7 @@ export default function UserProfile() {
 
       {/* Profile Info */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex items-center gap-4 text-left" data-testid="card-profile-info">
+        <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex items-center gap-4 text-left" data-testid="card-profile-info">
           <div className="relative flex-shrink-0">
             <div className={`w-20 h-20 rounded-full flex items-center justify-center ${user.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}>
               {user.profileImageUrl ? (
@@ -214,7 +214,7 @@ export default function UserProfile() {
 
       {/* Profile Details */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+        <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
           </div>
@@ -254,7 +254,7 @@ export default function UserProfile() {
 
       {/* Payment Methods */}
       <div className="px-6 mb-6">
-        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+        <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-primary" />
