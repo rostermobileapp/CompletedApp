@@ -11837,12 +11837,12 @@ export class DatabaseStorage implements IStorage {
 
   async findFacilityByAddress(address: string): Promise<Facility | undefined> {
     if (!address?.trim()) return undefined;
-    // Normalize: strip all non-alphanumeric/space chars and collapse whitespace for comparison
+    // Normalize: strip punctuation, collapse repeated whitespace, compare case-insensitively
     const [facility] = await db
       .select()
       .from(facilities)
       .where(
-        sql`lower(regexp_replace(${facilities.address}, '[^a-zA-Z0-9 ]', '', 'g')) = lower(regexp_replace(${address.trim()}, '[^a-zA-Z0-9 ]', '', 'g'))`
+        sql`regexp_replace(lower(regexp_replace(${facilities.address}, '[^a-zA-Z0-9 ]', '', 'g')), '\s+', ' ', 'g') = regexp_replace(lower(regexp_replace(${address.trim()}, '[^a-zA-Z0-9 ]', '', 'g')), '\s+', ' ', 'g')`
       )
       .limit(1);
     return facility;
@@ -11871,7 +11871,7 @@ export class DatabaseStorage implements IStorage {
     if (options?.address) {
       // Normalized address match: strip punctuation, collapse whitespace, case-insensitive
       conditions.push(
-        sql`lower(regexp_replace(${facilities.address}, '[^a-zA-Z0-9 ]', '', 'g')) = lower(regexp_replace(${options.address.trim()}, '[^a-zA-Z0-9 ]', '', 'g'))`
+        sql`regexp_replace(lower(regexp_replace(${facilities.address}, '[^a-zA-Z0-9 ]', '', 'g')), '\s+', ' ', 'g') = regexp_replace(lower(regexp_replace(${options.address.trim()}, '[^a-zA-Z0-9 ]', '', 'g')), '\s+', ' ', 'g')`
       );
     }
     

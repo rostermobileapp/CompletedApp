@@ -95,6 +95,7 @@ export function RinkPickerField({ onSelect }: Props) {
   const handleAddressInput = useCallback((value: string) => {
     setNewAddress(value);
     setDuplicateWarning(null);
+    setBypassCheck(false);
     if (!value.trim() || !autocompleteRef.current) {
       setAddressSuggestions([]);
       setShowAddressSuggestions(false);
