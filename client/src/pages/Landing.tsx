@@ -125,14 +125,16 @@ export default function Landing() {
       )}
       {/* Fixed Header */}
       <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
-        <div className="max-w-7xl mx-auto px-6 py-0 grid grid-cols-3 items-center">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-0 flex items-center md:grid md:grid-cols-3">
+          {/* Desktop nav — col 1 */}
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
             <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
             <Link href="/features" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Features</Link>
             <Link href="/pricing" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Pricing</Link>
             <Link href="/about" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">About</Link>
           </nav>
-          <div className="flex justify-center">
+          {/* Logo — left on mobile, centered col on desktop */}
+          <div className="flex-none md:flex md:justify-center">
             <img
               src={rosterLightLogo}
               alt="Roster"
@@ -140,7 +142,18 @@ export default function Landing() {
               data-testid="logo-image"
             />
           </div>
-          <div className="flex items-center gap-3 justify-end">
+          {/* Mobile: Join Waitlist centered between logo and hamburger */}
+          <div className="flex-1 flex justify-center md:hidden px-2">
+            <button
+              onClick={() => setLocation('/waitlist')}
+              className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
+              data-testid="button-join-waitlist-header"
+            >
+              Join Waitlist
+            </button>
+          </div>
+          {/* Right col — desktop: Log In + Join Waitlist; mobile: hamburger only */}
+          <div className="flex-none flex items-center gap-3 justify-end">
             <button
               onClick={handleLoginClick}
               className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
@@ -150,8 +163,7 @@ export default function Landing() {
             </button>
             <button
               onClick={() => setLocation('/waitlist')}
-              className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-xs sm:text-sm"
-              data-testid="button-join-waitlist-header"
+              className="hidden md:inline-flex px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             >
               Join Waitlist
             </button>
