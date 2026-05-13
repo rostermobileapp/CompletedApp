@@ -131,6 +131,10 @@ function LoadingScreen() {
 function Router() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
   const isDesktopWeb = useIsDesktopWeb();
   const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
   const { data: userData, isError: userDataError } = useQuery<any>({
