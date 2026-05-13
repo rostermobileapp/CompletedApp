@@ -365,44 +365,63 @@ function StickyLeagueSection() {
       <div className="hidden lg:grid lg:grid-cols-2 lg:gap-16 lg:items-start">
         {/* Sticky phone mockup */}
         <div className="sticky top-32 self-start">
-          <div ref={phoneRef} className="bg-gray-900 rounded-[2.5rem] p-3 shadow-2xl mx-auto max-w-[260px]">
-            <div className={`bg-gray-800 rounded-[2rem] overflow-hidden aspect-[9/19] flex flex-col items-center justify-center ${active === 0 ? '' : 'p-4'}`}>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={active}
-                  initial={reduced ? false : { opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={reduced ? undefined : { opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3 }}
-                  className="w-full h-full overflow-hidden"
-                >
-                  {active === 0 ? (
-                    <img
-                      src="/standings-preview.png"
-                      alt="League Standings"
-                      className="w-full h-full object-cover object-top"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-2xl p-6 border bg-blue-50 border-blue-100 flex flex-col gap-3 items-center justify-center text-center">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-50 border-blue-100">
-                        <ActiveIcon className="w-6 h-6 text-[#3c82f4]" />
-                      </div>
-                      <p className="text-xs font-semibold text-gray-700">{LEAGUE_CALLOUTS[active].eyebrow}</p>
-                      <p className="text-xs text-gray-500 leading-relaxed">{LEAGUE_CALLOUTS[active].headline}</p>
-                      <div className="flex gap-1 mt-2">
-                        {LEAGUE_CALLOUTS.map((_, i) => (
-                          <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === active ? 'w-6 bg-[#3c82f4]' : 'w-1.5 bg-gray-600'}`} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-              {active !== 0 && (
-                <div className="mt-3 text-center">
-                  <p className="text-gray-500 text-[10px]">Live preview</p>
+          {/* iPhone 16 mockup */}
+          <div ref={phoneRef} className="relative mx-auto" style={{ width: 260 }}>
+            {/* Left side buttons: action + vol up + vol down */}
+            <div className="absolute" style={{ left: -3, top: 96,  width: 3, height: 28, background: '#3a3a3c', borderRadius: '3px 0 0 3px' }} />
+            <div className="absolute" style={{ left: -3, top: 144, width: 3, height: 44, background: '#3a3a3c', borderRadius: '3px 0 0 3px' }} />
+            <div className="absolute" style={{ left: -3, top: 200, width: 3, height: 44, background: '#3a3a3c', borderRadius: '3px 0 0 3px' }} />
+            {/* Right side buttons: power + camera control */}
+            <div className="absolute" style={{ right: -3, top: 156, width: 3, height: 64, background: '#3a3a3c', borderRadius: '0 3px 3px 0' }} />
+            <div className="absolute" style={{ right: -3, top: 264, width: 3, height: 40, background: '#3a3a3c', borderRadius: '0 3px 3px 0' }} />
+
+            {/* Titanium frame + screen */}
+            <div style={{
+              background: 'linear-gradient(160deg, #2c2c2e 0%, #1c1c1e 50%, #2c2c2e 100%)',
+              borderRadius: 52,
+              padding: 3,
+              boxShadow: '0 0 0 0.5px #555, inset 0 0 0 0.5px #444, 0 32px 64px -16px rgba(0,0,0,0.85), 0 8px 24px -4px rgba(0,0,0,0.5)',
+            }}>
+              {/* Screen */}
+              <div style={{ background: '#000', borderRadius: 50, overflow: 'hidden', aspectRatio: '9/19.5', position: 'relative' }}>
+                {/* Dynamic Island */}
+                <div style={{
+                  position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                  width: 88, height: 28, background: '#000', borderRadius: 20,
+                  border: '1px solid #1a1a1a', boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.9)', zIndex: 10,
+                }} />
+
+                {/* Content */}
+                <div className={`w-full h-full flex flex-col items-center justify-center ${active === 0 ? '' : 'p-4 pt-12'}`}>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={active}
+                      initial={reduced ? false : { opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={reduced ? undefined : { opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.3 }}
+                      className="w-full h-full overflow-hidden"
+                    >
+                      {active === 0 ? (
+                        <img src="/standings-preview.png" alt="League Standings" className="w-full h-full object-cover object-top" />
+                      ) : (
+                        <div className="w-full h-full p-5 pt-12 bg-blue-50 flex flex-col gap-3 items-center justify-center text-center">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white shadow-sm">
+                            <ActiveIcon className="w-6 h-6 text-[#3c82f4]" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-700">{LEAGUE_CALLOUTS[active].eyebrow}</p>
+                          <p className="text-xs text-gray-500 leading-relaxed">{LEAGUE_CALLOUTS[active].headline}</p>
+                          <div className="flex gap-1 mt-1">
+                            {LEAGUE_CALLOUTS.map((_, i) => (
+                              <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === active ? 'w-6 bg-[#3c82f4]' : 'w-1.5 bg-gray-300'}`} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
