@@ -392,7 +392,7 @@ function StickyLeagueSection() {
                 }} />
 
                 {/* Content */}
-                <div className={`w-full h-full flex flex-col items-center justify-center ${active === 0 ? '' : 'p-4 pt-12'}`}>
+                <div className={`w-full h-full flex flex-col items-center justify-center ${active > 1 ? 'p-4 pt-12' : ''}`}>
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={active}
