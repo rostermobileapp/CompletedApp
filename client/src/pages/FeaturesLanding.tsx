@@ -392,7 +392,7 @@ function StickyLeagueSection() {
                 }} />
 
                 {/* Content */}
-                <div className={`w-full h-full flex flex-col items-center justify-center ${active > 1 ? 'p-4 pt-12' : ''}`}>
+                <div className={`w-full h-full flex flex-col items-center justify-center ${active > 2 ? 'p-4 pt-12' : ''}`}>
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={active}
@@ -406,6 +406,8 @@ function StickyLeagueSection() {
                         <img src="/standings-preview.png" alt="League Standings" className="w-full h-full object-cover object-top" />
                       ) : active === 1 ? (
                         <img src="/scorekeeper-preview.png" alt="Live Scorekeeping" className="w-full h-full object-cover object-top" />
+                      ) : active === 2 ? (
+                        <img src="/messaging-preview.png" alt="Team Messaging" className="w-full h-full object-cover object-top" />
                       ) : (
                         <div className="w-full h-full p-5 pt-12 bg-blue-50 flex flex-col gap-3 items-center justify-center text-center">
                           <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white shadow-sm">
