@@ -457,13 +457,17 @@ export async function terminateDraft(draftId: string) {
  *     as the priority source). Without this, drafted players showed up
  *     orphaned at the league level — the bug the user hit.
  *
- * Returns the list of (userId, teamId) assignments that were *applied for the
- * first time* this run, so the caller can fire push notifications without
- * spamming users on idempotent re-runs.
+ * Keeper assignments (draft_keepers rows with a real userId) are included so
+ * that finalize is the single, idempotent source of truth for all roster
+ * placements — drafted picks, commissioner goalies, and keepers alike.
+ *
+ * Returns the list of assignments applied for the *first time* this run (so
+ * the caller can send notifications without spamming on idempotent re-runs),
+ * with an `isKeeper` flag to let callers distinguish keepers from picks.
  */
 export async function assignDraftedPlayersToTeams(
   draftId: string,
-): Promise<{ userId: string; teamId: string }[]> {
+): Promise<{ userId: string; teamId: string; isKeeper: boolean }[]> {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return [];
 
@@ -472,21 +476,33 @@ export async function assignDraftedPlayersToTeams(
     .from(draftPicks)
     .where(eq(draftPicks.draftId, draftId));
 
-  // (userId, teamId) pairs to assign — drafted picks + commissioner goalies.
+  // (userId, teamId, isKeeper) pairs to assign — drafted picks + commissioner
+  // goalies + keepers (real-user keepers only; placeholder players have no
+  // account to assign or notify).
   const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
-  const pairs: { userId: string; teamId: string }[] = [];
+  const pairs: { userId: string; teamId: string; isKeeper: boolean }[] = [];
   for (const pick of picks) {
     if (!pick.playerId || pick.forfeited) continue;
-    pairs.push({ userId: pick.playerId, teamId: pick.teamId });
+    pairs.push({ userId: pick.playerId, teamId: pick.teamId, isKeeper: false });
   }
   for (const [teamId, userId] of Object.entries(goalieAssignments)) {
     if (!userId) continue;
-    pairs.push({ userId, teamId });
+    pairs.push({ userId, teamId, isKeeper: false });
   }
 
-  const newlyAssigned: { userId: string; teamId: string }[] = [];
+  // Keepers — only rows where userId is set (placeholder players have no account).
+  const keeperRows = await db
+    .select({ userId: draftKeepers.userId, teamId: draftKeepers.teamId })
+    .from(draftKeepers)
+    .where(eq(draftKeepers.draftId, draftId));
+  for (const k of keeperRows) {
+    if (!k.userId) continue;
+    pairs.push({ userId: k.userId, teamId: k.teamId, isKeeper: true });
+  }
 
-  for (const { userId, teamId } of pairs) {
+  const newlyAssigned: { userId: string; teamId: string; isKeeper: boolean }[] = [];
+
+  for (const { userId, teamId, isKeeper } of pairs) {
     // 1) team_memberships — insert if not present.
     const existingTM = await db
       .select()
@@ -524,7 +540,7 @@ export async function assignDraftedPlayersToTeams(
       didInsertOrUpdate = true;
     }
 
-    if (didInsertOrUpdate) newlyAssigned.push({ userId, teamId });
+    if (didInsertOrUpdate) newlyAssigned.push({ userId, teamId, isKeeper });
   }
 
   return newlyAssigned;
@@ -564,6 +580,38 @@ async function notifyDraftedPlayers(
   );
 }
 
+/**
+ * Send a push notification to each keeper that was just placed on their team
+ * during finalization. Best-effort — failures are swallowed per user.
+ */
+async function notifyKeeperPlayers(
+  pairs: { userId: string; teamId: string }[],
+  leagueId: string,
+) {
+  if (pairs.length === 0) return;
+  const { sendPushNotificationToUser } = await import("./oneSignalNotifications");
+  const teamIds = Array.from(new Set(pairs.map((p) => p.teamId)));
+  const teamRows = teamIds.length
+    ? await db.select().from(teams).where(inArray(teams.id, teamIds))
+    : [];
+  const teamNameById = new Map(teamRows.map((t) => [t.id, t.name]));
+
+  await Promise.allSettled(
+    pairs.map(({ userId, teamId }) => {
+      const teamName = teamNameById.get(teamId) || "your team";
+      return sendPushNotificationToUser({
+        userId,
+        title: "📋 You've been placed on a team!",
+        message: `You've been kept and placed on ${teamName}.`,
+        data: { type: "draft_result", leagueId, teamId },
+      }).catch((e) => {
+        console.error(`[Draft] keeper push notify failed for user ${userId}:`, e);
+        return false;
+      });
+    }),
+  );
+}
+
 async function completeDraft(draftId: string) {
   clearDraftTimer(draftId);
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
@@ -582,9 +630,10 @@ async function completeDraft(draftId: string) {
       .where(eq(drafts.id, draftId));
   }
 
-  // Push notifications to drafted players are intentionally disabled per
-  // commissioner request — players should not be pinged when their pick lands.
-  void newlyAssigned;
+  // Push notifications to drafted picks are intentionally disabled per
+  // commissioner request. Keepers, however, always get a placement notice.
+  const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
+  void notifyKeeperPlayers(newKeepers, draft.leagueId);
 
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
@@ -595,6 +644,10 @@ async function completeDraft(draftId: string) {
  * commissioner-facing "Finalize" button as a safety net in case the automatic
  * completion left anything unassigned (e.g. data added after completion, or
  * a legacy completed draft from before this assignment fix shipped).
+ *
+ * Keeper assignments are included alongside drafted picks. Keepers that have
+ * not yet been placed on their teams are assigned here and receive a push
+ * notification; subsequent runs are silent (idempotent).
  */
 export async function finalizeDraft(draftId: string): Promise<{
   ok: boolean;
@@ -609,8 +662,10 @@ export async function finalizeDraft(draftId: string): Promise<{
       .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
       .where(eq(drafts.id, draftId));
   }
-  // Push notifications to drafted players are intentionally disabled per
-  // commissioner request — finalize is now silent for the drafted players.
+  // Drafted pick notifications are disabled per commissioner request.
+  // Keepers receive a placement notice when they are newly assigned.
+  const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
+  void notifyKeeperPlayers(newKeepers, draft.leagueId);
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
   return { ok: true, assigned: newlyAssigned.length };
