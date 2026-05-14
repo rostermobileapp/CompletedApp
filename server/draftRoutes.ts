@@ -342,13 +342,11 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         isPlaceholderPlayer: true,
       }));
 
-      // ── When a draftId is provided, filter to free agents only and exclude keepers ──
+      // ── When a draftId is provided, exclude designated keepers from the pool ──
+      // (Team assignments from prior seasons are NOT used to gate eligibility —
+      //  picks and keepers handle all exclusion logic.)
       const draftIdParam = (req.query?.draftId as string | undefined) || null;
       if (draftIdParam) {
-        // Free agents only (not already assigned to a team)
-        enriched = enriched.filter((r) => !r.membership.assignedTeamId);
-        placeholderRows = placeholderRows.filter((r) => !r.membership.assignedTeamId);
-        // Exclude designated keepers (real users and placeholder players)
         const keeperRows = await db
           .select({ userId: draftKeepers.userId, placeholderPlayerId: draftKeepers.placeholderPlayerId })
           .from(draftKeepers)

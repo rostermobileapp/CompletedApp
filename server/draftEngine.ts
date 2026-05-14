@@ -295,7 +295,8 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return [];
 
-  // Free agents only: approved league members not yet assigned to a team
+  // All approved league members (team assignments from the previous season are
+  // NOT used to gate eligibility — keepers and already-drafted players handle exclusion)
   const members = await db
     .select({
       userId: leagueMemberships.userId,
@@ -306,7 +307,6 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
       and(
         eq(leagueMemberships.leagueId, draft.leagueId),
         eq(leagueMemberships.status, "approved"),
-        isNull(leagueMemberships.assignedTeamId),
       ),
     );
 
