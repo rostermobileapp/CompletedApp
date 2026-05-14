@@ -45,7 +45,21 @@ type IsAuth = (req: any, res: any, next: any) => void;
  */
 async function isLeagueCommissioner(leagueId: string, userId: string): Promise<boolean> {
   const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
-  return !!league && league.commissionerId === userId;
+  if (!league) return false;
+  if (league.commissionerId === userId) return true;
+  // Secondary commissioners in the league membership also get commissioner privileges
+  const [mem] = await db
+    .select({ leagueRole: leagueMemberships.leagueRole })
+    .from(leagueMemberships)
+    .where(
+      and(
+        eq(leagueMemberships.leagueId, leagueId),
+        eq(leagueMemberships.userId, userId),
+        eq(leagueMemberships.status, "approved"),
+      ),
+    )
+    .limit(1);
+  return mem?.leagueRole === "secondary_commissioner";
 }
 
 /**
@@ -1052,6 +1066,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const userId = req.user.claims.sub;
       const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
       if (!draft) return res.status(404).json({ message: "Draft not found" });
+      // isLeagueCommissioner now includes secondary commissioners
       const isCommish = await isLeagueCommissioner(draft.leagueId, userId);
       const result = isCommish
         ? await commissionerPick(draftId, playerId)
