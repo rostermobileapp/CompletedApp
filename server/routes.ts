@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, gameRsvps, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
@@ -19044,124 +19044,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user team events:", error);
       res.status(500).json({ message: "Failed to fetch team events" });
-    }
-  });
-
-  // Get attendance overview for games where the user is a captain
-  app.get('/api/games/attendance/captain-overview', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-
-      // Find teams where this user is the captain
-      const captainTeams = await db
-        .select({ id: teams.id, name: teams.name })
-        .from(teams)
-        .where(eq(teams.captainId, userId));
-
-      if (captainTeams.length === 0) {
-        return res.json([]);
-      }
-
-      const captainTeamIds = captainTeams.map(t => t.id);
-      const teamNameMap = new Map(captainTeams.map(t => [t.id, t.name]));
-
-      // Get upcoming games for those teams (next 7 days)
-      const now = new Date();
-      const upcoming = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-      const upcomingGames = await db
-        .select({
-          id: games.id,
-          scheduledAt: games.scheduledAt,
-          homeTeamId: games.homeTeamId,
-          awayTeamId: games.awayTeamId,
-        })
-        .from(games)
-        .where(
-          and(
-            or(
-              inArray(games.homeTeamId, captainTeamIds),
-              inArray(games.awayTeamId, captainTeamIds)
-            ),
-            sql`${games.scheduledAt} >= NOW()`,
-            sql`${games.scheduledAt} <= ${upcoming.toISOString()}`
-          )
-        );
-
-      if (upcomingGames.length === 0) {
-        return res.json([]);
-      }
-
-      const gameIds = upcomingGames.map(g => g.id);
-
-      // Get RSVPs for all these games
-      const rsvpRows = await db
-        .select({ gameId: gameRsvps.gameId, teamId: gameRsvps.teamId, status: gameRsvps.status })
-        .from(gameRsvps)
-        .where(inArray(gameRsvps.gameId, gameIds));
-
-      // Get team member counts for each captain team
-      const memberCountRows = await db
-        .select({ teamId: teamMemberships.teamId })
-        .from(teamMemberships)
-        .where(
-          and(
-            inArray(teamMemberships.teamId, captainTeamIds),
-            eq(teamMemberships.status, 'approved')
-          )
-        );
-
-      const memberCountMap = new Map<string, number>();
-      for (const row of memberCountRows) {
-        memberCountMap.set(row.teamId, (memberCountMap.get(row.teamId) || 0) + 1);
-      }
-
-      const result = upcomingGames.map(game => {
-        const captainTeamId = captainTeamIds.includes(game.homeTeamId || '') ? game.homeTeamId : game.awayTeamId;
-        const opponentTeamId = captainTeamId === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
-        const teamRsvps = rsvpRows.filter(r => r.gameId === game.id && r.teamId === captainTeamId);
-        const checkedInCount = teamRsvps.filter(r => r.status === 'attending').length;
-        const checkedOutCount = teamRsvps.filter(r => r.status === 'not_attending').length;
-        const totalRoster = memberCountMap.get(captainTeamId || '') || 0;
-
-        return {
-          gameId: game.id,
-          teamName: teamNameMap.get(captainTeamId || '') || '',
-          opponent: opponentTeamId || 'TBD',
-          scheduledAt: game.scheduledAt,
-          checkedInCount,
-          checkedOutCount,
-          totalRoster,
-        };
-      });
-
-      res.json(result);
-    } catch (error) {
-      console.error("Error fetching captain attendance overview:", error);
-      res.status(500).json({ message: "Failed to fetch attendance overview" });
-    }
-  });
-
-  // Get the current user's RSVP statuses for their upcoming games
-  app.get('/api/user/attendance-statuses', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-
-      // Get upcoming game IDs the user has RSVPs for
-      const userRsvps = await db
-        .select({ gameId: gameRsvps.gameId, status: gameRsvps.status })
-        .from(gameRsvps)
-        .where(eq(gameRsvps.userId, userId));
-
-      const statusMap: Record<string, string> = {};
-      for (const rsvp of userRsvps) {
-        statusMap[rsvp.gameId] = rsvp.status;
-      }
-
-      res.json(statusMap);
-    } catch (error) {
-      console.error("Error fetching user attendance statuses:", error);
-      res.status(500).json({ message: "Failed to fetch attendance statuses" });
     }
   });
 

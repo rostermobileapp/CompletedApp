@@ -447,7 +447,7 @@ export default function Profile() {
       <div className="sticky top-0 z-10 bg-background">
         {/* Profile Info */}
         <div className="px-6 pt-[24px] pb-[8px]">
-          <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 flex items-center gap-4 text-left" data-testid="card-profile-info">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
             <div className="relative flex-shrink-0">
               <div className={`w-20 h-20 rounded-full flex items-center justify-center ${(user as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}>
                 {(user as any)?.profileImageUrl ? (
