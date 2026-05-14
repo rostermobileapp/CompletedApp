@@ -4,6 +4,7 @@ import {
   draftPicks,
   draftBuddyPairs,
   draftChatMessages,
+  draftKeepers,
   teams,
   teamMemberships,
   leagueMemberships,
@@ -276,14 +277,22 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return [];
 
+  // Free agents only: approved league members not yet assigned to a team
   const members = await db
     .select({
       userId: leagueMemberships.userId,
       isGoalie: leagueMemberships.isGoalie,
     })
     .from(leagueMemberships)
-    .where(and(eq(leagueMemberships.leagueId, draft.leagueId), eq(leagueMemberships.status, "approved")));
+    .where(
+      and(
+        eq(leagueMemberships.leagueId, draft.leagueId),
+        eq(leagueMemberships.status, "approved"),
+        isNull(leagueMemberships.assignedTeamId),
+      ),
+    );
 
+  // Already picked in this draft
   const drafted = await db
     .select({ playerId: draftPicks.playerId })
     .from(draftPicks)
@@ -293,12 +302,20 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
     if (p.playerId) draftedSet.add(p.playerId);
   }
 
+  // Keepers: designated to stay on their team, not pickable
+  const keeperRows = await db
+    .select({ userId: draftKeepers.userId })
+    .from(draftKeepers)
+    .where(eq(draftKeepers.draftId, draftId));
+  const keeperSet = new Set<string>(keeperRows.map((k) => k.userId).filter(Boolean) as string[]);
+
   const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
   const assignedGoalieIds = new Set(Object.values(goalieAssignments));
 
   const goalieMethod = draft.goalieMethod || "included_with_skaters";
   return members
     .filter((m) => !draftedSet.has(m.userId))
+    .filter((m) => !keeperSet.has(m.userId))
     .filter((m) => !assignedGoalieIds.has(m.userId))
     .filter((m) => {
       // if commissioner_assigned or random_draw, exclude goalies entirely from pickable pool
