@@ -140,11 +140,13 @@ export default function DraftRoom() {
   const [pendingPickUserId, setPendingPickUserId] = useState<string | null>(null);
 
   // Filter & sort state for the player carousel
-  const [filterPos, setFilterPos] = useState<string>("all");
-  const [filterHanded, setFilterHanded] = useState<string>("any");
+  const [filterPositions, setFilterPositions] = useState<string[]>([]);  // empty = all
+  const [filterHanded, setFilterHanded] = useState<string>("any");       // "any"|"L"|"R"
   const [filterMinPoints, setFilterMinPoints] = useState<number>(0);
-  const [filterSkill, setFilterSkill] = useState<string>("all");
-  const [sortField, setSortField] = useState<"name" | "points" | "position">("name");
+  const [filterMaxPoints, setFilterMaxPoints] = useState<number>(0);     // 0 = no upper bound
+  const [filterMaxAge, setFilterMaxAge] = useState<number>(0);           // 0 = no filter
+  const [filterSkills, setFilterSkills] = useState<string[]>([]);        // empty = all
+  const [sortField, setSortField] = useState<"name" | "points" | "position" | "age" | "skill" | "handed">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const carouselRef = useRef<HTMLDivElement>(null);
   // Pick announcement modal: shown for 2s whenever any captain makes a pick
@@ -561,14 +563,14 @@ export default function DraftRoom() {
       (m: any) => !draftedSet.has(m.user.id) && !isExcludedGoalie(m),
     );
 
-    // Position filter
-    if (filterPos !== "all") {
+    // Position multi-select filter (empty = all positions shown)
+    if (filterPositions.length > 0) {
       list = list.filter((m: any) => {
         const pos =
-          (m.membership?.position as string | undefined) ||
-          (m.user.position as string | undefined) ||
-          "";
-        return pos.toLowerCase() === filterPos.toLowerCase();
+          ((m.membership?.position as string | undefined) ||
+            (m.user.position as string | undefined) ||
+            "").toLowerCase();
+        return filterPositions.some((p) => p.toLowerCase() === pos);
       });
     }
 
@@ -583,18 +585,34 @@ export default function DraftRoom() {
       });
     }
 
-    // Min points filter
-    if (filterMinPoints > 0) {
-      list = list.filter(
-        (m: any) =>
-          (m.priorStats?.goals ?? 0) + (m.priorStats?.assists ?? 0) >= filterMinPoints,
-      );
+    // Points range filter
+    if (filterMinPoints > 0 || filterMaxPoints > 0) {
+      list = list.filter((m: any) => {
+        const pts = (m.priorStats?.goals ?? 0) + (m.priorStats?.assists ?? 0);
+        if (filterMinPoints > 0 && pts < filterMinPoints) return false;
+        if (filterMaxPoints > 0 && pts > filterMaxPoints) return false;
+        return true;
+      });
     }
 
-    // Skill filter
-    if (filterSkill !== "all") {
+    // Max age filter (age stored as birth year or direct age field)
+    if (filterMaxAge > 0) {
+      const currentYear = new Date().getFullYear();
+      list = list.filter((m: any) => {
+        const age: number =
+          typeof m.user.age === "number"
+            ? m.user.age
+            : m.user.birthYear
+              ? currentYear - m.user.birthYear
+              : 0;
+        return age === 0 || age <= filterMaxAge;
+      });
+    }
+
+    // Skill multi-select filter (empty = all skill levels shown)
+    if (filterSkills.length > 0) {
       list = list.filter(
-        (m: any) => (m.membership?.skillLevel ?? "") === filterSkill,
+        (m: any) => filterSkills.includes(m.membership?.skillLevel ?? ""),
       );
     }
 
@@ -615,6 +633,23 @@ export default function DraftRoom() {
           (b.user.position as string | undefined) ||
           "zzz";
         cmp = posA.localeCompare(posB);
+      } else if (sortField === "age") {
+        const currentYear = new Date().getFullYear();
+        const getAge = (m: any): number =>
+          typeof m.user.age === "number"
+            ? m.user.age
+            : m.user.birthYear
+              ? currentYear - m.user.birthYear
+              : 99;
+        cmp = getAge(a) - getAge(b);
+      } else if (sortField === "skill") {
+        const skillA = a.membership?.skillLevel ?? "zzz";
+        const skillB = b.membership?.skillLevel ?? "zzz";
+        cmp = skillA.localeCompare(skillB);
+      } else if (sortField === "handed") {
+        const shootsA = (a.user.shoots || a.membership?.shoots || "").toLowerCase();
+        const shootsB = (b.user.shoots || b.membership?.shoots || "").toLowerCase();
+        cmp = shootsA.localeCompare(shootsB);
       } else {
         // name (default)
         const nameA = (
@@ -643,7 +678,7 @@ export default function DraftRoom() {
     });
 
     return list;
-  }, [members, draftedSet, draft, filterPos, filterHanded, filterMinPoints, filterSkill, sortField, sortDir]);
+  }, [members, draftedSet, draft, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
 
   const pickMutation = useMutation({
     mutationFn: async (playerId: string) => {
@@ -1154,7 +1189,7 @@ export default function DraftRoom() {
 
           {/* ── Filter & Sort strip ── */}
           {activeView === "players" && (() => {
-            const positions = Array.from(
+            const allPositions = Array.from(
               new Set(
                 members
                   .map(
@@ -1166,16 +1201,31 @@ export default function DraftRoom() {
                   .filter(Boolean),
               ),
             ).sort();
-            const skillLevels = Array.from(
+            const allSkillLevels = Array.from(
               new Set(
                 members
                   .map((m: any) => m.membership?.skillLevel as string | undefined)
                   .filter((s): s is string => !!s),
               ),
             ).sort();
+            const hasActiveFilter =
+              filterPositions.length > 0 ||
+              filterHanded !== "any" ||
+              filterMinPoints > 0 ||
+              filterMaxPoints > 0 ||
+              filterMaxAge > 0 ||
+              filterSkills.length > 0;
+            const togglePosition = (pos: string) =>
+              setFilterPositions((prev) =>
+                prev.includes(pos) ? prev.filter((p) => p !== pos) : [...prev, pos],
+              );
+            const toggleSkill = (skill: string) =>
+              setFilterSkills((prev) =>
+                prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill],
+              );
             return (
               <div className="shrink-0 flex gap-1.5 overflow-x-auto px-3 py-1.5 border-b border-border scrollbar-none">
-                {/* Sort */}
+                {/* Sort field + direction */}
                 <select
                   value={`${sortField}:${sortDir}`}
                   onChange={(e) => {
@@ -1190,27 +1240,40 @@ export default function DraftRoom() {
                   <option value="name:desc">Name Z–A</option>
                   <option value="points:desc">Most Points</option>
                   <option value="points:asc">Fewest Points</option>
-                  <option value="position:asc">Position</option>
+                  <option value="position:asc">Position A–Z</option>
+                  <option value="position:desc">Position Z–A</option>
+                  <option value="age:asc">Youngest First</option>
+                  <option value="age:desc">Oldest First</option>
+                  <option value="skill:asc">Skill Low–High</option>
+                  <option value="skill:desc">Skill High–Low</option>
+                  <option value="handed:asc">Shoots (L first)</option>
+                  <option value="handed:desc">Shoots (R first)</option>
                 </select>
 
-                {/* Position */}
-                {positions.length > 0 && (
-                  <select
-                    value={filterPos}
-                    onChange={(e) => setFilterPos(e.target.value)}
-                    className="shrink-0 h-7 px-2 bg-muted border border-border rounded-full text-xs font-medium text-foreground"
-                    data-testid="filter-position"
-                  >
-                    <option value="all">All Pos</option>
-                    {positions.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {/* Separator */}
+                <div className="shrink-0 w-px bg-border self-stretch mx-0.5" />
 
-                {/* Handed */}
+                {/* Position multi-select pills */}
+                {allPositions.length > 0 && allPositions.map((pos) => (
+                  <button
+                    key={pos}
+                    type="button"
+                    onClick={() => togglePosition(pos)}
+                    className={`shrink-0 h-7 px-2.5 rounded-full text-xs font-medium transition-colors ${
+                      filterPositions.includes(pos)
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted border border-border text-foreground hover:bg-muted/70"
+                    }`}
+                    data-testid={`filter-pos-${pos}`}
+                  >
+                    {pos}
+                  </button>
+                ))}
+
+                {/* Separator */}
+                {allPositions.length > 0 && <div className="shrink-0 w-px bg-border self-stretch mx-0.5" />}
+
+                {/* Handed toggle pills */}
                 {(["any", "L", "R"] as const).map((h) => (
                   <button
                     key={h}
@@ -1223,51 +1286,87 @@ export default function DraftRoom() {
                     }`}
                     data-testid={`filter-handed-${h}`}
                   >
-                    {h === "any" ? "Shoots: Any" : `${h} hand`}
+                    {h === "any" ? "Any" : `${h} hand`}
                   </button>
                 ))}
 
-                {/* Min points */}
+                {/* Separator */}
+                <div className="shrink-0 w-px bg-border self-stretch mx-0.5" />
+
+                {/* Points range */}
                 <div className="shrink-0 flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Pts ≥</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Pts</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={999}
+                    value={filterMinPoints || ""}
+                    onChange={(e) => setFilterMinPoints(Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="min"
+                    className="w-10 h-7 px-1 bg-muted border border-border rounded-full text-xs text-center text-foreground"
+                    data-testid="filter-min-points"
+                  />
+                  <span className="text-xs text-muted-foreground">–</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={999}
+                    value={filterMaxPoints || ""}
+                    onChange={(e) => setFilterMaxPoints(Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="max"
+                    className="w-10 h-7 px-1 bg-muted border border-border rounded-full text-xs text-center text-foreground"
+                    data-testid="filter-max-points"
+                  />
+                </div>
+
+                {/* Max age */}
+                <div className="shrink-0 flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Age ≤</span>
                   <input
                     type="number"
                     min={0}
                     max={99}
-                    value={filterMinPoints || ""}
-                    onChange={(e) => setFilterMinPoints(Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="0"
-                    className="w-10 h-7 px-1.5 bg-muted border border-border rounded-full text-xs text-center text-foreground"
-                    data-testid="filter-min-points"
+                    value={filterMaxAge || ""}
+                    onChange={(e) => setFilterMaxAge(Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="–"
+                    className="w-10 h-7 px-1 bg-muted border border-border rounded-full text-xs text-center text-foreground"
+                    data-testid="filter-max-age"
                   />
                 </div>
 
-                {/* Skill */}
-                {skillLevels.length > 0 && (
-                  <select
-                    value={filterSkill}
-                    onChange={(e) => setFilterSkill(e.target.value)}
-                    className="shrink-0 h-7 px-2 bg-muted border border-border rounded-full text-xs font-medium text-foreground"
-                    data-testid="filter-skill"
-                  >
-                    <option value="all">All Skill</option>
-                    {skillLevels.map((s) => (
-                      <option key={s} value={s}>
+                {/* Skill multi-select pills */}
+                {allSkillLevels.length > 0 && (
+                  <>
+                    <div className="shrink-0 w-px bg-border self-stretch mx-0.5" />
+                    {allSkillLevels.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => toggleSkill(s)}
+                        className={`shrink-0 h-7 px-2.5 rounded-full text-xs font-medium transition-colors ${
+                          filterSkills.includes(s)
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted border border-border text-foreground hover:bg-muted/70"
+                        }`}
+                        data-testid={`filter-skill-${s}`}
+                      >
                         Skill {s}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </>
                 )}
 
-                {/* Reset */}
-                {(filterPos !== "all" || filterHanded !== "any" || filterMinPoints > 0 || filterSkill !== "all") && (
+                {/* Clear all filters */}
+                {hasActiveFilter && (
                   <button
                     type="button"
                     onClick={() => {
-                      setFilterPos("all");
+                      setFilterPositions([]);
                       setFilterHanded("any");
                       setFilterMinPoints(0);
-                      setFilterSkill("all");
+                      setFilterMaxPoints(0);
+                      setFilterMaxAge(0);
+                      setFilterSkills([]);
                     }}
                     className="shrink-0 h-7 px-2.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20 transition-colors"
                     data-testid="filter-reset"
@@ -2282,8 +2381,8 @@ function PlayerCardOverlay({
         data-testid="player-card-overlay"
       >
         {/* Trading-card frame */}
-        <div className="relative bg-gradient-to-br from-amber-300 via-amber-100 to-amber-400 dark:from-amber-700 dark:via-amber-900 dark:to-amber-800 rounded-2xl p-3 shadow-2xl ring-4 ring-amber-500/40">
-          <div className="bg-gradient-to-b from-blue-600 to-blue-900 rounded-xl overflow-hidden">
+        <div className="relative bg-gradient-to-br from-amber-300 via-amber-100 to-amber-400 dark:from-amber-700 dark:via-amber-900 dark:to-amber-800 rounded-3xl p-3 shadow-2xl ring-4 ring-amber-500/40">
+          <div className="bg-gradient-to-b from-blue-600 to-blue-900 rounded-2xl overflow-hidden">
             {/* Header */}
             <div className="p-3 text-white flex items-center justify-between">
               <span className="text-xs uppercase tracking-widest font-bold opacity-80">

@@ -172,6 +172,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   const { data: existing } = useQuery<{
     draft: any;
     buddyPairs: { id: string; userIds: string[] }[];
+    keepersByTeam?: Record<string, string[]>;
   }>({
     queryKey: ["/api/leagues", leagueId, "seasons", seasonId, "draft"],
     enabled: !!leagueId && !!seasonId,
@@ -203,6 +204,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         userOverrodeRoundsRef.current = true;
       }
       if (existing.buddyPairs?.length) setBuddyPairs(existing.buddyPairs.map((p) => p.userIds));
+      // Hydrate saved keepers so re-opening the wizard doesn't clear them
+      if (existing.keepersByTeam && Object.keys(existing.keepersByTeam).length > 0) {
+        setKeepersByTeam(existing.keepersByTeam);
+      }
     }
   }, [existing]);
 

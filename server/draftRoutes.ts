@@ -117,7 +117,19 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           .select()
           .from(draftBuddyPairs)
           .where(eq(draftBuddyPairs.draftId, draft.id));
-        return res.json({ draft, buddyPairs });
+        const keeperRows = await db
+          .select()
+          .from(draftKeepers)
+          .where(eq(draftKeepers.draftId, draft.id));
+        // Reconstruct keepersByTeam map: teamId -> [userId or placeholderPlayerId, ...]
+        const keepersByTeam: Record<string, string[]> = {};
+        for (const k of keeperRows) {
+          const pid = k.userId ?? k.placeholderPlayerId;
+          if (!pid) continue;
+          if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
+          keepersByTeam[k.teamId].push(pid);
+        }
+        return res.json({ draft, buddyPairs, keepersByTeam });
       } catch (err) {
         console.error("GET draft error:", err);
         res.status(500).json({ message: "Failed to fetch draft" });
@@ -144,6 +156,64 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     } catch (err) {
       console.error("GET draft state error:", err);
       res.status(500).json({ message: "Failed to fetch draft state" });
+    }
+  });
+
+  // === GET keepers for a draft ===
+  app.get("/api/drafts/:draftId/keepers", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      if (!(await canViewDraft(draftId, userId))) {
+        return res.status(403).json({ message: "Not authorized to view this draft" });
+      }
+      const rows = await db
+        .select()
+        .from(draftKeepers)
+        .where(eq(draftKeepers.draftId, draftId));
+      // Reconstruct keepersByTeam map: teamId -> [userId or placeholderPlayerId, ...]
+      const keepersByTeam: Record<string, string[]> = {};
+      for (const k of rows) {
+        const pid = k.userId ?? k.placeholderPlayerId;
+        if (!pid) continue;
+        if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
+        keepersByTeam[k.teamId].push(pid);
+      }
+      return res.json({ keepersByTeam });
+    } catch (err) {
+      console.error("GET draft keepers error:", err);
+      res.status(500).json({ message: "Failed to fetch keepers" });
+    }
+  });
+
+  // === PUT keepers for a draft (replace all keepers) ===
+  app.put("/api/drafts/:draftId/keepers", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can set keepers" });
+      }
+      if (draft.status !== "pending") {
+        return res.status(400).json({ message: "Keepers can only be changed before the draft starts" });
+      }
+      const { keepersByTeam } = req.body as { keepersByTeam: Record<string, string[]> };
+      await db.delete(draftKeepers).where(eq(draftKeepers.draftId, draftId));
+      for (const [teamId, playerIds] of Object.entries(keepersByTeam ?? {})) {
+        for (const pid of playerIds) {
+          if (pid.startsWith("placeholder:")) {
+            await db.insert(draftKeepers).values({ draftId, userId: null, placeholderPlayerId: pid, teamId });
+          } else {
+            await db.insert(draftKeepers).values({ draftId, userId: pid, placeholderPlayerId: null, teamId });
+          }
+        }
+      }
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("PUT draft keepers error:", err);
+      res.status(500).json({ message: "Failed to save keepers" });
     }
   });
 
@@ -214,18 +284,6 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         priorStats: priorStatsByUser[r.user.id] || { goals: 0, assists: 0 },
       }));
 
-      // ── When a draftId is provided, filter to free agents only and exclude keepers ──
-      const draftIdParam = (req.query?.draftId as string | undefined) || null;
-      if (draftIdParam) {
-        enriched = enriched.filter((r) => !r.membership.assignedTeamId);
-        const keeperRows = await db
-          .select({ userId: draftKeepers.userId })
-          .from(draftKeepers)
-          .where(eq(draftKeepers.draftId, draftIdParam));
-        const keeperSet = new Set(keeperRows.map((k) => k.userId));
-        enriched = enriched.filter((r) => !keeperSet.has(r.user.id));
-      }
-
       // ── Include placeholder players (free agents without accounts) ──
       // Fetch all placeholder_players for this league (both team-assigned and
       // free agents) so they appear in the buddy system and the draft room's
@@ -258,8 +316,21 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         isPlaceholderPlayer: true,
       }));
 
+      // ── When a draftId is provided, filter to free agents only and exclude keepers ──
+      const draftIdParam = (req.query?.draftId as string | undefined) || null;
       if (draftIdParam) {
+        // Free agents only (not already assigned to a team)
+        enriched = enriched.filter((r) => !r.membership.assignedTeamId);
         placeholderRows = placeholderRows.filter((r) => !r.membership.assignedTeamId);
+        // Exclude designated keepers (real users and placeholder players)
+        const keeperRows = await db
+          .select({ userId: draftKeepers.userId, placeholderPlayerId: draftKeepers.placeholderPlayerId })
+          .from(draftKeepers)
+          .where(eq(draftKeepers.draftId, draftIdParam));
+        const keeperUserIds = new Set(keeperRows.map((k) => k.userId).filter(Boolean) as string[]);
+        const keeperPlaceholderIds = new Set(keeperRows.map((k) => k.placeholderPlayerId).filter(Boolean) as string[]);
+        enriched = enriched.filter((r) => !keeperUserIds.has(r.user.id));
+        placeholderRows = placeholderRows.filter((r) => !keeperPlaceholderIds.has(r.membership.id));
       }
 
       return res.json([...enriched, ...placeholderRows]);
@@ -355,12 +426,28 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           draftRow = created;
         }
 
-        // Replace keepers (idempotent)
+        // Replace keepers (idempotent) — supports both real user IDs and placeholder IDs
         await db.delete(draftKeepers).where(eq(draftKeepers.draftId, draftRow.id));
         if (config.keepersByTeam) {
-          for (const [teamId, userIds] of Object.entries(config.keepersByTeam)) {
-            for (const uid of userIds) {
-              await db.insert(draftKeepers).values({ draftId: draftRow.id, userId: uid, teamId });
+          for (const [teamId, playerIds] of Object.entries(config.keepersByTeam)) {
+            for (const pid of playerIds) {
+              if (pid.startsWith("placeholder:")) {
+                // Placeholder player — store in placeholderPlayerId column
+                await db.insert(draftKeepers).values({
+                  draftId: draftRow.id,
+                  userId: null,
+                  placeholderPlayerId: pid,
+                  teamId,
+                });
+              } else {
+                // Real user account
+                await db.insert(draftKeepers).values({
+                  draftId: draftRow.id,
+                  userId: pid,
+                  placeholderPlayerId: null,
+                  teamId,
+                });
+              }
             }
           }
         }

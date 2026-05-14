@@ -1677,15 +1677,18 @@ export const draftChatMessages = pgTable("draft_chat_messages", {
 ]);
 
 // Draft keepers — players designated to stay on their team without going through the draft
+// Either userId (real accounts) OR placeholderPlayerId (placeholder/imported accounts) must be set.
 export const draftKeepers = pgTable("draft_keepers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
-  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  // For real user accounts — nullable to support placeholder players
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  // For placeholder players (imported players without accounts) — nullable
+  placeholderPlayerId: varchar("placeholder_player_id"),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_draft_keepers_draft").on(table.draftId),
-  unique("draft_keepers_draft_user_unique").on(table.draftId, table.userId),
 ]);
 
 // Player import sessions table
