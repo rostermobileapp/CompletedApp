@@ -1273,8 +1273,8 @@ export default function DraftRoom() {
                 {/* Separator */}
                 {allPositions.length > 0 && <div className="shrink-0 w-px bg-border self-stretch mx-0.5" />}
 
-                {/* Handed toggle pills */}
-                {(["any", "L", "R"] as const).map((h) => (
+                {/* Handed toggle pills — any / L / R / Both */}
+                {(["any", "L", "R", "B"] as const).map((h) => (
                   <button
                     key={h}
                     type="button"
@@ -1286,7 +1286,7 @@ export default function DraftRoom() {
                     }`}
                     data-testid={`filter-handed-${h}`}
                   >
-                    {h === "any" ? "Any" : `${h} hand`}
+                    {h === "any" ? "Any" : h === "B" ? "Both" : `${h} hand`}
                   </button>
                 ))}
 

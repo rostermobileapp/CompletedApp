@@ -200,9 +200,35 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         return res.status(400).json({ message: "Keepers can only be changed before the draft starts" });
       }
       const { keepersByTeam } = req.body as { keepersByTeam: Record<string, string[]> };
+      // Validate that all teamIds belong to this draft's league
+      const leagueTeams = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.leagueId, draft.leagueId));
+      const leagueTeamIds = new Set(leagueTeams.map((t) => t.id));
+      // Validate that all real user IDs are approved members of this league
+      const leagueMembers = await db
+        .select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.leagueId, draft.leagueId), eq(leagueMemberships.status, "approved")));
+      const leagueMemberIds = new Set(leagueMembers.map((m) => m.userId));
+      for (const [teamId, playerIds] of Object.entries(keepersByTeam ?? {})) {
+        if (!leagueTeamIds.has(teamId)) {
+          return res.status(400).json({ message: `Team ${teamId} does not belong to this league` });
+        }
+        for (const pid of playerIds) {
+          if (!pid.startsWith("placeholder:") && !leagueMemberIds.has(pid)) {
+            return res.status(400).json({ message: `Player ${pid} is not a member of this league` });
+          }
+        }
+      }
+      // Deduplicate keepers by player ID to prevent double-entries
+      const seen = new Set<string>();
       await db.delete(draftKeepers).where(eq(draftKeepers.draftId, draftId));
       for (const [teamId, playerIds] of Object.entries(keepersByTeam ?? {})) {
         for (const pid of playerIds) {
+          if (seen.has(pid)) continue;
+          seen.add(pid);
           if (pid.startsWith("placeholder:")) {
             await db.insert(draftKeepers).values({ draftId, userId: null, placeholderPlayerId: pid, teamId });
           } else {
