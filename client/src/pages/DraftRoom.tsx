@@ -1581,6 +1581,7 @@ export default function DraftRoom() {
               {(draft.draftOrder || []).map((teamId: string, idx: number) => {
                 const team = teamById.get(teamId);
                 const teamPicks = bundle.picks.filter((p) => p.teamId === teamId);
+                const teamKeepers = (bundle.keepers || []).filter((k) => k.teamId === teamId);
                 const goalieId = draft.goalieAssignments?.[teamId];
                 const goalie = goalieId ? memberById.get(goalieId) : null;
                 const isPicking = bundle.pickingTeamId === teamId;
@@ -1599,9 +1600,14 @@ export default function DraftRoom() {
                         {team?.name || "Team"}
                         {isPicking && <Crown className="w-4 h-4 text-amber-500" />}
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {teamPicks.filter((p) => !p.forfeited).length} picks
-                      </span>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {teamKeepers.length > 0 && (
+                          <span className="flex items-center gap-0.5 text-blue-600 dark:text-blue-300">
+                            <Snowflake className="w-3 h-3" />{teamKeepers.length}
+                          </span>
+                        )}
+                        <span>{teamPicks.filter((p) => !p.forfeited).length} picks</span>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {goalie && (
@@ -1609,6 +1615,24 @@ export default function DraftRoom() {
                           {goalie.user.firstName || goalie.user.displayName} (G)
                         </span>
                       )}
+                      {teamKeepers.map((k) => {
+                        const keeperMember = k.userId ? memberById.get(k.userId) : null;
+                        const keeperName = keeperMember
+                          ? (keeperMember.user.firstName || keeperMember.user.displayName || "?")
+                          : k.placeholderPlayerId
+                          ? k.placeholderPlayerId.replace("placeholder:", "").split("-").slice(0, 2).join(" ")
+                          : "?";
+                        return (
+                          <span
+                            key={k.userId || k.placeholderPlayerId}
+                            className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 rounded text-[11px]"
+                            data-testid={`keeper-chip-${k.userId || k.placeholderPlayerId}`}
+                          >
+                            <Snowflake className="w-2.5 h-2.5" />
+                            {keeperName}
+                          </span>
+                        );
+                      })}
                       {teamPicks.map((p) => {
                         if (p.forfeited)
                           return (
@@ -1909,6 +1933,7 @@ export default function DraftRoom() {
       {teamPanelId && (() => {
         const team = teamById.get(teamPanelId);
         const teamPicks = bundle.picks.filter((p) => p.teamId === teamPanelId);
+        const teamKeepers = (bundle.keepers || []).filter((k) => k.teamId === teamPanelId);
         const goalieId = draft.goalieAssignments?.[teamPanelId];
         const goalie = goalieId ? memberById.get(goalieId) : null;
         const captain = team?.captainId ? memberById.get(team.captainId) : null;
@@ -1971,9 +1996,66 @@ export default function DraftRoom() {
                     </div>
                   </button>
                 )}
-                {teamPicks.length === 0 && !goalie && (
+                {/* Keepers section */}
+                {teamKeepers.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 px-1 pb-0.5">
+                      <Snowflake className="w-3 h-3 text-blue-500" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-300">
+                        Keepers
+                      </span>
+                    </div>
+                    {teamKeepers.map((k) => {
+                      const keeperMember = k.userId ? memberById.get(k.userId) : null;
+                      const keeperName = keeperMember
+                        ? `${keeperMember.user.firstName || ""} ${keeperMember.user.lastName || ""}`.trim() || keeperMember.user.displayName || "?"
+                        : k.placeholderPlayerId
+                        ? k.placeholderPlayerId.replace("placeholder:", "").split("-").slice(0, 2).join(" ")
+                        : "?";
+                      return (
+                        <button
+                          key={k.userId || k.placeholderPlayerId}
+                          onClick={() => k.userId && setCardUserId(k.userId)}
+                          disabled={!k.userId}
+                          className="w-full flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/25 rounded-lg text-left disabled:cursor-default"
+                          data-testid={`team-panel-keeper-${k.userId || k.placeholderPlayerId}`}
+                        >
+                          {keeperMember?.user.profileImageUrl ? (
+                            <img
+                              src={getImageUrl(keeperMember.user.profileImageUrl) || ""}
+                              alt=""
+                              className="w-9 h-9 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300">
+                              {(keeperName[0] || "?").toUpperCase()}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{keeperName}</div>
+                            {keeperMember?.membership.skillLevel && (
+                              <div className="text-[10px] text-muted-foreground">
+                                Skill: {keeperMember.membership.skillLevel}
+                              </div>
+                            )}
+                          </div>
+                          <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300 text-[10px] font-semibold">
+                            <Snowflake className="w-2.5 h-2.5" /> Keeper
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {teamPicks.length === 0 && !goalie && teamKeepers.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-6">
                     No picks yet.
+                  </p>
+                )}
+                {teamPicks.length === 0 && !goalie && teamKeepers.length > 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    No draft picks yet.
                   </p>
                 )}
                 {teamPicks.map((p) => {

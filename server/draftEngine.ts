@@ -139,6 +139,12 @@ export function computeNextTurn(
   return { round: totalRounds, pickInRound: numTeams, complete: true, teamId: null };
 }
 
+export interface DraftKeeper {
+  teamId: string;
+  userId: string | null;
+  placeholderPlayerId: string | null;
+}
+
 export interface DraftStateBundle {
   draft: Draft;
   picks: DraftPick[];
@@ -148,6 +154,8 @@ export interface DraftStateBundle {
   serverTime: number;
   /** Teams in the draft order, with fresh captainId values from the DB. */
   draftOrderTeams: { id: string; name: string; captainId: string | null }[];
+  /** Keepers for this draft — players pre-assigned to their team, skipping the draft pool. */
+  keepers: DraftKeeper[];
 }
 
 export async function getDraftStateBundle(draftId: string): Promise<DraftStateBundle | null> {
@@ -190,6 +198,15 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
           .map((t) => ({ id: t.id, name: t.name, captainId: captainAssignmentsMap[t.id] ?? null }))
       : [];
 
+  const keeperRows = await db
+    .select({
+      teamId: draftKeepers.teamId,
+      userId: draftKeepers.userId,
+      placeholderPlayerId: draftKeepers.placeholderPlayerId,
+    })
+    .from(draftKeepers)
+    .where(eq(draftKeepers.draftId, draftId));
+
   return {
     draft,
     picks,
@@ -198,6 +215,7 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
     pickingTeamId,
     serverTime: Date.now(),
     draftOrderTeams,
+    keepers: keeperRows,
   };
 }
 
