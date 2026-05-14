@@ -111,6 +111,8 @@ interface DraftStateBundle {
    * Avoids UUID mismatches where users.id ≠ Supabase JWT sub.
    */
   myCaptainTeamId?: string | null;
+  /** Keeper designations for this draft — players pre-assigned to their team. */
+  keepers?: { teamId: string; userId: string | null; placeholderPlayerId: string | null }[];
 }
 
 export default function DraftRoom() {
