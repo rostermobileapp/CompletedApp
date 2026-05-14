@@ -54,6 +54,7 @@ interface Member {
     isGoalie: boolean;
     isSkater?: boolean;
     skillLevel?: string | null;
+    assignedTeamId?: string | null;
   };
   user: {
     id: string;
@@ -83,6 +84,7 @@ const ALL_STEPS = [
   { id: "captains", label: "Captains" },
   { id: "goalies", label: "Goalies" },
   { id: "goalie_assign", label: "Assign Goalies" },
+  { id: "keepers", label: "Keepers" },
   { id: "format", label: "Format" },
   { id: "timer", label: "Timer" },
   { id: "skill", label: "Skill" },
@@ -143,6 +145,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
 
   // Notes
   const [playerNotes, setPlayerNotes] = useState<Record<string, string>>({});
+
+  // Keepers — players designated to stay on their team without going through the draft
+  // Record<teamId, userId[]>
+  const [keepersByTeam, setKeepersByTeam] = useState<Record<string, string[]>>({});
 
   // Buddy add-row filter (replaces the old <select>)
   const [buddySearch, setBuddySearch] = useState("");
@@ -246,12 +252,20 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // The "goalie_assign" step only matters when goalies are pulled out of the
   // skater draft (commissioner picks them OR a random draw decides). When
   // goalies are drafted with skaters there's nothing to assign in advance.
+  // The "keepers" step is only shown when there are members who have an
+  // assigned team (i.e. returning players that could be kept).
+  const hasAssignedPlayers = useMemo(
+    () => members.some((m) => !!m.membership.assignedTeamId),
+    [members],
+  );
   const STEPS = useMemo(
     () =>
       ALL_STEPS.filter(
-        (s) => s.id !== "goalie_assign" || goalieMethod !== "included_with_skaters",
+        (s) =>
+          (s.id !== "goalie_assign" || goalieMethod !== "included_with_skaters") &&
+          (s.id !== "keepers" || hasAssignedPlayers),
       ),
-    [goalieMethod],
+    [goalieMethod, hasAssignedPlayers],
   );
   // Clamp stepIdx whenever the visible step list shrinks/grows so we never
   // render an undefined step.
@@ -297,6 +311,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
             : Object.keys(captainAssignments).length
               ? captainAssignments
               : undefined,
+        keepersByTeam: Object.keys(keepersByTeam).length ? keepersByTeam : undefined,
         draftOrder,
         totalRounds,
       };
@@ -763,6 +778,88 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     </div>
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {stepId === "keepers" && (
+            <div className="space-y-4" data-testid="step-keepers">
+              <div>
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Snowflake className="w-4 h-4 text-blue-500" /> Keeper Designations
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Select players each team gets to keep from last season. Keepers skip
+                  the draft and are automatically re-assigned to their team. Only
+                  players currently on a team can be designated as keepers.
+                </p>
+              </div>
+              {teams.map((team) => {
+                const teamMembers = members.filter(
+                  (m) => m.membership.assignedTeamId === team.id,
+                );
+                const kept = keepersByTeam[team.id] || [];
+                if (teamMembers.length === 0) return null;
+                return (
+                  <div
+                    key={team.id}
+                    className="p-3 bg-card border border-border rounded-lg space-y-2"
+                    data-testid={`keeper-team-${team.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold">{team.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {kept.length} / {teamMembers.length} kept
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {teamMembers.map((m) => {
+                        const isKept = kept.includes(m.user.id);
+                        return (
+                          <button
+                            key={m.user.id}
+                            type="button"
+                            onClick={() => {
+                              setKeepersByTeam((prev) => {
+                                const cur = prev[team.id] || [];
+                                const next = isKept
+                                  ? cur.filter((id) => id !== m.user.id)
+                                  : [...cur, m.user.id];
+                                return { ...prev, [team.id]: next };
+                              });
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                              isKept
+                                ? "bg-blue-500/15 border border-blue-500/50 text-blue-700 dark:text-blue-300"
+                                : "bg-muted/40 border border-border hover:bg-muted/70"
+                            }`}
+                            data-testid={`keeper-toggle-${m.user.id}`}
+                          >
+                            <Snowflake
+                              className={`w-3.5 h-3.5 shrink-0 ${isKept ? "text-blue-500" : "text-muted-foreground"}`}
+                            />
+                            <span className="flex-1 truncate">{memberName(m)}</span>
+                            {m.membership.isGoalie && (
+                              <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">
+                                G
+                              </span>
+                            )}
+                            {isKept && (
+                              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                                KEPT
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {members.filter((m) => !!m.membership.assignedTeamId).length === 0 && (
+                <div className="p-4 bg-muted/40 rounded-lg text-sm text-muted-foreground text-center">
+                  No players currently assigned to teams — everyone is a free agent.
+                </div>
               )}
             </div>
           )}

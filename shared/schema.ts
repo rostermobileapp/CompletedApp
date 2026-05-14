@@ -1676,6 +1676,18 @@ export const draftChatMessages = pgTable("draft_chat_messages", {
   index("idx_draft_chat_messages_draft").on(table.draftId),
 ]);
 
+// Draft keepers — players designated to stay on their team without going through the draft
+export const draftKeepers = pgTable("draft_keepers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  teamId: varchar("team_id").references(() => teams.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_draft_keepers_draft").on(table.draftId),
+  unique("draft_keepers_draft_user_unique").on(table.draftId, table.userId),
+]);
+
 // Player import sessions table
 export const playerImports = pgTable("player_imports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2780,6 +2792,7 @@ export const draftSetupConfigSchema = z.object({
   goalieAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
   captainAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
   draftOrder: z.array(z.string()).optional(), // teamId order
+  keepersByTeam: z.record(z.string(), z.array(z.string())).optional(), // teamId -> [userId]
 });
 export type DraftSetupConfig = z.infer<typeof draftSetupConfigSchema>;
 

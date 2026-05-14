@@ -5,6 +5,7 @@ import {
   draftPicks,
   draftBuddyPairs,
   draftChatMessages,
+  draftKeepers,
   leagues,
   leagueMemberships,
   placeholderPlayers,
@@ -208,17 +209,29 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         }
       }
 
-      const enriched = rows.map((r) => ({
+      let enriched = rows.map((r) => ({
         ...r,
         priorStats: priorStatsByUser[r.user.id] || { goals: 0, assists: 0 },
       }));
+
+      // ── When a draftId is provided, filter to free agents only and exclude keepers ──
+      const draftIdParam = (req.query?.draftId as string | undefined) || null;
+      if (draftIdParam) {
+        enriched = enriched.filter((r) => !r.membership.assignedTeamId);
+        const keeperRows = await db
+          .select({ userId: draftKeepers.userId })
+          .from(draftKeepers)
+          .where(eq(draftKeepers.draftId, draftIdParam));
+        const keeperSet = new Set(keeperRows.map((k) => k.userId));
+        enriched = enriched.filter((r) => !keeperSet.has(r.user.id));
+      }
 
       // ── Include placeholder players (free agents without accounts) ──
       // Fetch all placeholder_players for this league (both team-assigned and
       // free agents) so they appear in the buddy system and the draft room's
       // player carousel, matching the behaviour of GET /api/leagues/:id/members.
       const placeholders = await storage.getLeaguePlaceholderPlayers(leagueId);
-      const placeholderRows = placeholders.map((ph) => ({
+      let placeholderRows = placeholders.map((ph) => ({
         membership: {
           id: `placeholder:${ph.id}`,
           userId: `placeholder:${ph.id}`,
@@ -244,6 +257,10 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         priorStats: { goals: 0, assists: 0 },
         isPlaceholderPlayer: true,
       }));
+
+      if (draftIdParam) {
+        placeholderRows = placeholderRows.filter((r) => !r.membership.assignedTeamId);
+      }
 
       return res.json([...enriched, ...placeholderRows]);
     } catch (err) {
@@ -336,6 +353,16 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             })
             .returning();
           draftRow = created;
+        }
+
+        // Replace keepers (idempotent)
+        await db.delete(draftKeepers).where(eq(draftKeepers.draftId, draftRow.id));
+        if (config.keepersByTeam) {
+          for (const [teamId, userIds] of Object.entries(config.keepersByTeam)) {
+            for (const uid of userIds) {
+              await db.insert(draftKeepers).values({ draftId: draftRow.id, userId: uid, teamId });
+            }
+          }
         }
 
         // Replace buddy pairs (idempotent)
