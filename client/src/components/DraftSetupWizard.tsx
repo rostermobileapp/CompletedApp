@@ -799,6 +799,37 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   players currently on a team can be designated as keepers.
                 </p>
               </div>
+              {/* Global summary pill */}
+              {(() => {
+                const totalAssigned = members.filter((m) => !!m.membership.assignedTeamId).length;
+                const totalFreeAgents = members.filter((m) => !m.membership.assignedTeamId).length;
+                const totalKept = Object.values(keepersByTeam).reduce((s, arr) => s + arr.length, 0);
+                const draftPool = totalFreeAgents + (totalAssigned - totalKept);
+                return totalAssigned > 0 ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs font-medium text-blue-700 dark:text-blue-300">
+                      <Snowflake className="w-3 h-3" />
+                      Kept {totalKept}
+                    </span>
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted border border-border text-xs font-medium text-foreground">
+                      Draft pool {draftPool}
+                    </span>
+                    {totalKept > 0 && (
+                      <>
+                        <span className="text-xs text-muted-foreground">•</span>
+                        <button
+                          type="button"
+                          onClick={() => setKeepersByTeam({})}
+                          className="text-xs text-destructive hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : null;
+              })()}
               {teams.map((team) => {
                 const teamMembers = members.filter(
                   (m) => m.membership.assignedTeamId === team.id,
