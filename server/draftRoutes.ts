@@ -1066,9 +1066,14 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const userId = req.user.claims.sub;
       const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
       if (!draft) return res.status(404).json({ message: "Draft not found" });
-      // isLeagueCommissioner now includes secondary commissioners
+      // isLeagueCommissioner now includes secondary commissioners.
+      // In "captains" pick mode, picks must be made by the captain of the picking
+      // team — even if the requester is the commissioner. Route through makePick()
+      // so the captain check is always enforced. Only in "commissioner" pick mode
+      // can the commissioner pick on behalf of any team via commissionerPick().
       const isCommish = await isLeagueCommissioner(draft.leagueId, userId);
-      const result = isCommish
+      const useCommissionerPick = isCommish && draft.pickMode !== "captains";
+      const result = useCommissionerPick
         ? await commissionerPick(draftId, playerId)
         : await makePick(draftId, userId, playerId);
       if (!result.ok) return res.status(400).json({ message: result.error });

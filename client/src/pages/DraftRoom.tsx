@@ -509,7 +509,12 @@ export default function DraftRoom() {
   // local t.captainId === user.id comparison silently fails.
   const isCaptainOfPickingTeam =
     !!myCaptainTeamId && bundle?.pickingTeamId === myCaptainTeamId;
-  const canPick = isCommissioner || isCaptainOfPickingTeam;
+  // In "captains" mode, only the captain of the picking team can pick.
+  // In "commissioner" mode, either the commissioner or the captain can pick.
+  const canPick =
+    draft?.pickMode === "captains"
+      ? isCaptainOfPickingTeam
+      : isCommissioner || isCaptainOfPickingTeam;
 
   // Available players (those not yet picked & not assigned as goalies)
   const draftedSet = useMemo(() => {
