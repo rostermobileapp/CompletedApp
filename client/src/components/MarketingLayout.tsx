@@ -185,12 +185,12 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
               <div>
                 <p className="font-semibold text-gray-900 mb-3">Download</p>
                 <div className="flex flex-col gap-2">
-                  <a href="https://apps.apple.com/us/app/roster-app/id6741723004" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
+                  <a href="https://apps.apple.com/us/app/roster-hockey/id6756852981" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
                     <SiAppstore className="w-4 h-4" />
                     App Store
                   </a>
                   {!isIos && (
-                    <a href="https://play.google.com/store/search?q=roster+team+management&c=apps" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
+                    <a href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
                       <SiGoogleplay className="w-4 h-4" />
                       Google Play
                     </a>

@@ -229,31 +229,33 @@ export default function Landing() {
 
             {/* App Store Badges */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-2" data-testid="app-store-badges">
-              <button
-                disabled
-                className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50 pl-[4px] pr-[4px]"
-                title="Coming June 1st"
-                aria-label="Download on the App Store - Coming June 1st"
+              <a
+                href="https://apps.apple.com/us/app/roster-hockey/id6756852981"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors pl-[4px] pr-[4px]"
+                aria-label="Download on the App Store"
               >
-                <SiAppstore className="w-7 h-7 text-gray-500" />
+                <SiAppstore className="w-7 h-7 text-white" />
                 <div className="text-left">
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Download on the</div>
-                  <div className="text-base font-semibold text-gray-600 leading-tight">App Store</div>
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wide">Download on the</div>
+                  <div className="text-base font-semibold text-white leading-tight">App Store</div>
                 </div>
-              </button>
+              </a>
               {!isIos && (
-                <button
-                  disabled
-                  className="flex items-center gap-3 bg-gray-300 border border-gray-300 rounded-xl px-5 py-3 cursor-not-allowed opacity-50 pl-[4px] pr-[4px]"
-                  title="Coming June 1st"
-                  aria-label="Get it on Google Play - Coming June 1st"
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors pl-[4px] pr-[4px]"
+                  aria-label="Get it on Google Play"
                 >
-                  <SiGoogleplay className="w-6 h-6 text-gray-500" />
+                  <SiGoogleplay className="w-6 h-6 text-white" />
                   <div className="text-left">
-                    <div className="text-[10px] text-gray-500 uppercase tracking-wide">Get it on</div>
-                    <div className="text-base font-semibold text-gray-600 leading-tight">Google Play</div>
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wide">Get it on</div>
+                    <div className="text-base font-semibold text-white leading-tight">Google Play</div>
                   </div>
-                </button>
+                </a>
               )}
             </div>
             <p className="text-xs text-gray-400">No credit card required · Free forever tier available</p>
@@ -624,7 +626,7 @@ export default function Landing() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
-              href="https://apps.apple.com/us/app/roster-app/id6741723004"
+              href="https://apps.apple.com/us/app/roster-hockey/id6756852981"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"
@@ -637,7 +639,7 @@ export default function Landing() {
             </a>
             {!isIos && (
               <a
-                href="https://play.google.com/store/search?q=roster+team+management&c=apps"
+                href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"

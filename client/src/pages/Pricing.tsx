@@ -375,7 +375,7 @@ export default function Pricing() {
           </button>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
-              href="https://apps.apple.com/us/app/roster-app/id6741723004"
+              href="https://apps.apple.com/us/app/roster-hockey/id6756852981"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"
@@ -388,7 +388,7 @@ export default function Pricing() {
             </a>
             {!isIos && (
               <a
-                href="https://play.google.com/store/search?q=roster+team+management&c=apps"
+                href="https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded-xl px-5 py-3 transition-colors justify-center"

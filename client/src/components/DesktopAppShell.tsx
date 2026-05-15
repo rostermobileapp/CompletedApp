@@ -429,13 +429,13 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
               id: 'app-store',
               label: 'App Store',
               icon: SiAppstore,
-              href: 'https://apps.apple.com/us/app/roster-app/id6741723004',
+              href: 'https://apps.apple.com/us/app/roster-hockey/id6756852981',
             },
             {
               id: 'google-play',
               label: 'Google Play',
               icon: SiGoogleplay,
-              href: 'https://play.google.com/store/search?q=roster+team+management&c=apps',
+              href: 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med',
             },
           ] as const).map((item) => {
             const Icon = item.icon;
