@@ -737,6 +737,39 @@ async function applyPick(
     pickedAt: new Date(),
   });
 
+  // Immediately assign the drafted player to their team — same effect as
+  // a commissioner manually adding a player to a team roster.
+  const [lm] = await db
+    .select()
+    .from(leagueMemberships)
+    .where(
+      and(
+        eq(leagueMemberships.leagueId, draft.leagueId),
+        eq(leagueMemberships.userId, playerId),
+      ),
+    )
+    .limit(1);
+  if (lm) {
+    await db
+      .update(leagueMemberships)
+      .set({ assignedTeamId: teamId })
+      .where(eq(leagueMemberships.id, lm.id));
+  }
+  // Ensure a teamMemberships row exists too (mirrors the league-management flow).
+  const existingTM = await db
+    .select()
+    .from(teamMemberships)
+    .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, playerId)))
+    .limit(1);
+  if (existingTM.length === 0) {
+    await db.insert(teamMemberships).values({
+      teamId,
+      userId: playerId,
+      isCaptain: false,
+      status: "approved" as any,
+    });
+  }
+
   // Buddy enforcement: if this player has buddies, auto-pick them all to the
   // same team and mark this captain's NEXT round (one-time) as forfeited.
   if (!opts?.isAutoBuddy) {
