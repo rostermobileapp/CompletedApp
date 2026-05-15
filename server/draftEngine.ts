@@ -342,6 +342,7 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
     })
     .map((m) => ({ userId: m.userId, isGoalie: m.isGoalie }));
 
+  console.log(`[Draft ${draftId}] listAvailablePlayers: ${result.length} available (${members.length} total members, ${draftedSet.size} drafted, ${keeperSet.size} keepers, goalieMethod=${goalieMethod})`);
   return result;
 }
 
@@ -366,13 +367,17 @@ export async function makePick(
   // Allow commissioner to pick on behalf
   // (commissioner check done in route layer to keep engine pure)
 
+  console.log(`[Draft ${draftId}] makePick: picker=${pickerUserId}, player=${playerId}, pickingTeam=${pickingTeamId}, teamCaptain=${team.captainId}, isCaptain=${isCaptain}`);
+
   if (!isCaptain) {
     // Engine-level check; route may pre-allow commissioner override
+    console.log(`[Draft ${draftId}] makePick FAILED: picker ${pickerUserId} is not captain of team ${pickingTeamId} (captain is ${team.captainId})`);
     return { ok: false, error: "You are not the captain of the picking team" };
   }
 
   const available = await listAvailablePlayers(draftId);
   const found = available.find((a) => a.userId === playerId);
+  console.log(`[Draft ${draftId}] makePick: ${available.length} players available, target player found=${!!found}`);
   if (!found) {
     return { ok: false, error: "Player not available" };
   }

@@ -1047,7 +1047,9 @@ export default function DraftRoom() {
               const ready = (draft.captainReadyState || {}) as Record<string, boolean>;
               // Prefer server-authoritative team data from the bundle; fall back to the
               // separate teams cache only if the bundle predates this feature.
-              const lobbyTeams = bundle?.draftOrderTeams ?? teams.filter((t: any) => draft.draftOrder.includes(t.id));
+              const caMap = (draft.captainAssignments as Record<string, string>) || {};
+              const lobbyTeams = (bundle?.draftOrderTeams ?? teams.filter((t: any) => draft.draftOrder.includes(t.id)))
+                .map((t: any) => ({ ...t, captainId: t.captainId ?? caMap[t.id] ?? null }));
               const captainIds = lobbyTeams
                 .map((t: any) => t.captainId)
                 .filter(Boolean) as string[];
@@ -1682,9 +1684,10 @@ export default function DraftRoom() {
           // push notification and the separate /teams cache hasn't resolved yet,
           // which caused myCaptainTeam to be falsy and the "I'm Ready" button to
           // never render for non-first captains.
-          const captainTeams = bundle?.draftOrderTeams ?? teams.filter((t: any) =>
+          const caAssignments = (draft.captainAssignments as Record<string, string>) || {};
+          const captainTeams = (bundle?.draftOrderTeams ?? teams.filter((t: any) =>
             draft.draftOrder.includes(t.id),
-          );
+          )).map((t: any) => ({ ...t, captainId: t.captainId ?? caAssignments[t.id] ?? null }));
           const meReady = !!user && !!ready[user.id];
           // Prefer the server-computed myCaptainTeamId (set from the REST load using
           // the verified JWT sub). This handles cases where users.id ≠ Supabase JWT
