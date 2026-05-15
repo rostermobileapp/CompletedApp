@@ -342,7 +342,6 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
     })
     .map((m) => ({ userId: m.userId, isGoalie: m.isGoalie }));
 
-  console.log(`[listAvailablePlayers] draftId=${draftId} leagueId=${draft.leagueId} totalMembers=${members.length} drafted=${draftedSet.size} keepers=${keeperSet.size} goalieMethod=${goalieMethod} result=${result.length} ids=${result.map(r=>r.userId).join(",")}`);
   return result;
 }
 
@@ -364,7 +363,6 @@ export async function makePick(
   const [team] = await db.select().from(teams).where(eq(teams.id, pickingTeamId));
   if (!team) return { ok: false, error: "Team not found" };
   const isCaptain = team.captainId === pickerUserId;
-  console.log(`[makePick] draftId=${draftId} pickerUserId=${pickerUserId} playerId=${playerId} pickingTeamId=${pickingTeamId} team.captainId=${team.captainId} isCaptain=${isCaptain}`);
   // Allow commissioner to pick on behalf
   // (commissioner check done in route layer to keep engine pure)
 
@@ -375,7 +373,6 @@ export async function makePick(
 
   const available = await listAvailablePlayers(draftId);
   const found = available.find((a) => a.userId === playerId);
-  console.log(`[makePick] playerId=${playerId} found=${!!found}`);
   if (!found) {
     return { ok: false, error: "Player not available" };
   }
@@ -829,7 +826,6 @@ export async function commissionerPick(
   if (!pickingTeamId) return { ok: false, error: "No active pick" };
   const available = await listAvailablePlayers(draftId);
   const found = available.find((a) => a.userId === playerId);
-  console.log(`[commissionerPick] draftId=${draftId} playerId=${playerId} pickingTeamId=${pickingTeamId} found=${!!found}`);
   if (!found) {
     return { ok: false, error: "Player not available" };
   }

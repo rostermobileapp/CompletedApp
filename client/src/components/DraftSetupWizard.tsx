@@ -204,8 +204,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         userOverrodeRoundsRef.current = true;
       }
       if (existing.buddyPairs?.length) setBuddyPairs(existing.buddyPairs.map((p) => p.userIds));
-      // Hydrate saved keepers so re-opening the wizard doesn't clear them
-      if (existing.keepersByTeam && Object.keys(existing.keepersByTeam).length > 0) {
+      // Hydrate saved keepers so re-opening the wizard shows the correct state.
+      // Always set (including empty map) so previously-cleared keepers don't
+      // linger in local state from a stale render before data arrived.
+      if (existing.keepersByTeam !== undefined) {
         setKeepersByTeam(existing.keepersByTeam);
       }
     }

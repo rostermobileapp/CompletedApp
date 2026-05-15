@@ -1084,7 +1084,6 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       // can the commissioner pick on behalf of any team via commissionerPick().
       const isCommish = await isLeagueCommissioner(draft.leagueId, userId);
       const useCommissionerPick = isCommish && draft.pickMode !== "captains";
-      console.log(`[pick-route] draftId=${draftId} userId=${userId} playerId=${playerId} pickMode=${draft.pickMode} isCommish=${isCommish} useCommissionerPick=${useCommissionerPick}`);
       const result = useCommissionerPick
         ? await commissionerPick(draftId, playerId)
         : await makePick(draftId, userId, playerId);
