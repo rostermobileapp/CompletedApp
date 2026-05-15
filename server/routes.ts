@@ -5769,8 +5769,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedMember = await storage.updateLeagueMember(memberId, updates);
       
-      // If team assignment changed, sync team chats
+      // If team assignment changed, sync team chats and enforce captain integrity
       if (oldTeamId !== newTeamId) {
+        // If the player was captain of their old team, clear that captain role.
+        // A captain must be on the team they lead.
+        if (oldTeamId) {
+          const oldTeam = await storage.getTeam(oldTeamId);
+          if (oldTeam?.captainId === membership.userId) {
+            await storage.setTeamCaptain(oldTeamId, null);
+          }
+        }
         try {
           // Sync old team (if existed) to remove user
           if (oldTeamId) {

@@ -517,6 +517,17 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             const captainUserId = assignments[teamId];
             if (captainUserId) {
               await db.update(teams).set({ captainId: captainUserId }).where(eq(teams.id, teamId));
+              // Auto-assign the captain to their team so they are always on the
+              // roster they lead. This prevents the "captain not on team" mismatch.
+              await db
+                .update(leagueMemberships)
+                .set({ assignedTeamId: teamId })
+                .where(
+                  and(
+                    eq(leagueMemberships.userId, captainUserId),
+                    eq(leagueMemberships.leagueId, leagueId),
+                  ),
+                );
             } else {
               // No captain selected for this team — clear any stale assignment
               await db.update(teams).set({ captainId: null }).where(eq(teams.id, teamId));

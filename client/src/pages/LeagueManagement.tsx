@@ -3743,9 +3743,15 @@ export default function LeagueManagement() {
                                 )}
                               </div>
                               <div className="text-sm text-muted-foreground space-y-1">
-                                {!team.isFreeAgents && (
-                                  <p>Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}</p>
-                                )}
+                                {!team.isFreeAgents && (() => {
+                                  const captainOnTeam = captain && teamMembers.some((m: LeagueMember) => m.userId === captain.userId);
+                                  return (
+                                    <p className={captain && !captainOnTeam ? 'text-amber-500' : ''}>
+                                      Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}
+                                      {captain && !captainOnTeam && ' ⚠ Not on roster'}
+                                    </p>
+                                  );
+                                })()}
                                 <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
                               </div>
                             </div>
