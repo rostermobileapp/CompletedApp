@@ -331,7 +331,7 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const assignedGoalieIds = new Set(Object.values(goalieAssignments));
 
   const goalieMethod = draft.goalieMethod || "included_with_skaters";
-  return members
+  const result = members
     .filter((m) => !draftedSet.has(m.userId))
     .filter((m) => !keeperSet.has(m.userId))
     .filter((m) => !assignedGoalieIds.has(m.userId))
@@ -341,6 +341,47 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
       return true;
     })
     .map((m) => ({ userId: m.userId, isGoalie: m.isGoalie }));
+
+  console.log(`[listAvailablePlayers] draftId=${draftId} leagueId=${draft.leagueId} totalMembers=${members.length} drafted=${draftedSet.size} keepers=${keeperSet.size} goalieMethod=${goalieMethod} result=${result.length} ids=${result.map(r=>r.userId).join(",")}`);
+  return result;
+}
+
+export async function makePick(
+  draftId: string,
+  pickerUserId: string,
+  playerId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status !== "active") return { ok: false, error: "Draft is not active" };
+
+  const draftOrder = (draft.draftOrder as string[]) || [];
+  const style = draft.draftStyle || draft.roundType || "snake";
+  const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style);
+  if (!pickingTeamId) return { ok: false, error: "No active pick" };
+
+  // Verify picker is captain of picking team OR commissioner of the league
+  const [team] = await db.select().from(teams).where(eq(teams.id, pickingTeamId));
+  if (!team) return { ok: false, error: "Team not found" };
+  const isCaptain = team.captainId === pickerUserId;
+  console.log(`[makePick] draftId=${draftId} pickerUserId=${pickerUserId} playerId=${playerId} pickingTeamId=${pickingTeamId} team.captainId=${team.captainId} isCaptain=${isCaptain}`);
+  // Allow commissioner to pick on behalf
+  // (commissioner check done in route layer to keep engine pure)
+
+  if (!isCaptain) {
+    // Engine-level check; route may pre-allow commissioner override
+    return { ok: false, error: "You are not the captain of the picking team" };
+  }
+
+  const available = await listAvailablePlayers(draftId);
+  const found = available.find((a) => a.userId === playerId);
+  console.log(`[makePick] playerId=${playerId} found=${!!found}`);
+  if (!found) {
+    return { ok: false, error: "Player not available" };
+  }
+
+  await applyPick(draftId, pickingTeamId, playerId);
+  return { ok: true };
 }
 
 async function startTurnTimer(draftId: string) {
@@ -775,41 +816,6 @@ async function applyPick(
 
 // PUBLIC: Make a pick on behalf of a team (called from a route).
 // Validates that pickerUserId is the captain of the picking team.
-export async function makePick(
-  draftId: string,
-  pickerUserId: string,
-  playerId: string
-): Promise<{ ok: boolean; error?: string }> {
-  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
-  if (!draft) return { ok: false, error: "Draft not found" };
-  if (draft.status !== "active") return { ok: false, error: "Draft is not active" };
-
-  const draftOrder = (draft.draftOrder as string[]) || [];
-  const style = draft.draftStyle || draft.roundType || "snake";
-  const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style);
-  if (!pickingTeamId) return { ok: false, error: "No active pick" };
-
-  // Verify picker is captain of picking team OR commissioner of the league
-  const [team] = await db.select().from(teams).where(eq(teams.id, pickingTeamId));
-  if (!team) return { ok: false, error: "Team not found" };
-  const isCaptain = team.captainId === pickerUserId;
-  // Allow commissioner to pick on behalf
-  // (commissioner check done in route layer to keep engine pure)
-
-  if (!isCaptain) {
-    // Engine-level check; route may pre-allow commissioner override
-    return { ok: false, error: "You are not the captain of the picking team" };
-  }
-
-  const available = await listAvailablePlayers(draftId);
-  if (!available.find((a) => a.userId === playerId)) {
-    return { ok: false, error: "Player not available" };
-  }
-
-  await applyPick(draftId, pickingTeamId, playerId);
-  return { ok: true };
-}
-
 export async function commissionerPick(
   draftId: string,
   playerId: string
@@ -822,7 +828,9 @@ export async function commissionerPick(
   const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style);
   if (!pickingTeamId) return { ok: false, error: "No active pick" };
   const available = await listAvailablePlayers(draftId);
-  if (!available.find((a) => a.userId === playerId)) {
+  const found = available.find((a) => a.userId === playerId);
+  console.log(`[commissionerPick] draftId=${draftId} playerId=${playerId} pickingTeamId=${pickingTeamId} found=${!!found}`);
+  if (!found) {
     return { ok: false, error: "Player not available" };
   }
   await applyPick(draftId, pickingTeamId, playerId);
