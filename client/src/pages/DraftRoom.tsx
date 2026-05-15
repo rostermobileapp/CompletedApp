@@ -5,6 +5,7 @@ import { useWebSocket } from "@/context/WebSocketContext";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
