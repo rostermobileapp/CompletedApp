@@ -1,3 +1,15 @@
+/**
+ * DRAFT BETA RESTRICTION
+ * Only leagues in this list can see and use the draft tool.
+ * To open it up to everyone, set this to null.
+ */
+const DRAFT_ALLOWED_LEAGUE_IDS: string[] | null = ["fqWG3Dko"];
+
+function isDraftEnabled(leagueId: string): boolean {
+  if (DRAFT_ALLOWED_LEAGUE_IDS === null) return true;
+  return DRAFT_ALLOWED_LEAGUE_IDS.includes(leagueId);
+}
+
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -2796,7 +2808,7 @@ export default function LeagueManagement() {
               <Plus className="w-4 h-4 mr-2 inline" />
               New Season
             </button>
-            {selectedSeasonId && teams.length >= 2 && (
+            {selectedSeasonId && teams.length >= 2 && isDraftEnabled(leagueId) && (
               <>
                 {/* No draft configured yet (or completed): offer full setup */}
                 {(!existingDraft || existingDraft.status === 'completed') && (
@@ -3007,7 +3019,7 @@ export default function LeagueManagement() {
                 assigned to a team yet (once assignment begins the draft would
                 conflict, so we hide it). Requires ≥2 teams so the wizard can
                 build a proper draft order. */}
-            {selectedSeasonId && teams.length >= 2 && !commissionerDisplayMembers.some((m: LeagueMember) => m.assignedTeamId) && (
+            {selectedSeasonId && teams.length >= 2 && isDraftEnabled(leagueId) && !commissionerDisplayMembers.some((m: LeagueMember) => m.assignedTeamId) && (
               <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Crown className="w-4 h-4 text-primary shrink-0" />

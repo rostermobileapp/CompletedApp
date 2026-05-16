@@ -41,6 +41,18 @@ import {
 type IsAuth = (req: any, res: any, next: any) => void;
 
 /**
+ * DRAFT BETA RESTRICTION
+ * While the draft tool is being tested, only leagues in this list can access it.
+ * To open it up to all leagues, set this to null.
+ */
+const DRAFT_ALLOWED_LEAGUE_IDS: string[] | null = ["fqWG3Dko"];
+
+function isDraftAllowed(leagueId: string): boolean {
+  if (DRAFT_ALLOWED_LEAGUE_IDS === null) return true;
+  return DRAFT_ALLOWED_LEAGUE_IDS.includes(leagueId);
+}
+
+/**
  * Verify the requesting user is the commissioner of the league.
  */
 async function isLeagueCommissioner(leagueId: string, userId: string): Promise<boolean> {
@@ -386,6 +398,9 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       try {
         const { leagueId, seasonId } = req.params;
         const userId = req.user.claims.sub;
+        if (!isDraftAllowed(leagueId)) {
+          return res.status(403).json({ message: "The draft tool is currently in beta testing and not yet available for this league." });
+        }
         if (!(await isLeagueCommissioner(leagueId, userId))) {
           return res.status(403).json({ message: "Only the commissioner can configure the draft" });
         }
