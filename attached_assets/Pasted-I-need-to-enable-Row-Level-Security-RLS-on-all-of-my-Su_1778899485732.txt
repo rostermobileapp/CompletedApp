@@ -1,0 +1,43 @@
+I need to enable Row Level Security (RLS) on all of my Supabase tables. Right now RLS is disabled across the board, which means anyone with my anon key can read, insert, update, or delete any row in any table. The app is live on iOS and Android so I cannot afford to break production. I want you to walk through this with me carefully and methodically — do not make changes yet, we are in planning mode first.
+
+Here is what I want you to do, in order:
+
+**Step 1 — Audit and report (do not change anything)**
+
+1. List every table in my Supabase database, grouped logically (auth/users, teams, leagues, games, subscriptions, etc.).
+2. For each table, tell me:
+   - What it stores and which other tables it relates to (foreign keys)
+   - Who realistically should be able to SELECT, INSERT, UPDATE, and DELETE rows (e.g., "the row's owner only," "any member of the team," "only the team captain," "anyone authenticated," "server-side only via service_role")
+   - Whether the app currently writes to this table from the client (using the anon key) or only from a server/edge function (using service_role)
+3. Flag any tables where you are not sure of the access pattern — I will clarify before we write policies.
+
+**Step 2 — Confirm how the app authenticates**
+
+Before writing any policies, confirm:
+- Where in the codebase the Supabase client is initialized
+- Whether we are using the anon key on the client and service_role only on the server (this should be the case — if service_role is anywhere in the client bundle, stop and flag it immediately, that is a critical issue to fix first)
+- How the current user's ID is available to Postgres (typically `auth.uid()` from Supabase Auth)
+
+**Step 3 — Draft policies (still do not apply them)**
+
+For each table, write the proposed RLS policies as SQL. Use `auth.uid()` and join through the relevant tables (e.g., team membership) where needed. Group them table-by-table so I can review one at a time. Include comments explaining what each policy does in plain English.
+
+**Step 4 — Rollout plan**
+
+Propose a safe rollout order, starting with the lowest-risk table (something with simple ownership rules, like a user_profiles table) and moving toward the most complex (anything with multi-user access like team rosters or game data). For each table, the rollout should be:
+   1. Apply the policies with RLS still disabled
+   2. Enable RLS on the table
+   3. Test the relevant app flows (read, write, edit, delete) as a logged-in test user
+   4. Confirm nothing broke before moving to the next table
+
+Also tell me how to roll back quickly if something does break (the SQL command to disable RLS on a single table).
+
+**Step 5 — Edge cases to think about**
+
+Before we start, surface anything I might not have considered:
+- Are there any places in the code where we query Supabase without a logged-in user (e.g., public marketing data, sign-up flows)?
+- Any database functions, triggers, or views that might behave differently with RLS on?
+- Any realtime subscriptions or storage buckets that also need policies?
+- Anything specific to how RevenueCat webhooks or other server-side processes write to the DB?
+
+Start with Step 1. Just give me the audit and report — no code changes, no SQL applied, no migrations yet. I want to read through your analysis and answer questions before we move forward.
