@@ -23,6 +23,7 @@ interface UserProfileData {
   venmoUsername?: string | null;
   cashappUsername?: string | null;
   timezone?: string | null;
+  deletedAt?: string | null;
 }
 
 export default function UserProfile() {
@@ -127,6 +128,43 @@ export default function UserProfile() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground">User not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user.deletedAt) {
+    return (
+      <div className="min-h-screen flex flex-col pb-24" data-testid="user-profile-page">
+        <div className="p-6 pt-12">
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => {
+                setPageTransitionDirection('down');
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate('/');
+                }
+              }}
+              className="text-muted-foreground"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">User Profile</h1>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="text-center space-y-4 max-w-sm">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto">
+              <span className="text-muted-foreground text-3xl font-bold">?</span>
+            </div>
+            <h2 className="text-xl font-semibold text-foreground">User No Longer on Roster</h2>
+            <p className="text-muted-foreground text-sm">
+              This user has deleted their account. Their profile is no longer available.
+            </p>
+          </div>
         </div>
       </div>
     );

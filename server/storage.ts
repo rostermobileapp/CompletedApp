@@ -1615,9 +1615,9 @@ export class DatabaseStorage implements IStorage {
       // can display "User No Longer on Roster" rather than breaking.
       await tx.update(users).set({
         deletedAt: new Date(),
-        firstName: null as any,
-        lastName: null as any,
-        email: null as any,
+        firstName: null,
+        lastName: null,
+        email: null,
         phoneNumber: null,
         profileImageUrl: null,
         dateOfBirth: null,
