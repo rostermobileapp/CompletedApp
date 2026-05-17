@@ -1628,32 +1628,36 @@ export class DatabaseStorage implements IStorage {
         stripeSubscriptionId: null,
       }).where(eq(users.id, id));
       
-      // Sync team chats + delete creator-owned conversations after transaction
-      // commits (async, so we don't hold the transaction open).
+      // Team chat resync is best-effort and non-critical — keep it async.
       setImmediate(async () => {
-        const { MessagingService } = await import('./messagingService');
-        const messagingService = new MessagingService();
-
-        // Delete all conversations this user created (cascade removes their
-        // messages, polls, attachments, read receipts, and participant rows).
-        for (const conv of createdConversationRows) {
-          try {
-            await messagingService.deleteConversation(conv.id);
-          } catch (error) {
-            console.error(`Error deleting created conversation ${conv.id} after user deletion:`, error);
+        try {
+          const { MessagingService } = await import('./messagingService');
+          const messagingService = new MessagingService();
+          for (const [teamId, leagueId] of teamsToSyncAfter) {
+            try {
+              await messagingService.syncTeamChatParticipants(teamId, leagueId);
+            } catch (err) {
+              console.error(`Error syncing team chat after user deletion for team ${teamId}:`, err);
+            }
           }
-        }
-
-        // Re-sync team chats to remove the deleted user's participant slot.
-        for (const [teamId, leagueId] of teamsToSyncAfter) {
-          try {
-            await messagingService.syncTeamChatParticipants(teamId, leagueId);
-          } catch (error) {
-            console.error(`Error syncing team chat after user deletion for team ${teamId}:`, error);
-          }
+        } catch (err) {
+          console.error('Error importing MessagingService for team chat resync:', err);
         }
       });
     });
+
+    // Synchronously delete all conversations this user created so the API does
+    // not return success until cleanup is complete. The soft-delete transaction
+    // already committed above, so if this step fails the user row is still
+    // tombstoned (PII wiped) and the orphaned threads surface as
+    // "User No Longer on Roster" — a recoverable state.
+    if (createdConversationRows.length > 0) {
+      const { MessagingService } = await import('./messagingService');
+      const messagingService = new MessagingService();
+      for (const conv of createdConversationRows) {
+        await messagingService.deleteConversation(conv.id);
+      }
+    }
   }
 
   // Permission management operations
