@@ -1500,25 +1500,23 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Cannot delete profile while you are a commissioner of leagues. Please transfer your commissioner status to another user first.");
     }
 
-    // Delete all conversations this user CREATED — fully cleans up messages, polls, attachments, etc.
-    // Non-creator membership rows are handled inside the transaction.
+    // Snapshot the user's created conversations BEFORE the transaction so we can
+    // clean them up after the soft-delete commits. Doing it after the transaction
+    // is the safer order: if conversation cleanup fails, the user row is already
+    // tombstoned (PII wiped) and the orphaned threads just show "User No Longer
+    // on Roster" — a recoverable state. The reverse order risked permanent data
+    // loss (conversations gone, user/PII still live).
     const createdConversationRows = await db
       .select({ id: conversations.id })
       .from(conversations)
       .where(eq(conversations.createdBy, id));
-    if (createdConversationRows.length > 0) {
-      const { MessagingService } = await import('./messagingService');
-      const messagingService = new MessagingService();
-      for (const conv of createdConversationRows) {
-        await messagingService.deleteConversation(conv.id);
-      }
-    }
 
-    return await db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       // Delete all user-related data in order of dependencies
       
-      // Delete messaging related data (messages themselves are kept for soft-deleted users;
-      // created-conversation cleanup already ran above)
+      // Delete messaging related data (sent messages are intentionally kept so
+      // threads can show the "User No Longer on Roster" tombstone label).
+      // Creator-owned conversation cleanup runs after this transaction commits.
       await tx.delete(typingIndicators).where(eq(typingIndicators.userId, id));
       await tx.delete(userOnlineStatus).where(eq(userOnlineStatus.userId, id));
       await tx.delete(messageReadReceipts).where(eq(messageReadReceipts.userId, id));
@@ -1630,13 +1628,25 @@ export class DatabaseStorage implements IStorage {
         stripeSubscriptionId: null,
       }).where(eq(users.id, id));
       
-      // After transaction completes, sync team chats asynchronously
-      // This runs after the transaction to avoid holding locks
+      // Sync team chats + delete creator-owned conversations after transaction
+      // commits (async, so we don't hold the transaction open).
       setImmediate(async () => {
+        const { MessagingService } = await import('./messagingService');
+        const messagingService = new MessagingService();
+
+        // Delete all conversations this user created (cascade removes their
+        // messages, polls, attachments, read receipts, and participant rows).
+        for (const conv of createdConversationRows) {
+          try {
+            await messagingService.deleteConversation(conv.id);
+          } catch (error) {
+            console.error(`Error deleting created conversation ${conv.id} after user deletion:`, error);
+          }
+        }
+
+        // Re-sync team chats to remove the deleted user's participant slot.
         for (const [teamId, leagueId] of teamsToSyncAfter) {
           try {
-            const { MessagingService } = await import('./messagingService');
-            const messagingService = new MessagingService();
             await messagingService.syncTeamChatParticipants(teamId, leagueId);
           } catch (error) {
             console.error(`Error syncing team chat after user deletion for team ${teamId}:`, error);
