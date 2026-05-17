@@ -10,6 +10,7 @@ interface ClickableAvatarProps {
   lastName?: string | null;
   className?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg';
+  isDeleted?: boolean;
 }
 
 export function ClickableAvatar({
@@ -18,13 +19,15 @@ export function ClickableAvatar({
   firstName,
   lastName,
   className = '',
-  size = 'md'
+  size = 'md',
+  isDeleted = false,
 }: ClickableAvatarProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isDeleted) return;
     if (!isPreviewOpen) {
       console.log('[ClickableAvatar] Avatar clicked, opening preview for userId:', userId);
       setIsPreviewOpen(true);
@@ -32,6 +35,7 @@ export function ClickableAvatar({
   };
 
   const getInitials = () => {
+    if (isDeleted) return '?';
     if (firstName && lastName) {
       return `${firstName[0]}${lastName[0]}`.toUpperCase();
     } else if (firstName) {
@@ -58,29 +62,32 @@ export function ClickableAvatar({
         onTouchEnd={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (isDeleted) return;
           if (!isPreviewOpen) {
             console.log('[ClickableAvatar] Touch end, opening preview for userId:', userId);
             setIsPreviewOpen(true);
           }
         }}
-        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary rounded-full relative z-10"
+        className={`focus:outline-none focus:ring-2 focus:ring-primary rounded-full relative z-10 ${isDeleted ? 'cursor-default' : 'cursor-pointer'}`}
         style={{ touchAction: 'manipulation' }}
         data-testid={`button-avatar-${userId}`}
       >
-        <Avatar className={`${sizeClasses[size]} ${className} pointer-events-none`}>
-          <AvatarImage src={getImageUrl(profileImageUrl) || undefined} alt={firstName || 'User'} />
-          <AvatarFallback>{getInitials()}</AvatarFallback>
+        <Avatar className={`${sizeClasses[size]} ${className} pointer-events-none ${isDeleted ? 'opacity-50' : ''}`}>
+          {!isDeleted && <AvatarImage src={getImageUrl(profileImageUrl) || undefined} alt={firstName || 'User'} />}
+          <AvatarFallback className={isDeleted ? 'bg-muted text-muted-foreground' : ''}>{getInitials()}</AvatarFallback>
         </Avatar>
       </button>
 
-      <ProfilePhotoPreview
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        userId={userId}
-        profileImageUrl={profileImageUrl}
-        firstName={firstName}
-        lastName={lastName}
-      />
+      {!isDeleted && (
+        <ProfilePhotoPreview
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          userId={userId}
+          profileImageUrl={profileImageUrl}
+          firstName={firstName}
+          lastName={lastName}
+        />
+      )}
     </>
   );
 }

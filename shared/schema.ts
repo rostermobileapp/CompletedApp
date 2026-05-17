@@ -292,6 +292,7 @@ export const users = pgTable("users", {
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"), // Soft-delete tombstone; set instead of hard-deleting the row
 });
 
 // User notifications table
@@ -978,7 +979,7 @@ export const conversations = pgTable("conversations", {
 // Conversation participants table
 export const conversationParticipants = pgTable("conversation_participants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  conversationId: varchar("conversation_id").references(() => conversations.id, { onDelete: 'cascade' }).notNull(),
   userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
   leftAt: timestamp("left_at"), // For when users leave group chats
@@ -996,7 +997,7 @@ export const conversationParticipants = pgTable("conversation_participants", {
 // Enhanced messages table
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  conversationId: varchar("conversation_id").references(() => conversations.id).notNull(),
+  conversationId: varchar("conversation_id").references(() => conversations.id, { onDelete: 'cascade' }).notNull(),
   senderId: varchar("sender_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   content: text("content"),
   messageType: varchar("message_type").default("text").notNull(), // text, image, gif, file, poll, payment_request

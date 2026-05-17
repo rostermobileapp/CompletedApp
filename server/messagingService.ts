@@ -82,6 +82,7 @@ export class MessagingService {
         userFirstName: users.firstName,
         userLastName: users.lastName,
         userProfileImageUrl: users.profileImageUrl,
+        userDeletedAt: users.deletedAt,
         displayFirstName: leagueMemberships.displayFirstName,
         displayLastName: leagueMemberships.displayLastName,
       })
@@ -119,7 +120,10 @@ export class MessagingService {
         firstName: row.displayFirstName || row.userFirstName,
         lastName: row.displayLastName || row.userLastName,
         profileImageUrl: row.userProfileImageUrl,
-        displayName: `${row.displayFirstName || row.userFirstName || ''} ${row.displayLastName || row.userLastName || ''}`.trim() || row.userEmail
+        deletedAt: row.userDeletedAt,
+        displayName: row.userDeletedAt
+          ? 'User No Longer on Roster'
+          : `${row.displayFirstName || row.userFirstName || ''} ${row.displayLastName || row.userLastName || ''}`.trim() || row.userEmail
       }
     })) as any[] as ConversationParticipant[];
   }
@@ -233,6 +237,7 @@ export class MessagingService {
             ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
             : users.lastName,
           profileImageUrl: users.profileImageUrl,
+          deletedAt: users.deletedAt,
         }
       })
       .from(messages)
@@ -318,6 +323,7 @@ export class MessagingService {
             ? sql<string>`COALESCE(${leagueMemberships.displayLastName}, ${users.lastName})`.as('lastName')
             : users.lastName,
           profileImageUrl: users.profileImageUrl,
+          deletedAt: users.deletedAt,
         }
       })
       .from(messages)
@@ -1371,7 +1377,9 @@ export class MessagingService {
                 COALESCE(${leagueMemberships.displayFirstName}, ${users.firstName}) || ' ' || COALESCE(${leagueMemberships.displayLastName}, ${users.lastName}),
                 ${users.email}
               )`.as('displayName')
-            : sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName')
+            : sql<string>`COALESCE(${users.firstName} || ' ' || ${users.lastName}, ${users.email})`.as('displayName'),
+          deletedAt: users.deletedAt,
+          profileImageUrl: users.profileImageUrl,
         },
         onlineStatus: userOnlineStatus.status,
         lastSeenAt: userOnlineStatus.lastSeenAt

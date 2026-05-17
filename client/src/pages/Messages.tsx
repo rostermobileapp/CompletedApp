@@ -41,6 +41,7 @@ interface Message {
     firstName?: string;
     lastName?: string;
     profileImageUrl?: string | null;
+    deletedAt?: string | null;
   };
 }
 
@@ -85,6 +86,7 @@ interface ConversationParticipant {
     profileImageUrl?: string;
     firstName?: string;
     lastName?: string;
+    deletedAt?: string | null;
   };
 }
 
@@ -2548,10 +2550,11 @@ export default function Messages() {
                       <div className="order-1">
                         <ClickableAvatar
                           userId={message.senderId}
-                          profileImageUrl={message.sender.profileImageUrl}
-                          firstName={message.sender.firstName}
-                          lastName={message.sender.lastName}
+                          profileImageUrl={message.sender.deletedAt ? null : message.sender.profileImageUrl}
+                          firstName={message.sender.deletedAt ? undefined : message.sender.firstName}
+                          lastName={message.sender.deletedAt ? undefined : message.sender.lastName}
                           size="sm"
+                          isDeleted={!!message.sender.deletedAt}
                         />
                       </div>
                     )}
@@ -2565,7 +2568,7 @@ export default function Messages() {
                         {!isCurrentUser && (
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
-                              {message.sender?.firstName || 'Unknown User'}{message.sender?.lastName ? ` ${message.sender.lastName}` : ''}
+                              {message.sender?.deletedAt ? 'User No Longer on Roster' : (message.sender?.firstName || 'Unknown User')}{!message.sender?.deletedAt && message.sender?.lastName ? ` ${message.sender.lastName}` : ''}
                             </span>
                             <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
                               {formatMessageTime(message.sentAt)}
@@ -3166,20 +3169,22 @@ export default function Messages() {
                   className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
                   data-testid={`member-${participant.userId}`}
                   onClick={() => {
+                    if (participant.user?.deletedAt) return;
                     setShowMembersModal(false);
                     navigate(`/user/${participant.userId}`);
                   }}
                 >
                   <ClickableAvatar
                     userId={participant.userId}
-                    profileImageUrl={participant.user?.profileImageUrl}
-                    firstName={participant.user?.firstName}
-                    lastName={participant.user?.lastName}
+                    profileImageUrl={participant.user?.deletedAt ? null : participant.user?.profileImageUrl}
+                    firstName={participant.user?.deletedAt ? undefined : participant.user?.firstName}
+                    lastName={participant.user?.deletedAt ? undefined : participant.user?.lastName}
                     size="sm"
+                    isDeleted={!!participant.user?.deletedAt}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate" data-testid={`member-name-${participant.userId}`}>
-                      {participant.user?.displayName || 'Unknown User'}
+                      {participant.user?.deletedAt ? 'User No Longer on Roster' : (participant.user?.displayName || 'Unknown User')}
                     </p>
                   </div>
                   {participant.userId === currentUserId && (

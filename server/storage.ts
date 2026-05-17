@@ -887,7 +887,8 @@ export class DatabaseStorage implements IStorage {
         referral_code as "referralCode",
         last_updated as "lastUpdated", 
         created_at as "createdAt", 
-        updated_at as "updatedAt"
+        updated_at as "updatedAt",
+        deleted_at as "deletedAt"
       FROM users 
       WHERE id = ${id}
       LIMIT 1
@@ -1499,17 +1500,28 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Cannot delete profile while you are a commissioner of leagues. Please transfer your commissioner status to another user first.");
     }
 
+    // Delete all conversations this user CREATED — fully cleans up messages, polls, attachments, etc.
+    // Non-creator membership rows are handled inside the transaction.
+    const createdConversationRows = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(eq(conversations.createdBy, id));
+    if (createdConversationRows.length > 0) {
+      const { MessagingService } = await import('./messagingService');
+      const messagingService = new MessagingService();
+      for (const conv of createdConversationRows) {
+        await messagingService.deleteConversation(conv.id);
+      }
+    }
+
     return await db.transaction(async (tx) => {
       // Delete all user-related data in order of dependencies
       
-      // Delete messaging related data
+      // Delete messaging related data (messages themselves are kept for soft-deleted users;
+      // created-conversation cleanup already ran above)
       await tx.delete(typingIndicators).where(eq(typingIndicators.userId, id));
       await tx.delete(userOnlineStatus).where(eq(userOnlineStatus.userId, id));
       await tx.delete(messageReadReceipts).where(eq(messageReadReceipts.userId, id));
-      await tx.delete(messageAttachments).where(
-        sql`${messageAttachments.messageId} IN (SELECT id FROM ${messages} WHERE ${messages.senderId} = ${id})`
-      );
-      await tx.delete(messages).where(eq(messages.senderId, id));
       await tx.delete(conversationParticipants).where(eq(conversationParticipants.userId, id));
       
       // Delete payment requests
@@ -1599,8 +1611,24 @@ export class DatabaseStorage implements IStorage {
       // Clear team captain assignments
       await tx.update(teams).set({ captainId: null }).where(eq(teams.captainId, id));
       
-      // Finally, delete the user
-      await tx.delete(users).where(eq(users.id, id));
+      // Soft-delete the user: wipe all PII but keep the row so existing messages
+      // can display "User No Longer on Roster" rather than breaking.
+      await tx.update(users).set({
+        deletedAt: new Date(),
+        firstName: null as any,
+        lastName: null as any,
+        email: null as any,
+        phoneNumber: null,
+        profileImageUrl: null,
+        dateOfBirth: null,
+        city: null,
+        zipCode: null,
+        venmoUsername: null,
+        cashappUsername: null,
+        referralCode: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      }).where(eq(users.id, id));
       
       // After transaction completes, sync team chats asynchronously
       // This runs after the transaction to avoid holding locks
