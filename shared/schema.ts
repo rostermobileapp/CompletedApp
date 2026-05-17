@@ -260,6 +260,7 @@ export const users = pgTable("users", {
   lng: decimal("lng", { precision: 9, scale: 6 }),
   primarySport: sportEnum("primary_sport"),
   playerType: playerTypeEnum("player_type"),
+  shoots: text("shoots"), // 'left' | 'right' — handedness for draft tool
   // Permission system fields
   role: userRoleEnum("role").default("free_tier").notNull(),
   specialPermissions: specialPermissionEnum("special_permissions").array(),

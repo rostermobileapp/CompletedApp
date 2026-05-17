@@ -289,7 +289,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
+  updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'shoots' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
@@ -1177,7 +1177,7 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User> {
+  async updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'shoots' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User> {
     if (profileData.city !== undefined && profileData.city === '') {
       profileData = { ...profileData, city: null };
     }

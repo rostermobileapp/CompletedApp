@@ -687,7 +687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/auth/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType, email, timezone, zipCode } = req.body;
+      const { firstName, lastName, city, age, phoneNumber, dateOfBirth, playerType, shoots, email, timezone, zipCode } = req.body;
       
       const profileData: any = {};
       if (firstName !== undefined) profileData.firstName = firstName;
@@ -697,6 +697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (phoneNumber !== undefined) profileData.phoneNumber = phoneNumber;
       if (dateOfBirth !== undefined) profileData.dateOfBirth = dateOfBirth;
       if (playerType !== undefined) profileData.playerType = playerType;
+      if (shoots !== undefined) profileData.shoots = shoots || null;
       if (email !== undefined) profileData.email = email;
       if (timezone !== undefined) {
         profileData.timezone = timezone;

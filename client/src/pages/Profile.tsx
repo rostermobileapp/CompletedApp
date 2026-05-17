@@ -52,6 +52,7 @@ const profileSchema = z.object({
   city: z.string().optional(),
   zipCode: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie']).optional(),
+  shoots: z.enum(['left', 'right']).optional(),
   timezone: z.string().optional(),
 });
 
@@ -142,6 +143,7 @@ export default function Profile() {
       city: (user as any)?.city || '',
       zipCode: (user as any)?.zipCode || '',
       playerType: (user as any)?.playerType || undefined,
+      shoots: (user as any)?.shoots || undefined,
       timezone: (user as any)?.timezone || 'America/New_York',
     },
   });
@@ -624,6 +626,28 @@ export default function Profile() {
               </div>
               
               <div>
+                <label className="block text-sm font-medium mb-1">Handedness</label>
+                <Controller
+                  name="shoots"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-shoots">
+                        <SelectValue placeholder="Select handedness" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="left" data-testid="option-left">Left</SelectItem>
+                        <SelectItem value="right" data-testid="option-right">Right</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium mb-1">Timezone</label>
                 <Controller
                   name="timezone"
@@ -684,6 +708,12 @@ export default function Profile() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Player Type:</span>
                 <span data-testid="text-player-type">{(user as any)?.playerType || 'Not specified'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Handedness:</span>
+                <span data-testid="text-shoots">
+                  {(user as any)?.shoots ? ((user as any).shoots === 'left' ? 'Left' : 'Right') : 'Not specified'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Timezone:</span>
