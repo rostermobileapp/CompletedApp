@@ -1320,7 +1320,24 @@ export class MessagingService {
     
     await db.delete(messageReadReceipts)
       .where(sql`message_id IN (SELECT id FROM messages WHERE conversation_id = ${conversationId})`);
-    
+
+    // Fetch attachment storage paths before deleting DB records, then remove
+    // the actual files from object storage so they don't become orphans.
+    const attachmentRows = await db
+      .select({ url: messageAttachments.url })
+      .from(messageAttachments)
+      .where(sql`message_id IN (SELECT id FROM messages WHERE conversation_id = ${conversationId})`);
+
+    if (attachmentRows.length > 0) {
+      try {
+        const { SupabaseStorageService } = await import('./supabaseStorage');
+        const storageService = new SupabaseStorageService();
+        await storageService.deleteMessageAttachments(attachmentRows.map((r) => r.url));
+      } catch (err) {
+        console.error('Failed to delete message attachment files from storage:', err);
+      }
+    }
+
     await db.delete(messageAttachments)
       .where(sql`message_id IN (SELECT id FROM messages WHERE conversation_id = ${conversationId})`);
     

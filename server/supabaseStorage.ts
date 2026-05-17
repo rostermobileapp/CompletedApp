@@ -474,6 +474,27 @@ export class SupabaseStorageService {
     };
   }
 
+  async deleteMessageAttachments(paths: string[]): Promise<void> {
+    if (paths.length === 0) return;
+
+    const filePaths = paths.map((p) => {
+      const normalized = p.startsWith("/message-attachments/")
+        ? p.slice(1)
+        : p.startsWith("message-attachments/")
+        ? p
+        : `message-attachments/${p}`;
+      return normalized;
+    });
+
+    const { error } = await this.supabase.storage
+      .from("private")
+      .remove(filePaths);
+
+    if (error) {
+      console.error("Error deleting message attachments from storage:", error);
+    }
+  }
+
   async deleteTournamentPhoto(tournamentPhotoPath: string): Promise<void> {
     if (!tournamentPhotoPath.startsWith("/tournament-photos/")) {
       throw new Error("Invalid tournament photo path");
