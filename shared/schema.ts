@@ -2548,6 +2548,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   primarySport: true,
+  shoots: true,
 });
 
 // Onboarding schema for updating onboarding-related fields

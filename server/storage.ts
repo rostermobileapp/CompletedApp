@@ -865,6 +865,7 @@ export class DatabaseStorage implements IStorage {
         city, 
         primary_sport as "primarySport", 
         player_type as "playerType",
+        shoots,
         role::text as role,
         special_permissions as "specialPermissions", 
         is_primary_commissioner as "isPrimaryCommissioner", 
