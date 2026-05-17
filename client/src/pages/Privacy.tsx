@@ -25,7 +25,7 @@ export default function Privacy() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-16">
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
         <div className="max-w-2xl w-full text-center space-y-8">
           {/* Privacy Statement */}
           <div className="space-y-4">
