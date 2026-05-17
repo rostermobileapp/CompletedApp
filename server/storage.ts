@@ -4018,7 +4018,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.leagueId, leagueId),
-          eq(leagueMemberships.status, "approved")
+          eq(leagueMemberships.status, "approved"),
+          isNull(users.deletedAt)
         )
       );
     return result.map(r => ({ ...r.league_memberships, user: r.users }));
@@ -9559,7 +9560,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(users)
-      .where(ilike(users.email, `%${email}%`))
+      .where(and(ilike(users.email, `%${email}%`), isNull(users.deletedAt)))
       .limit(limit);
   }
 

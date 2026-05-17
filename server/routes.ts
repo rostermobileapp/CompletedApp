@@ -35,7 +35,7 @@ import { leagues, leagueMemberships, importedPlayers, teams, users, announcement
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
-import { eq, and, or, ilike, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
 import { formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
 import {
@@ -1642,6 +1642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(tournamentParticipants.tournamentId, tournamentId as string),
               eq(tournamentParticipants.status, 'approved'),
+              isNull(users.deletedAt),
               or(
                 sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
@@ -1666,6 +1667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(leagueMemberships.leagueId, leagueId as string),
               eq(leagueMemberships.status, 'approved'),
+              isNull(users.deletedAt),
               or(
                 sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
@@ -1686,11 +1688,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .from(users)
           .where(
-            or(
-              sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
-              sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
-              sql`LOWER(${users.email}) LIKE LOWER(${`%${q}%`})`,
-              sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+            and(
+              isNull(users.deletedAt),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.email}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
             )
           )
           .limit(10);
@@ -4866,6 +4871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(tournamentParticipants.tournamentId, tournamentId as string),
               eq(tournamentParticipants.status, 'approved'),
+              isNull(users.deletedAt),
               or(
                 sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
@@ -4888,6 +4894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(leagueMemberships.leagueId, leagueId as string),
               eq(leagueMemberships.status, 'approved'),
+              isNull(users.deletedAt),
               or(
                 sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
                 sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
@@ -4906,10 +4913,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .from(users)
           .where(
-            or(
-              sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
-              sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
-              sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+            and(
+              isNull(users.deletedAt),
+              or(
+                sql`LOWER(${users.firstName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(${users.lastName}) LIKE LOWER(${`%${q}%`})`,
+                sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${`%${q}%`})`
+              )
             )
           )
           .limit(10);
@@ -15303,6 +15313,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const { otherUserId, leagueId, teamId, tournamentId } = requestSchema.parse(req.body);
+
+      // Prevent creating a conversation with a soft-deleted account
+      const otherUser = await storage.getUser(otherUserId);
+      if (!otherUser || otherUser.deletedAt) {
+        return res.status(404).json({ message: 'User not found' });
+      }
 
       // Normalize the scope server-side so all callers behave consistently
       // and stale/inconsistent client tuples can't fragment DM threads:
