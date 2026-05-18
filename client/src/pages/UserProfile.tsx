@@ -20,6 +20,7 @@ interface UserProfileData {
   profileImageUrl?: string | null;
   role?: string | null;
   playerType?: string | null;
+  shoots?: string | null;
   venmoUsername?: string | null;
   cashappUsername?: string | null;
   timezone?: string | null;
@@ -278,10 +279,18 @@ export default function UserProfile() {
               <span className="text-muted-foreground">City:</span>
               <span data-testid="text-profile-city">{user.city || 'Not specified'}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Player Type:</span>
-              <span data-testid="text-player-type">{user.playerType || 'Not specified'}</span>
-            </div>
+            {user.playerType && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Player Type:</span>
+                <span data-testid="text-player-type" className="capitalize">{user.playerType}</span>
+              </div>
+            )}
+            {user.shoots && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Handedness:</span>
+                <span data-testid="text-handedness" className="capitalize">{user.shoots}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Timezone:</span>
               <span data-testid="text-profile-timezone">{formatTimezone(user.timezone)}</span>
