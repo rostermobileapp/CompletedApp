@@ -8,4 +8,5 @@ ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_user_ids text[] NOT NULL 
 
 -- Add team_assignment to scrimmage_requests: light/dark team colour assigned when
 -- a commissioner approves (or later reassigns) a player's join request.
-ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar;
+-- DB-level CHECK mirrors API-level validation for defence-in-depth.
+ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar CHECK (team_assignment IN ('light', 'dark'));

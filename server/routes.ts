@@ -354,9 +354,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Ensure scrimmages.invite_group_id exists (live invite group for recurring scrimmages)
   try {
-    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_group_id varchar`);
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_group_id varchar REFERENCES invite_groups(id) ON DELETE SET NULL`);
   } catch (err) {
-    console.error('[Init] Failed to ensure scrimmages.invite_group_id column:', err);
+    // Column may already exist without FK — add FK separately if so
+    try {
+      await db.execute(sql`
+        ALTER TABLE scrimmages
+        ADD CONSTRAINT scrimmages_invite_group_id_fkey
+        FOREIGN KEY (invite_group_id) REFERENCES invite_groups(id) ON DELETE SET NULL
+      `);
+    } catch { /* constraint already exists — no-op */ }
   }
   // Ensure scrimmages.invite_user_ids exists (directly-selected invitees for recurring job merge)
   try {
@@ -366,9 +373,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   // Ensure scrimmage_requests.team_assignment exists (light/dark team colour assignment)
   try {
-    await db.execute(sql`ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar`);
+    await db.execute(sql`ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar CHECK (team_assignment IN ('light', 'dark'))`);
   } catch (err) {
-    console.error('[Init] Failed to ensure scrimmage_requests.team_assignment column:', err);
+    // Column may already exist without CHECK — add constraint separately if so
+    try {
+      await db.execute(sql`ALTER TABLE scrimmage_requests ADD CONSTRAINT scrimmage_requests_team_assignment_check CHECK (team_assignment IN ('light', 'dark'))`);
+    } catch { /* constraint already exists — no-op */ }
   }
 
   // Initialize user registration count table
