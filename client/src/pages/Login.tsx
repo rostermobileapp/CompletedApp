@@ -198,24 +198,24 @@ export default function Login() {
               <motion.div
                 className="fixed left-0 right-0 mx-auto z-50 w-full max-w-[512px] px-6"
                 initial={{ opacity: 0, scale: 0.95, top: '33%' }}
-                animate={{ opacity: 1, scale: 1, top: '8%' }}
+                animate={{ opacity: 1, scale: 1, top: '2%' }}
                 exit={{ opacity: 0, scale: 0.95, top: '33%' }}
                 transition={{
                   duration: 0.8,
                   ease: [0.4, 0, 0.2, 1],
                 }}
               >
-                <div className="text-center mb-6">
+                <div className="text-center mb-2">
                   <img
                     src={rosterLogo}
                     alt="Roster"
-                    className="w-full h-auto mx-auto"
+                    className="w-3/4 h-auto mx-auto"
                     data-testid="modal-logo"
                   />
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <div className="space-y-1">
+                <form onSubmit={handleSubmit} className="space-y-2">
+                  <div className="space-y-0.5">
                     <Label htmlFor="email" className="text-black text-sm">Email</Label>
                     <Input
                       id="email"
@@ -229,7 +229,7 @@ export default function Login() {
                     />
                   </div>
                   
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <Label htmlFor="password" className="text-black text-sm">Password</Label>
                     <div className="relative">
                       <Input
@@ -259,7 +259,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setLocation('/forgot-password')}
-                        className="hover:underline text-xs min-h-[36px] px-1 text-black"
+                        className="hover:underline text-xs min-h-[32px] px-1 text-black"
                         data-testid="link-forgot-password"
                       >
                         Forgot password?
