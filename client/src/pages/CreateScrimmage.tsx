@@ -70,7 +70,9 @@ export default function CreateScrimmage() {
   const queryClient = useQueryClient();
   const { canAccessPremiumFeatures } = usePermissions();
   const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [goalieSearchTerm, setGoalieSearchTerm] = useState("");
+  const [skaterSearchTerm, setSkaterSearchTerm] = useState("");
+  const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
   const [coHostSearchTerm, setCoHostSearchTerm] = useState("");
@@ -197,9 +199,14 @@ export default function CreateScrimmage() {
     enabled: emailSearchTerm.length > 2,
   });
 
-  // Filter members based on search term (names only)
-  const filteredMembers = (leagueMembers as any[]).filter((member: any) => 
-    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
+  // Separate goalie / skater lists with independent search
+  const filteredGoalies = (leagueMembers as any[]).filter((member: any) =>
+    member.isGoalie === true &&
+    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(goalieSearchTerm.toLowerCase())
+  );
+  const filteredSkaters = (leagueMembers as any[]).filter((member: any) =>
+    member.isSkater === true &&
+    `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(skaterSearchTerm.toLowerCase())
   );
 
   // Combine league facility with user facility memberships
@@ -398,6 +405,7 @@ export default function CreateScrimmage() {
           selectedMemberIds: filteredMemberIds, // Include for targeted announcements/invitations
           selectedEmails: data.selectedEmails || [], // Include email invites
           coHostIds: data.coHostIds || [], // Include co-hosts who can help manage
+          inviteGroupId: loadedInviteGroupId || null, // Persist group for recurring live-membership sends
         });
         return response.json();
       }
@@ -455,13 +463,34 @@ export default function CreateScrimmage() {
     form.trigger('selectedMemberIds');
   };
 
-  const selectAllMembers = () => {
-    const allMemberIds = filteredMembers.map((member: any) => member.user.id);
-    setSelectedMemberIds(allMemberIds);
-    form.setValue('selectedMemberIds', allMemberIds);
+  const selectAllGoalies = () => {
+    const ids = filteredGoalies.map((m: any) => m.user.id);
+    const combined = Array.from(new Set([...selectedMemberIds, ...ids]));
+    setSelectedMemberIds(combined);
+    form.setValue('selectedMemberIds', combined);
     form.trigger('selectedMemberIds');
   };
-
+  const deselectAllGoalies = () => {
+    const idSet = new Set(filteredGoalies.map((m: any) => m.user.id));
+    const remaining = selectedMemberIds.filter(id => !idSet.has(id));
+    setSelectedMemberIds(remaining);
+    form.setValue('selectedMemberIds', remaining);
+    form.trigger('selectedMemberIds');
+  };
+  const selectAllSkaters = () => {
+    const ids = filteredSkaters.map((m: any) => m.user.id);
+    const combined = Array.from(new Set([...selectedMemberIds, ...ids]));
+    setSelectedMemberIds(combined);
+    form.setValue('selectedMemberIds', combined);
+    form.trigger('selectedMemberIds');
+  };
+  const deselectAllSkaters = () => {
+    const idSet = new Set(filteredSkaters.map((m: any) => m.user.id));
+    const remaining = selectedMemberIds.filter(id => !idSet.has(id));
+    setSelectedMemberIds(remaining);
+    form.setValue('selectedMemberIds', remaining);
+    form.trigger('selectedMemberIds');
+  };
   const deselectAllMembers = () => {
     setSelectedMemberIds([]);
     form.setValue('selectedMemberIds', []);
@@ -516,7 +545,7 @@ export default function CreateScrimmage() {
     setSelectedEmails(selectedEmails.filter(e => e !== email));
   };
 
-  // Load invite group
+  // Load invite group — also records the group ID so recurring scrimmages re-use it live
   const loadInviteGroup = async (groupId: string) => {
     if (!groupId) return;
     
@@ -538,6 +567,7 @@ export default function CreateScrimmage() {
         
         setSelectedMemberIds(Array.from(new Set([...selectedMemberIds, ...userIds])));
         setSelectedEmails(Array.from(new Set([...selectedEmails, ...emails])));
+        setLoadedInviteGroupId(groupId);
         
         toast({
           title: 'Group Loaded',
@@ -1382,95 +1412,122 @@ export default function CreateScrimmage() {
             )}
           </div>
 
-          {/* League Members Section */}
-          <div className="mb-6">
-            <Label>League Members</Label>
-            {/* Search */}
-            <div className="mt-2 mb-4">
-              <Input
-                placeholder="Search by name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                data-testid="input-search-members"
-              />
-            </div>
-
-          {/* Selected count and bulk actions */}
-          <div className="mb-4 flex items-center justify-between">
+          {/* Total selected count + clear all */}
+          <div className="mb-3 flex items-center justify-between">
             <p className="text-sm text-muted-foreground" data-testid="text-selected-count">
               {selectedMemberIds.length} member{selectedMemberIds.length !== 1 ? 's' : ''} selected
             </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={selectAllMembers}
-                disabled={filteredMembers.length === 0}
-                data-testid="button-select-all"
-              >
-                Select All
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={deselectAllMembers}
-                disabled={selectedMemberIds.length === 0}
-                data-testid="button-deselect-all"
-              >
-                Deselect All
-              </Button>
-            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={deselectAllMembers} disabled={selectedMemberIds.length === 0} data-testid="button-deselect-all">
+              Clear All
+            </Button>
           </div>
 
-          {/* Member list */}
-          <ScrollArea className="h-64">
-            {membersLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
-                    <div className="w-10 h-10 bg-muted rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
+          {/* Goalies subsection */}
+          <div className="mb-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Label className="text-sm font-semibold">Goalies</Label>
+              <Badge variant="outline" className="text-xs">{filteredGoalies.length}</Badge>
+            </div>
+            <div className="mb-2">
+              <Input
+                placeholder="Search goalies..."
+                value={goalieSearchTerm}
+                onChange={(e) => setGoalieSearchTerm(e.target.value)}
+                data-testid="input-search-goalies"
+              />
+            </div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredGoalies.length} selected
+              </p>
+              <div className="flex gap-1">
+                <Button type="button" variant="outline" size="sm" onClick={selectAllGoalies} disabled={filteredGoalies.length === 0} data-testid="button-select-all-goalies">Select All</Button>
+                <Button type="button" variant="outline" size="sm" onClick={deselectAllGoalies} disabled={!filteredGoalies.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-goalies">Deselect</Button>
+              </div>
+            </div>
+            <ScrollArea className="h-48">
+              {membersLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                      <div className="w-8 h-8 bg-muted rounded-full" />
+                      <div className="h-4 bg-muted rounded w-1/2" />
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : filteredMembers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? 'No members found' : 'No league members available'}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredMembers.map((member: any) => (
-                  <div
-                    key={member.user.id}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 pt-[4px] pb-[4px]"
-                    data-testid={`member-item-${member.user.id}`}
-                  >
-                    <Checkbox
-                      checked={selectedMemberIds.includes(member.user.id)}
-                      onCheckedChange={() => toggleMemberSelection(member.user.id)}
-                      data-testid={`checkbox-member-${member.user.id}`}
-                    />
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={member.user.profileImageUrl || undefined} />
-                      <AvatarFallback>
-                        {member.user.firstName?.[0]}{member.user.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium" data-testid={`text-member-name-${member.user.id}`}>
-                        {member.user.firstName} {member.user.lastName}
-                      </p>
+                  ))}
+                </div>
+              ) : filteredGoalies.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredGoalies.map((member: any) => (
+                    <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`goalie-item-${member.user.id}`}>
+                      <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-goalie-${member.user.id}`} />
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={member.user.profileImageUrl || undefined} />
+                        <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* Skaters subsection */}
+          <div className="mb-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Label className="text-sm font-semibold">Skaters</Label>
+              <Badge variant="outline" className="text-xs">{filteredSkaters.length}</Badge>
+            </div>
+            <div className="mb-2">
+              <Input
+                placeholder="Search skaters..."
+                value={skaterSearchTerm}
+                onChange={(e) => setSkaterSearchTerm(e.target.value)}
+                data-testid="input-search-skaters"
+              />
+            </div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredSkaters.length} selected
+              </p>
+              <div className="flex gap-1">
+                <Button type="button" variant="outline" size="sm" onClick={selectAllSkaters} disabled={filteredSkaters.length === 0} data-testid="button-select-all-skaters">Select All</Button>
+                <Button type="button" variant="outline" size="sm" onClick={deselectAllSkaters} disabled={!filteredSkaters.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-skaters">Deselect</Button>
               </div>
-            )}
-          </ScrollArea>
+            </div>
+            <ScrollArea className="h-48">
+              {membersLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                      <div className="w-8 h-8 bg-muted rounded-full" />
+                      <div className="h-4 bg-muted rounded w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredSkaters.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredSkaters.map((member: any) => (
+                    <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`skater-item-${member.user.id}`}>
+                      <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-skater-${member.user.id}`} />
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={member.user.profileImageUrl || undefined} />
+                        <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
 
           {/* Email Invites Section */}

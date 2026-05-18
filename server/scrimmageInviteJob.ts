@@ -83,9 +83,17 @@ async function checkAndSendInvitations() {
           continue;
         }
 
-        // Get all league members to invite (based on the original scrimmage settings)
-        const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
-        const approvedMembers = leagueMembers.filter(m => m.status === 'approved');
+        // Get members to invite — use live invite group membership if one is linked to the parent
+        let approvedMembers;
+        if (parentScrimmage.inviteGroupId) {
+          const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
+          const groupUserIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
+          const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
+          approvedMembers = leagueMembers.filter(m => groupUserIds.has(m.userId));
+          console.log(`📋 Using live invite group ${parentScrimmage.inviteGroupId}: ${approvedMembers.length} / ${leagueMembers.length} league members`);
+        } else {
+          approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
+        }
         
         // Get the creator's name for the push notification
         const creator = await storage.getUser(scrimmage.creatorId);

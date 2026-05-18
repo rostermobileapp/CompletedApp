@@ -352,6 +352,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure tournaments.stripe_processed_session_ids column:', err);
   }
 
+  // Ensure scrimmages.invite_group_id exists (live invite group for recurring scrimmages)
+  try {
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_group_id varchar`);
+  } catch (err) {
+    console.error('[Init] Failed to ensure scrimmages.invite_group_id column:', err);
+  }
+  // Ensure scrimmage_requests.team_assignment exists (light/dark team colour assignment)
+  try {
+    await db.execute(sql`ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar`);
+  } catch (err) {
+    console.error('[Init] Failed to ensure scrimmage_requests.team_assignment column:', err);
+  }
+
   // Initialize user registration count table
   try {
     await db.execute(sql`
@@ -14295,7 +14308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const requestId = req.params.id;
       const userId = req.user.claims.sub;
-      const { status } = req.body;
+      const { status, teamAssignment } = req.body;
       
       const user = await storage.getUser(userId);
       if (!user) {
@@ -14305,6 +14318,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate status input
       if (!status || !['approved', 'dismissed'].includes(status)) {
         return res.status(400).json({ message: 'Status must be "approved" or "dismissed"' });
+      }
+
+      // Validate optional teamAssignment
+      if (teamAssignment !== undefined && teamAssignment !== null && !['light', 'dark'].includes(teamAssignment)) {
+        return res.status(400).json({ message: 'teamAssignment must be "light", "dark", or null' });
       }
 
       // Get the request first
@@ -14352,7 +14370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status);
+      const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status, undefined, teamAssignment ?? null);
       
       // Send approval notification email if request was approved
       if (status === 'approved') {
@@ -14421,6 +14439,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating request status:', error);
       res.status(500).json({ message: 'Failed to update request status' });
+    }
+  });
+
+  // Set team assignment on an already-approved scrimmage request
+  app.put('/api/scrimmage-requests/:id/team-assignment', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { teamAssignment } = req.body;
+
+      if (teamAssignment !== undefined && teamAssignment !== null && !['light', 'dark'].includes(teamAssignment)) {
+        return res.status(400).json({ message: 'teamAssignment must be "light", "dark", or null' });
+      }
+
+      const request = await storage.getScrimmageRequestById(requestId);
+      if (!request) return res.status(404).json({ message: 'Request not found' });
+
+      if (request.status !== 'approved') {
+        return res.status(409).json({ message: 'Team assignment can only be changed for approved players' });
+      }
+
+      const { canManage } = await storage.canUserManageScrimmage(request.scrimmageId, userId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only the creator or co-hosts can assign teams' });
+      }
+
+      const updatedRequest = await storage.setTeamAssignment(requestId, teamAssignment ?? null);
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error('Error setting team assignment:', error);
+      res.status(500).json({ message: 'Failed to set team assignment' });
     }
   });
 

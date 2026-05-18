@@ -622,7 +622,8 @@ export interface IStorage {
   createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest>;
   getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]>;
   getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined>;
-  updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest>;
+  updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date, teamAssignment?: string | null): Promise<ScrimmageRequest>;
+  setTeamAssignment(requestId: string, teamAssignment: string | null): Promise<ScrimmageRequest>;
   deleteScrimmageRequest(requestId: string): Promise<void>;
   getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
   getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]>;
@@ -9223,13 +9224,17 @@ export class DatabaseStorage implements IStorage {
     return request;
   }
 
-  async updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date): Promise<ScrimmageRequest> {
-    const updateData: Partial<InsertScrimmageRequest> = { status };
+  async updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date, teamAssignment?: string | null): Promise<ScrimmageRequest> {
+    const updateData: any = { status };
     
     if (status === 'approved') {
       updateData.approvedAt = timestamp || new Date();
     } else if (status === 'dismissed') {
       updateData.dismissedAt = timestamp || new Date();
+    }
+
+    if (teamAssignment !== undefined) {
+      updateData.teamAssignment = teamAssignment;
     }
 
     const [updatedRequest] = await db
@@ -9239,6 +9244,15 @@ export class DatabaseStorage implements IStorage {
         eq(scrimmageRequests.id, requestId),
         eq(scrimmageRequests.status, 'pending')
       ))
+      .returning();
+    return updatedRequest;
+  }
+
+  async setTeamAssignment(requestId: string, teamAssignment: string | null): Promise<ScrimmageRequest> {
+    const [updatedRequest] = await db
+      .update(scrimmageRequests)
+      .set({ teamAssignment })
+      .where(eq(scrimmageRequests.id, requestId))
       .returning();
     return updatedRequest;
   }

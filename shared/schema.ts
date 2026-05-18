@@ -1223,6 +1223,7 @@ export const scrimmages = pgTable("scrimmages", {
   inviteTimeOfDay: varchar("invite_time_of_day"), // Time to send invites in HH:MM format (e.g., "09:00" for 9am)
   inviteSentAt: timestamp("invite_sent_at"), // When the invite was sent for this occurrence (null if not sent yet)
   color: text("color"), // Optional color for calendar display (e.g. "#ef4444" or "blue")
+  inviteGroupId: varchar("invite_group_id"), // Live invite group for recurring scrimmages — re-fetched at each send time
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1236,6 +1237,7 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   requestedAt: timestamp("requested_at").defaultNow().notNull(),
   approvedAt: timestamp("approved_at"),
   dismissedAt: timestamp("dismissed_at"),
+  teamAssignment: varchar("team_assignment"), // 'light' | 'dark' | null — assigned team colour
 }, (table) => [
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);

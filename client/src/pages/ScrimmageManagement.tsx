@@ -75,6 +75,7 @@ export default function ScrimmageManagement() {
     canSendReminders: true,
     canManagePayments: true,
   });
+  const [pendingTeamAssignment, setPendingTeamAssignment] = useState<Record<string, 'light' | 'dark' | null>>({});
   const { canAccessPremiumFeatures } = usePermissions();
 
   const handleBack = () => {
@@ -144,8 +145,8 @@ export default function ScrimmageManagement() {
   });
 
   const manageRequestMutation = useMutation({
-    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
-      const response = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/status`, { status });
+    mutationFn: async ({ requestId, status, teamAssignment }: { requestId: string; status: 'approved' | 'dismissed'; teamAssignment?: 'light' | 'dark' | null }) => {
+      const response = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/status`, { status, teamAssignment: teamAssignment ?? null });
       return response.json();
     },
     onSuccess: (_, { status }) => {
@@ -158,6 +159,20 @@ export default function ScrimmageManagement() {
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to process request', variant: 'destructive' });
+    },
+  });
+
+  const setTeamAssignmentMutation = useMutation({
+    mutationFn: async ({ requestId, teamAssignment }: { requestId: string; teamAssignment: 'light' | 'dark' | null }) => {
+      const response = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/team-assignment`, { teamAssignment });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', viewRosterScrimmage, 'approved-players'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to update team assignment', variant: 'destructive' });
     },
   });
 
@@ -516,7 +531,20 @@ export default function ScrimmageManagement() {
                       <div className="flex-1">
                         <p className="font-medium text-white text-[16px]">{request.player.firstName} {request.player.lastName}</p>
                       </div>
-                      <Badge className="bg-green-600 text-white text-xs hover:bg-green-600">✓ Confirmed</Badge>
+                      <div className="flex items-center gap-1">
+                        {request.teamAssignment && (
+                          <Badge
+                            className={`text-xs hover:opacity-90 ${
+                              request.teamAssignment === 'light'
+                                ? 'bg-white text-black border border-gray-300 hover:bg-white'
+                                : 'bg-gray-700 text-white hover:bg-gray-700'
+                            }`}
+                          >
+                            {request.teamAssignment.charAt(0).toUpperCase() + request.teamAssignment.slice(1)}
+                          </Badge>
+                        )}
+                        <Badge className="bg-green-600 text-white text-xs hover:bg-green-600">✓ Confirmed</Badge>
+                      </div>
                     </div>
                   ))}
                   <div className="mt-4 pt-4 border-t border-gray-600 text-center">
@@ -554,22 +582,44 @@ export default function ScrimmageManagement() {
                       ) : (
                         <div className="space-y-3">
                           {getPendingRequests(requests).map((request) => (
-                            <div key={request.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={request.player.profileImageUrl || undefined} />
-                                <AvatarFallback>{request.player.firstName?.[0]}{request.player.lastName?.[0]}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <p className="font-medium">{request.player.firstName} {request.player.lastName}</p>
-                                <p className="text-sm text-muted-foreground">{formatDistanceToNow(new Date(request.requestedAt), { addSuffix: true })}</p>
+                            <div key={request.id} className="p-3 rounded-lg border bg-muted/50 space-y-2">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                  <AvatarFallback>{request.player.firstName?.[0]}{request.player.lastName?.[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="font-medium">{request.player.firstName} {request.player.lastName}</p>
+                                  <p className="text-sm text-muted-foreground">{formatDistanceToNow(new Date(request.requestedAt), { addSuffix: true })}</p>
+                                </div>
                               </div>
-                              <div className="flex gap-1">
-                                <Button size="sm" variant="default" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved' })} disabled={manageRequestMutation.isPending}>
-                                  <Check className="w-4 h-4" />
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })} disabled={manageRequestMutation.isPending}>
-                                  <X className="w-4 h-4" />
-                                </Button>
+                              <div className="flex items-center justify-between">
+                                <div className="flex gap-1">
+                                  {([null, 'light', 'dark'] as const).map(team => (
+                                    <button
+                                      key={team ?? 'none'}
+                                      type="button"
+                                      onClick={() => setPendingTeamAssignment(prev => ({ ...prev, [request.id]: team }))}
+                                      className={`text-xs px-2 py-1 rounded border transition-colors ${
+                                        (pendingTeamAssignment[request.id] ?? null) === team
+                                          ? team === 'light' ? 'bg-white text-black border-gray-400'
+                                            : team === 'dark' ? 'bg-gray-700 text-white border-gray-500'
+                                            : 'bg-muted border-foreground/30 text-foreground'
+                                          : 'border-transparent text-muted-foreground hover:border-foreground/20'
+                                      }`}
+                                    >
+                                      {team === null ? 'No Team' : team.charAt(0).toUpperCase() + team.slice(1)}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button size="sm" variant="default" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved', teamAssignment: pendingTeamAssignment[request.id] ?? null })} disabled={manageRequestMutation.isPending}>
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })} disabled={manageRequestMutation.isPending}>
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -585,16 +635,38 @@ export default function ScrimmageManagement() {
                       ) : (
                         <div className="space-y-3">
                           {getApprovedRequests(requests).map((request) => (
-                            <div key={request.id} className="flex items-center gap-3 p-3 rounded-lg border bg-[#e2e2e2] dark:bg-[#212121]">
-                              <Avatar className="h-10 w-10">
-                                <AvatarImage src={request.player.profileImageUrl || undefined} />
-                                <AvatarFallback>{request.player.firstName?.[0]}{request.player.lastName?.[0]}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <p className="font-medium">{request.player.firstName} {request.player.lastName}</p>
-                                <p className="text-sm text-muted-foreground">Approved {formatDistanceToNow(new Date(request.approvedAt!), { addSuffix: true })}</p>
+                            <div key={request.id} className="p-3 rounded-lg border bg-[#e2e2e2] dark:bg-[#212121] space-y-2">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                  <AvatarFallback>{request.player.firstName?.[0]}{request.player.lastName?.[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="font-medium">{request.player.firstName} {request.player.lastName}</p>
+                                  <p className="text-sm text-muted-foreground">Approved {formatDistanceToNow(new Date(request.approvedAt!), { addSuffix: true })}</p>
+                                </div>
+                                <Badge variant="default" className="bg-green-600">Approved</Badge>
                               </div>
-                              <Badge variant="default" className="bg-green-600">Approved</Badge>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-xs text-muted-foreground mr-1">Team:</span>
+                                {([null, 'light', 'dark'] as const).map(team => (
+                                  <button
+                                    key={team ?? 'none'}
+                                    type="button"
+                                    onClick={() => setTeamAssignmentMutation.mutate({ requestId: request.id, teamAssignment: team })}
+                                    disabled={setTeamAssignmentMutation.isPending}
+                                    className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+                                      (request.teamAssignment ?? null) === team
+                                        ? team === 'light' ? 'bg-white text-black border-gray-400'
+                                          : team === 'dark' ? 'bg-gray-700 text-white border-gray-500'
+                                          : 'bg-muted border-foreground/30 text-foreground'
+                                        : 'border-transparent text-muted-foreground hover:border-foreground/20'
+                                    }`}
+                                  >
+                                    {team === null ? 'None' : team.charAt(0).toUpperCase() + team.slice(1)}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           ))}
                         </div>
