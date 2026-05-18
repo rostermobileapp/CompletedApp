@@ -2896,6 +2896,8 @@ export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
 export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests).omit({
   id: true,
   requestedAt: true,
+}).extend({
+  teamAssignment: z.enum(['light', 'dark']).nullable().optional(),
 });
 
 export const insertScrimmageCoHostSchema = createInsertSchema(scrimmageCoHosts).omit({
