@@ -32,6 +32,7 @@ const profileSchema = z.object({
   email: z.string().email('Invalid email'),
   phoneNumber: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie'], { required_error: 'Please select your position' }),
+  shoots: z.enum(['Left', 'Right']).optional(),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -76,6 +77,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       email: '',
       phoneNumber: '',
       playerType: undefined,
+      shoots: undefined,
     },
   });
 
@@ -90,6 +92,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       email: userData.email || '',
       phoneNumber: userData.phoneNumber || '',
       playerType: userData.playerType || undefined,
+      shoots: userData.shoots || undefined,
     });
 
     // Load saved onboarding progress for resume functionality
@@ -193,6 +196,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
 
       await saveProgressMutation.mutateAsync({
         ...formData,
+        shoots: formData.shoots || null,
         onboardingProgress: { currentScreen: currentScreen + 1 },
       });
     } else if (currentScreen === 2 && selectedFacility) {
@@ -391,6 +395,32 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                 {form.formState.errors.playerType && (
                   <p className="text-red-500 text-sm mt-1">{form.formState.errors.playerType.message}</p>
                 )}
+              </div>
+
+              <div>
+                <Label className="text-white dark:text-white mb-3 block">
+                  Handedness
+                </Label>
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    variant={form.watch('shoots') === 'Left' ? 'default' : 'outline'}
+                    className="flex-1"
+                    onClick={() => form.setValue('shoots', 'Left')}
+                    data-testid="button-shoots-left"
+                  >
+                    Left
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={form.watch('shoots') === 'Right' ? 'default' : 'outline'}
+                    className="flex-1"
+                    onClick={() => form.setValue('shoots', 'Right')}
+                    data-testid="button-shoots-right"
+                  >
+                    Right
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

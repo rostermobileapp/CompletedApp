@@ -927,6 +927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateOfBirth,
         city,
         playerType,
+        shoots,
         profileImageUrl,
         venmoUsername,
         cashappUsername,
@@ -951,6 +952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
       if (city !== undefined) updateData.city = city;
       if (playerType !== undefined) updateData.playerType = playerType;
+      if (shoots !== undefined) updateData.shoots = shoots;
       if (profileImageUrl !== undefined) updateData.profileImageUrl = profileImageUrl;
       if (venmoUsername !== undefined) updateData.venmoUsername = venmoUsername;
       if (cashappUsername !== undefined) updateData.cashappUsername = cashappUsername;
