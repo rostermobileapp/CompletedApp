@@ -13605,8 +13605,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...scrimmageData,
           announcementId,
           dateTime: dates[0],
-          inviteUserIds: req.body.selectedMemberIds || [], // Persist for recurring job merge
-        } as any);
+          inviteUserIds: (req.body.selectedMemberIds as string[]) || [], // Persist for recurring job merge
+        });
         
         
         // Add co-hosts if provided
@@ -13759,8 +13759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const scrimmage = await storage.createScrimmage({
           ...scrimmageData,
           announcementId,
-          inviteUserIds: req.body.selectedMemberIds || [],
-        } as any);
+          inviteUserIds: (req.body.selectedMemberIds as string[]) || [],
+        });
         
         
         // Add co-hosts if provided

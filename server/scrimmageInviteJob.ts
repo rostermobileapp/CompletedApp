@@ -103,7 +103,7 @@ async function checkAndSendInvitations() {
           const recipientIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
 
           // Union: add directly-selected individuals who are still approved league members
-          const directInvitees: string[] = (parentScrimmage as any).inviteUserIds || [];
+          const directInvitees: string[] = parentScrimmage.inviteUserIds || [];
           directInvitees.forEach(uid => { if (leagueMemberMap.has(uid)) recipientIds.add(uid); });
 
           approvedMembers = [...recipientIds].map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
