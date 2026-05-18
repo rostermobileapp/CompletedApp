@@ -147,6 +147,7 @@ export default function Calendar() {
         type: 'scrimmage' as const,
         userRole: 'participant' as const,
         scheduledAt: request.scrimmage.dateTime, // Match games field name
+        teamAssignment: request.teamAssignment ?? null,
       }))
   ].filter(scrimmage => {
     // Filter by active team's league if a team is selected
@@ -251,6 +252,16 @@ export default function Calendar() {
                           <h3 className="font-semibold" data-testid={`text-scrimmage-title-${event.id}`}>
                             {event.title}
                           </h3>
+                          {event.teamAssignment === 'light' && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-white text-gray-800 border border-gray-300" data-testid={`badge-team-light-${event.id}`}>
+                              Team Light
+                            </span>
+                          )}
+                          {event.teamAssignment === 'dark' && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-800 text-white" data-testid={`badge-team-dark-${event.id}`}>
+                              Team Dark
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${event.id}`}>
                           {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}

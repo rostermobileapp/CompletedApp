@@ -353,7 +353,8 @@ export async function sendScrimmageApprovalPushNotification(
   recipientId: string,
   scrimmageTitle: string,
   dateTime: string,
-  scrimmageId: string
+  scrimmageId: string,
+  teamAssignment?: string | null
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -361,11 +362,42 @@ export async function sendScrimmageApprovalPushNotification(
     console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
     return false;
   }
-  
+
+  const teamLabel = teamAssignment === 'light' ? 'Team Light' : teamAssignment === 'dark' ? 'Team Dark' : null;
+  const message = teamLabel
+    ? `You're on ${teamLabel} – ${dateTime}`
+    : `Your request has been approved - ${dateTime}`;
+
   return sendPushNotificationToUser({
     userId: recipientId,
     title: `✅ You're in! ${scrimmageTitle}`,
-    message: `Your request has been approved - ${dateTime}`,
+    message,
+    data: {
+      type: 'scrimmage_approved',
+      scrimmageId,
+    },
+  });
+}
+
+export async function sendTeamAssignmentPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  scrimmageId: string,
+  teamAssignment: string | null
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  const teamLabel = teamAssignment === 'light' ? 'Team Light' : teamAssignment === 'dark' ? 'Team Dark' : 'Unassigned';
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏒 Team assignment updated`,
+    message: `Your team for "${scrimmageTitle}" has been updated to ${teamLabel}.`,
     data: {
       type: 'scrimmage_approved',
       scrimmageId,

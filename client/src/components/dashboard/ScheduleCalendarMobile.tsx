@@ -30,6 +30,7 @@ interface MobileCalendarEvent {
   subtitle?: string | null;
   color: string;
   navigateTo?: string;
+  teamAssignment?: string | null;
 }
 
 interface ScheduleCalendarMobileProps {
@@ -129,6 +130,7 @@ export function ScheduleCalendarMobile({
           subtitle: s.location || null,
           color: s.color || KIND_FALLBACK_COLOR.scrimmage,
           navigateTo: `/scrimmage/${s.id}`,
+          teamAssignment: r.teamAssignment ?? null,
         });
       }
     }
@@ -410,6 +412,16 @@ export function ScheduleCalendarMobile({
                         >
                           {KIND_BADGE_LABEL[ev.kind]}
                         </span>
+                        {ev.kind === 'scrimmage' && ev.teamAssignment === 'light' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-white text-gray-800 border border-gray-300">
+                            Team Light
+                          </span>
+                        )}
+                        {ev.kind === 'scrimmage' && ev.teamAssignment === 'dark' && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-800 text-white">
+                            Team Dark
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {format(ev.date, 'h:mm a')}

@@ -14424,12 +14424,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const timezone = league?.timezone || 'America/New_York';
             const { date: approvalDate, time: approvalTime } = formatDayAndTime(scrimmage.dateTime, timezone);
             
+            // Build team assignment suffix for messages
+            const approvedTeamLabel = teamAssignment === 'light' ? 'Team Light' : teamAssignment === 'dark' ? 'Team Dark' : null;
+            const teamSuffix = approvedTeamLabel ? ` You're on ${approvedTeamLabel}.` : '';
+
             // Send in-app notification
             await storage.createNotification({
               userId: player.id,
               type: 'scrimmage_approved',
               title: `You're in! ${scrimmage.title}`,
-              message: `Your request to join "${scrimmage.title}" on ${approvalDate} at ${approvalTime} has been approved!`,
+              message: `Your request to join "${scrimmage.title}" on ${approvalDate} at ${approvalTime} has been approved!${teamSuffix}`,
               actionUrl: `/scrimmage/${scrimmage.id}`,
               actionText: 'View Details',
               scrimmageId: scrimmage.id,
@@ -14443,7 +14447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               player.id,
               scrimmage.title,
               scrimmageDateTime,
-              scrimmage.id
+              scrimmage.id,
+              teamAssignment ?? null
             );
             console.log(`[Push] Scrimmage approval push to ${player.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             
@@ -14502,6 +14507,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedRequest = await storage.setTeamAssignment(requestId, teamAssignment ?? null);
+
+      // Notify the player that their team assignment changed
+      try {
+        const scrimmage = await storage.getScrimmage(request.scrimmageId);
+        if (scrimmage) {
+          const assignedTeamLabel = teamAssignment === 'light' ? 'Team Light' : teamAssignment === 'dark' ? 'Team Dark' : 'Unassigned';
+          await storage.createNotification({
+            userId: request.playerId,
+            type: 'scrimmage_approved',
+            title: `Team assignment updated`,
+            message: `Your team for "${scrimmage.title}" has been updated to ${assignedTeamLabel}.`,
+            actionUrl: `/scrimmage/${scrimmage.id}`,
+            actionText: 'View Details',
+            scrimmageId: scrimmage.id,
+          });
+          broadcastNotificationUpdate(request.playerId);
+          const { sendTeamAssignmentPushNotification } = await import('./oneSignalNotifications');
+          await sendTeamAssignmentPushNotification(request.playerId, scrimmage.title, scrimmage.id, teamAssignment ?? null);
+        }
+      } catch (notifyError) {
+        console.error('[TeamAssignment] Failed to send reassignment notification:', notifyError);
+      }
+
       res.json(updatedRequest);
     } catch (error) {
       console.error('Error setting team assignment:', error);
@@ -14610,12 +14638,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const timezone = league?.timezone || 'America/New_York';
       
       try {
-        for (const playerId of approvedUserIds) {
+        for (const approvedReq of approvedRequests) {
+          const playerId = approvedReq.playerId;
+          const confirmedTeamLabel = approvedReq.teamAssignment === 'light' ? 'Team Light' : approvedReq.teamAssignment === 'dark' ? 'Team Dark' : null;
+          const confirmTeamSuffix = confirmedTeamLabel ? ` You're on ${confirmedTeamLabel}.` : '';
           await storage.createNotification({
             userId: playerId,
             type: 'scrimmage_approved',
             title: `Scrimmage Confirmed: ${scrimmage.title}`,
-            message: `Your spot in "${scrimmage.title}" has been confirmed for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}. See you on the ice!`,
+            message: `Your spot in "${scrimmage.title}" has been confirmed for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}.${confirmTeamSuffix} See you on the ice!`,
             actionUrl: `/scrimmage/${scrimmage.id}`,
             actionText: 'View Details',
             scrimmageId: scrimmage.id,
