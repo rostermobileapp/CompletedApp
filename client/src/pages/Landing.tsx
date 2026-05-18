@@ -57,7 +57,6 @@ const howItWorks = [
 export default function Landing() {
   const [scrollY, setScrollY] = useState(0);
   const [, setLocation] = useLocation();
-  const [loginMessageVisible, setLoginMessageVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isIos = useIsIosDevice();
 
@@ -107,8 +106,7 @@ export default function Landing() {
   }, []);
 
   const handleLoginClick = () => {
-    setLoginMessageVisible(true);
-    setTimeout(() => setLoginMessageVisible(false), 3000);
+    setLocation('/login');
   };
 
   return (
@@ -117,12 +115,6 @@ export default function Landing() {
       <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
         🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist</button>
       </div>
-      {/* "Come back June 1st" toast */}
-      {loginMessageVisible && (
-        <div className="fixed top-[80px] left-1/2 -translate-x-1/2 z-[100] bg-white border border-gray-200 text-gray-900 px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold">
-          🗓️ Come back June 1st — we're not live yet!
-        </div>
-      )}
       {/* Fixed Header */}
       <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-0 flex items-center md:grid md:grid-cols-3">
