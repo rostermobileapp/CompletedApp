@@ -105,13 +105,15 @@ export function ImageCropDialog({
   const [zoom, setZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Delay mounting the Cropper until after the Dialog open animation finishes,
-  // so react-easy-crop measures the container at its full final size.
-  const [cropperReady, setCropperReady] = useState(false);
+  // cropSize is measured from the real container after the dialog animation
+  // settles, then passed explicitly to the Cropper so the circle and the save
+  // math are always in sync.
+  const [cropSize, setCropSize] = useState<{ width: number; height: number } | null>(null);
 
   const imageSrcRef = useRef<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const isSavingRef = useRef(false);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
 
   // onCropComplete fires whenever the user stops interacting — store the latest
   // croppedAreaPixels in a ref so handleSave always has the most recent value.
@@ -127,12 +129,12 @@ export function ImageCropDialog({
       setCrop({ x: 0, y: 0 });
       setZoom(1);
       croppedAreaPixelsRef.current = null;
-      setCropperReady(false);
+      setCropSize(null);
       setLoadError(null);
       return;
     }
     setLoadError(null);
-    setCropperReady(false);
+    setCropSize(null);
     readFileAsDataUrl(file)
       .then((dataUrl) => {
         if (!cancelled) {
@@ -141,11 +143,17 @@ export function ImageCropDialog({
           setCrop({ x: 0, y: 0 });
           setZoom(1);
           croppedAreaPixelsRef.current = null;
-          // Wait for Dialog open animation (~150ms) before mounting the Cropper
-          // so getBoundingClientRect() returns the full container dimensions.
+          // Wait for the Dialog open animation to finish, then measure the
+          // container's real width and derive an explicit square cropSize.
+          // Passing cropSize as a prop means the Cropper never has to guess —
+          // the circle and the pixel crop math always agree.
           setTimeout(() => {
-            if (!cancelled) setCropperReady(true);
-          }, 200);
+            if (!cancelled && cropContainerRef.current) {
+              const w = cropContainerRef.current.getBoundingClientRect().width;
+              const side = Math.min(w, 300);
+              setCropSize({ width: side, height: side });
+            }
+          }, 250);
         }
       })
       .catch((err) => {
@@ -216,16 +224,18 @@ export function ImageCropDialog({
 
         <div className="space-y-4">
           <div
+            ref={cropContainerRef}
             className="relative w-full bg-black rounded-md overflow-hidden"
             style={{ height: 300 }}
           >
-            {cropperReady && imageSrc ? (
+            {cropSize && imageSrc ? (
               <Cropper
                 key={imageSrc}
                 image={imageSrc}
                 crop={crop}
                 zoom={zoom}
                 aspect={1}
+                cropSize={cropSize}
                 cropShape={cropShape}
                 objectFit="cover"
                 showGrid={false}
