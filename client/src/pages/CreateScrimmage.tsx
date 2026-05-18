@@ -75,6 +75,10 @@ export default function CreateScrimmage() {
   const [goaliesSectionOpen, setGoaliesSectionOpen] = useState(true);
   const [skatersSectionOpen, setSkatersSectionOpen] = useState(true);
   const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
+  // Tracks which selectedMemberIds originated from the invite group snapshot vs manual selection.
+  // Only manually-selected users are persisted as inviteUserIds on the scrimmage so that
+  // the recurring invite job can treat the live group as the authoritative source.
+  const [groupLoadedUserIds, setGroupLoadedUserIds] = useState<Set<string>>(new Set());
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
   const [coHostSearchTerm, setCoHostSearchTerm] = useState("");
@@ -401,6 +405,13 @@ export default function CreateScrimmage() {
           ? data.selectedMemberIds.filter(id => id !== userId)
           : data.selectedMemberIds;
 
+        // When an invite group is linked, only store manually-selected IDs (not the group snapshot)
+        // as inviteUserIds. The recurring job re-fetches live group membership at send-time and
+        // unions it with these manual IDs — so only users added outside the group are persisted.
+        const manuallySelectedIds = loadedInviteGroupId
+          ? filteredMemberIds.filter(id => !groupLoadedUserIds.has(id))
+          : filteredMemberIds;
+
         const response = await apiRequest('POST', '/api/scrimmages', {
           ...scrimmageData,
           leagueId: selectedLeague.id, // Required by server for new scrimmages
@@ -408,6 +419,7 @@ export default function CreateScrimmage() {
           selectedEmails: data.selectedEmails || [], // Include email invites
           coHostIds: data.coHostIds || [], // Include co-hosts who can help manage
           inviteGroupId: loadedInviteGroupId || null, // Persist group for recurring live-membership sends
+          inviteUserIds: manuallySelectedIds, // Only manually-selected (non-group) users persisted
         });
         return response.json();
       }
@@ -569,6 +581,7 @@ export default function CreateScrimmage() {
         
         setSelectedMemberIds(Array.from(new Set([...selectedMemberIds, ...userIds])));
         setSelectedEmails(Array.from(new Set([...selectedEmails, ...emails])));
+        setGroupLoadedUserIds(new Set(userIds)); // Track which IDs came from the group snapshot
         setLoadedInviteGroupId(groupId);
         
         toast({
@@ -1410,6 +1423,7 @@ export default function CreateScrimmage() {
                       onClick={() => {
                         setLoadedInviteGroupId(null);
                         setSelectedInviteGroupId("");
+                        setGroupLoadedUserIds(new Set()); // Clear group snapshot tracking
                       }}
                       data-testid="button-unlink-group"
                     >
