@@ -13492,6 +13492,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Must be an approved league member to create scrimmages" });
       }
 
+      // Validate inviteGroupId ownership — prevents cross-user group linkage
+      if (scrimmageData.inviteGroupId) {
+        const inviteGroup = await storage.getInviteGroup(scrimmageData.inviteGroupId);
+        if (!inviteGroup) {
+          return res.status(400).json({ message: 'Invite group not found' });
+        }
+        if (inviteGroup.creatorId !== userId) {
+          return res.status(403).json({ message: 'You can only link invite groups that you created' });
+        }
+      }
+
       // Create announcement first if there are selected members
       let announcementId = null;
       if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
