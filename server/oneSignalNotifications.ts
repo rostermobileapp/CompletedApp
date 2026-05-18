@@ -397,7 +397,7 @@ export async function sendTeamAssignmentPushNotification(
   return sendPushNotificationToUser({
     userId: recipientId,
     title: `🏒 Team assignment updated`,
-    message: `Your team for "${scrimmageTitle}" has been updated to ${teamLabel}.`,
+    message: `Your team assignment for "${scrimmageTitle}" has been updated to ${teamLabel}.`,
     data: {
       type: 'scrimmage_approved',
       scrimmageId,

@@ -14517,7 +14517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: request.playerId,
             type: 'scrimmage_approved',
             title: `Team assignment updated`,
-            message: `Your team for "${scrimmage.title}" has been updated to ${assignedTeamLabel}.`,
+            message: `Your team assignment for "${scrimmage.title}" has been updated to ${assignedTeamLabel}.`,
             actionUrl: `/scrimmage/${scrimmage.id}`,
             actionText: 'View Details',
             scrimmageId: scrimmage.id,
