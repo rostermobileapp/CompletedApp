@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
+import "react-easy-crop/react-easy-crop.css";
 import type { Area, MediaSize } from "react-easy-crop/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -294,7 +295,7 @@ export function ImageCropDialog({
               We capture the computed values via setMediaSize and onCropSizeChange
               so handleSave can call computeCroppedArea from first principles. */}
           <div
-            className="relative w-full bg-black rounded-md overflow-hidden"
+            className="relative w-full bg-black rounded-md"
             style={{ height: 300 }}
           >
             {imageSrc ? (
