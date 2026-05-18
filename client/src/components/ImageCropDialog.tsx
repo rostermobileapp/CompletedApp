@@ -53,17 +53,16 @@ async function cropImageToBlob(
   quality: number,
 ): Promise<Blob> {
   const image = await loadImage(imageSrc);
-  const sourceMin = Math.max(1, Math.floor(Math.min(area.width, area.height)));
-  const effectiveSize = Math.max(1, Math.min(outputSize, sourceMin));
+
   const canvas = document.createElement("canvas");
-  canvas.width = effectiveSize;
-  canvas.height = effectiveSize;
+  canvas.width = outputSize;
+  canvas.height = outputSize;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not get canvas context");
 
   if (type === "image/jpeg") {
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, effectiveSize, effectiveSize);
+    ctx.fillRect(0, 0, outputSize, outputSize);
   }
 
   ctx.drawImage(
@@ -74,8 +73,8 @@ async function cropImageToBlob(
     area.height,
     0,
     0,
-    effectiveSize,
-    effectiveSize,
+    outputSize,
+    outputSize,
   );
 
   return new Promise<Blob>((resolve, reject) => {
@@ -112,6 +111,24 @@ export function ImageCropDialog({
   const CONTAINER_HEIGHT = 360;
   const [cropFrameSize, setCropFrameSize] = useState<number>(CONTAINER_HEIGHT);
 
+  // Keep a ref that's always in sync with the latest crop area pixels,
+  // so handleSave never reads a stale closure value even if the user taps
+  // Save quickly after adjusting the zoom/position slider.
+  const croppedAreaPixelsRef = useRef<Area | null>(null);
+
+  // Keep refs for imageSrc and file so handleSave never captures stale values.
+  const imageSrcRef = useRef<string | null>(null);
+  const fileRef = useRef<File | null>(null);
+  const isSavingRef = useRef(false);
+
+  useEffect(() => {
+    imageSrcRef.current = imageSrc;
+  }, [imageSrc]);
+
+  useEffect(() => {
+    fileRef.current = file;
+  }, [file]);
+
   useEffect(() => {
     if (!open) return;
     const el = containerRef.current;
@@ -133,9 +150,11 @@ export function ImageCropDialog({
     let cancelled = false;
     if (!file || !open) {
       setImageSrc(null);
+      imageSrcRef.current = null;
       setCrop({ x: 0, y: 0 });
       setZoom(1);
       setCroppedAreaPixels(null);
+      croppedAreaPixelsRef.current = null;
       setLoadError(null);
       return;
     }
@@ -144,6 +163,7 @@ export function ImageCropDialog({
       .then((dataUrl) => {
         if (!cancelled) {
           setImageSrc(dataUrl);
+          imageSrcRef.current = dataUrl;
           setCrop({ x: 0, y: 0 });
           setZoom(1);
         }
@@ -159,22 +179,33 @@ export function ImageCropDialog({
   }, [file, open]);
 
   const onCropComplete = useCallback((_croppedArea: Area, pixels: Area) => {
+    // Update both the ref (immediately) and state (for the disabled check on Save button).
+    croppedAreaPixelsRef.current = pixels;
     setCroppedAreaPixels(pixels);
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (isSaving) return;
-    if (!imageSrc || !croppedAreaPixels || !file) return;
+    if (isSavingRef.current) return;
+
+    // Read from refs so we always have the absolute latest values, regardless
+    // of whether React has re-rendered since the last crop/zoom change.
+    const currentImageSrc = imageSrcRef.current;
+    const currentPixels = croppedAreaPixelsRef.current;
+    const currentFile = fileRef.current;
+
+    if (!currentImageSrc || !currentPixels || !currentFile) return;
+
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
       const blob = await cropImageToBlob(
-        imageSrc,
-        croppedAreaPixels,
+        currentImageSrc,
+        currentPixels,
         outputSize,
         outputType,
         outputQuality,
       );
-      const baseName = file.name.replace(/\.[^.]+$/, "") || "image";
+      const baseName = currentFile.name.replace(/\.[^.]+$/, "") || "image";
       const ext = outputType === "image/webp" ? "webp" : "jpg";
       const cropped = new File([blob], `${baseName}-cropped.${ext}`, {
         type: outputType,
@@ -185,12 +216,13 @@ export function ImageCropDialog({
       console.error("Failed to crop image:", err);
       setLoadError(err instanceof Error ? err.message : "Failed to crop image");
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [imageSrc, croppedAreaPixels, file, outputSize, outputType, outputQuality, onConfirm]);
+  }, [outputSize, outputType, outputQuality, onConfirm]);
 
   const handleOpenChange = (next: boolean) => {
-    if (!next && !isSaving) {
+    if (!next && !isSavingRef.current) {
       onCancel();
     }
   };
