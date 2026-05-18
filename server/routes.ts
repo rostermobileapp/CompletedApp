@@ -14460,9 +14460,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'Team assignment can only be changed for approved players' });
       }
 
-      const { canManage } = await storage.canUserManageScrimmage(request.scrimmageId, userId);
+      const { canManage, isCoHost, permissions } = await storage.canUserManageScrimmage(request.scrimmageId, userId);
       if (!canManage) {
         return res.status(403).json({ message: 'Only the creator or co-hosts can assign teams' });
+      }
+      if (isCoHost && permissions && !permissions.canApproveRequests) {
+        return res.status(403).json({ message: 'You do not have permission to manage player assignments for this scrimmage' });
       }
 
       const updatedRequest = await storage.setTeamAssignment(requestId, teamAssignment ?? null);

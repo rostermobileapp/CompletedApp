@@ -9225,7 +9225,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date, teamAssignment?: string | null): Promise<ScrimmageRequest> {
-    const updateData: any = { status };
+    const updateData: { status: 'approved' | 'dismissed'; approvedAt?: Date; dismissedAt?: Date; teamAssignment?: string | null } = { status };
     
     if (status === 'approved') {
       updateData.approvedAt = timestamp || new Date();

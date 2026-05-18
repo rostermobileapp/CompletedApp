@@ -83,12 +83,21 @@ async function checkAndSendInvitations() {
           continue;
         }
 
-        // Get members to invite — use live invite group membership if one is linked to the parent
+        // Determine who to invite for this recurring occurrence.
+        //
+        // Design: When a recurring scrimmage has an inviteGroupId, the group acts
+        // as the live invitation list — membership is fetched fresh at send-time
+        // so additions/removals to the group are reflected in future occurrences
+        // without recreating the scrimmage.  Individual members selected at
+        // creation time receive their invite immediately when the scrimmage is
+        // created (synchronous path in POST /api/scrimmages); the job only handles
+        // future occurrences.  When no group is attached the job falls back to
+        // all currently-approved league members (original behaviour).
         let approvedMembers;
         if (parentScrimmage.inviteGroupId) {
+          const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
           const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
           const groupUserIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
-          const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
           approvedMembers = leagueMembers.filter(m => groupUserIds.has(m.userId));
           console.log(`📋 Using live invite group ${parentScrimmage.inviteGroupId}: ${approvedMembers.length} / ${leagueMembers.length} league members`);
         } else {
