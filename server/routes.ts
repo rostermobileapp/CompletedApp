@@ -358,6 +358,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } catch (err) {
     console.error('[Init] Failed to ensure scrimmages.invite_group_id column:', err);
   }
+  // Ensure scrimmages.invite_user_ids exists (directly-selected invitees for recurring job merge)
+  try {
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_user_ids text[] NOT NULL DEFAULT '{}'::text[]`);
+  } catch (err) {
+    console.error('[Init] Failed to ensure scrimmages.invite_user_ids column:', err);
+  }
   // Ensure scrimmage_requests.team_assignment exists (light/dark team colour assignment)
   try {
     await db.execute(sql`ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar`);
@@ -13599,7 +13605,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...scrimmageData,
           announcementId,
           dateTime: dates[0],
-        });
+          inviteUserIds: req.body.selectedMemberIds || [], // Persist for recurring job merge
+        } as any);
         
         
         // Add co-hosts if provided
@@ -13752,7 +13759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const scrimmage = await storage.createScrimmage({
           ...scrimmageData,
           announcementId,
-        });
+          inviteUserIds: req.body.selectedMemberIds || [],
+        } as any);
         
         
         // Add co-hosts if provided
@@ -14323,6 +14331,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate optional teamAssignment
       if (teamAssignment !== undefined && teamAssignment !== null && !['light', 'dark'].includes(teamAssignment)) {
         return res.status(400).json({ message: 'teamAssignment must be "light", "dark", or null' });
+      }
+      // teamAssignment only makes sense when approving; reject for dismissed
+      if (status === 'dismissed' && teamAssignment != null) {
+        return res.status(400).json({ message: 'teamAssignment cannot be set when dismissing a request' });
       }
 
       // Get the request first

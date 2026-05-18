@@ -96,10 +96,18 @@ async function checkAndSendInvitations() {
         let approvedMembers;
         if (parentScrimmage.inviteGroupId) {
           const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
+          const leagueMemberMap = new Map(leagueMembers.map(m => [m.userId, m]));
+
+          // Live group members (re-fetched at send-time)
           const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
-          const groupUserIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
-          approvedMembers = leagueMembers.filter(m => groupUserIds.has(m.userId));
-          console.log(`📋 Using live invite group ${parentScrimmage.inviteGroupId}: ${approvedMembers.length} / ${leagueMembers.length} league members`);
+          const recipientIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
+
+          // Union: add directly-selected individuals who are still approved league members
+          const directInvitees: string[] = (parentScrimmage as any).inviteUserIds || [];
+          directInvitees.forEach(uid => { if (leagueMemberMap.has(uid)) recipientIds.add(uid); });
+
+          approvedMembers = [...recipientIds].map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
+          console.log(`📋 Live invite group ${parentScrimmage.inviteGroupId} + ${directInvitees.length} direct invitees → ${approvedMembers.length} recipients`);
         } else {
           approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
         }
