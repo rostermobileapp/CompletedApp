@@ -544,6 +544,15 @@ export default function GameDetails() {
                         {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
                       </p>
                     </div>
+                    {request.teamAssignment && (
+                      <div className={`text-xs px-2 py-1 rounded font-medium ${
+                        request.teamAssignment === 'light'
+                          ? 'bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900 border border-gray-300'
+                          : 'bg-gray-800 text-gray-100 dark:bg-gray-900 dark:text-gray-100 border border-gray-600'
+                      }`}>
+                        {request.teamAssignment === 'light' ? 'Light' : 'Dark'}
+                      </div>
+                    )}
                     <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">
                       ✓ Confirmed
                     </div>
