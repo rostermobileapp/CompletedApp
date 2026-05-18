@@ -543,7 +543,7 @@ export default function Landing() {
               </div>
               <p className="text-blue-100 text-sm mb-6">For serious players who want the full experience — messaging, payments, and more.</p>
               <ul className="space-y-3 mb-8">
-                {['FREE +', 'Team Management', 'Unlimited Messaging', 'In-App Payments', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
+                {['FREE +', 'Team Management', 'Unlimited Messaging', 'Payment Tracking', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-player-pro-${i}`}>
                     <Check className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-white">{f}</span>

@@ -264,7 +264,7 @@ export default function Subscription() {
         "FREE +",
         "Team Management",
         "Unlimited Messaging",
-        "In-App Payments",
+        "Payment Tracking",
         "Team Scheduling",
         "League Stats",
         "League Standings",
