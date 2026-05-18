@@ -105,6 +105,9 @@ export function ImageCropDialog({
   const [zoom, setZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Delay mounting the Cropper until after the Dialog open animation finishes,
+  // so react-easy-crop measures the container at its full final size.
+  const [cropperReady, setCropperReady] = useState(false);
 
   const imageSrcRef = useRef<string | null>(null);
   const fileRef = useRef<File | null>(null);
@@ -124,10 +127,12 @@ export function ImageCropDialog({
       setCrop({ x: 0, y: 0 });
       setZoom(1);
       croppedAreaPixelsRef.current = null;
+      setCropperReady(false);
       setLoadError(null);
       return;
     }
     setLoadError(null);
+    setCropperReady(false);
     readFileAsDataUrl(file)
       .then((dataUrl) => {
         if (!cancelled) {
@@ -136,6 +141,11 @@ export function ImageCropDialog({
           setCrop({ x: 0, y: 0 });
           setZoom(1);
           croppedAreaPixelsRef.current = null;
+          // Wait for Dialog open animation (~150ms) before mounting the Cropper
+          // so getBoundingClientRect() returns the full container dimensions.
+          setTimeout(() => {
+            if (!cancelled) setCropperReady(true);
+          }, 200);
         }
       })
       .catch((err) => {
@@ -209,8 +219,9 @@ export function ImageCropDialog({
             className="relative w-full bg-black rounded-md overflow-hidden"
             style={{ height: 300 }}
           >
-            {imageSrc ? (
+            {cropperReady && imageSrc ? (
               <Cropper
+                key={imageSrc}
                 image={imageSrc}
                 crop={crop}
                 zoom={zoom}
