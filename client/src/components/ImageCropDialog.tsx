@@ -216,7 +216,7 @@ export function ImageCropDialog({
                 zoom={zoom}
                 aspect={1}
                 cropShape={cropShape}
-                objectFit="contain"
+                objectFit="cover"
                 showGrid={false}
                 minZoom={1}
                 maxZoom={4}
