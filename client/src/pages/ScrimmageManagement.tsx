@@ -646,6 +646,11 @@ export default function ScrimmageManagement() {
                                   <p className="text-sm text-muted-foreground">Approved {formatDistanceToNow(new Date(request.approvedAt!), { addSuffix: true })}</p>
                                 </div>
                                 <Badge variant="default" className="bg-green-600">Approved</Badge>
+                                {request.teamAssignment && (
+                                  <Badge variant="outline" className={`text-xs font-semibold ${request.teamAssignment === 'light' ? 'bg-white text-black border-gray-400' : 'bg-gray-700 text-white border-gray-500'}`}>
+                                    {request.teamAssignment.charAt(0).toUpperCase() + request.teamAssignment.slice(1)}
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 flex-wrap">
                                 <span className="text-xs text-muted-foreground mr-1">Team:</span>
