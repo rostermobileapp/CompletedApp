@@ -283,6 +283,20 @@ export default function GameDetails() {
     },
   });
 
+  // Set team assignment for a confirmed player (scrimmage organiser / co-host only)
+  const setTeamAssignmentMutation = useMutation({
+    mutationFn: async ({ requestId, teamAssignment }: { requestId: string; teamAssignment: 'light' | 'dark' | null }) => {
+      const response = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/team-assignment`, { teamAssignment });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to update team assignment', variant: 'destructive' });
+    },
+  });
+
   if ((isScrimmage && scrimmageLoading) || (!isScrimmage && gameLoading)) {
     return (
       <div className="min-h-screen bg-background">
@@ -343,7 +357,7 @@ export default function GameDetails() {
 
   // Early return with scrimmage-specific UI if viewing a scrimmage
   if (isScrimmage) {
-    const { scrimmage, approvedPlayers, creator: scrimmageCreator } = scrimmageData as any;
+    const { scrimmage, approvedPlayers, creator: scrimmageCreator, canManagePlayers } = scrimmageData as any;
     const isScrimmageCreator = scrimmage.creatorId === (user as any)?.id;
     const scrimmageVenmoUrl = resolveVenmoLink(
       scrimmage.venmoLinkOverride,
@@ -534,26 +548,57 @@ export default function GameDetails() {
                     className="flex items-center gap-3 p-3 rounded-lg bg-[#e2e2e2] dark:bg-[#212121] border"
                     data-testid={`player-${request.player?.id || 'unknown'}`}
                   >
-                    <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                    <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-black dark:text-white text-xs font-semibold">
                         {request.player?.firstName?.[0] || '?'}{request.player?.lastName?.[0] || ''}
                       </span>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-black dark:text-white" data-testid={`text-player-name-${request.player?.id || 'unknown'}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-black dark:text-white truncate" data-testid={`text-player-name-${request.player?.id || 'unknown'}`}>
                         {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
                       </p>
                     </div>
-                    {request.teamAssignment && (
-                      <div className={`text-xs px-2 py-1 rounded font-medium ${
-                        request.teamAssignment === 'light'
-                          ? 'bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900 border border-gray-300'
-                          : 'bg-gray-800 text-gray-100 dark:bg-gray-900 dark:text-gray-100 border border-gray-600'
-                      }`}>
-                        {request.teamAssignment === 'light' ? 'Light' : 'Dark'}
+                    {canManagePlayers ? (
+                      <div className="flex gap-1 flex-shrink-0" data-testid={`team-assignment-controls-${request.id}`}>
+                        <button
+                          onClick={() => setTeamAssignmentMutation.mutate({ requestId: request.id, teamAssignment: request.teamAssignment === 'light' ? null : 'light' })}
+                          disabled={setTeamAssignmentMutation.isPending}
+                          className={`text-xs px-2 py-1 rounded font-medium border transition-colors ${
+                            request.teamAssignment === 'light'
+                              ? 'bg-white text-gray-900 border-gray-400 shadow-sm'
+                              : 'bg-transparent text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                          }`}
+                          title="Assign to Light"
+                          data-testid={`btn-assign-light-${request.id}`}
+                        >
+                          Light
+                        </button>
+                        <button
+                          onClick={() => setTeamAssignmentMutation.mutate({ requestId: request.id, teamAssignment: request.teamAssignment === 'dark' ? null : 'dark' })}
+                          disabled={setTeamAssignmentMutation.isPending}
+                          className={`text-xs px-2 py-1 rounded font-medium border transition-colors ${
+                            request.teamAssignment === 'dark'
+                              ? 'bg-gray-900 text-gray-100 border-gray-600 shadow-sm dark:bg-gray-800'
+                              : 'bg-transparent text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                          }`}
+                          title="Assign to Dark"
+                          data-testid={`btn-assign-dark-${request.id}`}
+                        >
+                          Dark
+                        </button>
                       </div>
+                    ) : (
+                      request.teamAssignment && (
+                        <div className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${
+                          request.teamAssignment === 'light'
+                            ? 'bg-gray-100 text-gray-800 dark:bg-gray-200 dark:text-gray-900 border border-gray-300'
+                            : 'bg-gray-800 text-gray-100 dark:bg-gray-900 dark:text-gray-100 border border-gray-600'
+                        }`}>
+                          {request.teamAssignment === 'light' ? 'Light' : 'Dark'}
+                        </div>
+                      )
                     )}
-                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded flex-shrink-0">
                       ✓ Confirmed
                     </div>
                   </div>

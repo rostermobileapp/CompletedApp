@@ -14290,10 +14290,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : null;
 
+      // Determine whether the requesting user can manage player assignments
+      // (creator or co-host with canApproveRequests permission)
+      const { canManage, isCoHost, permissions } = await storage.canUserManageScrimmage(scrimmageId, userId);
+      const canManagePlayers = canManage && (!isCoHost || (permissions?.canApproveRequests ?? false));
+
       res.json({
         scrimmage,
         approvedPlayers,
         creator,
+        canManagePlayers,
       });
     } catch (error) {
       console.error('Error fetching approved players:', error);
