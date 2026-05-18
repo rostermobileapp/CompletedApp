@@ -247,7 +247,8 @@ export default function Subscription() {
         "Join Leagues / Teams",
         "Scheduling",
         "RSVP Function",
-        "Team Only Stats"
+        "Team Only Stats",
+        "Team-Only Messaging"
       ],
       current: isFree,
       buttonText: isFree ? "Current Plan" : "Manage Subscription",
@@ -262,7 +263,7 @@ export default function Subscription() {
       features: [
         "FREE +",
         "Team Management",
-        "In-App Messaging",
+        "Unlimited Messaging",
         "In-App Payments",
         "Team Scheduling",
         "League Stats",
@@ -286,8 +287,8 @@ export default function Subscription() {
         "Scorekeeping",
         "Player Management",
         "League Wide Posts",
-        "Awards & Records*",
-        "Bracket Management*"
+        "Awards & Records",
+        "Bracket Management"
       ],
       current: isCommissioner,
       buttonText: isCommissioner ? "Current Plan" : "Upgrade Plan",

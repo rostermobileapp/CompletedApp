@@ -126,13 +126,8 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900" data-testid="pricing-page">
-      {/* Launch banner */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
-      </div>
-
       {/* Header */}
-      <header className="fixed top-10 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
             <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
@@ -146,8 +141,8 @@ export default function Pricing() {
           </Link>
           <div className="flex items-center gap-3">
             <button
-              className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
-              title="Come back June 1st"
+              onClick={() => setLocation('/login')}
+              className="hidden md:block text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Log In
             </button>
@@ -162,7 +157,7 @@ export default function Pricing() {
       </header>
 
       {/* Hero */}
-      <section className="pt-36 pb-10 px-6 text-center bg-gradient-to-b from-blue-50/60 to-white">
+      <section className="pt-24 pb-10 px-6 text-center bg-gradient-to-b from-blue-50/60 to-white">
         <h1 className="text-4xl md:text-6xl font-bold mb-4 text-gray-900">
           Simple pricing.
           <br />
@@ -171,7 +166,7 @@ export default function Pricing() {
         <p className="text-gray-500 text-xl max-w-2xl mx-auto mb-3">
           Free to start. No credit card required. No ads on any plan — ever.
         </p>
-        <p className="text-gray-400 text-sm">Launching June 1, 2026 · Join the waitlist for early access</p>
+        <p className="text-gray-400 text-sm">Free to start · No credit card required · No ads on any plan</p>
       </section>
 
       {/* Billing toggle */}
@@ -363,16 +358,7 @@ export default function Pricing() {
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
             Ready for your<br /><span className="text-[#3c82f4]">best season yet?</span>
           </h2>
-          <p className="text-gray-500 mb-3 text-lg">
-            We launch <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free forever tier on day one.
-          </p>
-          <p className="text-gray-400 text-sm mb-8">No credit card required · No ads on any plan</p>
-          <button
-            onClick={() => setLocation('/waitlist')}
-            className="px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200 mb-8"
-          >
-            Join the Waitlist
-          </button>
+          <p className="text-gray-500 mb-8 text-lg">Free to start — no credit card required. No ads on any plan.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
               href="https://apps.apple.com/us/app/roster-hockey/id6756852981"

@@ -111,12 +111,8 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900" data-testid="landing-page">
-      {/* Launch date banner — fixed at very top */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist</button>
-      </div>
       {/* Fixed Header */}
-      <header className="fixed top-[40px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
+      <header className="fixed top-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-0 flex items-center md:grid md:grid-cols-3">
           {/* Desktop nav — col 1 */}
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
@@ -135,22 +131,20 @@ export default function Landing() {
               data-testid="logo-image"
             />
           </div>
-          {/* Mobile: Join Waitlist centered between logo and hamburger */}
+          {/* Mobile: Log In centered between logo and hamburger */}
           <div className="flex-1 flex justify-center md:hidden px-2">
             <button
-              onClick={() => setLocation('/waitlist')}
-              className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
-              data-testid="button-join-waitlist-header"
+              onClick={handleLoginClick}
+              className="px-4 py-2 rounded-full border border-gray-300 text-gray-700 hover:border-gray-400 hover:text-gray-900 transition-colors font-semibold text-sm"
             >
-              Join Waitlist
+              Log In
             </button>
           </div>
-          {/* Right col — desktop: Log In + Join Waitlist; mobile: hamburger only */}
+          {/* Right col — desktop: Log In + Get Started; mobile: hamburger only */}
           <div className="flex-none flex items-center gap-3 justify-end">
             <button
               onClick={handleLoginClick}
-              className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
-              title="Come back June 1st"
+              className="hidden md:block text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Log In
             </button>
@@ -158,7 +152,7 @@ export default function Landing() {
               onClick={() => setLocation('/waitlist')}
               className="hidden md:inline-flex px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             >
-              Join Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -183,7 +177,7 @@ export default function Landing() {
         )}
       </header>
       {/* Hero Section */}
-      <section className="relative pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white" style={{ paddingTop: 'calc(40px + 40px)' }}>
+      <section className="relative pb-20 px-6 overflow-hidden bg-gradient-to-b from-blue-50/60 to-white" style={{ paddingTop: '80px' }}>
         <div
           className="absolute inset-0 bg-gradient-to-b from-[#3c82f4]/5 via-transparent to-transparent"
           style={{ transform: `translateY(${scrollY * 0.4}px)` }}
@@ -212,8 +206,7 @@ export default function Landing() {
               </button>
               <button
                 onClick={handleLoginClick}
-                className="px-8 py-4 rounded-full border border-gray-300 text-gray-400 cursor-not-allowed font-semibold text-lg"
-                title="Come back June 1st"
+                className="px-8 py-4 rounded-full border border-gray-300 text-gray-700 hover:border-gray-400 hover:text-gray-900 transition-colors font-semibold text-lg"
               >
                 Log In
               </button>
@@ -522,7 +515,7 @@ export default function Landing() {
               </div>
               <p className="text-gray-500 text-sm mb-6">Perfect for players joining their first team. No strings attached.</p>
               <ul className="space-y-3 mb-8">
-                {['Join Leagues / Teams', 'Scheduling', 'RSVP Function', 'Team Only Stats'].map((f, i) => (
+                {['Join Leagues / Teams', 'Scheduling', 'RSVP Function', 'Team Only Stats', 'Team-Only Messaging'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-free-${i}`}>
                     <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-700">{f}</span>
@@ -550,7 +543,7 @@ export default function Landing() {
               </div>
               <p className="text-blue-100 text-sm mb-6">For serious players who want the full experience — messaging, payments, and more.</p>
               <ul className="space-y-3 mb-8">
-                {['FREE +', 'Team Management', 'In-App Messaging', 'In-App Payments', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
+                {['FREE +', 'Team Management', 'Unlimited Messaging', 'In-App Payments', 'Team Scheduling', 'League Stats', 'League Standings', 'League Announcements'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-player-pro-${i}`}>
                     <Check className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-white">{f}</span>
@@ -575,7 +568,7 @@ export default function Landing() {
               </div>
               <p className="text-gray-500 text-sm mb-6">Run a full league with schedules, scores, standings, and tournaments.</p>
               <ul className="space-y-3 mb-8">
-                {['FREE & PLAYER PRO +', 'League Scheduling', 'Scorekeeping', 'Player Management', 'League Wide Posts', 'Awards & Records*', 'Bracket Management*'].map((f, i) => (
+                {['FREE & PLAYER PRO +', 'League Scheduling', 'Scorekeeping', 'Player Management', 'League Wide Posts', 'Awards & Records', 'Bracket Management'].map((f, i) => (
                   <li key={f} className="flex items-start gap-3" data-testid={`feature-commissioner-${i}`}>
                     <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-gray-700">{f}</span>
@@ -606,16 +599,7 @@ export default function Landing() {
             <br />
             <span className="text-[#3c82f4]">best season yet?</span>
           </h2>
-          <p className="text-gray-500 text-xl mb-3">We launch <span className="text-gray-900 font-semibold">June 1, 2026</span>. Get early access by joining the waitlist — free forever tier available on day one.</p>
-          <p className="text-gray-400 text-sm mb-8">No credit card required · No ads on any plan</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <button
-              onClick={() => setLocation('/waitlist')}
-              className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
-            >
-              Join the Waitlist
-            </button>
-          </div>
+          <p className="text-gray-500 text-xl mb-8">Free to start — no credit card required. No ads on any plan.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
               href="https://apps.apple.com/us/app/roster-hockey/id6756852981"
