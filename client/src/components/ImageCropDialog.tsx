@@ -54,31 +54,50 @@ async function cropImageToBlob(
 ): Promise<Blob> {
   const image = await loadImage(imageSrc);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = outputSize;
-  canvas.height = outputSize;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not get canvas context");
+  // Draw the full image first at natural size, then extract the crop region.
+  // This approach correctly handles EXIF orientation since the browser normalises
+  // the image when rendering it, and getImageData reads display-correct pixels.
+  const fullCanvas = document.createElement("canvas");
+  fullCanvas.width = image.naturalWidth;
+  fullCanvas.height = image.naturalHeight;
+  const fullCtx = fullCanvas.getContext("2d");
+  if (!fullCtx) throw new Error("Could not get canvas context");
+  fullCtx.drawImage(image, 0, 0);
+
+  // Clamp the crop rectangle to the image bounds to avoid out-of-range reads.
+  const sx = Math.max(0, Math.round(area.x));
+  const sy = Math.max(0, Math.round(area.y));
+  const sw = Math.min(Math.round(area.width), image.naturalWidth - sx);
+  const sh = Math.min(Math.round(area.height), image.naturalHeight - sy);
+
+  if (sw <= 0 || sh <= 0) throw new Error("Invalid crop area");
+
+  const cropData = fullCtx.getImageData(sx, sy, sw, sh);
+
+  // Write the cropped pixels to the output canvas at the desired output size.
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = outputSize;
+  outCanvas.height = outputSize;
+  const outCtx = outCanvas.getContext("2d");
+  if (!outCtx) throw new Error("Could not get output canvas context");
 
   if (type === "image/jpeg") {
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, outputSize, outputSize);
+    outCtx.fillStyle = "#ffffff";
+    outCtx.fillRect(0, 0, outputSize, outputSize);
   }
 
-  ctx.drawImage(
-    image,
-    area.x,
-    area.y,
-    area.width,
-    area.height,
-    0,
-    0,
-    outputSize,
-    outputSize,
-  );
+  // Draw the raw crop at native size on a temporary canvas, then scale it.
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = sw;
+  tempCanvas.height = sh;
+  const tempCtx = tempCanvas.getContext("2d");
+  if (!tempCtx) throw new Error("Could not get temp canvas context");
+  tempCtx.putImageData(cropData, 0, 0);
+
+  outCtx.drawImage(tempCanvas, 0, 0, sw, sh, 0, 0, outputSize, outputSize);
 
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
+    outCanvas.toBlob(
       (blob) => {
         if (blob) resolve(blob);
         else reject(new Error("Failed to encode cropped image"));
@@ -107,44 +126,17 @@ export function ImageCropDialog({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const CONTAINER_HEIGHT = 360;
-  const [cropFrameSize, setCropFrameSize] = useState<number>(CONTAINER_HEIGHT);
 
-  // Keep a ref that's always in sync with the latest crop area pixels,
-  // so handleSave never reads a stale closure value even if the user taps
-  // Save quickly after adjusting the zoom/position slider.
+  // Refs always hold the latest values so handleSave never reads a stale closure,
+  // regardless of React render timing (important on mobile where the user can tap
+  // Save immediately after adjusting the zoom slider).
   const croppedAreaPixelsRef = useRef<Area | null>(null);
-
-  // Keep refs for imageSrc and file so handleSave never captures stale values.
   const imageSrcRef = useRef<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const isSavingRef = useRef(false);
 
-  useEffect(() => {
-    imageSrcRef.current = imageSrc;
-  }, [imageSrc]);
-
-  useEffect(() => {
-    fileRef.current = file;
-  }, [file]);
-
-  useEffect(() => {
-    if (!open) return;
-    const el = containerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      const min = Math.min(rect.width, rect.height);
-      if (min > 0) {
-        setCropFrameSize(Math.floor(min));
-      }
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [open]);
+  useEffect(() => { imageSrcRef.current = imageSrc; }, [imageSrc]);
+  useEffect(() => { fileRef.current = file; }, [file]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,13 +165,12 @@ export function ImageCropDialog({
           setLoadError(err?.message || "Failed to load image");
         }
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [file, open]);
 
   const onCropComplete = useCallback((_croppedArea: Area, pixels: Area) => {
-    // Update both the ref (immediately) and state (for the disabled check on Save button).
+    // Update the ref synchronously (no React batching delay) AND state
+    // (for the Save button disabled check).
     croppedAreaPixelsRef.current = pixels;
     setCroppedAreaPixels(pixels);
   }, []);
@@ -187,8 +178,7 @@ export function ImageCropDialog({
   const handleSave = useCallback(async () => {
     if (isSavingRef.current) return;
 
-    // Read from refs so we always have the absolute latest values, regardless
-    // of whether React has re-rendered since the last crop/zoom change.
+    // Always read from refs — guaranteed to have the absolute latest values.
     const currentImageSrc = imageSrcRef.current;
     const currentPixels = croppedAreaPixelsRef.current;
     const currentFile = fileRef.current;
@@ -241,10 +231,13 @@ export function ImageCropDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Fixed-height crop area. No external cropSize prop — react-easy-crop
+              sizes the crop frame internally from aspect={1} and the container
+              dimensions. This avoids a ResizeObserver race where a late-firing
+              measurement could overwrite the user's zoomed crop state. */}
           <div
-            ref={containerRef}
             className="relative w-full bg-black rounded-md overflow-hidden"
-            style={{ height: CONTAINER_HEIGHT }}
+            style={{ height: 300 }}
           >
             {imageSrc ? (
               <Cropper
@@ -253,7 +246,6 @@ export function ImageCropDialog({
                 zoom={zoom}
                 aspect={1}
                 cropShape={cropShape}
-                cropSize={{ width: cropFrameSize, height: cropFrameSize }}
                 objectFit="auto-cover"
                 showGrid={false}
                 minZoom={1}
