@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
-import type { Area } from "react-easy-crop/types";
+import type { Area, MediaSize } from "react-easy-crop/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +27,45 @@ interface ImageCropDialogProps {
   description?: string;
   onCancel: () => void;
   onConfirm: (croppedFile: File) => void | Promise<void>;
+}
+
+// Exact replica of react-easy-crop's internal computeCroppedArea (rotation=0).
+// mediaSize is the RENDERED image size (px) at zoom=1, not the natural size.
+// cropSize is the displayed crop square in px.
+// crop.x / crop.y are display-pixel offsets from center.
+function computePixels(
+  crop: { x: number; y: number },
+  mediaSize: MediaSize,
+  cropSize: { width: number; height: number },
+  zoom: number,
+): Area {
+  const mw = mediaSize.width;
+  const mh = mediaSize.height;
+  const nw = mediaSize.naturalWidth;
+  const nh = mediaSize.naturalHeight;
+  const cw = cropSize.width;
+  const ch = cropSize.height;
+
+  const limit = (max: number, v: number) => Math.min(max, Math.max(0, v));
+
+  const xPct = limit(100, ((mw - cw / zoom) / 2 - crop.x / zoom) / mw * 100);
+  const yPct = limit(100, ((mh - ch / zoom) / 2 - crop.y / zoom) / mh * 100);
+  const wPct = limit(100, cw / mw * 100 / zoom);
+  const hPct = limit(100, ch / mh * 100 / zoom);
+
+  const wPx = Math.round(limit(nw, wPct * nw / 100));
+  const hPx = Math.round(limit(nh, hPct * nh / 100));
+
+  // aspect=1 exact pixel match (same logic as the library)
+  const isWider = nw >= nh;
+  const size = isWider ? { width: hPx, height: hPx } : { width: wPx, height: wPx };
+
+  return {
+    x: Math.round(limit(nw - size.width, xPct * nw / 100)),
+    y: Math.round(limit(nh - size.height, yPct * nh / 100)),
+    width: size.width,
+    height: size.height,
+  };
 }
 
 async function readFileAsDataUrl(file: File): Promise<string> {
@@ -105,9 +144,6 @@ export function ImageCropDialog({
   const [zoom, setZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // cropSize is measured from the real container after the dialog animation
-  // settles, then passed explicitly to the Cropper so the circle and the save
-  // math are always in sync.
   const [cropSize, setCropSize] = useState<{ width: number; height: number } | null>(null);
 
   const imageSrcRef = useRef<string | null>(null);
@@ -115,11 +151,17 @@ export function ImageCropDialog({
   const isSavingRef = useRef(false);
   const cropContainerRef = useRef<HTMLDivElement>(null);
 
-  // onCropComplete fires whenever the user stops interacting — store the latest
-  // croppedAreaPixels in a ref so handleSave always has the most recent value.
-  const croppedAreaPixelsRef = useRef<Area | null>(null);
+  // Always-current refs — read these in handleSave to avoid stale closures.
+  const cropRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1);
+  const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
+  // Captured from the Cropper via setMediaSize — the rendered image size at zoom=1.
+  const mediaSizeRef = useRef<MediaSize | null>(null);
 
   useEffect(() => { fileRef.current = file; }, [file]);
+  useEffect(() => { cropRef.current = crop; }, [crop]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { cropSizeRef.current = cropSize; }, [cropSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,31 +169,36 @@ export function ImageCropDialog({
       setImageSrc(null);
       imageSrcRef.current = null;
       setCrop({ x: 0, y: 0 });
+      cropRef.current = { x: 0, y: 0 };
       setZoom(1);
-      croppedAreaPixelsRef.current = null;
+      zoomRef.current = 1;
       setCropSize(null);
+      cropSizeRef.current = null;
+      mediaSizeRef.current = null;
       setLoadError(null);
       return;
     }
     setLoadError(null);
     setCropSize(null);
+    mediaSizeRef.current = null;
     readFileAsDataUrl(file)
       .then((dataUrl) => {
         if (!cancelled) {
           setImageSrc(dataUrl);
           imageSrcRef.current = dataUrl;
           setCrop({ x: 0, y: 0 });
+          cropRef.current = { x: 0, y: 0 };
           setZoom(1);
-          croppedAreaPixelsRef.current = null;
-          // Wait for the Dialog open animation to finish, then measure the
-          // container's real width and derive an explicit square cropSize.
-          // Passing cropSize as a prop means the Cropper never has to guess —
-          // the circle and the pixel crop math always agree.
+          zoomRef.current = 1;
+          // Delay mounting the Cropper until after the Dialog animation settles
+          // so the container getBoundingClientRect() returns the final dimensions.
           setTimeout(() => {
             if (!cancelled && cropContainerRef.current) {
               const w = cropContainerRef.current.getBoundingClientRect().width;
               const side = Math.min(w, 300);
-              setCropSize({ width: side, height: side });
+              const cs = { width: side, height: side };
+              setCropSize(cs);
+              cropSizeRef.current = cs;
             }
           }, 250);
         }
@@ -162,8 +209,18 @@ export function ImageCropDialog({
     return () => { cancelled = true; };
   }, [file, open]);
 
-  const handleCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
-    croppedAreaPixelsRef.current = croppedAreaPixels;
+  const handleCropChange = useCallback((c: { x: number; y: number }) => {
+    setCrop(c);
+    cropRef.current = c;
+  }, []);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setZoom(z);
+    zoomRef.current = z;
+  }, []);
+
+  const handleSetMediaSize = useCallback((ms: MediaSize) => {
+    mediaSizeRef.current = ms;
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -171,13 +228,21 @@ export function ImageCropDialog({
 
     const currentImageSrc = imageSrcRef.current;
     const currentFile = fileRef.current;
-    const area = croppedAreaPixelsRef.current;
+    const currentCrop = cropRef.current;
+    const currentZoom = zoomRef.current;
+    const currentCropSize = cropSizeRef.current;
+    const currentMediaSize = mediaSizeRef.current;
 
     if (!currentImageSrc || !currentFile) return;
-    if (!area) {
+    if (!currentCropSize || !currentMediaSize) {
       setLoadError("Crop area not ready yet. Please try again.");
       return;
     }
+
+    // Compute croppedAreaPixels using the exact same formula as react-easy-crop.
+    // We read directly from refs so this always reflects the current position,
+    // regardless of onCropComplete timing.
+    const area = computePixels(currentCrop, currentMediaSize, currentCropSize, currentZoom);
 
     isSavingRef.current = true;
     setIsSaving(true);
@@ -242,9 +307,9 @@ export function ImageCropDialog({
                 minZoom={1}
                 maxZoom={4}
                 restrictPosition={true}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={handleCropComplete}
+                onCropChange={handleCropChange}
+                onZoomChange={handleZoomChange}
+                setMediaSize={handleSetMediaSize}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white/70 text-sm">
@@ -260,10 +325,14 @@ export function ImageCropDialog({
               min={1}
               max={4}
               step={0.01}
-              onValueChange={(v) => setZoom(v[0] ?? 1)}
+              onValueChange={(v) => {
+                const z = v[0] ?? 1;
+                setZoom(z);
+                zoomRef.current = z;
+              }}
               aria-label="Zoom"
               data-testid="slider-crop-zoom"
-              disabled={!imageSrc || isSaving}
+              disabled={!cropSize || isSaving}
               className="flex-1"
             />
             <ZoomIn className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -287,7 +356,7 @@ export function ImageCropDialog({
           <Button
             type="button"
             onClick={handleSave}
-            disabled={!imageSrc || isSaving}
+            disabled={!cropSize || isSaving}
             data-testid="button-crop-save"
           >
             {isSaving ? (
