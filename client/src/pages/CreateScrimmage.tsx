@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp } from 'lucide-react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { useLocation, useRoute } from 'wouter';
@@ -72,6 +72,8 @@ export default function CreateScrimmage() {
   const { user } = useAuth();
   const [goalieSearchTerm, setGoalieSearchTerm] = useState("");
   const [skaterSearchTerm, setSkaterSearchTerm] = useState("");
+  const [goaliesSectionOpen, setGoaliesSectionOpen] = useState(true);
+  const [skatersSectionOpen, setSkatersSectionOpen] = useState(true);
   const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
@@ -1365,34 +1367,57 @@ export default function CreateScrimmage() {
               Quick Load from Saved Group
             </Label>
             {(inviteGroups as any[]).length > 0 ? (
-              <div className="flex gap-2">
-                <Select
-                  value={selectedInviteGroupId}
-                  onValueChange={(value) => {
-                    setSelectedInviteGroupId(value);
-                    loadInviteGroup(value);
-                  }}
-                >
-                  <SelectTrigger data-testid="select-invite-group">
-                    <SelectValue placeholder="Select a group..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(inviteGroups as any[]).map((group: any) => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/invite-groups')}
-                  data-testid="button-manage-groups"
-                >
-                  Manage
-                </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Select
+                    value={selectedInviteGroupId}
+                    onValueChange={(value) => {
+                      setSelectedInviteGroupId(value);
+                      loadInviteGroup(value);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-invite-group">
+                      <SelectValue placeholder="Select a group..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(inviteGroups as any[]).map((group: any) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/invite-groups')}
+                    data-testid="button-manage-groups"
+                  >
+                    Manage
+                  </Button>
+                </div>
+                {loadedInviteGroupId && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="flex-1">
+                      Linked — future recurring invites will use live group membership
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => {
+                        setLoadedInviteGroupId(null);
+                        setSelectedInviteGroupId("");
+                      }}
+                      data-testid="button-unlink-group"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Unlink
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-between">
@@ -1424,110 +1449,134 @@ export default function CreateScrimmage() {
 
           {/* Goalies subsection */}
           <div className="mb-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Label className="text-sm font-semibold">Goalies</Label>
-              <Badge variant="outline" className="text-xs">{filteredGoalies.length}</Badge>
-            </div>
-            <div className="mb-2">
-              <Input
-                placeholder="Search goalies..."
-                value={goalieSearchTerm}
-                onChange={(e) => setGoalieSearchTerm(e.target.value)}
-                data-testid="input-search-goalies"
-              />
-            </div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredGoalies.length} selected
-              </p>
-              <div className="flex gap-1">
-                <Button type="button" variant="outline" size="sm" onClick={selectAllGoalies} disabled={filteredGoalies.length === 0} data-testid="button-select-all-goalies">Select All</Button>
-                <Button type="button" variant="outline" size="sm" onClick={deselectAllGoalies} disabled={!filteredGoalies.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-goalies">Deselect</Button>
-              </div>
-            </div>
-            <ScrollArea className="h-48">
-              {membersLoading ? (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                      <div className="w-8 h-8 bg-muted rounded-full" />
-                      <div className="h-4 bg-muted rounded w-1/2" />
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 mb-2 text-left"
+              onClick={() => setGoaliesSectionOpen(o => !o)}
+              data-testid="toggle-goalies-section"
+            >
+              <Label className="text-sm font-semibold cursor-pointer">Goalies</Label>
+              <Badge variant="outline" className="text-xs">{filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length}/{filteredGoalies.length}</Badge>
+              <span className="ml-auto text-muted-foreground">
+                {goaliesSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
+            </button>
+            {goaliesSectionOpen && (
+              <>
+                <div className="mb-2">
+                  <Input
+                    placeholder="Search goalies..."
+                    value={goalieSearchTerm}
+                    onChange={(e) => setGoalieSearchTerm(e.target.value)}
+                    data-testid="input-search-goalies"
+                  />
+                </div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredGoalies.length} selected
+                  </p>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="outline" size="sm" onClick={selectAllGoalies} disabled={filteredGoalies.length === 0} data-testid="button-select-all-goalies">Select All</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={deselectAllGoalies} disabled={!filteredGoalies.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-goalies">Deselect</Button>
+                  </div>
+                </div>
+                <ScrollArea className="h-48">
+                  {membersLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                          <div className="w-8 h-8 bg-muted rounded-full" />
+                          <div className="h-4 bg-muted rounded w-1/2" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : filteredGoalies.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground text-sm">
-                  {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {filteredGoalies.map((member: any) => (
-                    <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`goalie-item-${member.user.id}`}>
-                      <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-goalie-${member.user.id}`} />
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.user.profileImageUrl || undefined} />
-                        <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                  ) : filteredGoalies.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
                     </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+                  ) : (
+                    <div className="space-y-1">
+                      {filteredGoalies.map((member: any) => (
+                        <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`goalie-item-${member.user.id}`}>
+                          <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-goalie-${member.user.id}`} />
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.user.profileImageUrl || undefined} />
+                            <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </>
+            )}
           </div>
 
           {/* Skaters subsection */}
           <div className="mb-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Label className="text-sm font-semibold">Skaters</Label>
-              <Badge variant="outline" className="text-xs">{filteredSkaters.length}</Badge>
-            </div>
-            <div className="mb-2">
-              <Input
-                placeholder="Search skaters..."
-                value={skaterSearchTerm}
-                onChange={(e) => setSkaterSearchTerm(e.target.value)}
-                data-testid="input-search-skaters"
-              />
-            </div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredSkaters.length} selected
-              </p>
-              <div className="flex gap-1">
-                <Button type="button" variant="outline" size="sm" onClick={selectAllSkaters} disabled={filteredSkaters.length === 0} data-testid="button-select-all-skaters">Select All</Button>
-                <Button type="button" variant="outline" size="sm" onClick={deselectAllSkaters} disabled={!filteredSkaters.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-skaters">Deselect</Button>
-              </div>
-            </div>
-            <ScrollArea className="h-48">
-              {membersLoading ? (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                      <div className="w-8 h-8 bg-muted rounded-full" />
-                      <div className="h-4 bg-muted rounded w-1/2" />
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 mb-2 text-left"
+              onClick={() => setSkatersSectionOpen(o => !o)}
+              data-testid="toggle-skaters-section"
+            >
+              <Label className="text-sm font-semibold cursor-pointer">Skaters</Label>
+              <Badge variant="outline" className="text-xs">{filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length}/{filteredSkaters.length}</Badge>
+              <span className="ml-auto text-muted-foreground">
+                {skatersSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
+            </button>
+            {skatersSectionOpen && (
+              <>
+                <div className="mb-2">
+                  <Input
+                    placeholder="Search skaters..."
+                    value={skaterSearchTerm}
+                    onChange={(e) => setSkaterSearchTerm(e.target.value)}
+                    data-testid="input-search-skaters"
+                  />
+                </div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredSkaters.length} selected
+                  </p>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="outline" size="sm" onClick={selectAllSkaters} disabled={filteredSkaters.length === 0} data-testid="button-select-all-skaters">Select All</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={deselectAllSkaters} disabled={!filteredSkaters.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-skaters">Deselect</Button>
+                  </div>
+                </div>
+                <ScrollArea className="h-48">
+                  {membersLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                          <div className="w-8 h-8 bg-muted rounded-full" />
+                          <div className="h-4 bg-muted rounded w-1/2" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : filteredSkaters.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground text-sm">
-                  {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {filteredSkaters.map((member: any) => (
-                    <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`skater-item-${member.user.id}`}>
-                      <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-skater-${member.user.id}`} />
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.user.profileImageUrl || undefined} />
-                        <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                  ) : filteredSkaters.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
                     </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+                  ) : (
+                    <div className="space-y-1">
+                      {filteredSkaters.map((member: any) => (
+                        <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`skater-item-${member.user.id}`}>
+                          <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-skater-${member.user.id}`} />
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.user.profileImageUrl || undefined} />
+                            <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </>
+            )}
           </div>
 
           {/* Email Invites Section */}
