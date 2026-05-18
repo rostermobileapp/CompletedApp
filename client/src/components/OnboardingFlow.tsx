@@ -32,7 +32,7 @@ const profileSchema = z.object({
   email: z.string().email('Invalid email'),
   phoneNumber: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie'], { required_error: 'Please select your position' }),
-  shoots: z.enum(['Left', 'Right']).optional(),
+  shoots: z.enum(['left', 'right']).optional(),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -92,7 +92,7 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
       email: userData.email || '',
       phoneNumber: userData.phoneNumber || '',
       playerType: userData.playerType || undefined,
-      shoots: userData.shoots || undefined,
+      shoots: userData.shoots ? (userData.shoots.toLowerCase() as 'left' | 'right') : undefined,
     });
 
     // Load saved onboarding progress for resume functionality
@@ -404,18 +404,18 @@ export function OnboardingFlow({ onComplete, onSkip, isReplay = false }: Onboard
                 <div className="flex gap-4">
                   <Button
                     type="button"
-                    variant={form.watch('shoots') === 'Left' ? 'default' : 'outline'}
+                    variant={form.watch('shoots') === 'left' ? 'default' : 'outline'}
                     className="flex-1"
-                    onClick={() => form.setValue('shoots', 'Left')}
+                    onClick={() => form.setValue('shoots', 'left')}
                     data-testid="button-shoots-left"
                   >
                     Left
                   </Button>
                   <Button
                     type="button"
-                    variant={form.watch('shoots') === 'Right' ? 'default' : 'outline'}
+                    variant={form.watch('shoots') === 'right' ? 'default' : 'outline'}
                     className="flex-1"
-                    onClick={() => form.setValue('shoots', 'Right')}
+                    onClick={() => form.setValue('shoots', 'right')}
                     data-testid="button-shoots-right"
                   >
                     Right
