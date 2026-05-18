@@ -522,6 +522,26 @@ export default function ScrimmageManagement() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {(() => {
+                    const lightCount = rosterData.approvedPlayers.filter(r => r.teamAssignment === 'light').length;
+                    const darkCount = rosterData.approvedPlayers.filter(r => r.teamAssignment === 'dark').length;
+                    const unassignedCount = rosterData.approvedPlayers.filter(r => !r.teamAssignment).length;
+                    return (
+                      <div className="flex items-center justify-center gap-4 py-2 px-3 rounded-lg bg-[#1a1a1a] border border-gray-700 text-sm mb-2">
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-full bg-white border border-gray-400"></span>
+                          <span className="text-white font-medium">Light: {lightCount}</span>
+                        </span>
+                        <span className="text-gray-500">|</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block w-3 h-3 rounded-full bg-gray-600 border border-gray-500"></span>
+                          <span className="text-white font-medium">Dark: {darkCount}</span>
+                        </span>
+                        <span className="text-gray-500">|</span>
+                        <span className="text-muted-foreground">Unassigned: {unassignedCount}</span>
+                      </div>
+                    );
+                  })()}
                   {rosterData.approvedPlayers.map((request) => (
                     <div key={request.id} className="flex items-center gap-3 p-3 rounded-lg bg-[#212121] border border-gray-700">
                       <Avatar className="h-8 w-8">
