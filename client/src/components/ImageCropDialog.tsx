@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import type { Area, MediaSize } from "react-easy-crop/types";
-import { computeCroppedArea } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +26,47 @@ interface ImageCropDialogProps {
   description?: string;
   onCancel: () => void;
   onConfirm: (croppedFile: File) => void | Promise<void>;
+}
+
+// Inlined from react-easy-crop's exported helpers (the ESM bundle does not
+// re-export them). Rotation is always 0 here, so rotateSize is the identity.
+function clampArea(max: number, value: number) {
+  return Math.min(max, Math.max(0, value));
+}
+function computeCroppedAreaPixels(
+  crop: { x: number; y: number },
+  mediaSize: MediaSize,
+  cropSize: { width: number; height: number },
+  zoom: number,
+): Area {
+  const mw = mediaSize.width;
+  const mh = mediaSize.height;
+  const nw = mediaSize.naturalWidth;
+  const nh = mediaSize.naturalHeight;
+  const cw = cropSize.width;
+  const ch = cropSize.height;
+
+  const xPct = clampArea(100, ((mw - cw / zoom) / 2 - crop.x / zoom) / mw * 100);
+  const yPct = clampArea(100, ((mh - ch / zoom) / 2 - crop.y / zoom) / mh * 100);
+  const wPct = clampArea(100, cw / mw * 100 / zoom);
+  const hPct = clampArea(100, ch / mh * 100 / zoom);
+
+  const wPx = Math.round(clampArea(nw, wPct * nw / 100));
+  const hPx = Math.round(clampArea(nh, hPct * nh / 100));
+
+  // For a square crop (aspect=1) and square images wPx===hPx, but images
+  // with a non-square aspect need the size adjusted for exact pixel accuracy.
+  const isWider = nw >= nh; // aspect=1, so size is square — use smaller dim
+  const size = isWider
+    ? { width: hPx, height: hPx }
+    : { width: wPx, height: wPx };
+
+  return {
+    x: Math.round(clampArea(nw - size.width,  xPct * nw / 100)),
+    y: Math.round(clampArea(nh - size.height, yPct * nh / 100)),
+    width: size.width,
+    height: size.height,
+  };
 }
 
 async function readFileAsDataUrl(file: File): Promise<string> {
@@ -194,17 +234,14 @@ export function ImageCropDialog({
       return;
     }
 
-    // Compute croppedAreaPixels from first principles using react-easy-crop's
-    // own exported function — the same computation the Cropper uses internally.
-    // This is guaranteed to match exactly what the user sees in the preview.
-    const { croppedAreaPixels } = computeCroppedArea(
+    // Compute croppedAreaPixels from first principles — the same calculation
+    // react-easy-crop uses internally — so the saved region always matches
+    // exactly what the user sees in the preview.
+    const croppedAreaPixels = computeCroppedAreaPixels(
       currentCrop,
       currentMediaSize,
       currentCropSize,
-      currentCropSize.width / currentCropSize.height, // aspect = 1 for square
       currentZoom,
-      0,    // rotation (not used)
-      true, // restrictPosition
     );
 
     isSavingRef.current = true;
