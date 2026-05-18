@@ -21,9 +21,13 @@ import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
-import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User } from "@shared/schema";
+import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
+
+interface ApprovedScrimmagePlayer extends ScrimmageRequest {
+  player?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
+}
 
 export default function GameDetails() {
   const { user } = useAuth();
@@ -426,6 +430,42 @@ export default function GameDetails() {
             )}
           </div>
 
+          {/* Team colour banner — shown only to approved players with an assignment */}
+          {(() => {
+            const myRequest = (approvedPlayers as ApprovedScrimmagePlayer[]).find(
+              (r) => r.player?.id === dbUserId
+            );
+            const assignment: string | null = myRequest?.teamAssignment ?? null;
+            if (!assignment) return null;
+            const isLight = assignment.toLowerCase() === 'light';
+            return (
+              <div
+                className={`rounded-xl border shadow-[var(--elev-rest)] px-5 py-4 flex items-center gap-3 ${
+                  isLight
+                    ? 'bg-white dark:bg-zinc-100 border-zinc-200 text-zinc-900'
+                    : 'bg-zinc-900 dark:bg-zinc-800 border-zinc-700 text-zinc-100'
+                }`}
+                data-testid="banner-team-assignment"
+              >
+                <div
+                  className={`w-9 h-9 rounded-full border-2 flex-shrink-0 ${
+                    isLight
+                      ? 'bg-white border-zinc-300'
+                      : 'bg-zinc-900 border-zinc-600'
+                  }`}
+                />
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider opacity-60">
+                    Your team
+                  </p>
+                  <p className="text-base font-semibold capitalize">
+                    Team {assignment}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Pay-the-organizer card — shown when the scrimmage has a cost
               and at least one payment link can be resolved. The override
               wins; otherwise we fall back to the creator's profile handle. */}
@@ -488,7 +528,7 @@ export default function GameDetails() {
 
             {approvedPlayers.length > 0 ? (
               <div className="space-y-2">
-                {approvedPlayers.map((request: any) => (
+                {(approvedPlayers as ApprovedScrimmagePlayer[]).map((request) => (
                   <div 
                     key={request.id} 
                     className="flex items-center gap-3 p-3 rounded-lg bg-[#e2e2e2] dark:bg-[#212121] border"
