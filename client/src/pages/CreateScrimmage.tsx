@@ -579,8 +579,14 @@ export default function CreateScrimmage() {
           }
         });
         
-        setSelectedMemberIds(Array.from(new Set([...selectedMemberIds, ...userIds])));
-        setSelectedEmails(Array.from(new Set([...selectedEmails, ...emails])));
+        const mergedUserIds = Array.from(new Set([...selectedMemberIds, ...userIds]));
+        const mergedEmails = Array.from(new Set([...selectedEmails, ...emails]));
+        setSelectedMemberIds(mergedUserIds);
+        setSelectedEmails(mergedEmails);
+        // Sync to React Hook Form so submission payload and validation are consistent
+        form.setValue('selectedMemberIds', mergedUserIds);
+        form.setValue('selectedEmails', mergedEmails);
+        form.trigger('selectedMemberIds');
         setGroupLoadedUserIds(new Set(userIds)); // Track which IDs came from the group snapshot
         setLoadedInviteGroupId(groupId);
         
