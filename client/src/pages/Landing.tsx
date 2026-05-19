@@ -363,86 +363,189 @@ export default function Landing() {
             <p className="text-gray-500 text-lg max-w-2xl mx-auto">See how Roster stacks up against the competition — for a fraction of the price.</p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse bg-white rounded-xl border border-gray-200 shadow-sm" data-testid="comparison-table">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left p-4 font-bold text-gray-900">Feature</th>
-                  <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border border-[#3c82f4]/20">
-                    <div className="flex flex-col items-center gap-1">
-                      <img src={rosterLightLogo} alt="Roster" className="h-6 object-contain" />
-                      <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/10 rounded-full px-2 py-0.5">Best Value</span>
-                    </div>
-                  </th>
-                  <th className="text-center p-4 font-bold text-gray-700">BenchApp</th>
-                  <th className="text-center p-4 font-bold text-gray-700">TeamSnap</th>
-                  <th className="text-center p-4 font-bold text-gray-700">SportsEngine HQ</th>
-                  <th className="text-center p-4 font-bold text-gray-700">Crossbar</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="p-4 font-medium text-gray-900">Price</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">See "Pricing" Page</td>
-                  <td className="text-center p-4 text-gray-700">$9 / Month</td>
-                  <td className="text-center p-4 text-gray-700">$16 / Month</td>
-                  <td className="text-center p-4 text-gray-700">$1,299 / Year</td>
-                  <td className="text-center p-4 text-gray-700">$995 / Year</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="p-4 text-gray-900">Annoying Ads</td>
-                  <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">NEVER</td>
-                  <td className="text-center p-4 text-red-500 font-semibold">MULTIPLE</td>
-                  <td className="text-center p-4 text-red-500 font-semibold">TONS</td>
-                  <td className="text-center p-4 text-red-500 font-semibold">ALWAYS</td>
-                  <td className="text-center p-4 text-gray-700">No</td>
-                </tr>
-                {[
-                  { label: "Team Scheduling", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Roster Management", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Player/Attendance Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "In App Messaging", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Bracket Generation Tool", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "In-Game Scorekeeping", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "League Drafts", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "3 Stars of the Game", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "In App RSVP", roster: true, bench: false, snap: true, engine: false, cross: true },
-                  { label: "Intelligent Sub Request Tool", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "Polls/Bulletins", roster: true, bench: true, snap: true, engine: false, cross: false },
-                  { label: "Facility Event Calendar", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "Fee & Payment Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Links to Venmo/CashApp", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "Team Expense Tracking", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Mobile App", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Website Portal", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Multi-Team/Org Management", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Registration Notices", roster: true, bench: false, snap: true, engine: true, cross: true },
-                  { label: "Volunteer/Role Assignment", roster: true, bench: true, snap: true, engine: true, cross: true },
-                  { label: "Custom Awards", roster: true, bench: false, snap: false, engine: false, cross: false },
-                  { label: "Tournaments Mode", roster: true, bench: false, snap: false, engine: true, cross: true },
-                ].map(({ label, roster, bench, snap, engine, cross }) => (
-                  <tr key={label} className="border-b border-gray-100 last:border-0">
-                    <td className="p-4 text-gray-800">{label}</td>
-                    <td className="text-center p-4 bg-[#3c82f4]/5">
-                      {roster ? <Check className="w-5 h-5 text-[#3c82f4] inline" /> : <span className="text-red-500 text-xl font-bold">✕</span>}
-                    </td>
-                    <td className="text-center p-4">
-                      {bench ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
-                    </td>
-                    <td className="text-center p-4">
-                      {snap ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
-                    </td>
-                    <td className="text-center p-4">
-                      {engine ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
-                    </td>
-                    <td className="text-center p-4">
-                      {cross ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const competitors = [
+              { key: 'bench',  label: 'BenchApp',        favicon: 'https://www.google.com/s2/favicons?domain=benchapp.com&sz=32' },
+              { key: 'snap',   label: 'TeamSnap',         favicon: 'https://www.google.com/s2/favicons?domain=teamsnap.com&sz=32' },
+              { key: 'engine', label: 'SportsEngine HQ',  favicon: 'https://www.google.com/s2/favicons?domain=sportsengine.com&sz=32' },
+              { key: 'cross',  label: 'Crossbar',         favicon: 'https://www.google.com/s2/favicons?domain=crossbar.io&sz=32' },
+            ] as const;
+            type CompKey = typeof competitors[number]['key'];
+
+            const featureData: Array<{ label: string; roster: boolean } & Record<CompKey, boolean>> = [
+              { label: "Team Scheduling",            roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Roster Management",          roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Player/Attendance Tracking", roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "In App Messaging",           roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Bracket Generation Tool",    roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "In-Game Scorekeeping",       roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "League Drafts",              roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "3 Stars of the Game",        roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "In App RSVP",                roster: true,  bench: false, snap: true,  engine: false, cross: true  },
+              { label: "Intelligent Sub Request",    roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "Polls/Bulletins",            roster: true,  bench: true,  snap: true,  engine: false, cross: false },
+              { label: "Facility Event Calendar",    roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "Fee & Payment Tracking",     roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Links to Venmo/CashApp",     roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "Team Expense Tracking",      roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Mobile App",                 roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Website Portal",             roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Multi-Team/Org Management",  roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Registration Notices",       roster: true,  bench: false, snap: true,  engine: true,  cross: true  },
+              { label: "Volunteer/Role Assignment",  roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
+              { label: "Custom Awards",              roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "Tournaments Mode",           roster: true,  bench: false, snap: false, engine: true,  cross: true  },
+            ];
+
+            return (
+              <>
+                {/* ── MOBILE (< md): 3-column — Feature | Roster | Competition logos ── */}
+                <div className="md:hidden">
+                  <table className="w-full border-collapse bg-white rounded-xl border border-gray-200 shadow-sm" data-testid="comparison-table-mobile">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left px-3 py-3 font-bold text-gray-900 text-sm">Feature</th>
+                        <th className="text-center px-2 py-3 font-bold bg-[#3c82f4]/8 border-x border-[#3c82f4]/20 w-20">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <img src={rosterLightLogo} alt="Roster" className="h-5 object-contain" />
+                            <span className="text-[9px] font-semibold text-[#3c82f4] leading-none">Best Value</span>
+                          </div>
+                        </th>
+                        <th className="text-center px-2 py-3 w-28">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Competition</span>
+                            <div className="flex items-center gap-1 justify-center">
+                              {competitors.map(c => (
+                                <img key={c.key} src={c.favicon} alt={c.label} title={c.label} className="w-4 h-4 rounded-sm" />
+                              ))}
+                            </div>
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-100">
+                        <td className="px-3 py-2.5 font-medium text-gray-900 text-sm">Price</td>
+                        <td className="text-center px-2 py-2.5 bg-[#3c82f4]/5 font-bold text-[#3c82f4] text-xs leading-tight">See<br/>Pricing</td>
+                        <td className="px-2 py-2.5">
+                          <div className="flex flex-col gap-px items-center text-[10px] text-gray-500 leading-tight">
+                            <span>$9/mo</span><span>$16/mo</span><span>$1,299/yr</span><span>$995/yr</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="px-3 py-2.5 text-gray-900 text-sm">Annoying Ads</td>
+                        <td className="text-center px-2 py-2.5 bg-[#3c82f4]/5 font-bold text-[#3c82f4] text-xs">NEVER</td>
+                        <td className="px-2 py-2.5">
+                          <div className="flex flex-col gap-px items-center text-[10px] font-semibold leading-tight">
+                            <span className="text-red-500">MULTI</span>
+                            <span className="text-red-500">TONS</span>
+                            <span className="text-red-500">ALWAYS</span>
+                            <span className="text-gray-500">No</span>
+                          </div>
+                        </td>
+                      </tr>
+                      {featureData.map(({ label, roster, ...rest }) => {
+                        const supporting = competitors.filter(c => rest[c.key as CompKey]);
+                        return (
+                          <tr key={label} className="border-b border-gray-100 last:border-0">
+                            <td className="px-3 py-2.5 text-gray-800 text-sm leading-snug">{label}</td>
+                            <td className="text-center px-2 py-2.5 bg-[#3c82f4]/5">
+                              {roster
+                                ? <Check className="w-4 h-4 text-[#3c82f4] inline" />
+                                : <span className="text-red-500 font-bold leading-none">✕</span>}
+                            </td>
+                            <td className="px-2 py-2.5 text-center">
+                              {supporting.length === 0 ? (
+                                <span className="text-red-400 font-bold leading-none">✕</span>
+                              ) : (
+                                <div className="flex items-center justify-center gap-1 flex-wrap">
+                                  {supporting.map(c => (
+                                    <img key={c.key} src={c.favicon} alt={c.label} title={c.label} className="w-5 h-5 rounded-sm flex-shrink-0" />
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 justify-center">
+                    {competitors.map(c => (
+                      <div key={c.key} className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <img src={c.favicon} alt={c.label} className="w-4 h-4 rounded-sm" />
+                        <span>{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── DESKTOP (≥ md): full 6-column table ── */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full border-collapse bg-white rounded-xl border border-gray-200 shadow-sm" data-testid="comparison-table">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left p-4 font-bold text-gray-900">Feature</th>
+                        <th className="text-center p-4 font-bold bg-[#3c82f4]/8 text-gray-900 border border-[#3c82f4]/20">
+                          <div className="flex flex-col items-center gap-1">
+                            <img src={rosterLightLogo} alt="Roster" className="h-6 object-contain" />
+                            <span className="text-xs font-normal text-[#3c82f4] bg-[#3c82f4]/10 rounded-full px-2 py-0.5">Best Value</span>
+                          </div>
+                        </th>
+                        {competitors.map(c => (
+                          <th key={c.key} className="text-center p-4 font-bold text-gray-700">
+                            <div className="flex flex-col items-center gap-1">
+                              <img src={c.favicon} alt={c.label} className="w-6 h-6 rounded" />
+                              <span>{c.label}</span>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-4 font-medium text-gray-900">Price</td>
+                        <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">See "Pricing" Page</td>
+                        <td className="text-center p-4 text-gray-700">$9 / Month</td>
+                        <td className="text-center p-4 text-gray-700">$16 / Month</td>
+                        <td className="text-center p-4 text-gray-700">$1,299 / Year</td>
+                        <td className="text-center p-4 text-gray-700">$995 / Year</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-4 text-gray-900">Annoying Ads</td>
+                        <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">NEVER</td>
+                        <td className="text-center p-4 text-red-500 font-semibold">MULTIPLE</td>
+                        <td className="text-center p-4 text-red-500 font-semibold">TONS</td>
+                        <td className="text-center p-4 text-red-500 font-semibold">ALWAYS</td>
+                        <td className="text-center p-4 text-gray-700">No</td>
+                      </tr>
+                      {featureData.map(({ label, roster, bench, snap, engine, cross }) => (
+                        <tr key={label} className="border-b border-gray-100 last:border-0">
+                          <td className="p-4 text-gray-800">{label}</td>
+                          <td className="text-center p-4 bg-[#3c82f4]/5">
+                            {roster ? <Check className="w-5 h-5 text-[#3c82f4] inline" /> : <span className="text-red-500 text-xl font-bold">✕</span>}
+                          </td>
+                          <td className="text-center p-4">
+                            {bench ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                          </td>
+                          <td className="text-center p-4">
+                            {snap ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                          </td>
+                          <td className="text-center p-4">
+                            {engine ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                          </td>
+                          <td className="text-center p-4">
+                            {cross ? <Check className="w-5 h-5 text-green-600 inline" /> : <span className="text-red-400 text-xl font-bold">✕</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </section>
       {/* Testimonials Section */}
