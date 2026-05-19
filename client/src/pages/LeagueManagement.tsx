@@ -1563,8 +1563,9 @@ export default function LeagueManagement() {
       if (fileInputRef.current) fileInputRef.current.value = '';
       setShowBulkImport(false);
       
-      // Refetch data to show any new suggestions
+      // Refetch members and invalidate teams so newly created teams appear immediately
       refetchMembers();
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
     },
     onError: (error: Error) => {
       toast({

@@ -5867,7 +5867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: `placeholder:${ph.id}`,
         userId: `placeholder:${ph.id}`,
         leagueId,
-        skillLevel: null,
+        skillLevel: ph.skillLevel ?? null,
         status: 'placeholder',
         assignedTeamId: ph.teamId ?? undefined,
         position: ph.position ?? undefined,
@@ -11468,8 +11468,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can delete all players' });
       }
 
-      // Find placeholder users in this league before deleting memberships
-      const placeholderMembers = await db
+      // Delete all placeholder_players rows for this league (new no-email placeholder system)
+      await db.delete(placeholderPlayers).where(eq(placeholderPlayers.leagueId, leagueId));
+
+      // Find old-style @placeholder.roster ghost users before deleting memberships
+      const ghostPlaceholderMembers = await db
         .select({ userId: leagueMemberships.userId })
         .from(leagueMemberships)
         .innerJoin(users, eq(users.id, leagueMemberships.userId))
@@ -11483,8 +11486,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete all league memberships for this league
       await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, leagueId));
 
-      // Delete placeholder user records that have no remaining memberships in other leagues
-      for (const pm of placeholderMembers) {
+      // Delete old-style ghost placeholder user records with no remaining memberships
+      for (const pm of ghostPlaceholderMembers) {
         const remaining = await db.select({ id: leagueMemberships.id })
           .from(leagueMemberships)
           .where(eq(leagueMemberships.userId, pm.userId));
