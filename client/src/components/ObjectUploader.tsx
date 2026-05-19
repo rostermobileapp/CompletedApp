@@ -11,6 +11,7 @@ import {
 import { Upload, X } from "lucide-react";
 import { ImageCropDialog, type CropShape } from "@/components/ImageCropDialog";
 import { useToast } from "@/hooks/use-toast";
+import { compressImage } from "@/lib/imageCompression";
 
 interface UploadResult {
   successful?: Array<{
@@ -209,7 +210,21 @@ export function ObjectUploader({
 
       for (const file of selectedFiles) {
         try {
-          const result = await uploadOneFile(file);
+          let fileToUpload: File = file;
+          if (file.type.startsWith("image/")) {
+            try {
+              fileToUpload = await compressImage(file, "teamLogo");
+            } catch (compressionErr) {
+              toast({
+                title: "Image rejected",
+                description: compressionErr instanceof Error ? compressionErr.message : "Could not process image.",
+                variant: "destructive",
+              });
+              failed.push({ file: file.name, error: compressionErr });
+              continue;
+            }
+          }
+          const result = await uploadOneFile(fileToUpload);
           successful.push(result);
         } catch (error) {
           console.error("Failed to upload file:", file.name, error);
@@ -252,7 +267,7 @@ export function ObjectUploader({
           <input
             ref={cropInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/gif"
             onChange={handleCropFileChosen}
             className="hidden"
             data-testid="input-crop-file"
@@ -313,7 +328,7 @@ export function ObjectUploader({
                   ref={fileInputRef}
                   type="file"
                   multiple={maxNumberOfFiles > 1}
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={(e) => handleFileSelect(e.target.files)}
                   className="hidden"
                 />

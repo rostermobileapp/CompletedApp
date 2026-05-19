@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
+import { compressImage } from '@/lib/imageCompression';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
@@ -1640,16 +1641,28 @@ export default function Messages() {
   const uploadFiles = async (files: File[]): Promise<any[]> => {
     const uploadPromises = files.map(async (file) => {
       try {
-        // Get upload URL and path
+        let fileToUpload = file;
+        if (file.type.startsWith('image/')) {
+          try {
+            fileToUpload = await compressImage(file, 'messageImage');
+          } catch (compressionErr) {
+            toast({
+              title: 'Image rejected',
+              description: compressionErr instanceof Error ? compressionErr.message : 'Could not process image.',
+              variant: 'destructive',
+            });
+            throw compressionErr;
+          }
+        }
+
         const uploadUrlResponse = await apiRequest('POST', '/api/message-attachments/upload');
         const { uploadURL, path } = await uploadUrlResponse.json();
         
-        // Upload file to object storage
         const uploadResponse = await fetch(uploadURL, {
           method: 'PUT',
-          body: file,
+          body: fileToUpload,
           headers: {
-            'Content-Type': file.type
+            'Content-Type': fileToUpload.type
           }
         });
         
@@ -1657,14 +1670,11 @@ export default function Messages() {
           throw new Error('Failed to upload file');
         }
         
-        // Use the path returned from the API
-        const fileUrl = path;
-        
         return {
           fileName: file.name,
-          fileUrl,
-          fileType: file.type,
-          fileSize: file.size
+          fileUrl: path,
+          fileType: fileToUpload.type,
+          fileSize: fileToUpload.size
         };
       } catch (error) {
         console.error('Error uploading file:', error);

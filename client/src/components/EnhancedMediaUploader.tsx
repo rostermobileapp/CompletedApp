@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { X, Upload, Image as ImageIcon, Video, FileText, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { errorTracker } from "@/lib/errorTracking";
+import { compressImage } from "@/lib/imageCompression";
 
 interface MediaFile {
   file: File;
@@ -22,76 +23,6 @@ interface EnhancedMediaUploaderProps {
   className?: string;
 }
 
-// Image compression utility with WebP support for better storage savings
-const compressImage = async (file: File, quality: number = 0.7, maxWidth: number = 1200): Promise<File> => {
-  return new Promise((resolve) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    
-    img.onload = () => {
-      // Calculate new dimensions
-      let { width, height } = img;
-      
-      // Also limit height to prevent very tall images
-      const maxHeight = 1200;
-      
-      if (width > maxWidth) {
-        height = (height * maxWidth) / width;
-        width = maxWidth;
-      }
-      
-      if (height > maxHeight) {
-        width = (width * maxHeight) / height;
-        height = maxHeight;
-      }
-      
-      canvas.width = width;
-      canvas.height = height;
-      
-      // Draw and compress
-      ctx?.drawImage(img, 0, 0, width, height);
-      
-      // Try WebP first for better compression (typically 25-35% smaller than JPEG)
-      // Fall back to original type if WebP not supported
-      const supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp');
-      const outputType = supportsWebP ? 'image/webp' : file.type;
-      const outputFileName = supportsWebP ? file.name.replace(/\.[^.]+$/, '.webp') : file.name;
-      
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const compressedFile = new File([blob], outputFileName, {
-              type: outputType,
-              lastModified: Date.now(),
-            });
-            
-            // Only use compressed version if it's actually smaller
-            if (compressedFile.size < file.size) {
-              resolve(compressedFile);
-            } else {
-              resolve(file);
-            }
-          } else {
-            resolve(file);
-          }
-        },
-        outputType,
-        quality
-      );
-      
-      // Clean up object URL
-      URL.revokeObjectURL(img.src);
-    };
-    
-    img.onerror = () => {
-      // If image loading fails, return original file
-      resolve(file);
-    };
-    
-    img.src = URL.createObjectURL(file);
-  });
-};
 
 const getFileType = (file: File): 'image' | 'video' | 'document' => {
   if (file.type.startsWith('image/')) return 'image';
@@ -137,12 +68,21 @@ export function EnhancedMediaUploader({
 
       const type = getFileType(file);
       const preview = URL.createObjectURL(file);
-      
+
       let compressed = file;
-      
-      // Compress images for better storage savings (70% quality, 1200px max, WebP conversion)
+
       if (type === 'image') {
-        compressed = await compressImage(file);
+        try {
+          compressed = await compressImage(file, 'leagueAsset');
+        } catch (err) {
+          if (err instanceof Error) {
+            errorTracker.captureWarning('Image compression rejected file', {
+              filename: file.name,
+              reason: err.message,
+            });
+          }
+          continue;
+        }
       }
 
       mediaFiles.push({
