@@ -1,0 +1,215 @@
+# Photos Page Upload Cap — 5 Per User Per Calendar Month
+
+CONTEXT: The Photos page is already gated to paid users only (Player Pro, Commissioner). Free users cannot access this page at all. This means the upload route only needs to enforce the monthly cap — no paid-vs-free check needed inside the route itself.
+
+## Phase 1: Audit (DO NOT modify code yet)
+
+### 1.1 Confirm the Photos page is paid-only
+Find the existing access gate that prevents free users from reaching the Photos page. This may be:
+- A route guard on the client side
+- A page-level redirect
+- A server-side middleware check
+
+Report:
+- File path and line number of the gate
+- The check used to determine paid status
+- Confirm there are no client-side workarounds (e.g. directly hitting the upload API endpoint without loading the page)
+
+If the upload API endpoint is not also protected by the same paid-only gate, FLAG THIS — we need to add server-side enforcement to prevent a free user from bypassing the page and calling the API directly.
+
+### 1.2 Identify the Photos page upload route
+Find the server route that handles uploads from the Photos page specifically. This is NOT the same as team logos, league banners, message attachments, or profile avatars — those are exempt from this cap.
+
+Report:
+- The exact route path and method
+- The file path and line number of the handler
+- How the route currently identifies the uploading user
+
+### 1.3 Identify the Photos page client component
+Report:
+- File path
+- Current upload flow (button, drag-drop, etc.)
+- Where success/error states are displayed to the user
+
+STOP HERE. Report findings before Phase 2.
+
+---
+
+## Phase 2: Database — usage tracking
+
+### 2.1 Create a photo_upload_quota table
+Migration to add:
+
+CREATE TABLE photo_upload_quota (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  period_start date NOT NULL,  -- first day of the calendar month, UTC
+  upload_count integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, period_start)
+);
+
+CREATE INDEX idx_photo_upload_quota_user_period ON photo_upload_quota(user_id, period_start);
+
+Rationale: keying on (user_id, period_start) makes "how many has this user uploaded this month" a single-row lookup. Historical rows are kept for analytics and never deleted automatically.
+
+### 2.2 Add RLS policies
+- Users can SELECT their own row (so the client can display "3 of 5 used this month")
+- Only the service role can INSERT or UPDATE
+
+### 2.3 Create a helper function to get current period
+In server/quotaHelpers.ts:
+
+export function getCurrentPeriodStart(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
+}
+
+UTC is intentional — the reset happens at midnight UTC on the 1st of every month, same for every user globally. Do not localize to user timezone.
+
+---
+
+## Phase 3: Server-side enforcement
+
+### 3.1 Create the Postgres RPC functions
+Migration to add two functions:
+
+CREATE OR REPLACE FUNCTION increment_photo_quota(p_user_id uuid, p_period_start date, p_limit integer)
+RETURNS json AS $$
+DECLARE
+  v_current integer;
+  v_new integer;
+BEGIN
+  INSERT INTO photo_upload_quota (user_id, period_start, upload_count)
+  VALUES (p_user_id, p_period_start, 0)
+  ON CONFLICT (user_id, period_start) DO NOTHING;
+
+  SELECT upload_count INTO v_current
+  FROM photo_upload_quota
+  WHERE user_id = p_user_id AND period_start = p_period_start
+  FOR UPDATE;
+
+  IF v_current >= p_limit THEN
+    RETURN json_build_object('allowed', false, 'used', v_current);
+  END IF;
+
+  UPDATE photo_upload_quota
+  SET upload_count = upload_count + 1, updated_at = now()
+  WHERE user_id = p_user_id AND period_start = p_period_start
+  RETURNING upload_count INTO v_new;
+
+  RETURN json_build_object('allowed', true, 'used', v_new);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION decrement_photo_quota(p_user_id uuid, p_period_start date)
+RETURNS void AS $$
+BEGIN
+  UPDATE photo_upload_quota
+  SET upload_count = GREATEST(0, upload_count - 1), updated_at = now()
+  WHERE user_id = p_user_id AND period_start = p_period_start;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+The FOR UPDATE lock prevents the race condition where two simultaneous uploads both pass the limit check.
+
+### 3.2 Create a quota check + increment helper
+In server/quotaHelpers.ts:
+
+const MONTHLY_PHOTO_LIMIT = 5;
+
+export async function checkAndReservePhotoQuota(userId: string): Promise<{ allowed: boolean; used: number; limit: number; remaining: number }> {
+  const periodStart = getCurrentPeriodStart();
+
+  const { data, error } = await supabaseAdmin.rpc('increment_photo_quota', {
+    p_user_id: userId,
+    p_period_start: periodStart,
+    p_limit: MONTHLY_PHOTO_LIMIT,
+  });
+
+  if (error) throw error;
+
+  return {
+    allowed: data.allowed,
+    used: data.used,
+    limit: MONTHLY_PHOTO_LIMIT,
+    remaining: Math.max(0, MONTHLY_PHOTO_LIMIT - data.used),
+  };
+}
+
+export async function rollbackPhotoQuota(userId: string): Promise<void> {
+  const periodStart = getCurrentPeriodStart();
+  await supabaseAdmin.rpc('decrement_photo_quota', {
+    p_user_id: userId,
+    p_period_start: periodStart,
+  });
+}
+
+### 3.3 Wire the check into the Photos page upload route
+At the top of the handler, BEFORE any file processing:
+
+1. Call checkAndReservePhotoQuota(userId). If allowed is false, return HTTP 429:
+   {
+     error: "You've reached your monthly photo limit.",
+     used: 5,
+     limit: 5,
+     resetDate: "<first of next month, ISO string>"
+   }
+
+2. Proceed with the upload (compression, storage write, database insert).
+
+3. If the upload fails AFTER the quota was incremented, call rollbackPhotoQuota(userId) so the user isn't penalized for a server-side failure.
+
+### 3.4 Add a quota status route
+Create GET /api/photos/quota — returns the user's current usage:
+
+{
+  used: 3,
+  limit: 5,
+  remaining: 2,
+  resetDate: "2026-06-01T00:00:00.000Z"
+}
+
+This route should also be protected by the same paid-only gate.
+
+---
+
+## Phase 4: Client-side UI
+
+### 4.1 Fetch and display quota on the Photos page
+When the Photos page mounts, call GET /api/photos/quota. Display the result near the upload button:
+
+"3 of 5 photos used this month. Resets June 1."
+
+When remaining hits 0:
+
+"You've used all 5 photos this month. Resets June 1."
+
+And disable the upload button.
+
+### 4.2 Handle the 429 response
+If the upload route returns 429 (race condition where the cap was hit between the page load and the actual upload), show a clean error toast: "You've reached your monthly photo limit. Resets [date]." Refresh the quota display.
+
+### 4.3 Refresh quota after each upload
+After every successful upload, re-fetch the quota or optimistically increment the displayed count.
+
+---
+
+## Phase 5: Testing checklist (report only, do not run)
+
+List the exact test scenarios I should run before shipping:
+
+1. Paid user uploads 5 photos in a month — all succeed
+2. Paid user attempts 6th upload — blocked with clean error and reset date displayed
+3. Paid user on May 31 has 5 uploaded; on June 1 at 00:01 UTC, can upload again
+4. Two simultaneous uploads when user has 4/5 used — only one succeeds, the other gets 429 (race condition test)
+5. Upload fails server-side after quota increment — count rolls back, user can retry
+6. Free user attempts to call /api/photos/upload directly (bypassing the page) — blocked by existing paid-only gate
+7. Quota status endpoint requires authentication and paid status
+
+### Final summary
+Report:
+- Files modified
+- Files created (migrations, helpers, components)
+- Open questions
+
+DO NOT extend this cap to other upload surfaces (team logos, league banners, message attachments, avatars). Those remain uncapped per the spec.

@@ -234,23 +234,6 @@ export function TournamentPhotos({
     (p) => p.userId === currentUserId && p.status === 'approved'
   );
 
-  const uploadPhotoMutation = useMutation({
-    mutationFn: async (data: { fileUrl: string; fileName: string; fileSize: number }) => {
-      const response = await apiRequest('POST', '/api/tournament-photos', {
-        tournamentId,
-        ...data,
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tournament-photos', tournamentId] });
-      toast({ title: 'Photo uploaded successfully!' });
-    },
-    onError: () => {
-      toast({ title: 'Failed to upload photo', variant: 'destructive' });
-    },
-  });
-
   const deletePhotoMutation = useMutation({
     mutationFn: async (photoId: string) => {
       const response = await apiRequest('DELETE', `/api/tournament-photos/${photoId}`);
@@ -317,14 +300,35 @@ export function TournamentPhotos({
           throw new Error('Failed to upload file');
         }
 
-        const savedPhoto = await uploadPhotoMutation.mutateAsync({
+        // Save the photo record — server enforces monthly quota here
+        const saveResponse = await apiRequest('POST', '/api/tournament-photos', {
+          tournamentId,
           fileUrl: path,
           fileName: mediaFile.file.name,
           fileSize: mediaFile.file.size,
         });
+
+        if (!saveResponse.ok) {
+          const errBody = await saveResponse.json().catch(() => ({}));
+          if (saveResponse.status === 429) {
+            const resetDate = errBody.resetDate
+              ? new Date(errBody.resetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+              : 'next month';
+            toast({
+              title: "Monthly photo limit reached",
+              description: `You've used all ${errBody.limit ?? 5} photos this month. Resets ${resetDate}.`,
+              variant: 'destructive',
+            });
+            return;
+          }
+          throw new Error(errBody.error || 'Failed to save photo');
+        }
+
+        const savedPhoto = await saveResponse.json();
         
         // Track the uploaded photo for tagging
         if (savedPhoto?.id) {
+          queryClient.invalidateQueries({ queryKey: ['/api/tournament-photos', tournamentId] });
           uploadedPhotos.push({
             id: savedPhoto.id,
             url: getImageUrl(savedPhoto.fileUrl) || savedPhoto.fileUrl,
@@ -336,6 +340,7 @@ export function TournamentPhotos({
       // Store uploaded photos for tagging (dialog will show via useEffect when users are available)
       if (uploadedPhotos.length > 0) {
         setNewlyUploadedPhotos(uploadedPhotos);
+        toast({ title: 'Photo uploaded successfully!' });
       }
     } catch (error) {
       console.error('Error uploading photos:', error);

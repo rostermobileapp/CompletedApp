@@ -12,6 +12,7 @@ import {
   decimal,
   unique,
   check,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -4031,3 +4032,21 @@ export const referralSettings = pgTable("referral_settings", {
 });
 
 export type ReferralSetting = typeof referralSettings.$inferSelect;
+
+// Photo upload quota — tracks monthly upload counts per paid user
+// Primary key (userId, periodStart) makes current-month lookup a single-row read
+export const photoUploadQuota = pgTable(
+  "photo_upload_quota",
+  {
+    userId: varchar("user_id").notNull(),
+    periodStart: varchar("period_start", { length: 10 }).notNull(), // "YYYY-MM-DD", first day of UTC month
+    uploadCount: integer("upload_count").notNull().default(0),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.periodStart] }),
+    index("idx_photo_upload_quota_user_period").on(table.userId, table.periodStart),
+  ],
+);
+
+export type PhotoUploadQuota = typeof photoUploadQuota.$inferSelect;

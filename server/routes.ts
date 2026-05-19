@@ -33,6 +33,7 @@ import {
 import { db } from "./db";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
+import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -4147,6 +4148,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "File size exceeds maximum of 10MB" });
       }
 
+      // Security: verify paid subscription before issuing upload URL
+      const uploaderUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!uploaderUser || uploaderUser.length === 0) {
+        return res.status(403).json({ error: "User not found" });
+      }
+      const hasUploadAccess = uploaderUser[0].role === 'player_pro' ||
+                              uploaderUser[0].role === 'commissioner' ||
+                              uploaderUser[0].role === 'secondary_commissioner';
+      if (!hasUploadAccess) {
+        return res.status(403).json({ error: "Tournament photo uploads require a paid subscription" });
+      }
+
       // Check if user is an approved participant in the tournament
       const participant = await db
         .select()
@@ -4216,19 +4229,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Only approved tournament participants can upload photos" });
       }
 
-      const { SupabaseStorageService } = await import('./supabaseStorage');
-      const supabaseStorageService = new SupabaseStorageService();
-      const normalizedPath = supabaseStorageService.normalizeTournamentPhotoPath(fileUrl);
+      // Enforce monthly upload quota
+      const quota = await checkAndReservePhotoQuota(userId);
+      if (!quota.allowed) {
+        return res.status(429).json({
+          error: "You've reached your monthly photo limit.",
+          used: quota.used,
+          limit: quota.limit,
+          resetDate: quota.resetDate,
+        });
+      }
 
-      // Always set uploadedBy to the authenticated user (prevent spoofing)
-      const photo = await storage.createTournamentPhoto({
-        tournamentId,
-        uploadedBy: userId,
-        fileUrl: normalizedPath,
-        fileName,
-        fileSize: fileSize || 0,
-        caption: caption || null,
-      });
+      let photo;
+      try {
+        const { SupabaseStorageService } = await import('./supabaseStorage');
+        const supabaseStorageService = new SupabaseStorageService();
+        const normalizedPath = supabaseStorageService.normalizeTournamentPhotoPath(fileUrl);
+
+        // Always set uploadedBy to the authenticated user (prevent spoofing)
+        photo = await storage.createTournamentPhoto({
+          tournamentId,
+          uploadedBy: userId,
+          fileUrl: normalizedPath,
+          fileName,
+          fileSize: fileSize || 0,
+          caption: caption || null,
+        });
+      } catch (saveError) {
+        // Roll back quota if the save failed so user isn't penalised
+        await rollbackPhotoQuota(userId).catch(() => {});
+        throw saveError;
+      }
 
       res.json(photo);
     } catch (error) {
@@ -4456,24 +4487,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "League photos require a paid subscription" });
       }
 
-      const { SupabaseStorageService } = await import('./supabaseStorage');
-      const supabaseStorageService = new SupabaseStorageService();
-      const normalizedPath = supabaseStorageService.normalizeLeaguePhotoPath(fileUrl);
+      // Enforce monthly upload quota
+      const quota = await checkAndReservePhotoQuota(userId);
+      if (!quota.allowed) {
+        return res.status(429).json({
+          error: "You've reached your monthly photo limit.",
+          used: quota.used,
+          limit: quota.limit,
+          resetDate: quota.resetDate,
+        });
+      }
 
-      // Always set uploadedBy to the authenticated user (prevent spoofing)
-      const photo = await storage.createLeaguePhoto({
-        leagueId,
-        uploadedBy: userId,
-        fileUrl: normalizedPath,
-        fileName,
-        fileSize: fileSize || 0,
-        caption: caption || null,
-      });
+      let photo;
+      try {
+        const { SupabaseStorageService } = await import('./supabaseStorage');
+        const supabaseStorageService = new SupabaseStorageService();
+        const normalizedPath = supabaseStorageService.normalizeLeaguePhotoPath(fileUrl);
+
+        // Always set uploadedBy to the authenticated user (prevent spoofing)
+        photo = await storage.createLeaguePhoto({
+          leagueId,
+          uploadedBy: userId,
+          fileUrl: normalizedPath,
+          fileName,
+          fileSize: fileSize || 0,
+          caption: caption || null,
+        });
+      } catch (saveError) {
+        // Roll back quota if the save failed so user isn't penalised
+        await rollbackPhotoQuota(userId).catch(() => {});
+        throw saveError;
+      }
 
       res.json(photo);
     } catch (error) {
       console.error("Error creating league photo:", error);
       res.status(500).json({ error: "Failed to create photo" });
+    }
+  });
+
+  // Quota status — returns current monthly upload usage for the authenticated paid user
+  app.get("/api/photos/quota", isAuthenticated, requirePremiumFeatures, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const status = await getPhotoQuotaStatus(userId);
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching photo quota:", error);
+      res.status(500).json({ error: "Failed to fetch quota" });
     }
   });
 

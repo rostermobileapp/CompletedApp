@@ -150,6 +150,18 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
   const [showOnlyMyPhotos, setShowOnlyMyPhotos] = useState(false);
   const [showUserFilter, setShowUserFilter] = useState(false);
   const { role, canAccessPremiumFeatures } = usePermissions();
+
+  const { data: photoQuota, refetch: refetchQuota } = useQuery<{
+    used: number;
+    limit: number;
+    remaining: number;
+    resetDate: string;
+    allowed: boolean;
+  }>({
+    queryKey: ['/api/photos/quota'],
+    enabled: canAccessPremiumFeatures(),
+    staleTime: 30_000,
+  });
   
   // FREE TIER RESTRICTION: Block access to Photos page for free tier users
   const isFreeTier = !canAccessPremiumFeatures();
@@ -353,18 +365,28 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
           </div>
 
           {canUpload && (
-            <Button
-              onClick={() => setShowUploader(true)}
-              disabled={isUploading}
-              size="icon"
-              data-testid="button-upload-photos"
-            >
-              {isUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Upload className="h-5 w-5" />
+            <div className="flex items-center gap-2">
+              {photoQuota && (
+                <span className={`text-xs whitespace-nowrap ${photoQuota.remaining === 0 ? 'text-destructive' : 'text-muted-foreground'}`} data-testid="text-quota-display">
+                  {photoQuota.remaining === 0
+                    ? `Limit reached · Resets ${new Date(photoQuota.resetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                    : `${photoQuota.used}/${photoQuota.limit} this month`}
+                </span>
               )}
-            </Button>
+              <Button
+                onClick={() => setShowUploader(true)}
+                disabled={isUploading || photoQuota?.remaining === 0}
+                size="icon"
+                title={photoQuota?.remaining === 0 ? `Monthly limit reached. Resets ${new Date(photoQuota.resetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}` : 'Upload photos'}
+                data-testid="button-upload-photos"
+              >
+                {isUploading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Upload className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -391,7 +413,7 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
             showUploader={showUploader}
             onShowUploaderChange={setShowUploader}
             onUploadStart={() => setIsUploading(true)}
-            onUploadComplete={() => setIsUploading(false)}
+            onUploadComplete={() => { setIsUploading(false); refetchQuota(); }}
             selectedTeamFilter={selectedTeamFilter}
             selectedUserFilter={selectedUserFilter}
             onTeamsLoaded={setAvailableTeams}
@@ -427,7 +449,7 @@ export default function MediaGalleryPage({ overlayEntityType, overlayEntityId }:
               showUploader={showUploader}
               onShowUploaderChange={setShowUploader}
               onUploadStart={() => setIsUploading(true)}
-              onUploadComplete={() => setIsUploading(false)}
+              onUploadComplete={() => { setIsUploading(false); refetchQuota(); }}
               selectedTeamFilter={selectedTeamFilter}
               selectedUserFilter={selectedUserFilter}
               onTeamsLoaded={setAvailableTeams}
