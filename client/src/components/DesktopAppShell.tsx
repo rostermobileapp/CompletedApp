@@ -68,7 +68,8 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const { data: currentUser } = useQuery<any>({
     queryKey: ['/api/user'],
-    enabled: !!isAuthenticated,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
   });
 
   const { data: userTeams } = useQuery<any[]>({
