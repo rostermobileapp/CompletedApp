@@ -3746,26 +3746,35 @@ export default function LeagueManagement() {
                             onClick={() => setSelectedTeam(team)}
                             data-testid={`team-${team.id}`}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2">
-                                <p className="font-medium text-base">{team.name}</p>
-                                {team.isFreeAgents && (
-                                  <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">
-                                    Unassigned
-                                  </span>
-                                )}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              {/* Team logo placeholder */}
+                              <div className="w-10 h-10 rounded-full bg-muted border hairline flex items-center justify-center flex-shrink-0 text-sm font-semibold text-muted-foreground uppercase">
+                                {team.isFreeAgents
+                                  ? <Shield className="w-4 h-4" />
+                                  : team.name.trim().split(/\s+/).slice(0, 2).map((w: string) => w[0]).join('')
+                                }
                               </div>
-                              <div className="text-sm text-muted-foreground space-y-1">
-                                {!team.isFreeAgents && (() => {
-                                  const captainOnTeam = captain && teamMembers.some((m: LeagueMember) => m.userId === captain.userId);
-                                  return (
-                                    <p className={captain && !captainOnTeam ? 'text-amber-500' : ''}>
-                                      Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}
-                                      {captain && !captainOnTeam && ' ⚠ Not on roster'}
-                                    </p>
-                                  );
-                                })()}
-                                <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <p className="font-medium text-base">{team.name}</p>
+                                  {team.isFreeAgents && (
+                                    <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full">
+                                      Unassigned
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground space-y-1">
+                                  {!team.isFreeAgents && (() => {
+                                    const captainOnTeam = captain && teamMembers.some((m: LeagueMember) => m.userId === captain.userId);
+                                    return (
+                                      <p className={captain && !captainOnTeam ? 'text-amber-500' : ''}>
+                                        Captain: {captain?.user ? formatUserName(captain.user) : 'Not assigned'}
+                                        {captain && !captainOnTeam && ' ⚠ Not on roster'}
+                                      </p>
+                                    );
+                                  })()}
+                                  <p>{teamMembers.length} player{teamMembers.length !== 1 ? 's' : ''}</p>
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-3 ml-4">
