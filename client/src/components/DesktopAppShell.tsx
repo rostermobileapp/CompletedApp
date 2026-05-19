@@ -5,6 +5,7 @@ import { Users, Trophy, Swords, Info, LifeBuoy, Clock } from 'lucide-react';
 import PastSeasonsModal from '@/components/PastSeasonsModal';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { cn } from '@/lib/utils';
+import { getImageUrl } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
@@ -64,6 +65,11 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     setTournamentSelection,
   } = useDashboardSelection();
   const slideOverlay = useSlideUpOverlay();
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+    enabled: !!isAuthenticated,
+  });
 
   const { data: userTeams } = useQuery<any[]>({
     queryKey: ['/api/user/teams'],
@@ -362,11 +368,19 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
         data-testid="desktop-sidebar"
       >
         <div className="px-2 py-3 xl:py-6 [@media(max-height:760px)]:py-2 flex items-center justify-center border-b border-white/20">
-          <img
-            src={desktopHeaderLogo}
-            alt="Roster"
-            className="w-10 h-10 xl:w-14 xl:h-14 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:h-8 object-contain"
-          />
+          {currentUser?.profileImageUrl ? (
+            <img
+              src={getImageUrl(currentUser.profileImageUrl) || ''}
+              alt="Profile"
+              className="w-10 h-10 xl:w-14 xl:h-14 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:h-8 rounded-full object-cover ring-2 ring-white/40"
+            />
+          ) : (
+            <img
+              src={desktopHeaderLogo}
+              alt="Roster"
+              className="w-10 h-10 xl:w-14 xl:h-14 [@media(max-height:760px)]:w-8 [@media(max-height:760px)]:h-8 object-contain"
+            />
+          )}
         </div>
         <nav className="flex-1 px-1.5 xl:px-2 py-2 xl:py-4 [@media(max-height:760px)]:py-1 space-y-0.5 xl:space-y-1 overflow-y-auto">
           {MAIN_NAV_ITEMS.map((item) => {
