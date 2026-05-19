@@ -10979,7 +10979,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const placeholderDedupeKeys = new Set<string>();
 
         // Create placeholder user accounts and league memberships for imported players
+        console.log(`[CSVImport] Processing ${validPlayers.length} valid players`);
         for (const player of validPlayers) {
+          console.log(`[CSVImport] Player: ${player.firstName} ${player.lastName}, email: ${player.email || 'none'}, skillLevel: ${player.skillLevel || 'none'}`);
           try {
             // Check if player already exists in the league (by name or email)
             const existingMember = existingMemberships.find(m => {
