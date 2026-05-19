@@ -7466,8 +7466,6 @@ export default function LeagueManagement() {
                     maxFileSize={10485760}
                     onGetUploadParameters={handleGetTeamLogoUploadParameters}
                     onComplete={createTeamLogoUploadComplete(selectedTeamForEdit.id)}
-                    cropShape="rect"
-                    cropDialogTitle="Position your team logo"
                     buttonClassName="h-8 px-3 text-xs"
                   >
                     <div className="flex items-center gap-2">

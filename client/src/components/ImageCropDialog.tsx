@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 import type { Area } from "react-easy-crop/types";
@@ -70,9 +70,30 @@ export function ImageCropDialog({
   const isSavingRef = useRef(false);
   const cropRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
-  // react-easy-crop gives us the exact pixel coordinates via onCropComplete —
-  // no container-size measurement needed at all.
   const croppedAreaPixelsRef = useRef<Area | null>(null);
+
+  // Measure the crop container so react-easy-crop gets a concrete cropSize.
+  // Without this, aspectRatio-based heights aren't picked up by the library.
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const [cropSize, setCropSize] = useState<{ width: number; height: number } | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const el = cropContainerRef.current;
+    if (!el) return;
+    const update = (w: number, h: number) => {
+      if (w > 0 && h > 0) {
+        const side = Math.min(w, h) - 8;
+        setCropSize({ width: side, height: side });
+      }
+    };
+    update(el.offsetWidth, el.offsetHeight);
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      update(width, height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
 
   useEffect(() => { fileRef.current = file; }, [file]);
   useEffect(() => { cropRef.current = crop; }, [crop]);
@@ -205,8 +226,9 @@ export function ImageCropDialog({
         <div className="space-y-3">
           {/* Crop canvas — fills full dialog width as a square */}
           <div
+            ref={cropContainerRef}
             className="relative w-full bg-black rounded-md overflow-hidden"
-            style={{ aspectRatio: "1 / 1" }}
+            style={{ aspectRatio: "1 / 1", minHeight: "260px" }}
           >
             {imageSrc ? (
               <Cropper
@@ -216,6 +238,7 @@ export function ImageCropDialog({
                 zoom={zoom}
                 aspect={1}
                 cropShape={cropShape}
+                cropSize={cropSize}
                 objectFit="cover"
                 showGrid={false}
                 minZoom={1}
