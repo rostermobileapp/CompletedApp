@@ -1,6 +1,10 @@
 import { Calendar, Check, UserPlus, Trophy, Star, Shield, Zap, Menu, X } from 'lucide-react';
 import appPreviewImage from "@assets/previewed_1768341988878.png";
 import rosterLightLogo from "@assets/Light_Mode_Logo_1768322748282.png";
+import benchappLogo from "@assets/Benchapp_1779157432375.png";
+import teamsnapLogo from "@assets/TeamSnap_1779157432375.png";
+import sportsEngineLogo from "@assets/8W3CySTF_400x400_large_1779157432372.jpg";
+import crossbarLogo from "@assets/Crossbar_1779157432374.png";
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
@@ -365,10 +369,10 @@ export default function Landing() {
 
           {(() => {
             const competitors = [
-              { key: 'bench',  label: 'BenchApp',        favicon: 'https://www.google.com/s2/favicons?domain=benchapp.com&sz=32' },
-              { key: 'snap',   label: 'TeamSnap',         favicon: 'https://www.google.com/s2/favicons?domain=teamsnap.com&sz=32' },
-              { key: 'engine', label: 'SportsEngine HQ',  favicon: 'https://www.google.com/s2/favicons?domain=sportsengine.com&sz=32' },
-              { key: 'cross',  label: 'Crossbar',         favicon: 'https://www.google.com/s2/favicons?domain=crossbar.io&sz=32' },
+              { key: 'bench',  label: 'BenchApp',        favicon: benchappLogo },
+              { key: 'snap',   label: 'TeamSnap',         favicon: teamsnapLogo },
+              { key: 'engine', label: 'SportsEngine HQ',  favicon: sportsEngineLogo },
+              { key: 'cross',  label: 'Crossbar',         favicon: crossbarLogo },
             ] as const;
             type CompKey = typeof competitors[number]['key'];
 
