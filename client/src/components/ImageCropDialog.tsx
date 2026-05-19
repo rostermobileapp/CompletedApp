@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
-import type { Area } from "react-easy-crop/types";
+import type { Area, MediaSize } from "react-easy-crop/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,6 +47,73 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+// Draws the crop to a canvas by replicating the Cropper's visual geometry directly.
+// This is equivalent to the computeCroppedArea math but expressed as a geometry
+// problem: given where the image is rendered and where the crop circle is, what
+// source rectangle do we sample from the original image?
+//
+//   image transform: translate(cropX, cropY) scale(zoom)
+//   image CSS size at zoom=1: mediaSize (width × height)
+//   container size: cw × ch  (the Cropper's container = our wrapper div)
+//   crop circle: centred in container, size cropW × cropH
+//
+// After the transform the image centre is at (cw/2 + cropX, ch/2 + cropY).
+// The image occupies (mw*zoom) × (mh*zoom) display pixels.
+function drawCrop(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  mediaSize: MediaSize,
+  containerWidth: number,
+  containerHeight: number,
+  cropWidth: number,
+  cropHeight: number,
+  cropX: number,
+  cropY: number,
+  zoom: number,
+  outputW: number,
+  outputH: number,
+): void {
+  const { width: mw, height: mh, naturalWidth: nw, naturalHeight: nh } = mediaSize;
+
+  // Centre of image in display-px (after the Cropper's translate+scale transform)
+  const imgCx = containerWidth / 2 + cropX;
+  const imgCy = containerHeight / 2 + cropY;
+
+  // Top-left corner of the rendered image in display-px
+  const imgLeft = imgCx - (mw * zoom) / 2;
+  const imgTop  = imgCy - (mh * zoom) / 2;
+
+  // Top-left corner of the crop circle in display-px
+  const cropLeft = containerWidth  / 2 - cropWidth  / 2;
+  const cropTop  = containerHeight / 2 - cropHeight / 2;
+
+  // Position of the crop box relative to the rendered image, in display-px
+  const relX = cropLeft - imgLeft;
+  const relY = cropTop  - imgTop;
+
+  // Scale from display-px to natural image-px
+  const scaleX = nw / (mw * zoom);
+  const scaleY = nh / (mh * zoom);
+
+  // Source rectangle in natural image-px
+  const srcX = Math.max(0, relX * scaleX);
+  const srcY = Math.max(0, relY * scaleY);
+  const srcW = Math.min(cropWidth  * scaleX, nw - srcX);
+  const srcH = Math.min(cropHeight * scaleY, nh - srcY);
+
+  console.log("[ImageCrop] drawCrop", {
+    mediaSize: { mw, mh, nw, nh },
+    container: { containerWidth, containerHeight },
+    crop: { cropX, cropY, zoom, cropWidth, cropHeight },
+    imgTopLeft: { imgLeft, imgTop },
+    cropTopLeft: { cropLeft, cropTop },
+    relative: { relX, relY },
+    source: { srcX, srcY, srcW, srcH },
+  });
+
+  ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outputW, outputH);
+}
+
 export function ImageCropDialog({
   open,
   file,
@@ -64,40 +131,32 @@ export function ImageCropDialog({
   const [zoom, setZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [cropSize, setCropSize] = useState<{ width: number; height: number } | null>(null);
 
   const imageSrcRef = useRef<string | null>(null);
   const fileRef = useRef<File | null>(null);
   const isSavingRef = useRef(false);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+
+  // Always-current refs for handleSave — avoids stale closure issues.
   const cropRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
-  const croppedAreaPixelsRef = useRef<Area | null>(null);
+  const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
 
-  // Measure the crop container so react-easy-crop gets a concrete cropSize.
-  // Without this, aspectRatio-based heights aren't picked up by the library.
-  const cropContainerRef = useRef<HTMLDivElement>(null);
-  const [cropSize, setCropSize] = useState<{ width: number; height: number } | undefined>(undefined);
+  // mediaSize is set by the Cropper via setMediaSize prop.
+  // computeSizes() fires twice:
+  //   1. When the image loads (state.mediaObjectFit is still undefined → uses 'contain' → WRONG)
+  //   2. As a setState callback when componentDidUpdate sets state.mediaObjectFit → CORRECT
+  // We always keep the LATEST value; after the second call it's correct.
+  const mediaSizeRef = useRef<MediaSize | null>(null);
 
-  useLayoutEffect(() => {
-    const el = cropContainerRef.current;
-    if (!el) return;
-    const update = (w: number, h: number) => {
-      if (w > 0 && h > 0) {
-        const side = Math.min(w, h) - 8;
-        setCropSize({ width: side, height: side });
-      }
-    };
-    update(el.offsetWidth, el.offsetHeight);
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      update(width, height);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [open]);
+  // Container geometry measured after dialog animation settles.
+  const containerDimsRef = useRef<{ width: number; height: number } | null>(null);
 
   useEffect(() => { fileRef.current = file; }, [file]);
   useEffect(() => { cropRef.current = crop; }, [crop]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { cropSizeRef.current = cropSize; }, [cropSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,12 +167,17 @@ export function ImageCropDialog({
       cropRef.current = { x: 0, y: 0 };
       setZoom(1);
       zoomRef.current = 1;
-      croppedAreaPixelsRef.current = null;
+      setCropSize(null);
+      cropSizeRef.current = null;
+      mediaSizeRef.current = null;
+      containerDimsRef.current = null;
       setLoadError(null);
       return;
     }
     setLoadError(null);
-    croppedAreaPixelsRef.current = null;
+    setCropSize(null);
+    mediaSizeRef.current = null;
+    containerDimsRef.current = null;
 
     readFileAsDataUrl(file)
       .then((dataUrl) => {
@@ -124,6 +188,18 @@ export function ImageCropDialog({
         cropRef.current = { x: 0, y: 0 };
         setZoom(1);
         zoomRef.current = 1;
+        // Delay Cropper mount until the Dialog's open animation finishes so that
+        // getBoundingClientRect() reflects the final container dimensions.
+        setTimeout(() => {
+          if (cancelled || !cropContainerRef.current) return;
+          const rect = cropContainerRef.current.getBoundingClientRect();
+          containerDimsRef.current = { width: rect.width, height: rect.height };
+          // Use the full container square so the circle fills the available space.
+          const side = Math.min(rect.width, rect.height);
+          const cs = { width: side, height: side };
+          setCropSize(cs);
+          cropSizeRef.current = cs;
+        }, 300);
       })
       .catch((err) => {
         if (!cancelled) setLoadError(err?.message || "Failed to load image");
@@ -142,10 +218,11 @@ export function ImageCropDialog({
     zoomRef.current = z;
   }, []);
 
-  // react-easy-crop calls this whenever the crop/zoom changes and provides
-  // croppedAreaPixels — the source rectangle in natural image coordinates.
-  const handleCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
-    croppedAreaPixelsRef.current = croppedAreaPixels;
+  // setMediaSize fires each time computeSizes() runs. We always keep the latest
+  // value; the second (correct cover-mode) call overwrites the first (wrong contain-mode).
+  const handleSetMediaSize = useCallback((ms: MediaSize) => {
+    mediaSizeRef.current = ms;
+    console.log("[ImageCrop] setMediaSize called:", ms);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -153,11 +230,15 @@ export function ImageCropDialog({
 
     const currentImageSrc = imageSrcRef.current;
     const currentFile = fileRef.current;
-    const pixels = croppedAreaPixelsRef.current;
+    const currentCrop = { ...cropRef.current };
+    const currentZoom = zoomRef.current;
+    const currentCropSize = cropSizeRef.current;
+    const currentMediaSize = mediaSizeRef.current;
+    const dims = containerDimsRef.current;
 
     if (!currentImageSrc || !currentFile) return;
-    if (!pixels || pixels.width <= 0 || pixels.height <= 0) {
-      setLoadError("Crop area not ready. Please move or zoom the image and try again.");
+    if (!currentCropSize) {
+      setLoadError("Crop area not ready. Please try again.");
       return;
     }
 
@@ -165,6 +246,41 @@ export function ImageCropDialog({
     setIsSaving(true);
     try {
       const img = await loadImage(currentImageSrc);
+
+      // Determine the mediaSize to use.
+      // Prefer the value from setMediaSize (Cropper's own computation), but fall back
+      // to computing it ourselves from natural dims + container dims if unavailable.
+      let mediaSize: MediaSize;
+      if (currentMediaSize && currentMediaSize.naturalWidth > 0 && currentMediaSize.width > 0) {
+        mediaSize = currentMediaSize;
+        console.log("[ImageCrop] Using mediaSize from setMediaSize:", mediaSize);
+      } else if (dims) {
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        const cw = dims.width;
+        const ch = dims.height;
+        const mediaAspect = nw / nh;
+        const containerAspect = cw / ch;
+        // Replicate react-easy-crop getObjectFit() + computeSizes() with objectFit="cover":
+        //   vertical-cover (mediaAspect >= containerAspect): width = ch * mediaAspect, height = ch
+        //   horizontal-cover (mediaAspect < containerAspect): width = cw, height = cw / mediaAspect
+        const mw = mediaAspect >= containerAspect ? ch * mediaAspect : cw;
+        const mh = mediaAspect >= containerAspect ? ch : cw / mediaAspect;
+        mediaSize = { width: mw, height: mh, naturalWidth: nw, naturalHeight: nh };
+        console.log("[ImageCrop] Computed mediaSize from natural+container dims:", mediaSize);
+      } else {
+        setLoadError("Crop area not ready. Please try again.");
+        return;
+      }
+
+      console.log("[ImageCrop] handleSave inputs:", {
+        crop: currentCrop,
+        zoom: currentZoom,
+        cropSize: currentCropSize,
+        containerDims: dims,
+        mediaSize,
+        naturalSize: { nw: img.naturalWidth, nh: img.naturalHeight },
+      });
 
       const canvas = document.createElement("canvas");
       canvas.width = outputSize;
@@ -176,11 +292,23 @@ export function ImageCropDialog({
         ctx.fillRect(0, 0, outputSize, outputSize);
       }
 
-      // Draw only the cropped portion of the original image into the output canvas.
-      ctx.drawImage(
+      // Use container dims for geometry; fall back to mediaSize dimensions if unavailable.
+      const containerW = dims?.width  ?? mediaSize.width;
+      const containerH = dims?.height ?? mediaSize.height;
+
+      drawCrop(
+        ctx,
         img,
-        pixels.x, pixels.y, pixels.width, pixels.height,
-        0, 0, outputSize, outputSize,
+        mediaSize,
+        containerW,
+        containerH,
+        currentCropSize.width,
+        currentCropSize.height,
+        currentCrop.x,
+        currentCrop.y,
+        currentZoom,
+        outputSize,
+        outputSize,
       );
 
       const blob = await new Promise<Blob>((resolve, reject) => {
@@ -224,21 +352,21 @@ export function ImageCropDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          {/* Crop canvas — fills full dialog width as a square */}
+          {/* Square container — height matches width so the circle fills it completely */}
           <div
             ref={cropContainerRef}
             className="relative w-full bg-black rounded-md overflow-hidden"
-            style={{ aspectRatio: "1 / 1", minHeight: "260px" }}
+            style={{ aspectRatio: "1 / 1" }}
           >
-            {imageSrc ? (
+            {cropSize && imageSrc ? (
               <Cropper
                 key={imageSrc}
                 image={imageSrc}
                 crop={crop}
                 zoom={zoom}
                 aspect={1}
-                cropShape={cropShape}
                 cropSize={cropSize}
+                cropShape={cropShape}
                 objectFit="cover"
                 showGrid={false}
                 minZoom={1}
@@ -246,7 +374,7 @@ export function ImageCropDialog({
                 restrictPosition={true}
                 onCropChange={handleCropChange}
                 onZoomChange={handleZoomChange}
-                onCropComplete={handleCropComplete}
+                setMediaSize={handleSetMediaSize}
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white/70 text-sm">
@@ -269,7 +397,7 @@ export function ImageCropDialog({
               }}
               aria-label="Zoom"
               data-testid="slider-crop-zoom"
-              disabled={!imageSrc || isSaving}
+              disabled={!cropSize || isSaving}
               className="flex-1"
             />
             <ZoomIn className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -293,7 +421,7 @@ export function ImageCropDialog({
           <Button
             type="button"
             onClick={handleSave}
-            disabled={!imageSrc || isSaving}
+            disabled={!cropSize || isSaving}
             data-testid="button-crop-save"
           >
             {isSaving ? (
