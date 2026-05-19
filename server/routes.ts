@@ -10973,6 +10973,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
+        // Also fetch existing placeholder players so we can update them instead of
+        // creating duplicates when the same no-email player is re-imported.
+        const existingPlaceholders = await db
+          .select()
+          .from(placeholderPlayers)
+          .where(eq(placeholderPlayers.leagueId, leagueId));
+
         // Track teams that need chat syncing (both old and new assignments)
         const teamsToSyncAfterImport = new Set<string>();
         // Dedupe placeholder_players writes within this CSV batch.
@@ -11077,14 +11084,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   });
                 }
               } else {
-                // No email provided: create a placeholder_players row instead
-                // of a ghost @placeholder.roster user. When the real person
-                // signs up with the same email later, claimPlaceholdersForUser
-                // turns it into a real membership.
-                //
-                // Dedupe within this CSV batch by name+team so the same
-                // email-less name on multiple rows doesn't multiply.
-                const dedupeKey = `${player.firstName.toLowerCase()}|${player.lastName.toLowerCase()}|${player.teamId || ''}`;
+                // No email provided: create or update a placeholder_players row.
+                // Dedupe within this CSV batch by name so the same email-less
+                // name on multiple rows doesn't multiply.
+                const dedupeKey = `${player.firstName.toLowerCase()}|${player.lastName.toLowerCase()}`;
                 if (placeholderDedupeKeys.has(dedupeKey)) {
                   actualSuccessCount++;
                   if (player.teamId) teamsToSyncAfterImport.add(player.teamId);
@@ -11092,16 +11095,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
                 placeholderDedupeKeys.add(dedupeKey);
 
-                await storage.addLeaguePlaceholderPlayer({
-                  leagueId,
-                  teamId: player.teamId || null,
-                  firstName: player.firstName,
-                  lastName: player.lastName,
-                  position: player.position || null,
-                  jerseyNumber: player.jerseyNumber ?? null,
-                  skillLevel: player.skillLevel || null,
-                  addedBy: userId,
-                });
+                // Check if this placeholder already exists (by name) — update instead of duplicating
+                const existingPlaceholder = existingPlaceholders.find(ph =>
+                  ph.firstName.toLowerCase() === player.firstName.toLowerCase() &&
+                  ph.lastName.toLowerCase() === player.lastName.toLowerCase()
+                );
+
+                if (existingPlaceholder) {
+                  // Update existing placeholder with new CSV data
+                  const phUpdateData: Record<string, any> = {};
+                  if (player.skillLevel) phUpdateData.skillLevel = player.skillLevel;
+                  if (player.position) phUpdateData.position = player.position;
+                  if (player.jerseyNumber !== null) phUpdateData.jerseyNumber = player.jerseyNumber;
+                  if (player.teamId) phUpdateData.teamId = player.teamId;
+                  if (Object.keys(phUpdateData).length > 0) {
+                    await db.update(placeholderPlayers)
+                      .set(phUpdateData)
+                      .where(eq(placeholderPlayers.id, existingPlaceholder.id));
+                  }
+                } else {
+                  await storage.addLeaguePlaceholderPlayer({
+                    leagueId,
+                    teamId: player.teamId || null,
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    position: player.position || null,
+                    jerseyNumber: player.jerseyNumber ?? null,
+                    skillLevel: player.skillLevel || null,
+                    addedBy: userId,
+                  });
+                }
                 actualSuccessCount++;
                 if (player.teamId) teamsToSyncAfterImport.add(player.teamId);
                 continue; // Skip the leagueMembership insert below
