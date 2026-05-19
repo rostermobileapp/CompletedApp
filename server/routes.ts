@@ -11651,8 +11651,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeSeasonForSchedule = leagueSeasonsForSchedule.find(s => s.isActive) || leagueSeasonsForSchedule[0];
 
       // Read and parse the CSV file
-      const fileContent = fs.readFileSync(file.path, 'utf8');
-      const parseResults = Papa.parse(fileContent, {
+      let scheduleFileContent = fs.readFileSync(file.path, 'utf8');
+      
+      // Skip instruction lines if present (schedule template has 2 instruction lines)
+      const scheduleLines = scheduleFileContent.split('\n');
+      if (scheduleLines.length > 2 && scheduleLines[0].toUpperCase().includes('INSTRUCTION')) {
+        scheduleFileContent = scheduleLines.slice(2).join('\n');
+      }
+
+      const parseResults = Papa.parse(scheduleFileContent, {
         header: true,
         skipEmptyLines: true,
         transformHeader: (header: string) => {
