@@ -219,7 +219,7 @@ import {
   type LeagueProSeat,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne } from "drizzle-orm";
 
 // Helper function to generate unique 6-character alphanumeric team IDs (ABC123 format)
 async function generateUniqueTeamId(): Promise<string> {
@@ -2388,10 +2388,63 @@ export class DatabaseStorage implements IStorage {
       await db.delete(seasons).where(inArray(seasons.id, seasonIds));
     }
     
-    // 24. Delete league memberships
+    // 24. Soft-delete placeholder users who belong exclusively to this league.
+    // Find all placeholder members of this league first (memberships still exist at this point).
+    const placeholderMembers = await db
+      .select({ userId: leagueMemberships.userId })
+      .from(leagueMemberships)
+      .innerJoin(users, eq(users.id, leagueMemberships.userId))
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, id),
+          eq(users.isPlaceholder, true)
+        )
+      );
+
+    if (placeholderMembers.length > 0) {
+      const placeholderUserIds = placeholderMembers.map(m => m.userId);
+
+      // Find which of those placeholders also have memberships in OTHER leagues.
+      const membershipsElsewhere = await db
+        .select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .where(
+          and(
+            inArray(leagueMemberships.userId, placeholderUserIds),
+            ne(leagueMemberships.leagueId, id)
+          )
+        );
+
+      const usersWithOtherLeagues = new Set(membershipsElsewhere.map(m => m.userId));
+      const exclusivePlaceholderIds = placeholderUserIds.filter(uid => !usersWithOtherLeagues.has(uid));
+
+      if (exclusivePlaceholderIds.length > 0) {
+        // Soft-delete: scramble PII so the row acts as a tombstone.
+        const now = Date.now();
+        for (const uid of exclusivePlaceholderIds) {
+          const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, uid));
+          await db
+            .update(users)
+            .set({
+              email: `deleted_${now}_${u?.email ?? uid}`,
+              firstName: '[Deleted]',
+              lastName: 'User',
+            })
+            .where(eq(users.id, uid));
+        }
+
+        // Mark them as having left any conversations they were part of.
+        await db
+          .update(conversationParticipants)
+          .set({ leftAt: new Date() })
+          .where(inArray(conversationParticipants.userId, exclusivePlaceholderIds));
+      }
+    }
+
+    // 25. Delete league memberships
     await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, id));
     
-    // 25. Finally, delete the league itself
+    // 26. Finally, delete the league itself
     await db.delete(leagues).where(eq(leagues.id, id));
   }
 
