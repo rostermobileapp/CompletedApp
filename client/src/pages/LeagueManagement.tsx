@@ -3747,12 +3747,19 @@ export default function LeagueManagement() {
                             data-testid={`team-${team.id}`}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {/* Team logo placeholder */}
-                              <div className="w-10 h-10 rounded-full bg-muted border hairline flex items-center justify-center flex-shrink-0 text-sm font-semibold text-muted-foreground uppercase">
-                                {team.isFreeAgents
-                                  ? <Shield className="w-4 h-4" />
-                                  : team.name.trim().split(/\s+/).slice(0, 2).map((w: string) => w[0]).join('')
-                                }
+                              {/* Team logo */}
+                              <div className="w-10 h-10 rounded-full bg-muted border hairline flex items-center justify-center flex-shrink-0 text-sm font-semibold text-muted-foreground uppercase overflow-hidden">
+                                {team.isFreeAgents ? (
+                                  <Shield className="w-4 h-4" />
+                                ) : team.logoUrl ? (
+                                  <img
+                                    src={getImageUrl(team.logoUrl) || ''}
+                                    alt={`${team.name} logo`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  team.name.trim().split(/\s+/).slice(0, 2).map((w: string) => w[0]).join('')
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-2">

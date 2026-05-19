@@ -192,11 +192,12 @@ export function ImageCropDialog({
         // getBoundingClientRect() reflects the final container dimensions.
         setTimeout(() => {
           if (cancelled || !cropContainerRef.current) return;
-          const rect = cropContainerRef.current.getBoundingClientRect();
-          containerDimsRef.current = { width: rect.width, height: rect.height };
-          // Use the full container square so the circle fills the available space.
-          const side = Math.min(rect.width, rect.height);
-          const cs = { width: side, height: side };
+          // Use offsetWidth for the square — the container has aspect-ratio 1:1 so
+          // height always equals width, but getBoundingClientRect().height can lag
+          // behind during dialog open animations and give a smaller value.
+          const w = cropContainerRef.current.offsetWidth;
+          containerDimsRef.current = { width: w, height: w };
+          const cs = { width: w, height: w };
           setCropSize(cs);
           cropSizeRef.current = cs;
         }, 300);
