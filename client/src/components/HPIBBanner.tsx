@@ -40,13 +40,14 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
     
     return (
       <div 
-        className="w-full cursor-pointer mb-4"
+        className="cursor-pointer mb-4 flex justify-center"
         onClick={handleClick}
       >
         <img 
           src={hpibBannerImage} 
           alt="Hockey Players In Business - Join for only $50/yr"
-          className="w-full h-auto object-cover rounded-lg"
+          className="max-w-full h-auto rounded-lg"
+          style={{ width: 'auto', maxWidth: '100%' }}
         />
       </div>
     );
