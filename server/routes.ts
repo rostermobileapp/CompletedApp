@@ -11099,6 +11099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   lastName: player.lastName,
                   position: player.position || null,
                   jerseyNumber: player.jerseyNumber ?? null,
+                  skillLevel: player.skillLevel || null,
                   addedBy: userId,
                 });
                 actualSuccessCount++;

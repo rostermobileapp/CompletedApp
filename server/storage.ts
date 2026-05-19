@@ -365,6 +365,7 @@ export interface IStorage {
     phoneNumber?: string | null;
     position?: string | null;
     jerseyNumber?: number | null;
+    skillLevel?: string | null;
     addedBy?: string | null;
   }): Promise<PlaceholderPlayer>;
   claimPlaceholdersForUser(userId: string): Promise<{ claimedCount: number; teamIds: string[]; leagueIds: string[] }>;
@@ -3209,6 +3210,7 @@ export class DatabaseStorage implements IStorage {
     phoneNumber?: string | null;
     position?: string | null;
     jerseyNumber?: number | null;
+    skillLevel?: string | null;
     addedBy?: string | null;
   }): Promise<PlaceholderPlayer> {
     const [row] = await db
@@ -3223,6 +3225,7 @@ export class DatabaseStorage implements IStorage {
         phoneNumber: input.phoneNumber ?? null,
         position: input.position ?? null,
         jerseyNumber: input.jerseyNumber ?? null,
+        skillLevel: input.skillLevel ?? null,
         addedBy: input.addedBy ?? null,
       })
       .returning();
@@ -3294,6 +3297,7 @@ export class DatabaseStorage implements IStorage {
               displayLastName: ph.lastName,
               position: ph.position ?? null,
               jerseyNumber: ph.jerseyNumber ?? null,
+              skillLevel: ph.skillLevel ?? null,
               approvedAt: new Date(),
             });
           }
