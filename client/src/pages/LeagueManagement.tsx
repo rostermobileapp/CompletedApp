@@ -1808,8 +1808,12 @@ export default function LeagueManagement() {
       const response = await apiRequest('PATCH', `/api/teams/${data.teamId}/logo`, { logoUrl: data.logoUrl });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedTeam) => {
       queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'teams'] });
+      // Refresh selectedTeamForEdit so the logo appears immediately in the panel
+      if (updatedTeam?.id && selectedTeamForEdit && updatedTeam.id === selectedTeamForEdit.id) {
+        setSelectedTeamForEdit(updatedTeam);
+      }
       toast({
         title: "Success",
         description: "Team logo updated successfully.",
