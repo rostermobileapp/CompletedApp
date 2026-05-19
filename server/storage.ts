@@ -370,6 +370,14 @@ export interface IStorage {
   }): Promise<PlaceholderPlayer>;
   claimPlaceholdersForUser(userId: string): Promise<{ claimedCount: number; teamIds: string[]; leagueIds: string[] }>;
   getLeaguePlaceholderPlayers(leagueId: string): Promise<PlaceholderPlayer[]>;
+  updatePlaceholderPlayer(id: string, updates: {
+    firstName?: string | null;
+    lastName?: string | null;
+    position?: string | null;
+    jerseyNumber?: number | null;
+    skillLevel?: string | null;
+    teamId?: string | null;
+  }): Promise<PlaceholderPlayer | undefined>;
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
@@ -3228,6 +3236,30 @@ export class DatabaseStorage implements IStorage {
         skillLevel: input.skillLevel ?? null,
         addedBy: input.addedBy ?? null,
       })
+      .returning();
+    return row;
+  }
+
+  async updatePlaceholderPlayer(id: string, updates: {
+    firstName?: string | null;
+    lastName?: string | null;
+    position?: string | null;
+    jerseyNumber?: number | null;
+    skillLevel?: string | null;
+    teamId?: string | null;
+  }): Promise<PlaceholderPlayer | undefined> {
+    const setValues: Record<string, any> = {};
+    if (updates.firstName !== undefined) setValues.firstName = updates.firstName;
+    if (updates.lastName !== undefined) setValues.lastName = updates.lastName;
+    if (updates.position !== undefined) setValues.position = updates.position;
+    if (updates.jerseyNumber !== undefined) setValues.jerseyNumber = updates.jerseyNumber;
+    if (updates.skillLevel !== undefined) setValues.skillLevel = updates.skillLevel;
+    if (updates.teamId !== undefined) setValues.teamId = updates.teamId;
+    if (Object.keys(setValues).length === 0) return undefined;
+    const [row] = await db
+      .update(placeholderPlayers)
+      .set(setValues)
+      .where(eq(placeholderPlayers.id, id))
       .returning();
     return row;
   }

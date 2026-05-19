@@ -5777,6 +5777,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updates = req.body;
+
+      // Placeholder players have synthetic IDs prefixed with "placeholder:"
+      // They live in placeholder_players, not league_memberships.
+      if (memberId.startsWith('placeholder:')) {
+        const placeholderId = memberId.slice('placeholder:'.length);
+        const updated = await storage.updatePlaceholderPlayer(placeholderId, {
+          firstName: updates.displayFirstName ?? undefined,
+          lastName: updates.displayLastName ?? undefined,
+          position: updates.position ?? undefined,
+          jerseyNumber: updates.jerseyNumber != null ? Number(updates.jerseyNumber) : undefined,
+          skillLevel: updates.skillLevel ?? undefined,
+          teamId: updates.assignedTeamId ?? undefined,
+        });
+        // Return a synthetic member-shaped response so the frontend is happy
+        return res.json({ id: memberId, ...updates, updated });
+      }
       
       // Get the membership to verify it belongs to this league
       const membership = await storage.getLeagueMembership(memberId);
