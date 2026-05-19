@@ -1,0 +1,143 @@
+# Photo Upload Compression — Audit & Implementation
+
+## Phase 1: Audit (DO NOT modify code yet)
+
+Before making any changes, search the entire codebase and report back on the following. Do not skip this phase. Do not assume. Report findings as a checklist with file paths and line numbers.
+
+### 1.1 Identify all photo/image upload entry points
+Search for and list every location where a user uploads an image. Common patterns to look for:
+- `<input type="file"` with image accept attributes
+- Supabase Storage calls: `.storage.from(...).upload(...)`
+- Any usage of `FileReader`, `URL.createObjectURL`, `Blob`, `File` objects in upload contexts
+- Drag-and-drop handlers (`onDrop`, `ondragover`)
+- Camera capture inputs (`capture="environment"` or `capture="user"`)
+- Any component named with patterns like `*Upload*`, `*Avatar*`, `*Photo*`, `*Image*`, `*Profile*`
+
+For each entry point found, report:
+- File path and line number
+- What the upload is for (avatar, team logo, league asset, roster photo, etc.)
+- The destination Supabase bucket
+- The current max file size restriction (if any)
+
+### 1.2 Check for existing compression
+Search for any of the following:
+- Package dependencies in `package.json`: `browser-image-compression`, `react-image-file-resizer`, `compressorjs`, `pica`, `sharp`, `jimp`, `imagemin`
+- Canvas-based resize logic: `canvas.toBlob`, `canvas.toDataURL`, `drawImage` used for resizing
+- Any function or hook named like `compress*`, `resize*`, `optimize*`, `shrink*` in image contexts
+- Server-side image processing (Supabase Edge Functions handling images, Vercel API routes processing uploads)
+
+Report: YES (with file paths) or NO for each.
+
+### 1.3 Check current upload pipeline behavior
+For each upload entry point, trace what happens between file selection and Supabase upload. Report:
+- Is the raw File object passed directly to Supabase?
+- Is there any transformation (resize, format conversion, quality reduction)?
+- Is there any client-side validation (file size, dimensions, type)?
+
+### 1.4 Summary
+After completing the audit, give me a single summary block:
+- Total upload entry points found: [N]
+- Compression library installed: [YES/NO]
+- Compression actually used in upload flow: [YES/NO/PARTIAL]
+- Recommendation: [SKIP IMPLEMENTATION / PROCEED WITH IMPLEMENTATION / PROCEED WITH MODIFICATIONS — explain]
+
+STOP HERE. Wait for my approval before proceeding to Phase 2.
+
+---
+
+## Phase 2: Implementation (only after I approve Phase 1)
+
+If audit confirms compression is missing or incomplete, implement the following:
+
+### 2.1 Install dependency
+Add `browser-image-compression` to package.json.
+
+### 2.2 Create a shared compression utility
+Create `src/lib/imageCompression.js` (or `.ts` if the project is TypeScript — match the existing convention):
+
+```javascript
+import imageCompression from 'browser-image-compression';
+
+// Compression presets keyed by use case
+const PRESETS = {
+  avatar:      { maxSizeMB: 0.3,  maxWidthOrHeight: 512,  useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.85 },
+  rosterPhoto: { maxSizeMB: 0.4,  maxWidthOrHeight: 1080, useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.85 },
+  teamLogo:    { maxSizeMB: 0.2,  maxWidthOrHeight: 600,  useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.9  },
+  leagueAsset: { maxSizeMB: 0.5,  maxWidthOrHeight: 1600, useWebWorker: true, fileType: 'image/jpeg', initialQuality: 0.85 },
+};
+
+export async function compressImage(file, preset = 'rosterPhoto') {
+  // Skip compression for non-images (defensive)
+  if (!file.type.startsWith('image/')) return file;
+
+  // Skip if already smaller than target
+  const options = PRESETS[preset] || PRESETS.rosterPhoto;
+  if (file.size <= options.maxSizeMB * 1024 * 1024) return file;
+
+  try {
+    const compressed = await imageCompression(file, options);
+    console.log(`[compressImage] ${file.name}: ${(file.size/1024/1024).toFixed(2)}MB → ${(compressed.size/1024/1024).toFixed(2)}MB`);
+    return compressed;
+  } catch (err) {
+    console.error('[compressImage] failed, uploading original:', err);
+    return file; // Fail open — never block an upload because of compression
+  }
+}
+```
+
+### 2.3 Wire compression into every upload entry point identified in Phase 1
+For each entry point, insert a `compressImage(file, '<preset>')` call BEFORE the Supabase upload call. Pick the preset based on the upload context:
+- User profile photo / avatar → `avatar`
+- Roster/player photo → `rosterPhoto`
+- Team logo → `teamLogo`
+- League banner, event flyer, generic image → `leagueAsset`
+
+Example transformation:
+
+BEFORE:
+```javascript
+const { data, error } = await supabase.storage
+  .from('avatars')
+  .upload(path, file);
+```
+
+AFTER:
+```javascript
+const compressed = await compressImage(file, 'avatar');
+const { data, error } = await supabase.storage
+  .from('avatars')
+  .upload(path, compressed);
+```
+
+### 2.4 HEIC handling
+`browser-image-compression` does NOT handle HEIC natively. iPhones often deliver HEIC from the file picker. Add a check:
+- If `file.type === 'image/heic'` or filename ends in `.heic`/`.heif`, the compression library will throw.
+- Catch this case and either:
+  - (a) Reject with a friendly error: "Please convert your photo to JPEG before uploading" — OR —
+  - (b) Add `heic2any` as a dependency and convert HEIC→JPEG before compression.
+
+Implement option (b). Add `heic2any` to package.json and convert HEIC inside `compressImage` before calling the main compression function.
+
+### 2.5 Add a global file size guard
+Inside `compressImage`, after compression, if the final file is still > 2 MB, reject the upload with an error. This is a safety net so a corrupt or unusually large file can't bypass compression.
+
+### 2.6 Update Supabase bucket policies (REPORT ONLY, do not modify)
+Tell me which Supabase buckets currently allow files larger than 2 MB. I will tighten the server-side limits manually in the Supabase dashboard after this PR ships.
+
+### 2.7 Test plan (report only, do not run)
+List the exact test steps I should run in the iOS BuildNatively build and Android BuildNatively build:
+1. Upload a fresh iPhone 17 HEIC photo from camera roll → verify it converts and compresses
+2. Upload a JPEG → verify it compresses
+3. Upload a small image already under threshold → verify it skips compression (check console log)
+4. Upload a non-image file to an image input → verify graceful handling
+5. Upload on Android Chrome Custom Tabs wrapped flow → verify the web worker doesn't break
+
+### 2.8 Final summary
+Report:
+- Files modified: [list with line counts]
+- Files created: [list]
+- Dependencies added: [list with versions]
+- Buckets that should have server-side size limits tightened: [list]
+- Any upload entry points you found in Phase 1 that you did NOT modify, and why
+A few things worth flagging before you paste this in:
+HEIC is the sneaky one. iPhone 17 ships HEIC by default and browser-image-compression will choke on it. heic2any is the standard fix but it's a ~1.5 MB library — heavy. The alternative is forcing Apple's auto-convert by setting accept="image/jpeg,image/png" on the file input, which makes iOS deliver a JPEG instead of HEIC. Faster, no library. Worth asking Replit which approach it recommends after the audit.
