@@ -3213,7 +3213,6 @@ export class DatabaseStorage implements IStorage {
     skillLevel?: string | null;
     addedBy?: string | null;
   }): Promise<PlaceholderPlayer> {
-    console.log(`[Placeholder] Inserting ${input.firstName} ${input.lastName} skillLevel=${input.skillLevel ?? 'null'}`);
     const [row] = await db
       .insert(placeholderPlayers)
       .values({
