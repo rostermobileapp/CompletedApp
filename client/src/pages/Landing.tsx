@@ -382,7 +382,7 @@ export default function Landing() {
               { label: "Player/Attendance Tracking", roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
               { label: "In App Messaging",           roster: true,  bench: true,  snap: true,  engine: true,  cross: true  },
               { label: "Bracket Generation Tool",    roster: true,  bench: false, snap: false, engine: false, cross: false },
-              { label: "In-Game Scorekeeping",       roster: true,  bench: false, snap: false, engine: false, cross: false },
+              { label: "In-Game Scorekeeping",       roster: true,  bench: true,  snap: false, engine: false, cross: false },
               { label: "League Drafts",              roster: true,  bench: false, snap: false, engine: false, cross: false },
               { label: "3 Stars of the Game",        roster: true,  bench: false, snap: false, engine: false, cross: false },
               { label: "In App RSVP",                roster: true,  bench: false, snap: true,  engine: false, cross: true  },
