@@ -393,7 +393,7 @@ export default function Pricing() {
       {/* Footer */}
       <footer className="border-t border-gray-200 py-10 px-6 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <p className="text-sm text-gray-400">© 2025 Roster. Built for teams, by team players. No ads. Ever.</p>
+          <p className="text-sm text-gray-400">© 2026 Roster. Built for teams, by team players. No ads. Ever.</p>
           <div className="flex items-center gap-6">
             <Link href="/pricing" className="text-sm text-[#3c82f4] font-medium">Pricing</Link>
             <Link href="/privacy-policy" className="text-sm text-gray-400 hover:text-gray-900 transition-colors">Privacy Policy</Link>

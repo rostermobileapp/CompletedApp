@@ -760,7 +760,7 @@ export default function Landing() {
           </div>
           <div className="border-t border-gray-100 pt-6">
             <p className="text-sm text-gray-400 text-center flex items-center justify-center gap-2" data-testid="text-footer">
-              © 2025 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.
+              © 2026 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.
             </p>
           </div>
         </div>

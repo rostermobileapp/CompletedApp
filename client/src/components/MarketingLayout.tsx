@@ -194,7 +194,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
             </div>
           </div>
           <div className="border-t border-gray-100 pt-6 text-center">
-            <p className="text-sm text-gray-400 flex items-center justify-center gap-2">© 2025 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.</p>
+            <p className="text-sm text-gray-400 flex items-center justify-center gap-2">© 2026 <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />. Built for teams, by team players. No ads. Ever.</p>
           </div>
         </div>
       </footer>

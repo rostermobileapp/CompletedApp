@@ -432,7 +432,7 @@ export default function ReferralProgram() {
             <Link href="/privacy-policy" className="hover:text-gray-900 transition-colors">Privacy</Link>
             <Link href="/terms-of-service" className="hover:text-gray-900 transition-colors">Terms</Link>
           </div>
-          <p>© 2025 Roster. No ads. Ever.</p>
+          <p>© 2026 Roster. No ads. Ever.</p>
         </div>
       </footer>
     </div>

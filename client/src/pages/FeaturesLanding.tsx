@@ -982,7 +982,7 @@ export default function FeaturesLanding() {
           </div>
           <div className="border-t border-gray-100 pt-6">
             <p className="text-sm text-gray-400 text-center flex items-center justify-center gap-2">
-              &copy; 2025{' '}
+              &copy; 2026{' '}
               <img src={rosterLightLogo} alt="Roster" className="h-4 object-contain" />
               . Built for leagues, by a beer league captain. No ads. Ever.
             </p>
