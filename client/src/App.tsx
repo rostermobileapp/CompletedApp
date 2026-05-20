@@ -28,7 +28,6 @@ import Pricing from "@/pages/Pricing";
 import About from "@/pages/About";
 import SportLanding from "@/pages/SportLanding";
 import SegmentLanding from "@/pages/SegmentLanding";
-import Waitlist from "@/pages/Waitlist";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
@@ -207,7 +206,6 @@ function Router() {
           <Route path="/for-adult-leagues">{() => <SegmentLanding segment="for-adult-leagues" />}</Route>
           <Route path="/for-varsity">{() => <SegmentLanding segment="for-varsity" />}</Route>
           <Route path="/app" component={RedirectToLogin} />
-          <Route path="/waitlist" component={Waitlist} />
           <Route path="/login" component={Login} />
           <Route path="/get-started" component={OnboardingQuestionnaire} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />

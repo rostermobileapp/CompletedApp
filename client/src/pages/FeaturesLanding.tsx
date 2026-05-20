@@ -668,26 +668,28 @@ export default function FeaturesLanding() {
           <div className="flex-none md:flex md:justify-center">
             <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" />
           </div>
-          {/* Mobile: Join Waitlist centered between logo and hamburger */}
+          {/* Mobile: Log In centered between logo and hamburger */}
           <div className="flex-1 flex justify-center md:hidden px-2">
             <button
-              onClick={() => setLocation('/waitlist')}
-              className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
+              onClick={() => setLocation('/login')}
+              className="px-4 py-2 rounded-full border border-gray-300 text-gray-700 hover:border-gray-400 hover:text-gray-900 transition-colors font-semibold text-sm"
             >
-              Join Waitlist
+              Log In
             </button>
           </div>
-          {/* Right col — desktop: badge + Join Waitlist; mobile: hamburger only */}
+          {/* Right col — desktop: Log In + Get Started; mobile: hamburger only */}
           <div className="flex-none flex items-center gap-3 justify-end">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-[#3c82f4] bg-[#3c82f4]/8 border border-[#3c82f4]/20 rounded-full px-3 py-1 whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#3c82f4] animate-pulse" />
-              June 1st Launch
-            </span>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/login')}
+              className="hidden md:block text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => setLocation('/get-started')}
               className="hidden md:inline-flex px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             >
-              Join Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -966,7 +968,6 @@ export default function FeaturesLanding() {
               <ul className="space-y-2 text-gray-400">
                 <li><Link href="/features" className="hover:text-gray-900 transition-colors font-medium text-[#3c82f4]">Features</Link></li>
                 <li><Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link></li>
-                <li><Link href="/waitlist" className="hover:text-gray-900 transition-colors">Join Waitlist</Link></li>
               </ul>
             </div>
             <div>

@@ -194,10 +194,10 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
-              Join the Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setLocation('/pricing')}
@@ -300,10 +300,10 @@ export default function SegmentLanding({ segment }: SegmentLandingProps) {
             Launching <span className="text-gray-900 font-semibold">June 1, 2026</span>. Free tier available on day one.
           </p>
           <button
-            onClick={() => setLocation('/waitlist')}
+            onClick={() => setLocation('/get-started')}
             className="px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
           >
-            Join the Waitlist
+            Get Started
           </button>
         </div>
       </section>

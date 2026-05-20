@@ -130,7 +130,7 @@ const sportConfigs: Record<string, SportConfig> = {
       gradient: "from-green-500 to-green-700",
     },
     metaTitle: 'Soccer Team Management App | Roster — Coming Soon',
-    metaDescription: 'Roster is bringing its powerful hockey team management tools to soccer. Scheduling, RSVPs, lineups, stats, and payments — all in one ad-free app. Join the waitlist.',
+    metaDescription: 'Roster is bringing its powerful hockey team management tools to soccer. Scheduling, RSVPs, lineups, stats, and payments — all in one ad-free app.',
     comingSoon: true,
   },
   baseball: {
@@ -187,7 +187,7 @@ const sportConfigs: Record<string, SportConfig> = {
       gradient: "from-amber-500 to-amber-700",
     },
     metaTitle: 'Baseball Team Management App | Roster — Coming Soon',
-    metaDescription: 'Roster is bringing powerful team management to baseball. Batting orders, schedules, RSVP reminders, stats, and in-app payments — all in one ad-free app. Join the waitlist.',
+    metaDescription: 'Roster is bringing powerful team management to baseball. Batting orders, schedules, RSVP reminders, stats, and in-app payments — all in one ad-free app.',
     comingSoon: true,
   },
 };
@@ -231,10 +231,10 @@ export default function SportLanding({ sport }: SportLandingProps) {
           )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
-              Join the Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setLocation('/pricing')}
@@ -344,10 +344,10 @@ export default function SportLanding({ sport }: SportLandingProps) {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-10 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
             >
-              Join the Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setLocation('/about')}

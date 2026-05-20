@@ -94,13 +94,8 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
     <div className="min-h-screen bg-white text-gray-900">
       {!isAuthenticated && (
         <>
-      {/* Launch banner */}
-      <div className="fixed top-0 left-0 right-0 z-[60] bg-[#3c82f4] text-white text-center py-2.5 px-4 text-sm font-semibold tracking-wide">
-        🚀 Launching June 1, 2026 — <button onClick={() => setLocation('/waitlist')} className="underline underline-offset-2 hover:no-underline font-bold">Join the waitlist for early access</button>
-      </div>
-
       {/* Header */}
-      <header className="fixed top-[44px] left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200 -mt-2">
+      <header className="fixed top-0 left-0 right-0 z-[70] bg-white/90 backdrop-blur-xl border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-0 flex justify-between items-center">
           <nav className="hidden md:flex items-center gap-1 text-sm whitespace-nowrap">
             <Link href="/" className="px-3 py-2 rounded-lg text-gray-500 hover:text-[#3c82f4] hover:bg-[#3c82f4]/8 transition-colors font-medium">Home</Link>
@@ -114,16 +109,16 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
           </Link>
           <div className="flex items-center gap-3">
             <button
-              className="hidden md:block text-sm text-gray-400 cursor-not-allowed font-medium"
-              title="Come back June 1st"
+              onClick={() => setLocation('/login')}
+              className="hidden md:block text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
             >
               Log In
             </button>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-xs sm:text-sm"
             >
-              Join Waitlist
+              Get Started
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -151,7 +146,7 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
       )}
 
       {/* Page content */}
-      <main style={isAuthenticated ? undefined : { paddingTop: 'calc(44px + 40px)' }}>
+      <main style={isAuthenticated ? undefined : { paddingTop: '64px' }}>
         {children}
       </main>
 
@@ -169,7 +164,6 @@ export function MarketingLayout({ title, description, ogTitle, ogDescription, ca
                 <ul className="space-y-2 text-gray-500">
                   <li><Link href="/#features" className="hover:text-gray-900 transition-colors">Features</Link></li>
                   <li><Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link></li>
-                  <li><Link href="/waitlist" className="hover:text-gray-900 transition-colors">Join Waitlist</Link></li>
                 </ul>
               </div>
               <div>

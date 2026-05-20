@@ -147,10 +147,10 @@ export default function Pricing() {
               Log In
             </button>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="px-5 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             >
-              Join the Waitlist
+              Get Started
             </button>
           </div>
         </div>
@@ -230,11 +230,11 @@ export default function Pricing() {
               ))}
             </ul>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="w-full py-3 px-6 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors font-semibold text-gray-900"
               data-testid="button-pricing-free"
             >
-              Join the Waitlist
+              Get Started
             </button>
           </div>
 
@@ -267,11 +267,11 @@ export default function Pricing() {
               ))}
             </ul>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="w-full py-3 px-6 rounded-full bg-white hover:bg-blue-50 transition-colors font-semibold text-[#3c82f4]"
               data-testid="button-pricing-player-pro"
             >
-              Join the Waitlist
+              Get Started
             </button>
           </div>
 
@@ -301,11 +301,11 @@ export default function Pricing() {
               ))}
             </ul>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="w-full py-3 px-6 rounded-full border-2 border-gray-200 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold text-gray-900"
               data-testid="button-pricing-commissioner"
             >
-              Join the Waitlist
+              Get Started
             </button>
           </div>
         </div>

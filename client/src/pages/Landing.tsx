@@ -153,7 +153,7 @@ export default function Landing() {
               Log In
             </button>
             <button
-              onClick={() => setLocation('/waitlist')}
+              onClick={() => setLocation('/get-started')}
               className="hidden md:inline-flex px-4 py-2 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-sm"
             >
               Get Started
@@ -202,11 +202,11 @@ export default function Landing() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="px-8 py-4 rounded-full bg-[#3c82f4] text-white hover:bg-[#3c82f4]/90 transition-colors font-semibold text-lg shadow-lg shadow-blue-200"
-                data-testid="button-join-waitlist"
+                data-testid="button-get-started"
               >
-                Join the Waitlist
+                Get Started
               </button>
               <button
                 onClick={handleLoginClick}
@@ -630,11 +630,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="w-full py-3 px-6 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors font-semibold text-gray-900"
                 data-testid="button-pricing-free"
               >
-                Join the Waitlist
+                Get Started
               </button>
             </div>
 
@@ -658,11 +658,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="w-full py-3 px-6 rounded-full bg-white hover:bg-blue-50 transition-colors font-semibold text-[#3c82f4]"
                 data-testid="button-pricing-player-pro"
               >
-                Join the Waitlist
+                Get Started
               </button>
             </div>
 
@@ -683,11 +683,11 @@ export default function Landing() {
                 ))}
               </ul>
               <button
-                onClick={() => setLocation('/waitlist')}
+                onClick={() => setLocation('/get-started')}
                 className="w-full py-3 px-6 rounded-full border-2 border-gray-200 hover:border-[#3c82f4] hover:text-[#3c82f4] transition-colors font-semibold text-gray-900"
                 data-testid="button-pricing-commissioner"
               >
-                Join the Waitlist
+                Get Started
               </button>
             </div>
           </div>
@@ -746,7 +746,6 @@ export default function Landing() {
               <ul className="space-y-2 text-gray-400">
                 <li><Link href="/#features" className="hover:text-gray-900 transition-colors">Features</Link></li>
                 <li><Link href="/pricing" className="hover:text-gray-900 transition-colors">Pricing</Link></li>
-                <li><Link href="/waitlist" className="hover:text-gray-900 transition-colors">Join Waitlist</Link></li>
               </ul>
             </div>
             <div>
