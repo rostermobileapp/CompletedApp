@@ -100,16 +100,14 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const getTeamDisplayName = (team: any) => {
     if (!team) return 'Select Team';
-    if (!team.leagueId) return team.name;
+    if (!team.leagueId && !team.membershipLeagueId) return team.name;
+    const effectiveLeagueId = team.membershipLeagueId ?? team.leagueId;
     const league = Array.isArray(userLeagues)
-      ? userLeagues.find((l: any) => l.id === team.leagueId)
+      ? userLeagues.find((l: any) => l.id === effectiveLeagueId)
       : null;
     if (league) {
-      const seasonLabel = team.seasonName ?? league.seasonName;
-      if (seasonLabel) {
-        return `${league.name}: ${seasonLabel} - ${team.name}`;
-      }
-      return `${league.name}: ${team.name}`;
+      const leagueIdSuffix = league.uniqueLeagueId ? ` - ${league.uniqueLeagueId}` : '';
+      return `${league.name}: ${team.name}${leagueIdSuffix}`;
     }
     return team.name;
   };
