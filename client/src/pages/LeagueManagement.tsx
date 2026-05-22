@@ -2708,6 +2708,16 @@ export default function LeagueManagement() {
     [seasons],
   );
 
+  // Seasons that are considered "past": explicitly inactive OR end date has passed.
+  // Used for prior-season data import dropdowns.
+  const pastSeasons = React.useMemo(() => {
+    if (!Array.isArray(seasons)) return [];
+    const now = new Date();
+    return seasons.filter((s: Season) =>
+      !s.isActive || (s.endDate != null && new Date(s.endDate) < now)
+    );
+  }, [seasons]);
+
   // Open the New Season wizard. Skip the "close current season" step when
   // there is no active season to close.
   const openNewSeasonWizard = React.useCallback(() => {
@@ -3400,7 +3410,7 @@ export default function LeagueManagement() {
               </div>
               <button
                 onClick={() => { setShowStatsImport(!showStatsImport); setStatsImportResult(null); }}
-                disabled={seasons.length === 0}
+                disabled={pastSeasons.length === 0}
                 className="flex items-center gap-2 px-3 py-1.5 bg-muted text-foreground border border-border rounded-md hover:bg-muted/80 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 data-testid="button-import-stats"
               >
@@ -3435,8 +3445,8 @@ export default function LeagueManagement() {
                       className="w-full p-2 bg-background hairline elev-inset rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       data-testid="select-stats-season"
                     >
-                      <option value="">Select a season…</option>
-                      {seasons.map((s: Season) => (
+                      <option value="">Select a past season…</option>
+                      {pastSeasons.map((s: Season) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
@@ -4619,7 +4629,7 @@ export default function LeagueManagement() {
                 </div>
                 <button
                   onClick={() => { setShowScoresImport(!showScoresImport); setScoresImportResult(null); }}
-                  disabled={seasons.length === 0}
+                  disabled={pastSeasons.length === 0}
                   className="flex items-center gap-2 px-3 py-1.5 bg-muted text-foreground border border-border rounded-md hover:bg-muted/80 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   data-testid="button-import-scores"
                 >
@@ -4654,8 +4664,8 @@ export default function LeagueManagement() {
                         className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
                         data-testid="select-scores-import-season"
                       >
-                        <option value="">Select a season…</option>
-                        {seasons.map((s: any) => (
+                        <option value="">Select a past season…</option>
+                        {pastSeasons.map((s: Season) => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
