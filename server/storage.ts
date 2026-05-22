@@ -219,7 +219,7 @@ import {
   type LeagueProSeat,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists } from "drizzle-orm";
 
 // Helper function to generate unique 6-character alphanumeric team IDs (ABC123 format)
 async function generateUniqueTeamId(): Promise<string> {
@@ -4732,9 +4732,31 @@ export class DatabaseStorage implements IStorage {
     const userTeams = await this.getUserTeams(userId);
     const teamIds = userTeams.map(t => t.id);
     
-    // Also get leagues where user is a member (for commissioners who may not be on teams)
-    const userLeagues = await this.getUserLeagues(userId);
-    const leagueIds = userLeagues.map(l => l.id);
+    // Only get leagues where the user has commissioner-level access.
+    // Regular free-agent members (league member but no team) must NOT see all league games.
+    const commissionerOwnedRows = await db
+      .select({ id: leagues.id })
+      .from(leagues)
+      .where(eq(leagues.commissionerId, userId));
+    const commissionerRoleRows = await db
+      .select({ leagueId: leagueMemberships.leagueId })
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.status, 'approved'),
+          or(
+            eq(leagueMemberships.leagueRole, 'commissioner'),
+            eq(leagueMemberships.leagueRole, 'secondary_commissioner')
+          )
+        )
+      );
+    const leagueIds = [
+      ...new Set([
+        ...commissionerOwnedRows.map(l => l.id),
+        ...commissionerRoleRows.map(l => l.leagueId),
+      ])
+    ];
     
     // Games drop off by noon the following day according to the league's timezone
     // First, use a generous 3-day lookback to fetch candidates, then filter per-game based on league timezone
@@ -9726,6 +9748,20 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.leagueId, leagueId),
           eq(leagueMemberships.status, "approved"),
+          // Only include players who are on an approved team in this league.
+          // Free agents (approved league members with no team) must not appear on the stats board.
+          exists(
+            db.select({ one: sql`1` })
+              .from(teamMemberships)
+              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+              .where(
+                and(
+                  eq(teamMemberships.userId, users.id),
+                  eq(teams.leagueId, leagueId),
+                  eq(teamMemberships.status, 'approved')
+                )
+              )
+          ),
           // Filter by player type if specified
           ...(playerType === 'goalies' ? [eq(leagueMemberships.isGoalie, true)] : []),
           ...(playerType === 'non-goalies' ? [eq(leagueMemberships.isGoalie, false)] : [])
