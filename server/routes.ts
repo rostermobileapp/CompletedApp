@@ -12431,7 +12431,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         if (!matchingGame) {
-          warnings.push(`Row ${rowNum}: No game found for ${homeTeamName} vs ${awayTeamName} on ${dateStr} — skipped`);
+          // No existing game found — create one and apply the scores immediately.
+          // Use noon local time so the date always reads correctly regardless of timezone display.
+          const scheduledAt = `${dateStr} 12:00:00`;
+          const [newGame] = await db.insert(games).values({
+            leagueId,
+            seasonId,
+            homeTeamId,
+            awayTeamId,
+            scheduledAt,
+            homeScore,
+            awayScore,
+            isCompleted: true,
+            resultType,
+          }).returning();
+          // Add to allGames so duplicate rows in the same CSV don't create duplicates
+          allGames.push(newGame);
+          updatedCount++;
           continue;
         }
 

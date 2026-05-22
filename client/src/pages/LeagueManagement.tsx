@@ -1853,8 +1853,8 @@ export default function LeagueManagement() {
       setScoresImportFile(null);
       if (scoresFileInputRef.current) scoresFileInputRef.current.value = '';
       const parts = [
-        `${data.updated} game score${data.updated !== 1 ? 's' : ''} updated`,
-        data.warnings?.length > 0 ? `${data.warnings.length} unmatched` : null,
+        `${data.updated} game${data.updated !== 1 ? 's' : ''} imported`,
+        data.warnings?.length > 0 ? `${data.warnings.length} skipped` : null,
         data.errors?.length > 0 ? `${data.errors.length} errors` : null,
       ].filter(Boolean).join(', ');
       toast({ title: data.updated > 0 ? 'Scores Imported' : 'Scores Import Complete', description: parts });
@@ -4715,10 +4715,10 @@ export default function LeagueManagement() {
 
                     {scoresImportResult && (
                       <div className="mt-1 space-y-2 text-sm">
-                        <p className="font-medium text-green-600">{scoresImportResult.updated} of {scoresImportResult.total} game scores updated.</p>
+                        <p className="font-medium text-green-600">{scoresImportResult.updated} of {scoresImportResult.total} game{scoresImportResult.total !== 1 ? 's' : ''} imported.</p>
                         {scoresImportResult.warnings.length > 0 && (
                           <details className="text-xs">
-                            <summary className="cursor-pointer text-amber-600 font-medium">{scoresImportResult.warnings.length} unmatched game{scoresImportResult.warnings.length !== 1 ? 's' : ''}</summary>
+                            <summary className="cursor-pointer text-amber-600 font-medium">{scoresImportResult.warnings.length} skipped</summary>
                             <ul className="mt-1 pl-3 list-disc space-y-0.5 text-muted-foreground">
                               {scoresImportResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
