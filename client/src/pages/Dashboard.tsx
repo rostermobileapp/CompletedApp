@@ -1947,13 +1947,8 @@ function DashboardMobile() {
       : null;
     
     if (league) {
-      // Prefer the team's own season name (set when the team belongs to a specific season),
-      // fall back to the league's active season name for league-level teams (no seasonId).
-      const seasonLabel = team.seasonName ?? league.seasonName;
-      if (seasonLabel) {
-        return `${league.name}: ${seasonLabel} - ${team.name}`;
-      }
-      return `${league.name}: ${team.name}`;
+      const leagueIdSuffix = league.uniqueLeagueId ? ` - ${league.uniqueLeagueId}` : '';
+      return `${league.name}: ${team.name}${leagueIdSuffix}`;
     }
     
     // Fallback if league not found (shouldn't happen)
