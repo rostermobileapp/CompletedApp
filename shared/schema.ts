@@ -1791,7 +1791,8 @@ export const importedSchedules = pgTable("imported_schedules", {
 // Player stats table
 export const playerStats = pgTable("player_stats", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }), // nullable: null for unregistered imported players
+  importedPlayerId: varchar("imported_player_id").references(() => importedPlayers.id, { onDelete: 'cascade' }), // set when player hasn't registered yet
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
   seasonId: varchar("season_id").references(() => seasons.id),
   gamesPlayed: integer("games_played").default(0).notNull(),
@@ -1802,6 +1803,7 @@ export const playerStats = pgTable("player_stats", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_player_league_season_stats").on(table.userId, table.leagueId, table.seasonId),
+  unique("unique_imported_player_league_season_stats").on(table.importedPlayerId, table.leagueId, table.seasonId),
   index("idx_player_stats_league_id").on(table.leagueId),
   index("idx_player_stats_user_id").on(table.userId),
 ]);
@@ -1891,6 +1893,10 @@ export const playerStatsRelations = relations(playerStats, ({ one }) => ({
   user: one(users, {
     fields: [playerStats.userId],
     references: [users.id],
+  }),
+  importedPlayer: one(importedPlayers, {
+    fields: [playerStats.importedPlayerId],
+    references: [importedPlayers.id],
   }),
   league: one(leagues, {
     fields: [playerStats.leagueId],

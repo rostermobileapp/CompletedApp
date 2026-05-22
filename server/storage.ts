@@ -9782,12 +9782,13 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(sql`COALESCE(${playerStats.goals}, 0) + COALESCE(${playerStats.assists}, 0)`)); // Order by points (goals + assists)
     
-    return result.map(r => ({
+    const registeredRows = result.map(r => ({
       // If player has stats, use them; otherwise use default zero values
       id: r.statsId || `${r.userId}-${leagueId}-${seasonId || 'null'}`,
       leagueId: leagueId,
       seasonId: seasonId || null,
       userId: r.userId,
+      importedPlayerId: null as string | null,
       gamesPlayed: r.statsGamesPlayed || 0,
       goals: r.statsGoals || 0,
       assists: r.statsAssists || 0,
@@ -9808,7 +9809,6 @@ export class DatabaseStorage implements IStorage {
         playerType: r.userPlayerType,
         createdAt: r.userCreatedAt,
         updatedAt: r.userUpdatedAt,
-        // New permission fields
         role: r.userRole,
         specialPermissions: r.userSpecialPermissions,
         isPrimaryCommissioner: r.userIsPrimaryCommissioner,
@@ -9822,6 +9822,77 @@ export class DatabaseStorage implements IStorage {
         navigationPreferences: null,
       }
     }));
+
+    // Also fetch stats stored for unregistered imported players and append them.
+    // These are rows where importedPlayerId IS NOT NULL (userId IS NULL).
+    let importedStatsConditions: any[] = [
+      eq(playerStats.leagueId, leagueId),
+      isNull(playerStats.userId),
+      isNotNull(playerStats.importedPlayerId),
+    ];
+    if (seasonId) importedStatsConditions.push(eq(playerStats.seasonId, seasonId));
+
+    const importedRows = await db
+      .select({
+        statsId: playerStats.id,
+        statsLeagueId: playerStats.leagueId,
+        statsSeasonId: playerStats.seasonId,
+        statsImportedPlayerId: playerStats.importedPlayerId,
+        statsGamesPlayed: playerStats.gamesPlayed,
+        statsGoals: playerStats.goals,
+        statsAssists: playerStats.assists,
+        statsPenaltyMinutes: playerStats.penaltyMinutes,
+        statsCreatedAt: playerStats.createdAt,
+        statsUpdatedAt: playerStats.updatedAt,
+        ipFirstName: importedPlayers.firstName,
+        ipLastName: importedPlayers.lastName,
+        ipPosition: importedPlayers.position,
+      })
+      .from(playerStats)
+      .innerJoin(importedPlayers, eq(playerStats.importedPlayerId, importedPlayers.id))
+      .where(and(...importedStatsConditions));
+
+    const importedMappedRows = importedRows.map(r => ({
+      id: r.statsId,
+      leagueId: leagueId,
+      seasonId: seasonId || null,
+      userId: null as string | null,
+      importedPlayerId: r.statsImportedPlayerId,
+      gamesPlayed: r.statsGamesPlayed || 0,
+      goals: r.statsGoals || 0,
+      assists: r.statsAssists || 0,
+      penaltyMinutes: r.statsPenaltyMinutes || 0,
+      createdAt: r.statsCreatedAt || new Date(),
+      updatedAt: r.statsUpdatedAt || new Date(),
+      isGoalie: false,
+      user: {
+        id: r.statsImportedPlayerId || '',
+        email: '',
+        firstName: r.ipFirstName || '',
+        lastName: r.ipLastName || '',
+        profileImageUrl: null,
+        age: null,
+        phoneNumber: null,
+        city: null,
+        primarySport: null,
+        playerType: r.ipPosition || null,
+        createdAt: r.statsCreatedAt || new Date(),
+        updatedAt: r.statsUpdatedAt || new Date(),
+        role: 'free_tier' as any,
+        specialPermissions: null,
+        isPrimaryCommissioner: false,
+        createdBy: null,
+        lastUpdated: null,
+        dateOfBirth: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        venmoUsername: null,
+        cashappUsername: null,
+        navigationPreferences: null,
+      }
+    }));
+
+    return [...registeredRows, ...importedMappedRows];
   }
 
   async getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined> {

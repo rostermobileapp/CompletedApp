@@ -12099,7 +12099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Load all approved league members for name matching
       const leagueMembers = await storage.getLeagueMembers(leagueId);
 
-      // Build lookup: "firstname lastname" (lowercased) -> userId
+      // Build lookup: "firstname lastname" (lowercased) -> userId  (real registered players)
       const playerLookup = new Map<string, string>();
       leagueMembers.forEach((m: any) => {
         const u = m.user || {};
@@ -12109,6 +12109,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const realLast  = (u.lastName  || '').toLowerCase().trim();
         if (dispFirst && dispLast) playerLookup.set(`${dispFirst} ${dispLast}`, m.userId);
         if (realFirst && realLast) playerLookup.set(`${realFirst} ${realLast}`, m.userId);
+      });
+
+      // Also load imported (unregistered) players so we can store stats for them
+      // even before they create accounts.  importedPlayerId is used as the key;
+      // if a player has already merged their account, mergedWithUserId is used instead.
+      const allImportedPlayers = await db
+        .select()
+        .from(importedPlayers)
+        .where(eq(importedPlayers.leagueId, leagueId));
+
+      // "firstname lastname" -> { importedPlayerId, mergedWithUserId | null }
+      const importedPlayerLookup = new Map<string, { id: string; mergedWithUserId: string | null }>();
+      allImportedPlayers.forEach((p: any) => {
+        const first = (p.firstName || '').toLowerCase().trim();
+        const last  = (p.lastName  || '').toLowerCase().trim();
+        if (first && last) {
+          // Prefer merged (real user) entries if there's a collision
+          const key = `${first} ${last}`;
+          if (!importedPlayerLookup.has(key) || p.mergedWithUserId) {
+            importedPlayerLookup.set(key, { id: p.id, mergedWithUserId: p.mergedWithUserId || null });
+          }
+        }
       });
 
       // Build team name -> teamId lookup for optional Team column
@@ -12167,9 +12189,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const lookupKey = `${firstName.toLowerCase()} ${lastName.toLowerCase()}`;
+
+        // Priority: real registered league member > merged imported player > unmerged imported player
         const matchedUserId = playerLookup.get(lookupKey);
-        if (!matchedUserId) {
-          warnings.push(`Row ${rowNum}: No league member matched "${firstName} ${lastName}" — skipped`);
+        const importedEntry = !matchedUserId ? importedPlayerLookup.get(lookupKey) : undefined;
+
+        // If merged imported player, treat as real user
+        const resolvedUserId = matchedUserId || (importedEntry?.mergedWithUserId ?? null);
+        const resolvedImportedPlayerId = (!resolvedUserId && importedEntry) ? importedEntry.id : null;
+
+        if (!resolvedUserId && !resolvedImportedPlayerId) {
+          warnings.push(`Row ${rowNum}: No player matched "${firstName} ${lastName}" — skipped`);
           continue;
         }
 
@@ -12178,28 +12208,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const gamesPlayed    = Math.max(0, parseInt(row.gamesPlayed    || '0', 10) || 0);
         const penaltyMinutes = Math.max(0, parseInt(row.penaltyMinutes || '0', 10) || 0);
 
-        await db.insert(playerStats)
-          .values({ userId: matchedUserId, leagueId, seasonId, goals, assists, gamesPlayed, penaltyMinutes })
-          .onConflictDoUpdate({
-            target: [playerStats.userId, playerStats.leagueId, playerStats.seasonId],
-            set: { goals, assists, gamesPlayed, penaltyMinutes, updatedAt: new Date() },
-          });
+        if (resolvedUserId) {
+          // Real user — upsert on (userId, leagueId, seasonId)
+          await db.insert(playerStats)
+            .values({ userId: resolvedUserId, leagueId, seasonId, goals, assists, gamesPlayed, penaltyMinutes })
+            .onConflictDoUpdate({
+              target: [playerStats.userId, playerStats.leagueId, playerStats.seasonId],
+              set: { goals, assists, gamesPlayed, penaltyMinutes, updatedAt: new Date() },
+            });
+        } else {
+          // Imported (unregistered) player — upsert on (importedPlayerId, leagueId, seasonId)
+          await db.insert(playerStats)
+            .values({ importedPlayerId: resolvedImportedPlayerId, leagueId, seasonId, goals, assists, gamesPlayed, penaltyMinutes })
+            .onConflictDoUpdate({
+              target: [playerStats.importedPlayerId, playerStats.leagueId, playerStats.seasonId],
+              set: { goals, assists, gamesPlayed, penaltyMinutes, updatedAt: new Date() },
+            });
+        }
 
         // If a Team column is provided, add the player to that team (idempotent — skip if
         // membership already exists). This mirrors standard player-import behaviour so the
         // player shows up in the Teams tab with the correct roster.
         const teamNameRaw = (row.teamName || '').trim();
-        if (teamNameRaw) {
+        if (teamNameRaw && resolvedUserId) {
           const teamIdForPlayer = statsTeamNameToId.get(teamNameRaw.toLowerCase());
           if (teamIdForPlayer) {
             const [existingMembership] = await db
               .select({ id: teamMemberships.id })
               .from(teamMemberships)
-              .where(and(eq(teamMemberships.userId, matchedUserId), eq(teamMemberships.teamId, teamIdForPlayer)))
+              .where(and(eq(teamMemberships.userId, resolvedUserId), eq(teamMemberships.teamId, teamIdForPlayer)))
               .limit(1);
             if (!existingMembership) {
               await db.insert(teamMemberships).values({
-                userId: matchedUserId,
+                userId: resolvedUserId,
                 teamId: teamIdForPlayer,
                 status: 'approved',
                 isCaptain: false,
