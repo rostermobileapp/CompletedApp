@@ -114,10 +114,8 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
 
   const getLeagueDisplayName = (league: any) => {
     if (!league) return 'Select League';
-    if (league.seasonName) {
-      return `${league.name}: ${league.seasonName}`;
-    }
-    return league.name;
+    const idSuffix = league.uniqueLeagueId ? ` - ${league.uniqueLeagueId}` : '';
+    return `${league.name}${idSuffix}`;
   };
 
   const { data: unpaidPaymentData } = useQuery({
@@ -574,8 +572,12 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
                       (membership.leagueId &&
                         notificationCounts?.leagues?.[membership.leagueId]) ||
                       0;
-                    const label =
-                      getLeagueDisplayName(membership.league) ?? 'League';
+                    const leagueData = Array.isArray(userLeagues)
+                      ? (userLeagues as any[]).find((l: any) => l.id === membership.leagueId)
+                      : null;
+                    const label = leagueData
+                      ? getLeagueDisplayName(leagueData)
+                      : (leagueActivityMap.get(membership.leagueId)?.name ?? 'League');
                     return (
                       <SelectPrimitive.Item
                         key={`league-${membership.leagueId}`}
