@@ -379,6 +379,7 @@ const createSeasonSchema = z.object({
   name: z.string().min(1, 'Season name is required'),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  isActive: z.boolean().default(true),
 });
 
 type CreateSeasonForm = z.infer<typeof createSeasonSchema>;
@@ -1229,6 +1230,7 @@ export default function LeagueManagement() {
       name: '',
       startDate: '',
       endDate: '',
+      isActive: true,
     },
   });
 
@@ -2720,7 +2722,7 @@ export default function LeagueManagement() {
       setShowDesktopRequiredSeason(true);
       return;
     }
-    seasonForm.reset({ name: '', startDate: '', endDate: '' });
+    seasonForm.reset({ name: '', startDate: '', endDate: '', isActive: true });
     setNotReturningMemberIds(new Set());
     setCloseCurrentSeason(!!activeSeason);
     setNewSeasonStep(activeSeason ? 'close' : 'details');
@@ -2734,7 +2736,7 @@ export default function LeagueManagement() {
     setCloseCurrentSeason(true);
     setNotReturningMemberIds(new Set());
     setShowResetPlayersConfirm(false);
-    seasonForm.reset({ name: '', startDate: '', endDate: '' });
+    seasonForm.reset({ name: '', startDate: '', endDate: '', isActive: true });
   }, [seasonForm]);
 
   // Season transition mutation: closes current season (optionally), creates
@@ -2743,7 +2745,7 @@ export default function LeagueManagement() {
   const seasonTransitionMutation = useMutation({
     mutationFn: async (payload: {
       closeCurrentSeasonId?: string | null;
-      season: { name: string; startDate?: string | null; endDate?: string | null };
+      season: { name: string; startDate?: string | null; endDate?: string | null; isActive?: boolean };
       resetAllPlayers?: boolean;
       removedMemberIds?: string[];
     }) => {
@@ -6077,6 +6079,7 @@ export default function LeagueManagement() {
               name: data.name,
               startDate: data.startDate || null,
               endDate: data.endDate || null,
+              isActive: data.isActive,
             },
             resetAllPlayers,
             removedMemberIds: resetAllPlayers
@@ -6249,6 +6252,19 @@ export default function LeagueManagement() {
                         data-testid="input-season-end-date"
                       />
                     </div>
+
+                    <label className="flex items-center justify-between p-3 bg-card hairline elev-rest rounded-lg cursor-pointer">
+                      <div>
+                        <div className="text-sm font-medium">Mark as active</div>
+                        <div className="text-xs text-muted-foreground">Turn off if you're adding a past season for historical records</div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={seasonForm.watch('isActive')}
+                        onChange={e => seasonForm.setValue('isActive', e.target.checked)}
+                        className="w-4 h-4 accent-primary"
+                      />
+                    </label>
 
                     <div className="text-xs text-muted-foreground p-3 bg-muted/40 rounded-lg">
                       The new season starts with an empty schedule and no

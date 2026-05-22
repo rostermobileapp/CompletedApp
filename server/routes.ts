@@ -5483,7 +5483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         removedMemberIds,
       }: {
         closeCurrentSeasonId?: string | null;
-        season: { name: string; startDate?: string | null; endDate?: string | null };
+        season: { name: string; startDate?: string | null; endDate?: string | null; isActive?: boolean };
         resetAllPlayers?: boolean;
         removedMemberIds?: string[];
       } = req.body || {};
@@ -5511,7 +5511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // 2. Create the new season (always active)
+        // 2. Create the new season (active by default, but can be set inactive for historical imports)
         const [created] = await tx
           .insert(seasons)
           .values({
@@ -5519,7 +5519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             leagueId,
             startDate: season.startDate ? new Date(season.startDate) : null,
             endDate: season.endDate ? new Date(season.endDate) : null,
-            isActive: true,
+            isActive: season.isActive !== false,
           })
           .returning();
 
