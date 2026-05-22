@@ -12053,7 +12053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================================
   // PRIOR SEASON STATS IMPORT
   // POST /api/leagues/:leagueId/stats/import
-  // CSV columns: First Name, Last Name, Goals, Assists, Games Played, Penalty Minutes
+  // CSV columns: First Name, Last Name, Team (optional), Goals, Assists, Games Played, Penalty Minutes
   // Form field: seasonId (required)
   // ============================================================
   app.post('/api/leagues/:leagueId/stats/import', isAuthenticated, (req: any, res, next) => {
@@ -12111,6 +12111,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (realFirst && realLast) playerLookup.set(`${realFirst} ${realLast}`, m.userId);
       });
 
+      // Build team name -> teamId lookup for optional Team column
+      const leagueTeamsForStats = await storage.getTeamsByLeague(leagueId);
+      const statsTeamNameToId = new Map<string, string>();
+      leagueTeamsForStats.forEach((t: any) => {
+        statsTeamNameToId.set(t.name.toLowerCase().trim(), t.id);
+      });
+
       // Parse CSV
       const fileContent = fs.readFileSync(file.path, 'utf8');
       fs.unlinkSync(file.path);
@@ -12124,6 +12131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'first name': 'firstName', 'firstname': 'firstName', 'first': 'firstName',
             'last name': 'lastName',  'lastname': 'lastName',   'last': 'lastName',
             'full name': 'fullName',  'name': 'fullName', 'player': 'fullName', 'player name': 'fullName',
+            'team': 'teamName', 'team name': 'teamName', 'teamname': 'teamName', 'club': 'teamName',
             'goals': 'goals', 'g': 'goals',
             'assists': 'assists', 'a': 'assists',
             'games played': 'gamesPlayed', 'gp': 'gamesPlayed', 'games': 'gamesPlayed',
@@ -12176,6 +12184,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             target: [playerStats.userId, playerStats.leagueId, playerStats.seasonId],
             set: { goals, assists, gamesPlayed, penaltyMinutes, updatedAt: new Date() },
           });
+
+        // If a Team column is provided, add the player to that team (idempotent — skip if
+        // membership already exists). This mirrors standard player-import behaviour so the
+        // player shows up in the Teams tab with the correct roster.
+        const teamNameRaw = (row.teamName || '').trim();
+        if (teamNameRaw) {
+          const teamIdForPlayer = statsTeamNameToId.get(teamNameRaw.toLowerCase());
+          if (teamIdForPlayer) {
+            const [existingMembership] = await db
+              .select({ id: teamMemberships.id })
+              .from(teamMemberships)
+              .where(and(eq(teamMemberships.userId, matchedUserId), eq(teamMemberships.teamId, teamIdForPlayer)))
+              .limit(1);
+            if (!existingMembership) {
+              await db.insert(teamMemberships).values({
+                userId: matchedUserId,
+                teamId: teamIdForPlayer,
+                status: 'approved',
+                isCaptain: false,
+                approvedBy: userId,
+              });
+            }
+          } else {
+            warnings.push(`Row ${rowNum}: Team "${teamNameRaw}" not found in this league — stats imported, team not assigned`);
+          }
+        }
 
         importedCount++;
       }

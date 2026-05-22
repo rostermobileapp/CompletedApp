@@ -3466,7 +3466,7 @@ export default function LeagueManagement() {
                     ) : (
                       <div>
                         <p className="font-medium text-sm mb-0.5">Select CSV file</p>
-                        <p className="text-xs text-muted-foreground">Columns: First Name, Last Name, Goals, Assists, Games Played, Penalty Minutes</p>
+                        <p className="text-xs text-muted-foreground">Columns: First Name, Last Name, Team (optional), Goals, Assists, Games Played, Penalty Minutes</p>
                       </div>
                     )}
                     <input
