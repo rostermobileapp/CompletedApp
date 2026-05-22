@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -12406,10 +12406,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Only delete if it's not the real user
           if (placeholderUserId !== realUserId) {
+            // Transfer all stat/game records from placeholder → real user BEFORE
+            // deleting the placeholder (cascade would otherwise wipe the data).
+
+            // player_stats has a unique(userId, leagueId, seasonId) constraint, so
+            // upsert: add placeholder's numbers into any existing real-user row, then
+            // delete the now-redundant placeholder rows.
+            await db.execute(sql`
+              INSERT INTO player_stats
+                (id, user_id, league_id, season_id, games_played, goals, assists, penalty_minutes, created_at, updated_at)
+              SELECT
+                gen_random_uuid(),
+                ${realUserId},
+                league_id,
+                season_id,
+                games_played,
+                goals,
+                assists,
+                penalty_minutes,
+                created_at,
+                NOW()
+              FROM player_stats
+              WHERE user_id = ${placeholderUserId}
+              ON CONFLICT (user_id, league_id, season_id) DO UPDATE SET
+                games_played    = player_stats.games_played    + EXCLUDED.games_played,
+                goals           = player_stats.goals           + EXCLUDED.goals,
+                assists         = player_stats.assists         + EXCLUDED.assists,
+                penalty_minutes = player_stats.penalty_minutes + EXCLUDED.penalty_minutes,
+                updated_at      = NOW()
+            `);
+            await db.delete(playerStats).where(eq(playerStats.userId, placeholderUserId));
+
+            // game_goals: scorer and both assists
+            await db.update(gameGoals)
+              .set({ scorerId: realUserId })
+              .where(eq(gameGoals.scorerId, placeholderUserId));
+            await db.update(gameGoals)
+              .set({ primaryAssistId: realUserId })
+              .where(eq(gameGoals.primaryAssistId, placeholderUserId));
+            await db.update(gameGoals)
+              .set({ secondaryAssistId: realUserId })
+              .where(eq(gameGoals.secondaryAssistId, placeholderUserId));
+
+            // game_goalies: goalie of record
+            await db.update(gameGoalies)
+              .set({ goalieUserId: realUserId })
+              .where(eq(gameGoalies.goalieUserId, placeholderUserId));
+
+            // game_stars: all three star slots
+            await db.update(gameStars)
+              .set({ firstStarUserId: realUserId })
+              .where(eq(gameStars.firstStarUserId, placeholderUserId));
+            await db.update(gameStars)
+              .set({ secondStarUserId: realUserId })
+              .where(eq(gameStars.secondStarUserId, placeholderUserId));
+            await db.update(gameStars)
+              .set({ thirdStarUserId: realUserId })
+              .where(eq(gameStars.thirdStarUserId, placeholderUserId));
+
+            // game_rsvps: attendance records
+            await db.update(gameRsvps)
+              .set({ userId: realUserId })
+              .where(eq(gameRsvps.userId, placeholderUserId));
+
+            // game_score_submissions: audit trail
+            await db.update(gameScoreSubmissions)
+              .set({ submittedBy: realUserId })
+              .where(eq(gameScoreSubmissions.submittedBy, placeholderUserId));
+
             await db.delete(leagueMemberships)
               .where(eq(leagueMemberships.id, pm.league_memberships.id));
             
-            // Optionally delete the placeholder user if they have no other memberships
+            // Delete the placeholder user if they have no other memberships
             const otherMemberships = await db.select()
               .from(leagueMemberships)
               .where(eq(leagueMemberships.userId, placeholderUserId));
