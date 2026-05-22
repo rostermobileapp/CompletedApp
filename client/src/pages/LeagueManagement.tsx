@@ -521,6 +521,89 @@ function GamesCalendar({ games, teams, onGameClick }: {
   );
 }
 
+interface MemberSearchInputProps {
+  members: any[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  'data-testid'?: string;
+}
+
+function MemberSearchInput({ members, value, onChange, placeholder, 'data-testid': testId }: MemberSearchInputProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = React.useMemo(() => {
+    if (!value.trim()) return [];
+    const q = value.trim().toLowerCase();
+    return members.filter((m: any) => {
+      const fullName = `${m.user?.firstName || ''} ${m.user?.lastName || ''}`.toLowerCase();
+      const email = (m.user?.email || '').toLowerCase();
+      return fullName.includes(q) || email.includes(q);
+    }).slice(0, 10);
+  }, [members, value]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') setOpen(false);
+  }
+
+  function selectMember(m: any) {
+    onChange(m.user?.email || '');
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className="relative flex-1">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => { if (value.trim()) setOpen(true); }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="w-full p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+        data-testid={testId}
+        autoComplete="off"
+      />
+      {open && value.trim() && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card hairline elev-lift rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+          {filtered.length > 0 ? (
+            filtered.map((m: any) => {
+              const name = m.user?.firstName && m.user?.lastName
+                ? `${m.user.firstName} ${m.user.lastName}`
+                : m.user?.email || '';
+              const email = m.user?.email || '';
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); selectMember(m); }}
+                  className="w-full flex flex-col items-start px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
+                >
+                  <span className="font-medium">{name}</span>
+                  {name !== email && <span className="text-muted-foreground text-xs">{email}</span>}
+                </button>
+              );
+            })
+          ) : (
+            <p className="px-3 py-2 text-sm text-muted-foreground">No members found — you can still submit a raw email.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LeagueManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -5174,12 +5257,11 @@ export default function LeagueManagement() {
                   
                   {/* Add new co-commissioner */}
                   <div className="flex gap-2">
-                    <input
-                      type="email"
+                    <MemberSearchInput
+                      members={members}
                       value={coCommissionerEmail}
-                      onChange={(e) => setCoCommissionerEmail(e.target.value)}
-                      placeholder="Enter user's email"
-                      className="flex-1 p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      onChange={setCoCommissionerEmail}
+                      placeholder="Search by name or enter email"
                       data-testid="input-cocommissioner-email"
                     />
                     <button
@@ -5243,12 +5325,11 @@ export default function LeagueManagement() {
                   
                   {/* Add new admin */}
                   <div className="flex gap-2">
-                    <input
-                      type="email"
+                    <MemberSearchInput
+                      members={members}
                       value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
-                      placeholder="Enter league member's email"
-                      className="flex-1 p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      onChange={setAdminEmail}
+                      placeholder="Search by name or enter email"
                       data-testid="input-admin-email"
                     />
                     <button
@@ -5312,12 +5393,11 @@ export default function LeagueManagement() {
                   
                   {/* Add new stat manager */}
                   <div className="flex gap-2">
-                    <input
-                      type="email"
+                    <MemberSearchInput
+                      members={members}
                       value={statManagerEmail}
-                      onChange={(e) => setStatManagerEmail(e.target.value)}
-                      placeholder="Enter scorekeeper's email"
-                      className="flex-1 p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      onChange={setStatManagerEmail}
+                      placeholder="Search by name or enter email"
                       data-testid="input-stat-manager-email"
                     />
                     <button
