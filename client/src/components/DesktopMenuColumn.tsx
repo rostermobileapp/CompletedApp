@@ -12,8 +12,11 @@ import {
   Trophy,
   Target,
   Lock,
+  Search,
+  MessageSquare,
 } from 'lucide-react';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
+import FeedbackModal from '@/components/FeedbackModal';
 
 /**
  * Permanent vertical menu column shown on desktop between the left primary
@@ -28,6 +31,7 @@ import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 export function DesktopMenuColumn() {
   const [, navigate] = useLocation();
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const {
     canAccessPremiumFeatures,
     canManageLeague,
@@ -108,6 +112,22 @@ export function DesktopMenuColumn() {
       bgColor: 'bg-red-500/20',
       iconColor: 'text-red-500',
     },
+    {
+      icon: Search,
+      label: 'Find a League / Tournament',
+      path: '/league-tournament-search',
+      locked: false,
+      bgColor: 'bg-sky-500/20',
+      iconColor: 'text-sky-500',
+    },
+    {
+      icon: Users,
+      label: 'Find a Team',
+      path: '/team-search',
+      locked: false,
+      bgColor: 'bg-indigo-500/20',
+      iconColor: 'text-indigo-500',
+    },
   ];
 
   const handleNavigate = (path: string, locked: boolean) => {
@@ -159,9 +179,22 @@ export function DesktopMenuColumn() {
               </button>
             );
           })}
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            className="w-full bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-lg p-3 flex items-center gap-3 transition-all hover:bg-white/90 dark:hover:bg-black/80 hover:border-primary/50"
+            data-testid="desktop-menu-item-feedback"
+          >
+            <div className="p-2.5 rounded-xl flex-shrink-0 bg-pink-500/20">
+              <MessageSquare className="w-5 h-5 text-pink-500" />
+            </div>
+            <span className="text-sm font-semibold text-left text-gray-900 dark:text-white truncate">
+              Send Feedback
+            </span>
+          </button>
         </div>
       </aside>
 
+      <FeedbackModal isOpen={showFeedbackModal} onClose={() => setShowFeedbackModal(false)} />
       <PremiumFeatureAlert
         open={showPremiumAlert}
         onOpenChange={setShowPremiumAlert}
