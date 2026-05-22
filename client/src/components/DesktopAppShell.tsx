@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Users, Trophy, Swords, Info, LifeBuoy, Clock } from 'lucide-react';
 import PastSeasonsModal from '@/components/PastSeasonsModal';
+import FeedbackModal from '@/components/FeedbackModal';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { cn } from '@/lib/utils';
 import { getImageUrl } from '@/lib/queryClient';
@@ -57,6 +58,7 @@ interface DesktopAppShellProps {
 export function DesktopAppShell({ children }: DesktopAppShellProps) {
   const [location, navigate] = useLocation();
   const { isAuthenticated } = useAuth();
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const {
     selectedType,
     selectedId,
@@ -670,7 +672,32 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
               <div />
             )}
           </div>
+          {/* Find a League / Team / Feedback buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => navigate('/league-tournament-search')}
+              className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 font-medium text-sm whitespace-nowrap"
+              data-testid="desktop-button-find-league"
+            >
+              Find a League / Tournament
+            </button>
+            <button
+              onClick={() => navigate('/team-search')}
+              className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 font-medium text-sm whitespace-nowrap"
+              data-testid="desktop-button-find-team"
+            >
+              Find a Team
+            </button>
+            <button
+              onClick={() => setShowFeedbackModal(true)}
+              className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 font-medium text-sm whitespace-nowrap"
+              data-testid="desktop-button-send-feedback"
+            >
+              Send Feedback
+            </button>
+          </div>
         </header>
+        <FeedbackModal isOpen={showFeedbackModal} onClose={() => setShowFeedbackModal(false)} />
         <PastSeasonsModal
           open={pastSeasonsOpen}
           onOpenChange={setPastSeasonsOpen}
