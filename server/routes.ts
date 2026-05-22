@@ -12210,6 +12210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { leagueId } = req.params;
       const userId = req.user.claims.sub;
       const file = req.file;
+      const seasonId = req.body.seasonId || null;
 
       if (!file) return res.status(400).json({ message: 'No file uploaded' });
 
@@ -12220,15 +12221,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only commissioners can import scores' });
       }
 
-      // Load all games for this league so we can match by date + team names
-      const allGames = await storage.getGamesByLeague(leagueId);
+      if (!seasonId) {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({ message: 'A season must be selected for scores import' });
+      }
 
-      // Build team-name lookup from the games data: lowercase name -> teamId
+      // Verify season belongs to this league
+      const scoresLeagueSeasons = await storage.getSeasonsByLeague(leagueId);
+      const scoresTargetSeason = scoresLeagueSeasons.find(s => s.id === seasonId);
+      if (!scoresTargetSeason) {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({ message: 'Season not found in this league' });
+      }
+
+      // Load teams for name->id lookup
+      const leagueTeamsForScores = await storage.getTeamsByLeague(leagueId);
       const teamNameToId = new Map<string, string>();
-      allGames.forEach((g: any) => {
-        if (g.homeTeam?.name) teamNameToId.set(g.homeTeam.name.toLowerCase().trim(), g.homeTeamId);
-        if (g.awayTeam?.name) teamNameToId.set(g.awayTeam.name.toLowerCase().trim(), g.awayTeamId);
+      leagueTeamsForScores.forEach((t: any) => {
+        teamNameToId.set(t.name.toLowerCase().trim(), t.id);
       });
+
+      // Load games directly via Drizzle ORM so scheduledAt comes back as a league-local
+      // string (not a JS Date), enabling safe date-only comparison without timezone conversion.
+      // Filter to the selected season to prevent cross-season collisions.
+      const allGames = await db.select().from(games).where(
+        and(eq(games.leagueId, leagueId), eq(games.seasonId, seasonId))
+      );
 
       // Parse CSV
       const fileContent = fs.readFileSync(file.path, 'utf8');
@@ -12326,12 +12344,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const resultType = normaliseResultType(row.resultType || '');
 
-        // Find matching game: same league, home team, away team, and date (day portion of scheduledAt)
+        // Find matching game within the season by home team, away team, and date.
+        // scheduledAt is a league-local string (e.g. "2024-01-15 19:00:00") returned by
+        // Drizzle ORM's mode:'string' — so we compare date portions directly without
+        // any UTC/timezone conversion.
         const matchingGame = allGames.find((g: any) => {
           if (g.homeTeamId !== homeTeamId || g.awayTeamId !== awayTeamId) return false;
-          const gameDateStr = typeof g.scheduledAt === 'string'
-            ? g.scheduledAt.substring(0, 10)
-            : new Date(g.scheduledAt).toISOString().substring(0, 10);
+          const raw = g.scheduledAt as string;
+          const gameDateStr = raw ? raw.substring(0, 10) : '';
           return gameDateStr === dateStr;
         });
 

@@ -672,6 +672,7 @@ export default function LeagueManagement() {
   // Prior season scores import state
   const [showScoresImport, setShowScoresImport] = useState(false);
   const [scoresImportFile, setScoresImportFile] = useState<File | null>(null);
+  const [scoresImportSeasonId, setScoresImportSeasonId] = useState('');
   const [scoresImportResult, setScoresImportResult] = useState<{ updated: number; warnings: string[]; errors: string[]; total: number } | null>(null);
   const scoresFileInputRef = React.useRef<HTMLInputElement>(null);
   
@@ -1825,9 +1826,10 @@ export default function LeagueManagement() {
 
   // Upload mutation for prior-season scores import
   const scoresUploadMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, seasonId }: { file: File; seasonId: string }) => {
       const formData = new FormData();
       formData.append('scoresFile', file);
+      formData.append('seasonId', seasonId);
 
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
@@ -4644,6 +4646,21 @@ export default function LeagueManagement() {
                       </a>
                     </div>
 
+                    <div>
+                      <label className="block text-xs font-medium mb-1 text-muted-foreground">Season *</label>
+                      <select
+                        value={scoresImportSeasonId}
+                        onChange={(e) => { setScoresImportSeasonId(e.target.value); setScoresImportResult(null); }}
+                        className="w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                        data-testid="select-scores-import-season"
+                      >
+                        <option value="">Select a season…</option>
+                        {seasons.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div
                       className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => scoresFileInputRef.current?.click()}
@@ -4674,8 +4691,8 @@ export default function LeagueManagement() {
                     {scoresImportFile && (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => scoresUploadMutation.mutate(scoresImportFile)}
-                          disabled={scoresUploadMutation.isPending}
+                          onClick={() => scoresUploadMutation.mutate({ file: scoresImportFile, seasonId: scoresImportSeasonId })}
+                          disabled={scoresUploadMutation.isPending || !scoresImportSeasonId}
                           className="flex-1 bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                           data-testid="button-upload-scores-file"
                         >
