@@ -12445,6 +12445,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isCompleted: true,
             resultType,
           }).returning();
+          // Mark score as commissioner-verified so it doesn't appear in the
+          // "needs verification" alerts — the commissioner just imported it.
+          await db.insert(gameScoreSubmissions).values({
+            gameId: newGame.id,
+            submittedBy: userId,
+            submitterRole: 'commissioner',
+            homeScore,
+            awayScore,
+            isCommissionerOverride: true,
+          });
           // Add to allGames so duplicate rows in the same CSV don't create duplicates
           allGames.push(newGame);
           updatedCount++;
@@ -12452,6 +12462,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         await storage.updateGameScore(matchingGame.id, homeScore, awayScore, resultType);
+        // Ensure a commissioner override submission exists so the game doesn't
+        // sit in the "needs verification" queue.
+        const existingSub = await db
+          .select({ id: gameScoreSubmissions.id })
+          .from(gameScoreSubmissions)
+          .where(and(
+            eq(gameScoreSubmissions.gameId, matchingGame.id),
+            eq(gameScoreSubmissions.isCommissionerOverride, true)
+          ))
+          .limit(1);
+        if (existingSub.length === 0) {
+          await db.insert(gameScoreSubmissions).values({
+            gameId: matchingGame.id,
+            submittedBy: userId,
+            submitterRole: 'commissioner',
+            homeScore,
+            awayScore,
+            isCommissionerOverride: true,
+          });
+        } else {
+          await db.update(gameScoreSubmissions)
+            .set({ homeScore, awayScore })
+            .where(eq(gameScoreSubmissions.id, existingSub[0].id));
+        }
         updatedCount++;
       }
 
