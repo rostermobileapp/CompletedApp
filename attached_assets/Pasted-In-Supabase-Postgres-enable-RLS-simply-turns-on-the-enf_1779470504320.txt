@@ -1,0 +1,119 @@
+In Supabase/Postgres, “enable RLS” simply turns on the enforcement. Once RLS is enabled, every access (SELECT/INSERT/UPDATE/DELETE) will be denied unless you have matching policies (or you’re using service_role / a role with bypassrls).
+
+What I can do
+Enable RLS across your tables (including those currently missing it), in bulk.
+Then optionally help you create/adjust policies so your app users regain the intended access.
+Quick question (so I don’t break your app)
+Are these tables in the public schema (your API-exposed area), or also in other schemas?
+Do you already have policies written for them—or do you want a “template” policy model (e.g., “users can only access their own rows”)?
+If you confirm the target schemas (start with public if that’s what you mean), I’ll scan the tables and apply the ALTER TABLE ... ENABLE ROW LEVEL SECURITY; changes.
+
+rostermobileapp
+can you give me a list of these tables so I can review them?
+
+
+
+
+Reasoned
+
+Ran list_tables
+Tables in public (for your review)
+Here are the public tables I see right now, along with whether RLS is currently enabled:
+
+announcement_attachments — RLS off
+announcement_poll_votes — off
+announcement_polls — off
+announcement_reactions — off
+announcement_read_status — off
+announcement_visibility — off
+announcements — off
+calendar_events — off
+chat_poll_votes — off
+chat_polls — off
+conversation_participants — off
+conversations — off
+draft_picks — off
+drafts — off
+duty_assignments — off
+duty_templates — off
+event_participants — off
+facilities — off
+facility_memberships — off
+feedback_submissions — off
+game_goalies — off
+game_rsvps — off
+game_score_submissions — off
+game_stars — off
+games — off
+imported_players — off
+imported_schedules — off
+invite_group_members — off
+invite_groups — off
+league_memberships — off
+leagues — off
+line_combination_assignments — off
+line_combinations — off
+message_attachments — off
+messages — off
+payment_request_recipients — off
+payment_requests — off
+personal_reminders — off
+placeholder_players — off
+player_imports — on
+player_merge_requests — off
+player_stats — off
+schedule_imports — on
+scrimmage_invites — off
+scrimmage_requests — off
+scrimmages — off
+seasons — off
+sessions — on
+substitute_requests — off
+substitution_approvals — off
+team_league_requests — off
+team_memberships — off
+teams — off
+typing_indicators — off
+user_online_status — off
+users — off
+visitor_count — off
+user_notifications — off
+tournament_matches — off
+tournament_stats — off
+tournament_teams — off
+tournaments — off
+tournament_participants — off
+game_goals — off
+game_penalties — off
+tournament_photos — off
+league_photos — off
+scrimmage_reminders_sent — off
+notification_preferences — off
+tournament_photo_tags — off
+league_photo_tags — off
+waitlist_signups — off
+scrimmage_co_hosts — off
+event_reminders_sent — off
+duty_exclusions — off
+tournament_match_rsvps — off
+team_events — off
+team_event_rsvps — off
+rsvp_reminders_sent — off
+announcement_comments — off
+user_registration_count — off
+message_read_receipts — off
+onboarding_sport_poll — off
+visitor_locations — on
+tournament_scorekeeper_invites — off
+league_pro_grants — on
+league_pro_seats — on
+draft_buddy_pairs — off
+draft_chat_messages — off
+referral_partners — on
+referral_magic_links — off
+referral_conversions — on
+referral_payouts — off
+referral_settings — off
+referral_user_links — on
+draft_keepers — off
+photo_upload_quota — off
