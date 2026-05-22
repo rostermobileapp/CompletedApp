@@ -4204,6 +4204,19 @@ export class DatabaseStorage implements IStorage {
             inArray(teamMemberships.teamId, leagueTeamIds)
           )
         );
+
+      // If this user was captain of any team in the league, clear that role.
+      // A captain must be a member of the team — removing them from the league
+      // must also vacate the captain slot to avoid the "captain not on roster" state.
+      await db
+        .update(teams)
+        .set({ captainId: null })
+        .where(
+          and(
+            inArray(teams.id, leagueTeamIds),
+            eq(teams.captainId, membership.userId)
+          )
+        );
     }
     
     // Clean up attendance records for this user's games in this league
