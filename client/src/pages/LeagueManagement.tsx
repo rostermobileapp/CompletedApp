@@ -2708,15 +2708,10 @@ export default function LeagueManagement() {
     [seasons],
   );
 
-  // Seasons that are considered "past": explicitly inactive OR end date has passed.
-  // Used for prior-season data import dropdowns.
-  const pastSeasons = React.useMemo(() => {
-    if (!Array.isArray(seasons)) return [];
-    const now = new Date();
-    return seasons.filter((s: Season) =>
-      !s.isActive || (s.endDate != null && new Date(s.endDate) < now)
-    );
-  }, [seasons]);
+  // All seasons available for the prior-data import dropdowns.
+  // We intentionally show every season (not just inactive ones) because a
+  // commissioner may want to back-fill stats/scores for the current season too.
+  const pastSeasons = seasons;
 
   // Open the New Season wizard. Skip the "close current season" step when
   // there is no active season to close.
