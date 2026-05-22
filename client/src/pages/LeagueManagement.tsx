@@ -58,7 +58,8 @@ import {
   Search,
   Zap,
   Snowflake,
-  RotateCcw
+  RotateCcw,
+  BarChart2
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema, type LeagueProGrant, type League } from '@shared/schema';
 
@@ -660,6 +661,19 @@ export default function LeagueManagement() {
   const [showScheduleImport, setShowScheduleImport] = useState(false);
   const [scheduleImportFile, setScheduleImportFile] = useState<File | null>(null);
   const scheduleFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Prior season stats import state
+  const [showStatsImport, setShowStatsImport] = useState(false);
+  const [statsImportFile, setStatsImportFile] = useState<File | null>(null);
+  const [statsImportSeasonId, setStatsImportSeasonId] = useState('');
+  const [statsImportResult, setStatsImportResult] = useState<{ imported: number; warnings: string[]; errors: string[]; total: number } | null>(null);
+  const statsFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Prior season scores import state
+  const [showScoresImport, setShowScoresImport] = useState(false);
+  const [scoresImportFile, setScoresImportFile] = useState<File | null>(null);
+  const [scoresImportResult, setScoresImportResult] = useState<{ updated: number; warnings: string[]; errors: string[]; total: number } | null>(null);
+  const scoresFileInputRef = React.useRef<HTMLInputElement>(null);
   
   // Games list scroll refs
   const gamesListDesktopRef = React.useRef<HTMLDivElement>(null);
@@ -1767,6 +1781,87 @@ export default function LeagueManagement() {
     if (!scheduleImportFile) return;
     scheduleUploadMutation.mutate(scheduleImportFile);
   };
+
+  // Upload mutation for prior-season stats import
+  const statsUploadMutation = useMutation({
+    mutationFn: async ({ file, seasonId }: { file: File; seasonId: string }) => {
+      const formData = new FormData();
+      formData.append('statsFile', file);
+      formData.append('seasonId', seasonId);
+
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${API_BASE_URL}/api/leagues/${leagueId}/stats/import`, {
+        method: 'POST', headers, body: formData,
+      });
+
+      if (!response.ok) {
+        let msg = 'Stats upload failed';
+        try { const e = await response.json(); msg = e.message || msg; } catch {}
+        throw new Error(msg);
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setStatsImportResult(data);
+      setStatsImportFile(null);
+      if (statsFileInputRef.current) statsFileInputRef.current.value = '';
+      const parts = [
+        `${data.imported} player stat${data.imported !== 1 ? 's' : ''} imported`,
+        data.warnings?.length > 0 ? `${data.warnings.length} unmatched` : null,
+        data.errors?.length > 0 ? `${data.errors.length} errors` : null,
+      ].filter(Boolean).join(', ');
+      toast({ title: data.imported > 0 ? 'Stats Imported' : 'Stats Import Complete', description: parts });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Stats Import Failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Upload mutation for prior-season scores import
+  const scoresUploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('scoresFile', file);
+
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${API_BASE_URL}/api/leagues/${leagueId}/scores/import`, {
+        method: 'POST', headers, body: formData,
+      });
+
+      if (!response.ok) {
+        let msg = 'Scores upload failed';
+        try { const e = await response.json(); msg = e.message || msg; } catch {}
+        throw new Error(msg);
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setScoresImportResult(data);
+      setScoresImportFile(null);
+      if (scoresFileInputRef.current) scoresFileInputRef.current.value = '';
+      const parts = [
+        `${data.updated} game score${data.updated !== 1 ? 's' : ''} updated`,
+        data.warnings?.length > 0 ? `${data.warnings.length} unmatched` : null,
+        data.errors?.length > 0 ? `${data.errors.length} errors` : null,
+      ].filter(Boolean).join(', ');
+      toast({ title: data.updated > 0 ? 'Scores Imported' : 'Scores Import Complete', description: parts });
+      refetchGames();
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Scores Import Failed', description: error.message, variant: 'destructive' });
+    },
+  });
 
   // Mutation for manual player addition
   const manualAddPlayerMutation = useMutation({
@@ -3295,6 +3390,134 @@ export default function LeagueManagement() {
               </div>
             )}
 
+            {/* Prior Season Stats Import */}
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Prior Season Stats</span>
+              </div>
+              <button
+                onClick={() => { setShowStatsImport(!showStatsImport); setStatsImportResult(null); }}
+                disabled={seasons.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 bg-muted text-foreground border border-border rounded-md hover:bg-muted/80 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                data-testid="button-import-stats"
+              >
+                <Upload className="w-3 h-3" />
+                Import Stats
+              </button>
+            </div>
+
+            {showStatsImport && (
+              <div className="p-4 bg-card rounded-lg hairline elev-rest">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <p className="text-sm text-muted-foreground">
+                      Upload prior season stats (Goals, Assists, Games Played, PIM) for existing league members.
+                    </p>
+                    <a
+                      href="/prior-stats-import-template.csv"
+                      download="prior-stats-import-template.csv"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm shrink-0 ml-3"
+                      data-testid="button-download-stats-template"
+                    >
+                      <Download className="w-3 h-3" />
+                      Template
+                    </a>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-muted-foreground">Season *</label>
+                    <select
+                      value={statsImportSeasonId}
+                      onChange={(e) => setStatsImportSeasonId(e.target.value)}
+                      className="w-full p-2 bg-background hairline elev-inset rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      data-testid="select-stats-season"
+                    >
+                      <option value="">Select a season…</option>
+                      {seasons.map((s: Season) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div
+                    className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => statsFileInputRef.current?.click()}
+                    data-testid="stats-file-drop-zone"
+                  >
+                    <FileText className="w-7 h-7 text-muted-foreground mx-auto mb-1" />
+                    {statsImportFile ? (
+                      <div>
+                        <p className="font-medium text-green-600 text-sm">{statsImportFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(statsImportFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="font-medium text-sm mb-0.5">Select CSV file</p>
+                        <p className="text-xs text-muted-foreground">Columns: First Name, Last Name, Goals, Assists, Games Played, Penalty Minutes</p>
+                      </div>
+                    )}
+                    <input
+                      ref={statsFileInputRef}
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => { setStatsImportFile(e.target.files?.[0] || null); setStatsImportResult(null); }}
+                      className="hidden"
+                      data-testid="stats-file-input"
+                    />
+                  </div>
+
+                  {statsImportFile && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (!statsImportSeasonId) {
+                            toast({ title: 'Season Required', description: 'Please select a season before importing stats.', variant: 'destructive' });
+                            return;
+                          }
+                          statsUploadMutation.mutate({ file: statsImportFile, seasonId: statsImportSeasonId });
+                        }}
+                        disabled={statsUploadMutation.isPending || !statsImportSeasonId}
+                        className="flex-1 bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid="button-upload-stats-file"
+                      >
+                        {statsUploadMutation.isPending ? 'Processing…' : 'Upload Stats'}
+                      </button>
+                      <button
+                        onClick={() => { setStatsImportFile(null); if (statsFileInputRef.current) statsFileInputRef.current.value = ''; setStatsImportResult(null); }}
+                        className="px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
+                        data-testid="button-clear-stats-file"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+
+                  {statsImportResult && (
+                    <div className="mt-1 space-y-2 text-sm">
+                      <p className="font-medium text-green-600">{statsImportResult.imported} of {statsImportResult.total} rows imported.</p>
+                      {statsImportResult.warnings.length > 0 && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-amber-600 font-medium">{statsImportResult.warnings.length} unmatched player{statsImportResult.warnings.length !== 1 ? 's' : ''}</summary>
+                          <ul className="mt-1 pl-3 list-disc space-y-0.5 text-muted-foreground">
+                            {statsImportResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                          </ul>
+                        </details>
+                      )}
+                      {statsImportResult.errors.length > 0 && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-red-500 font-medium">{statsImportResult.errors.length} error{statsImportResult.errors.length !== 1 ? 's' : ''}</summary>
+                          <ul className="mt-1 pl-3 list-disc space-y-0.5 text-muted-foreground">
+                            {statsImportResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Manual Add Player Modal */}
             {showManualAddPlayer && (
               <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -4380,6 +4603,113 @@ export default function LeagueManagement() {
                         >
                           Clear
                         </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Prior Season Scores Import */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Prior Season Scores</span>
+                </div>
+                <button
+                  onClick={() => { setShowScoresImport(!showScoresImport); setScoresImportResult(null); }}
+                  disabled={seasons.length === 0}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-muted text-foreground border border-border rounded-md hover:bg-muted/80 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  data-testid="button-import-scores"
+                >
+                  <Upload className="w-3 h-3" />
+                  Import Scores
+                </button>
+              </div>
+
+              {showScoresImport && (
+                <div className="mb-4 p-4 bg-card rounded-lg hairline elev-rest">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <p className="text-sm text-muted-foreground">
+                        Update scores on existing games from a prior season. Games must already be scheduled.
+                      </p>
+                      <a
+                        href="/prior-scores-import-template.csv"
+                        download="prior-scores-import-template.csv"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm shrink-0 ml-3"
+                        data-testid="button-download-scores-template"
+                      >
+                        <Download className="w-3 h-3" />
+                        Template
+                      </a>
+                    </div>
+
+                    <div
+                      className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => scoresFileInputRef.current?.click()}
+                      data-testid="scores-file-drop-zone"
+                    >
+                      <FileText className="w-7 h-7 text-muted-foreground mx-auto mb-1" />
+                      {scoresImportFile ? (
+                        <div>
+                          <p className="font-medium text-green-600 text-sm">{scoresImportFile.name}</p>
+                          <p className="text-xs text-muted-foreground">{(scoresImportFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="font-medium text-sm mb-0.5">Select CSV file</p>
+                          <p className="text-xs text-muted-foreground">Columns: Date, Home Team, Away Team, Home Score, Away Score, Result Type (optional)</p>
+                        </div>
+                      )}
+                      <input
+                        ref={scoresFileInputRef}
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => { setScoresImportFile(e.target.files?.[0] || null); setScoresImportResult(null); }}
+                        className="hidden"
+                        data-testid="scores-file-input"
+                      />
+                    </div>
+
+                    {scoresImportFile && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => scoresUploadMutation.mutate(scoresImportFile)}
+                          disabled={scoresUploadMutation.isPending}
+                          className="flex-1 bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          data-testid="button-upload-scores-file"
+                        >
+                          {scoresUploadMutation.isPending ? 'Processing…' : 'Upload Scores'}
+                        </button>
+                        <button
+                          onClick={() => { setScoresImportFile(null); if (scoresFileInputRef.current) scoresFileInputRef.current.value = ''; setScoresImportResult(null); }}
+                          className="px-3 py-1.5 border border-border rounded-md hover:bg-muted text-sm"
+                          data-testid="button-clear-scores-file"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+
+                    {scoresImportResult && (
+                      <div className="mt-1 space-y-2 text-sm">
+                        <p className="font-medium text-green-600">{scoresImportResult.updated} of {scoresImportResult.total} game scores updated.</p>
+                        {scoresImportResult.warnings.length > 0 && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-amber-600 font-medium">{scoresImportResult.warnings.length} unmatched game{scoresImportResult.warnings.length !== 1 ? 's' : ''}</summary>
+                            <ul className="mt-1 pl-3 list-disc space-y-0.5 text-muted-foreground">
+                              {scoresImportResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                            </ul>
+                          </details>
+                        )}
+                        {scoresImportResult.errors.length > 0 && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-red-500 font-medium">{scoresImportResult.errors.length} error{scoresImportResult.errors.length !== 1 ? 's' : ''}</summary>
+                            <ul className="mt-1 pl-3 list-disc space-y-0.5 text-muted-foreground">
+                              {scoresImportResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                            </ul>
+                          </details>
+                        )}
                       </div>
                     )}
                   </div>

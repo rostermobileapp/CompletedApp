@@ -12050,6 +12050,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================
+  // PRIOR SEASON STATS IMPORT
+  // POST /api/leagues/:leagueId/stats/import
+  // CSV columns: First Name, Last Name, Goals, Assists, Games Played, Penalty Minutes
+  // Form field: seasonId (required)
+  // ============================================================
+  app.post('/api/leagues/:leagueId/stats/import', isAuthenticated, (req: any, res, next) => {
+    upload.single('statsFile')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+      const seasonId = req.body.seasonId || null;
+
+      if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) {
+        fs.unlinkSync(file.path);
+        return res.status(403).json({ message: 'Only commissioners can import stats' });
+      }
+
+      if (!seasonId) {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({ message: 'A season must be selected for stats import' });
+      }
+
+      // Verify season belongs to this league
+      const leagueSeasons = await storage.getSeasonsByLeague(leagueId);
+      const targetSeason = leagueSeasons.find(s => s.id === seasonId);
+      if (!targetSeason) {
+        fs.unlinkSync(file.path);
+        return res.status(400).json({ message: 'Season not found in this league' });
+      }
+
+      // Load all approved league members for name matching
+      const leagueMembers = await storage.getLeagueMembers(leagueId);
+
+      // Build lookup: "firstname lastname" (lowercased) -> userId
+      const playerLookup = new Map<string, string>();
+      leagueMembers.forEach((m: any) => {
+        const u = m.user || {};
+        const dispFirst = (m.displayFirstName || u.firstName || '').toLowerCase().trim();
+        const dispLast  = (m.displayLastName  || u.lastName  || '').toLowerCase().trim();
+        const realFirst = (u.firstName || '').toLowerCase().trim();
+        const realLast  = (u.lastName  || '').toLowerCase().trim();
+        if (dispFirst && dispLast) playerLookup.set(`${dispFirst} ${dispLast}`, m.userId);
+        if (realFirst && realLast) playerLookup.set(`${realFirst} ${realLast}`, m.userId);
+      });
+
+      // Parse CSV
+      const fileContent = fs.readFileSync(file.path, 'utf8');
+      fs.unlinkSync(file.path);
+
+      const parseResults = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => {
+          const n = header.toLowerCase().trim();
+          const map: Record<string, string> = {
+            'first name': 'firstName', 'firstname': 'firstName', 'first': 'firstName',
+            'last name': 'lastName',  'lastname': 'lastName',   'last': 'lastName',
+            'full name': 'fullName',  'name': 'fullName', 'player': 'fullName', 'player name': 'fullName',
+            'goals': 'goals', 'g': 'goals',
+            'assists': 'assists', 'a': 'assists',
+            'games played': 'gamesPlayed', 'gp': 'gamesPlayed', 'games': 'gamesPlayed',
+            'penalty minutes': 'penaltyMinutes', 'pim': 'penaltyMinutes', 'pims': 'penaltyMinutes',
+          };
+          return map[n] || header;
+        },
+      });
+
+      if (parseResults.errors.length > 0 && parseResults.data.length === 0) {
+        return res.status(400).json({ message: 'Error parsing CSV file', errors: parseResults.errors.map((e: any) => e.message) });
+      }
+
+      let importedCount = 0;
+      const warnings: string[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < parseResults.data.length; i++) {
+        const row = parseResults.data[i] as any;
+        const rowNum = i + 2;
+
+        // Resolve first/last name
+        let firstName = (row.firstName || '').trim();
+        let lastName  = (row.lastName  || '').trim();
+        if (!firstName && !lastName && row.fullName) {
+          const parts = (row.fullName as string).trim().split(/\s+/);
+          firstName = parts[0] || '';
+          lastName  = parts.slice(1).join(' ') || '';
+        }
+        if (!firstName || !lastName) {
+          errors.push(`Row ${rowNum}: Missing player name — skipped`);
+          continue;
+        }
+
+        const lookupKey = `${firstName.toLowerCase()} ${lastName.toLowerCase()}`;
+        const matchedUserId = playerLookup.get(lookupKey);
+        if (!matchedUserId) {
+          warnings.push(`Row ${rowNum}: No league member matched "${firstName} ${lastName}" — skipped`);
+          continue;
+        }
+
+        const goals          = Math.max(0, parseInt(row.goals          || '0', 10) || 0);
+        const assists        = Math.max(0, parseInt(row.assists        || '0', 10) || 0);
+        const gamesPlayed    = Math.max(0, parseInt(row.gamesPlayed    || '0', 10) || 0);
+        const penaltyMinutes = Math.max(0, parseInt(row.penaltyMinutes || '0', 10) || 0);
+
+        await db.insert(playerStats)
+          .values({ userId: matchedUserId, leagueId, seasonId, goals, assists, gamesPlayed, penaltyMinutes })
+          .onConflictDoUpdate({
+            target: [playerStats.userId, playerStats.leagueId, playerStats.seasonId],
+            set: { goals, assists, gamesPlayed, penaltyMinutes, updatedAt: new Date() },
+          });
+
+        importedCount++;
+      }
+
+      res.json({ imported: importedCount, warnings, errors, total: parseResults.data.length });
+    } catch (error) {
+      console.error('Error importing stats:', error);
+      if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch {} }
+      res.status(500).json({ message: 'Failed to import stats' });
+    }
+  });
+
+  // ============================================================
+  // PRIOR SEASON SCORES IMPORT
+  // POST /api/leagues/:leagueId/scores/import
+  // CSV columns: Date, Home Team, Away Team, Home Score, Away Score, Result Type (optional)
+  // Matches pre-existing games and updates their scores
+  // ============================================================
+  app.post('/api/leagues/:leagueId/scores/import', isAuthenticated, (req: any, res, next) => {
+    upload.single('scoresFile')(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+          return res.status(400).json({ message: err.message });
+        }
+        return res.status(400).json({ message: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
+    try {
+      const { leagueId } = req.params;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+
+      if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) {
+        fs.unlinkSync(file.path);
+        return res.status(403).json({ message: 'Only commissioners can import scores' });
+      }
+
+      // Load all games for this league so we can match by date + team names
+      const allGames = await storage.getGamesByLeague(leagueId);
+
+      // Build team-name lookup from the games data: lowercase name -> teamId
+      const teamNameToId = new Map<string, string>();
+      allGames.forEach((g: any) => {
+        if (g.homeTeam?.name) teamNameToId.set(g.homeTeam.name.toLowerCase().trim(), g.homeTeamId);
+        if (g.awayTeam?.name) teamNameToId.set(g.awayTeam.name.toLowerCase().trim(), g.awayTeamId);
+      });
+
+      // Parse CSV
+      const fileContent = fs.readFileSync(file.path, 'utf8');
+      fs.unlinkSync(file.path);
+
+      const parseResults = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => {
+          const n = header.toLowerCase().trim();
+          const map: Record<string, string> = {
+            'date': 'date',
+            'home team': 'homeTeam', 'home': 'homeTeam',
+            'away team': 'awayTeam', 'away': 'awayTeam', 'visitor': 'awayTeam', 'visiting team': 'awayTeam',
+            'home score': 'homeScore', 'home goals': 'homeScore', 'h score': 'homeScore',
+            'away score': 'awayScore', 'away goals': 'awayScore', 'a score': 'awayScore', 'visitor score': 'awayScore',
+            'result type': 'resultType', 'result': 'resultType', 'type': 'resultType', 'ot/so': 'resultType',
+          };
+          return map[n] || header;
+        },
+      });
+
+      if (parseResults.errors.length > 0 && parseResults.data.length === 0) {
+        return res.status(400).json({ message: 'Error parsing CSV file', errors: parseResults.errors.map((e: any) => e.message) });
+      }
+
+      let updatedCount = 0;
+      const warnings: string[] = [];
+      const errors: string[] = [];
+
+      // Helper: parse a date string to YYYY-MM-DD local
+      const parseDateStr = (dateStr: string): string | null => {
+        if (!dateStr) return null;
+        dateStr = dateStr.trim();
+        let year: number, month: number, day: number;
+        if (dateStr.includes('-')) {
+          const parts = dateStr.split('-');
+          if (parts[0].length === 4) {
+            year = parseInt(parts[0], 10); month = parseInt(parts[1], 10); day = parseInt(parts[2], 10);
+          } else {
+            month = parseInt(parts[0], 10); day = parseInt(parts[1], 10); year = parseInt(parts[2], 10);
+          }
+        } else if (dateStr.includes('/')) {
+          const parts = dateStr.split('/');
+          month = parseInt(parts[0], 10); day = parseInt(parts[1], 10); year = parseInt(parts[2], 10);
+        } else {
+          return null;
+        }
+        if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      };
+
+      // Normalise result type alias
+      const normaliseResultType = (raw: string): 'regulation' | 'overtime' | 'shootout' => {
+        const r = (raw || '').toLowerCase().trim();
+        if (r === 'ot' || r === 'overtime' || r === 'o/t') return 'overtime';
+        if (r === 'so' || r === 'shootout' || r === 's/o') return 'shootout';
+        return 'regulation';
+      };
+
+      for (let i = 0; i < parseResults.data.length; i++) {
+        const row = parseResults.data[i] as any;
+        const rowNum = i + 2;
+
+        const dateStr = parseDateStr(row.date || '');
+        if (!dateStr) {
+          errors.push(`Row ${rowNum}: Missing or unrecognised date "${row.date}" — skipped`);
+          continue;
+        }
+
+        const homeTeamName = (row.homeTeam || '').trim();
+        const awayTeamName = (row.awayTeam || '').trim();
+        if (!homeTeamName || !awayTeamName) {
+          errors.push(`Row ${rowNum}: Missing home or away team name — skipped`);
+          continue;
+        }
+
+        const homeTeamId = teamNameToId.get(homeTeamName.toLowerCase());
+        const awayTeamId = teamNameToId.get(awayTeamName.toLowerCase());
+        if (!homeTeamId) {
+          warnings.push(`Row ${rowNum}: No team found matching home team "${homeTeamName}" — skipped`);
+          continue;
+        }
+        if (!awayTeamId) {
+          warnings.push(`Row ${rowNum}: No team found matching away team "${awayTeamName}" — skipped`);
+          continue;
+        }
+
+        const homeScore = parseInt(row.homeScore, 10);
+        const awayScore = parseInt(row.awayScore, 10);
+        if (isNaN(homeScore) || isNaN(awayScore)) {
+          errors.push(`Row ${rowNum}: Invalid score values (home="${row.homeScore}", away="${row.awayScore}") — skipped`);
+          continue;
+        }
+
+        const resultType = normaliseResultType(row.resultType || '');
+
+        // Find matching game: same league, home team, away team, and date (day portion of scheduledAt)
+        const matchingGame = allGames.find((g: any) => {
+          if (g.homeTeamId !== homeTeamId || g.awayTeamId !== awayTeamId) return false;
+          const gameDateStr = typeof g.scheduledAt === 'string'
+            ? g.scheduledAt.substring(0, 10)
+            : new Date(g.scheduledAt).toISOString().substring(0, 10);
+          return gameDateStr === dateStr;
+        });
+
+        if (!matchingGame) {
+          warnings.push(`Row ${rowNum}: No game found for ${homeTeamName} vs ${awayTeamName} on ${dateStr} — skipped`);
+          continue;
+        }
+
+        await storage.updateGameScore(matchingGame.id, homeScore, awayScore, resultType);
+        updatedCount++;
+      }
+
+      res.json({ updated: updatedCount, warnings, errors, total: parseResults.data.length });
+    } catch (error) {
+      console.error('Error importing scores:', error);
+      if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch {} }
+      res.status(500).json({ message: 'Failed to import scores' });
+    }
+  });
+
   // Find potential merge matches for a player
   app.get('/api/leagues/:leagueId/imported-players/matches', isAuthenticated, async (req: any, res) => {
     try {
