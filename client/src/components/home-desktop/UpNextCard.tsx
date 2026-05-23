@@ -38,7 +38,7 @@ interface UpcomingItem {
 }
 
 export function UpNextCard({
-  effectiveLeagueId: _effectiveLeagueId,
+  effectiveLeagueId,
   selectedTeamId,
   userTeamIds,
   isLeagueScope = false,
@@ -47,60 +47,79 @@ export function UpNextCard({
 }: UpNextCardProps) {
   const [, navigate] = useLocation();
 
-  const { data: upcoming, isLoading } = useQuery<UpcomingItem[]>({
+  const { data: upcoming, isLoading: upcomingLoading } = useQuery<UpcomingItem[]>({
     queryKey: ['/api/user/games/upcoming'],
     staleTime: 30_000,
   });
 
+  // When a league is selected, also fetch ALL league games so commissioners
+  // (who may have no team) can still see the next game in the league.
+  const { data: leagueGames, isLoading: leagueLoading } = useQuery<UpcomingItem[]>({
+    queryKey: ['/api/leagues', effectiveLeagueId, 'games'],
+    enabled: isLeagueScope && !!effectiveLeagueId,
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const isLoading = upcomingLoading || (isLeagueScope && leagueLoading);
+
   // Pick the next non-completed game (prefer real games over scrimmages but
   // the API already returns chronological order, so use first non-completed).
   const nextGame = (() => {
-    if (!Array.isArray(upcoming)) return null;
     const now = Date.now();
-    const eligible = upcoming.filter((g) => {
-      if (g.isCompleted) return false;
-      const t = new Date(g.scheduledAt).getTime();
-      if (Number.isNaN(t)) return false;
-      // Show items up to 2 hours after scheduled start
-      return t + 2 * 60 * 60 * 1000 >= now;
-    });
+
+    const makeEligible = (list: UpcomingItem[] | undefined) => {
+      if (!Array.isArray(list)) return [];
+      return list.filter((g) => {
+        if (g.isCompleted) return false;
+        const t = new Date(g.scheduledAt).getTime();
+        if (Number.isNaN(t)) return false;
+        return t + 2 * 60 * 60 * 1000 >= now;
+      });
+    };
+
+    const eligible = makeEligible(upcoming);
 
     // Tournament scope: only show this tournament's matches.
     if (selectedTournamentId) {
-      const tournamentGame = eligible.find(
-        (g) => g.tournamentId === selectedTournamentId,
-      );
-      return tournamentGame || null;
+      return eligible.find((g) => g.tournamentId === selectedTournamentId) || null;
     }
 
-    // Strict team scope: when a team is selected, only show that team's
-    // upcoming games. Never fall through to other teams' games.
+    // Strict team scope: when a team is selected, only show that team's games.
     if (selectedTeamId) {
-      const teamGame = eligible.find(
+      return eligible.find(
         (g) =>
           g.homeTeam?.id === selectedTeamId ||
           g.awayTeam?.id === selectedTeamId ||
           g.homeTeamId === selectedTeamId ||
           g.awayTeamId === selectedTeamId,
-      );
-      return teamGame || null;
+      ) || null;
     }
 
-    // If a league is selected (not a specific team), restrict to games
-    // involving the user's teams in that league.
-    // If the user has no teams in the selected league (e.g. commissioner-only),
-    // return null rather than falling through to games from other leagues.
     if (isLeagueScope) {
-      if (!Array.isArray(leagueTeamIds) || !leagueTeamIds.length) return null;
-      const set = new Set(leagueTeamIds);
-      const leagueGame = eligible.find(
-        (g) =>
-          (g.homeTeam?.id && set.has(g.homeTeam.id)) ||
-          (g.awayTeam?.id && set.has(g.awayTeam.id)) ||
-          (g.homeTeamId && set.has(g.homeTeamId)) ||
-          (g.awayTeamId && set.has(g.awayTeamId)),
+      // When the user has teams in the league, prefer their next playing game.
+      if (Array.isArray(leagueTeamIds) && leagueTeamIds.length) {
+        const set = new Set(leagueTeamIds);
+        const teamGame = eligible.find(
+          (g) =>
+            (g.homeTeam?.id && set.has(g.homeTeam.id)) ||
+            (g.awayTeam?.id && set.has(g.awayTeam.id)) ||
+            (g.homeTeamId && set.has(g.homeTeamId)) ||
+            (g.awayTeamId && set.has(g.awayTeamId)),
+        );
+        if (teamGame) return teamGame;
+      }
+
+      // Commissioner-only (or no team game found): show next scheduled
+      // game in the league, sorted ascending by scheduledAt.
+      const leagueEligible = makeEligible(leagueGames).sort(
+        (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
       );
-      return leagueGame || null;
+      return leagueEligible[0] || null;
     }
 
     return eligible[0] || null;
