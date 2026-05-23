@@ -1124,8 +1124,13 @@ export default function LeagueManagement() {
           (m.seasonId == null && selectedSeasonId === firstCreatedSeasonId)
         );
       }
-      // Real member: show if unassigned, or assigned to a team in this season
-      return !m.assignedTeamId || seasonTeamIds.has(m.assignedTeamId);
+      // Real member: if assigned to a team, show only in that team's season.
+      // If unassigned (no team), anchor to the first-created season — same
+      // legacy rule as teams/games — so they don't bleed into every season.
+      if (m.assignedTeamId) {
+        return seasonTeamIds.has(m.assignedTeamId);
+      }
+      return selectedSeasonId === firstCreatedSeasonId;
     });
   }, [members, selectedSeasonId, allTeams, firstCreatedSeasonId]);
 
