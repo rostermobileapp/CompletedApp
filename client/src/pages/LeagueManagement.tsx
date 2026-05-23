@@ -3829,9 +3829,9 @@ export default function LeagueManagement() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <UserCheck className="w-5 h-5 text-green-500/50" />
-                  <h3 className="text-lg font-semibold">League Members ({members.length})</h3>
+                  <h3 className="text-lg font-semibold">League Members ({commissionerDisplayMembers.length})</h3>
                 </div>
-                {members.length > 0 && (
+                {commissionerDisplayMembers.length > 0 && (
                   <button
                     onClick={() => setShowDeleteAllPlayersDialog(true)}
                     className="flex items-center gap-2 px-3 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors"
@@ -3853,11 +3853,11 @@ export default function LeagueManagement() {
                   data-testid="input-member-search"
                 />
               </div>
-              {members.length === 0 ? (
+              {commissionerDisplayMembers.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No approved members yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {members.filter((member: LeagueMember) => {
+                  {commissionerDisplayMembers.filter((member: LeagueMember) => {
                     if (!memberSearch.trim()) return true;
                     const searchLower = memberSearch.toLowerCase().trim();
                     const displayName = formatUserName(member.user, member).toLowerCase();
