@@ -89,6 +89,12 @@ export function ScheduleCalendar({
   const events = useMemo<ScheduleEvent[]>(() => {
     const out: ScheduleEvent[] = [];
 
+    // When a league is selected but the user has no teams in it (e.g.
+    // commissioner-only), leagueScopeSet will be null and leagueScopeEmpty
+    // will be true. Games must be skipped in that case so we don't fall
+    // through to showing all user games from other leagues.
+    const leagueScopeEmpty =
+      isLeagueScope && (!Array.isArray(leagueTeamIds) || !leagueTeamIds.length);
     const leagueScopeSet =
       isLeagueScope && Array.isArray(leagueTeamIds) && leagueTeamIds.length
         ? new Set(leagueTeamIds)
@@ -114,6 +120,10 @@ export function ScheduleCalendar({
             g.awayTeamId === selectedTeamId ||
             g.isScrimmage; // keep scrimmages visible
           if (!myMatch) continue;
+        } else if (leagueScopeEmpty) {
+          // League selected but user has no teams in it — skip all games so
+          // we don't show items from other leagues (fallthrough bug).
+          continue;
         } else if (leagueScopeSet) {
           // League-scope: only show games involving a user-team in this league.
           // Keep scrimmages visible since they aren't strictly league-bound.
@@ -159,7 +169,7 @@ export function ScheduleCalendar({
 
     // Tournaments don't have league/team events — skip the team-events stream
     // entirely so the calendar only shows the bracket matches.
-    if (!selectedTournamentId && Array.isArray(rawTeamEvents)) {
+    if (!selectedTournamentId && !leagueScopeEmpty && Array.isArray(rawTeamEvents)) {
       for (const e of rawTeamEvents) {
         if (!e?.scheduledAt) continue;
         const d = new Date(e.scheduledAt);

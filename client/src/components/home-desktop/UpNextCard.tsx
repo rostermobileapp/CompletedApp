@@ -88,7 +88,10 @@ export function UpNextCard({
 
     // If a league is selected (not a specific team), restrict to games
     // involving the user's teams in that league.
-    if (isLeagueScope && Array.isArray(leagueTeamIds) && leagueTeamIds.length) {
+    // If the user has no teams in the selected league (e.g. commissioner-only),
+    // return null rather than falling through to games from other leagues.
+    if (isLeagueScope) {
+      if (!Array.isArray(leagueTeamIds) || !leagueTeamIds.length) return null;
       const set = new Set(leagueTeamIds);
       const leagueGame = eligible.find(
         (g) =>
@@ -97,8 +100,7 @@ export function UpNextCard({
           (g.homeTeamId && set.has(g.homeTeamId)) ||
           (g.awayTeamId && set.has(g.awayTeamId)),
       );
-      if (leagueGame) return leagueGame;
-      return null;
+      return leagueGame || null;
     }
 
     return eligible[0] || null;
