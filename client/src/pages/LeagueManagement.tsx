@@ -953,9 +953,6 @@ export default function LeagueManagement() {
     enabled: !!leagueId,
   });
 
-  // Use all members - no filtering needed, placeholders will be merged with real users
-  const commissionerDisplayMembers: LeagueMember[] = Array.isArray(members) ? members : [];
-
   // Fetch pending members
   const { data: pendingMembers = [], refetch: refetchPending } = useQuery({
     queryKey: ['/api/leagues', leagueId, 'pending-members'],
@@ -1091,10 +1088,41 @@ export default function LeagueManagement() {
     return allTeams.filter((t: any) => t.seasonId === selectedSeasonId || t.seasonId == null);
   }, [allTeams, selectedSeasonId]);
 
+  // Scope members to the currently-selected season.
+  // - Real league members (no seasonId on leagueMemberships) are shown when they are
+  //   assigned to a team that belongs to this season, OR have no team assignment at all.
+  // - Placeholder players carry a seasonId and are shown only when it matches the
+  //   selected season (or is null, meaning legacy / season-agnostic).
+  // When no season is selected yet, all members are returned unchanged.
+  const commissionerDisplayMembers: LeagueMember[] = React.useMemo(() => {
+    const all: LeagueMember[] = Array.isArray(members) ? members : [];
+    if (!selectedSeasonId) return all;
+
+    // Build a fast lookup of team IDs that belong to the selected season
+    // (season-specific teams + legacy null-seasonId teams).
+    const seasonTeamIds = new Set(
+      allTeams
+        .filter((t: any) => t.seasonId === selectedSeasonId || t.seasonId == null)
+        .map((t: any) => t.id)
+    );
+
+    return all.filter((m: any) => {
+      if (m.isPlaceholderPlayer) {
+        // Placeholder: show if seasonId matches the selected season or is null (legacy)
+        return m.seasonId === selectedSeasonId || m.seasonId == null;
+      }
+      // Real member: show if unassigned, or assigned to a team in this season
+      return !m.assignedTeamId || seasonTeamIds.has(m.assignedTeamId);
+    });
+  }, [members, selectedSeasonId, allTeams]);
+
   // Scope and sort games to the currently-selected season.
+  // Games without a seasonId (legacy pre-seasons data) are surfaced in every
+  // season view so commissioners can still see/manage them — mirrors the same
+  // null-fallback used for the teams filter above.
   const games = React.useMemo(() => {
     const scoped = selectedSeasonId
-      ? allGamesData.filter((g: any) => g.seasonId === selectedSeasonId)
+      ? allGamesData.filter((g: any) => g.seasonId === selectedSeasonId || g.seasonId == null)
       : allGamesData;
     return [...scoped].sort((a, b) => {
       const dateA = new Date(a.scheduledAt);

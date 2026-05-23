@@ -5944,6 +5944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: `placeholder:${ph.id}`,
         userId: `placeholder:${ph.id}`,
         leagueId,
+        seasonId: ph.seasonId ?? null,
         skillLevel: ph.skillLevel ?? null,
         status: 'placeholder',
         assignedTeamId: ph.teamId ?? undefined,
