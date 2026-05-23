@@ -180,12 +180,14 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
               effectiveLeagueId={effectiveLeagueId}
               seasonId={activeSeason?.id || null}
               seasonLabel={seasonLabel}
+              seasons={seasons ?? undefined}
             />
             <StandingsTable
               effectiveLeagueId={effectiveLeagueId}
               userTeamIdsInLeague={userTeamIdsInLeague}
               seasonLabel={seasonLabel}
               seasonId={effectiveSeasonId}
+              seasons={seasons ?? undefined}
             />
           </div>
         )}

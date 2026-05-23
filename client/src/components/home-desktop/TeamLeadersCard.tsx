@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -12,6 +12,8 @@ interface TeamLeadersCardProps {
   effectiveLeagueId?: string | null;
   seasonId?: string | null;
   seasonLabel?: string;
+  /** Full list of seasons for this league (passed from HomeDesktop to avoid refetch). */
+  seasons?: any[];
 }
 
 interface SkaterStat {
@@ -39,10 +41,21 @@ export function TeamLeadersCard({
   effectiveLeagueId,
   seasonId,
   seasonLabel,
+  seasons,
 }: TeamLeadersCardProps) {
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<'season' | 'playoffs'>('season');
+
+  // Allow user to pick a prior season; default to whatever the parent passes in.
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(
+    seasonId ?? null,
+  );
+
+  // Re-sync when parent season or league changes.
+  useEffect(() => {
+    setSelectedSeasonId(seasonId ?? null);
+  }, [seasonId, effectiveLeagueId]);
 
   const isLocked = !canAccessPremiumFeatures();
 
@@ -51,12 +64,12 @@ export function TeamLeadersCard({
       '/api/leagues',
       effectiveLeagueId,
       'stats',
-      { seasonId: seasonId || undefined, playerType: 'non-goalies' },
+      { seasonId: selectedSeasonId || undefined, playerType: 'non-goalies' },
     ],
     enabled: !!effectiveLeagueId && !isLocked && mode === 'season',
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (seasonId) params.append('seasonId', seasonId);
+      if (selectedSeasonId) params.append('seasonId', selectedSeasonId);
       params.append('playerType', 'non-goalies');
       const res = await apiRequest(
         'GET',
@@ -72,12 +85,12 @@ export function TeamLeadersCard({
       '/api/leagues',
       effectiveLeagueId,
       'playoff-stats',
-      { seasonId: seasonId || undefined },
+      { seasonId: selectedSeasonId || undefined },
     ],
     enabled: !!effectiveLeagueId && !isLocked && mode === 'playoffs',
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (seasonId) params.append('seasonId', seasonId);
+      if (selectedSeasonId) params.append('seasonId', selectedSeasonId);
       const res = await apiRequest(
         'GET',
         `/api/leagues/${effectiveLeagueId}/playoff-stats?${params.toString()}`,
@@ -101,8 +114,15 @@ export function TeamLeadersCard({
     .sort((a, b) => (b.goals || 0) - (a.goals || 0))
     .slice(0, 5);
 
-  const seasonText = seasonLabel
-    ? `${seasonLabel} Team leaders`
+  // Display label for the selected season
+  const displaySeasonLabel = (() => {
+    if (!Array.isArray(seasons) || !seasons.length) return seasonLabel;
+    const found = seasons.find((s) => s.id === selectedSeasonId);
+    return found?.name || seasonLabel;
+  })();
+
+  const seasonText = displaySeasonLabel
+    ? `${displaySeasonLabel} Team leaders`
     : 'Team leaders';
 
   return (
@@ -111,8 +131,25 @@ export function TeamLeadersCard({
       style={cardStyle}
       data-testid="card-team-leaders"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className={sectionTitleClass}>{seasonText}</div>
+        <div className="flex items-center gap-2">
+          {/* Season picker — only shown when multiple seasons are available */}
+          {Array.isArray(seasons) && seasons.length > 1 && (
+            <select
+              value={selectedSeasonId ?? ''}
+              onChange={(e) => setSelectedSeasonId(e.target.value || null)}
+              className="text-[12px] text-[#444] bg-black/[0.04] border-0 rounded-md px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#3b82f6] cursor-pointer"
+              data-testid="leaders-season-select"
+              aria-label="Select season"
+            >
+              {seasons.map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
         <div
           className="flex items-center text-[12px] rounded-md p-0.5 bg-black/[0.04]"
           role="tablist"
@@ -161,6 +198,7 @@ export function TeamLeadersCard({
             Playoffs
           </button>
         </div>
+        </div>{/* end flex items-center gap-2 */}
       </div>
 
       {isLocked ? (

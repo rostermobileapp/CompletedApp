@@ -843,15 +843,35 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId, seasonId }: {
   seasonId?: string | null;
 }) {
   const { canAccessPremiumFeatures } = usePermissions();
-  
-  // Fetch league standings — scoped to the selected season when available
-  // so the modal mirrors the team/season chosen in the dashboard dropdown.
-  const { data: leagueStandings = [], isLoading: isLoadingLeague } = useQuery({
-    queryKey: ['/api/leagues', leagueId, 'standings', { seasonId: seasonId ?? null }],
+
+  // Local season selection — defaults to the season passed in by the parent
+  // but lets the user browse prior seasons without leaving the modal.
+  const [localSeasonId, setLocalSeasonId] = React.useState<string | null>(
+    seasonId ?? null,
+  );
+  React.useEffect(() => {
+    setLocalSeasonId(seasonId ?? null);
+  }, [seasonId, leagueId]);
+
+  // Fetch all seasons for the league so the user can pick a prior one.
+  const { data: leagueSeasons = [] } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'seasons'],
     queryFn: async () => {
       if (!leagueId) return [];
-      const url = seasonId
-        ? `/api/leagues/${leagueId}/standings?seasonId=${seasonId}`
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/seasons`);
+      return response.json();
+    },
+    enabled: !!leagueId && isOpen && !tournamentId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch league standings — scoped to the locally selected season.
+  const { data: leagueStandings = [], isLoading: isLoadingLeague } = useQuery({
+    queryKey: ['/api/leagues', leagueId, 'standings', { seasonId: localSeasonId ?? null }],
+    queryFn: async () => {
+      if (!leagueId) return [];
+      const url = localSeasonId
+        ? `/api/leagues/${leagueId}/standings?seasonId=${localSeasonId}`
         : `/api/leagues/${leagueId}/standings`;
       const response = await apiRequest('GET', url);
       return response.json();
@@ -964,6 +984,24 @@ function StandingsModal({ isOpen, onClose, leagueId, tournamentId, seasonId }: {
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </button>
+          {/* Season picker — only shown for league standings with multiple seasons */}
+          {!tournamentId && Array.isArray(leagueSeasons) && leagueSeasons.length > 1 && (
+            <div className="mt-2 flex justify-center">
+              <select
+                value={localSeasonId ?? ''}
+                onChange={(e) => setLocalSeasonId(e.target.value || null)}
+                className="bg-muted text-foreground border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                data-testid="standings-modal-season-select"
+                aria-label="Select season"
+              >
+                {(leagueSeasons as any[]).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Content */}
