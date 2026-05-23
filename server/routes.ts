@@ -6223,6 +6223,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const games = await storage.getGamesByLeague(leagueId);
       
+      // Build a set of inactive season IDs — games in closed/inactive seasons are
+      // treated as already finalised and should never appear in the verification queue.
+      const leagueSeasons = await storage.getSeasonsByLeague(leagueId);
+      const inactiveSeasonIds = new Set(
+        leagueSeasons.filter((s: any) => !s.isActive).map((s: any) => s.id)
+      );
+
       // Get all game IDs that are linked to tournament matches (these should not appear as regular games)
       const tournamentLinkedGames = await db
         .select({ gameId: tournamentMatches.gameId })
@@ -6233,10 +6240,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       
-      // Filter games that started more than 1 hour ago (exclude scrimmages and tournament-linked games)
+      // Filter games that started more than 1 hour ago (exclude scrimmages,
+      // tournament-linked games, and games belonging to inactive seasons).
       const pastGames = games.filter((game: any) => {
         if (game.isScrimmage) return false;
         if (tournamentGameIds.has(game.id)) return false;
+        if (game.seasonId && inactiveSeasonIds.has(game.seasonId)) return false;
         const gameStart = new Date(game.scheduledAt);
         return gameStart <= oneHourAgo;
       });
