@@ -114,7 +114,7 @@ export default function PaymentRequests() {
     queryKey: ['/api/payment-requests/received/by-me'],
   });
 
-  const filterPaymentRequests = (requests: any[]) => {
+  const filterCreatedRequests = (requests: any[]) => {
     if (selectedType === 'tournament') {
       return [];
     }
@@ -143,12 +143,14 @@ export default function PaymentRequests() {
   };
 
   const createdRequestsArray = useMemo(() => {
-    return filterPaymentRequests(allCreatedRequests as any[]);
+    return filterCreatedRequests(allCreatedRequests as any[]);
   }, [allCreatedRequests, selectedType, selectedTeamId, selectedLeagueId, teamLeagueMap, activeSeasonTeamIds]);
 
+  // "Requests for Me" always shows ALL received requests regardless of selected
+  // context — the global badge count is also unscoped, so the list must match.
   const receivedRequestsArray = useMemo(() => {
-    return filterPaymentRequests(allReceivedRequests as any[]);
-  }, [allReceivedRequests, selectedType, selectedTeamId, selectedLeagueId, teamLeagueMap, activeSeasonTeamIds]);
+    return allReceivedRequests as any[];
+  }, [allReceivedRequests]);
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="payment-requests-page">

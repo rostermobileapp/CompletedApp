@@ -217,16 +217,23 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
   // routed through the Past Seasons modal instead.
   const activeTeamLeagueIds = new Set(teamOptions.map((t: any) => t.leagueId));
   const leagueOptions = Array.isArray(userLeagueMemberships)
-    ? (userLeagueMemberships as any[]).filter((m: any) => {
-        if (!m.leagueId) return false;
-        if (activeTeamLeagueIds.has(m.leagueId)) return false;
-        const info = leagueActivityMap.get(m.leagueId);
-        // If the league isn't yet in the map (e.g. payload still loading)
-        // we keep it visible; once `userLeagues` arrives we filter it out
-        // when its seasons are all closed.
-        if (info && !info.hasActiveSeason) return false;
-        return true;
-      })
+    ? (() => {
+        const seen = new Set<string>();
+        return (userLeagueMemberships as any[]).filter((m: any) => {
+          if (!m.leagueId) return false;
+          if (activeTeamLeagueIds.has(m.leagueId)) return false;
+          const info = leagueActivityMap.get(m.leagueId);
+          // If the league isn't yet in the map (e.g. payload still loading)
+          // we keep it visible; once `userLeagues` arrives we filter it out
+          // when its seasons are all closed.
+          if (info && !info.hasActiveSeason) return false;
+          // Deduplicate by leagueId in case a user has multiple membership
+          // records for the same league (e.g. commissioner + member rows).
+          if (seen.has(m.leagueId)) return false;
+          seen.add(m.leagueId);
+          return true;
+        });
+      })()
     : [];
   const [pastSeasonsOpen, setPastSeasonsOpen] = useState(false);
   // Deduplicate tournaments by id (a creator who is also a participant

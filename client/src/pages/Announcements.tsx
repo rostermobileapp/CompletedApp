@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -1424,13 +1425,15 @@ export default function Announcements() {
     enabled: !!(tournamentId || leagueId),
   });
 
-  // Mark announcements as read when page loads
+  // Mark announcements as read when page loads and immediately refresh the
+  // notification-counts cache so the badge drops to zero without waiting for
+  // the next polling interval.
   useEffect(() => {
     if (isTournamentContext && tournamentId && data?.announcements) {
       const markAsRead = async () => {
         try {
           await apiRequest('POST', `/api/tournaments/${tournamentId}/announcements/mark-read`);
-          console.log('📖 Tournament announcements marked as read');
+          queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
         } catch (error) {
           console.error('Failed to mark tournament announcements as read:', error);
         }
@@ -1440,7 +1443,7 @@ export default function Announcements() {
       const markAsRead = async () => {
         try {
           await apiRequest('POST', `/api/leagues/${leagueId}/announcements/mark-read`);
-          console.log('📖 League announcements marked as read');
+          queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
         } catch (error) {
           console.error('Failed to mark league announcements as read:', error);
         }

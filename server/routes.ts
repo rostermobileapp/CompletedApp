@@ -13043,10 +13043,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
 
-      // Check if user is member of the league
-      const membership = await storage.getUserLeagueMembership(userId, leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(403).json({ message: 'Access denied' });
+      // Allow commissioners as well as approved members to mark announcements as read
+      const [leagueRow] = await db
+        .select({ commissionerId: leagues.commissionerId })
+        .from(leagues)
+        .where(eq(leagues.id, leagueId));
+      const isCommissioner = leagueRow?.commissionerId === userId;
+
+      if (!isCommissioner) {
+        const membership = await storage.getUserLeagueMembership(userId, leagueId);
+        if (!membership || membership.status !== 'approved') {
+          return res.status(403).json({ message: 'Access denied' });
+        }
       }
 
       // Mark ALL visible announcements in the league as read for this user using bulk insert
@@ -16891,6 +16899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   `)
                 : Promise.resolve({ rows: [{ count: 0 }] }),
               // Games where this user is the winning captain and stars haven't been awarded
+              // Only consider games from the last 365 days to prevent historical accumulation
               db.execute(sql`
                 SELECT COUNT(*)::int AS count
                 FROM games g
@@ -16905,6 +16914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   AND g.home_score IS NOT NULL
                   AND g.away_score IS NOT NULL
                   AND g.home_score <> g.away_score
+                  AND g.scheduled_at >= NOW() - INTERVAL '365 days'
                   AND NOT EXISTS (
                     SELECT 1 FROM game_stars gs WHERE gs.game_id = g.id
                   )
