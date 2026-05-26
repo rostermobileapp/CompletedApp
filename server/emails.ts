@@ -5,11 +5,11 @@ const APP_URL = process.env.REPLIT_DEV_DOMAIN
   ? `https://${process.env.REPLIT_DEV_DOMAIN}`
   : 'https://rosters.replit.app';
 
-const APPLE_URL = 'https://apps.apple.com/app/roster-hockey-league/id6479073192';
-const GOOGLE_URL = 'https://play.google.com/store/apps/details?id=com.natively.roster';
+const APPLE_URL = 'https://apps.apple.com/us/app/roster-hockey/id6756852981';
+const GOOGLE_URL = 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med';
 
 function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6'): string {
-  const logoUrl = `${APP_URL}/roster-logo.png`;
+  const logoUrl = `${APP_URL}/roster-logo-email.png`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,7 +68,7 @@ function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6')
               <p style="margin:0 0 6px 0;font-size:12px;color:#6b7280;line-height:1.6;">
                 Sent by <strong style="color:#9ca3af;">Roster Hockey</strong> &mdash; Your beer league hockey app.
               </p>
-              <a href="${APP_URL}" style="font-size:12px;color:#3b82f6;text-decoration:none;">rosterhockey.app</a>
+              <a href="https://RosterHockey.com" style="font-size:12px;color:#3b82f6;text-decoration:none;">RosterHockey.com</a>
             </td>
           </tr>
 
@@ -208,7 +208,7 @@ Google Play: ${GOOGLE_URL}
 
 ---
 Sent by Roster Hockey - Your beer league hockey app
-Visit: ${APP_URL}
+Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
@@ -346,7 +346,7 @@ Google Play: ${GOOGLE_URL}
 
 ---
 Sent by Roster Hockey - Your beer league hockey app
-Visit: ${APP_URL}
+Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
@@ -476,7 +476,7 @@ Google Play: ${GOOGLE_URL}
 
 ---
 Sent by Roster Hockey - Your beer league hockey app
-Visit: ${APP_URL}
+Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
@@ -559,7 +559,7 @@ Questions? Contact your league commissioner or visit our support page.
 
 ---
 Sent by Roster Hockey - Your beer league hockey app
-Visit: ${APP_URL}
+Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
@@ -659,7 +659,7 @@ Google Play: ${GOOGLE_URL}
 
 ---
 Sent by Roster Hockey - Your beer league hockey app
-Visit: ${APP_URL}
+Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
@@ -747,7 +747,7 @@ View the full schedule: ${tournamentUrl}
 
 ---
 Sent by Roster Hockey - Your beer league hockey app
-Visit: ${APP_URL}
+Visit: https://RosterHockey.com
     `.trim();
 
     await client.emails.send({
