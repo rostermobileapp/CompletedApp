@@ -187,16 +187,16 @@ export async function sendScrimmageInviteEmail(
               </table>` : ''}
 
               <!-- CTA -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
                 <tr>
                   <td align="center">
-                    <a href="${scrimmageUrl}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">RSVP &amp; View Details</a>
+                    <div style="background-color:#0a0a0a;border-radius:12px;padding:20px 32px;display:inline-block;">
+                      <p style="margin:0 0 4px 0;font-size:18px;font-weight:800;color:#ffffff;text-align:center;letter-spacing:0.01em;">Open the Roster Hockey app to RSVP</p>
+                      <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">Download the app using the links below</p>
+                    </div>
                   </td>
                 </tr>
               </table>
-              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;line-height:1.5;">
-                Open the Roster Hockey app or click above to respond to this invitation.
-              </p>
             </td>
           </tr>`;
 
