@@ -1,5 +1,7 @@
 import { getUncachableResendClient } from './resend';
 import { format } from 'date-fns';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 const APP_URL = process.env.REPLIT_DEV_DOMAIN
   ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -8,8 +10,22 @@ const APP_URL = process.env.REPLIT_DEV_DOMAIN
 const APPLE_URL = 'https://apps.apple.com/us/app/roster-hockey/id6756852981';
 const GOOGLE_URL = 'https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med';
 
+// Embed the logo as base64 so it always renders in email clients
+// regardless of whether the server URL is publicly accessible.
+function getLogoDataUrl(): string {
+  try {
+    const logoPath = join(process.cwd(), 'client', 'public', 'roster-logo-email.png');
+    const data = readFileSync(logoPath);
+    return `data:image/png;base64,${data.toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
+
+const LOGO_DATA_URL = getLogoDataUrl();
+
 function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6'): string {
-  const logoUrl = `${APP_URL}/roster-logo-email.png`;
+  const logoUrl = LOGO_DATA_URL;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
