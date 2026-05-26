@@ -347,6 +347,9 @@ export const requireLeaguePremiumFeatures = (paramName: string = 'id'): RequestH
       return res.status(401).json({ message: "User permissions not loaded" });
     }
 
+    // Fee-exempt accounts (founder / demo) bypass all premium feature gates
+    if (user.feeExempt) return next();
+
     // Global Pro short-circuit so we don't run a DB lookup for users that
     // already have the entitlement.
     const userRole = user.role || 'free_tier';
@@ -560,6 +563,10 @@ export const requireLeagueManagementSpecific: RequestHandler = async (req, res, 
  */
 export async function hasValidTournamentAccess(userId: string, tournamentId: string): Promise<boolean> {
   try {
+    // Fee-exempt accounts bypass all tournament access checks
+    const user = await storage.getUser(userId);
+    if (user?.feeExempt) return true;
+
     const { db } = await import("./db");
     const { tournamentParticipants, tournaments } = await import("@shared/schema");
     const { eq, and } = await import("drizzle-orm");

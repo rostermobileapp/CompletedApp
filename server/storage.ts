@@ -898,7 +898,8 @@ export class DatabaseStorage implements IStorage {
         last_updated as "lastUpdated", 
         created_at as "createdAt", 
         updated_at as "updatedAt",
-        deleted_at as "deletedAt"
+        deleted_at as "deletedAt",
+        fee_exempt as "feeExempt"
       FROM users 
       WHERE id = ${id}
       LIMIT 1
