@@ -93,6 +93,7 @@ interface UserWithPermissions extends User {
   role: UserRole;
   specialPermissions: SpecialPermission[] | null;
   isPrimaryCommissioner: boolean;
+  feeExempt: boolean;
 }
 
 // Role hierarchy for permission checking (higher number = more access)
@@ -415,6 +416,7 @@ export function canEditStats(user: UserWithPermissions): boolean {
 }
 
 export function canAccessPremiumFeatures(user: UserWithPermissions): boolean {
+  if (user.feeExempt) return true;
   return hasRole(user, 'player_pro');
 }
 
@@ -1063,6 +1065,12 @@ export function requireTournamentPaid(options: RequireTournamentPaidOptions = {}
 
       if (!tournament) {
         // Let the route surface its own 404
+        return next();
+      }
+
+      // Fee-exempt accounts (founder / demo) bypass the payment gate entirely
+      const requestingUser = (req as any).userWithPermissions;
+      if (requestingUser?.feeExempt) {
         return next();
       }
 

@@ -294,6 +294,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"), // Soft-delete tombstone; set instead of hard-deleting the row
+  // Fee bypass for founder/demo accounts — skips all payment gates (tournament fees, league premium)
+  feeExempt: boolean("fee_exempt").default(false).notNull(),
 });
 
 // User notifications table

@@ -353,6 +353,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure tournaments.stripe_processed_session_ids column:', err);
   }
 
+  // Ensure users.fee_exempt exists — allows founder/demo accounts to bypass all payment gates
+  try {
+    await db.execute(sql`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS fee_exempt boolean NOT NULL DEFAULT false
+    `);
+    // Seed the founder account
+    await db.execute(sql`
+      UPDATE users SET fee_exempt = true WHERE email = 'founder@rosterhockey.com'
+    `);
+    console.log('[Init] fee_exempt column ensured; founder account seeded');
+  } catch (err) {
+    console.error('[Init] Failed to ensure users.fee_exempt column:', err);
+  }
+
   // Ensure scrimmages.invite_group_id exists (live invite group for recurring scrimmages)
   try {
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_group_id varchar REFERENCES invite_groups(id) ON DELETE SET NULL`);
@@ -17468,6 +17483,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Toggle fee-exempt flag for a user — restricted to primary commissioner only
+  app.patch('/api/admin/users/:userId/fee-exempt', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const caller = req.userWithPermissions;
+      if (!caller?.isPrimaryCommissioner) {
+        return res.status(403).json({ message: 'Only the primary commissioner can modify fee-exempt status' });
+      }
+      const { userId } = req.params;
+      const { feeExempt } = req.body;
+      if (typeof feeExempt !== 'boolean') {
+        return res.status(400).json({ message: 'feeExempt must be a boolean' });
+      }
+      await db.update(users).set({ feeExempt }).where(eq(users.id, userId));
+      res.json({ userId, feeExempt });
+    } catch (error) {
+      console.error('Error updating fee-exempt status:', error);
+      res.status(500).json({ message: 'Failed to update fee-exempt status' });
+    }
+  });
+
   // Get users by league (for league-specific user management)
   app.get('/api/leagues/:leagueId/users', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
