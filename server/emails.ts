@@ -1,6 +1,85 @@
 import { getUncachableResendClient } from './resend';
 import { format } from 'date-fns';
 
+const APP_URL = process.env.REPLIT_DEV_DOMAIN
+  ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+  : 'https://rosters.replit.app';
+
+const APPLE_URL = 'https://apps.apple.com/app/roster-hockey-league/id6479073192';
+const GOOGLE_URL = 'https://play.google.com/store/apps/details?id=com.natively.roster';
+
+function emailShell(title: string, bodyContent: string, accentColor = '#3b82f6'): string {
+  const logoUrl = `${APP_URL}/roster-logo.png`;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
+
+          <!-- HEADER -->
+          <tr>
+            <td align="center" style="background-color:#0a0a0a;padding:28px 40px;">
+              <img src="${logoUrl}" alt="Roster Hockey" width="200" style="display:block;max-width:200px;height:auto;">
+            </td>
+          </tr>
+
+          <!-- ACCENT BAR -->
+          <tr>
+            <td style="height:4px;background-color:${accentColor};font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <!-- BODY -->
+          ${bodyContent}
+
+          <!-- APP DOWNLOAD -->
+          <tr>
+            <td style="padding:0 40px 32px 40px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8faff;border:1px solid #dbeafe;border-radius:10px;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="margin:0 0 6px 0;font-size:13px;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:0.05em;">Get Roster Hockey</p>
+                    <p style="margin:0 0 16px 0;font-size:13px;color:#64748b;line-height:1.5;">Download the app to RSVP, view schedules, and stay connected with your team.</p>
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding-right:10px;">
+                          <a href="${APPLE_URL}" style="display:inline-block;background-color:#0a0a0a;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.01em;">&#xf8ff; App Store</a>
+                        </td>
+                        <td>
+                          <a href="${GOOGLE_URL}" style="display:inline-block;background-color:#1a73e8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.01em;">&#9654; Google Play</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color:#0a0a0a;padding:20px 40px;text-align:center;">
+              <p style="margin:0 0 6px 0;font-size:12px;color:#6b7280;line-height:1.6;">
+                Sent by <strong style="color:#9ca3af;">Roster Hockey</strong> &mdash; Your beer league hockey app.
+              </p>
+              <a href="${APP_URL}" style="font-size:12px;color:#3b82f6;text-decoration:none;">rosterhockey.app</a>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 interface ScrimmageInviteData {
   scrimmageId: string;
   title: string;
@@ -19,127 +98,94 @@ export async function sendScrimmageInviteEmail(
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    
+
     const formattedDate = format(scrimmageData.dateTime, 'EEEE, MMMM d, yyyy');
     const formattedTime = format(scrimmageData.dateTime, 'h:mm a');
-    
-    // Build the scrimmage details URL
-    const appUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://rosters.replit.app';
-    const scrimmageUrl = `${appUrl}/?scrimmage=${scrimmageData.scrimmageId}`;
-    
-    // Build email HTML
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>You're Invited to a Scrimmage</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-          <table role="presentation" style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">You're Invited!</h1>
-                    </td>
-                  </tr>
-                  
-                  <!-- Content -->
-                  <tr>
-                    <td style="padding: 40px;">
-                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        <strong>${scrimmageData.creatorName}</strong> has invited you to join a scrimmage:
-                      </p>
-                      
-                      <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                        <h2 style="margin: 0 0 16px 0; font-size: 22px; color: #333333;">${scrimmageData.title}</h2>
-                        
-                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>📅 Date:</strong> ${formattedDate}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>🕐 Time:</strong> ${formattedTime}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>📍 Location:</strong> ${scrimmageData.location}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>👥 Max Players:</strong> ${scrimmageData.maxPlayers}
-                            </td>
-                          </tr>
-                          ${scrimmageData.skillLevel ? `
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>⭐ Skill Level:</strong> ${scrimmageData.skillLevel}
-                            </td>
-                          </tr>
-                          ` : ''}
-                          ${scrimmageData.costPerPlayer ? `
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>💰 Cost:</strong> $${scrimmageData.costPerPlayer} per player
-                            </td>
-                          </tr>
-                          ` : ''}
-                        </table>
-                        
-                        ${scrimmageData.notes ? `
-                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
-                          <p style="margin: 0; font-size: 14px; color: #666666; line-height: 20px;">
-                            <strong>📝 Notes:</strong><br>
-                            ${scrimmageData.notes}
-                          </p>
-                        </div>
-                        ` : ''}
-                      </div>
-                      
-                      <!-- CTA Button -->
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
-                        <tr>
-                          <td align="center">
-                            <a href="${scrimmageUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Scrimmage Details</a>
-                          </td>
-                        </tr>
-                      </table>
-                      
-                      <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 20px; color: #666666;">
-                        Click the button above to view full details and respond to this invitation on Rosters.
-                      </p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Footer -->
-                  <tr>
-                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
-                        This invitation was sent through <strong>Rosters</strong> - Your sports team management platform<br>
-                        <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit Rosters</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `;
-    
-    // Plain text version
+    const scrimmageUrl = `${APP_URL}/?scrimmage=${scrimmageData.scrimmageId}`;
+
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">Scrimmage Invitation</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">${scrimmageData.title}</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                <strong style="color:#0a0a0a;">${scrimmageData.creatorName}</strong> has invited you to hit the ice.
+              </p>
+
+              <!-- Details card -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+                          <span style="font-size:13px;color:#64748b;display:block;margin-bottom:2px;">Date</span>
+                          <span style="font-size:15px;font-weight:600;color:#0a0a0a;">${formattedDate}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+                          <span style="font-size:13px;color:#64748b;display:block;margin-bottom:2px;">Time</span>
+                          <span style="font-size:15px;font-weight:600;color:#0a0a0a;">${formattedTime}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+                          <span style="font-size:13px;color:#64748b;display:block;margin-bottom:2px;">Location</span>
+                          <span style="font-size:15px;font-weight:600;color:#0a0a0a;">${scrimmageData.location}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0${scrimmageData.skillLevel || scrimmageData.costPerPlayer ? ';border-bottom:1px solid #e2e8f0' : ''};">
+                          <span style="font-size:13px;color:#64748b;display:block;margin-bottom:2px;">Max Players</span>
+                          <span style="font-size:15px;font-weight:600;color:#0a0a0a;">${scrimmageData.maxPlayers}</span>
+                        </td>
+                      </tr>
+                      ${scrimmageData.skillLevel ? `
+                      <tr>
+                        <td style="padding:8px 0;${scrimmageData.costPerPlayer ? 'border-bottom:1px solid #e2e8f0;' : ''}">
+                          <span style="font-size:13px;color:#64748b;display:block;margin-bottom:2px;">Skill Level</span>
+                          <span style="font-size:15px;font-weight:600;color:#0a0a0a;">${scrimmageData.skillLevel}</span>
+                        </td>
+                      </tr>` : ''}
+                      ${scrimmageData.costPerPlayer ? `
+                      <tr>
+                        <td style="padding:8px 0;">
+                          <span style="font-size:13px;color:#64748b;display:block;margin-bottom:2px;">Cost per Player</span>
+                          <span style="font-size:15px;font-weight:600;color:#0a0a0a;">$${scrimmageData.costPerPlayer}</span>
+                        </td>
+                      </tr>` : ''}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              ${scrimmageData.notes ? `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.06em;">Notes from the organizer</p>
+                    <p style="margin:0;font-size:14px;color:#78350f;line-height:1.6;">${scrimmageData.notes}</p>
+                  </td>
+                </tr>
+              </table>` : ''}
+
+              <!-- CTA -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+                <tr>
+                  <td align="center">
+                    <a href="${scrimmageUrl}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">RSVP &amp; View Details</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;line-height:1.5;">
+                Open the Roster Hockey app or click above to respond to this invitation.
+              </p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell("You're Invited to a Scrimmage", body);
+
     const textContent = `
 You're Invited to a Scrimmage!
 
@@ -153,22 +199,26 @@ Location: ${scrimmageData.location}
 Max Players: ${scrimmageData.maxPlayers}
 ${scrimmageData.skillLevel ? `Skill Level: ${scrimmageData.skillLevel}\n` : ''}${scrimmageData.costPerPlayer ? `Cost: $${scrimmageData.costPerPlayer} per player\n` : ''}
 ${scrimmageData.notes ? `\nNotes:\n${scrimmageData.notes}\n` : ''}
-View and respond to this invitation:
+RSVP and view details:
 ${scrimmageUrl}
 
+Download Roster Hockey to manage your RSVP:
+App Store: ${APPLE_URL}
+Google Play: ${GOOGLE_URL}
+
 ---
-This invitation was sent through Rosters - Your Beer League Hockey App
-Visit: ${appUrl}
+Sent by Roster Hockey - Your beer league hockey app
+Visit: ${APP_URL}
     `.trim();
-    
+
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `🏒 You're invited: ${scrimmageData.title}`,
+      subject: `You're invited: ${scrimmageData.title}`,
       html: htmlContent,
       text: textContent,
     });
-    
+
     console.log(`✅ Sent scrimmage invite email to ${recipientEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send scrimmage invite email to ${recipientEmail}:`, error);
@@ -182,7 +232,7 @@ export async function sendBulkScrimmageInvites(
 ): Promise<{ sent: string[]; failed: string[] }> {
   const sent: string[] = [];
   const failed: string[] = [];
-  
+
   for (const email of emails) {
     try {
       await sendScrimmageInviteEmail(email, scrimmageData);
@@ -192,7 +242,7 @@ export async function sendBulkScrimmageInvites(
       failed.push(email);
     }
   }
-  
+
   return { sent, failed };
 }
 
@@ -213,102 +263,67 @@ export async function sendScrimmageApprovalEmail(
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    
+
     const formattedDate = format(data.dateTime, 'EEEE, MMMM d, yyyy');
     const formattedTime = format(data.dateTime, 'h:mm a');
-    
-    const appUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://rosters.replit.app';
-    const scrimmageUrl = `${appUrl}/?scrimmage=${data.scrimmageId}`;
-    
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>You're In! Scrimmage Approved</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-          <table role="presentation" style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;">
-                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">You're In!</h1>
-                      <p style="margin: 10px 0 0 0; color: #d1fae5; font-size: 16px;">Your spot has been confirmed</p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Content -->
-                  <tr>
-                    <td style="padding: 40px;">
-                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        Hey ${data.playerName}, great news! <strong>${data.organizerName}</strong> has approved your request to join:
-                      </p>
-                      
-                      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                        <h2 style="margin: 0 0 16px 0; font-size: 22px; color: #333333;">${data.title}</h2>
-                        
-                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>📅 Date:</strong> ${formattedDate}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>🕐 Time:</strong> ${formattedTime}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>📍 Location:</strong> ${data.location}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>👥 Players:</strong> ${data.currentPlayers} / ${data.maxPlayers} confirmed
-                            </td>
-                          </tr>
-                        </table>
-                      </div>
-                      
-                      <!-- CTA Button -->
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
-                        <tr>
-                          <td align="center">
-                            <a href="${scrimmageUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Scrimmage Details</a>
-                          </td>
-                        </tr>
-                      </table>
-                      
-                      <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 20px; color: #666666;">
-                        Make sure to add this event to your calendar. See you on the ice!
-                      </p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Footer -->
-                  <tr>
-                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
-                        This notification was sent through <strong>Rosters</strong> - Your sports team management platform<br>
-                        <a href="${appUrl}" style="color: #10b981; text-decoration: none;">Visit Rosters</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `;
-    
+    const scrimmageUrl = `${APP_URL}/?scrimmage=${data.scrimmageId}`;
+
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#10b981;text-transform:uppercase;letter-spacing:0.08em;">Spot Confirmed</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">You're In!</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                Hey <strong style="color:#0a0a0a;">${data.playerName}</strong> — <strong style="color:#0a0a0a;">${data.organizerName}</strong> has approved your spot for:
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="margin:0 0 12px 0;font-size:17px;font-weight:700;color:#0a0a0a;">${data.title}</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #d1fae5;">
+                          <span style="font-size:13px;color:#065f46;display:block;margin-bottom:1px;">Date</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${formattedDate}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #d1fae5;">
+                          <span style="font-size:13px;color:#065f46;display:block;margin-bottom:1px;">Time</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${formattedTime}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #d1fae5;">
+                          <span style="font-size:13px;color:#065f46;display:block;margin-bottom:1px;">Location</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.location}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;">
+                          <span style="font-size:13px;color:#065f46;display:block;margin-bottom:1px;">Roster</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.currentPlayers} / ${data.maxPlayers} players confirmed</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+                <tr>
+                  <td align="center">
+                    <a href="${scrimmageUrl}" style="display:inline-block;background-color:#10b981;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">View Scrimmage</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;">See you on the ice!</p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell("Your Scrimmage Spot is Confirmed", body, '#10b981');
+
     const textContent = `
 You're In! Your Scrimmage Spot is Confirmed
 
@@ -323,21 +338,25 @@ Players: ${data.currentPlayers} / ${data.maxPlayers} confirmed
 
 View scrimmage details: ${scrimmageUrl}
 
-Make sure to add this event to your calendar. See you on the ice!
+See you on the ice!
+
+Download Roster Hockey:
+App Store: ${APPLE_URL}
+Google Play: ${GOOGLE_URL}
 
 ---
-This notification was sent through Rosters - Your Beer League Hockey App
-Visit: ${appUrl}
+Sent by Roster Hockey - Your beer league hockey app
+Visit: ${APP_URL}
     `.trim();
-    
+
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `✅ You're in! ${data.title}`,
+      subject: `Spot confirmed: ${data.title}`,
       html: htmlContent,
       text: textContent,
     });
-    
+
     console.log(`✅ Sent scrimmage approval email to ${recipientEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send scrimmage approval email to ${recipientEmail}:`, error);
@@ -363,110 +382,77 @@ export async function sendScrimmageReminderEmail(
 ): Promise<void> {
   try {
     const { client, fromEmail } = await getUncachableResendClient();
-    
+
     const formattedDate = format(data.dateTime, 'EEEE, MMMM d, yyyy');
     const formattedTime = format(data.dateTime, 'h:mm a');
-    
-    const appUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://rosters.replit.app';
-    const scrimmageUrl = `${appUrl}/?scrimmage=${data.scrimmageId}`;
-    
-    const timeLabel = data.hoursUntil >= 24 
-      ? `${Math.round(data.hoursUntil / 24)} day${Math.round(data.hoursUntil / 24) !== 1 ? 's' : ''}` 
+    const scrimmageUrl = `${APP_URL}/?scrimmage=${data.scrimmageId}`;
+
+    const timeLabel = data.hoursUntil >= 24
+      ? `${Math.round(data.hoursUntil / 24)} day${Math.round(data.hoursUntil / 24) !== 1 ? 's' : ''}`
       : `${data.hoursUntil} hour${data.hoursUntil !== 1 ? 's' : ''}`;
-    
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Scrimmage Reminder</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-          <table role="presentation" style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 8px 8px 0 0;">
-                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Reminder: ${timeLabel} to go!</h1>
-                    </td>
-                  </tr>
-                  
-                  <!-- Content -->
-                  <tr>
-                    <td style="padding: 40px;">
-                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        Hey ${data.playerName}, this is a friendly reminder that you have an upcoming scrimmage:
-                      </p>
-                      
-                      <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                        <h2 style="margin: 0 0 16px 0; font-size: 22px; color: #333333;">${data.title}</h2>
-                        
-                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>📅 Date:</strong> ${formattedDate}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>🕐 Time:</strong> ${formattedTime}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>📍 Location:</strong> ${data.location}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>👥 Players:</strong> ${data.currentPlayers} / ${data.maxPlayers} confirmed
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 0; font-size: 14px; color: #666666;">
-                              <strong>🎯 Organized by:</strong> ${data.organizerName}
-                            </td>
-                          </tr>
-                        </table>
-                      </div>
-                      
-                      <!-- CTA Button -->
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
-                        <tr>
-                          <td align="center">
-                            <a href="${scrimmageUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Scrimmage Details</a>
-                          </td>
-                        </tr>
-                      </table>
-                      
-                      <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 20px; color: #666666;">
-                        Don't forget to pack your gear! See you there.
-                      </p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Footer -->
-                  <tr>
-                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
-                        This reminder was sent through <strong>Rosters</strong> - Your sports team management platform<br>
-                        <a href="${appUrl}" style="color: #f59e0b; text-decoration: none;">Visit Rosters</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `;
-    
+
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:0.08em;">Reminder</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">${timeLabel} to go!</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                Hey <strong style="color:#0a0a0a;">${data.playerName}</strong> — don't forget you've got a scrimmage coming up:
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="margin:0 0 12px 0;font-size:17px;font-weight:700;color:#0a0a0a;">${data.title}</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #fde68a;">
+                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">Date</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${formattedDate}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #fde68a;">
+                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">Time</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${formattedTime}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #fde68a;">
+                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">Location</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.location}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;border-bottom:1px solid #fde68a;">
+                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">Roster</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.currentPlayers} / ${data.maxPlayers} confirmed</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;">
+                          <span style="font-size:13px;color:#92400e;display:block;margin-bottom:1px;">Organized by</span>
+                          <span style="font-size:14px;font-weight:600;color:#0a0a0a;">${data.organizerName}</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+                <tr>
+                  <td align="center">
+                    <a href="${scrimmageUrl}" style="display:inline-block;background-color:#f59e0b;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">View Scrimmage</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;">Don't forget your gear. See you out there!</p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell(`Scrimmage Reminder: ${data.title}`, body, '#f59e0b');
+
     const textContent = `
 Reminder: ${timeLabel} to go!
 
@@ -482,21 +468,25 @@ Organized by: ${data.organizerName}
 
 View scrimmage details: ${scrimmageUrl}
 
-Don't forget to pack your gear! See you there.
+Don't forget your gear. See you out there!
+
+Download Roster Hockey:
+App Store: ${APPLE_URL}
+Google Play: ${GOOGLE_URL}
 
 ---
-This reminder was sent through Rosters - Your Beer League Hockey App
-Visit: ${appUrl}
+Sent by Roster Hockey - Your beer league hockey app
+Visit: ${APP_URL}
     `.trim();
-    
+
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `⏰ Reminder: ${data.title} in ${timeLabel}`,
+      subject: `Reminder: ${data.title} in ${timeLabel}`,
       html: htmlContent,
       text: textContent,
     });
-    
+
     console.log(`✅ Sent scrimmage reminder email to ${recipientEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send scrimmage reminder email to ${recipientEmail}:`, error);
@@ -518,136 +508,68 @@ export async function sendWelcomeEmail(
     console.log(`[Email] Starting sendWelcomeEmail for ${recipientEmail}`);
     const { client, fromEmail } = await getUncachableResendClient();
     console.log(`[Email] Resend client initialized, fromEmail: ${fromEmail}`);
-    
-    const appUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://rosters.replit.app';
-    const signupUrl = `${appUrl}/?email=${encodeURIComponent(recipientEmail)}`;
-    
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to Roster</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-          <table role="presentation" style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background-color: #000000; border-radius: 8px 8px 0 0;">
-                      <img src="${appUrl}/roster-logo.png" alt="Roster Logo" style="max-width: 280px; height: auto; margin: 0 auto; display: block;">
-                    </td>
-                  </tr>
-                  
-                  <!-- Content -->
-                  <tr>
-                    <td style="padding: 40px;">
-                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        Hey <strong>${data.playerName}</strong>,
-                      </p>
-                      
-                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        You've been added to <strong>${data.leagueName}</strong>${data.teamName ? ` to play for <strong>${data.teamName}</strong>` : ''} on Roster. Now it's time to create your account and join the action!
-                      </p>
-                      
-                      <!-- CTA Button -->
-                      <div style="text-align: center; margin: 30px 0;">
-                        <a href="${signupUrl}" style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 16px; font-weight: 600; transition: background-color 0.2s;">
-                          Log In
-                        </a>
-                      </div>
-                      
-                      <!-- Download Info -->
-                      <div style="background-color: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 24px; margin: 30px 0;">
-                        <p style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e40af;">
-                          🎮 Download the Roster App
-                        </p>
-                        <p style="margin: 0 0 16px 0; font-size: 14px; color: #475569;">
-                          For the best experience, download Roster on your phone and stay connected with your team.
-                        </p>
-                        
-                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                          <tr>
-                            <td style="padding: 0 8px 0 0; text-align: center; width: 50%;">
-                              <a href="https://apps.apple.com/app/roster-hockey-league/id6479073192" style="display: inline-block; text-decoration: none;">
-                                <img src="https://img.shields.io/badge/Download-App_Store-black?style=for-the-badge&logo=apple" alt="Download on App Store" style="max-width: 100%; height: auto; border-radius: 6px;">
-                              </a>
-                            </td>
-                            <td style="padding: 0 0 0 8px; text-align: center; width: 50%;">
-                              <a href="https://play.google.com/store/apps/details?id=com.natively.roster" style="display: inline-block; text-decoration: none;">
-                                <img src="https://img.shields.io/badge/Get_it_on-Google_Play-414141?style=for-the-badge&logo=google-play" alt="Get it on Google Play" style="max-width: 100%; height: auto; border-radius: 6px;">
-                              </a>
-                            </td>
-                          </tr>
-                        </table>
-                      </div>
-                      
-                      <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 21px; color: #666666;">
-                        If you already have a Roster account, you can simply log in with <strong>${recipientEmail}</strong> and you'll automatically be added to the team.
-                      </p>
-                      
-                      <p style="margin: 0; font-size: 14px; line-height: 21px; color: #666666;">
-                        Questions? Contact your league commissioner or visit our support page.
-                      </p>
-                    </td>
-                  </tr>
-                  
-                  <!-- Footer -->
-                  <tr>
-                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
-                        This email was sent to you because you were added to a team on <strong>Roster</strong><br>
-                        <a href="${appUrl}" style="color: #3b82f6; text-decoration: none;">Visit Roster</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `;
-    
+
+    const signupUrl = `${APP_URL}/?email=${encodeURIComponent(recipientEmail)}`;
+
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">Welcome</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">You're on the team!</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                Hey <strong style="color:#0a0a0a;">${data.playerName}</strong> — you've been added to <strong style="color:#0a0a0a;">${data.leagueName}</strong>${data.teamName ? ` to play for <strong style="color:#0a0a0a;">${data.teamName}</strong>` : ''} on Roster Hockey. Create your account to get started.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                <tr>
+                  <td align="center">
+                    <a href="${signupUrl}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">Log In / Create Account</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 24px 0;font-size:13px;color:#94a3b8;text-align:center;">
+                Already have an account? Log in with <strong>${recipientEmail}</strong> and you'll be added automatically.
+              </p>
+
+              <p style="margin:0 0 32px 0;font-size:14px;color:#475569;line-height:1.5;">
+                Questions? Reach out to your league commissioner or visit our support page.
+              </p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell('Welcome to Roster Hockey', body);
+
     const textContent = `
-Welcome to Roster! 🏒
+Welcome to Roster Hockey!
 
 Hey ${data.playerName},
 
-You've been added to ${data.leagueName}${data.teamName ? ` to play for ${data.teamName}` : ''} on Roster. Now it's time to create your account and join the action!
+You've been added to ${data.leagueName}${data.teamName ? ` to play for ${data.teamName}` : ''} on Roster Hockey. Now it's time to create your account and join the action!
 
 CREATE YOUR ACCOUNT:
 ${signupUrl}
 
-DOWNLOAD THE ROSTER APP:
-Apple App Store:
-https://apps.apple.com/app/roster-hockey-league/id6479073192
+DOWNLOAD ROSTER HOCKEY:
+App Store: ${APPLE_URL}
+Google Play: ${GOOGLE_URL}
 
-Google Play Store:
-https://play.google.com/store/apps/details?id=com.natively.roster
-
-If you already have a Roster account, you can simply log in with ${recipientEmail} and you'll automatically be added to the team.
+If you already have a Roster Hockey account, you can simply log in with ${recipientEmail} and you'll automatically be added to the team.
 
 Questions? Contact your league commissioner or visit our support page.
 
 ---
-This email was sent to you because you were added to a team on Roster
-Visit: ${appUrl}
+Sent by Roster Hockey - Your beer league hockey app
+Visit: ${APP_URL}
     `.trim();
-    
+
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `🏒 Welcome to Roster - Join ${data.leagueName}!`,
+      subject: `Welcome to ${data.leagueName} on Roster Hockey`,
       html: htmlContent,
       text: textContent,
     });
-    
+
     console.log(`✅ Sent welcome email to ${recipientEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send welcome email to ${recipientEmail}:`, error);
@@ -670,10 +592,7 @@ export async function sendTournamentAccessOpenEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
 
-    const appUrl = process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://rosters.replit.app';
-    const searchUrl = `${appUrl}/tournament-search`;
+    const searchUrl = `${APP_URL}/tournament-search`;
 
     const startDateStr = data.accessStartDate
       ? format(data.accessStartDate, 'MMMM d, yyyy')
@@ -682,67 +601,46 @@ export async function sendTournamentAccessOpenEmail(
       ? format(data.accessEndDate, 'MMMM d, yyyy')
       : null;
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Tournament Registration Now Open</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-          <table role="presentation" style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">Registration is Open!</h1>
-                      <p style="margin: 10px 0 0 0; color: #e0e0ff; font-size: 16px;">${data.tournamentName}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 40px;">
-                      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        The registration window for <strong>${data.tournamentName}</strong> is now open. Use the tournament ID below to find and join the tournament.
-                      </p>
-                      <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px; text-align: center;">
-                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #666666;">Your Tournament ID</p>
-                        <p style="margin: 0; font-size: 32px; font-weight: bold; font-family: monospace; color: #333333; letter-spacing: 4px;">${data.uniqueTournamentId}</p>
-                      </div>
-                      ${(startDateStr || endDateStr) ? `
-                      <div style="background-color: #f0f4ff; border-radius: 4px; padding: 16px; margin: 16px 0;">
-                        ${startDateStr ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #666666;"><strong>Opens:</strong> ${startDateStr}</p>` : ''}
-                        ${endDateStr ? `<p style="margin: 0; font-size: 14px; color: #666666;"><strong>Closes:</strong> ${endDateStr}</p>` : ''}
-                      </div>
-                      ` : ''}
-                      <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 30px 0;">
-                        <tr>
-                          <td align="center">
-                            <a href="${searchUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">Join the Tournament</a>
-                          </td>
-                        </tr>
-                      </table>
-                      <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 20px; color: #666666;">
-                        Enter the tournament ID on the Find a Tournament page to register your spot.
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
-                        This notification was sent through <strong>Rosters</strong> - Your sports team management platform<br>
-                        <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit Rosters</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `;
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">Tournament</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">Registration is Open!</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                The registration window for <strong style="color:#0a0a0a;">${data.tournamentName}</strong> is now open.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:${startDateStr || endDateStr ? '16' : '28'}px;">
+                <tr>
+                  <td style="padding:20px 24px;text-align:center;">
+                    <p style="margin:0 0 6px 0;font-size:13px;color:#64748b;">Your Tournament ID</p>
+                    <p style="margin:0;font-size:34px;font-weight:800;font-family:monospace;color:#0a0a0a;letter-spacing:6px;">${data.uniqueTournamentId}</p>
+                  </td>
+                </tr>
+              </table>
+
+              ${(startDateStr || endDateStr) ? `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    ${startDateStr ? `<p style="margin:0 0 4px 0;font-size:14px;color:#0c4a6e;"><strong>Opens:</strong> ${startDateStr}</p>` : ''}
+                    ${endDateStr ? `<p style="margin:0;font-size:14px;color:#0c4a6e;"><strong>Closes:</strong> ${endDateStr}</p>` : ''}
+                  </td>
+                </tr>
+              </table>` : ''}
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+                <tr>
+                  <td align="center">
+                    <a href="${searchUrl}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">Find &amp; Join Tournament</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;">Enter your Tournament ID on the Find a Tournament page to register.</p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell('Tournament Registration Open', body);
 
     const textContent = `
 Tournament Registration is Now Open!
@@ -755,15 +653,19 @@ Join the tournament at: ${searchUrl}
 
 Enter the tournament ID on the Find a Tournament page to register your spot.
 
+Download Roster Hockey:
+App Store: ${APPLE_URL}
+Google Play: ${GOOGLE_URL}
+
 ---
-This notification was sent through Rosters - Your sports team management platform
-Visit: ${appUrl}
+Sent by Roster Hockey - Your beer league hockey app
+Visit: ${APP_URL}
     `.trim();
 
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `🏆 Registration Open: ${data.tournamentName}`,
+      subject: `Registration open: ${data.tournamentName}`,
       html: htmlContent,
       text: textContent,
     });
@@ -790,10 +692,7 @@ export async function sendTournamentScheduleShiftEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
 
-    const appUrl = process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : 'https://rosters.replit.app';
-    const tournamentUrl = `${appUrl}/tournaments/${data.tournamentId}`;
+    const tournamentUrl = `${APP_URL}/tournaments/${data.tournamentId}`;
 
     const direction = data.dayDelta > 0 ? 'later' : 'earlier';
     const days = Math.abs(data.dayDelta);
@@ -807,64 +706,37 @@ export async function sendTournamentScheduleShiftEmail(
       ? format(data.firstNewMatchTime, 'h:mm a')
       : null;
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${data.tournamentName} schedule updated</title>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-          <table role="presentation" style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td align="center" style="padding: 40px 0;">
-                <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  <tr>
-                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;">
-                      <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: bold;">Schedule Updated</h1>
-                      <p style="margin: 10px 0 0 0; color: #e0e0ff; font-size: 16px;">${data.tournamentName}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 40px;">
-                      <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 24px; color: #333333;">
-                        <strong>${data.matchCount}</strong> of your ${matchWord} in <strong>${data.tournamentName}</strong>
-                        moved <strong>${days} ${dayWord} ${direction}</strong>.
-                      </p>
-                      ${firstNewDateStr ? `
-                      <div style="background-color: #f0f4ff; border-left: 4px solid #667eea; border-radius: 4px; padding: 16px; margin: 20px 0;">
-                        <p style="margin: 0 0 6px 0; font-size: 14px; color: #666666;">Your next affected match is now on:</p>
-                        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333333;">${firstNewDateStr}${firstNewTimeStr ? ` at ${firstNewTimeStr}` : ''}</p>
-                      </div>
-                      ` : ''}
-                      <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 20px; color: #555555;">
-                        Open the tournament for the full updated schedule.
-                      </p>
-                      <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                          <td align="center">
-                            <a href="${tournamentUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">View Tournament</a>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 20px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; text-align: center;">
-                      <p style="margin: 0; font-size: 12px; color: #999999; line-height: 18px;">
-                        This notification was sent through <strong>Rosters</strong> - Your sports team management platform<br>
-                        <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit Rosters</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `;
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:0.08em;">Schedule Update</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">${data.tournamentName}</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                <strong style="color:#0a0a0a;">${data.matchCount} ${matchWord}</strong> moved <strong style="color:#0a0a0a;">${days} ${dayWord} ${direction}</strong>.
+              </p>
+
+              ${firstNewDateStr ? `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 4px 0;font-size:13px;color:#92400e;">Your next affected match is now on:</p>
+                    <p style="margin:0;font-size:16px;font-weight:700;color:#0a0a0a;">${firstNewDateStr}${firstNewTimeStr ? ` at ${firstNewTimeStr}` : ''}</p>
+                  </td>
+                </tr>
+              </table>` : ''}
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+                <tr>
+                  <td align="center">
+                    <a href="${tournamentUrl}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">View Updated Schedule</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;">Open the tournament for the full updated schedule.</p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell(`${data.tournamentName} schedule updated`, body, '#f59e0b');
 
     const textContent = `
 ${data.tournamentName} schedule updated
@@ -874,14 +746,14 @@ ${firstNewDateStr ? `Your next affected match is now on ${firstNewDateStr}${firs
 View the full schedule: ${tournamentUrl}
 
 ---
-This notification was sent through Rosters - Your sports team management platform
-Visit: ${appUrl}
+Sent by Roster Hockey - Your beer league hockey app
+Visit: ${APP_URL}
     `.trim();
 
     await client.emails.send({
       from: fromEmail,
       to: recipientEmail,
-      subject: `📅 ${data.tournamentName} schedule updated`,
+      subject: `Schedule update: ${data.tournamentName}`,
       html: htmlContent,
       text: textContent,
     });
