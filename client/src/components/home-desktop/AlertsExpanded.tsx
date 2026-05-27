@@ -32,6 +32,8 @@ interface AlertsExpandedProps {
   /** All of this user's team IDs, used to figure out the "opponent" for
    *  per-game alerts (verify score, award stars, etc.). */
   userTeamIds?: string[];
+  /** Compact mode: reduced padding, capped list, condensed rows for narrow column layouts. */
+  compact?: boolean;
 }
 
 function formatGameDate(value?: string | Date | null): string | null {
@@ -80,6 +82,7 @@ const SEVERITY_BORDER: Record<AlertSeverity, string> = {
 export function AlertsExpanded({
   effectiveLeagueId,
   userTeamIds = [],
+  compact = false,
 }: AlertsExpandedProps) {
   const [, navigate] = useLocation();
 
@@ -409,37 +412,44 @@ export function AlertsExpanded({
     notifs.length;
   const newCount = totalCount;
 
+  const wrapperClass = compact
+    ? 'bg-white rounded-xl px-4 py-3 text-[#212121]'
+    : cardClass;
+
+  const visibleAlerts = compact ? alerts.slice(0, 3) : alerts;
+  const hasMore = compact && alerts.length > 3;
+
   return (
-    <div className={cardClass} style={cardStyle} data-testid="card-alerts">
+    <div className={wrapperClass} style={cardStyle} data-testid="card-alerts">
       <div className="flex items-center justify-between">
-        <div className={sectionTitleClass}>Alerts</div>
+        <div className={compact ? 'text-[13px] font-medium text-[#212121] tracking-tight' : sectionTitleClass}>Alerts</div>
         {newCount > 0 && (
           <span
             className="text-[12px] font-medium px-2 py-0.5 rounded-full text-white"
             style={{ backgroundColor: '#dc2626' }}
             data-testid="alerts-new-count"
           >
-            {newCount} new
+            {newCount}
           </span>
         )}
       </div>
 
       {newCount === 0 ? (
         <div
-          className="mt-3 text-sm text-[#666] py-6 text-center"
+          className={`text-sm text-[#666] ${compact ? 'mt-1.5 py-0.5' : 'mt-3 py-6 text-center'}`}
           data-testid="alerts-empty"
         >
           You're all caught up.
         </div>
       ) : (
-        <div className="mt-3 flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
-          {alerts.map((a) => (
+        <div className={`${compact ? 'mt-2' : 'mt-3'} flex flex-col gap-1.5 ${compact ? '' : 'max-h-[300px] overflow-y-auto pr-1'}`}>
+          {visibleAlerts.map((a) => (
             <button
               type="button"
               key={a.key}
               onClick={a.onClick}
               disabled={!a.onClick}
-              className="text-left rounded-md pl-3 pr-2 py-2 bg-black/[0.02] hover:bg-black/[0.05] transition-colors"
+              className={`text-left rounded-md pl-3 pr-2 ${compact ? 'py-1.5' : 'py-2'} bg-black/[0.02] hover:bg-black/[0.05] transition-colors`}
               style={{
                 borderLeftWidth: '3px',
                 borderLeftStyle: 'solid',
@@ -447,14 +457,26 @@ export function AlertsExpanded({
               }}
               data-testid={a.testid}
             >
-              <div className="text-[13px] font-medium text-[#212121] truncate">
+              <div className={`${compact ? 'text-[12px]' : 'text-[13px]'} font-medium text-[#212121] truncate`}>
                 {a.title}
               </div>
-              {a.meta && (
+              {a.meta && !compact && (
                 <div className="text-[12px] text-[#666] truncate">{a.meta}</div>
               )}
             </button>
           ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/notifications');
+              }}
+              className="text-left text-[11px] text-[#3b82f6] hover:underline px-1 pt-0.5"
+              data-testid="alerts-see-all"
+            >
+              +{alerts.length - 3} more
+            </button>
+          )}
         </div>
       )}
     </div>

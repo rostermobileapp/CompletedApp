@@ -138,23 +138,68 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
       data-testid="home-desktop"
     >
       <div className="mx-auto w-full max-w-[1280px] px-6 py-6 flex flex-col gap-4">
-        {/* Row 1: Up Next + Alerts */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <UpNextCard
-            effectiveLeagueId={effectiveLeagueId}
-            selectedTeamId={selectedTeamId}
-            userTeamIds={allUserTeamIds}
-            isLeagueScope={isLeagueScope}
-            leagueTeamIds={userTeamIdsInLeague}
-            selectedTournamentId={selectedTournamentId}
-          />
-          <AlertsExpanded
-            effectiveLeagueId={effectiveLeagueId}
-            userTeamIds={allUserTeamIds}
-          />
-        </div>
+        {isTournamentScope ? (
+          <>
+            {/* Tournament layout: Up Next + Alerts full-width, then tournament cards */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <UpNextCard
+                effectiveLeagueId={effectiveLeagueId}
+                selectedTeamId={selectedTeamId}
+                userTeamIds={allUserTeamIds}
+                isLeagueScope={isLeagueScope}
+                leagueTeamIds={userTeamIdsInLeague}
+                selectedTournamentId={selectedTournamentId}
+              />
+              <AlertsExpanded
+                effectiveLeagueId={effectiveLeagueId}
+                userTeamIds={allUserTeamIds}
+              />
+            </div>
+            <TournamentBracketCard tournamentId={selectedTournamentId!} />
+            <TournamentScorekeeperCard tournamentId={selectedTournamentId!} />
+          </>
+        ) : (
+          <>
+            {/* Row 1: Left = compact Up Next + Alerts stacked; Right = Stats + Standings */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_3fr] lg:items-stretch">
+              {/* Left column: compact cards stacked */}
+              <div className="flex flex-col gap-4">
+                <UpNextCard
+                  compact
+                  effectiveLeagueId={effectiveLeagueId}
+                  selectedTeamId={selectedTeamId}
+                  userTeamIds={allUserTeamIds}
+                  isLeagueScope={isLeagueScope}
+                  leagueTeamIds={userTeamIdsInLeague}
+                  selectedTournamentId={selectedTournamentId}
+                />
+                <AlertsExpanded
+                  compact
+                  effectiveLeagueId={effectiveLeagueId}
+                  userTeamIds={allUserTeamIds}
+                />
+              </div>
+              {/* Right column: Stats + Standings side by side, full height */}
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
+                <TeamLeadersCard
+                  effectiveLeagueId={effectiveLeagueId}
+                  seasonId={activeSeason?.id || null}
+                  seasonLabel={seasonLabel}
+                  seasons={seasons ?? undefined}
+                />
+                <StandingsTable
+                  effectiveLeagueId={effectiveLeagueId}
+                  userTeamIdsInLeague={userTeamIdsInLeague}
+                  seasonLabel={seasonLabel}
+                  seasonId={effectiveSeasonId}
+                  seasons={seasons ?? undefined}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
-        {/* Row 2: Schedule (capped 1080px, centered) */}
+        {/* Schedule (capped 1080px, centered) */}
         <div className="mx-auto w-full max-w-[1080px]">
           <ScheduleCalendar
             selectedTeamId={selectedTeamId}
@@ -166,31 +211,6 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
             selectedTournamentId={selectedTournamentId}
           />
         </div>
-
-        {/* Row 3: Tournament bracket card (when tournament selected) OR
-            Team Leaders + Standings (otherwise) */}
-        {isTournamentScope ? (
-          <>
-            <TournamentBracketCard tournamentId={selectedTournamentId!} />
-            <TournamentScorekeeperCard tournamentId={selectedTournamentId!} />
-          </>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-            <TeamLeadersCard
-              effectiveLeagueId={effectiveLeagueId}
-              seasonId={activeSeason?.id || null}
-              seasonLabel={seasonLabel}
-              seasons={seasons ?? undefined}
-            />
-            <StandingsTable
-              effectiveLeagueId={effectiveLeagueId}
-              userTeamIdsInLeague={userTeamIdsInLeague}
-              seasonLabel={seasonLabel}
-              seasonId={effectiveSeasonId}
-              seasons={seasons ?? undefined}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

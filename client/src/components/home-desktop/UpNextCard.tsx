@@ -17,6 +17,8 @@ interface UpNextCardProps {
   leagueTeamIds?: string[];
   /** When set, restrict to tournament matches for the given tournament. */
   selectedTournamentId?: string | null;
+  /** Compact mode: reduced padding and condensed content for narrow column layouts. */
+  compact?: boolean;
 }
 
 interface UpcomingItem {
@@ -44,6 +46,7 @@ export function UpNextCard({
   isLeagueScope = false,
   leagueTeamIds,
   selectedTournamentId,
+  compact = false,
 }: UpNextCardProps) {
   const [, navigate] = useLocation();
 
@@ -172,7 +175,7 @@ export function UpNextCard({
     if (isLoading) {
       return (
         <div
-          className="mt-3 h-20 rounded-lg bg-black/[0.03] animate-pulse"
+          className={`${compact ? 'mt-2 h-12' : 'mt-3 h-20'} rounded-lg bg-black/[0.03] animate-pulse`}
           data-testid="up-next-loading"
         />
       );
@@ -188,7 +191,7 @@ export function UpNextCard({
           : 'No upcoming games scheduled.';
       return (
         <div
-          className="mt-3 text-sm text-[#666] py-6 text-center"
+          className={`text-sm text-[#666] ${compact ? 'mt-2 py-1' : 'mt-3 py-6 text-center'}`}
           data-testid="up-next-empty"
         >
           {emptyMessage}
@@ -221,10 +224,10 @@ export function UpNextCard({
         <button
           type="button"
           onClick={handleClick}
-          className="mt-3 w-full flex items-center gap-3 text-left rounded-lg p-2 -mx-2 hover:bg-black/[0.03] transition-colors"
+          className={`${compact ? 'mt-2' : 'mt-3'} w-full flex items-center gap-2.5 text-left rounded-lg p-2 -mx-2 hover:bg-black/[0.03] transition-colors`}
           data-testid="up-next-game"
         >
-          <div className="w-12 h-12 rounded-lg bg-[#DBEAFE] flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div className={`${compact ? 'w-9 h-9' : 'w-12 h-12'} rounded-lg bg-[#DBEAFE] flex items-center justify-center overflow-hidden flex-shrink-0`}>
             {opponent?.logoUrl ? (
               <img
                 src={getImageUrl(opponent.logoUrl) || ''}
@@ -232,20 +235,20 @@ export function UpNextCard({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <Trophy className="w-5 h-5" style={{ color: '#1E3A8A' }} />
+              <Trophy className={`${compact ? 'w-4 h-4' : 'w-5 h-5'}`} style={{ color: '#1E3A8A' }} />
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-medium text-[#212121] truncate">
+            <div className={`${compact ? 'text-[13px]' : 'text-[15px]'} font-medium text-[#212121] truncate`}>
               {headline}
             </div>
-            <div className="mt-0.5 flex items-center gap-1 text-[13px] text-[#555]">
-              <Clock className="w-3.5 h-3.5" />
+            <div className={`mt-0.5 flex items-center gap-1 ${compact ? 'text-[12px]' : 'text-[13px]'} text-[#555]`}>
+              <Clock className="w-3 h-3" />
               <span className="truncate">
-                {format(new Date(nextGame.scheduledAt), 'EEE MMM d • h:mm a')}
+                {format(new Date(nextGame.scheduledAt), compact ? 'MMM d • h:mm a' : 'EEE MMM d • h:mm a')}
               </span>
             </div>
-            {venueText && (
+            {venueText && !compact && (
               <div className="mt-0.5 flex items-center gap-1 text-[12px] text-[#777]">
                 <MapPin className="w-3 h-3" />
                 <span className="truncate">{venueText}</span>
@@ -256,7 +259,7 @@ export function UpNextCard({
 
         {showRsvp && (
           <div
-            className="mt-3 grid grid-cols-3 gap-2"
+            className={`${compact ? 'mt-2' : 'mt-3'} grid grid-cols-3 gap-1.5`}
             data-testid="up-next-rsvp"
           >
             <RsvpCell
@@ -265,6 +268,7 @@ export function UpNextCard({
               bg="#E6F6EC"
               fg="#15803d"
               testid="rsvp-in"
+              compact={compact}
             />
             <RsvpCell
               count={rsvpSummary?.notAttending?.length || 0}
@@ -272,6 +276,7 @@ export function UpNextCard({
               bg="#FBE7E7"
               fg="#b91c1c"
               testid="rsvp-out"
+              compact={compact}
             />
             <RsvpCell
               count={rsvpSummary?.noResponse?.length || 0}
@@ -279,6 +284,7 @@ export function UpNextCard({
               bg="#EFEFEC"
               fg="#555"
               testid="rsvp-noresponse"
+              compact={compact}
             />
           </div>
         )}
@@ -286,9 +292,13 @@ export function UpNextCard({
     );
   };
 
+  const wrapperClass = compact
+    ? 'bg-white rounded-xl px-4 py-3 text-[#212121]'
+    : cardClass;
+
   return (
-    <div className={cardClass} style={cardStyle} data-testid="card-up-next">
-      <div className={sectionTitleClass}>Up next</div>
+    <div className={wrapperClass} style={cardStyle} data-testid="card-up-next">
+      <div className={compact ? 'text-[13px] font-medium text-[#212121] tracking-tight' : sectionTitleClass}>Up next</div>
       {renderBody()}
     </div>
   );
@@ -300,21 +310,23 @@ function RsvpCell({
   bg,
   fg,
   testid,
+  compact = false,
 }: {
   count: number;
   label: string;
   bg: string;
   fg: string;
   testid: string;
+  compact?: boolean;
 }) {
   return (
     <div
-      className="rounded-lg px-3 py-2 text-center"
+      className={`rounded-lg text-center ${compact ? 'px-2 py-1' : 'px-3 py-2'}`}
       style={{ backgroundColor: bg, color: fg }}
       data-testid={testid}
     >
-      <div className="text-[18px] font-medium leading-none">{count}</div>
-      <div className="mt-1 text-[11px]">{label}</div>
+      <div className={`${compact ? 'text-[14px]' : 'text-[18px]'} font-medium leading-none`}>{count}</div>
+      <div className={`${compact ? 'mt-0.5 text-[10px]' : 'mt-1 text-[11px]'}`}>{label}</div>
     </div>
   );
 }
