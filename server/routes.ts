@@ -2075,11 +2075,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
 
       } else {
-        // Update existing customer's email to match current profile
-        await stripe.customers.update(customerId, {
-          email: user.email || undefined,
-          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
-        });
+        // Update existing customer's email to match current profile.
+        // If the stored ID no longer exists in Stripe (e.g. test-mode ID on live key)
+        // create a fresh customer and persist it so future calls succeed.
+        try {
+          await stripe.customers.update(customerId, {
+            email: user.email || undefined,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          });
+        } catch (customerError: any) {
+          if (customerError.code === 'resource_missing' || customerError.statusCode === 404) {
+            const freshCustomer = await stripe.customers.create({
+              email: user.email || undefined,
+              name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+              metadata: { userId },
+            });
+            customerId = freshCustomer.id;
+            await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+          } else {
+            throw customerError;
+          }
+        }
       }
 
       // Build URL from request
@@ -2089,8 +2105,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 'localhost:5000');
       const appUrl = `${protocol}://${host}`;
 
-      // Payment amount is already stored in cents
-      const amountInCents = Math.round(tournament.paymentAmount || 0);
+      // Payment amount is already stored in cents. If somehow zero (tournament
+      // created before teams were added), recalculate from current team count.
+      let amountInCents = Math.round(tournament.paymentAmount || 0);
+      if (amountInCents <= 0) {
+        amountInCents = await calculateTournamentPayment(tournamentId);
+        if (amountInCents > 0) {
+          await db.update(tournaments).set({ paymentAmount: amountInCents, updatedAt: new Date() }).where(eq(tournaments.id, tournamentId));
+        }
+      }
+      if (amountInCents <= 0) {
+        return res.status(400).json({ message: 'Tournament payment amount is not set. Please add teams first.' });
+      }
 
       // Embedded checkout = in-app payment modal (preferred for tournament page).
       // When the client passes { embedded: true } we use Stripe's Embedded Checkout
@@ -2227,10 +2253,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
 
       } else {
-        await stripe.customers.update(customerId, {
-          email: user.email || undefined,
-          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
-        });
+        try {
+          await stripe.customers.update(customerId, {
+            email: user.email || undefined,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          });
+        } catch (customerError: any) {
+          if (customerError.code === 'resource_missing' || customerError.statusCode === 404) {
+            const freshCustomer = await stripe.customers.create({
+              email: user.email || undefined,
+              name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+              metadata: { userId },
+            });
+            customerId = freshCustomer.id;
+            await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+          } else {
+            throw customerError;
+          }
+        }
       }
 
       // Build URL from request
@@ -2495,11 +2535,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
 
       } else {
-        // Update existing customer's email to match current profile
-        await stripe.customers.update(customerId, {
-          email: user.email || undefined,
-          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
-        });
+        // Update existing customer's email to match current profile.
+        // If the stored ID no longer exists in Stripe (e.g. test-mode ID on live key)
+        // create a fresh customer and persist it.
+        try {
+          await stripe.customers.update(customerId, {
+            email: user.email || undefined,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+          });
+        } catch (customerError: any) {
+          if (customerError.code === 'resource_missing' || customerError.statusCode === 404) {
+            const freshCustomer = await stripe.customers.create({
+              email: user.email || undefined,
+              name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : undefined,
+              metadata: { userId },
+            });
+            customerId = freshCustomer.id;
+            await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
+          } else {
+            throw customerError;
+          }
+        }
       }
 
       // Create billing portal session
