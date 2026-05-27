@@ -140,7 +140,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
       <div className="mx-auto w-full max-w-[1280px] px-6 py-6 flex flex-col gap-4">
         {isTournamentScope ? (
           <>
-            {/* Tournament layout: Up Next + Alerts full-width, then tournament cards */}
+            {/* Tournament Row 1: Up Next + Alerts full-width */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <UpNextCard
                 effectiveLeagueId={effectiveLeagueId}
@@ -155,6 +155,19 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 userTeamIds={allUserTeamIds}
               />
             </div>
+            {/* Tournament Row 2: Schedule (unchanged) */}
+            <div className="mx-auto w-full max-w-[1080px]">
+              <ScheduleCalendar
+                selectedTeamId={selectedTeamId}
+                effectiveLeagueId={effectiveLeagueId}
+                userTeamIds={allUserTeamIds}
+                isLeagueScope={isLeagueScope}
+                leagueTeamIds={userTeamIdsInLeague}
+                onAddEvent={onAddEvent}
+                selectedTournamentId={selectedTournamentId}
+              />
+            </div>
+            {/* Tournament Row 3: Bracket + Scorekeeper */}
             <TournamentBracketCard tournamentId={selectedTournamentId!} />
             <TournamentScorekeeperCard tournamentId={selectedTournamentId!} />
           </>
@@ -196,21 +209,20 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 />
               </div>
             </div>
+            {/* Row 2: Schedule (capped 1080px, centered) */}
+            <div className="mx-auto w-full max-w-[1080px]">
+              <ScheduleCalendar
+                selectedTeamId={selectedTeamId}
+                effectiveLeagueId={effectiveLeagueId}
+                userTeamIds={allUserTeamIds}
+                isLeagueScope={isLeagueScope}
+                leagueTeamIds={userTeamIdsInLeague}
+                onAddEvent={onAddEvent}
+                selectedTournamentId={selectedTournamentId}
+              />
+            </div>
           </>
         )}
-
-        {/* Schedule (capped 1080px, centered) */}
-        <div className="mx-auto w-full max-w-[1080px]">
-          <ScheduleCalendar
-            selectedTeamId={selectedTeamId}
-            effectiveLeagueId={effectiveLeagueId}
-            userTeamIds={allUserTeamIds}
-            isLeagueScope={isLeagueScope}
-            leagueTeamIds={userTeamIdsInLeague}
-            onAddEvent={onAddEvent}
-            selectedTournamentId={selectedTournamentId}
-          />
-        </div>
       </div>
     </div>
   );
