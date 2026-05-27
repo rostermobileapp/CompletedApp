@@ -75,7 +75,7 @@ export function StandingsTable({
   })();
 
   return (
-    <div className={cardClass} style={cardStyle} data-testid="card-standings">
+    <div className={`${cardClass} h-full`} style={cardStyle} data-testid="card-standings">
       <div className="flex items-center justify-between gap-2">
         <div className={sectionTitleClass}>Standings</div>
         {Array.isArray(seasons) && seasons.length > 1 ? (

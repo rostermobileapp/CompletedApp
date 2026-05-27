@@ -180,7 +180,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 />
               </div>
               {/* Right column: Stats + Standings side by side, full height */}
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr] lg:items-stretch">
                 <TeamLeadersCard
                   effectiveLeagueId={effectiveLeagueId}
                   seasonId={activeSeason?.id || null}

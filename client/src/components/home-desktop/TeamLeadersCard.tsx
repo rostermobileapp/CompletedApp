@@ -127,7 +127,7 @@ export function TeamLeadersCard({
 
   return (
     <div
-      className={cardClass}
+      className={`${cardClass} h-full`}
       style={cardStyle}
       data-testid="card-team-leaders"
     >
