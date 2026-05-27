@@ -21737,14 +21737,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(tournamentTeams)
           .where(eq(tournamentTeams.tournamentId, id));
 
-        const existingTeamIds = new Set(existingTeams.map(t => t.teamId));
-        const incomingTeamIds = new Set(teams.map((t: any) => t.teamId));
-
         const formatChanged = format && format !== tournament.format;
-        const teamsRemoved = [...existingTeamIds].some(id => !incomingTeamIds.has(id));
-        const teamsAdded = teams.filter((t: any) => !existingTeamIds.has(t.teamId));
-        const teamsUnchanged = !teamsRemoved && teamsAdded.length === 0;
-        const addOnly = !formatChanged && !teamsRemoved && teamsAdded.length > 0;
+
+        // Standalone tournaments store teams with teamId=null; compare by name instead.
+        const isStandaloneTournament = existingTeams.every(t => t.teamId === null) || tournament.type === 'standalone';
+        let teamsRemoved: boolean;
+        let teamsAdded: any[];
+        let teamsUnchanged: boolean;
+        let addOnly: boolean;
+
+        if (isStandaloneTournament) {
+          // For standalone: any team list change means a full regeneration.
+          // Compare by name to detect differences.
+          const existingNames = new Set(existingTeams.map(t => (t.teamName || '').toLowerCase()));
+          const incomingNames = new Set(teams.map((t: any) => (t.teamName || '').toLowerCase()));
+          teamsRemoved = [...existingNames].some(n => !incomingNames.has(n));
+          const incomingNamesAdded = teams.filter((t: any) => !existingNames.has((t.teamName || '').toLowerCase()));
+          teamsAdded = incomingNamesAdded;
+          teamsUnchanged = !teamsRemoved && teamsAdded.length === 0;
+          addOnly = false; // Standalone always does full regen when teams change (teamId=null prevents add-only append)
+        } else {
+          const existingTeamIds = new Set(existingTeams.map(t => t.teamId));
+          const incomingTeamIds = new Set(teams.map((t: any) => t.teamId));
+          teamsRemoved = [...existingTeamIds].some(id => !incomingTeamIds.has(id));
+          teamsAdded = teams.filter((t: any) => !existingTeamIds.has(t.teamId));
+          teamsUnchanged = !teamsRemoved && teamsAdded.length === 0;
+          addOnly = !formatChanged && !teamsRemoved && teamsAdded.length > 0;
+        }
+
         const skipRegeneration = teamsUnchanged || addOnly || req.body.regenerateBracket === false;
 
         if (!formatChanged && skipRegeneration) {

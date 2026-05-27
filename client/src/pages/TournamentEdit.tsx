@@ -125,6 +125,12 @@ export default function TournamentEdit() {
     pendingData: FormData | null;
   }>({ open: false, dayDelta: 0, pendingData: null });
 
+  // Standalone tournament team management (free-form names, no league lookup needed)
+  const [standaloneTeams, setStandaloneTeams] = useState<{ name: string }[]>([]);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+
   const { data: tournament, isLoading: tournamentLoading } = useQuery<Tournament & { accessState?: string }>({
     queryKey: ['/api/tournaments', tournamentId],
     enabled: !!tournamentId
@@ -201,6 +207,14 @@ export default function TournamentEdit() {
         teamIds: currentTeams.map(t => t.teamId).filter((id): id is string => id !== null),
         byePolicy: settings?.byePolicy || "top_seed_bye"
       });
+      // For standalone tournaments, seed the free-form team list from existing tournament teams
+      if (tournament.type === 'standalone') {
+        setStandaloneTeams(
+          [...currentTeams]
+            .sort((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+            .map(t => ({ name: t.teamName || '' }))
+        );
+      }
     }
   }, [tournament, currentTeams, form]);
 
@@ -223,22 +237,31 @@ export default function TournamentEdit() {
   const updateMutation = useMutation({
     mutationFn: async (payload: { data: FormData; shiftScheduledMatches?: boolean }) => {
       const { data, shiftScheduledMatches } = payload;
-      if (!teams) {
-        throw new Error("Teams data not loaded");
-      }
 
-      const teamData = data.teamIds.map((teamId, index) => {
-        const team = teams.find(t => t.id === teamId);
-        if (!team) throw new Error(`Team ${teamId} not found`);
-        
-        return {
-          teamId: team.id,
-          teamName: team.name,
+      // Build team payload differently depending on tournament type
+      let teamData: { teamId: string | null; teamName: string; seed: number; wins: number; losses: number }[];
+      if (tournament?.type === 'standalone') {
+        teamData = standaloneTeams.map((t, index) => ({
+          teamId: null,
+          teamName: t.name,
           seed: index + 1,
           wins: 0,
           losses: 0
-        };
-      });
+        }));
+      } else {
+        if (!teams) throw new Error("Teams data not loaded");
+        teamData = data.teamIds.map((teamId, index) => {
+          const team = teams.find(t => t.id === teamId);
+          if (!team) throw new Error(`Team ${teamId} not found`);
+          return {
+            teamId: team.id,
+            teamName: team.name,
+            seed: index + 1,
+            wins: 0,
+            losses: 0
+          };
+        });
+      }
 
       const settings: any = {};
       if (data.byePolicy) {
@@ -326,14 +349,54 @@ export default function TournamentEdit() {
     }
   };
 
+  // Standalone team management helpers
+  const addStandaloneTeam = () => {
+    const trimmed = newTeamName.trim();
+    if (!trimmed) {
+      toast({ title: "Team name required", description: "Please enter a team name", variant: "destructive" });
+      return;
+    }
+    if (standaloneTeams.some(t => t.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast({ title: "Duplicate team", description: "A team with this name already exists", variant: "destructive" });
+      return;
+    }
+    setStandaloneTeams(prev => [...prev, { name: trimmed }]);
+    setNewTeamName("");
+  };
+
+  const removeStandaloneTeam = (index: number) => {
+    setStandaloneTeams(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEditStandaloneTeam = (index: number) => {
+    const trimmed = editingName.trim();
+    if (!trimmed) return;
+    if (standaloneTeams.some((t, i) => i !== index && t.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast({ title: "Duplicate team", description: "A team with this name already exists", variant: "destructive" });
+      return;
+    }
+    setStandaloneTeams(prev => prev.map((t, i) => i === index ? { name: trimmed } : t));
+    setEditingIndex(null);
+    setEditingName("");
+  };
+
   const nextStep = async () => {
-    const fieldsToValidate = step === 1 
-      ? ["name", "type", "seasonId", "format", "description", "firstGameDate"] as const
-      : ["teamIds"] as const;
-    
-    const isValid = await form.trigger(fieldsToValidate);
-    if (isValid) {
-      setStep(step + 1);
+    if (step === 1) {
+      const isValid = await form.trigger(["name", "type", "seasonId", "format", "description", "firstGameDate"] as const);
+      if (isValid) setStep(step + 1);
+      return;
+    }
+    if (step === 2) {
+      if (tournament?.type === 'standalone') {
+        if (standaloneTeams.length < 2) {
+          toast({ title: "Not enough teams", description: "Please add at least 2 teams", variant: "destructive" });
+          return;
+        }
+        setStep(step + 1);
+      } else {
+        const isValid = await form.trigger(["teamIds"] as const);
+        if (isValid) setStep(step + 1);
+      }
     }
   };
 
@@ -648,7 +711,91 @@ export default function TournamentEdit() {
               </Card>
             )}
 
-            {step === 2 && (
+            {step === 2 && tournament?.type === 'standalone' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Edit Teams
+                  </CardTitle>
+                  <CardDescription>
+                    Add, rename, or remove teams. Seed order follows the list order ({standaloneTeams.length} teams).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {standaloneTeams.length > 0 && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        Any change to teams will regenerate the bracket and clear existing match data.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Add team row */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Team name"
+                      value={newTeamName}
+                      onChange={e => setNewTeamName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addStandaloneTeam(); } }}
+                      data-testid="input-new-team-name"
+                    />
+                    <Button type="button" onClick={addStandaloneTeam} data-testid="button-add-team">
+                      Add
+                    </Button>
+                  </div>
+
+                  {standaloneTeams.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No teams added yet. Add at least 2 teams to continue.</p>
+                  )}
+
+                  {/* Team list */}
+                  <div className="space-y-2">
+                    {standaloneTeams.map((team, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                        <Badge variant="secondary" className="font-mono shrink-0">#{index + 1}</Badge>
+                        {editingIndex === index ? (
+                          <>
+                            <Input
+                              className="h-8 flex-1"
+                              value={editingName}
+                              onChange={e => setEditingName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEditStandaloneTeam(index); } if (e.key === 'Escape') { setEditingIndex(null); } }}
+                              autoFocus
+                              data-testid={`input-edit-team-${index}`}
+                            />
+                            <Button type="button" size="sm" onClick={() => saveEditStandaloneTeam(index)} data-testid={`button-save-team-${index}`}>Save</Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setEditingIndex(null)}>Cancel</Button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 font-medium text-sm">{team.name}</span>
+                            <Button
+                              type="button" size="sm" variant="ghost"
+                              onClick={() => { setEditingIndex(index); setEditingName(team.name); }}
+                              data-testid={`button-edit-team-${index}`}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button" size="sm" variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => removeStandaloneTeam(index)}
+                              data-testid={`button-remove-team-${index}`}
+                            >
+                              Remove
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {step === 2 && tournament?.type !== 'standalone' && (
               <Card>
                 <CardHeader>
                   <CardTitle>Select Teams</CardTitle>
@@ -692,7 +839,7 @@ export default function TournamentEdit() {
                             <span className="font-medium">Select All Teams</span>
                           </div>
 
-                          {teams?.map((team, index) => (
+                          {teams?.map((team) => (
                             <FormField
                               key={team.id}
                               control={form.control}
@@ -710,7 +857,7 @@ export default function TournamentEdit() {
                                           if (checked) {
                                             field.onChange([...field.value, team.id]);
                                           } else {
-                                            field.onChange(field.value.filter(id => id !== team.id));
+                                            field.onChange(field.value.filter((id: string) => id !== team.id));
                                           }
                                         }}
                                         data-testid={`checkbox-team-${team.id}`}
@@ -750,64 +897,69 @@ export default function TournamentEdit() {
             )}
 
             {/* Bye Policy - Show for single elimination (odd teams only) or double elimination (all teams) */}
-            {step === 2 &&
-             ((watchedFormat === "single_elimination" && watchedTeamIds.length % 2 === 1) || 
-              watchedFormat === "double_elimination") && 
-             watchedTeamIds.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {watchedTeamIds.length % 2 === 1 ? "Bye Week Policy" : "Play-In Game Option"}
-                  </CardTitle>
-                  <CardDescription>
-                    {watchedTeamIds.length % 2 === 1 
-                      ? `With ${watchedTeamIds.length} teams (odd number), choose how to handle the extra team`
-                      : `With ${watchedTeamIds.length} teams, optionally add a play-in game for the lowest 2 seeds`
-                    }
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="byePolicy"
-                    render={({ field }) => (
-                      <FormItem>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-bye-policy">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {watchedTeamIds.length % 2 === 1 ? (
-                              <>
-                                <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
-                                <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
-                              </>
-                            ) : (
-                              <>
-                                <SelectItem value="top_seed_bye">No Play-In Game (Standard Bracket)</SelectItem>
-                                <SelectItem value="play_in_game">Lowest 2 Seeds Play Play-In Game</SelectItem>
-                              </>
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {watchedTeamIds.length % 2 === 1
-                            ? "Either the top seed advances automatically or the bottom 2 teams play for the final spot."
-                            : "Add an extra game where the bottom 2 seeds compete for entry into the main bracket."
-                          }
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-            )}
+            {step === 2 && (() => {
+              const teamCount = tournament?.type === 'standalone' ? standaloneTeams.length : watchedTeamIds.length;
+              const showBye =
+                ((watchedFormat === "single_elimination" && teamCount % 2 === 1) ||
+                  watchedFormat === "double_elimination") &&
+                teamCount > 0;
+              if (!showBye) return null;
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      {teamCount % 2 === 1 ? "Bye Week Policy" : "Play-In Game Option"}
+                    </CardTitle>
+                    <CardDescription>
+                      {teamCount % 2 === 1
+                        ? `With ${teamCount} teams (odd number), choose how to handle the extra team`
+                        : `With ${teamCount} teams, optionally add a play-in game for the lowest 2 seeds`
+                      }
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <FormField
+                      control={form.control}
+                      name="byePolicy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-bye-policy">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {teamCount % 2 === 1 ? (
+                                <>
+                                  <SelectItem value="top_seed_bye">Top Seed Gets Bye to Round 2</SelectItem>
+                                  <SelectItem value="play_in_game">Bottom 2 Seeds Play Play-In Game</SelectItem>
+                                </>
+                              ) : (
+                                <>
+                                  <SelectItem value="top_seed_bye">No Play-In Game (Standard Bracket)</SelectItem>
+                                  <SelectItem value="play_in_game">Lowest 2 Seeds Play Play-In Game</SelectItem>
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            {teamCount % 2 === 1
+                              ? "Either the top seed advances automatically or the bottom 2 teams play for the final spot."
+                              : "Add an extra game where the bottom 2 seeds compete for entry into the main bracket."
+                            }
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {step === 3 && (
               <Card>
@@ -843,24 +995,49 @@ export default function TournamentEdit() {
                     )}
 
                     <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">
-                        Participating Teams ({watchedTeamIds.length})
-                      </div>
-                      <div className="space-y-2">
-                        {watchedTeamIds.map((teamId, index) => {
-                          const team = teams?.find(t => t.id === teamId);
-                          return (
-                            <div key={teamId} className="flex items-center gap-2 p-2 bg-muted rounded">
-                              <Badge variant="secondary" className="font-mono">#{index + 1}</Badge>
-                              <span className="font-medium">{team?.name}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {tournament?.type === 'standalone' ? (
+                        <>
+                          <div className="text-sm font-medium text-muted-foreground mb-2">
+                            Participating Teams ({standaloneTeams.length})
+                          </div>
+                          <div className="space-y-2">
+                            {standaloneTeams.map((team, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                                <Badge variant="secondary" className="font-mono">#{index + 1}</Badge>
+                                <span className="font-medium">{team.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-sm font-medium text-muted-foreground mb-2">
+                            Participating Teams ({watchedTeamIds.length})
+                          </div>
+                          <div className="space-y-2">
+                            {watchedTeamIds.map((teamId, index) => {
+                              const team = teams?.find(t => t.id === teamId);
+                              return (
+                                <div key={teamId} className="flex items-center gap-2 p-2 bg-muted rounded">
+                                  <Badge variant="secondary" className="font-mono">#{index + 1}</Badge>
+                                  <span className="font-medium">{team?.name}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {willRegenerateBracket ? (
+                  {tournament?.type === 'standalone' ? (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Warning:</strong> Saving will regenerate the bracket and clear all existing match data.
+                      </AlertDescription>
+                    </Alert>
+                  ) : willRegenerateBracket ? (
                     <Alert variant="destructive">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription>
