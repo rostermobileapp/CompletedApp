@@ -124,7 +124,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
       }}
     >
       <LayoutGroup>
-        <div className="grid py-2 grid-cols-5 bg-[#e2e2e2] dark:bg-[#212121]">
+        <div className="grid py-2 grid-cols-5 bg-[#e2e2e2] dark:bg-[#212121] pt-[2px] pb-[2px]">
           {FIXED_SHORTCUTS.map((shortcut) => {
             const Icon = shortcut.icon;
             const isActive = activeId === shortcut.id;
@@ -160,7 +160,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
                     // Shared-layoutId pill: framer-motion morphs this circle
                     // from the previous active tab to this one with spring
                     // physics whenever the active tab changes.
-                    <motion.div
+                    (<motion.div
                       layoutId="active-nav-pill"
                       className="absolute -top-6 w-12 h-12 rounded-full bg-[#e2e2e2] dark:bg-[#212121] hairline elev-lift flex items-center justify-center"
                       style={{ left: '50%', marginLeft: '-24px' }}
@@ -195,7 +195,7 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
                           </div>
                         )}
                       </motion.div>
-                    </motion.div>
+                    </motion.div>)
                   ) : shortcut.id === 'home' ? (
                     <img src={homeLogo} alt="Home" className="w-[35px] h-[35px] -mt-[10px]" />
                   ) : Icon && (
