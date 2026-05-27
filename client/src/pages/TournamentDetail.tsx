@@ -936,6 +936,8 @@ export default function TournamentDetail() {
   // Define this before hooks that use it
   const canManageTournament = () => {
     if (!tournament || !currentUser) return false;
+    // Fee-exempt (founder) accounts are super-admins — full management on any tournament.
+    if (currentUser.feeExempt) return true;
     if (tournament.type === 'standalone' && tournament.createdBy === currentUser.id) return true;
     if (tournament.type === 'season_playoff' && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId)) return true;
     return false;

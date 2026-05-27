@@ -872,6 +872,7 @@ export async function canManageTournamentSpecific(
   if (!user || !tournamentId) return false;
 
   // Global passes
+  if (user.feeExempt) return true;
   if (user.isPrimaryCommissioner) return true;
   if (user.role === 'commissioner') return true;
   if (hasSpecialPermission(user, 'admin')) return true;
