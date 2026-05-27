@@ -22680,10 +22680,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Tournament not found" });
       }
 
-      if (tournament.status !== 'draft') {
-        return res.status(400).json({ message: "Cannot delete tournament after it has started" });
-      }
-
       // Get all games associated with this tournament's matches
       const matchesWithGames = await db
         .select({ gameId: tournamentMatches.gameId })

@@ -956,7 +956,9 @@ export default function TournamentDetail() {
   // surface inline gating banners next to disabled controls so creators know
   // exactly what payment unlocks (player imports, team assignments, bracket
   // edits, schedule/score). Mirrors the server's `requireTournamentPaid` 402.
-  const isUnpaid = !!tournament && tournament.paymentStatus !== 'paid' && canManageTournament();
+  // Fee-exempt users (founder/demo accounts) bypass all payment gates.
+  const isFeeExempt = !!currentUser?.feeExempt;
+  const isUnpaid = !!tournament && tournament.paymentStatus !== 'paid' && canManageTournament() && !isFeeExempt;
 
   const { data: pendingParticipants } = useQuery<any[]>({
     queryKey: ['/api/tournaments', tournamentId, 'participants', 'pending'],
@@ -1893,38 +1895,29 @@ export default function TournamentDetail() {
 
             {!isReadOnlyMode && (
               <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Pay button — only for unpaid draft tournaments; hidden for fee-exempt accounts */}
+                {tournament.status === 'draft' && canManageTournament() && tournament.paymentStatus !== 'paid' && !isFeeExempt && (
+                  <Button
+                    onClick={() => paymentMutation.mutate()}
+                    disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
+                    size="sm"
+                    data-testid="button-pay-now"
+                    title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                  </Button>
+                )}
+                {/* Edit Settings — only for draft; Edit First Game Date for started standalone */}
                 {tournament.status === 'draft' ? (
-                  <>
-                    {canManageTournament() && tournament.paymentStatus !== 'paid' && (
-                      <Button
-                        onClick={() => paymentMutation.mutate()}
-                        disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
-                        size="sm"
-                        data-testid="button-pay-now"
-                        title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
-                      >
-                        <DollarSign className="h-4 w-4 mr-1" />
-                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                      </Button>
-                    )}
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
-                      data-testid="button-edit"
-                    >
-                      Edit Settings
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => setShowDeleteDialog(true)}
-                      data-testid="button-delete"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                    data-testid="button-edit"
+                  >
+                    Edit Settings
+                  </Button>
                 ) : tournament.type === 'standalone' && (
                   <Button
                     variant="outline"
@@ -1935,6 +1928,16 @@ export default function TournamentDetail() {
                     Edit First Game Date
                   </Button>
                 )}
+                {/* Delete — always visible to managers regardless of status */}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  data-testid="button-delete"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
               </div>
             )}
           </div>
@@ -3114,9 +3117,18 @@ export default function TournamentDetail() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Tournament?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{tournament?.name}"? This action cannot be undone.
-              All matches, teams, and tournament data will be permanently removed.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure you want to delete <strong>"{tournament?.name}"</strong>? This action cannot be undone.
+                  All matches, teams, and tournament data will be permanently removed.
+                </p>
+                {tournament?.paymentStatus === 'paid' && (
+                  <p className="text-destructive font-medium">
+                    ⚠️ Payments are non-refundable. Any fees already collected for this tournament will NOT be returned if you delete it.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
