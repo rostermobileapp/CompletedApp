@@ -872,7 +872,6 @@ export async function canManageTournamentSpecific(
   if (!user || !tournamentId) return false;
 
   // Global passes
-  if (user.feeExempt) return true;
   if (user.isPrimaryCommissioner) return true;
   if (user.role === 'commissioner') return true;
   if (hasSpecialPermission(user, 'admin')) return true;
@@ -1073,12 +1072,6 @@ export function requireTournamentPaid(options: RequireTournamentPaidOptions = {}
 
       if (!tournament) {
         // Let the route surface its own 404
-        return next();
-      }
-
-      // Fee-exempt accounts (founder / demo) bypass the payment gate entirely
-      const requestingUser = (req as any).userWithPermissions;
-      if (requestingUser?.feeExempt) {
         return next();
       }
 
