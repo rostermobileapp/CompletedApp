@@ -22666,7 +22666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Delete tournament (draft only)
   // Delete tournament — creators can always delete their own tournament regardless of payment.
-  app.delete('/api/tournaments/:id', isAuthenticated, loadUserPermissions, requireTournamentManagement, async (req: any, res) => {
+  app.delete('/api/tournaments/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
 

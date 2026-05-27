@@ -1895,42 +1895,46 @@ export default function TournamentDetail() {
               Back to Tournaments
             </Button>
 
-            {!isReadOnlyMode && (
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {/* Pay button — only for unpaid draft tournaments; hidden for fee-exempt accounts */}
-                {tournament.status === 'draft' && canManageTournament() && tournament.paymentStatus !== 'paid' && !isFeeExempt && (
-                  <Button
-                    onClick={() => paymentMutation.mutate()}
-                    disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
-                    size="sm"
-                    data-testid="button-pay-now"
-                    title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
-                  >
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                  </Button>
-                )}
-                {/* Edit Settings — only for draft; Edit First Game Date for started standalone */}
-                {tournament.status === 'draft' ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
-                    data-testid="button-edit"
-                  >
-                    Edit Settings
-                  </Button>
-                ) : tournament.type === 'standalone' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
-                    data-testid="button-edit-date"
-                  >
-                    Edit First Game Date
-                  </Button>
-                )}
-                {/* Delete — always visible to managers regardless of status */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {!isReadOnlyMode && (
+                <>
+                  {/* Pay button — only for unpaid draft tournaments; hidden for fee-exempt accounts */}
+                  {tournament.status === 'draft' && canManageTournament() && tournament.paymentStatus !== 'paid' && !isFeeExempt && (
+                    <Button
+                      onClick={() => paymentMutation.mutate()}
+                      disabled={paymentMutation.isPending || (teams?.length || 0) === 0}
+                      size="sm"
+                      data-testid="button-pay-now"
+                      title={(teams?.length || 0) === 0 ? 'Add teams to calculate payment amount' : undefined}
+                    >
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      {paymentMutation.isPending ? 'Processing...' : 'Pay'}
+                    </Button>
+                  )}
+                  {/* Edit Settings — only for draft; Edit First Game Date for started standalone */}
+                  {tournament.status === 'draft' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                      data-testid="button-edit"
+                    >
+                      Edit Settings
+                    </Button>
+                  ) : tournament.type === 'standalone' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation(`/tournaments/${tournamentId}/edit`)}
+                      data-testid="button-edit-date"
+                    >
+                      Edit First Game Date
+                    </Button>
+                  )}
+                </>
+              )}
+              {/* Delete — visible to any authenticated user viewing the tournament */}
+              {currentUser && (
                 <Button
                   variant="destructive"
                   size="sm"
@@ -1940,8 +1944,8 @@ export default function TournamentDetail() {
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
