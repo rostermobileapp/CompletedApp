@@ -2507,22 +2507,6 @@ export default function TournamentDetail() {
                     </a>
                   </div>
 
-                  {isUnpaid && (
-                    <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-csv">
-                      <p className="text-sm text-amber-700 dark:text-amber-400">
-                        Pay your tournament invoice to start importing teams &amp; players.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={() => paymentMutation.mutate()}
-                        disabled={paymentMutation.isPending}
-                        data-testid="button-pay-csv"
-                      >
-                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                      </Button>
-                    </div>
-                  )}
-
                   <div className="space-y-3">
                     <input
                       type="file"
@@ -2533,19 +2517,40 @@ export default function TournamentDetail() {
                       id="csv-upload"
                       data-testid="input-csv-upload"
                     />
-                    <label htmlFor="csv-upload">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isUploadingCsv || isUnpaid}
-                        onClick={() => document.getElementById('csv-upload')?.click()}
-                        data-testid="button-csv-upload"
-                        className="w-full"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {isUploadingCsv ? 'Uploading...' : 'Upload CSV'}
-                      </Button>
-                    </label>
+                    <TooltipProvider>
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <label htmlFor={isUnpaid ? undefined : 'csv-upload'} className="block">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={isUploadingCsv || isUnpaid}
+                              onClick={() => !isUnpaid && document.getElementById('csv-upload')?.click()}
+                              data-testid="button-csv-upload"
+                              className="w-full"
+                              style={isUnpaid ? { pointerEvents: 'none' } : undefined}
+                            >
+                              <Upload className="h-4 w-4 mr-2" />
+                              {isUploadingCsv ? 'Uploading...' : 'Upload CSV'}
+                            </Button>
+                          </label>
+                        </TooltipTrigger>
+                        {isUnpaid && (
+                          <TooltipContent className="flex flex-col items-start gap-2 p-3 max-w-xs">
+                            <p className="text-sm">Pay your invoice to start importing teams &amp; players.</p>
+                            <Button
+                              size="sm"
+                              onClick={() => paymentMutation.mutate()}
+                              disabled={paymentMutation.isPending}
+                              className="w-full"
+                            >
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              {paymentMutation.isPending ? 'Processing...' : 'Pay Now'}
+                            </Button>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     {csvFile && (
                       <p className="text-sm text-muted-foreground">
                         Selected: {csvFile.name}
@@ -2569,21 +2574,6 @@ export default function TournamentDetail() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isUnpaid && (
-                    <div className="mb-4 p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-approve">
-                      <p className="text-sm text-amber-700 dark:text-amber-400">
-                        You can approve players now, but assigning them to teams unlocks after you pay your tournament invoice.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={() => paymentMutation.mutate()}
-                        disabled={paymentMutation.isPending}
-                        data-testid="button-pay-approve"
-                      >
-                        {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                      </Button>
-                    </div>
-                  )}
                   <div className="space-y-3">
                     {pendingParticipants.map((participant: any) => {
                       const teamSelection = pendingApprovalTeamId[participant.id] ?? '__free__';
@@ -2861,21 +2851,6 @@ export default function TournamentDetail() {
           {/* Players Tab - Manager only, hidden in read-only */}
           {!isReadOnlyMode && canManageTournament() && (
             <TabsContent value="players" className="max-w-7xl mx-auto px-4 md:px-8 space-y-6">
-              {isUnpaid && (
-                <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-players">
-                  <p className="text-sm text-amber-700 dark:text-amber-400">
-                    Pay your tournament invoice to assign players to teams. You can still see the roster below.
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => paymentMutation.mutate()}
-                    disabled={paymentMutation.isPending}
-                    data-testid="button-pay-players"
-                  >
-                    {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                  </Button>
-                </div>
-              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -3003,21 +2978,6 @@ export default function TournamentDetail() {
 
           {/* Schedule Tab */}
           <TabsContent value="schedule" className="max-w-7xl mx-auto px-4 md:px-8 space-y-4">
-            {isUnpaid && canManageTournament() && (
-              <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-schedule">
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  Pay your tournament invoice to set match times, locations, and scores.
-                </p>
-                <Button
-                  size="sm"
-                  onClick={() => paymentMutation.mutate()}
-                  disabled={paymentMutation.isPending}
-                  data-testid="button-pay-schedule"
-                >
-                  {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                </Button>
-              </div>
-            )}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -3075,26 +3035,72 @@ export default function TournamentDetail() {
                                       {match.status}
                                     </Badge>
                                     {tournament && tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
-                                      <Button 
-                                        size="sm" 
-                                        variant="default" 
-                                        onClick={() => setScoringMatchId(match.id)}
-                                        disabled={isUnpaid}
-                                        data-testid={`button-score-match-${match.matchNumber}`}
-                                      >
-                                        <Edit3 className="h-3.5 w-3.5 mr-1" />
-                                        Score
-                                      </Button>
+                                      <TooltipProvider>
+                                        <Tooltip delayDuration={0}>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex">
+                                              <Button 
+                                                size="sm" 
+                                                variant="default" 
+                                                onClick={() => setScoringMatchId(match.id)}
+                                                disabled={isUnpaid}
+                                                data-testid={`button-score-match-${match.matchNumber}`}
+                                                style={isUnpaid ? { pointerEvents: 'none' } : undefined}
+                                              >
+                                                <Edit3 className="h-3.5 w-3.5 mr-1" />
+                                                Score
+                                              </Button>
+                                            </span>
+                                          </TooltipTrigger>
+                                          {isUnpaid && (
+                                            <TooltipContent className="flex flex-col items-start gap-2 p-3 max-w-xs">
+                                              <p className="text-sm">Pay your invoice to set scores and times.</p>
+                                              <Button
+                                                size="sm"
+                                                onClick={() => paymentMutation.mutate()}
+                                                disabled={paymentMutation.isPending}
+                                                className="w-full"
+                                              >
+                                                <DollarSign className="h-3 w-3 mr-1" />
+                                                {paymentMutation.isPending ? 'Processing...' : 'Pay Now'}
+                                              </Button>
+                                            </TooltipContent>
+                                          )}
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     )}
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline" 
-                                      onClick={() => setEditingMatch(match)}
-                                      disabled={isUnpaid}
-                                      data-testid={`button-edit-match-${match.matchNumber}`}
-                                    >
-                                      Edit
-                                    </Button>
+                                    <TooltipProvider>
+                                      <Tooltip delayDuration={0}>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex">
+                                            <Button 
+                                              size="sm" 
+                                              variant="outline" 
+                                              onClick={() => setEditingMatch(match)}
+                                              disabled={isUnpaid}
+                                              data-testid={`button-edit-match-${match.matchNumber}`}
+                                              style={isUnpaid ? { pointerEvents: 'none' } : undefined}
+                                            >
+                                              Edit
+                                            </Button>
+                                          </span>
+                                        </TooltipTrigger>
+                                        {isUnpaid && (
+                                          <TooltipContent className="flex flex-col items-start gap-2 p-3 max-w-xs">
+                                            <p className="text-sm">Pay your invoice to set scores and times.</p>
+                                            <Button
+                                              size="sm"
+                                              onClick={() => paymentMutation.mutate()}
+                                              disabled={paymentMutation.isPending}
+                                              className="w-full"
+                                            >
+                                              <DollarSign className="h-3 w-3 mr-1" />
+                                              {paymentMutation.isPending ? 'Processing...' : 'Pay Now'}
+                                            </Button>
+                                          </TooltipContent>
+                                        )}
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   </div>
                                 </div>
                                 
