@@ -1946,24 +1946,20 @@ export default function TournamentDetail() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            {/* Line 1: Tournament title with logo */}
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-tournament-name">
+          <div className="space-y-1">
+            {/* Title + all badges on one compact row */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="text-tournament-name">
               {tournament.logoUrl ? (
                 <img
                   src={getImageUrl(tournament.logoUrl) || undefined}
                   alt={`${tournament.name} logo`}
-                  className="h-7 w-7 md:h-9 md:w-9 rounded object-cover"
+                  className="h-5 w-5 rounded object-cover flex-shrink-0"
                   data-testid="img-tournament-logo"
                 />
               ) : (
-                <Trophy className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+                <Trophy className="h-5 w-5 text-primary flex-shrink-0" />
               )}
-              {tournament.name}
-            </h1>
-
-            {/* Line 2: All badges (ID, type, format, team count, payment) */}
-            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xl font-bold tracking-tight">{tournament.name}</span>
               <Badge 
                 variant="outline" 
                 className="font-mono font-semibold text-xs cursor-pointer hover:bg-muted"
