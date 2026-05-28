@@ -45,6 +45,7 @@ import LocationLink from "@/components/LocationLink";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { usePermissions } from "@/context/SubscriptionContext";
+import { useWebSocket } from "@/context/WebSocketContext";
 import { resolveTeamDisplay, resolveGameName } from "@/utils/tournamentMatchDisplay";
 import { StripeCheckoutModal } from "@/components/StripeCheckoutModal";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -853,6 +854,7 @@ export default function TournamentDetail() {
   const tournamentId = params?.tournamentId;
   const { toast } = useToast();
   const { canManageLeagueSpecific } = usePermissions();
+  const ws = useWebSocket();
   
   // Read tab and readonly mode from URL query parameters.
   // The "real" isReadOnlyMode is derived later (see below) so it can also
@@ -992,6 +994,37 @@ export default function TournamentDetail() {
       markAsRead();
     }
   }, [tournamentId, announcements]);
+
+  // Real-time bracket updates: subscribe to this tournament over WebSocket so
+  // all connected viewers (not just the commissioner) see score/bracket changes
+  // instantly without needing to refresh.
+  useEffect(() => {
+    if (!tournamentId) return;
+
+    const invalidateMatches = () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'matches'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId] });
+    };
+
+    ws.send({ type: 'tournament_subscribe', tournamentId });
+
+    const offReconnect = ws.onConnected(() => {
+      ws.send({ type: 'tournament_subscribe', tournamentId });
+    });
+
+    const offUpdate = ws.subscribe('tournament_match_update', (data: any) => {
+      if (data.tournamentId === tournamentId) {
+        invalidateMatches();
+      }
+    });
+
+    return () => {
+      ws.send({ type: 'tournament_unsubscribe', tournamentId });
+      offReconnect();
+      offUpdate();
+    };
+  }, [tournamentId, ws]);
 
   // Auto-sync tournament payment state from Stripe on every page mount.
   // Mirrors the Subscription page's `/api/stripe/sync-subscription` pattern.

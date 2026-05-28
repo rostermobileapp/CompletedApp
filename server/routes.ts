@@ -138,6 +138,41 @@ export function broadcastNotificationUpdate(userId: string) {
   });
 }
 
+// In-memory map of subscribed users per tournament (tournamentId -> Set<userId>)
+const tournamentSubscribers = new Map<string, Set<string>>();
+
+function subscribeToTournament(tournamentId: string, userId: string) {
+  let subs = tournamentSubscribers.get(tournamentId);
+  if (!subs) {
+    subs = new Set();
+    tournamentSubscribers.set(tournamentId, subs);
+  }
+  subs.add(userId);
+}
+
+function unsubscribeFromTournament(tournamentId: string, userId: string) {
+  const subs = tournamentSubscribers.get(tournamentId);
+  if (subs) subs.delete(userId);
+}
+
+function unsubscribeUserFromAllTournaments(userId: string) {
+  for (const subs of Array.from(tournamentSubscribers.values())) {
+    subs.delete(userId);
+  }
+}
+
+function broadcastToTournament(tournamentId: string, message: any) {
+  const subs = tournamentSubscribers.get(tournamentId);
+  if (!subs) return;
+  for (const userId of Array.from(subs)) {
+    try {
+      broadcastToUser(userId, message);
+    } catch (e) {
+      // ignore per-user broadcast failures
+    }
+  }
+}
+
 // Helper function to format date as local time string without timezone suffix
 // Returns format: "YYYY-MM-DDTHH:MM:SS" which prevents timezone adjustments on frontend
 function formatDateAsLocalString(date: Date | string | null | undefined): string {
@@ -18109,6 +18144,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unsubscribeFromDraft(data.draftId, userId);
             break;
 
+          case 'tournament_subscribe':
+            if (!userId || !data.tournamentId) return;
+            subscribeToTournament(data.tournamentId, userId);
+            ws.send(JSON.stringify({ type: 'tournament_subscribed', tournamentId: data.tournamentId }));
+            break;
+
+          case 'tournament_unsubscribe':
+            if (!userId || !data.tournamentId) return;
+            unsubscribeFromTournament(data.tournamentId, userId);
+            break;
+
           case 'draft_chat':
             if (!userId || !data.draftId || !data.body) return;
             try {
@@ -18137,6 +18183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Remove connection
         activeConnections.delete(userId);
         unsubscribeUserFromAllDrafts(userId);
+        unsubscribeUserFromAllTournaments(userId);
         
         // Update user offline status (wrapped in try-catch to prevent server crash)
         try {
@@ -20962,6 +21009,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return updatedMatch;
       });
 
+      broadcastToTournament(tournamentId, {
+        type: 'tournament_match_update',
+        tournamentId,
+        matchId: result.id,
+      });
+
       res.json({ 
         match: result,
         message: "Match scored successfully"
@@ -22365,6 +22418,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await recomputeTournamentDatesFromMatches(updatedMatch.tournamentId);
       }
 
+      broadcastToTournament(updatedMatch.tournamentId, {
+        type: 'tournament_match_update',
+        tournamentId: updatedMatch.tournamentId,
+        matchId: updatedMatch.id,
+      });
+
       res.json(updatedMatch);
     } catch (error) {
       console.error("Error updating match:", error);
@@ -22548,6 +22607,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .from(tournamentMatches)
         .where(eq(tournamentMatches.tournamentId, id));
+
+      broadcastToTournament(id, {
+        type: 'tournament_match_update',
+        tournamentId: id,
+        matchId: null,
+      });
 
       res.json({ 
         success: true, 
