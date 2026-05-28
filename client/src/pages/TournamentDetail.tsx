@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2047,21 +2048,6 @@ export default function TournamentDetail() {
 
           {/* Bracket Tab - Full width */}
           <TabsContent value="bracket" className="space-y-4 px-2 mt-[4px]">
-            {isUnpaid && canManageTournament() && (
-              <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="banner-pay-required-bracket">
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  Pay your tournament invoice to unlock bracket editing. You can still preview the auto-generated bracket below.
-                </p>
-                <Button
-                  size="sm"
-                  onClick={() => paymentMutation.mutate()}
-                  disabled={paymentMutation.isPending}
-                  data-testid="button-pay-bracket"
-                >
-                  {paymentMutation.isPending ? 'Processing...' : 'Pay'}
-                </Button>
-              </div>
-            )}
             {(matches && matches.length > 0) || 
              tournament.format === 'custom_bracket' ||
              (tournament.status === 'draft' && ['single_elimination', 'double_elimination', 'three_game_guarantee', 'round_robin_split'].includes(tournament.format)) ? (
@@ -2128,16 +2114,39 @@ export default function TournamentDetail() {
                       {!isReadOnlyMode && (
                         <div className="flex gap-2 flex-wrap">
                           {tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
-                            <Button
-                              onClick={() => setIsEditingBracket(true)}
-                              data-testid="button-unlock-bracket"
-                              variant="outline"
-                              className="gap-2"
-                              disabled={isUnpaid}
-                            >
-                              <Edit className="h-4 w-4" />
-                              Edit Bracket
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex">
+                                    <Button
+                                      onClick={() => setIsEditingBracket(true)}
+                                      data-testid="button-unlock-bracket"
+                                      variant="outline"
+                                      className="gap-2 pointer-events-none"
+                                      disabled={isUnpaid}
+                                      style={isUnpaid ? { pointerEvents: 'none' } : undefined}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                      Edit Bracket
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {isUnpaid && (
+                                  <TooltipContent className="flex flex-col items-start gap-2 p-3 max-w-xs">
+                                    <p className="text-sm">Pay your invoice to unlock bracket editing.</p>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => paymentMutation.mutate()}
+                                      disabled={paymentMutation.isPending}
+                                      className="w-full"
+                                    >
+                                      <DollarSign className="h-3 w-3 mr-1" />
+                                      {paymentMutation.isPending ? 'Processing...' : 'Pay Now'}
+                                    </Button>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                           {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
                             <Button
@@ -2325,17 +2334,40 @@ export default function TournamentDetail() {
                             {!isReadOnlyMode && canManageTournament() && (
                               <>
                                 {tournament.status === 'draft' && (
-                                  <Button
-                                    onClick={() => setIsEditingBracket(true)}
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-2"
-                                    disabled={isUnpaid}
-                                    data-testid="button-edit-bracket"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                    Edit Bracket
-                                  </Button>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex">
+                                          <Button
+                                            onClick={() => setIsEditingBracket(true)}
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2"
+                                            disabled={isUnpaid}
+                                            data-testid="button-edit-bracket"
+                                            style={isUnpaid ? { pointerEvents: 'none' } : undefined}
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                            Edit Bracket
+                                          </Button>
+                                        </span>
+                                      </TooltipTrigger>
+                                      {isUnpaid && (
+                                        <TooltipContent className="flex flex-col items-start gap-2 p-3 max-w-xs">
+                                          <p className="text-sm">Pay your invoice to unlock bracket editing.</p>
+                                          <Button
+                                            size="sm"
+                                            onClick={() => paymentMutation.mutate()}
+                                            disabled={paymentMutation.isPending}
+                                            className="w-full"
+                                          >
+                                            <DollarSign className="h-3 w-3 mr-1" />
+                                            {paymentMutation.isPending ? 'Processing...' : 'Pay Now'}
+                                          </Button>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
                                 {tournament.leagueId && canManageLeagueSpecific(tournament.leagueId) && (
                                   <Button
