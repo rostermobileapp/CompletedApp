@@ -2115,7 +2115,7 @@ export default function TournamentDetail() {
                         <div className="flex gap-2 flex-wrap">
                           {tournament.status === 'draft' && isBracketLocked && !isEditingBracket && (
                             <TooltipProvider>
-                              <Tooltip>
+                              <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
                                   <span className="inline-flex">
                                     <Button
@@ -2335,7 +2335,7 @@ export default function TournamentDetail() {
                               <>
                                 {tournament.status === 'draft' && (
                                   <TooltipProvider>
-                                    <Tooltip>
+                                    <Tooltip delayDuration={0}>
                                       <TooltipTrigger asChild>
                                         <span className="inline-flex">
                                           <Button
