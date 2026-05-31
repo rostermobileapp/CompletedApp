@@ -24050,6 +24050,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signupsLastMonth = Number((lastMonthRow as any).rows?.[0]?.cnt ?? 0);
 
       // ── Revenue / subscription breakdown ─────────────────────────────────
+      // Count all paid users by role; then split by platform as a secondary lens.
+      // Platform split: Apple = iap_original_transaction_id set; Stripe = stripe_subscription_id
+      // set (and no IAP); Google = all remaining paid users (RevenueCat Android, etc.)
       const [paidRow] = await db.execute(sql`
         SELECT
           COUNT(*)::int AS total_paid,
@@ -24059,7 +24062,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
         AND role IN ('player_pro', 'commissioner')
-        AND (stripe_subscription_id IS NOT NULL OR iap_original_transaction_id IS NOT NULL)
       `);
       const paidStats = (paidRow as any).rows?.[0] ?? {};
       const paidCount = Number(paidStats.total_paid ?? 0);
@@ -24083,41 +24085,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const mrrCents = paidCount * PLAYER_PRO_MONTHLY_CENTS;
 
-      // MoM MRR: approximate by comparing paid counts this vs last month
+      // MoM MRR: new paid users who joined this month vs last month (by role only, no source filter)
       const [paidThisMonthRow] = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
         AND role IN ('player_pro', 'commissioner')
-        AND (stripe_subscription_id IS NOT NULL OR iap_original_transaction_id IS NOT NULL)
         AND created_at >= ${thisMonthStart.toISOString()}
       `);
       const newPaidThisMonth = Number((paidThisMonthRow as any).rows?.[0]?.cnt ?? 0);
-      const [paidLastMonthRow] = await db.execute(sql`
-        SELECT COUNT(*)::int AS cnt FROM users
-        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
-        AND deleted_at IS NULL
-        AND role IN ('player_pro', 'commissioner')
-        AND (stripe_subscription_id IS NOT NULL OR iap_original_transaction_id IS NOT NULL)
-        AND created_at >= ${lastMonthStart.toISOString()}
-        AND created_at <= ${lastMonthEnd.toISOString()}
-      `);
-      const newPaidLastMonth = Number((paidLastMonthRow as any).rows?.[0]?.cnt ?? 0);
+      // Estimated last-month MRR = current paid base minus those who became paid this month
+      const lastMonthMrrCents = Math.max(0, paidCount - newPaidThisMonth) * PLAYER_PRO_MONTHLY_CENTS;
 
       // ── Referral partners ────────────────────────────────────────────────
+      // Commission due = 10% of gross attributed revenue (fixed rate per spec)
+      const COMMISSION_RATE = 0.10;
       const partnersResult = await db.execute(sql`
         SELECT
           rp.id,
           rp.org_name,
           rp.status,
           rp.approved_at,
-          rp.payout_rate,
           COUNT(DISTINCT rul.user_id)::int AS attributed_signups,
           COALESCE(SUM(rc.gross_price_cents) FILTER (WHERE rc.status = 'active'), 0)::bigint AS gross_revenue_cents
         FROM referral_partners rp
         LEFT JOIN referral_user_links rul ON rul.referral_partner_id = rp.id
         LEFT JOIN referral_conversions rc ON rc.partner_id = rp.id
-        GROUP BY rp.id, rp.org_name, rp.status, rp.approved_at, rp.payout_rate
+        GROUP BY rp.id, rp.org_name, rp.status, rp.approved_at
         ORDER BY rp.created_at ASC
       `);
 
@@ -24128,13 +24122,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         approvedAt: p.approved_at,
         attributedSignups: Number(p.attributed_signups ?? 0),
         grossRevenueCents: Number(p.gross_revenue_cents ?? 0),
-        payoutRate: Number(p.payout_rate ?? 0.10),
-        commissionDueCents: Math.round(Number(p.gross_revenue_cents ?? 0) * Number(p.payout_rate ?? 0.10)),
+        commissionDueCents: Math.round(Number(p.gross_revenue_cents ?? 0) * COMMISSION_RATE),
       }));
 
       res.json({
         overview: {
           totalUsers,
+          // Estimated total users at end of last month (current total minus this month's signups)
+          lastMonthTotalUsers: Math.max(0, totalUsers - signupsThisMonth),
           dau,
           wau,
           mau,
@@ -24144,6 +24139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         revenue: {
           mrrCents,
+          lastMonthMrrCents,
           freeCount,
           paidCount,
           compedCount,
@@ -24154,7 +24150,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { source: 'Google', count: googleCount, mrrCents: googleCount * PLAYER_PRO_MONTHLY_CENTS },
           ],
           newPaidThisMonth,
-          newPaidLastMonth,
         },
         partners,
       });

@@ -94,7 +94,31 @@ export default function AdminMetrics() {
     staleTime: 60_000,
   });
 
-  if (authLoading || (!authLoading && authUser?.email !== ADMIN_EMAIL)) {
+  // Full-page skeleton while auth is resolving
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-24">
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-8">
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-11 h-11 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-40" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not the founder — redirect in-flight; render nothing while navigating
+  if (authUser?.email !== ADMIN_EMAIL) {
     return null;
   }
 
@@ -127,9 +151,9 @@ export default function AdminMetrics() {
             <h2 className="text-base font-semibold">Overview</h2>
             {!isLoading && overview && (
               <MomBadge
-                current={overview.signupsThisMonth}
-                previous={overview.signupsLastMonth}
-                label="signups"
+                current={overview.totalUsers}
+                previous={overview.lastMonthTotalUsers}
+                label="total users"
               />
             )}
           </div>
@@ -166,9 +190,9 @@ export default function AdminMetrics() {
             <h2 className="text-base font-semibold">Revenue</h2>
             {!isLoading && revenue && (
               <MomBadge
-                current={revenue.newPaidThisMonth}
-                previous={revenue.newPaidLastMonth}
-                label="new paid"
+                current={revenue.mrrCents}
+                previous={revenue.lastMonthMrrCents}
+                label="MRR"
               />
             )}
           </div>
