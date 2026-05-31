@@ -91,6 +91,7 @@ import ReferralPortal from "@/pages/ReferralPortal";
 import ReferralAdmin from "@/pages/ReferralAdmin";
 import ReferralAdminLogin from "@/pages/ReferralAdminLogin";
 import ReferralAdminPartnerDetail from "@/pages/ReferralAdminPartnerDetail";
+import AdminMetrics from "@/pages/AdminMetrics";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -321,6 +322,7 @@ function Router() {
               <Route path="/support" component={Support} />
               <Route path="/about" component={About} />
               <Route path="/admin/stripe" component={StripeAdmin} />
+              <Route path="/admin/metrics" component={AdminMetrics} />
               <Route component={Dashboard} />
             </Switch>
   );

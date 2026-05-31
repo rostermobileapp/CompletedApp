@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock, Monitor } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock, Monitor, BarChart2 } from 'lucide-react';
 import { Sheet, AnimatedSheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
@@ -31,7 +31,8 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
   const [location, navigate] = useLocation();
   const pendingPathRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
-  const { canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
+  const { user, canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
+  const isFounder = user?.email === 'founder@rosterhockey.com';
 
   const isControlled = externalOpen !== undefined && externalOnOpenChange !== undefined;
   const open = isControlled ? externalOpen : internalOpen;
@@ -138,6 +139,18 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
     },
   ];
 
+  const founderItem = isFounder
+    ? [{
+        icon: BarChart2,
+        label: 'App Statistics',
+        path: '/admin/metrics',
+        locked: false,
+        requiredTier: '',
+        bgColor: 'bg-violet-500/20',
+        iconColor: 'text-violet-500',
+      }]
+    : [];
+
   // Handle navigation after sheet closes
   useEffect(() => {
     if (!open && pendingPathRef.current) {
@@ -232,7 +245,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
           </SheetHeader>
           
           <div className="flex-1 flex flex-col gap-2 px-6 pb-6">
-            {menuItems.map((item) => {
+            {[...menuItems, ...founderItem].map((item) => {
               const showLock = item.locked;
               return (
                 <button

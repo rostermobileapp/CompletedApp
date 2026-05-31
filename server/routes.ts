@@ -23982,6 +23982,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start the tournament access window job (emails on open, push 24h before close)
   startTournamentAccessJob();
 
+  // ─── Admin Metrics Dashboard (founder-only) ──────────────────────────────
+  const ADMIN_EMAIL = 'founder@rosterhockey.com';
+  const PLAYER_PRO_MONTHLY_CENTS = 499; // $4.99/month
+
+  const requireFounder = (req: any, res: any, next: any) => {
+    const email = req.user?.claims?.email;
+    if (email !== ADMIN_EMAIL) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    next();
+  };
+
+  app.get('/api/admin/metrics', isAuthenticated, requireFounder, async (req: any, res) => {
+    try {
+      const now = new Date();
+      const day1 = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+      const day7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const day30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+      // ── Overview counts ──────────────────────────────────────────────────
+      const [totalRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS total FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+      `);
+      const totalUsers = Number((totalRow as any).rows?.[0]?.total ?? 0);
+
+      const [dauRow] = await db.execute(sql`
+        SELECT COUNT(DISTINCT id)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL AND updated_at >= ${day1.toISOString()}
+      `);
+      const dau = Number((dauRow as any).rows?.[0]?.cnt ?? 0);
+
+      const [wauRow] = await db.execute(sql`
+        SELECT COUNT(DISTINCT id)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL AND updated_at >= ${day7.toISOString()}
+      `);
+      const wau = Number((wauRow as any).rows?.[0]?.cnt ?? 0);
+
+      const [mauRow] = await db.execute(sql`
+        SELECT COUNT(DISTINCT id)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL AND updated_at >= ${day30.toISOString()}
+      `);
+      const mau = Number((mauRow as any).rows?.[0]?.cnt ?? 0);
+
+      const [thisMonthRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL AND created_at >= ${thisMonthStart.toISOString()}
+      `);
+      const signupsThisMonth = Number((thisMonthRow as any).rows?.[0]?.cnt ?? 0);
+
+      const [lastMonthRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+        AND created_at >= ${lastMonthStart.toISOString()}
+        AND created_at <= ${lastMonthEnd.toISOString()}
+      `);
+      const signupsLastMonth = Number((lastMonthRow as any).rows?.[0]?.cnt ?? 0);
+
+      // ── Revenue / subscription breakdown ─────────────────────────────────
+      const [paidRow] = await db.execute(sql`
+        SELECT
+          COUNT(*)::int AS total_paid,
+          COUNT(*) FILTER (WHERE iap_original_transaction_id IS NOT NULL)::int AS apple_count,
+          COUNT(*) FILTER (WHERE stripe_subscription_id IS NOT NULL AND iap_original_transaction_id IS NULL)::int AS stripe_count
+        FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+        AND role IN ('player_pro', 'commissioner')
+        AND (stripe_subscription_id IS NOT NULL OR iap_original_transaction_id IS NOT NULL)
+      `);
+      const paidStats = (paidRow as any).rows?.[0] ?? {};
+      const paidCount = Number(paidStats.total_paid ?? 0);
+      const appleCount = Number(paidStats.apple_count ?? 0);
+      const stripeCount = Number(paidStats.stripe_count ?? 0);
+      const googleCount = Math.max(0, paidCount - appleCount - stripeCount);
+
+      const [freeRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL AND role = 'free_tier' AND fee_exempt = false
+      `);
+      const freeCount = Number((freeRow as any).rows?.[0]?.cnt ?? 0);
+
+      const [compedRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL AND fee_exempt = true
+      `);
+      const compedCount = Number((compedRow as any).rows?.[0]?.cnt ?? 0);
+
+      const mrrCents = paidCount * PLAYER_PRO_MONTHLY_CENTS;
+
+      // MoM MRR: approximate by comparing paid counts this vs last month
+      const [paidThisMonthRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+        AND role IN ('player_pro', 'commissioner')
+        AND (stripe_subscription_id IS NOT NULL OR iap_original_transaction_id IS NOT NULL)
+        AND created_at >= ${thisMonthStart.toISOString()}
+      `);
+      const newPaidThisMonth = Number((paidThisMonthRow as any).rows?.[0]?.cnt ?? 0);
+      const [paidLastMonthRow] = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+        AND role IN ('player_pro', 'commissioner')
+        AND (stripe_subscription_id IS NOT NULL OR iap_original_transaction_id IS NOT NULL)
+        AND created_at >= ${lastMonthStart.toISOString()}
+        AND created_at <= ${lastMonthEnd.toISOString()}
+      `);
+      const newPaidLastMonth = Number((paidLastMonthRow as any).rows?.[0]?.cnt ?? 0);
+
+      // ── Referral partners ────────────────────────────────────────────────
+      const partnersResult = await db.execute(sql`
+        SELECT
+          rp.id,
+          rp.org_name,
+          rp.status,
+          rp.approved_at,
+          rp.payout_rate,
+          COUNT(DISTINCT rul.user_id)::int AS attributed_signups,
+          COALESCE(SUM(rc.gross_price_cents) FILTER (WHERE rc.status = 'active'), 0)::bigint AS gross_revenue_cents
+        FROM referral_partners rp
+        LEFT JOIN referral_user_links rul ON rul.referral_partner_id = rp.id
+        LEFT JOIN referral_conversions rc ON rc.partner_id = rp.id
+        GROUP BY rp.id, rp.org_name, rp.status, rp.approved_at, rp.payout_rate
+        ORDER BY rp.created_at ASC
+      `);
+
+      const partners = ((partnersResult as any).rows ?? []).map((p: any) => ({
+        id: p.id,
+        orgName: p.org_name,
+        status: p.status,
+        approvedAt: p.approved_at,
+        attributedSignups: Number(p.attributed_signups ?? 0),
+        grossRevenueCents: Number(p.gross_revenue_cents ?? 0),
+        payoutRate: Number(p.payout_rate ?? 0.10),
+        commissionDueCents: Math.round(Number(p.gross_revenue_cents ?? 0) * Number(p.payout_rate ?? 0.10)),
+      }));
+
+      res.json({
+        overview: {
+          totalUsers,
+          dau,
+          wau,
+          mau,
+          wauMauRatio: mau > 0 ? +(wau / mau).toFixed(2) : 0,
+          signupsThisMonth,
+          signupsLastMonth,
+        },
+        revenue: {
+          mrrCents,
+          freeCount,
+          paidCount,
+          compedCount,
+          conversionRate: totalUsers > 0 ? +(paidCount / totalUsers).toFixed(4) : 0,
+          bySource: [
+            { source: 'Stripe', count: stripeCount, mrrCents: stripeCount * PLAYER_PRO_MONTHLY_CENTS },
+            { source: 'Apple', count: appleCount, mrrCents: appleCount * PLAYER_PRO_MONTHLY_CENTS },
+            { source: 'Google', count: googleCount, mrrCents: googleCount * PLAYER_PRO_MONTHLY_CENTS },
+          ],
+          newPaidThisMonth,
+          newPaidLastMonth,
+        },
+        partners,
+      });
+    } catch (err) {
+      console.error('[Admin Metrics] Error:', err);
+      res.status(500).json({ message: 'Failed to load metrics' });
+    }
+  });
+
   // Referral program routes (public, partner portal, admin, webhook)
   registerReferralRoutes(app);
 

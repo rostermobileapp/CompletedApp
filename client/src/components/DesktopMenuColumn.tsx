@@ -14,6 +14,7 @@ import {
   Lock,
   Search,
   MessageSquare,
+  BarChart2,
 } from 'lucide-react';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 import FeedbackModal from '@/components/FeedbackModal';
@@ -33,12 +34,14 @@ export function DesktopMenuColumn() {
   const [showPremiumAlert, setShowPremiumAlert] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const {
+    user,
     canAccessPremiumFeatures,
     canManageLeague,
     hasStatManagerAccess,
     isCoCommissionerOfAnyLeague,
     isLoading,
   } = usePermissions();
+  const isFounder = user?.email === 'founder@rosterhockey.com';
 
   const isCommissioner = canManageLeague();
   const isPlayerPro = canAccessPremiumFeatures();
@@ -128,6 +131,16 @@ export function DesktopMenuColumn() {
       bgColor: 'bg-indigo-500/20',
       iconColor: 'text-indigo-500',
     },
+    ...(isFounder
+      ? [{
+          icon: BarChart2,
+          label: 'App Statistics',
+          path: '/admin/metrics',
+          locked: false,
+          bgColor: 'bg-violet-500/20',
+          iconColor: 'text-violet-500',
+        }]
+      : []),
   ];
 
   const handleNavigate = (path: string, locked: boolean) => {
