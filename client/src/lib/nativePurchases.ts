@@ -223,9 +223,13 @@ function applyPendingReferralAttribute(): void {
  *   resp.error         — error message when status is "FAILED"
  *   resp.jwsRepresentation — StoreKit 2 JWS (if available)
  */
+/**
+ * Note: The Natively/RevenueCat bridge (`purchasePackage`) does not support
+ * passing an appAccountToken to StoreKit. Server verification therefore cannot
+ * rely on that field being present and proceeds on JWS cryptographic proof alone.
+ */
 export async function purchaseProduct(
   packageId: string,
-  _appAccountToken?: string
 ): Promise<NativelyTransaction> {
   applyPendingReferralAttribute();
   const data = await toPromise<any>((cb) => np.purchasePackage(packageId, cb));

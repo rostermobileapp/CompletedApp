@@ -20,7 +20,6 @@ import {
   purchaseProductAndroid,
   restorePurchases,
   restorePurchasesAndroid,
-  getAppAccountToken,
   PRODUCT_PLAYER_PRO,
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO_YEARLY,
@@ -433,8 +432,7 @@ export default function Subscription() {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
-      const appAccountToken = user?.id ? getAppAccountToken(user.id) : undefined;
-      const transaction = await purchaseProduct(productId, appAccountToken);
+      const transaction = await purchaseProduct(productId);
 
       // Build the verification payload, preferring StoreKit 2 JWS > transactionId
       const verifyPayload: Record<string, string> = {};

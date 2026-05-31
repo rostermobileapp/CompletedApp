@@ -3627,14 +3627,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
 
     if (tx.appAccountToken) {
+      // If the token is present, enforce it — mismatches are a strong replay-attack signal.
       if (tx.appAccountToken.toLowerCase() !== expectedToken) {
         console.warn('[IAP] appAccountToken mismatch — possible replay attack', { userId });
         throw Object.assign(new Error('Purchase does not belong to this account'), { status: 403 });
       }
     } else {
-      // No appAccountToken: reject — all new purchases must include it
-      console.warn('[IAP] No appAccountToken in transaction — binding cannot be verified', { userId });
-      throw Object.assign(new Error('Receipt cannot be bound to an account — please re-purchase or contact support'), { status: 403 });
+      // The Natively/RevenueCat bridge does not forward appAccountToken to StoreKit,
+      // so legitimate purchases arrive without it. The JWS is already cryptographically
+      // verified against Apple Root CA G3 and the bundleId is enforced — it is safe to
+      // proceed. Log a warning for observability but do not block the purchase.
+      console.warn('[IAP] No appAccountToken in transaction — proceeding without account binding check', { userId });
     }
 
     return tx;
@@ -3721,7 +3724,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(402).json({ message: 'Subscription has expired' });
         }
 
-        // Verify account binding using the payload's appAccountToken
+        // Verify account binding using the payload's appAccountToken (when present).
+        // The Natively/RevenueCat bridge does not forward appAccountToken to StoreKit,
+        // so legitimate purchases may arrive without it. Only hard-reject on a mismatch.
         const { v5: uuidv5 } = await import('uuid');
         const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
         if (tx.appAccountToken) {
@@ -3730,8 +3735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(403).json({ message: 'Purchase does not belong to this account' });
           }
         } else {
-          console.warn('[IAP] No appAccountToken in Apple response (transactionId path)', { userId });
-          return res.status(403).json({ message: 'Receipt cannot be bound to an account' });
+          console.warn('[IAP] No appAccountToken in Apple response (transactionId path) — proceeding without binding check', { userId });
         }
 
         const newRole = IAP_PRODUCT_ROLES[tx.productId] ?? null;
