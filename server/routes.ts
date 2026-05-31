@@ -24004,114 +24004,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
+      // Helper — read the first row from a db.execute result (which returns {rows: [...]}
+      const firstRow = (r: any) => (r?.rows?.[0] ?? {});
+
       // ── Overview counts ──────────────────────────────────────────────────
-      const [totalRow] = await db.execute(sql`
+      const totalResult = await db.execute(sql`
         SELECT COUNT(*)::int AS total FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
       `);
-      const totalUsers = Number((totalRow as any).rows?.[0]?.total ?? 0);
+      const totalUsers = Number(firstRow(totalResult).total ?? 0);
 
-      const [dauRow] = await db.execute(sql`
+      // DAU/WAU/MAU use created_at as the available activity proxy
+      const dauResult = await db.execute(sql`
         SELECT COUNT(DISTINCT id)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
-        AND deleted_at IS NULL AND updated_at >= ${day1.toISOString()}
+        AND deleted_at IS NULL AND created_at >= ${day1.toISOString()}
       `);
-      const dau = Number((dauRow as any).rows?.[0]?.cnt ?? 0);
+      const dau = Number(firstRow(dauResult).cnt ?? 0);
 
-      const [wauRow] = await db.execute(sql`
+      const wauResult = await db.execute(sql`
         SELECT COUNT(DISTINCT id)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
-        AND deleted_at IS NULL AND updated_at >= ${day7.toISOString()}
+        AND deleted_at IS NULL AND created_at >= ${day7.toISOString()}
       `);
-      const wau = Number((wauRow as any).rows?.[0]?.cnt ?? 0);
+      const wau = Number(firstRow(wauResult).cnt ?? 0);
 
-      const [mauRow] = await db.execute(sql`
+      const mauResult = await db.execute(sql`
         SELECT COUNT(DISTINCT id)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
-        AND deleted_at IS NULL AND updated_at >= ${day30.toISOString()}
+        AND deleted_at IS NULL AND created_at >= ${day30.toISOString()}
       `);
-      const mau = Number((mauRow as any).rows?.[0]?.cnt ?? 0);
+      const mau = Number(firstRow(mauResult).cnt ?? 0);
 
-      const [thisMonthRow] = await db.execute(sql`
+      const thisMonthResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL AND created_at >= ${thisMonthStart.toISOString()}
       `);
-      const signupsThisMonth = Number((thisMonthRow as any).rows?.[0]?.cnt ?? 0);
+      const signupsThisMonth = Number(firstRow(thisMonthResult).cnt ?? 0);
 
-      const [lastMonthRow] = await db.execute(sql`
+      const lastMonthResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
         AND created_at >= ${lastMonthStart.toISOString()}
         AND created_at <= ${lastMonthEnd.toISOString()}
       `);
-      const signupsLastMonth = Number((lastMonthRow as any).rows?.[0]?.cnt ?? 0);
+      const signupsLastMonth = Number(firstRow(lastMonthResult).cnt ?? 0);
 
       // ── Revenue / subscription breakdown ─────────────────────────────────
-      // Count all paid users by role; then split by platform as a secondary lens.
-      // Platform split: Apple = iap_original_transaction_id set; Stripe = stripe_subscription_id
-      // set (and no IAP); Google = all remaining paid users (RevenueCat Android, etc.)
-      const [paidRow] = await db.execute(sql`
+      // Count paid users by role (player_pro / commissioner) only — no source filter.
+      // Platform split: Apple = iap_original_transaction_id set;
+      //   Stripe = stripe_subscription_id set and no IAP id;
+      //   Google = all remaining paid users.
+      const paidResult = await db.execute(sql`
         SELECT
           COUNT(*)::int AS total_paid,
           COUNT(*) FILTER (WHERE iap_original_transaction_id IS NOT NULL)::int AS apple_count,
-          COUNT(*) FILTER (WHERE stripe_subscription_id IS NOT NULL AND iap_original_transaction_id IS NULL)::int AS stripe_count
+          COUNT(*) FILTER (WHERE stripe_subscription_id IS NOT NULL
+                            AND iap_original_transaction_id IS NULL)::int AS stripe_count
         FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
         AND role IN ('player_pro', 'commissioner')
       `);
-      const paidStats = (paidRow as any).rows?.[0] ?? {};
+      const paidStats = firstRow(paidResult);
       const paidCount = Number(paidStats.total_paid ?? 0);
       const appleCount = Number(paidStats.apple_count ?? 0);
       const stripeCount = Number(paidStats.stripe_count ?? 0);
       const googleCount = Math.max(0, paidCount - appleCount - stripeCount);
 
-      const [freeRow] = await db.execute(sql`
+      const freeResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL AND role = 'free_tier' AND fee_exempt = false
       `);
-      const freeCount = Number((freeRow as any).rows?.[0]?.cnt ?? 0);
+      const freeCount = Number(firstRow(freeResult).cnt ?? 0);
 
-      const [compedRow] = await db.execute(sql`
+      const compedResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL AND fee_exempt = true
       `);
-      const compedCount = Number((compedRow as any).rows?.[0]?.cnt ?? 0);
+      const compedCount = Number(firstRow(compedResult).cnt ?? 0);
 
       const mrrCents = paidCount * PLAYER_PRO_MONTHLY_CENTS;
 
-      // MoM MRR: new paid users who joined this month vs last month (by role only, no source filter)
-      const [paidThisMonthRow] = await db.execute(sql`
+      // New paid users who first appeared with a paid role this calendar month
+      const newPaidResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
         AND role IN ('player_pro', 'commissioner')
         AND created_at >= ${thisMonthStart.toISOString()}
       `);
-      const newPaidThisMonth = Number((paidThisMonthRow as any).rows?.[0]?.cnt ?? 0);
+      const newPaidThisMonth = Number(firstRow(newPaidResult).cnt ?? 0);
       // Estimated last-month MRR = current paid base minus those who became paid this month
       const lastMonthMrrCents = Math.max(0, paidCount - newPaidThisMonth) * PLAYER_PRO_MONTHLY_CENTS;
 
       // ── Referral partners ────────────────────────────────────────────────
-      // Commission due = 10% of gross attributed revenue (fixed rate per spec)
+      // Use CTEs to pre-aggregate signups and conversions per partner independently
+      // before joining — avoids N×M row multiplication that inflates SUM().
+      // Commission due = 10% of gross attributed revenue (fixed rate per spec).
       const COMMISSION_RATE = 0.10;
       const partnersResult = await db.execute(sql`
+        WITH signup_counts AS (
+          SELECT referral_partner_id, COUNT(DISTINCT user_id)::int AS attributed_signups
+          FROM referral_user_links
+          GROUP BY referral_partner_id
+        ),
+        conversion_totals AS (
+          SELECT partner_id,
+                 COALESCE(SUM(gross_price_cents) FILTER (WHERE status = 'active'), 0)::bigint AS gross_revenue_cents
+          FROM referral_conversions
+          GROUP BY partner_id
+        )
         SELECT
           rp.id,
           rp.org_name,
           rp.status,
           rp.approved_at,
-          COUNT(DISTINCT rul.user_id)::int AS attributed_signups,
-          COALESCE(SUM(rc.gross_price_cents) FILTER (WHERE rc.status = 'active'), 0)::bigint AS gross_revenue_cents
+          COALESCE(sc.attributed_signups, 0) AS attributed_signups,
+          COALESCE(ct.gross_revenue_cents, 0) AS gross_revenue_cents
         FROM referral_partners rp
-        LEFT JOIN referral_user_links rul ON rul.referral_partner_id = rp.id
-        LEFT JOIN referral_conversions rc ON rc.partner_id = rp.id
-        GROUP BY rp.id, rp.org_name, rp.status, rp.approved_at
+        LEFT JOIN signup_counts sc ON sc.referral_partner_id = rp.id
+        LEFT JOIN conversion_totals ct ON ct.partner_id = rp.id
         ORDER BY rp.created_at ASC
       `);
 
@@ -24128,7 +24146,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         overview: {
           totalUsers,
-          // Estimated total users at end of last month (current total minus this month's signups)
           lastMonthTotalUsers: Math.max(0, totalUsers - signupsThisMonth),
           dau,
           wau,
