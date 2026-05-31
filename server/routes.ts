@@ -3601,13 +3601,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── Apple App Store Server API helpers ────────────────────────────────────
-  // Product ID → subscription role mapping (server-side truth only — never trust client)
-  const IAP_PRODUCT_ROLES: Record<string, 'commissioner' | 'player_pro'> = {
-    'com.rosterapp.commissioner_monthly': 'commissioner',
-    'com.rosterapp.player_pro_monthly': 'player_pro',
-    'com.rosterapp.commissioner_yearly': 'commissioner',
-    'com.rosterapp.player_pro_yearly': 'player_pro',
-  };
+  // Product ID → subscription role mapping and notification-type decision logic
+  // are exported from appleNotificationHandler.ts so they can be unit-tested
+  // independently of the database and Apple JWS signing stack.
+  const { IAP_PRODUCT_ROLES, resolveNotificationAction } = await import('./appleNotificationHandler');
 
   // Stable namespace used to derive deterministic appAccountTokens from userIds
   const IAP_APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -3815,35 +3812,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ message: 'Notification acknowledged (user not found)' });
       }
 
-      // Determine what to do based on notification type
-      const GRANT_TYPES = new Set([
-        'SUBSCRIBED',
-        'DID_RENEW',
-        'OFFER_REDEEMED',
-        'DID_CHANGE_RENEWAL_STATUS',
-      ]);
-      const REVOKE_TYPES = new Set([
-        'EXPIRED',
-        'REFUND',
-        'REVOKE',
-        'GRACE_PERIOD_EXPIRED',
-      ]);
+      // Delegate the role-mapping decision to the pure function in appleNotificationHandler.ts
+      // (same module used by the unit tests, so logic is always in sync).
+      const decision = resolveNotificationAction(notificationType, productId, expiresDate, Date.now());
 
-      const now = Date.now();
+      if (decision.action === 'grant') {
+        await applyIapRole(notifUserId, decision.role, originalTransactionId);
+        console.log(`[IAP/Notify] ${notificationType} → role set to ${decision.role} for user ${notifUserId}`);
 
-      if (GRANT_TYPES.has(notificationType)) {
-        // Subscription is (or becomes) active
-        if (expiresDate && expiresDate < now) {
-          console.log(`[IAP/Notify] ${notificationType} but subscription already expired — skipping`);
-          return res.status(200).json({ message: 'Already expired' });
-        }
-        const newRole = IAP_PRODUCT_ROLES[productId];
-        if (newRole) {
-          await applyIapRole(notifUserId, newRole, originalTransactionId);
-          console.log(`[IAP/Notify] ${notificationType} → role set to ${newRole} for user ${notifUserId}`);
-        }
-
-      } else if (REVOKE_TYPES.has(notificationType)) {
+      } else if (decision.action === 'revoke') {
         // Subscription ended — downgrade to free_tier
         await db
           .update(users)
@@ -3860,7 +3837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[IAP/Notify] ${notificationType} → role reset to free_tier for user ${notifUserId}`);
 
       } else {
-        console.log(`[IAP/Notify] Unhandled notification type: ${notificationType} — acknowledged`);
+        console.log(`[IAP/Notify] ${decision.reason} — acknowledged, no role change`);
       }
 
       res.status(200).json({ message: 'Notification processed' });
