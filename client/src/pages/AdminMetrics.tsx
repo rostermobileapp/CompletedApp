@@ -31,9 +31,8 @@ function MomBadge({ current, previous, label }: { current: number; previous: num
   if (previous === 0) {
     return <Badge variant="outline" className="text-xs">{label}: N/A</Badge>;
   }
-  const diff = current - previous;
-  const pct = ((diff / previous) * 100).toFixed(1);
-  const positive = diff >= 0;
+  const pct = ((current / previous) * 100).toFixed(1);
+  const positive = current >= previous;
   return (
     <Badge
       className={`text-xs flex items-center gap-1 ${
@@ -44,7 +43,7 @@ function MomBadge({ current, previous, label }: { current: number; previous: num
       variant="outline"
     >
       {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-      {positive ? '+' : ''}{pct}% MoM {label}
+      {pct}% MoM {label}
     </Badge>
   );
 }
