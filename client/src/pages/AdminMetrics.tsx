@@ -195,9 +195,9 @@ export default function AdminMetrics() {
             <h2 className="text-base font-semibold">Revenue</h2>
             {!isLoading && revenue && (
               <MomBadge
-                current={revenue.newPaidThisMonth}
-                previous={revenue.newPaidLastMonth}
-                label="new paid"
+                current={revenue.mrrCents}
+                previous={revenue.lastMonthMrrCents}
+                label="MRR"
               />
             )}
           </div>
