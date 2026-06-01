@@ -151,9 +151,9 @@ export default function AdminMetrics() {
             <h2 className="text-base font-semibold">Overview</h2>
             {!isLoading && overview && (
               <MomBadge
-                current={overview.totalUsers}
-                previous={overview.lastMonthTotalUsers}
-                label="total users"
+                current={overview.signupsThisMonth}
+                previous={overview.signupsLastMonth}
+                label="signups"
               />
             )}
           </div>
@@ -190,9 +190,9 @@ export default function AdminMetrics() {
             <h2 className="text-base font-semibold">Revenue</h2>
             {!isLoading && revenue && (
               <MomBadge
-                current={revenue.mrrCents}
-                previous={revenue.lastMonthMrrCents}
-                label="MRR"
+                current={revenue.newPaidThisMonth}
+                previous={revenue.newPaidLastMonth}
+                label="new paid"
               />
             )}
           </div>
@@ -206,7 +206,7 @@ export default function AdminMetrics() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                <StatCard label="MRR" value={fmtDollars(revenue.mrrCents)} sub="~$4.99/user" />
+                <StatCard label="MRR" value={fmtDollars(revenue.mrrCents)} sub="~$6.49/user" />
                 <StatCard label="Paid Users" value={fmt(revenue.paidCount)} />
                 <StatCard label="Free Users" value={fmt(revenue.freeCount)} />
                 <StatCard label="Comped Users" value={fmt(revenue.compedCount)} sub="fee_exempt" />

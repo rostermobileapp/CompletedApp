@@ -24092,7 +24092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mrrCents = paidCount * PLAYER_PRO_MONTHLY_CENTS;
 
       // New Player Pro users created this month (within the pricing cohort)
-      const newPaidResult = await db.execute(sql`
+      const newPaidThisMonthResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
@@ -24100,7 +24100,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         AND created_at >= ${PRICING_CUTOFF}
         AND created_at >= ${thisMonthStart.toISOString()}
       `);
-      const newPaidThisMonth = Number(firstRow(newPaidResult).cnt ?? 0);
+      const newPaidThisMonth = Number(firstRow(newPaidThisMonthResult).cnt ?? 0);
+      // New Player Pro users created last month (within the pricing cohort)
+      const newPaidLastMonthResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS cnt FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+        AND role = 'player_pro'
+        AND created_at >= ${PRICING_CUTOFF}
+        AND created_at >= ${lastMonthStart.toISOString()}
+        AND created_at <= ${lastMonthEnd.toISOString()}
+      `);
+      const newPaidLastMonth = Number(firstRow(newPaidLastMonthResult).cnt ?? 0);
       // Estimated last-month MRR = current paid cohort minus those created this month
       const lastMonthMrrCents = Math.max(0, paidCount - newPaidThisMonth) * PLAYER_PRO_MONTHLY_CENTS;
 
@@ -24168,6 +24179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { source: 'Google', count: googleCount, mrrCents: googleCount * PLAYER_PRO_MONTHLY_CENTS },
           ],
           newPaidThisMonth,
+          newPaidLastMonth,
         },
         partners,
       });
