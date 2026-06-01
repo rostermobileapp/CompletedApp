@@ -23984,7 +23984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── Admin Metrics Dashboard (founder-only) ──────────────────────────────
   const ADMIN_EMAIL = 'founder@rosterhockey.com';
-  const PLAYER_PRO_MONTHLY_CENTS = 499; // $4.99/month
+  const PLAYER_PRO_MONTHLY_CENTS = 649; // $6.49/month (new pricing since 2026-05-15)
 
   const requireFounder = (req: any, res: any, next: any) => {
     const email = req.user?.claims?.email;
@@ -24054,10 +24054,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signupsLastMonth = Number(firstRow(lastMonthResult).cnt ?? 0);
 
       // ── Revenue / subscription breakdown ─────────────────────────────────
-      // Count paid users by role (player_pro / commissioner) only — no source filter.
-      // Platform split: Apple = iap_original_transaction_id set;
-      //   Stripe = stripe_subscription_id set and no IAP id;
-      //   Google = all remaining paid users.
+      // MRR counts only Player Pro users created on or after 2026-05-15
+      // (new $6.49 pricing cohort). Platform split is a secondary lens.
+      const PRICING_CUTOFF = '2026-05-15T00:00:00.000Z';
       const paidResult = await db.execute(sql`
         SELECT
           COUNT(*)::int AS total_paid,
@@ -24067,7 +24066,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
-        AND role IN ('player_pro', 'commissioner')
+        AND role = 'player_pro'
+        AND created_at >= ${PRICING_CUTOFF}
       `);
       const paidStats = firstRow(paidResult);
       const paidCount = Number(paidStats.total_paid ?? 0);
@@ -24091,16 +24091,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const mrrCents = paidCount * PLAYER_PRO_MONTHLY_CENTS;
 
-      // New paid users who first appeared with a paid role this calendar month
+      // New Player Pro users created this month (within the pricing cohort)
       const newPaidResult = await db.execute(sql`
         SELECT COUNT(*)::int AS cnt FROM users
         WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
         AND deleted_at IS NULL
-        AND role IN ('player_pro', 'commissioner')
+        AND role = 'player_pro'
+        AND created_at >= ${PRICING_CUTOFF}
         AND created_at >= ${thisMonthStart.toISOString()}
       `);
       const newPaidThisMonth = Number(firstRow(newPaidResult).cnt ?? 0);
-      // Estimated last-month MRR = current paid base minus those who became paid this month
+      // Estimated last-month MRR = current paid cohort minus those created this month
       const lastMonthMrrCents = Math.max(0, paidCount - newPaidThisMonth) * PLAYER_PRO_MONTHLY_CENTS;
 
       // ── Referral partners ────────────────────────────────────────────────
