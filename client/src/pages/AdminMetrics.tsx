@@ -88,8 +88,14 @@ export default function AdminMetrics() {
     }
   }, [authLoading, authUser, navigate]);
 
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data, isLoading, isError } = useQuery<any>({
-    queryKey: ['/api/admin/metrics'],
+    queryKey: ['/api/admin/metrics', timezone],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/metrics?timezone=${encodeURIComponent(timezone)}`);
+      if (!res.ok) throw new Error('Failed to load metrics');
+      return res.json();
+    },
     enabled: !authLoading && authUser?.email === ADMIN_EMAIL,
     staleTime: 60_000,
   });
@@ -151,9 +157,9 @@ export default function AdminMetrics() {
             <h2 className="text-base font-semibold">Overview</h2>
             {!isLoading && overview && (
               <MomBadge
-                current={overview.signupsThisMonth}
-                previous={overview.signupsLastMonth}
-                label="signups"
+                current={overview.totalUsers}
+                previous={overview.lastMonthTotalUsers}
+                label="total users"
               />
             )}
           </div>

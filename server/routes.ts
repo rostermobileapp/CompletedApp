@@ -23996,7 +23996,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/metrics', isAuthenticated, requireFounder, async (req: any, res) => {
     try {
-      const now = new Date();
+      // Month boundaries use the browser's timezone (passed via query param)
+      const tz = req.query.timezone as string || 'America/New_York';
+      const nowStr = new Date().toLocaleString('en-US', { timeZone: tz });
+      const now = new Date(nowStr);
       const day1 = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
       const day7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const day30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -24052,6 +24055,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         AND created_at <= ${lastMonthEnd.toISOString()}
       `);
       const signupsLastMonth = Number(firstRow(lastMonthResult).cnt ?? 0);
+
+      const lastMonthTotalResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS total FROM users
+        WHERE email IS NOT NULL AND email NOT LIKE '%@placeholder.roster'
+        AND deleted_at IS NULL
+        AND created_at < ${thisMonthStart.toISOString()}
+      `);
+      const lastMonthTotalUsers = Number(firstRow(lastMonthTotalResult).total ?? 0);
 
       // ── Revenue / subscription breakdown ─────────────────────────────────
       // MRR counts only Player Pro users created on or after 2026-05-15
