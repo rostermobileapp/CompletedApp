@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -91,8 +92,7 @@ export default function AdminMetrics() {
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: ['/api/admin/metrics', timezone],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/metrics?timezone=${encodeURIComponent(timezone)}`);
-      if (!res.ok) throw new Error('Failed to load metrics');
+      const res = await apiRequest('GET', `/api/admin/metrics?timezone=${encodeURIComponent(timezone)}`);
       return res.json();
     },
     enabled: !authLoading && authUser?.email === ADMIN_EMAIL,
