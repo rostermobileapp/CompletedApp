@@ -779,3 +779,92 @@ Visit: https://RosterHockey.com
     console.error(`❌ Failed to send tournament shift email to ${recipientEmail}:`, error);
   }
 }
+
+export async function sendTeamPlayerInviteEmail(
+  recipientEmail: string,
+  data: {
+    playerFirstName: string;
+    teamName: string;
+    inviterName: string;
+  }
+): Promise<void> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">Team Invitation</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">You've been added to a team!</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                Hey <strong style="color:#0a0a0a;">${data.playerFirstName}</strong> — <strong style="color:#0a0a0a;">${data.inviterName}</strong> has added you to <strong style="color:#0a0a0a;">${data.teamName}</strong> on Roster Hockey.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:28px;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="margin:0 0 8px 0;font-size:15px;font-weight:700;color:#1e40af;">How to join your team</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:8px 0;border-bottom:1px solid #dbeafe;">
+                          <span style="font-size:14px;color:#1e3a8a;font-weight:600;">Step 1</span>
+                          <span style="font-size:14px;color:#374151;margin-left:8px;">Download the Roster Hockey app below</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;border-bottom:1px solid #dbeafe;">
+                          <span style="font-size:14px;color:#1e3a8a;font-weight:600;">Step 2</span>
+                          <span style="font-size:14px;color:#374151;margin-left:8px;">Sign up using <strong>${recipientEmail}</strong></span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;">
+                          <span style="font-size:14px;color:#1e3a8a;font-weight:600;">Step 3</span>
+                          <span style="font-size:14px;color:#374151;margin-left:8px;">You'll automatically appear on <strong>${data.teamName}</strong> — no extra steps needed!</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 32px 0;font-size:13px;color:#94a3b8;text-align:center;">Make sure to sign up with this email address so we can connect you to your team automatically.</p>
+            </td>
+          </tr>`;
+
+    const htmlContent = emailShell(`You've been added to ${data.teamName}`, body, '#3b82f6');
+
+    const textContent = `
+You've been added to ${data.teamName}!
+
+Hey ${data.playerFirstName} — ${data.inviterName} has added you to ${data.teamName} on Roster Hockey.
+
+How to join your team:
+1. Download the Roster Hockey app (links below)
+2. Sign up using ${recipientEmail}
+3. You'll automatically appear on ${data.teamName} — no extra steps needed!
+
+Make sure to sign up with this email address so we can connect you to your team automatically.
+
+Download Roster Hockey:
+App Store: ${APPLE_URL}
+Google Play: ${GOOGLE_URL}
+
+---
+Sent by Roster Hockey - Your beer league hockey app
+Visit: https://RosterHockey.com
+    `.trim();
+
+    await client.emails.send({
+      from: fromEmail,
+      to: recipientEmail,
+      subject: `You've been added to ${data.teamName} on Roster Hockey`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    console.log(`✅ Sent team player invite email to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send team player invite email to ${recipientEmail}:`, error);
+  }
+}

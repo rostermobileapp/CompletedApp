@@ -8214,6 +8214,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         position
       );
       res.json(membership);
+
+      // Fire-and-forget invite email when an email address was provided
+      if (email && email.trim()) {
+        const inviterName = user
+          ? `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || 'Your captain'
+          : 'Your captain';
+        import('./emails').then(({ sendTeamPlayerInviteEmail }) => {
+          sendTeamPlayerInviteEmail(email.trim(), {
+            playerFirstName: firstName,
+            teamName: team.name,
+            inviterName,
+          }).catch((err: Error) => console.error('[TeamInvite] Email send failed:', err));
+        });
+      }
     } catch (error) {
       console.error('Error adding manual player:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : 'Failed to add player' });
