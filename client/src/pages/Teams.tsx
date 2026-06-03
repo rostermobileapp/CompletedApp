@@ -421,6 +421,7 @@ export default function Teams() {
 
   // Computed values (after early returns)
   const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
+  const isTeamCreator = currentTeam?.creatorId === (user as any)?.id;
   const isCommissioner = hasRole('secondary_commissioner');
   const canUploadLogo = isTeamCaptain || isCommissioner;
 
@@ -816,7 +817,7 @@ export default function Teams() {
                 {/* Line Combinations Manager */}
                 <LineManager 
                   teamId={team.id}
-                  isTeamCaptain={isTeamCaptain}
+                  isTeamCaptain={isTeamCaptain || isTeamCreator}
                   teamMembers={teamMembers}
                 />
                 
