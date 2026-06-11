@@ -15,8 +15,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   LabelList,
+  LineChart,
+  Line,
+  Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Users, DollarSign, BarChart2, Handshake } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, DollarSign, BarChart2, Handshake, QrCode } from 'lucide-react';
 
 const ADMIN_EMAIL = 'founder@rosterhockey.com';
 
@@ -93,6 +96,16 @@ export default function AdminMetrics() {
     queryKey: ['/api/admin/metrics', timezone],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/admin/metrics?timezone=${encodeURIComponent(timezone)}`);
+      return res.json();
+    },
+    enabled: !authLoading && authUser?.email === ADMIN_EMAIL,
+    staleTime: 60_000,
+  });
+
+  const { data: hpibData, isLoading: hpibLoading, isError: hpibError } = useQuery<any>({
+    queryKey: ['/api/hpib/stats'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/hpib/stats');
       return res.json();
     },
     enabled: !authLoading && authUser?.email === ADMIN_EMAIL,
@@ -352,6 +365,82 @@ export default function AdminMetrics() {
                 </table>
               </div>
             </Card>
+          )}
+        </section>
+
+        {/* ── HPIB QR Landing Page ──────────────────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <QrCode className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">HPIB QR Landing Page</h2>
+          </div>
+
+          {hpibLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : hpibError ? (
+            <p className="text-sm text-destructive">Failed to load HPIB data.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <StatCard label="Page Views" value={fmt(hpibData?.page_view ?? 0)} sub="all time" />
+                <StatCard label="App Store Taps" value={fmt(hpibData?.apple_tap ?? 0)} sub="all time" />
+                <StatCard label="Google Play Taps" value={fmt(hpibData?.google_tap ?? 0)} sub="all time" />
+                <StatCard
+                  label="Conversion Rate"
+                  value={`${((hpibData?.conversionRate ?? 0) * 100).toFixed(1)}%`}
+                  sub="taps ÷ views"
+                />
+              </div>
+
+              {/* 30-day time-series chart */}
+              {hpibData?.daily?.length > 0 && (
+                <Card className="elev-rest">
+                  <CardHeader className="pb-2 pt-4">
+                    <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Last 30 Days
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart
+                        data={hpibData.daily}
+                        margin={{ top: 4, right: 8, bottom: 0, left: -16 }}
+                      >
+                        <XAxis
+                          dataKey="date"
+                          tickFormatter={(d: string) => {
+                            const dt = new Date(d + 'T00:00:00');
+                            return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          }}
+                          tick={{ fontSize: 11 }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip
+                          labelFormatter={(d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                        <Line type="monotone" dataKey="page_view" name="Page Views" stroke="#6366f1" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="apple_tap" name="App Store" stroke="#22c55e" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="google_tap" name="Google Play" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {hpibData?.daily?.length === 0 && (
+                <Card className="elev-rest">
+                  <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                    No activity in the last 30 days.
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </section>
 

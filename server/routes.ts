@@ -24238,6 +24238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // HPIB analytics — admin stats endpoint
   app.get('/api/hpib/stats', isAuthenticated, requireFounder, async (_req: any, res) => {
     try {
+      // All-time totals
       const rows = await db
         .select({ event: hpibEvents.event, count: sql<number>`cast(count(*) as int)` })
         .from(hpibEvents)
@@ -24249,7 +24250,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conversionRate = totals.page_view > 0
         ? +((totals.apple_tap + totals.google_tap) / totals.page_view).toFixed(4)
         : 0;
-      return res.json({ ...totals, conversionRate });
+
+      // Last 30 days daily breakdown
+      const dailyRows = await db
+        .select({
+          date: sql<string>`to_char(${hpibEvents.createdAt}, 'YYYY-MM-DD')`,
+          event: hpibEvents.event,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(hpibEvents)
+        .where(sql`${hpibEvents.createdAt} >= now() - interval '30 days'`)
+        .groupBy(sql`to_char(${hpibEvents.createdAt}, 'YYYY-MM-DD')`, hpibEvents.event)
+        .orderBy(sql`to_char(${hpibEvents.createdAt}, 'YYYY-MM-DD')`);
+
+      // Pivot into { date, page_view, apple_tap, google_tap }
+      const dailyMap: Record<string, { date: string; page_view: number; apple_tap: number; google_tap: number }> = {};
+      for (const r of dailyRows) {
+        if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, page_view: 0, apple_tap: 0, google_tap: 0 };
+        (dailyMap[r.date] as any)[r.event] = r.count;
+      }
+      const daily = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+
+      return res.json({ ...totals, conversionRate, daily });
     } catch (err) {
       console.error('[HPIB Stats] Error:', err);
       return res.status(500).json({ message: 'Failed to load stats' });
