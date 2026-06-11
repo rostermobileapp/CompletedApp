@@ -25,8 +25,8 @@ export default function HPIBDownload() {
         href={WEBSITE_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="mb-10 text-sm font-semibold tracking-wide transition-opacity active:opacity-60"
-        style={{ color: "#3b82f6" }}
+        className="mb-10 w-full max-w-xs flex items-center justify-center rounded-2xl px-6 py-4 text-white font-bold text-lg tracking-wide transition-opacity active:opacity-70"
+        style={{ backgroundColor: "#3b82f6" }}
       >
         RosterHockey.com
       </a>
