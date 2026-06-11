@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -24216,6 +24216,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Referral program routes (public, partner portal, admin, webhook)
   registerReferralRoutes(app);
+
+  // HPIB analytics — public track endpoint (no auth required, QR code landing page)
+  app.post('/api/hpib/track', async (req: any, res) => {
+    try {
+      const { event } = req.body;
+      const allowed = ['page_view', 'apple_tap', 'google_tap'];
+      if (!allowed.includes(event)) {
+        return res.status(400).json({ message: 'Invalid event' });
+      }
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || null;
+      const userAgent = (req.headers['user-agent'] as string) || null;
+      await db.insert(hpibEvents).values({ event, ip, userAgent });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[HPIB Track] Error:', err);
+      return res.status(500).json({ message: 'Failed to record event' });
+    }
+  });
+
+  // HPIB analytics — admin stats endpoint
+  app.get('/api/hpib/stats', isAuthenticated, requireFounder, async (_req: any, res) => {
+    try {
+      const rows = await db
+        .select({ event: hpibEvents.event, count: sql<number>`cast(count(*) as int)` })
+        .from(hpibEvents)
+        .groupBy(hpibEvents.event);
+      const totals: Record<string, number> = { page_view: 0, apple_tap: 0, google_tap: 0 };
+      for (const row of rows) {
+        totals[row.event] = row.count;
+      }
+      const conversionRate = totals.page_view > 0
+        ? +((totals.apple_tap + totals.google_tap) / totals.page_view).toFixed(4)
+        : 0;
+      return res.json({ ...totals, conversionRate });
+    } catch (err) {
+      console.error('[HPIB Stats] Error:', err);
+      return res.status(500).json({ message: 'Failed to load stats' });
+    }
+  });
 
   // IMPORTANT: Catch-all for unmatched API routes - must return JSON 404 instead of HTML
   // This prevents the static file handler from serving index.html for API routes

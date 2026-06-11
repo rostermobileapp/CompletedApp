@@ -4058,3 +4058,17 @@ export const photoUploadQuota = pgTable(
 );
 
 export type PhotoUploadQuota = typeof photoUploadQuota.$inferSelect;
+
+// HPIB analytics — tracks page views and store button taps from the /hpib QR landing page
+export const hpibEvents = pgTable("hpib_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  event: varchar("event", { length: 50 }).notNull(), // "page_view" | "apple_tap" | "google_tap"
+  ip: varchar("ip", { length: 100 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_hpib_events_event").on(table.event),
+  index("idx_hpib_events_created_at").on(table.createdAt),
+]);
+
+export type HpibEvent = typeof hpibEvents.$inferSelect;

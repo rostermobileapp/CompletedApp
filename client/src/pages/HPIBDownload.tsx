@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import rosterLogo from "@assets/less_admin,_more_hockey_1781211414957.png";
 
 const APPLE_URL = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
@@ -5,7 +6,23 @@ const GOOGLE_URL =
   "https://play.google.com/store/apps/details?id=com.aFFhvtIzJvyF.natively&utm_source=na_Med";
 const WEBSITE_URL = "https://www.rosterhockey.com";
 
+async function trackHpib(event: "page_view" | "apple_tap" | "google_tap") {
+  try {
+    await fetch("/api/hpib/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    });
+  } catch {
+    // fire-and-forget, never surface errors to the user
+  }
+}
+
 export default function HPIBDownload() {
+  useEffect(() => {
+    trackHpib("page_view");
+  }, []);
+
   return (
     <div
       className="min-h-screen w-full flex flex-col items-center px-6 pt-10 pb-12"
@@ -61,6 +78,7 @@ export default function HPIBDownload() {
           className="flex-1 flex flex-col items-center justify-center gap-2 rounded-2xl px-3 py-4 transition-opacity active:opacity-70"
           style={{ backgroundColor: "#1a1a1a", border: "1.5px solid #444" }}
           aria-label="Download on the App Store"
+          onClick={() => trackHpib("apple_tap")}
         >
           <svg
             viewBox="0 0 814 1000"
@@ -85,6 +103,7 @@ export default function HPIBDownload() {
           className="flex-1 flex flex-col items-center justify-center gap-2 rounded-2xl px-3 py-4 transition-opacity active:opacity-70"
           style={{ backgroundColor: "#1a1a1a", border: "1.5px solid #444" }}
           aria-label="Get it on Google Play"
+          onClick={() => trackHpib("google_tap")}
         >
           <svg
             viewBox="0 0 24 24"
