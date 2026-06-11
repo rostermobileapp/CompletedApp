@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import rosterLogo from "@assets/less_admin,_more_hockey_1781211414957.png";
 
 const APPLE_URL = "https://apps.apple.com/us/app/roster-hockey/id6756852981";
@@ -18,14 +18,12 @@ async function trackHpib(event: "page_view" | "apple_tap" | "google_tap") {
   }
 }
 
-function IPhoneMockup() {
-  const PHONE_W = 260;
-  const PHONE_H = 530;
-  const RADIUS = 38;
-  const BORDER = 10;
-  const SCREEN_W = PHONE_W - BORDER * 2;
-  const SCREEN_H = PHONE_H - BORDER * 2;
+const PHONE_W = 220;
+const PHONE_H = 450;
+const PHONE_RADIUS = 34;
+const PHONE_BORDER = 9;
 
+function IPhoneMockup({ scale }: { scale: number }) {
   return (
     <div
       style={{
@@ -36,6 +34,8 @@ function IPhoneMockup() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        transformOrigin: "top center",
+        transform: `scale(${scale})`,
       }}
     >
       {/* Phone body */}
@@ -44,7 +44,7 @@ function IPhoneMockup() {
           position: "relative",
           width: PHONE_W,
           height: PHONE_H,
-          borderRadius: RADIUS,
+          borderRadius: PHONE_RADIUS,
           background: "linear-gradient(145deg, #2a2a2a 0%, #111 60%, #1c1c1e 100%)",
           boxShadow:
             "0 0 0 1px #3a3a3c, 2px 4px 12px rgba(0,0,0,0.6), 8px 16px 48px rgba(0,0,0,0.8), -2px -2px 6px rgba(255,255,255,0.04)",
@@ -52,123 +52,96 @@ function IPhoneMockup() {
           transformStyle: "preserve-3d",
         }}
       >
-        {/* Volume buttons — left side */}
-        {[80, 130, 175].map((top, i) => (
+        {/* Volume buttons */}
+        {[68, 112, 150].map((top, i) => (
           <div
             key={i}
             style={{
               position: "absolute",
-              left: -5,
+              left: -4,
               top,
-              width: 4,
-              height: i === 0 ? 30 : 52,
+              width: 3,
+              height: i === 0 ? 24 : 42,
               borderRadius: 2,
               background: "linear-gradient(to right, #1a1a1a, #3a3a3c)",
-              boxShadow: "-1px 0 2px rgba(0,0,0,0.5)",
             }}
           />
         ))}
-        {/* Power button — right side */}
+        {/* Power button */}
         <div
           style={{
             position: "absolute",
-            right: -5,
-            top: 140,
-            width: 4,
-            height: 72,
+            right: -4,
+            top: 118,
+            width: 3,
+            height: 60,
             borderRadius: 2,
             background: "linear-gradient(to left, #1a1a1a, #3a3a3c)",
-            boxShadow: "1px 0 2px rgba(0,0,0,0.5)",
           }}
         />
 
-        {/* Screen bezel */}
+        {/* Screen */}
         <div
           style={{
             position: "absolute",
-            inset: BORDER,
-            borderRadius: RADIUS - BORDER,
+            inset: PHONE_BORDER,
+            borderRadius: PHONE_RADIUS - PHONE_BORDER,
             background: "#000",
             overflow: "hidden",
           }}
         >
-          {/* App screenshot */}
           <img
             src="/roster-app-screenshot.png"
             alt="Roster app"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "top",
-              display: "block",
-            }}
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }}
           />
-
-          {/* Dynamic Island overlay */}
+          {/* Dynamic Island */}
           <div
             style={{
               position: "absolute",
-              top: 12,
+              top: 10,
               left: "50%",
               transform: "translateX(-50%)",
-              width: 90,
-              height: 26,
-              borderRadius: 13,
+              width: 76,
+              height: 22,
+              borderRadius: 11,
               background: "#000",
               zIndex: 10,
             }}
           />
-
-          {/* Subtle screen glare */}
+          {/* Screen glare */}
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background:
-                "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 45%)",
+              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 45%)",
               pointerEvents: "none",
               zIndex: 5,
             }}
           />
         </div>
 
-        {/* USB-C port */}
+        {/* USB-C */}
         <div
           style={{
             position: "absolute",
-            bottom: 14,
+            bottom: 12,
             left: "50%",
             transform: "translateX(-50%)",
-            width: 48,
-            height: 7,
-            borderRadius: 3.5,
+            width: 40,
+            height: 6,
+            borderRadius: 3,
             background: "#0a0a0a",
             boxShadow: "inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px #2a2a2a",
           }}
         />
 
-        {/* Top speaker pill */}
-        <div
-          style={{
-            position: "absolute",
-            top: 14,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 36,
-            height: 5,
-            borderRadius: 2.5,
-            background: "#0a0a0a",
-            boxShadow: "inset 0 1px 2px rgba(0,0,0,0.8)",
-          }}
-        />
-
-        {/* Edge highlight — top-left rim catches light */}
+        {/* Edge highlight */}
         <div
           style={{
             position: "absolute",
             inset: 0,
-            borderRadius: RADIUS,
+            borderRadius: PHONE_RADIUS,
             pointerEvents: "none",
             boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.12), inset -1px -1px 0 rgba(0,0,0,0.3)",
           }}
@@ -179,22 +152,42 @@ function IPhoneMockup() {
 }
 
 export default function HPIBDownload() {
+  const phoneSection = useRef<HTMLDivElement>(null);
+  const [phoneScale, setPhoneScale] = useState(1);
+
   useEffect(() => {
     trackHpib("page_view");
   }, []);
 
+  // Compute scale so the phone fits the available section height
+  useEffect(() => {
+    function measure() {
+      if (!phoneSection.current) return;
+      const available = phoneSection.current.clientHeight;
+      const phoneContainerH = PHONE_H + 60;
+      const scale = Math.min(1, available / phoneContainerH);
+      setPhoneScale(scale);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   return (
     <div
-      className="min-h-screen w-full flex flex-col items-center px-6 pt-10 pb-12"
-      style={{ backgroundColor: "#000", minHeight: "100dvh" }}
+      style={{
+        height: "100dvh",
+        overflow: "hidden",
+        backgroundColor: "#000",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "20px 24px 0",
+      }}
     >
       {/* Logo */}
-      <div className="w-full max-w-xs mb-6">
-        <img
-          src={rosterLogo}
-          alt="Roster — less admin, more hockey"
-          className="w-full h-auto object-contain"
-        />
+      <div style={{ width: "100%", maxWidth: 280, marginBottom: 10, flexShrink: 0 }}>
+        <img src={rosterLogo} alt="Roster — less admin, more hockey" style={{ width: "100%", height: "auto" }} />
       </div>
 
       {/* RosterHockey.com button */}
@@ -202,62 +195,64 @@ export default function HPIBDownload() {
         href={WEBSITE_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="mb-10 w-full max-w-xs flex items-center justify-center rounded-2xl px-6 py-4 text-white font-bold text-lg tracking-wide transition-opacity active:opacity-70"
-        style={{ backgroundColor: "#3b82f6" }}
+        style={{
+          width: "100%",
+          maxWidth: 280,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 16,
+          padding: "12px 24px",
+          backgroundColor: "#3b82f6",
+          color: "#fff",
+          fontWeight: 700,
+          fontSize: 17,
+          textDecoration: "none",
+          marginBottom: 14,
+          flexShrink: 0,
+        }}
       >
         RosterHockey.com
       </a>
 
       {/* CTA */}
-      <div className="text-center max-w-sm mb-10 space-y-4">
-        <p
-          className="text-white font-bold leading-tight"
-          style={{ fontSize: "clamp(1.35rem, 5vw, 1.75rem)" }}
-        >
+      <div style={{ textAlign: "center", maxWidth: 300, marginBottom: 14, flexShrink: 0 }}>
+        <p style={{ color: "#fff", fontWeight: 700, fontSize: "clamp(1.1rem, 4.5vw, 1.5rem)", lineHeight: 1.25, margin: "0 0 6px" }}>
           Run your team or league through Roster
         </p>
-        <p
-          className="leading-snug"
-          style={{
-            color: "#3b82f6",
-            fontSize: "clamp(1.05rem, 4vw, 1.3rem)",
-            fontWeight: 600,
-          }}
-        >
+        <p style={{ color: "#3b82f6", fontWeight: 600, fontSize: "clamp(0.9rem, 3.5vw, 1.1rem)", lineHeight: 1.3, margin: 0 }}>
           We'll send&nbsp;10% back to Hockey Players in Business
         </p>
       </div>
 
       {/* Store buttons */}
-      <div className="flex flex-row gap-3 w-full max-w-xs">
+      <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 280, flexShrink: 0 }}>
         <a
           href={APPLE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 flex items-center justify-center rounded-2xl px-3 py-3 transition-opacity active:opacity-70"
-          style={{ backgroundColor: "#1a1a1a", border: "1.5px solid #444" }}
-          aria-label="Download on the App Store"
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 14, padding: "10px 8px", backgroundColor: "#1a1a1a", border: "1.5px solid #444", color: "#fff", fontWeight: 700, fontSize: 14, textDecoration: "none" }}
           onClick={() => trackHpib("apple_tap")}
         >
-          <span className="text-white font-bold text-sm text-center leading-tight">App Store</span>
+          App Store
         </a>
-
         <a
           href={GOOGLE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 flex items-center justify-center rounded-2xl px-3 py-3 transition-opacity active:opacity-70"
-          style={{ backgroundColor: "#1a1a1a", border: "1.5px solid #444" }}
-          aria-label="Get it on Google Play"
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 14, padding: "10px 8px", backgroundColor: "#1a1a1a", border: "1.5px solid #444", color: "#fff", fontWeight: 700, fontSize: 14, textDecoration: "none" }}
           onClick={() => trackHpib("google_tap")}
         >
-          <span className="text-white font-bold text-sm text-center leading-tight">Google Play</span>
+          Google Play
         </a>
       </div>
 
-      {/* iPhone mockup */}
-      <div className="mt-2">
-        <IPhoneMockup />
+      {/* Phone section — grows to fill remaining space */}
+      <div
+        ref={phoneSection}
+        style={{ flex: 1, minHeight: 0, width: "100%", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden" }}
+      >
+        <IPhoneMockup scale={phoneScale} />
       </div>
     </div>
   );
