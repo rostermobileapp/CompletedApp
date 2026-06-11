@@ -92,6 +92,7 @@ import ReferralAdmin from "@/pages/ReferralAdmin";
 import ReferralAdminLogin from "@/pages/ReferralAdminLogin";
 import ReferralAdminPartnerDetail from "@/pages/ReferralAdminPartnerDetail";
 import AdminMetrics from "@/pages/AdminMetrics";
+import HPIBDownload from "@/pages/HPIBDownload";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -178,13 +179,17 @@ function Router() {
     };
   }, [isAuthenticated, authLoading]);
 
-  // Always render password reset pages standalone, regardless of auth state
+  // Always render standalone pages regardless of auth state
   if (location === '/reset-password') {
     return <ResetPassword />;
   }
 
   if (location === '/forgot-password') {
     return <ForgotPassword />;
+  }
+
+  if (location === '/hpib') {
+    return <HPIBDownload />;
   }
 
   if (authLoading) {
