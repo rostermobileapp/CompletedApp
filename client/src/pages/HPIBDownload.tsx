@@ -124,10 +124,6 @@ export default function HPIBDownload() {
         </a>
       </div>
 
-      {/* Footer */}
-      <p className="mt-10 text-center text-xs" style={{ color: "#444" }}>
-        Roster · less admin, more hockey
-      </p>
     </div>
   );
 }
