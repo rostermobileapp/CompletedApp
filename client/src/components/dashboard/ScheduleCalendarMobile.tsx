@@ -359,7 +359,7 @@ export function ScheduleCalendarMobile({
         })}
       </div>
       {/* Day detail strip */}
-      <div className="border-t border-border p-3 bg-card">
+      <div className="border-t border-border p-3 bg-card pt-[4px] pb-[4px]">
         <div className="text-xs font-medium text-muted-foreground mb-2">
           {format(selectedDay, 'EEEE, MMM d')}
         </div>
