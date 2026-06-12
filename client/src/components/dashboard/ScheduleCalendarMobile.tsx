@@ -268,7 +268,7 @@ export function ScheduleCalendarMobile({
       data-testid="schedule-calendar-mobile"
     >
       {/* Month header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border pb-[0px] pt-[0px]">
         <button
           type="button"
           onClick={() => setCursorMonth((d) => addMonths(d, -1))}
@@ -294,7 +294,6 @@ export function ScheduleCalendarMobile({
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
-
       {/* Weekday header */}
       <div className="grid grid-cols-7 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted/30">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
@@ -303,7 +302,6 @@ export function ScheduleCalendarMobile({
           </div>
         ))}
       </div>
-
       {/* Day grid */}
       <div
         className="grid grid-cols-7 gap-px bg-border"
@@ -360,7 +358,6 @@ export function ScheduleCalendarMobile({
           );
         })}
       </div>
-
       {/* Day detail strip */}
       <div className="border-t border-border p-3 bg-card">
         <div className="text-xs font-medium text-muted-foreground mb-2">
