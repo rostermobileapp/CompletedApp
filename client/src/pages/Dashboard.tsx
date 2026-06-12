@@ -2680,12 +2680,12 @@ function DashboardMobile() {
           <div className="grid grid-cols-4 gap-3">
             {/* Announcements Card */}
             <div 
-              className="rounded-xl hairline elev-rest p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid="card-announcements"
               onClick={() => openOverlay('/announcements', <Announcements />)}
             >
               <div className="h-full flex flex-col items-center justify-center">
-                <BrickWall className="w-8 h-8 text-blue-500 mb-3" />
+                <BrickWall className="w-8 h-8 text-blue-500 mb-[10px]" />
                 <p className="text-xs font-medium text-center">Wall</p>
               </div>
               {selectedType === 'tournament' && selectedId ? (
@@ -2697,7 +2697,7 @@ function DashboardMobile() {
 
             {/* Photos Card - Always clickable, paywall shown on MediaGalleryPage if needed */}
             <div 
-              className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
+              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
               data-testid="card-photos"
               onClick={() => {
                 let entityType: 'tournament' | 'league' | 'team' | null = null;
@@ -2724,33 +2724,33 @@ function DashboardMobile() {
               }}
             >
               <div className="h-full flex flex-col items-center justify-center">
-                <Camera className="w-8 h-8 text-blue-500 mb-3" />
+                <Camera className="w-8 h-8 text-blue-500 mb-[10px]" />
                 <p className="text-xs font-medium">Photos</p>
               </div>
             </div>
 
             {/* Stats Card */}
             <div 
-              className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid="card-stats"
               onClick={() => openOverlay('/stats', <StatsPage />)}
             >
               <div className="h-full flex flex-col items-center justify-center">
-                <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
+                <BarChart3 className="w-8 h-8 text-blue-500 mb-[10px]" />
                 <p className="text-xs font-medium">Stats</p>
               </div>
             </div>
 
             {/* Standings Card */}
             <div 
-              className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid="card-standings"
               onClick={() => {
                 setShowStandingsModal(true);
               }}
             >
               <div className="h-full flex flex-col items-center justify-center">
-                <Award className="w-8 h-8 text-blue-500 mb-3" />
+                <Award className="w-8 h-8 text-blue-500 mb-[10px]" />
                 <p className="text-xs font-medium">Standings</p>
               </div>
             </div>
