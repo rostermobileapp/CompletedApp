@@ -523,7 +523,7 @@ export default function Profile() {
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
         {/* Profile Details */}
-        <div className="px-6 mb-6 pt-2">
+        <div className="px-6 mb-[12px] pt-[0px]">
         <div className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 pt-[4px] pb-[4px] bg-[#e2e2e2] dark:bg-[#212121]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" data-testid="text-profile-details-title">Profile Details</h2>
