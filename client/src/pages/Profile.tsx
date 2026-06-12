@@ -516,11 +516,10 @@ export default function Profile() {
           </div>
         </div>
         {/* HPIB Banner for paid users - below profile info */}
-        <div className="px-6 pb-2">
+        <div className="px-6 pb-[0px]">
           <HPIBBanner placement="profile-header" />
         </div>
       </div>
-      
       {/* Scrollable Content Section */}
       <div className={`flex-1 overflow-y-auto ${role === 'free_tier' ? 'pb-52' : 'pb-24'}`}>
         {/* Profile Details */}
