@@ -2800,7 +2800,7 @@ function DashboardMobile() {
         )}
         {/* Quick Stats */}
         {primaryTeam && (
-          <div className="px-6 mb-6">
+          <div className="px-6 mb-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
                 <div className="flex items-center gap-3">
@@ -2894,7 +2894,7 @@ function DashboardMobile() {
         {/* Upcoming Games — hidden while a pre-window tournament countdown
             is active so the player only sees the timer above. */}
         {!isTournamentCountdownActive && (
-        <div className="px-6 mt-2 mb-[8px]">
+        <div className="px-6 mt-0 mb-[8px]">
           {/* Row 1: title + add button */}
           <div className="flex gap-2 items-center mb-2">
             <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
@@ -2917,7 +2917,7 @@ function DashboardMobile() {
               <button
                 type="button"
                 onClick={() => setScheduleScope('team')}
-                className={`px-2 py-0.5 rounded transition-colors text-center ${
+                className={`px-2 py-0.5 rounded transition-colors text-center whitespace-nowrap ${
                   scheduleScope === 'team'
                     ? 'bg-blue-500 text-white shadow-sm'
                     : 'text-muted-foreground'
@@ -2930,7 +2930,7 @@ function DashboardMobile() {
               <button
                 type="button"
                 onClick={() => setScheduleScope('league')}
-                className={`px-2 py-0.5 rounded transition-colors text-center ${
+                className={`px-2 py-0.5 rounded transition-colors text-center whitespace-nowrap ${
                   scheduleScope === 'league'
                     ? 'bg-blue-500 text-white shadow-sm'
                     : 'text-muted-foreground'
