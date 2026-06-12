@@ -2373,1198 +2373,1198 @@ function DashboardMobile() {
   // its add-event flow live in the parent component.
   return (
     <>
-    <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
-          <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
-            <div className="flex items-center gap-2">
-              <img 
-                src={theme === 'dark' ? darkModeLogo : lightModeLogo}
-                alt="Roster"
-                className="h-[50px] pl-[12px] pr-[12px]"
-                data-testid="img-roster-logo"
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => navigate('/profile')}
-                className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}
-                data-testid="button-profile"
-              >
-                {(userProfile as any)?.profileImageUrl ? (
-                  <img 
-                    src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
-                    alt="Profile"
-                    className="w-full h-full object-cover bg-transparent"
-                  />
-                ) : (
-                  <span className="text-primary-foreground text-lg font-semibold">
-                    {(userProfile as any)?.firstName?.[0] || 'U'}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setShowHamburgerMenu(true)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
-                data-testid="button-hamburger-menu"
-              >
-                <Menu className="w-8 h-8 text-foreground" />
-              </button>
-              <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
-            </div>
-          </div>
-        </div>
-      {/* Team/League/Tournament Selection Dropdown */}
-      {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0) || hasPastSeasons) && (
-        <div className="px-6 mb-4">
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className={`w-full hairline elev-rest rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${mobileSelectorHasOtherAlerts ? 'alerts-glow' : ''}`}
-              data-testid="button-selector"
-            >
+      <div className="min-h-screen flex flex-col" data-testid="dashboard-page">
+        {/* Header */}
+        <div className="sticky top-0 z-50 bg-background p-3 flex items-center mb-[12px] pl-[16px] pr-[16px] pt-[4px] pb-[4px]">
+            <div className="flex items-center justify-between w-full mt-[4px] mb-[4px] pt-[8px] pb-[8px]">
               <div className="flex items-center gap-2">
-                {selectedType === 'team' ? (
-                  <Users className="w-4 h-4 text-primary" />
-                ) : selectedType === 'tournament' ? (
-                  <Trophy className="w-4 h-4 text-orange-500" />
-                ) : (
-                  <Trophy className="w-4 h-4 text-primary" />
-                )}
-                <span className="font-medium pl-[8px] pr-[8px] text-[12px]">
-                  {selectedType === 'team' 
-                    ? getTeamDisplayName((userTeamsAll as any[])?.find((t: any) => t.id === selectedId))
-                    : selectedType === 'tournament'
-                    ? getTournamentDisplayName(selectedTournament)
-                    : getLeagueDisplayName(selectedLeague)}
-                </span>
+                <img 
+                  src={theme === 'dark' ? darkModeLogo : lightModeLogo}
+                  alt="Roster"
+                  className="h-[50px] pl-[12px] pr-[12px]"
+                  data-testid="img-roster-logo"
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select</span>
-                {/* Total notification count for ALL other teams/leagues/tournaments */}
-                {(() => {
-                  let totalNotifications = 0;
-
-                  // Determine the league currently visible on the home screen
-                  // (messages for this league show on the bottom nav, not here)
-                  let currentlySelectedLeagueId: string | null = null;
-                  if (selectedType === 'league') {
-                    currentlySelectedLeagueId = selectedId;
-                  } else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
-                    const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
-                    currentlySelectedLeagueId = sel?.leagueId ?? null;
-                  }
-
-                  // Track which league message counts we've already added (avoid double-counting
-                  // when a user has multiple teams in the same league)
-                  const countedMessageLeagues = new Set<string>();
-
-                  // Count notifications from other teams (via their league).
-                  // Past-season teams are intentionally excluded so a closed
-                  // season can never inflate the badge total.
-                  activeTeams.forEach((team: any) => {
-                    if (selectedType === 'team' && selectedId === team.id) return;
-                    const leagueId = team.leagueId;
-                    if (leagueId && notificationCounts?.leagues[leagueId]) {
-                      totalNotifications += notificationCounts.leagues[leagueId];
-                    }
-                    // Add unread message count for other leagues only
-                    if (leagueId && leagueId !== currentlySelectedLeagueId && !countedMessageLeagues.has(leagueId) && leagueUnreadMessages[leagueId]) {
-                      totalNotifications += leagueUnreadMessages[leagueId];
-                      countedMessageLeagues.add(leagueId);
-                    }
-                  });
-                  
-                  // Count notifications from leagues (without teams)
-                  if (Array.isArray(leaguesWithoutTeams)) {
-                    leaguesWithoutTeams.forEach((league: any) => {
-                      if (selectedType === 'league' && selectedId === league.id) return;
-                      if (notificationCounts?.leagues[league.id]) {
-                        totalNotifications += notificationCounts.leagues[league.id];
-                      }
-                      // Add unread message count for other leagues only
-                      if (league.id !== currentlySelectedLeagueId && !countedMessageLeagues.has(league.id) && leagueUnreadMessages[league.id]) {
-                        totalNotifications += leagueUnreadMessages[league.id];
-                        countedMessageLeagues.add(league.id);
-                      }
-                    });
-                  }
-                  
-                  // Count notifications from tournaments
-                  if (Array.isArray(userPaidTournaments)) {
-                    userPaidTournaments.forEach((tournament: any) => {
-                      if (selectedType === 'tournament' && selectedId === tournament.id) return;
-                      if (notificationCounts?.tournaments[tournament.id]) {
-                        totalNotifications += notificationCounts.tournaments[tournament.id];
-                      }
-                    });
-                  }
-                  
-                  return totalNotifications > 0 ? <NotificationBadge count={totalNotifications} /> : null;
-                })()}
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
-            
-            {showDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-card hairline elev-lift rounded-lg z-50 max-h-[400px] overflow-y-auto">
-                {/* Teams Section — only active-season teams; closed seasons
-                    live behind the "Past Seasons" entry below. */}
-                {activeTeams.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30">
-                      MY TEAMS
-                    </div>
-                    {activeTeams.map((team: any) => {
-                      // Get notification count for this team's league (announcements + unread messages)
-                      const teamNotificationCount =
-                        (team.leagueId && notificationCounts?.leagues[team.leagueId] || 0) +
-                        (team.leagueId && leagueUnreadMessages[team.leagueId] || 0);
-                      
-                      return (
-                        <button
-                          key={`team-${team.id}`}
-                          onClick={() => {
-                            setSelectedType('team');
-                            setSelectedId(team.id);
-                            setShowDropdown(false);
-                          }}
-                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
-                            selectedType === 'team' && selectedId === team.id ? 'bg-primary/10 text-primary' : ''
-                          }`}
-                          data-testid={`option-team-${team.id}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Users className="w-4 h-4" />
-                              <span className="font-medium text-sm">{getTeamDisplayName(team)}</span>
-                            </div>
-                            {teamNotificationCount > 0 && (
-                              <NotificationBadge count={teamNotificationCount} />
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-                
-                {/* Leagues Section - Only show leagues where user has no team */}
-                {Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
-                      MY LEAGUES
-                    </div>
-                    {leaguesWithoutTeams.map((league: any) => {
-                      const leagueNotificationCount =
-                        (notificationCounts?.leagues[league.id] || 0) +
-                        (leagueUnreadMessages[league.id] || 0);
-                      
-                      return (
-                        <button
-                          key={`league-${league.id}`}
-                          onClick={() => {
-                            setSelectedType('league');
-                            setSelectedId(league.id);
-                            setShowDropdown(false);
-                          }}
-                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
-                            selectedType === 'league' && selectedId === league.id ? 'bg-primary/10 text-primary' : ''
-                          }`}
-                          data-testid={`option-league-${league.id}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Trophy className="w-4 h-4" />
-                              <span className="font-medium text-sm">{getLeagueDisplayName(league)}</span>
-                            </div>
-                            {leagueNotificationCount > 0 && (
-                              <NotificationBadge count={leagueNotificationCount} />
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-                
-                {/* Tournaments Section - Show paid tournaments */}
-                {Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0 && (
-                  <>
-                    <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
-                      MY TOURNAMENTS
-                    </div>
-                    {userPaidTournaments.map((tournament: any) => {
-                      const tournamentNotificationCount = notificationCounts?.tournaments[tournament.id] || 0;
-                      
-                      return (
-                        <button
-                          key={`tournament-${tournament.id}`}
-                          onClick={() => {
-                            setSelectedType('tournament');
-                            setSelectedId(tournament.id);
-                            setShowDropdown(false);
-                          }}
-                          className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
-                            selectedType === 'tournament' && selectedId === tournament.id ? 'bg-primary/10 text-primary' : ''
-                          }`}
-                          data-testid={`option-tournament-${tournament.id}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Trophy className="w-4 h-4 text-orange-500" />
-                              <span className="font-medium text-sm">{getTournamentDisplayName(tournament)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {tournamentNotificationCount > 0 && (
-                                <NotificationBadge count={tournamentNotificationCount} />
-                              )}
-                              {tournament.uniqueTournamentId && (
-                                <span className="text-xs text-muted-foreground">{tournament.uniqueTournamentId}</span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* Past Seasons — single entry that opens a modal listing
-                    every team the user had in a closed season. Hidden when
-                    the user has no past-season items. */}
-                {hasPastSeasons && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDropdown(false);
-                      setShowPastSeasonsModal(true);
-                    }}
-                    className="w-full p-3 text-left hover:bg-muted/50 transition-colors border-t border-border last:rounded-b-lg"
-                    data-testid="option-past-seasons"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium text-sm">Past Seasons</span>
-                    </div>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      <PastSeasonsModal
-        open={showPastSeasonsModal}
-        onOpenChange={setShowPastSeasonsModal}
-        teams={pastSeasonTeams}
-        leagues={
-          Array.isArray(userLeagues)
-            ? (userLeagues as any[]).map((lg: any) => ({
-                id: lg.id,
-                name: lg.name,
-                isPastOnly: lg.hasActiveSeason === false,
-                pastSeasons: Array.isArray(lg.pastSeasons) ? lg.pastSeasons : [],
-              }))
-            : []
-        }
-        onSelect={(s) => {
-          setSelectedType(s.type);
-          setSelectedId(s.id);
-        }}
-      />
-      {/* 4-Card Section — hidden while a pre-window tournament countdown
-          is active so the player only sees the timer below. */}
-      {!isTournamentCountdownActive && (
-      <div className="px-6 mb-6">
-        <div className="grid grid-cols-4 gap-3">
-          {/* Announcements Card */}
-          <div 
-            className="rounded-xl hairline elev-rest p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
-            data-testid="card-announcements"
-            onClick={() => openOverlay('/announcements', <Announcements />)}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <BrickWall className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium text-center">Wall</p>
-            </div>
-            {selectedType === 'tournament' && selectedId ? (
-              <AnnouncementBadge tournamentId={selectedId} />
-            ) : (
-              effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />
-            )}
-          </div>
-
-          {/* Photos Card - Always clickable, paywall shown on MediaGalleryPage if needed */}
-          <div 
-            className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
-            data-testid="card-photos"
-            onClick={() => {
-              let entityType: 'tournament' | 'league' | 'team' | null = null;
-              let entityId: string | null = null;
-              let route: string | null = null;
-              
-              if (selectedType === 'tournament' && selectedId) {
-                entityType = 'tournament';
-                entityId = selectedId;
-                route = `/media/tournament/${selectedId}`;
-              } else if (effectiveLeagueId) {
-                entityType = 'league';
-                entityId = effectiveLeagueId;
-                route = `/media/league/${effectiveLeagueId}`;
-              } else if (selectedType === 'team' && selectedId) {
-                entityType = 'team';
-                entityId = selectedId;
-                route = `/media/team/${selectedId}`;
-              }
-              
-              if (route && entityType && entityId) {
-                openOverlay(route, <MediaGalleryPage overlayEntityType={entityType} overlayEntityId={entityId} />);
-              }
-            }}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <Camera className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium">Photos</p>
-            </div>
-          </div>
-
-          {/* Stats Card */}
-          <div 
-            className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
-            data-testid="card-stats"
-            onClick={() => openOverlay('/stats', <StatsPage />)}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium">Stats</p>
-            </div>
-          </div>
-
-          {/* Standings Card */}
-          <div 
-            className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
-            data-testid="card-standings"
-            onClick={() => {
-              setShowStandingsModal(true);
-            }}
-          >
-            <div className="h-full flex flex-col items-center justify-center">
-              <Award className="w-8 h-8 text-blue-500 mb-3" />
-              <p className="text-xs font-medium">Standings</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      )}
-      {/* Tournament-focused section when tournament is selected */}
-      {selectedType === 'tournament' && selectedTournament && !primaryTeam && (
-        <div className="px-6 mb-6">
-          {selectedTournamentDetail?.accessState === 'pending' ? (
-            // Approved participant whose access window has not yet opened —
-            // show a live countdown that polls every 30s and auto-swaps to
-            // the View Bracket card the moment the window flips open. We
-            // override the component's default min-h-screen so it fits
-            // naturally inside the mobile dashboard layout instead of
-            // taking over the viewport.
-            <div className="[&>div]:min-h-0 [&>div]:py-0">
-              <TournamentCountdown
-                tournamentId={selectedTournament.id}
-                name={selectedTournamentDetail.name || selectedTournament.name}
-                logoUrl={selectedTournamentDetail.logoUrl}
-                accessStartDate={selectedTournamentDetail.accessStartDate}
-              />
-            </div>
-          ) : (
-            <div className="rounded-xl hairline elev-rest p-4 bg-[#e2e2e2] dark:bg-[#212121]">
-              <div className="flex items-center gap-3 mb-3">
-                <Trophy className="w-8 h-8 text-orange-500" />
-                <div>
-                  <h3 className="font-semibold">{selectedTournament.name}</h3>
-                  <p className="text-xs text-muted-foreground">Tournament ID: {selectedTournament.uniqueTournamentId}</p>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground mb-3">
-                View the tournament bracket, manage teams, and track scores on the tournament detail page.
-              </p>
-              <Button
-                onClick={() => navigate(`/tournaments/${selectedTournament.id}`)}
-                className="w-full bg-orange-500 hover:bg-orange-600"
-                data-testid="button-view-bracket"
-              >
-                View Bracket
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-      {/* Quick Stats */}
-      {primaryTeam && (
-        <div className="px-6 mb-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
-                  {primaryTeam?.logoUrl ? (
+                <button 
+                  onClick={() => navigate('/profile')}
+                  className={`w-[48px] h-[48px] rounded-full flex items-center justify-center overflow-hidden ${(userProfile as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}
+                  data-testid="button-profile"
+                >
+                  {(userProfile as any)?.profileImageUrl ? (
                     <img 
-                      src={getImageUrl(primaryTeam.logoUrl) || ''} 
-                      alt={`${primaryTeam.name} logo`}
-                      className="w-full h-full rounded-lg object-cover bg-transparent"
-                      data-testid="img-team-logo"
+                      src={getImageUrl((userProfile as any).profileImageUrl) || ''} 
+                      alt="Profile"
+                      className="w-full h-full object-cover bg-transparent"
                     />
                   ) : (
-                    <Trophy className="w-5 h-5 text-primary-foreground" />
+                    <span className="text-primary-foreground text-lg font-semibold">
+                      {(userProfile as any)?.firstName?.[0] || 'U'}
+                    </span>
                   )}
-                </div>
-                <div>
-                  <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                    {(teamRecord as any)?.gamesRemaining ?? 0}
-                  </p>
-                  <p className="text-muted-foreground text-[16px]">Games Left</p>
-                </div>
+                </button>
+                <button
+                  onClick={() => setShowHamburgerMenu(true)}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors"
+                  data-testid="button-hamburger-menu"
+                >
+                  <Menu className="w-8 h-8 text-foreground" />
+                </button>
+                <SlideOutMenu open={showHamburgerMenu} onOpenChange={setShowHamburgerMenu} />
               </div>
             </div>
-            
-            {effectiveLeagueId && (
-              <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
-                {isLoadingNeedsAttention ? (
-                  <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
-                    <div className="flex items-center gap-3">
-                      <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
-                      <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
-                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
-                    </div>
-                  </div>
-                ) : needsAttentionData ? (
-                  <button
-                    onClick={() => setShowNeedsAttentionModal(true)}
-                    className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2"
-                    data-testid="button-needs-attention-permanent"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
-                      <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
+          </div>
+        {/* Team/League/Tournament Selection Dropdown */}
+        {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0) || hasPastSeasons) && (
+          <div className="px-6 mb-4">
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className={`w-full hairline elev-rest rounded-lg p-3 flex items-center justify-between hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] pt-[8px] pb-[8px] pl-[4px] pr-[4px] ${mobileSelectorHasOtherAlerts ? 'alerts-glow' : ''}`}
+                data-testid="button-selector"
+              >
+                <div className="flex items-center gap-2">
+                  {selectedType === 'team' ? (
+                    <Users className="w-4 h-4 text-primary" />
+                  ) : selectedType === 'tournament' ? (
+                    <Trophy className="w-4 h-4 text-orange-500" />
+                  ) : (
+                    <Trophy className="w-4 h-4 text-primary" />
+                  )}
+                  <span className="font-medium pl-[8px] pr-[8px] text-[12px]">
+                    {selectedType === 'team' 
+                      ? getTeamDisplayName((userTeamsAll as any[])?.find((t: any) => t.id === selectedId))
+                      : selectedType === 'tournament'
+                      ? getTournamentDisplayName(selectedTournament)
+                      : getLeagueDisplayName(selectedLeague)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs mr-1 text-[#3c83f6] font-bold">Select</span>
+                  {/* Total notification count for ALL other teams/leagues/tournaments */}
+                  {(() => {
+                    let totalNotifications = 0;
+
+                    // Determine the league currently visible on the home screen
+                    // (messages for this league show on the bottom nav, not here)
+                    let currentlySelectedLeagueId: string | null = null;
+                    if (selectedType === 'league') {
+                      currentlySelectedLeagueId = selectedId;
+                    } else if (selectedType === 'team' && Array.isArray(userTeamsAll)) {
+                      const sel = (userTeamsAll as any[]).find((t: any) => t.id === selectedId);
+                      currentlySelectedLeagueId = sel?.leagueId ?? null;
+                    }
+
+                    // Track which league message counts we've already added (avoid double-counting
+                    // when a user has multiple teams in the same league)
+                    const countedMessageLeagues = new Set<string>();
+
+                    // Count notifications from other teams (via their league).
+                    // Past-season teams are intentionally excluded so a closed
+                    // season can never inflate the badge total.
+                    activeTeams.forEach((team: any) => {
+                      if (selectedType === 'team' && selectedId === team.id) return;
+                      const leagueId = team.leagueId;
+                      if (leagueId && notificationCounts?.leagues[leagueId]) {
+                        totalNotifications += notificationCounts.leagues[leagueId];
+                      }
+                      // Add unread message count for other leagues only
+                      if (leagueId && leagueId !== currentlySelectedLeagueId && !countedMessageLeagues.has(leagueId) && leagueUnreadMessages[leagueId]) {
+                        totalNotifications += leagueUnreadMessages[leagueId];
+                        countedMessageLeagues.add(leagueId);
+                      }
+                    });
+                    
+                    // Count notifications from leagues (without teams)
+                    if (Array.isArray(leaguesWithoutTeams)) {
+                      leaguesWithoutTeams.forEach((league: any) => {
+                        if (selectedType === 'league' && selectedId === league.id) return;
+                        if (notificationCounts?.leagues[league.id]) {
+                          totalNotifications += notificationCounts.leagues[league.id];
+                        }
+                        // Add unread message count for other leagues only
+                        if (league.id !== currentlySelectedLeagueId && !countedMessageLeagues.has(league.id) && leagueUnreadMessages[league.id]) {
+                          totalNotifications += leagueUnreadMessages[league.id];
+                          countedMessageLeagues.add(league.id);
+                        }
+                      });
+                    }
+                    
+                    // Count notifications from tournaments
+                    if (Array.isArray(userPaidTournaments)) {
+                      userPaidTournaments.forEach((tournament: any) => {
+                        if (selectedType === 'tournament' && selectedId === tournament.id) return;
+                        if (notificationCounts?.tournaments[tournament.id]) {
+                          totalNotifications += notificationCounts.tournaments[tournament.id];
+                        }
+                      });
+                    }
+                    
+                    return totalNotifications > 0 ? <NotificationBadge count={totalNotifications} /> : null;
+                  })()}
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+              
+              {showDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card hairline elev-lift rounded-lg z-50 max-h-[400px] overflow-y-auto">
+                  {/* Teams Section — only active-season teams; closed seasons
+                      live behind the "Past Seasons" entry below. */}
+                  {activeTeams.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30">
+                        MY TEAMS
                       </div>
-                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
-                    </div>
-                  </button>
-                ) : null}
+                      {activeTeams.map((team: any) => {
+                        // Get notification count for this team's league (announcements + unread messages)
+                        const teamNotificationCount =
+                          (team.leagueId && notificationCounts?.leagues[team.leagueId] || 0) +
+                          (team.leagueId && leagueUnreadMessages[team.leagueId] || 0);
+                        
+                        return (
+                          <button
+                            key={`team-${team.id}`}
+                            onClick={() => {
+                              setSelectedType('team');
+                              setSelectedId(team.id);
+                              setShowDropdown(false);
+                            }}
+                            className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
+                              selectedType === 'team' && selectedId === team.id ? 'bg-primary/10 text-primary' : ''
+                            }`}
+                            data-testid={`option-team-${team.id}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4" />
+                                <span className="font-medium text-sm">{getTeamDisplayName(team)}</span>
+                              </div>
+                              {teamNotificationCount > 0 && (
+                                <NotificationBadge count={teamNotificationCount} />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  
+                  {/* Leagues Section - Only show leagues where user has no team */}
+                  {Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
+                        MY LEAGUES
+                      </div>
+                      {leaguesWithoutTeams.map((league: any) => {
+                        const leagueNotificationCount =
+                          (notificationCounts?.leagues[league.id] || 0) +
+                          (leagueUnreadMessages[league.id] || 0);
+                        
+                        return (
+                          <button
+                            key={`league-${league.id}`}
+                            onClick={() => {
+                              setSelectedType('league');
+                              setSelectedId(league.id);
+                              setShowDropdown(false);
+                            }}
+                            className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
+                              selectedType === 'league' && selectedId === league.id ? 'bg-primary/10 text-primary' : ''
+                            }`}
+                            data-testid={`option-league-${league.id}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Trophy className="w-4 h-4" />
+                                <span className="font-medium text-sm">{getLeagueDisplayName(league)}</span>
+                              </div>
+                              {leagueNotificationCount > 0 && (
+                                <NotificationBadge count={leagueNotificationCount} />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  
+                  {/* Tournaments Section - Show paid tournaments */}
+                  {Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground bg-muted/30 border-t border-border">
+                        MY TOURNAMENTS
+                      </div>
+                      {userPaidTournaments.map((tournament: any) => {
+                        const tournamentNotificationCount = notificationCounts?.tournaments[tournament.id] || 0;
+                        
+                        return (
+                          <button
+                            key={`tournament-${tournament.id}`}
+                            onClick={() => {
+                              setSelectedType('tournament');
+                              setSelectedId(tournament.id);
+                              setShowDropdown(false);
+                            }}
+                            className={`w-full p-3 text-left hover:bg-muted/50 transition-colors last:rounded-b-lg ${
+                              selectedType === 'tournament' && selectedId === tournament.id ? 'bg-primary/10 text-primary' : ''
+                            }`}
+                            data-testid={`option-tournament-${tournament.id}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Trophy className="w-4 h-4 text-orange-500" />
+                                <span className="font-medium text-sm">{getTournamentDisplayName(tournament)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {tournamentNotificationCount > 0 && (
+                                  <NotificationBadge count={tournamentNotificationCount} />
+                                )}
+                                {tournament.uniqueTournamentId && (
+                                  <span className="text-xs text-muted-foreground">{tournament.uniqueTournamentId}</span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* Past Seasons — single entry that opens a modal listing
+                      every team the user had in a closed season. Hidden when
+                      the user has no past-season items. */}
+                  {hasPastSeasons && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDropdown(false);
+                        setShowPastSeasonsModal(true);
+                      }}
+                      className="w-full p-3 text-left hover:bg-muted/50 transition-colors border-t border-border last:rounded-b-lg"
+                      data-testid="option-past-seasons"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">Past Seasons</span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <PastSeasonsModal
+          open={showPastSeasonsModal}
+          onOpenChange={setShowPastSeasonsModal}
+          teams={pastSeasonTeams}
+          leagues={
+            Array.isArray(userLeagues)
+              ? (userLeagues as any[]).map((lg: any) => ({
+                  id: lg.id,
+                  name: lg.name,
+                  isPastOnly: lg.hasActiveSeason === false,
+                  pastSeasons: Array.isArray(lg.pastSeasons) ? lg.pastSeasons : [],
+                }))
+              : []
+          }
+          onSelect={(s) => {
+            setSelectedType(s.type);
+            setSelectedId(s.id);
+          }}
+        />
+        {/* 4-Card Section — hidden while a pre-window tournament countdown
+            is active so the player only sees the timer below. */}
+        {!isTournamentCountdownActive && (
+        <div className="px-6 mb-6">
+          <div className="grid grid-cols-4 gap-3">
+            {/* Announcements Card */}
+            <div 
+              className="rounded-xl hairline elev-rest p-5 min-h-[72px] relative cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+              data-testid="card-announcements"
+              onClick={() => openOverlay('/announcements', <Announcements />)}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <BrickWall className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium text-center">Wall</p>
+              </div>
+              {selectedType === 'tournament' && selectedId ? (
+                <AnnouncementBadge tournamentId={selectedId} />
+              ) : (
+                effectiveLeagueId && <AnnouncementBadge leagueId={effectiveLeagueId} />
+              )}
+            </div>
+
+            {/* Photos Card - Always clickable, paywall shown on MediaGalleryPage if needed */}
+            <div 
+              className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]" 
+              data-testid="card-photos"
+              onClick={() => {
+                let entityType: 'tournament' | 'league' | 'team' | null = null;
+                let entityId: string | null = null;
+                let route: string | null = null;
+                
+                if (selectedType === 'tournament' && selectedId) {
+                  entityType = 'tournament';
+                  entityId = selectedId;
+                  route = `/media/tournament/${selectedId}`;
+                } else if (effectiveLeagueId) {
+                  entityType = 'league';
+                  entityId = effectiveLeagueId;
+                  route = `/media/league/${effectiveLeagueId}`;
+                } else if (selectedType === 'team' && selectedId) {
+                  entityType = 'team';
+                  entityId = selectedId;
+                  route = `/media/team/${selectedId}`;
+                }
+                
+                if (route && entityType && entityId) {
+                  openOverlay(route, <MediaGalleryPage overlayEntityType={entityType} overlayEntityId={entityId} />);
+                }
+              }}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <Camera className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Photos</p>
+              </div>
+            </div>
+
+            {/* Stats Card */}
+            <div 
+              className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+              data-testid="card-stats"
+              onClick={() => openOverlay('/stats', <StatsPage />)}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <BarChart3 className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Stats</p>
+              </div>
+            </div>
+
+            {/* Standings Card */}
+            <div 
+              className="rounded-xl hairline elev-rest p-5 min-h-[72px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+              data-testid="card-standings"
+              onClick={() => {
+                setShowStandingsModal(true);
+              }}
+            >
+              <div className="h-full flex flex-col items-center justify-center">
+                <Award className="w-8 h-8 text-blue-500 mb-3" />
+                <p className="text-xs font-medium">Standings</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        )}
+        {/* Tournament-focused section when tournament is selected */}
+        {selectedType === 'tournament' && selectedTournament && !primaryTeam && (
+          <div className="px-6 mb-6">
+            {selectedTournamentDetail?.accessState === 'pending' ? (
+              // Approved participant whose access window has not yet opened —
+              // show a live countdown that polls every 30s and auto-swaps to
+              // the View Bracket card the moment the window flips open. We
+              // override the component's default min-h-screen so it fits
+              // naturally inside the mobile dashboard layout instead of
+              // taking over the viewport.
+              (<div className="[&>div]:min-h-0 [&>div]:py-0">
+                <TournamentCountdown
+                  tournamentId={selectedTournament.id}
+                  name={selectedTournamentDetail.name || selectedTournament.name}
+                  logoUrl={selectedTournamentDetail.logoUrl}
+                  accessStartDate={selectedTournamentDetail.accessStartDate}
+                />
+              </div>)
+            ) : (
+              <div className="rounded-xl hairline elev-rest p-4 bg-[#e2e2e2] dark:bg-[#212121]">
+                <div className="flex items-center gap-3 mb-3">
+                  <Trophy className="w-8 h-8 text-orange-500" />
+                  <div>
+                    <h3 className="font-semibold">{selectedTournament.name}</h3>
+                    <p className="text-xs text-muted-foreground">Tournament ID: {selectedTournament.uniqueTournamentId}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  View the tournament bracket, manage teams, and track scores on the tournament detail page.
+                </p>
+                <Button
+                  onClick={() => navigate(`/tournaments/${selectedTournament.id}`)}
+                  className="w-full bg-orange-500 hover:bg-orange-600"
+                  data-testid="button-view-bracket"
+                >
+                  View Bracket
+                </Button>
               </div>
             )}
           </div>
-        </div>
-      )}
-      {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
-      {!primaryTeam && hasStatManagerAccess() && (
-        <div className="px-6 mb-6">
-          <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
-            <button
-              onClick={() => navigate('/scorekeeper')}
-              className="w-full h-full flex items-center justify-between rounded-xl px-4 py-3"
-              data-testid="button-scorekeeper-link"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                  <Clipboard className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <span className="font-medium text-sm text-[#212121] dark:text-white block">Scorekeeper Dashboard</span>
-                  <span className="text-xs text-muted-foreground">Manage game scores</span>
+        )}
+        {/* Quick Stats */}
+        {primaryTeam && (
+          <div className="px-6 mb-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+                    {primaryTeam?.logoUrl ? (
+                      <img 
+                        src={getImageUrl(primaryTeam.logoUrl) || ''} 
+                        alt={`${primaryTeam.name} logo`}
+                        className="w-full h-full rounded-lg object-cover bg-transparent"
+                        data-testid="img-team-logo"
+                      />
+                    ) : (
+                      <Trophy className="w-5 h-5 text-primary-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold" data-testid="text-games-remaining">
+                      {(teamRecord as any)?.gamesRemaining ?? 0}
+                    </p>
+                    <p className="text-muted-foreground text-[16px]">Games Left</p>
+                  </div>
                 </div>
               </div>
-              <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white rotate-[-90deg]" />
-            </button>
+              
+              {effectiveLeagueId && (
+                <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
+                  {isLoadingNeedsAttention ? (
+                    <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
+                        <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                        <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
+                      </div>
+                    </div>
+                  ) : needsAttentionData ? (
+                    <button
+                      onClick={() => setShowNeedsAttentionModal(true)}
+                      className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2"
+                      data-testid="button-needs-attention-permanent"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
+                        <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
+                      </div>
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-      {/* Needs Attention Section - Show for leagues and league teams */}
-      {effectiveLeagueId && (
-        <NeedsAttentionTasks 
-          leagueId={effectiveLeagueId} 
-          onNavigate={navigate}
-        />
-      )}
-      {/* Upcoming Games — hidden while a pre-window tournament countdown
-          is active so the player only sees the timer above. */}
-      {!isTournamentCountdownActive && (
-      <div className="px-6 mt-[8px] mb-[8px]">
-        {/* Row 1: title + add button */}
-        <div className="flex items-center gap-2 mb-2">
-          <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
-          <Button
-            onClick={() => setShowAddEventDialog(true)}
-            className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
-            data-testid="button-add-event"
-          >
-            <Plus className="w-[12.8px] h-[12.8px]" />
-          </Button>
-        </div>
-        {/* Row 2: scope toggle | list/calendar toggle + view all */}
-        <div className="flex items-center justify-between mb-4 gap-2">
-          {/* My Team / League scope toggle */}
-          <div
-            className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
-            role="tablist"
-            aria-label="Schedule scope"
-          >
-            <button
-              type="button"
-              onClick={() => setScheduleScope('team')}
-              className={`px-2 py-0.5 rounded transition-colors text-center ${
-                scheduleScope === 'team'
-                  ? 'bg-blue-500 text-white shadow-sm'
-                  : 'text-muted-foreground'
-              }`}
-              aria-pressed={scheduleScope === 'team'}
-              data-testid="schedule-scope-team"
-            >
-              My Team
-            </button>
-            <button
-              type="button"
-              onClick={() => setScheduleScope('league')}
-              className={`px-2 py-0.5 rounded transition-colors text-center ${
-                scheduleScope === 'league'
-                  ? 'bg-blue-500 text-white shadow-sm'
-                  : 'text-muted-foreground'
-              }`}
-              aria-pressed={scheduleScope === 'league'}
-              data-testid="schedule-scope-league"
-            >
-              League
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[120px]"
-              role="tablist"
-              aria-label="Schedule view"
-            >
+        )}
+        {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
+        {!primaryTeam && hasStatManagerAccess() && (
+          <div className="px-6 mb-6">
+            <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
               <button
-                type="button"
-                onClick={() => setScheduleView('list')}
-                className={`px-2 py-0.5 rounded transition-colors text-center ${
-                  scheduleView === 'list'
-                    ? 'bg-blue-500 text-white shadow-sm'
-                    : 'text-muted-foreground'
-                }`}
-                aria-pressed={scheduleView === 'list'}
-                data-testid="mobile-schedule-toggle-list"
+                onClick={() => navigate('/scorekeeper')}
+                className="w-full h-full flex items-center justify-between rounded-xl px-4 py-3"
+                data-testid="button-scorekeeper-link"
               >
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => setScheduleView('calendar')}
-                className={`px-2 py-0.5 rounded transition-colors text-center ${
-                  scheduleView === 'calendar'
-                    ? 'bg-blue-500 text-white shadow-sm'
-                    : 'text-muted-foreground'
-                }`}
-                aria-pressed={scheduleView === 'calendar'}
-                data-testid="mobile-schedule-toggle-calendar"
-              >
-                Calendar
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                    <Clipboard className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-medium text-sm text-[#212121] dark:text-white block">Scorekeeper Dashboard</span>
+                    <span className="text-xs text-muted-foreground">Manage game scores</span>
+                  </div>
+                </div>
+                <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white rotate-[-90deg]" />
               </button>
             </div>
-            <button
-              onClick={() => navigate('/calendar')}
-              className="text-primary text-sm"
-              data-testid="button-view-all-games"
+          </div>
+        )}
+        {/* Needs Attention Section - Show for leagues and league teams */}
+        {effectiveLeagueId && (
+          <NeedsAttentionTasks 
+            leagueId={effectiveLeagueId} 
+            onNavigate={navigate}
+          />
+        )}
+        {/* Upcoming Games — hidden while a pre-window tournament countdown
+            is active so the player only sees the timer above. */}
+        {!isTournamentCountdownActive && (
+        <div className="px-6 mt-[8px] mb-[8px]">
+          {/* Row 1: title + add button */}
+          <div className="flex gap-2 justify-center items-center mb-[0px]">
+            <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
+            <Button
+              onClick={() => setShowAddEventDialog(true)}
+              className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
+              data-testid="button-add-event"
             >
-              View All
-            </button>
+              <Plus className="w-[12.8px] h-[12.8px]" />
+            </Button>
           </div>
-        </div>
-        
-        {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
-          <div className="bg-card rounded-xl hairline elev-rest p-4 animate-pulse" data-testid="loading-upcoming-games">
-            <div className="h-16 bg-muted rounded"></div>
+          {/* Row 2: scope toggle | list/calendar toggle + view all */}
+          <div className="flex items-center justify-between mb-4 gap-2">
+            {/* My Team / League scope toggle */}
+            <div
+              className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
+              role="tablist"
+              aria-label="Schedule scope"
+            >
+              <button
+                type="button"
+                onClick={() => setScheduleScope('team')}
+                className={`px-2 py-0.5 rounded transition-colors text-center ${
+                  scheduleScope === 'team'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+                aria-pressed={scheduleScope === 'team'}
+                data-testid="schedule-scope-team"
+              >
+                My Team
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleScope('league')}
+                className={`px-2 py-0.5 rounded transition-colors text-center ${
+                  scheduleScope === 'league'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+                aria-pressed={scheduleScope === 'league'}
+                data-testid="schedule-scope-league"
+              >
+                League
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[120px]"
+                role="tablist"
+                aria-label="Schedule view"
+              >
+                <button
+                  type="button"
+                  onClick={() => setScheduleView('list')}
+                  className={`px-2 py-0.5 rounded transition-colors text-center ${
+                    scheduleView === 'list'
+                      ? 'bg-blue-500 text-white shadow-sm'
+                      : 'text-muted-foreground'
+                  }`}
+                  aria-pressed={scheduleView === 'list'}
+                  data-testid="mobile-schedule-toggle-list"
+                >
+                  List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleView('calendar')}
+                  className={`px-2 py-0.5 rounded transition-colors text-center ${
+                    scheduleView === 'calendar'
+                      ? 'bg-blue-500 text-white shadow-sm'
+                      : 'text-muted-foreground'
+                  }`}
+                  aria-pressed={scheduleView === 'calendar'}
+                  data-testid="mobile-schedule-toggle-calendar"
+                >
+                  Calendar
+                </button>
+              </div>
+              <button
+                onClick={() => navigate('/calendar')}
+                className="text-primary text-sm"
+                data-testid="button-view-all-games"
+              >
+                View All
+              </button>
+            </div>
           </div>
-        ) : scheduleView === 'calendar' ? (() => {
-          // In league scope, pass the full league game set; in team scope apply
-          // the usual eligibility filter (scrimmages, user-team games, subs, tournaments).
-          let calendarGames: any[];
-          if (scheduleScope === 'league') {
-            calendarGames = Array.isArray(scheduleGames) ? (scheduleGames as any[]) : [];
-          } else {
-            const userTeamIds = Array.isArray(userTeams) ? userTeams.map((t: any) => t.id) : [];
-            calendarGames = Array.isArray(scheduleGames)
-              ? (scheduleGames as any[]).filter((game: any) => {
-                  if (game.isScrimmage) return true;
-                  const isOnTeam =
-                    userTeamIds.includes(game.homeTeamId) ||
-                    userTeamIds.includes(game.awayTeamId);
-                  const isTournamentMatchForUser = game.isTournamentMatch === true;
-                  const isSubstitute = game.isSubstitute === true;
-                  return isOnTeam || isSubstitute || isTournamentMatchForUser;
+          
+          {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
+            <div className="bg-card rounded-xl hairline elev-rest p-4 animate-pulse" data-testid="loading-upcoming-games">
+              <div className="h-16 bg-muted rounded"></div>
+            </div>
+          ) : scheduleView === 'calendar' ? (() => {
+            // In league scope, pass the full league game set; in team scope apply
+            // the usual eligibility filter (scrimmages, user-team games, subs, tournaments).
+            let calendarGames: any[];
+            if (scheduleScope === 'league') {
+              calendarGames = Array.isArray(scheduleGames) ? (scheduleGames as any[]) : [];
+            } else {
+              const userTeamIds = Array.isArray(userTeams) ? userTeams.map((t: any) => t.id) : [];
+              calendarGames = Array.isArray(scheduleGames)
+                ? (scheduleGames as any[]).filter((game: any) => {
+                    if (game.isScrimmage) return true;
+                    const isOnTeam =
+                      userTeamIds.includes(game.homeTeamId) ||
+                      userTeamIds.includes(game.awayTeamId);
+                    const isTournamentMatchForUser = game.isTournamentMatch === true;
+                    const isSubstitute = game.isSubstitute === true;
+                    return isOnTeam || isSubstitute || isTournamentMatchForUser;
+                  })
+                : [];
+            }
+            // Mirror the tournament scope filter the list-cards apply
+            const filteredTournaments = Array.isArray(visibleTournaments)
+              ? (visibleTournaments as any[]).filter((tournament: any) => {
+                  if (selectedType === 'team' && selectedId) {
+                    const teamsArray = Array.isArray(userTeamsAll) ? userTeamsAll : [];
+                    const team = teamsArray.find((t: any) => t.id === selectedId);
+                    if (!team?.leagueId) return false;
+                    return tournament.leagueId === team.leagueId;
+                  }
+                  if (selectedType === 'league' && selectedId) {
+                    return tournament.leagueId === selectedId;
+                  }
+                  if (selectedType === 'tournament') {
+                    return tournament.id === selectedId;
+                  }
+                  return true;
                 })
               : [];
-          }
-          // Mirror the tournament scope filter the list-cards apply
-          const filteredTournaments = Array.isArray(visibleTournaments)
-            ? (visibleTournaments as any[]).filter((tournament: any) => {
-                if (selectedType === 'team' && selectedId) {
-                  const teamsArray = Array.isArray(userTeamsAll) ? userTeamsAll : [];
-                  const team = teamsArray.find((t: any) => t.id === selectedId);
-                  if (!team?.leagueId) return false;
-                  return tournament.leagueId === team.leagueId;
-                }
-                if (selectedType === 'league' && selectedId) {
-                  return tournament.leagueId === selectedId;
-                }
-                if (selectedType === 'tournament') {
-                  return tournament.id === selectedId;
-                }
-                return true;
-              })
-            : [];
-          return (
-            <ScheduleCalendarMobile
-              scrimmageInvites={scheduleScope === 'league' ? [] : (Array.isArray(scrimmageInvites) ? scrimmageInvites : [])}
-              scrimmageRequests={scheduleScope === 'league' ? [] : (Array.isArray(scrimmageRequests) ? scrimmageRequests : [])}
-              personalReminders={scheduleScope === 'league' ? [] : (Array.isArray(personalReminders) ? personalReminders : [])}
-              teamEvents={Array.isArray(teamEvents) ? teamEvents : []}
-              upcomingGames={calendarGames}
-              visibleTournaments={filteredTournaments}
-              primaryTeam={primaryTeam}
-            />
-          );
-        })() : (() => {
-          // Helper to check if a date is today or in the future (comparing local dates, not timestamps)
-          // Games should remain visible until the day AFTER they are scheduled
-          const isYesterdayOrLater = (dateStr: string) => {
-            const eventDate = new Date(dateStr);
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            yesterday.setHours(0, 0, 0, 0);
-            const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-            return eventDateOnly >= yesterday;
-          };
-          const hasGames = Array.isArray(scheduleGames) && (scheduleGames as any[]).filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0;
-          const hasInvites = scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0;
-          const hasRequests = scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
-          const hasReminders = scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0;
-          return hasGames || hasInvites || hasRequests || hasReminders || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
-        })() ? (
-          <div className="space-y-3">
-            {/* First show scrimmage invites (yesterday and future - visible until day after) */}
-            {scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
-              const eventDate = new Date(invite.dateTime);
+            return (
+              <ScheduleCalendarMobile
+                scrimmageInvites={scheduleScope === 'league' ? [] : (Array.isArray(scrimmageInvites) ? scrimmageInvites : [])}
+                scrimmageRequests={scheduleScope === 'league' ? [] : (Array.isArray(scrimmageRequests) ? scrimmageRequests : [])}
+                personalReminders={scheduleScope === 'league' ? [] : (Array.isArray(personalReminders) ? personalReminders : [])}
+                teamEvents={Array.isArray(teamEvents) ? teamEvents : []}
+                upcomingGames={calendarGames}
+                visibleTournaments={filteredTournaments}
+                primaryTeam={primaryTeam}
+              />
+            );
+          })() : (() => {
+            // Helper to check if a date is today or in the future (comparing local dates, not timestamps)
+            // Games should remain visible until the day AFTER they are scheduled
+            const isYesterdayOrLater = (dateStr: string) => {
+              const eventDate = new Date(dateStr);
               const yesterday = new Date();
               yesterday.setDate(yesterday.getDate() - 1);
               yesterday.setHours(0, 0, 0, 0);
               const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
               return eventDateOnly >= yesterday;
-            }).map((invite: any) => (
-              <div 
-                key={`invite-${invite.id}`}
-                className="rounded-xl border border-yellow-500/50 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
-                data-testid={`card-scrimmage-invite-${invite.id}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
-                    <Trophy className="w-6 h-6 text-black" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold" data-testid={`text-invite-title-${invite.id}`}>
-                        {invite.title}
-                      </h3>
-                      <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded">Invite</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
-                      {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
-                    </p>
-                    {invite.location && (
-                      <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>
-                        {invite.location}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      scrimmageCheckInMutation.mutate(invite.id);
-                    }}
-                    disabled={scrimmageCheckInMutation.isPending}
-                    className="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm disabled:opacity-50"
-                    data-testid={`button-check-in-${invite.id}`}
-                  >
-                    Check In
-                  </button>
-                </div>
-              </div>
-            ))}
-            
-            {/* Show approved scrimmages (yesterday and future - visible until day after) */}
-            {scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests
-              .filter((request: any) => {
-                if (request.status !== 'approved' || !request.scrimmage) return false;
-                const eventDate = new Date(request.scrimmage.dateTime);
+            };
+            const hasGames = Array.isArray(scheduleGames) && (scheduleGames as any[]).filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0;
+            const hasInvites = scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0;
+            const hasRequests = scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
+            const hasReminders = scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0;
+            return hasGames || hasInvites || hasRequests || hasReminders || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
+          })() ? (
+            <div className="space-y-3">
+              {/* First show scrimmage invites (yesterday and future - visible until day after) */}
+              {scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
+                const eventDate = new Date(invite.dateTime);
                 const yesterday = new Date();
                 yesterday.setDate(yesterday.getDate() - 1);
                 yesterday.setHours(0, 0, 0, 0);
                 const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
                 return eventDateOnly >= yesterday;
-              })
-              .slice(0, 5)
-              .map((request: any) => {
-                const scrimmage = request.scrimmage;
-                return (
-                  <div 
-                    key={`scrimmage-${scrimmage.id}`}
-                    className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
-                    onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
-                    data-testid={`card-scrimmage-${scrimmage.id}`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                        <Trophy className="w-6 h-6 text-primary-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
-                          {scrimmage.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
-                          {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}
-                        </p>
-                        {scrimmage.location && (
-                          <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${scrimmage.id}`}>
-                            {scrimmage.location}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            
-            {/* Show personal reminders (yesterday and future - visible until day after) */}
-            {scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders
-              .filter((reminder: any) => {
-                if (reminder.isCompleted) return false;
-                const eventDate = new Date(reminder.scheduledAt);
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-                yesterday.setHours(0, 0, 0, 0);
-                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-                return eventDateOnly >= yesterday;
-              })
-              .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-              .slice(0, 5)
-              .map((reminder: any) => {
-                const isDismissing = dismissingReminders.has(reminder.id);
-                return (
-                  <div 
-                    key={`reminder-${reminder.id}`}
-                    className={`transition-all duration-300 ease-out ${isDismissing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
-                    style={{ 
-                      maxHeight: isDismissing ? '0px' : '200px', 
-                      marginTop: isDismissing ? '0px' : undefined,
-                      marginBottom: isDismissing ? '-12px' : undefined,
-                      padding: isDismissing ? '0px' : undefined,
-                      overflow: 'hidden',
-                      transform: isDismissing ? 'translateX(-100%)' : 'translateX(0)',
-                    }}
-                  >
-                    <div 
-                      className="rounded-xl border border-green-200 dark:border-green-800 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
-                      data-testid={`card-reminder-${reminder.id}`}
-                    >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                        <Clock className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold" data-testid={`text-reminder-title-${reminder.id}`}>
-                            {reminder.title}
-                          </h3>
-                          <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Reminder</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${reminder.id}`}>
-                          {format(new Date(reminder.scheduledAt), 'MMM d • h:mm a')}
-                        </p>
-                        {reminder.description && (
-                          <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${reminder.id}`}>
-                            {reminder.description}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDismissReminder(reminder.id);
-                        }}
-                        className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                        data-testid={`button-dismiss-reminder-${reminder.id}`}
-                        disabled={isDismissing || deleteReminderMutation.isPending}
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                    </div>
-                  </div>
-                );
-              })}
-            
-            {/* Show team events (general events and scrimmages) */}
-            {Array.isArray(teamEvents) && teamEvents
-              .filter((event: any) => {
-                const eventDate = new Date(event.scheduledAt);
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-                yesterday.setHours(0, 0, 0, 0);
-                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-                return eventDateOnly >= yesterday;
-              })
-              .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-              .slice(0, 5)
-              .map((event: any) => (
+              }).map((invite: any) => (
                 <div 
-                  key={`team-event-${event.id}`}
-                  className={`rounded-xl border elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
-                    event.eventType === 'scrimmage' 
-                      ? 'border-orange-200 dark:border-orange-800' 
-                      : 'border-blue-200 dark:border-blue-800'
-                  }`}
-                  onClick={() => navigate(`/team-event/${event.id}`)}
-                  data-testid={`card-team-event-${event.id}`}
+                  key={`invite-${invite.id}`}
+                  className="rounded-xl border border-yellow-500/50 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                  data-testid={`card-scrimmage-invite-${invite.id}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
-                    }`}>
-                      {event.eventType === 'scrimmage' ? (
-                        <Trophy className="w-6 h-6 text-white" />
-                      ) : (
-                        <Calendar className="w-6 h-6 text-white" />
-                      )}
+                    <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+                      <Trophy className="w-6 h-6 text-black" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold" data-testid={`text-team-event-title-${event.id}`}>
-                          {event.title}
+                        <h3 className="font-semibold" data-testid={`text-invite-title-${invite.id}`}>
+                          {invite.title}
                         </h3>
-                        <span className={`text-xs text-white px-2 py-0.5 rounded ${
-                          event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
-                        }`}>
-                          {event.eventType === 'scrimmage' ? 'Scrimmage' : 'Event'}
-                        </span>
+                        <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded">Invite</span>
                       </div>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-team-event-time-${event.id}`}>
-                        {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                      <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
+                        {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
                       </p>
-                      {event.teamName && (
-                        <p className="text-xs text-muted-foreground" data-testid={`text-team-event-team-${event.id}`}>
-                          {event.teamName}
-                        </p>
-                      )}
-                      {event.location && (
-                        <p className="text-xs text-muted-foreground" data-testid={`text-team-event-location-${event.id}`}>
-                          {event.location}
+                      {invite.location && (
+                        <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>
+                          {invite.location}
                         </p>
                       )}
                     </div>
-                    {event.canEdit && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingTeamEvent(event);
-                        }}
-                        className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                        data-testid={`button-edit-team-event-${event.id}`}
-                      >
-                        Edit
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        scrimmageCheckInMutation.mutate(invite.id);
+                      }}
+                      disabled={scrimmageCheckInMutation.isPending}
+                      className="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm disabled:opacity-50"
+                      data-testid={`button-check-in-${invite.id}`}
+                    >
+                      Check In
+                    </button>
                   </div>
                 </div>
               ))}
-            
-            {/* Show visible tournament brackets - only for the selected team's league or selected league */}
-            {Array.isArray(visibleTournaments) && visibleTournaments
-              .filter((tournament: any) => {
-                // If a team is selected, only show brackets from that team's league
-                if (selectedType === 'team' && selectedId) {
-                  // Ensure userTeamsAll is an array before using find
-                  const teamsArray = Array.isArray(userTeamsAll) ? userTeamsAll : [];
-                  const team = teamsArray.find((t: any) => t.id === selectedId);
-                  // If team has no league (independent), don't show any brackets
-                  if (!team?.leagueId) return false;
-                  // Only show brackets from the team's league
-                  return tournament.leagueId === team.leagueId;
-                }
-                // If a league is selected, only show brackets from that league
-                if (selectedType === 'league' && selectedId) {
-                  return tournament.leagueId === selectedId;
-                }
-                // If a tournament is selected, show its bracket
-                if (selectedType === 'tournament') {
-                  return tournament.id === selectedId;
-                }
-                return true;
-              })
-              .map((tournament: any) => (
-              <div 
-                key={`bracket-${tournament.id}`}
-                className="rounded-xl hairline p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
-                onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
-                data-testid={`card-bracket-${tournament.id}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-[#FFD700]">
-                    <Trophy className="w-6 h-6 text-black" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold" data-testid={`text-bracket-name-${tournament.id}`}>
-                        {tournament.name}
-                      </h3>
-                      <span className="text-xs px-2 py-0.5 rounded text-[#000000] bg-[#ffd700]">Bracket</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground" data-testid={`text-bracket-league-${tournament.id}`}>
-                      {tournament.leagueName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      View Bracket
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Then show regular games (yesterday and future - visible until day after) */}
-            {(scheduleGames as any[])
-              .filter((game: any) => {
-                // Games remain visible until the day AFTER they are scheduled
-                // Compare local dates only (not timestamps) to handle timezone differences correctly
-                const eventDate = new Date(game.scheduledAt);
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-                yesterday.setHours(0, 0, 0, 0);
-                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-                if (eventDateOnly < yesterday) {
-                  return false;
-                }
-                // In league scope show all games in the league without team filtering
-                if (scheduleScope === 'league') {
-                  return true;
-                }
-                // Always show scrimmages (user is already approved)
-                if (game.isScrimmage) {
-                  return true;
-                }
-                // For regular games, ensure we only show games for teams the user is currently on
-                const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
-                const isOnTeam = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
-                // Tournament matches: trust the backend filter (admin/creator OR
-                // approved participant whose team plays in the match). The
-                // server already restricts the upcoming-games response to
-                // matches the user should see, so we don't re-filter by team
-                // name here — that previously hid admin-only matches when the
-                // tournament creator wasn't rostered on either team.
-                const isTournamentMatchForUser = game.isTournamentMatch === true;
-                // Also show games where user is an approved substitute (marked by backend)
-                const isSubstitute = game.isSubstitute === true;
-                return isOnTeam || isSubstitute || isTournamentMatchForUser;
-              })
-              .slice(0, 5).map((game: any) => (
-              <div 
-                key={game.id} 
-                className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
-                onClick={() => navigate(`/game/${game.id}`)}
-                data-testid={`card-game-${game.id}`}
-              >
-                <div className="flex items-center gap-4 bg-[212121]">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center relative ${(() => {
-                      const isHomeTeamUser = game.isTournamentMatch 
-                        ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
-                        : game.homeTeam?.id === primaryTeam?.id;
-                      const opponentTeam = isHomeTeamUser ? game.awayTeam : game.homeTeam;
-                      return opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary';
-                    })()}`}>
-                    {(() => {
-                      // For tournament matches, compare by name since IDs may be null
-                      const isHomeTeamUser = game.isTournamentMatch 
-                        ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
-                        : game.homeTeam?.id === primaryTeam?.id;
-                      const opponentTeam = isHomeTeamUser ? game.awayTeam : game.homeTeam;
-                      return opponentTeam?.logoUrl ? (
-                        <img 
-                          src={getImageUrl(opponentTeam.logoUrl) || ''} 
-                          alt={`${opponentTeam.name} logo`}
-                          className="w-full h-full rounded-lg object-cover bg-transparent"
-                          data-testid={`img-opponent-logo-${game.id}`}
-                        />
-                      ) : (
-                        <Trophy className="w-6 h-6 text-primary-foreground" />
-                      );
-                    })()}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
-                        {game.isScrimmage ? game.scrimmageTitle : game.isTournamentMatch ? (
-                          `vs ${game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase() ? game.awayTeam?.name : game.homeTeam?.name}`
-                        ) : (
-                          `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`
-                        )}
-                      </h3>
-                      {game.isScrimmage && (
-                        <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-scrimmage-${game.id}`}>
-                          Scrimmage
-                        </span>
-                      )}
-                      {!game.isScrimmage && !game.isTournamentMatch && (
-                        <span className="text-xs bg-primary text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-game-${game.id}`}>
-                          Game
-                        </span>
-                      )}
-                      {game.isSubstitute === true && (
-                        <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-sub-${game.id}`}>
-                          SUB
-                        </span>
-                      )}
-                      {game.isTournamentMatch && (
-                        <span className="text-xs bg-[#ffd700] text-black px-2 py-0.5 rounded font-medium" data-testid={`badge-tournament-${game.id}`}>
-                          Playoff
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
-                      {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
-                    </p>
-                    {game.venue && (
-                      <p className="text-xs text-muted-foreground" data-testid={`text-game-venue-${game.id}`}>
-                        {game.venue}
-                      </p>
-                    )}
-                    {/* Score display for completed games */}
-                    {(game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) && !game.isScrimmage && (
-                      <div className="text-sm font-medium" data-testid={`text-game-score-${game.id}`}>
-                        <span className={game.homeTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
-                          {game.homeTeam?.name}: {game.homeScore ?? 0}
-                        </span>
-                        <span className="text-muted-foreground mx-2">•</span>
-                        <span className={game.awayTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
-                          {game.awayTeam?.name}: {game.awayScore ?? 0}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Duty Icons */}
-                    {(() => {
-                      // Find duty assignments for this game
-                      const gameAssignments = dutyAssignments?.find((ga: any) => ga.gameId === game.id);
-                      if (!gameAssignments || !Array.isArray(gameAssignments.assignments)) {
-                        return null;
-                      }
-                      
-                      // Filter assignments claimed by current user
-                      const userDuties = gameAssignments.assignments.filter(
-                        (assignment: any) => assignment.userId === (userProfile as any)?.id
-                      );
-                      
-                      if (userDuties.length === 0) return null;
-                      
-                      return (
-                        <div className="flex items-center gap-1">
-                          {userDuties.map((assignment: any, index: number) => {
-                            // First check if there's a Lucide icon available
-                            const IconComponent = getIconComponent(assignment.dutyTemplate?.icon);
-                            if (IconComponent) {
-                              return (
-                                <div 
-                                  key={`${assignment.id}-${index}`}
-                                  className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
-                                  title={assignment.dutyTemplate?.name}
-                                  data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
-                                >
-                                  <IconComponent className="w-5 h-5 text-primary-foreground" />
-                                </div>
-                              );
-                            }
-                            
-                            // Fallback to beverage jar for default duties that haven't been edited
-                            if (assignment.dutyTemplate?.name === 'Beverages') {
-                              return (
-                                <div 
-                                  key={`${assignment.id}-${index}`}
-                                  className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
-                                  title={assignment.dutyTemplate?.name}
-                                  data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
-                                >
-                                  <img 
-                                    src={beverageJarUrl}
-                                    alt="Beverage Duty"
-                                    className="h-5 w-auto invert dark:invert-0"
-                                    style={{ aspectRatio: '9/16' }}
-                                  />
-                                </div>
-                              );
-                            }
-                            
-                            return null;
-                          })}
+              
+              {/* Show approved scrimmages (yesterday and future - visible until day after) */}
+              {scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests
+                .filter((request: any) => {
+                  if (request.status !== 'approved' || !request.scrimmage) return false;
+                  const eventDate = new Date(request.scrimmage.dateTime);
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  yesterday.setHours(0, 0, 0, 0);
+                  const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                  return eventDateOnly >= yesterday;
+                })
+                .slice(0, 5)
+                .map((request: any) => {
+                  const scrimmage = request.scrimmage;
+                  return (
+                    <div 
+                      key={`scrimmage-${scrimmage.id}`}
+                      className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                      onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
+                      data-testid={`card-scrimmage-${scrimmage.id}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                          <Trophy className="w-6 h-6 text-primary-foreground" />
                         </div>
-                      );
-                    })()}
-                    <ChevronRight 
-                      className="w-8 h-8 text-primary ml-auto"
-                      data-testid={`icon-view-details-${game.id}`}
-                    />
+                        <div className="flex-1">
+                          <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
+                            {scrimmage.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
+                            {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}
+                          </p>
+                          {scrimmage.location && (
+                            <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${scrimmage.id}`}>
+                              {scrimmage.location}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              
+              {/* Show personal reminders (yesterday and future - visible until day after) */}
+              {scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders
+                .filter((reminder: any) => {
+                  if (reminder.isCompleted) return false;
+                  const eventDate = new Date(reminder.scheduledAt);
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  yesterday.setHours(0, 0, 0, 0);
+                  const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                  return eventDateOnly >= yesterday;
+                })
+                .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                .slice(0, 5)
+                .map((reminder: any) => {
+                  const isDismissing = dismissingReminders.has(reminder.id);
+                  return (
+                    <div 
+                      key={`reminder-${reminder.id}`}
+                      className={`transition-all duration-300 ease-out ${isDismissing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                      style={{ 
+                        maxHeight: isDismissing ? '0px' : '200px', 
+                        marginTop: isDismissing ? '0px' : undefined,
+                        marginBottom: isDismissing ? '-12px' : undefined,
+                        padding: isDismissing ? '0px' : undefined,
+                        overflow: 'hidden',
+                        transform: isDismissing ? 'translateX(-100%)' : 'translateX(0)',
+                      }}
+                    >
+                      <div 
+                        className="rounded-xl border border-green-200 dark:border-green-800 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                        data-testid={`card-reminder-${reminder.id}`}
+                      >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
+                          <Clock className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold" data-testid={`text-reminder-title-${reminder.id}`}>
+                              {reminder.title}
+                            </h3>
+                            <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded">Reminder</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground" data-testid={`text-reminder-time-${reminder.id}`}>
+                            {format(new Date(reminder.scheduledAt), 'MMM d • h:mm a')}
+                          </p>
+                          {reminder.description && (
+                            <p className="text-xs text-muted-foreground" data-testid={`text-reminder-description-${reminder.id}`}>
+                              {reminder.description}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDismissReminder(reminder.id);
+                          }}
+                          className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                          data-testid={`button-dismiss-reminder-${reminder.id}`}
+                          disabled={isDismissing || deleteReminderMutation.isPending}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              
+              {/* Show team events (general events and scrimmages) */}
+              {Array.isArray(teamEvents) && teamEvents
+                .filter((event: any) => {
+                  const eventDate = new Date(event.scheduledAt);
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  yesterday.setHours(0, 0, 0, 0);
+                  const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                  return eventDateOnly >= yesterday;
+                })
+                .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                .slice(0, 5)
+                .map((event: any) => (
+                  <div 
+                    key={`team-event-${event.id}`}
+                    className={`rounded-xl border elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
+                      event.eventType === 'scrimmage' 
+                        ? 'border-orange-200 dark:border-orange-800' 
+                        : 'border-blue-200 dark:border-blue-800'
+                    }`}
+                    onClick={() => navigate(`/team-event/${event.id}`)}
+                    data-testid={`card-team-event-${event.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
+                      }`}>
+                        {event.eventType === 'scrimmage' ? (
+                          <Trophy className="w-6 h-6 text-white" />
+                        ) : (
+                          <Calendar className="w-6 h-6 text-white" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold" data-testid={`text-team-event-title-${event.id}`}>
+                            {event.title}
+                          </h3>
+                          <span className={`text-xs text-white px-2 py-0.5 rounded ${
+                            event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
+                          }`}>
+                            {event.eventType === 'scrimmage' ? 'Scrimmage' : 'Event'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-team-event-time-${event.id}`}>
+                          {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                        </p>
+                        {event.teamName && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-team-event-team-${event.id}`}>
+                            {event.teamName}
+                          </p>
+                        )}
+                        {event.location && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-team-event-location-${event.id}`}>
+                            {event.location}
+                          </p>
+                        )}
+                      </div>
+                      {event.canEdit && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTeamEvent(event);
+                          }}
+                          className="px-3 py-1 text-sm hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                          data-testid={`button-edit-team-event-${event.id}`}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              
+              {/* Show visible tournament brackets - only for the selected team's league or selected league */}
+              {Array.isArray(visibleTournaments) && visibleTournaments
+                .filter((tournament: any) => {
+                  // If a team is selected, only show brackets from that team's league
+                  if (selectedType === 'team' && selectedId) {
+                    // Ensure userTeamsAll is an array before using find
+                    const teamsArray = Array.isArray(userTeamsAll) ? userTeamsAll : [];
+                    const team = teamsArray.find((t: any) => t.id === selectedId);
+                    // If team has no league (independent), don't show any brackets
+                    if (!team?.leagueId) return false;
+                    // Only show brackets from the team's league
+                    return tournament.leagueId === team.leagueId;
+                  }
+                  // If a league is selected, only show brackets from that league
+                  if (selectedType === 'league' && selectedId) {
+                    return tournament.leagueId === selectedId;
+                  }
+                  // If a tournament is selected, show its bracket
+                  if (selectedType === 'tournament') {
+                    return tournament.id === selectedId;
+                  }
+                  return true;
+                })
+                .map((tournament: any) => (
+                <div 
+                  key={`bracket-${tournament.id}`}
+                  className="rounded-xl hairline p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
+                  onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
+                  data-testid={`card-bracket-${tournament.id}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-[#FFD700]">
+                      <Trophy className="w-6 h-6 text-black" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold" data-testid={`text-bracket-name-${tournament.id}`}>
+                          {tournament.name}
+                        </h3>
+                        <span className="text-xs px-2 py-0.5 rounded text-[#000000] bg-[#ffd700]">Bracket</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-bracket-league-${tournament.id}`}>
+                        {tournament.leagueName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        View Bracket
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-card rounded-xl hairline elev-rest p-8 text-center" data-testid="empty-upcoming-games">
-            <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No upcoming games scheduled</p>
-          </div>
+              ))}
+              
+              {/* Then show regular games (yesterday and future - visible until day after) */}
+              {(scheduleGames as any[])
+                .filter((game: any) => {
+                  // Games remain visible until the day AFTER they are scheduled
+                  // Compare local dates only (not timestamps) to handle timezone differences correctly
+                  const eventDate = new Date(game.scheduledAt);
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  yesterday.setHours(0, 0, 0, 0);
+                  const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                  if (eventDateOnly < yesterday) {
+                    return false;
+                  }
+                  // In league scope show all games in the league without team filtering
+                  if (scheduleScope === 'league') {
+                    return true;
+                  }
+                  // Always show scrimmages (user is already approved)
+                  if (game.isScrimmage) {
+                    return true;
+                  }
+                  // For regular games, ensure we only show games for teams the user is currently on
+                  const userTeamIds = Array.isArray(userTeams) ? userTeams.map((team: any) => team.id) : [];
+                  const isOnTeam = userTeamIds.includes(game.homeTeamId) || userTeamIds.includes(game.awayTeamId);
+                  // Tournament matches: trust the backend filter (admin/creator OR
+                  // approved participant whose team plays in the match). The
+                  // server already restricts the upcoming-games response to
+                  // matches the user should see, so we don't re-filter by team
+                  // name here — that previously hid admin-only matches when the
+                  // tournament creator wasn't rostered on either team.
+                  const isTournamentMatchForUser = game.isTournamentMatch === true;
+                  // Also show games where user is an approved substitute (marked by backend)
+                  const isSubstitute = game.isSubstitute === true;
+                  return isOnTeam || isSubstitute || isTournamentMatchForUser;
+                })
+                .slice(0, 5).map((game: any) => (
+                <div 
+                  key={game.id} 
+                  className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                  onClick={() => navigate(`/game/${game.id}`)}
+                  data-testid={`card-game-${game.id}`}
+                >
+                  <div className="flex items-center gap-4 bg-[212121]">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center relative ${(() => {
+                        const isHomeTeamUser = game.isTournamentMatch 
+                          ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
+                          : game.homeTeam?.id === primaryTeam?.id;
+                        const opponentTeam = isHomeTeamUser ? game.awayTeam : game.homeTeam;
+                        return opponentTeam?.logoUrl ? 'bg-transparent' : 'bg-primary';
+                      })()}`}>
+                      {(() => {
+                        // For tournament matches, compare by name since IDs may be null
+                        const isHomeTeamUser = game.isTournamentMatch 
+                          ? game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase()
+                          : game.homeTeam?.id === primaryTeam?.id;
+                        const opponentTeam = isHomeTeamUser ? game.awayTeam : game.homeTeam;
+                        return opponentTeam?.logoUrl ? (
+                          <img 
+                            src={getImageUrl(opponentTeam.logoUrl) || ''} 
+                            alt={`${opponentTeam.name} logo`}
+                            className="w-full h-full rounded-lg object-cover bg-transparent"
+                            data-testid={`img-opponent-logo-${game.id}`}
+                          />
+                        ) : (
+                          <Trophy className="w-6 h-6 text-primary-foreground" />
+                        );
+                      })()}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold" data-testid={`text-game-opponent-${game.id}`}>
+                          {game.isScrimmage ? game.scrimmageTitle : game.isTournamentMatch ? (
+                            `vs ${game.homeTeam?.name?.toLowerCase() === primaryTeam?.name?.toLowerCase() ? game.awayTeam?.name : game.homeTeam?.name}`
+                          ) : (
+                            `vs ${game.homeTeam?.id === primaryTeam?.id ? game.awayTeam?.name : game.homeTeam?.name}`
+                          )}
+                        </h3>
+                        {game.isScrimmage && (
+                          <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-scrimmage-${game.id}`}>
+                            Scrimmage
+                          </span>
+                        )}
+                        {!game.isScrimmage && !game.isTournamentMatch && (
+                          <span className="text-xs bg-primary text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-game-${game.id}`}>
+                            Game
+                          </span>
+                        )}
+                        {game.isSubstitute === true && (
+                          <span className="text-xs bg-yellow-500 text-white px-2 py-0.5 rounded font-medium" data-testid={`badge-sub-${game.id}`}>
+                            SUB
+                          </span>
+                        )}
+                        {game.isTournamentMatch && (
+                          <span className="text-xs bg-[#ffd700] text-black px-2 py-0.5 rounded font-medium" data-testid={`badge-tournament-${game.id}`}>
+                            Playoff
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-game-time-${game.id}`}>
+                        {format(new Date(game.scheduledAt), 'MMM d • h:mm a')}
+                      </p>
+                      {game.venue && (
+                        <p className="text-xs text-muted-foreground" data-testid={`text-game-venue-${game.id}`}>
+                          {game.venue}
+                        </p>
+                      )}
+                      {/* Score display for completed games */}
+                      {(game.isCompleted || (game.homeScore !== null && game.awayScore !== null)) && !game.isScrimmage && (
+                        <div className="text-sm font-medium" data-testid={`text-game-score-${game.id}`}>
+                          <span className={game.homeTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                            {game.homeTeam?.name}: {game.homeScore ?? 0}
+                          </span>
+                          <span className="text-muted-foreground mx-2">•</span>
+                          <span className={game.awayTeam?.id === primaryTeam?.id ? "text-primary" : "text-muted-foreground"}>
+                            {game.awayTeam?.name}: {game.awayScore ?? 0}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Duty Icons */}
+                      {(() => {
+                        // Find duty assignments for this game
+                        const gameAssignments = dutyAssignments?.find((ga: any) => ga.gameId === game.id);
+                        if (!gameAssignments || !Array.isArray(gameAssignments.assignments)) {
+                          return null;
+                        }
+                        
+                        // Filter assignments claimed by current user
+                        const userDuties = gameAssignments.assignments.filter(
+                          (assignment: any) => assignment.userId === (userProfile as any)?.id
+                        );
+                        
+                        if (userDuties.length === 0) return null;
+                        
+                        return (
+                          <div className="flex items-center gap-1">
+                            {userDuties.map((assignment: any, index: number) => {
+                              // First check if there's a Lucide icon available
+                              const IconComponent = getIconComponent(assignment.dutyTemplate?.icon);
+                              if (IconComponent) {
+                                return (
+                                  <div 
+                                    key={`${assignment.id}-${index}`}
+                                    className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+                                    title={assignment.dutyTemplate?.name}
+                                    data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
+                                  >
+                                    <IconComponent className="w-5 h-5 text-primary-foreground" />
+                                  </div>
+                                );
+                              }
+                              
+                              // Fallback to beverage jar for default duties that haven't been edited
+                              if (assignment.dutyTemplate?.name === 'Beverages') {
+                                return (
+                                  <div 
+                                    key={`${assignment.id}-${index}`}
+                                    className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+                                    title={assignment.dutyTemplate?.name}
+                                    data-testid={`icon-duty-${assignment.dutyTemplate.name}-${game.id}`}
+                                  >
+                                    <img 
+                                      src={beverageJarUrl}
+                                      alt="Beverage Duty"
+                                      className="h-5 w-auto invert dark:invert-0"
+                                      style={{ aspectRatio: '9/16' }}
+                                    />
+                                  </div>
+                                );
+                              }
+                              
+                              return null;
+                            })}
+                          </div>
+                        );
+                      })()}
+                      <ChevronRight 
+                        className="w-8 h-8 text-primary ml-auto"
+                        data-testid={`icon-view-details-${game.id}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl hairline elev-rest p-8 text-center" data-testid="empty-upcoming-games">
+              <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No upcoming games scheduled</p>
+            </div>
+          )}
+        </div>
         )}
+        {/* Find a League/Team Section - Bottom */}
+        <div className="px-6 flex gap-2">
+          <button
+            onClick={() => navigate('/league-tournament-search')}
+            className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
+            data-testid="button-find-league"
+          >Find a League / Tournament</button>
+          <button
+            onClick={() => navigate('/team-search')}
+            className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
+            data-testid="button-find-team"
+          >
+            Find a Team
+          </button>
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
+            data-testid="button-send-feedback"
+          >
+            Send Feedback
+          </button>
+        </div>
+        {/* Mobile-only spacer so the HPIB banner + bottom nav don't cover the
+            search buttons above. Banner sits ~80px above the bottom nav and is
+            up to 128px tall; with the new lifted active-tab pill that floats
+            above the nav we add a touch more cushion so nothing scrolls
+            underneath the lifted icon. */}
+        <div className="h-72 md:hidden" aria-hidden="true" />
       </div>
-      )}
-      {/* Find a League/Team Section - Bottom */}
-      <div className="px-6 flex gap-2">
-        <button
-          onClick={() => navigate('/league-tournament-search')}
-          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
-          data-testid="button-find-league"
-        >Find a League / Tournament</button>
-        <button
-          onClick={() => navigate('/team-search')}
-          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
-          data-testid="button-find-team"
-        >
-          Find a Team
-        </button>
-        <button
-          onClick={() => setShowFeedbackModal(true)}
-          className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
-          data-testid="button-send-feedback"
-        >
-          Send Feedback
-        </button>
-      </div>
-      {/* Mobile-only spacer so the HPIB banner + bottom nav don't cover the
-          search buttons above. Banner sits ~80px above the bottom nav and is
-          up to 128px tall; with the new lifted active-tab pill that floats
-          above the nav we add a touch more cushion so nothing scrolls
-          underneath the lifted icon. */}
-      <div className="h-72 md:hidden" aria-hidden="true" />
-    </div>
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
         <DialogContent className="sm:max-w-md">
