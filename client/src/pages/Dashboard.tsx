@@ -2907,7 +2907,7 @@ function DashboardMobile() {
             </Button>
           </div>
           {/* Row 2: scope toggle | list/calendar toggle + view all */}
-          <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-[4px]">
             {/* My Team / League scope toggle */}
             <div
               className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
