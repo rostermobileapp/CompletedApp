@@ -1240,6 +1240,9 @@ function DashboardMobile() {
       // ignore storage errors (private mode, quota, etc.)
     }
   }, [scheduleView]);
+
+  const [scheduleScope, setScheduleScope] = useState<'team' | 'league'>('team');
+
   
   // Edit team event state
   const [editingTeamEvent, setEditingTeamEvent] = useState<any>(null);
@@ -1671,7 +1674,24 @@ function DashboardMobile() {
 
     return games;
   }, [rawUpcomingGames, selectedType, selectedId, selectedLeagueId, userTeamsAll]);
-  
+
+  // When the scope toggle is set to "League" and a team is currently selected,
+  // bypass the team filter and show all games for that team's league instead.
+  const leagueScopeGames = React.useMemo(() => {
+    if (!Array.isArray(rawUpcomingGames)) return upcomingGames;
+    if (selectedType !== 'team' || !selectedId) return upcomingGames;
+    const selectedTeam = (userTeamsAll as any[] | undefined)?.find((t: any) => t.id === selectedId);
+    const teamLeagueId = selectedTeam?.leagueId;
+    if (!teamLeagueId) return upcomingGames;
+    return (rawUpcomingGames as any[]).filter((game: any) =>
+      game.homeTeam?.leagueId === teamLeagueId ||
+      game.awayTeam?.leagueId === teamLeagueId
+    );
+  }, [rawUpcomingGames, upcomingGames, selectedType, selectedId, userTeamsAll]);
+
+  // The games list used in the schedule section — respects the scope toggle
+  const scheduleGames = scheduleScope === 'league' ? leagueScopeGames : upcomingGames;
+
   // Fetch duty assignments for upcoming games
   const { data: dutyAssignments = [] } = useQuery({
     queryKey: ['/api/duty-assignments', upcomingGames],
@@ -2875,18 +2895,55 @@ function DashboardMobile() {
           is active so the player only sees the timer above. */}
       {!isTournamentCountdownActive && (
       <div className="px-6 mt-[8px] mb-[8px]">
-        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-          <div className="flex items-center gap-2 min-w-0">
-            <h2 className="text-lg font-semibold" data-testid="text-schedule-title">Schedule</h2>
-            <Button
-              onClick={() => setShowAddEventDialog(true)}
-              className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
-              data-testid="button-add-event"
+        {/* Row 1: title + add button */}
+        <div className="flex items-center gap-2 mb-2">
+          <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
+          <Button
+            onClick={() => setShowAddEventDialog(true)}
+            className="w-[25.6px] h-[25.6px] p-0 bg-blue-500 hover:bg-blue-600 text-white rounded-full"
+            data-testid="button-add-event"
+          >
+            <Plus className="w-[12.8px] h-[12.8px]" />
+          </Button>
+        </div>
+        {/* Row 2: scope toggle | list/calendar toggle + view all */}
+        <div className="flex items-center justify-between mb-4 gap-2">
+          {/* My Team / League scope toggle */}
+          <div
+            className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
+            role="tablist"
+            aria-label="Schedule scope"
+          >
+            <button
+              type="button"
+              onClick={() => setScheduleScope('team')}
+              className={`px-2 py-0.5 rounded transition-colors text-center ${
+                scheduleScope === 'team'
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'text-muted-foreground'
+              }`}
+              aria-pressed={scheduleScope === 'team'}
+              data-testid="schedule-scope-team"
             >
-              <Plus className="w-[12.8px] h-[12.8px]" />
-            </Button>
+              My Team
+            </button>
+            <button
+              type="button"
+              onClick={() => setScheduleScope('league')}
+              className={`px-2 py-0.5 rounded transition-colors text-center ${
+                scheduleScope === 'league'
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'text-muted-foreground'
+              }`}
+              aria-pressed={scheduleScope === 'league'}
+              data-testid="schedule-scope-league"
+            >
+              League
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
             <div
-              className="ml-1 grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
+              className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[120px]"
               role="tablist"
               aria-label="Schedule view"
             >
@@ -2917,14 +2974,14 @@ function DashboardMobile() {
                 Calendar
               </button>
             </div>
+            <button
+              onClick={() => navigate('/calendar')}
+              className="text-primary text-sm"
+              data-testid="button-view-all-games"
+            >
+              View All
+            </button>
           </div>
-          <button 
-            onClick={() => navigate('/calendar')}
-            className="text-primary text-sm"
-            data-testid="button-view-all-games"
-          >
-            View All
-          </button>
         </div>
         
         {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
@@ -2932,29 +2989,25 @@ function DashboardMobile() {
             <div className="h-16 bg-muted rounded"></div>
           </div>
         ) : scheduleView === 'calendar' ? (() => {
-          // Mirror the eligibility filter the list-cards apply to upcomingGames
-          // so the calendar surfaces exactly the same set of games (scrimmages,
-          // user-team games, substitute appearances, tournament-name matches).
-          const userTeamIds = Array.isArray(userTeams) ? userTeams.map((t: any) => t.id) : [];
-          const userTeamNames = Array.isArray(userTeams)
-            ? userTeams.map((t: any) => t.name?.toLowerCase())
-            : [];
-          const filteredGames = Array.isArray(upcomingGames)
-            ? (upcomingGames as any[]).filter((game: any) => {
-                if (game.isScrimmage) return true;
-                const isOnTeam =
-                  userTeamIds.includes(game.homeTeamId) ||
-                  userTeamIds.includes(game.awayTeamId);
-                // Tournament matches: trust the backend filter — the server
-                // already restricts upcoming games to matches the user
-                // should see (admin/creator OR approved participant), so we
-                // don't re-filter by team-name match here. Re-filtering used
-                // to drop admin-only matches from the calendar view.
-                const isTournamentMatchForUser = game.isTournamentMatch === true;
-                const isSubstitute = game.isSubstitute === true;
-                return isOnTeam || isSubstitute || isTournamentMatchForUser;
-              })
-            : [];
+          // In league scope, pass the full league game set; in team scope apply
+          // the usual eligibility filter (scrimmages, user-team games, subs, tournaments).
+          let calendarGames: any[];
+          if (scheduleScope === 'league') {
+            calendarGames = Array.isArray(scheduleGames) ? (scheduleGames as any[]) : [];
+          } else {
+            const userTeamIds = Array.isArray(userTeams) ? userTeams.map((t: any) => t.id) : [];
+            calendarGames = Array.isArray(scheduleGames)
+              ? (scheduleGames as any[]).filter((game: any) => {
+                  if (game.isScrimmage) return true;
+                  const isOnTeam =
+                    userTeamIds.includes(game.homeTeamId) ||
+                    userTeamIds.includes(game.awayTeamId);
+                  const isTournamentMatchForUser = game.isTournamentMatch === true;
+                  const isSubstitute = game.isSubstitute === true;
+                  return isOnTeam || isSubstitute || isTournamentMatchForUser;
+                })
+              : [];
+          }
           // Mirror the tournament scope filter the list-cards apply
           const filteredTournaments = Array.isArray(visibleTournaments)
             ? (visibleTournaments as any[]).filter((tournament: any) => {
@@ -2975,11 +3028,11 @@ function DashboardMobile() {
             : [];
           return (
             <ScheduleCalendarMobile
-              scrimmageInvites={Array.isArray(scrimmageInvites) ? scrimmageInvites : []}
-              scrimmageRequests={Array.isArray(scrimmageRequests) ? scrimmageRequests : []}
-              personalReminders={Array.isArray(personalReminders) ? personalReminders : []}
+              scrimmageInvites={scheduleScope === 'league' ? [] : (Array.isArray(scrimmageInvites) ? scrimmageInvites : [])}
+              scrimmageRequests={scheduleScope === 'league' ? [] : (Array.isArray(scrimmageRequests) ? scrimmageRequests : [])}
+              personalReminders={scheduleScope === 'league' ? [] : (Array.isArray(personalReminders) ? personalReminders : [])}
               teamEvents={Array.isArray(teamEvents) ? teamEvents : []}
-              upcomingGames={filteredGames}
+              upcomingGames={calendarGames}
               visibleTournaments={filteredTournaments}
               primaryTeam={primaryTeam}
             />
@@ -2995,11 +3048,15 @@ function DashboardMobile() {
             const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
             return eventDateOnly >= yesterday;
           };
-          return (Array.isArray(upcomingGames) && upcomingGames.filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0) || (Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0) || (Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0) || (Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0) || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
+          const hasGames = Array.isArray(scheduleGames) && (scheduleGames as any[]).filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0;
+          const hasInvites = scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0;
+          const hasRequests = scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
+          const hasReminders = scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0;
+          return hasGames || hasInvites || hasRequests || hasReminders || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
         })() ? (
           <div className="space-y-3">
             {/* First show scrimmage invites (yesterday and future - visible until day after) */}
-            {Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
+            {scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
               const eventDate = new Date(invite.dateTime);
               const yesterday = new Date();
               yesterday.setDate(yesterday.getDate() - 1);
@@ -3048,7 +3105,7 @@ function DashboardMobile() {
             ))}
             
             {/* Show approved scrimmages (yesterday and future - visible until day after) */}
-            {Array.isArray(scrimmageRequests) && scrimmageRequests
+            {scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests
               .filter((request: any) => {
                 if (request.status !== 'approved' || !request.scrimmage) return false;
                 const eventDate = new Date(request.scrimmage.dateTime);
@@ -3091,7 +3148,7 @@ function DashboardMobile() {
               })}
             
             {/* Show personal reminders (yesterday and future - visible until day after) */}
-            {Array.isArray(personalReminders) && personalReminders
+            {scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders
               .filter((reminder: any) => {
                 if (reminder.isCompleted) return false;
                 const eventDate = new Date(reminder.scheduledAt);
@@ -3286,7 +3343,7 @@ function DashboardMobile() {
             ))}
             
             {/* Then show regular games (yesterday and future - visible until day after) */}
-            {(upcomingGames as any[])
+            {(scheduleGames as any[])
               .filter((game: any) => {
                 // Games remain visible until the day AFTER they are scheduled
                 // Compare local dates only (not timestamps) to handle timezone differences correctly
@@ -3297,6 +3354,10 @@ function DashboardMobile() {
                 const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
                 if (eventDateOnly < yesterday) {
                   return false;
+                }
+                // In league scope show all games in the league without team filtering
+                if (scheduleScope === 'league') {
+                  return true;
                 }
                 // Always show scrimmages (user is already approved)
                 if (game.isScrimmage) {
