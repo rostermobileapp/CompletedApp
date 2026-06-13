@@ -654,11 +654,11 @@ export async function checkAndSendEventReminders(): Promise<void> {
               dutyMessage = "🍺 You have beverage duty!";
             }
             
-            // Each player sees their own team's logo; home logo as fallback for unassigned
+            // Each player sees their own team's logo; unassigned players get undefined (default icon)
             const playerTeamLogoUrl =
               player.teamId === game.awayTeamId ? awayTeamLogoUrl :
               player.teamId === game.homeTeamId ? homeTeamLogoUrl :
-              homeTeamLogoUrl;
+              undefined;
             
             await sendEventReminder(eventInfo, player, trigger, dutyMessage, playerTeamLogoUrl);
           }
