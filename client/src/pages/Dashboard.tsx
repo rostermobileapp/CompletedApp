@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useAuth } from '@/hooks/useAuth';
 // 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
@@ -95,6 +95,18 @@ const generalEventSchema = z.object({
   endTime: z.string().optional(),
   location: z.string().optional(),
 });
+
+async function uploadEventPhoto(file: File, apiReq: typeof apiRequest): Promise<string> {
+  const res = await apiReq('POST', '/api/event-photos/upload', {});
+  const { uploadURL, path } = await res.json();
+  const putRes = await fetch(uploadURL, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': file.type },
+  });
+  if (!putRes.ok) throw new Error(`Photo upload failed: ${putRes.status}`);
+  return path as string;
+}
 
 const scrimmageEventSchema = z.object({
   teamId: z.string().min(1, "Team is required"),
@@ -1249,7 +1261,31 @@ function DashboardMobile() {
   
   // Dismissing reminders animation state
   const [dismissingReminders, setDismissingReminders] = useState<Set<string>>(new Set());
-  
+
+  // Photo upload state — personal reminder
+  const [reminderPhotoFile, setReminderPhotoFile] = useState<File | null>(null);
+  const [reminderPhotoPreview, setReminderPhotoPreview] = useState<string | null>(null);
+  const reminderPhotoRef = useRef<HTMLInputElement>(null);
+
+  // Photo upload state — general event
+  const [eventPhotoFile, setEventPhotoFile] = useState<File | null>(null);
+  const [eventPhotoPreview, setEventPhotoPreview] = useState<string | null>(null);
+  const eventPhotoRef = useRef<HTMLInputElement>(null);
+
+  const handleReminderPhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setReminderPhotoFile(file);
+    setReminderPhotoPreview(URL.createObjectURL(file));
+  }, []);
+
+  const handleEventPhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEventPhotoFile(file);
+    setEventPhotoPreview(URL.createObjectURL(file));
+  }, []);
+
   // Reminder form
   const reminderForm = useForm<z.infer<typeof personalReminderSchema>>({
     resolver: zodResolver(personalReminderSchema),
@@ -1303,10 +1339,14 @@ function DashboardMobile() {
   // Create personal reminder mutation
   const createReminderMutation = useMutation({
     mutationFn: async (data: z.infer<typeof personalReminderSchema>) => {
-      // Send datetime-local string directly without timezone conversion
+      let photoUrl: string | null = null;
+      if (reminderPhotoFile) {
+        photoUrl = await uploadEventPhoto(reminderPhotoFile, apiRequest);
+      }
       await apiRequest("POST", "/api/personal-reminders", {
         ...data,
         scheduledAt: data.scheduledAt,
+        photoUrl,
       });
     },
     onSuccess: () => {
@@ -1317,6 +1357,8 @@ function DashboardMobile() {
       });
       setEventType(null);
       reminderForm.reset();
+      setReminderPhotoFile(null);
+      setReminderPhotoPreview(null);
     },
     onError: () => {
       toast({
@@ -1396,6 +1438,10 @@ function DashboardMobile() {
   // Create general event mutation
   const createGeneralEventMutation = useMutation({
     mutationFn: async (data: z.infer<typeof generalEventSchema>) => {
+      let photoUrl: string | null = null;
+      if (eventPhotoFile) {
+        photoUrl = await uploadEventPhoto(eventPhotoFile, apiRequest);
+      }
       await apiRequest("POST", "/api/team-events", {
         teamId: data.teamId,
         eventType: "general",
@@ -1404,6 +1450,7 @@ function DashboardMobile() {
         scheduledAt: data.scheduledAt,
         endTime: data.endTime || null,
         location: data.location || null,
+        photoUrl,
       });
     },
     onSuccess: () => {
@@ -1414,6 +1461,8 @@ function DashboardMobile() {
       });
       setEventType(null);
       generalEventForm.reset();
+      setEventPhotoFile(null);
+      setEventPhotoPreview(null);
     },
     onError: () => {
       toast({
@@ -3717,7 +3766,7 @@ function DashboardMobile() {
         </DialogContent>
       </Dialog>
       {/* Personal Reminder Form Dialog */}
-      <Dialog open={eventType === 'reminder'} onOpenChange={(open) => !open && setEventType(null)}>
+      <Dialog open={eventType === 'reminder'} onOpenChange={(open) => { if (!open) { setEventType(null); setReminderPhotoFile(null); setReminderPhotoPreview(null); } }}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-reminder">
           <DialogHeader>
             <DialogTitle data-testid="text-create-reminder-title">Create Personal Reminder</DialogTitle>
@@ -3763,11 +3812,40 @@ function DashboardMobile() {
                   </FormItem>
                 )}
               />
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Cover Photo (Optional)</label>
+                <input
+                  ref={reminderPhotoRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleReminderPhotoChange}
+                />
+                {reminderPhotoPreview ? (
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '3/5' }}>
+                    <img src={reminderPhotoPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setReminderPhotoFile(null); setReminderPhotoPreview(null); if (reminderPhotoRef.current) reminderPhotoRef.current.value = ''; }}
+                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-black/80"
+                    >✕</button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => reminderPhotoRef.current?.click()}
+                    className="w-full border-2 border-dashed border-border rounded-lg py-6 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center gap-1"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span>Tap to add a cover photo</span>
+                  </button>
+                )}
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setEventType(null)}
+                  onClick={() => { setEventType(null); setReminderPhotoFile(null); setReminderPhotoPreview(null); }}
                   data-testid="button-cancel-reminder"
                 >
                   Cancel
@@ -3890,7 +3968,7 @@ function DashboardMobile() {
         </DialogContent>
       </Dialog>
       {/* General Event Form Dialog */}
-      <Dialog open={eventType === 'generalEvent'} onOpenChange={(open) => !open && setEventType(null)}>
+      <Dialog open={eventType === 'generalEvent'} onOpenChange={(open) => { if (!open) { setEventType(null); setEventPhotoFile(null); setEventPhotoPreview(null); } }}>
         <DialogContent className="w-[calc(100vw-2rem)] max-w-[500px] max-h-[90vh] overflow-y-auto" data-testid="dialog-create-general-event">
           <DialogHeader>
             <DialogTitle data-testid="text-create-general-event-title">Create Team Event</DialogTitle>
@@ -3986,11 +4064,40 @@ function DashboardMobile() {
                   </FormItem>
                 )}
               />
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Cover Photo (Optional)</label>
+                <input
+                  ref={eventPhotoRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleEventPhotoChange}
+                />
+                {eventPhotoPreview ? (
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '3/5' }}>
+                    <img src={eventPhotoPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setEventPhotoFile(null); setEventPhotoPreview(null); if (eventPhotoRef.current) eventPhotoRef.current.value = ''; }}
+                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-black/80"
+                    >✕</button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => eventPhotoRef.current?.click()}
+                    className="w-full border-2 border-dashed border-border rounded-lg py-6 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors flex flex-col items-center gap-1"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span>Tap to add a cover photo</span>
+                  </button>
+                )}
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setEventType(null)}
+                  onClick={() => { setEventType(null); setEventPhotoFile(null); setEventPhotoPreview(null); }}
                   data-testid="button-cancel-general-event"
                 >
                   Cancel
