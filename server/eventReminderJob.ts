@@ -35,8 +35,6 @@ interface EventInfo {
   location: string;
   eventTime: Date;
   eventType: "game" | "scrimmage";
-  /** Resolved public URL for the team logo to show in the push notification. */
-  teamLogoUrl?: string;
 }
 
 function calculateTriggerTime(eventTime: Date, trigger: ReminderTrigger, timezone: string = "America/New_York"): Date {
@@ -62,7 +60,7 @@ function shouldSendReminder(now: Date, triggerTime: Date): boolean {
   return nowTime >= triggerTimeMs && nowTime <= triggerTimeMs + (10 * 60 * 1000);
 }
 
-async function getGameParticipants(gameId: string): Promise<{ id: string; firstName: string | null; lastName: string | null }[]> {
+async function getGameParticipants(gameId: string): Promise<{ id: string; firstName: string | null; lastName: string | null; teamId: string | null }[]> {
   const game = await db.select().from(games).where(eq(games.id, gameId)).limit(1);
   if (!game.length) return [];
   
@@ -75,6 +73,7 @@ async function getGameParticipants(gameId: string): Promise<{ id: string; firstN
       id: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
+      teamId: teamMemberships.teamId,
     })
     .from(teamMemberships)
     .innerJoin(users, eq(teamMemberships.userId, users.id))
@@ -91,6 +90,7 @@ async function getGameParticipants(gameId: string): Promise<{ id: string; firstN
       id: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
+      teamId: leagueMemberships.assignedTeamId,
     })
     .from(leagueMemberships)
     .innerJoin(users, eq(leagueMemberships.userId, users.id))
@@ -113,19 +113,23 @@ async function getGameParticipants(gameId: string): Promise<{ id: string; firstN
     .innerJoin(users, eq(gameRsvps.userId, users.id))
     .where(eq(gameRsvps.gameId, gameId));
   
-  // Combine and deduplicate all sources
-  const uniqueMembers = new Map<string, { id: string; firstName: string | null; lastName: string | null }>();
+  // Combine and deduplicate — preserve teamId from roster sources; rsvp-only entries get null
+  const uniqueMembers = new Map<string, { id: string; firstName: string | null; lastName: string | null; teamId: string | null }>();
   
   for (const member of directMembers) {
-    uniqueMembers.set(member.id, member);
+    uniqueMembers.set(member.id, { ...member, teamId: member.teamId ?? null });
   }
   
   for (const member of leagueMembers) {
-    uniqueMembers.set(member.id, member);
+    if (!uniqueMembers.has(member.id)) {
+      uniqueMembers.set(member.id, { ...member, teamId: member.teamId ?? null });
+    }
   }
   
   for (const member of rsvpMembers) {
-    uniqueMembers.set(member.id, member);
+    if (!uniqueMembers.has(member.id)) {
+      uniqueMembers.set(member.id, { ...member, teamId: null });
+    }
   }
   
   console.log(`📋 Game ${gameId} participants: ${directMembers.length} direct team members, ${leagueMembers.length} league-assigned members, ${rsvpMembers.length} from RSVPs, ${uniqueMembers.size} total unique`);
@@ -192,7 +196,8 @@ async function sendEventReminder(
   event: EventInfo,
   player: { id: string; firstName: string | null; lastName: string | null },
   trigger: ReminderTrigger,
-  dutyMessage?: string
+  dutyMessage?: string,
+  teamLogoUrl?: string
 ): Promise<void> {
   const triggerAlreadySent = await hasReminderBeenSent(event.eventType, event.id, player.id, trigger);
   if (triggerAlreadySent) {
@@ -213,7 +218,7 @@ async function sendEventReminder(
       event.id,
       event.eventType,
       dutyMessage,
-      event.teamLogoUrl
+      teamLogoUrl
     );
     
     // Record that we sent this reminder
@@ -578,6 +583,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
         dateTime: scrimmages.dateTime,
         location: scrimmages.location,
         leagueId: scrimmages.leagueId,
+        creatorId: scrimmages.creatorId,
       })
       .from(scrimmages)
       .where(
@@ -608,9 +614,10 @@ export async function checkAndSendEventReminders(): Promise<void> {
       // Parse the league-local datetime string with proper timezone context
       const eventTime = parseLeagueLocalDateTime(game.scheduledAt, timezone);
       
-      // Build event title from teams and resolve the home team logo for the notification
+      // Build event title and pre-fetch both team logos for per-player icon selection
       let title = "Game";
-      let gameTeamLogoUrl: string | undefined;
+      let homeTeamLogoUrl: string | undefined;
+      let awayTeamLogoUrl: string | undefined;
       try {
         const homeTeam = await storage.getTeam(game.homeTeamId);
         const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
@@ -619,10 +626,8 @@ export async function checkAndSendEventReminders(): Promise<void> {
         } else if (homeTeam) {
           title = `${homeTeam.name} Game`;
         }
-        // Use the home team's logo as the notification icon (it's the host team)
-        if (homeTeam?.logoUrl) {
-          gameTeamLogoUrl = resolveTeamLogoUrl(homeTeam.logoUrl) ?? undefined;
-        }
+        homeTeamLogoUrl = resolveTeamLogoUrl(homeTeam?.logoUrl);
+        awayTeamLogoUrl = resolveTeamLogoUrl(awayTeam?.logoUrl);
       } catch (e) {
         // Keep default title and no logo
       }
@@ -633,7 +638,6 @@ export async function checkAndSendEventReminders(): Promise<void> {
         location: game.venue || 'TBD',
         eventTime,
         eventType: "game",
-        teamLogoUrl: gameTeamLogoUrl,
       };
       
       for (const trigger of triggers) {
@@ -650,7 +654,13 @@ export async function checkAndSendEventReminders(): Promise<void> {
               dutyMessage = "🍺 You have beverage duty!";
             }
             
-            await sendEventReminder(eventInfo, player, trigger, dutyMessage);
+            // Each player sees their own team's logo; home logo as fallback for unassigned
+            const playerTeamLogoUrl =
+              player.teamId === game.awayTeamId ? awayTeamLogoUrl :
+              player.teamId === game.homeTeamId ? homeTeamLogoUrl :
+              homeTeamLogoUrl;
+            
+            await sendEventReminder(eventInfo, player, trigger, dutyMessage, playerTeamLogoUrl);
           }
         }
       }
@@ -672,6 +682,26 @@ export async function checkAndSendEventReminders(): Promise<void> {
       // Parse the league-local datetime string with proper timezone context
       const eventTime = parseLeagueLocalDateTime(scrimmage.dateTime, scrimmageTimezone);
       
+      // Look up the scrimmage creator's team logo for the notification icon
+      let scrimmageTeamLogoUrl: string | undefined;
+      if (scrimmage.creatorId && scrimmage.leagueId) {
+        try {
+          const creatorTeamRows = await db
+            .select({ logoUrl: teams.logoUrl })
+            .from(teamMemberships)
+            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+            .where(and(
+              eq(teamMemberships.userId, scrimmage.creatorId),
+              eq(teams.leagueId, scrimmage.leagueId),
+              eq(teamMemberships.status, 'approved')
+            ))
+            .limit(1);
+          scrimmageTeamLogoUrl = resolveTeamLogoUrl(creatorTeamRows[0]?.logoUrl);
+        } catch (e) {
+          // Keep undefined
+        }
+      }
+
       const eventInfo: EventInfo = {
         id: scrimmage.id,
         title: scrimmage.title || 'Scrimmage',
@@ -688,7 +718,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
           console.log(`📧 Sending ${trigger} reminders for scrimmage ${scrimmage.id} to ${participants.length} players`);
           
           for (const player of participants) {
-            await sendEventReminder(eventInfo, player, trigger);
+            await sendEventReminder(eventInfo, player, trigger, undefined, scrimmageTeamLogoUrl);
           }
         }
       }

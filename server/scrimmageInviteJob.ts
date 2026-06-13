@@ -1,6 +1,9 @@
 import { storage } from './storage';
+import { db } from './db';
+import { teams, teamMemberships } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes, format } from 'date-fns';
-import { sendScrimmageInvitePushNotification } from './oneSignalNotifications';
+import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
 import { formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
@@ -125,6 +128,24 @@ async function checkAndSendInvitations() {
         const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
         const { date: formattedDate, time: formattedTime } = formatDayAndTime(scrimmage.dateTime, timezone);
         
+        // Resolve creator's team logo once — used as the notification icon for all invites
+        let jobInviteTeamLogoUrl: string | undefined;
+        if (scrimmage.creatorId && scrimmage.leagueId) {
+          try {
+            const creatorTeamRows = await db
+              .select({ logoUrl: teams.logoUrl })
+              .from(teamMemberships)
+              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+              .where(and(
+                eq(teamMemberships.userId, scrimmage.creatorId),
+                eq(teams.leagueId, scrimmage.leagueId),
+                eq(teamMemberships.status, 'approved')
+              ))
+              .limit(1);
+            jobInviteTeamLogoUrl = resolveTeamLogoUrl(creatorTeamRows[0]?.logoUrl);
+          } catch (e) { /* keep undefined */ }
+        }
+        
         // Send in-app notifications to all approved league members (with idempotency check)
         let sentCount = 0;
         for (const member of approvedMembers) {
@@ -149,7 +170,8 @@ async function checkAndSendInvitations() {
               scrimmage.title,
               scrimmageDateTime,
               scrimmage.location || 'TBD',
-              scrimmage.id
+              scrimmage.id,
+              jobInviteTeamLogoUrl
             ).catch(console.error);
           }
         }

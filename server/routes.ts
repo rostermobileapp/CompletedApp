@@ -102,7 +102,7 @@ import { startEventReminderJob } from "./eventReminderJob";
 import { startTournamentAccessJob } from "./tournamentAccessJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
-import { sendTeamEventPushNotification } from "./oneSignalNotifications";
+import { sendTeamEventPushNotification, resolveTeamLogoUrl } from "./oneSignalNotifications";
 import { registerDraftRoutes, canViewDraft, canChatInDraft } from "./draftRoutes";
 import { registerReferralRoutes } from "./referralRoutes";
 import {
@@ -14445,6 +14445,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const scrimmageDateTime = formatScrimmageDateTime(scrimmageData.dateTime, league.timezone);
           const { date: inviteDate, time: inviteTime } = formatShortDayAndTime(scrimmageData.dateTime, league.timezone);
           
+          // Resolve creator's team logo once for all recipients in this batch
+          let inviteTeamLogoUrl: string | undefined;
+          try {
+            const inviteTeamRows = await db
+              .select({ logoUrl: teams.logoUrl })
+              .from(teamMemberships)
+              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+              .where(and(
+                eq(teamMemberships.userId, userId),
+                eq(teams.leagueId, league.id),
+                eq(teamMemberships.status, 'approved')
+              ))
+              .limit(1);
+            inviteTeamLogoUrl = resolveTeamLogoUrl(inviteTeamRows[0]?.logoUrl);
+          } catch (e) { /* keep undefined */ }
+          
           for (const memberId of req.body.selectedMemberIds) {
             try {
               // ALWAYS create in-app notification for Alerts
@@ -14467,7 +14483,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   scrimmageData.title,
                   scrimmageDateTime,
                   scrimmageData.location || 'TBD',
-                  parentScrimmage.id
+                  parentScrimmage.id,
+                  inviteTeamLogoUrl
                 );
                 console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
               }
@@ -14570,6 +14587,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const scrimmageDateTime = formatScrimmageDateTime(scrimmageData.dateTime, league.timezone);
           const { date: singleInviteDate, time: singleInviteTime } = formatShortDayAndTime(scrimmageData.dateTime, league.timezone);
           
+          // Resolve creator's team logo once for all recipients in this batch
+          let singleInviteTeamLogoUrl: string | undefined;
+          try {
+            const singleInviteTeamRows = await db
+              .select({ logoUrl: teams.logoUrl })
+              .from(teamMemberships)
+              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+              .where(and(
+                eq(teamMemberships.userId, userId),
+                eq(teams.leagueId, league.id),
+                eq(teamMemberships.status, 'approved')
+              ))
+              .limit(1);
+            singleInviteTeamLogoUrl = resolveTeamLogoUrl(singleInviteTeamRows[0]?.logoUrl);
+          } catch (e) { /* keep undefined */ }
+          
           for (const memberId of req.body.selectedMemberIds) {
             try {
               // ALWAYS create in-app notification for Alerts
@@ -14592,7 +14625,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   scrimmageData.title,
                   scrimmageDateTime,
                   scrimmageData.location || 'TBD',
-                  scrimmage.id
+                  scrimmage.id,
+                  singleInviteTeamLogoUrl
                 );
                 console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
               }
@@ -15197,13 +15231,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Send IMMEDIATE push notification - await to ensure delivery
             const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
+            let approvalTeamLogoUrl: string | undefined;
+            try {
+              const approvalTeamRows = await db
+                .select({ logoUrl: teams.logoUrl })
+                .from(teamMemberships)
+                .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+                .where(and(
+                  eq(teamMemberships.userId, scrimmage.creatorId),
+                  eq(teams.leagueId, scrimmage.leagueId),
+                  eq(teamMemberships.status, 'approved')
+                ))
+                .limit(1);
+              approvalTeamLogoUrl = resolveTeamLogoUrl(approvalTeamRows[0]?.logoUrl);
+            } catch (e) { /* keep undefined */ }
             const { sendScrimmageApprovalPushNotification } = await import('./oneSignalNotifications');
             const pushResult = await sendScrimmageApprovalPushNotification(
               player.id,
               scrimmage.title,
               scrimmageDateTime,
               scrimmage.id,
-              teamAssignment ?? null
+              teamAssignment ?? null,
+              approvalTeamLogoUrl
             );
             console.log(`[Push] Scrimmage approval push to ${player.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             
@@ -15278,8 +15327,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             scrimmageId: scrimmage.id,
           });
           broadcastNotificationUpdate(request.playerId);
+          let assignmentLogoUrl: string | undefined;
+          try {
+            const assignmentTeamRows = await db
+              .select({ logoUrl: teams.logoUrl })
+              .from(teamMemberships)
+              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+              .where(and(
+                eq(teamMemberships.userId, scrimmage.creatorId),
+                eq(teams.leagueId, scrimmage.leagueId),
+                eq(teamMemberships.status, 'approved')
+              ))
+              .limit(1);
+            assignmentLogoUrl = resolveTeamLogoUrl(assignmentTeamRows[0]?.logoUrl);
+          } catch (e) { /* keep undefined */ }
           const { sendTeamAssignmentPushNotification } = await import('./oneSignalNotifications');
-          await sendTeamAssignmentPushNotification(request.playerId, scrimmage.title, scrimmage.id, teamAssignment ?? null);
+          await sendTeamAssignmentPushNotification(request.playerId, scrimmage.title, scrimmage.id, teamAssignment ?? null, assignmentLogoUrl);
         }
       } catch (notifyError) {
         console.error('[TeamAssignment] Failed to send reassignment notification:', notifyError);
@@ -15544,12 +15607,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send push notification
       try {
+        let coHostLogoUrl: string | undefined;
+        try {
+          const coHostTeamRows = await db
+            .select({ logoUrl: teams.logoUrl })
+            .from(teamMemberships)
+            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+            .where(and(
+              eq(teamMemberships.userId, scrimmage.creatorId),
+              eq(teams.leagueId, scrimmage.leagueId),
+              eq(teamMemberships.status, 'approved')
+            ))
+            .limit(1);
+          coHostLogoUrl = resolveTeamLogoUrl(coHostTeamRows[0]?.logoUrl);
+        } catch (e) { /* keep undefined */ }
         const { sendCoHostPushNotification } = await import('./oneSignalNotifications');
         const pushResult = await sendCoHostPushNotification(
           coHostUserId,
           scrimmage.title,
           dateTimeStr,
-          scrimmageId
+          scrimmageId,
+          coHostLogoUrl
         );
         console.log(`[Push] Co-host notification to ${coHostUserId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
       } catch (pushError) {
