@@ -27,6 +27,7 @@ interface TeamEventData {
   isInternalScrimmage?: boolean;
   notes?: string | null;
   maxParticipants?: number | null;
+  photoUrl?: string | null;
   rsvps: Array<{
     id: string;
     userId: string;
@@ -192,7 +193,17 @@ export default function TeamEventDetails() {
       </div>
 
       <div className="px-6 py-6 space-y-6">
-        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+        <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] overflow-hidden">
+          {eventData.photoUrl && (
+            <div className="w-full" style={{ aspectRatio: '3/5' }}>
+              <img
+                src={eventData.photoUrl}
+                alt={eventData.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+          <div className="p-6">
           <div className="flex items-center gap-4 mb-4">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
               isScrimmage ? 'bg-orange-500' : 'bg-blue-500'
@@ -282,6 +293,7 @@ export default function TeamEventDetails() {
                 </Button>
               )}
             </div>
+          </div>
           </div>
         </div>
 

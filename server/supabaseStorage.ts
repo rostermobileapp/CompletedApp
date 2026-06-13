@@ -613,4 +613,47 @@ export class SupabaseStorageService {
       }
     }
   }
+
+  // Event Photos (personal reminders & general team events)
+  async getEventPhotoUploadURL(): Promise<{ uploadURL: string; path: string }> {
+    const objectId = randomUUID();
+    const filePath = `event-photos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .createSignedUploadUrl(filePath);
+
+    if (error) {
+      console.error("Error creating signed upload URL for event photo:", error);
+      throw new Error("Failed to create upload URL");
+    }
+
+    return {
+      uploadURL: data.signedUrl,
+      path: `/event-photos/${objectId}`,
+    };
+  }
+
+  async getEventPhotoFile(photoPath: string): Promise<{ data: Blob; contentType: string }> {
+    if (!photoPath.startsWith("/event-photos/")) {
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    const objectId = photoPath.slice("/event-photos/".length);
+    const filePath = `event-photos/${objectId}`;
+
+    const { data, error } = await this.supabase.storage
+      .from("private")
+      .download(filePath);
+
+    if (error || !data) {
+      console.error("Error downloading event photo:", error);
+      throw new SupabaseStorageNotFoundError();
+    }
+
+    return {
+      data,
+      contentType: data.type || "application/octet-stream",
+    };
+  }
 }

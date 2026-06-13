@@ -811,6 +811,7 @@ export const personalReminders = pgTable("personal_reminders", {
   isCompleted: boolean("is_completed").default(false).notNull(),
   notificationSentAt: timestamp("notification_sent_at"),
   color: text("color"), // Optional color for calendar display (e.g. "#ef4444")
+  photoUrl: text("photo_url"), // Optional cover photo
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -1448,6 +1449,7 @@ export const teamEvents = pgTable("team_events", {
   notes: text("notes"),
   maxParticipants: integer("max_participants"),
   color: text("color"), // Optional color for calendar display (e.g. "#ef4444")
+  photoUrl: text("photo_url"), // Optional cover photo (3:5 aspect ratio)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

@@ -286,10 +286,19 @@ export default function Calendar() {
                 return (
                   <div 
                     key={`reminder-${event.id}`}
-                    className="rounded-xl border border-green-200 dark:border-green-800 p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                    className="rounded-xl border border-green-200 dark:border-green-800 overflow-hidden bg-[#e2e2e2] dark:bg-[#212121]" 
                     data-testid={`card-reminder-${event.id}`}
                   >
-                    <div className="flex items-center gap-4">
+                    {event.photoUrl && (
+                      <div className="w-full" style={{ aspectRatio: '3/5' }}>
+                        <img
+                          src={event.photoUrl}
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 pt-[5px] pb-[5px] pl-[20px] pr-[20px]">
                       <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center relative">
                         <Clock className="w-6 h-6 text-white" />
                       </div>

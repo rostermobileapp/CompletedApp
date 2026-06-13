@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ImageIcon, X, Loader2 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { User, League } from '@shared/schema';
@@ -53,6 +54,7 @@ const personalReminderSchema = z.object({
   description: z.string().optional(),
   scheduledAt: z.string().min(1, 'Date and time are required'),
   color: z.string().optional(),
+  photoUrl: z.string().optional().nullable(),
 });
 
 const teamGameSchema = z.object({
@@ -72,6 +74,7 @@ const generalEventSchema = z.object({
   endTime: z.string().optional(),
   location: z.string().optional(),
   color: z.string().optional(),
+  photoUrl: z.string().optional().nullable(),
 });
 
 const scrimmageEventSchema = z.object({
@@ -140,11 +143,76 @@ interface AddEventDialogProps {
  * this component does not introduce any new network requests on the desktop
  * code path.
  */
+async function uploadEventPhoto(file: File): Promise<string> {
+  const res = await apiRequest('POST', '/api/event-photos/upload', {});
+  const { uploadURL, path } = await res.json();
+  await fetch(uploadURL, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': file.type },
+  });
+  return path as string;
+}
+
+interface EventPhotoPicker {
+  previewUrl: string | null;
+  uploading: boolean;
+  path: string | null;
+  inputRef: React.RefObject<HTMLInputElement>;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemove: () => void;
+}
+
 export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
   const { toast } = useToast();
   const [eventType, setEventType] = useState<
     'reminder' | 'game' | 'generalEvent' | 'scrimmage' | null
   >(null);
+
+  // Photo state for reminder form
+  const [reminderPhotoPreview, setReminderPhotoPreview] = useState<string | null>(null);
+  const [reminderPhotoPath, setReminderPhotoPath] = useState<string | null>(null);
+  const [reminderPhotoUploading, setReminderPhotoUploading] = useState(false);
+  const reminderPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Photo state for general event form
+  const [generalEventPhotoPreview, setGeneralEventPhotoPreview] = useState<string | null>(null);
+  const [generalEventPhotoPath, setGeneralEventPhotoPath] = useState<string | null>(null);
+  const [generalEventPhotoUploading, setGeneralEventPhotoUploading] = useState(false);
+  const generalEventPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  async function handlePhotoFile(
+    file: File,
+    setPreview: (url: string | null) => void,
+    setPath: (path: string | null) => void,
+    setUploading: (v: boolean) => void,
+  ) {
+    if (!file.type.startsWith('image/')) return;
+    setPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const path = await uploadEventPhoto(file);
+      setPath(path);
+    } catch {
+      toast({ title: 'Photo upload failed', description: 'Could not upload photo.', variant: 'destructive' });
+      setPreview(null);
+      setPath(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function resetReminderPhoto() {
+    setReminderPhotoPreview(null);
+    setReminderPhotoPath(null);
+    if (reminderPhotoInputRef.current) reminderPhotoInputRef.current.value = '';
+  }
+
+  function resetGeneralEventPhoto() {
+    setGeneralEventPhotoPreview(null);
+    setGeneralEventPhotoPath(null);
+    if (generalEventPhotoInputRef.current) generalEventPhotoInputRef.current.value = '';
+  }
 
   // Only fetch the data the picker/forms need once the user has actually
   // opened (or is mid-flow inside) the dialog. This keeps the desktop home's
@@ -228,6 +296,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
         ...data,
         scheduledAt: data.scheduledAt,
         color: data.color || null,
+        photoUrl: reminderPhotoPath || null,
       });
     },
     onSuccess: () => {
@@ -238,6 +307,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
       });
       setEventType(null);
       reminderForm.reset();
+      resetReminderPhoto();
     },
     onError: () => {
       toast({
@@ -290,6 +360,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
         endTime: data.endTime || null,
         location: data.location || null,
         color: data.color || null,
+        photoUrl: generalEventPhotoPath || null,
       });
     },
     onSuccess: () => {
@@ -300,6 +371,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
       });
       setEventType(null);
       generalEventForm.reset();
+      resetGeneralEventPhoto();
     },
     onError: () => {
       toast({
@@ -488,6 +560,53 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   </FormItem>
                 )}
               />
+              {/* Photo upload */}
+              <div>
+                <label className="text-sm font-medium leading-none">Cover Photo (Optional)</label>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  Displayed at 3:5 portrait ratio across the top of the event card
+                </p>
+                <input
+                  ref={reminderPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePhotoFile(file, setReminderPhotoPreview, setReminderPhotoPath, setReminderPhotoUploading);
+                  }}
+                />
+                {reminderPhotoPreview ? (
+                  <div className="relative w-full" style={{ aspectRatio: '3/5', maxHeight: 240 }}>
+                    <img
+                      src={reminderPhotoPreview}
+                      alt="Cover photo preview"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    {reminderPhotoUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={resetReminderPhoto}
+                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => reminderPhotoInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-border rounded-lg p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                  >
+                    <ImageIcon className="w-6 h-6" />
+                    <span className="text-sm">Tap to add a photo</span>
+                  </button>
+                )}
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
@@ -499,7 +618,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createReminderMutation.isPending}
+                  disabled={createReminderMutation.isPending || reminderPhotoUploading}
                   data-testid="button-submit-reminder"
                 >
                   {createReminderMutation.isPending ? 'Creating...' : 'Create Reminder'}
@@ -807,6 +926,53 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   </FormItem>
                 )}
               />
+              {/* Photo upload */}
+              <div>
+                <label className="text-sm font-medium leading-none">Cover Photo (Optional)</label>
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
+                  Displayed at 3:5 portrait ratio across the top of the event card
+                </p>
+                <input
+                  ref={generalEventPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePhotoFile(file, setGeneralEventPhotoPreview, setGeneralEventPhotoPath, setGeneralEventPhotoUploading);
+                  }}
+                />
+                {generalEventPhotoPreview ? (
+                  <div className="relative w-full" style={{ aspectRatio: '3/5', maxHeight: 240 }}>
+                    <img
+                      src={generalEventPhotoPreview}
+                      alt="Cover photo preview"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    {generalEventPhotoUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={resetGeneralEventPhoto}
+                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => generalEventPhotoInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-border rounded-lg p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                  >
+                    <ImageIcon className="w-6 h-6" />
+                    <span className="text-sm">Tap to add a photo</span>
+                  </button>
+                )}
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
@@ -818,7 +984,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createGeneralEventMutation.isPending}
+                  disabled={createGeneralEventMutation.isPending || generalEventPhotoUploading}
                   data-testid="button-submit-general-event"
                 >
                   {createGeneralEventMutation.isPending ? 'Creating...' : 'Create Event'}

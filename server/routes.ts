@@ -4043,6 +4043,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Event photo upload and serving routes
+  app.post("/api/event-photos/upload", isAuthenticated, async (req: any, res) => {
+    try {
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const { uploadURL, path } = await supabaseStorageService.getEventPhotoUploadURL();
+      res.json({ uploadURL, path });
+    } catch (error) {
+      console.error("Error getting event photo upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.get("/event-photos/:objectPath(*)", async (req, res) => {
+    try {
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const supabaseStorageService = new SupabaseStorageService();
+      const fullPath = `/event-photos/${req.params.objectPath}`;
+      const objectFile = await supabaseStorageService.getEventPhotoFile(fullPath);
+      await supabaseStorageService.streamToResponse(objectFile, res);
+    } catch (error) {
+      console.error("Error serving event photo:", error);
+      if ((error as Error).name === 'SupabaseStorageNotFoundError') {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // Update (or remove) the logo on a standalone tournament. Only the tournament
   // creator or a commissioner of its parent league may change it. Pass
   // `logoUrl: null` (or omit it) to remove an existing logo.
