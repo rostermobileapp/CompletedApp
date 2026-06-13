@@ -146,11 +146,14 @@ interface AddEventDialogProps {
 async function uploadEventPhoto(file: File): Promise<string> {
   const res = await apiRequest('POST', '/api/event-photos/upload', {});
   const { uploadURL, path } = await res.json();
-  await fetch(uploadURL, {
+  const putRes = await fetch(uploadURL, {
     method: 'PUT',
     body: file,
     headers: { 'Content-Type': file.type },
   });
+  if (!putRes.ok) {
+    throw new Error(`Photo upload failed: ${putRes.status} ${putRes.statusText}`);
+  }
   return path as string;
 }
 
