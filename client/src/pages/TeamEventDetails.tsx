@@ -111,15 +111,39 @@ export default function TeamEventDetails() {
     },
   });
 
+  async function cropImageTo3x5(file: File): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const targetRatio = 3 / 5;
+        const srcRatio = img.width / img.height;
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (srcRatio > targetRatio) { sw = img.height * targetRatio; sx = (img.width - sw) / 2; }
+        else { sh = img.width / targetRatio; sy = (img.height - sh) / 2; }
+        const canvas = document.createElement('canvas');
+        canvas.width = sw; canvas.height = sh;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas not available'));
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('toBlob failed')), file.type || 'image/jpeg', 0.92);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+      img.src = url;
+    });
+  }
+
   async function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const previewUrl = URL.createObjectURL(file);
-    setEditPhotoPreview(previewUrl);
     setIsUploadingPhoto(true);
     try {
+      const cropped = await cropImageTo3x5(file);
+      const previewUrl = URL.createObjectURL(cropped);
+      setEditPhotoPreview(previewUrl);
       const formData = new FormData();
-      formData.append('photo', file);
+      formData.append('photo', cropped, file.name);
       const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/event-photos/upload', {
         method: 'POST',

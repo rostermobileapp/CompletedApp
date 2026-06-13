@@ -628,15 +628,20 @@ export class SupabaseStorageService {
       throw new Error("Failed to upload event photo");
     }
 
-    return `/event-photos/${objectId}`;
+    return `/api/event-photos/${objectId}`;
   }
 
   async getEventPhotoFile(photoPath: string): Promise<{ data: Blob; contentType: string }> {
-    if (!photoPath.startsWith("/event-photos/")) {
-      throw new SupabaseStorageNotFoundError();
-    }
+    // Accept both /api/event-photos/<id> and /event-photos/<id>
+    const prefix = photoPath.startsWith("/api/event-photos/")
+      ? "/api/event-photos/"
+      : photoPath.startsWith("/event-photos/")
+      ? "/event-photos/"
+      : null;
 
-    const objectId = photoPath.slice("/event-photos/".length);
+    if (!prefix) throw new SupabaseStorageNotFoundError();
+
+    const objectId = photoPath.slice(prefix.length);
     const filePath = `event-photos/${objectId}`;
 
     const { data, error } = await this.supabase.storage

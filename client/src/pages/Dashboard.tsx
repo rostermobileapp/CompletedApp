@@ -96,9 +96,41 @@ const generalEventSchema = z.object({
   location: z.string().optional(),
 });
 
+async function cropImageTo3x5(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const targetRatio = 3 / 5; // width / height
+      const srcRatio = img.width / img.height;
+      let sx = 0, sy = 0, sw = img.width, sh = img.height;
+      if (srcRatio > targetRatio) {
+        sw = img.height * targetRatio;
+        sx = (img.width - sw) / 2;
+      } else {
+        sh = img.width / targetRatio;
+        sy = (img.height - sh) / 2;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas not available'));
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('Canvas toBlob failed'));
+      }, file.type || 'image/jpeg', 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
 async function uploadEventPhoto(file: File): Promise<string> {
   const formData = new FormData();
-  formData.append('photo', file);
+  formData.append('photo', file, file.name);
   const authHeaders = await getAuthHeaders();
   const res = await fetch('/api/event-photos/upload', {
     method: 'POST',
@@ -1274,18 +1306,22 @@ function DashboardMobile() {
   const [eventPhotoPreview, setEventPhotoPreview] = useState<string | null>(null);
   const eventPhotoRef = useRef<HTMLInputElement>(null);
 
-  const handleReminderPhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReminderPhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setReminderPhotoFile(file);
-    setReminderPhotoPreview(URL.createObjectURL(file));
+    const cropped = await cropImageTo3x5(file);
+    const croppedFile = new File([cropped], file.name, { type: cropped.type });
+    setReminderPhotoFile(croppedFile);
+    setReminderPhotoPreview(URL.createObjectURL(cropped));
   }, []);
 
-  const handleEventPhotoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEventPhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setEventPhotoFile(file);
-    setEventPhotoPreview(URL.createObjectURL(file));
+    const cropped = await cropImageTo3x5(file);
+    const croppedFile = new File([cropped], file.name, { type: cropped.type });
+    setEventPhotoFile(croppedFile);
+    setEventPhotoPreview(URL.createObjectURL(cropped));
   }, []);
 
   // Reminder form

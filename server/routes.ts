@@ -4082,11 +4082,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/event-photos/:objectPath(*)", async (req, res) => {
+  app.get("/api/event-photos/:objectPath(*)", async (req, res) => {
     try {
       const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
-      const fullPath = `/event-photos/${req.params.objectPath}`;
+      const fullPath = `/api/event-photos/${req.params.objectPath}`;
       const objectFile = await supabaseStorageService.getEventPhotoFile(fullPath);
       await supabaseStorageService.streamToResponse(objectFile, res);
     } catch (error) {
