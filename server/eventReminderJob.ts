@@ -296,8 +296,12 @@ async function checkAndSendRsvpReminders(now: Date): Promise<void> {
       );
     
     for (const game of upcomingGames) {
-      // Build event name
+      // Build event name and pre-fetch team logos for per-player icon
       let eventName = "Game";
+      let homeTeamLogoUrl: string | undefined;
+      let awayTeamLogoUrl: string | undefined;
+      let homeTeamId: string | undefined = game.homeTeamId;
+      let awayTeamId: string | undefined = game.awayTeamId ?? undefined;
       try {
         const homeTeam = await storage.getTeam(game.homeTeamId);
         const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
@@ -306,8 +310,10 @@ async function checkAndSendRsvpReminders(now: Date): Promise<void> {
         } else if (homeTeam) {
           eventName = `${homeTeam.name} Game`;
         }
+        homeTeamLogoUrl = resolveTeamLogoUrl(homeTeam?.logoUrl);
+        awayTeamLogoUrl = resolveTeamLogoUrl(awayTeam?.logoUrl);
       } catch (e) {
-        // Keep default name
+        // Keep default name and no logo
       }
       
       // Get all team members who should RSVP
@@ -369,7 +375,12 @@ async function checkAndSendRsvpReminders(now: Date): Promise<void> {
           // Check if we already sent this reminder
           const alreadySent = await hasRsvpReminderBeenSent('game', game.id, userId);
           if (!alreadySent) {
-            const success = await sendRsvpReminderPushNotification(userId, eventName, game.id, 'game');
+            // Pick the player's own team logo
+            const playerTeamLogoUrl =
+              member.teamId === awayTeamId ? awayTeamLogoUrl :
+              member.teamId === homeTeamId ? homeTeamLogoUrl :
+              undefined;
+            const success = await sendRsvpReminderPushNotification(userId, eventName, game.id, 'game', playerTeamLogoUrl);
             if (success) {
               await markRsvpReminderSent('game', game.id, userId);
               console.log(`✅ Sent RSVP reminder for game ${game.id} to user ${userId}`);

@@ -589,7 +589,8 @@ export async function sendRsvpReminderPushNotification(
   recipientId: string,
   eventName: string,
   eventId: string,
-  eventType: 'game' | 'tournament_match' | 'team_event'
+  eventType: 'game' | 'tournament_match' | 'team_event',
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -607,6 +608,7 @@ export async function sendRsvpReminderPushNotification(
       eventType,
       eventId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
