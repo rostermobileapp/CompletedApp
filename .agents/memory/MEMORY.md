@@ -1,0 +1,1 @@
+- [Raw fetch auth pattern](raw-fetch-auth.md) — raw fetch() to backend must use getAuthHeaders() from queryClient; credentials:'include' does nothing (JWT not cookie).

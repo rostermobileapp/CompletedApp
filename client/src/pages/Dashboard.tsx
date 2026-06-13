@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient, getImageUrl } from '@/lib/queryClient';
+import { apiRequest, queryClient, getImageUrl, getAuthHeaders } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -99,10 +99,11 @@ const generalEventSchema = z.object({
 async function uploadEventPhoto(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('photo', file);
+  const authHeaders = await getAuthHeaders();
   const res = await fetch('/api/event-photos/upload', {
     method: 'POST',
     body: formData,
-    credentials: 'include',
+    headers: authHeaders,
   });
   if (!res.ok) throw new Error(`Photo upload failed: ${res.status}`);
   const { path } = await res.json();

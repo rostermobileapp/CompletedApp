@@ -5,7 +5,7 @@ import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, Calendar, ArrowLeft, MapPin, Clock, Users, Check, X, UserPlus, Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import { useState, useRef } from "react";
 import type { User } from "@shared/schema";
@@ -120,10 +120,11 @@ export default function TeamEventDetails() {
     try {
       const formData = new FormData();
       formData.append('photo', file);
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/event-photos/upload', {
         method: 'POST',
         body: formData,
-        credentials: 'include',
+        headers: authHeaders,
       });
       if (!res.ok) throw new Error('Upload failed');
       const { path } = await res.json();
