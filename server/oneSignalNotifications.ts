@@ -13,16 +13,39 @@ import { storage } from './storage';
 // specifically for this purpose; do not swap it for a colored asset.
 const NOTIFICATION_ICON_URL = 'https://www.roster-app.com/icon-512.png';
 const NOTIFICATION_BADGE_URL = 'https://www.roster-app.com/notification-badge.png';
+const APP_BASE_URL = 'https://www.roster-app.com';
+
+/**
+ * Converts a stored team logo path (e.g. "/team-logos/<id>") to a fully
+ * qualified public URL served by the app. Returns undefined when the path is
+ * absent so callers can fall back to the default Roster icon.
+ */
+export function resolveTeamLogoUrl(logoPath: string | null | undefined): string | undefined {
+  if (!logoPath) return undefined;
+  // Paths are normalised to "/team-logos/<id>" by supabaseStorage.normalizeTeamLogoPath
+  if (logoPath.startsWith('/team-logos/')) {
+    return `${APP_BASE_URL}${logoPath}`;
+  }
+  // Full URL already (e.g. a Supabase public URL) — use as-is
+  if (logoPath.startsWith('http://') || logoPath.startsWith('https://')) {
+    return logoPath;
+  }
+  return undefined;
+}
 
 interface SendPushNotificationOptions {
   userId: string;
   title: string;
   message: string;
   data?: Record<string, string>;
+  /** Optional override for the large icon shown in the notification card.
+   *  Falls back to the default Roster logo when omitted. */
+  iconUrl?: string;
 }
 
 export async function sendPushNotificationToUser(options: SendPushNotificationOptions): Promise<boolean> {
-  const { userId, title, message, data } = options;
+  const { userId, title, message, data, iconUrl } = options;
+  const largeIcon = iconUrl ?? NOTIFICATION_ICON_URL;
   
   const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
   const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
@@ -66,14 +89,14 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         ...(process.env.ONESIGNAL_ANDROID_CHANNEL_ID ? { android_channel_id: process.env.ONESIGNAL_ANDROID_CHANNEL_ID } : {}),
         // Web push (Chrome / Firefox / Edge / Safari) — override the dashboard
         // default with the current Roster logo so old uploads don't appear.
-        chrome_web_icon: NOTIFICATION_ICON_URL,
+        chrome_web_icon: largeIcon,
         chrome_web_badge: NOTIFICATION_BADGE_URL,
-        firefox_icon: NOTIFICATION_ICON_URL,
+        firefox_icon: largeIcon,
         // Android — the small icon in the status bar uses the bundled
         // `ic_stat_onesignal_default` silhouette from the mobile app, while
         // `large_icon` (this URL) shows the colored logo in the expanded
         // notification card.
-        large_icon: NOTIFICATION_ICON_URL,
+        large_icon: largeIcon,
         data,
       }),
     });
@@ -211,7 +234,8 @@ export async function sendJoinRequestPushNotification(
   requesterName: string,
   entityType: 'team' | 'league',
   entityName: string,
-  requestId: string
+  requestId: string,
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -229,6 +253,7 @@ export async function sendJoinRequestPushNotification(
       entityType,
       requestId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
@@ -239,7 +264,8 @@ export async function sendScheduleReminderPushNotification(
   location: string,
   eventId: string,
   eventType: 'scrimmage' | 'game',
-  dutyMessage?: string
+  dutyMessage?: string,
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -262,6 +288,7 @@ export async function sendScheduleReminderPushNotification(
       eventType,
       eventId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
@@ -329,7 +356,8 @@ export async function sendScrimmageInvitePushNotification(
   scrimmageTitle: string,
   dateTime: string,
   location: string,
-  scrimmageId: string
+  scrimmageId: string,
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -346,6 +374,7 @@ export async function sendScrimmageInvitePushNotification(
       type: 'scrimmage_invite',
       scrimmageId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
@@ -354,7 +383,8 @@ export async function sendScrimmageApprovalPushNotification(
   scrimmageTitle: string,
   dateTime: string,
   scrimmageId: string,
-  teamAssignment?: string | null
+  teamAssignment?: string | null,
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -376,6 +406,7 @@ export async function sendScrimmageApprovalPushNotification(
       type: 'scrimmage_approved',
       scrimmageId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
@@ -383,7 +414,8 @@ export async function sendTeamAssignmentPushNotification(
   recipientId: string,
   scrimmageTitle: string,
   scrimmageId: string,
-  teamAssignment: string | null
+  teamAssignment: string | null,
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -402,6 +434,7 @@ export async function sendTeamAssignmentPushNotification(
       type: 'scrimmage_approved',
       scrimmageId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
@@ -409,7 +442,8 @@ export async function sendCoHostPushNotification(
   recipientId: string,
   scrimmageTitle: string,
   dateTime: string,
-  scrimmageId: string
+  scrimmageId: string,
+  teamLogoUrl?: string
 ): Promise<boolean> {
   const prefs = await storage.getNotificationPreferences(recipientId);
   const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
@@ -426,6 +460,7 @@ export async function sendCoHostPushNotification(
       type: 'scrimmage_cohost_added',
       scrimmageId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 
@@ -463,6 +498,14 @@ export async function sendPlayerRsvpPushNotification(
   
   const statusText = rsvpStatus === 'attending' ? 'IN' : 'OUT';
   const emoji = rsvpStatus === 'attending' ? '✅' : '❌';
+
+  let teamLogoUrl: string | undefined;
+  try {
+    const team = await storage.getTeam(teamId);
+    teamLogoUrl = resolveTeamLogoUrl(team?.logoUrl);
+  } catch {
+    // Non-fatal — fall back to default Roster icon
+  }
   
   return sendPushNotificationToUser({
     userId: captainId,
@@ -473,6 +516,7 @@ export async function sendPlayerRsvpPushNotification(
       gameId,
       teamId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 

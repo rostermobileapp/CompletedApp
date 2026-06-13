@@ -8270,13 +8270,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send push notification to league commissioner (fire and forget)
       if (league.commissionerId) {
-        import('./oneSignalNotifications').then(({ sendJoinRequestPushNotification }) => {
+        import('./oneSignalNotifications').then(({ sendJoinRequestPushNotification, resolveTeamLogoUrl }) => {
+          const teamLogoUrl = resolveTeamLogoUrl(team.logoUrl);
           sendJoinRequestPushNotification(
             league.commissionerId,
             team.name || 'A team',
             'team',
             league.name,
-            request.id
+            request.id,
+            teamLogoUrl
           ).catch(err => console.error('[Notifications] Failed to send team join request notification:', err));
         }).catch(console.error);
       }

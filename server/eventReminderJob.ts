@@ -22,7 +22,7 @@ import { and, eq, gt, lt, gte, lte, inArray, sql, or, not, isNull, notInArray } 
 import { storage } from "./storage";
 import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { sendScheduleReminderPushNotification, sendPersonalReminderPushNotification, sendRsvpReminderPushNotification } from "./oneSignalNotifications";
+import { sendScheduleReminderPushNotification, sendPersonalReminderPushNotification, sendRsvpReminderPushNotification, resolveTeamLogoUrl } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
@@ -35,6 +35,8 @@ interface EventInfo {
   location: string;
   eventTime: Date;
   eventType: "game" | "scrimmage";
+  /** Resolved public URL for the team logo to show in the push notification. */
+  teamLogoUrl?: string;
 }
 
 function calculateTriggerTime(eventTime: Date, trigger: ReminderTrigger, timezone: string = "America/New_York"): Date {
@@ -210,7 +212,8 @@ async function sendEventReminder(
       event.location || 'TBD',
       event.id,
       event.eventType,
-      dutyMessage
+      dutyMessage,
+      event.teamLogoUrl
     );
     
     // Record that we sent this reminder
@@ -605,8 +608,9 @@ export async function checkAndSendEventReminders(): Promise<void> {
       // Parse the league-local datetime string with proper timezone context
       const eventTime = parseLeagueLocalDateTime(game.scheduledAt, timezone);
       
-      // Build event title from teams
+      // Build event title from teams and resolve the home team logo for the notification
       let title = "Game";
+      let gameTeamLogoUrl: string | undefined;
       try {
         const homeTeam = await storage.getTeam(game.homeTeamId);
         const awayTeam = game.awayTeamId ? await storage.getTeam(game.awayTeamId) : null;
@@ -615,8 +619,12 @@ export async function checkAndSendEventReminders(): Promise<void> {
         } else if (homeTeam) {
           title = `${homeTeam.name} Game`;
         }
+        // Use the home team's logo as the notification icon (it's the host team)
+        if (homeTeam?.logoUrl) {
+          gameTeamLogoUrl = resolveTeamLogoUrl(homeTeam.logoUrl) ?? undefined;
+        }
       } catch (e) {
-        // Keep default title
+        // Keep default title and no logo
       }
       
       const eventInfo: EventInfo = {
@@ -625,6 +633,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
         location: game.venue || 'TBD',
         eventTime,
         eventType: "game",
+        teamLogoUrl: gameTeamLogoUrl,
       };
       
       for (const trigger of triggers) {
