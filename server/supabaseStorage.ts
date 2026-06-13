@@ -615,23 +615,20 @@ export class SupabaseStorageService {
   }
 
   // Event Photos (personal reminders & general team events)
-  async getEventPhotoUploadURL(): Promise<{ uploadURL: string; path: string }> {
+  async uploadEventPhotoBuffer(buffer: Buffer, contentType: string): Promise<string> {
     const objectId = randomUUID();
     const filePath = `event-photos/${objectId}`;
 
-    const { data, error } = await this.supabase.storage
+    const { error } = await this.supabase.storage
       .from("private")
-      .createSignedUploadUrl(filePath);
+      .upload(filePath, buffer, { contentType, upsert: false });
 
     if (error) {
-      console.error("Error creating signed upload URL for event photo:", error);
-      throw new Error("Failed to create upload URL");
+      console.error("Error uploading event photo:", error);
+      throw new Error("Failed to upload event photo");
     }
 
-    return {
-      uploadURL: data.signedUrl,
-      path: `/event-photos/${objectId}`,
-    };
+    return `/event-photos/${objectId}`;
   }
 
   async getEventPhotoFile(photoPath: string): Promise<{ data: Blob; contentType: string }> {

@@ -2,12 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Calendar, ArrowLeft, MapPin, Clock, Users, Check, X, UserPlus } from "lucide-react";
+import { Trophy, Calendar, ArrowLeft, MapPin, Clock, Users, Check, X, UserPlus, Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { User } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
@@ -66,6 +66,9 @@ export default function TeamEventDetails() {
   const [, params] = useRoute("/team-event/:id");
   const eventId = params?.id;
   const [substituteModalOpen, setSubstituteModalOpen] = useState(false);
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const { data: eventData, isLoading } = useQuery<TeamEventData>({
     queryKey: [`/api/team-events/${eventId}`],
@@ -92,6 +95,47 @@ export default function TeamEventDetails() {
       });
     },
   });
+
+  const updatePhotoMutation = useMutation({
+    mutationFn: async (photoUrl: string | null) => {
+      await apiRequest("PATCH", `/api/team-events/${eventId}`, { photoUrl });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/team-events/${eventId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
+      setEditPhotoPreview(null);
+      toast({ title: "Photo updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update photo.", variant: "destructive" });
+    },
+  });
+
+  async function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setEditPhotoPreview(previewUrl);
+    setIsUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await fetch('/api/event-photos/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const { path } = await res.json();
+      updatePhotoMutation.mutate(path);
+    } catch {
+      toast({ title: "Error", description: "Failed to upload photo.", variant: "destructive" });
+      setEditPhotoPreview(null);
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }
 
   if (isLoading) {
     return (
@@ -170,6 +214,8 @@ export default function TeamEventDetails() {
     }));
 
   const gameDate = format(new Date(eventData.scheduledAt), 'yyyy-MM-dd');
+  const canEditPhoto = isGeneralEvent && (eventData.isCaptain || eventData.creatorId === (user as User | null)?.id);
+  const displayPhotoUrl = editPhotoPreview || eventData.photoUrl;
 
   return (
     <div className="min-h-screen bg-background pb-36">
@@ -194,15 +240,58 @@ export default function TeamEventDetails() {
 
       <div className="px-6 py-6 space-y-6">
         <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] overflow-hidden">
-          {eventData.photoUrl && (
-            <div className="w-full" style={{ aspectRatio: '3/5' }}>
+          {/* Hidden file input for photo editing */}
+          {canEditPhoto && (
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
+              onChange={handlePhotoFileChange}
+            />
+          )}
+
+          {/* Photo display / edit area */}
+          {displayPhotoUrl ? (
+            <div className="relative w-full" style={{ aspectRatio: '3/5' }}>
               <img
-                src={eventData.photoUrl}
+                src={displayPhotoUrl}
                 alt={eventData.title}
                 className="w-full h-full object-cover"
               />
+              {isUploadingPhoto && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                  <p className="text-white text-sm font-medium">Uploading…</p>
+                </div>
+              )}
+              {canEditPhoto && !isUploadingPhoto && (
+                <div className="absolute bottom-3 right-3 flex gap-2">
+                  <button
+                    onClick={() => photoInputRef.current?.click()}
+                    className="bg-black/60 hover:bg-black/80 text-white rounded-full p-2 transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => updatePhotoMutation.mutate(null)}
+                    disabled={updatePhotoMutation.isPending}
+                    className="bg-black/60 hover:bg-red-600 text-white rounded-full p-2 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          ) : canEditPhoto ? (
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 py-6 border-b border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+            >
+              <Camera className="w-4 h-4" />
+              <span className="text-sm">Add cover photo</span>
+            </button>
+          ) : null}
+
           <div className="p-6">
           <div className="flex items-center gap-4 mb-4">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${

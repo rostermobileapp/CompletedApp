@@ -4044,15 +4044,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Event photo upload and serving routes
-  app.post("/api/event-photos/upload", isAuthenticated, async (req: any, res) => {
+  const eventPhotoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    },
+  });
+
+  app.post("/api/event-photos/upload", isAuthenticated, (req: any, res, next) => {
+    eventPhotoUpload.single('photo')(req, res, (err) => {
+      if (err) {
+        console.error('Event photo multer error:', err);
+        return res.status(400).json({ error: err.message || 'File upload error' });
+      }
+      next();
+    });
+  }, async (req: any, res) => {
     try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file provided' });
+      }
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
-      const { uploadURL, path } = await supabaseStorageService.getEventPhotoUploadURL();
-      res.json({ uploadURL, path });
+      const path = await supabaseStorageService.uploadEventPhotoBuffer(
+        req.file.buffer,
+        req.file.mimetype
+      );
+      res.json({ path });
     } catch (error) {
-      console.error("Error getting event photo upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
+      console.error("Error uploading event photo:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
     }
   });
 

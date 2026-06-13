@@ -96,15 +96,16 @@ const generalEventSchema = z.object({
   location: z.string().optional(),
 });
 
-async function uploadEventPhoto(file: File, apiReq: typeof apiRequest): Promise<string> {
-  const res = await apiReq('POST', '/api/event-photos/upload', {});
-  const { uploadURL, path } = await res.json();
-  const putRes = await fetch(uploadURL, {
-    method: 'PUT',
-    body: file,
-    headers: { 'Content-Type': file.type },
+async function uploadEventPhoto(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('photo', file);
+  const res = await fetch('/api/event-photos/upload', {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
   });
-  if (!putRes.ok) throw new Error(`Photo upload failed: ${putRes.status}`);
+  if (!res.ok) throw new Error(`Photo upload failed: ${res.status}`);
+  const { path } = await res.json();
   return path as string;
 }
 
@@ -1341,7 +1342,7 @@ function DashboardMobile() {
     mutationFn: async (data: z.infer<typeof personalReminderSchema>) => {
       let photoUrl: string | null = null;
       if (reminderPhotoFile) {
-        photoUrl = await uploadEventPhoto(reminderPhotoFile, apiRequest);
+        photoUrl = await uploadEventPhoto(reminderPhotoFile);
       }
       await apiRequest("POST", "/api/personal-reminders", {
         ...data,
@@ -1440,7 +1441,7 @@ function DashboardMobile() {
     mutationFn: async (data: z.infer<typeof generalEventSchema>) => {
       let photoUrl: string | null = null;
       if (eventPhotoFile) {
-        photoUrl = await uploadEventPhoto(eventPhotoFile, apiRequest);
+        photoUrl = await uploadEventPhoto(eventPhotoFile);
       }
       await apiRequest("POST", "/api/team-events", {
         teamId: data.teamId,
