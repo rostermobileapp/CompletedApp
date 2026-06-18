@@ -385,7 +385,7 @@ export default function Landing() {
               { label: "In-Game Scorekeeping",       roster: true,  bench: true,  snap: false, engine: false, cross: false },
               { label: "League Drafts",              roster: true,  bench: false, snap: false, engine: false, cross: false },
               { label: "3 Stars of the Game",        roster: true,  bench: false, snap: false, engine: false, cross: false },
-              { label: "In-App RSVP Only",           roster: true,  bench: false, snap: true,  engine: false, cross: true  },
+              { label: "In-App Only RSVP",           roster: true,  bench: false, snap: true,  engine: false, cross: true  },
               { label: "Intelligent Sub Request",    roster: true,  bench: false, snap: false, engine: false, cross: false },
               { label: "Polls/Bulletins",            roster: true,  bench: true,  snap: true,  engine: false, cross: false },
               { label: "Facility Event Calendar",    roster: true,  bench: false, snap: false, engine: false, cross: false },

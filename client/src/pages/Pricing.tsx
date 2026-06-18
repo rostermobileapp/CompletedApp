@@ -11,7 +11,7 @@ const featureRows = [
   { label: "Annoying Ads", free: "never", pro: "never", comm: "never", special: "ads" },
   // Free tier
   { label: "Team Schedule", free: true, pro: true, comm: true },
-  { label: "In-App RSVP Only", free: true, pro: true, comm: true },
+  { label: "In-App Only RSVP", free: true, pro: true, comm: true },
   { label: "In App Messaging", free: true, pro: true, comm: true, freeNote: "Team Chat Only" },
   { label: "Facility Event Calendar", free: true, pro: true, comm: true },
   { label: "Website Portal", free: true, pro: true, comm: true },
@@ -222,7 +222,7 @@ export default function Pricing() {
               <span className="text-gray-400"> / forever</span>
             </div>
             <ul className="space-y-3 mb-8 flex-1">
-              {['Team Schedule', 'In-App RSVP Only', 'In App Messaging (Team Chat)', 'Facility Event Calendar', 'Website Portal', 'Team Stats', 'Standings'].map((f) => (
+              {['Team Schedule', 'In-App Only RSVP', 'In App Messaging (Team Chat)', 'Facility Event Calendar', 'Website Portal', 'Team Stats', 'Standings'].map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-[#3c82f4] flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{f}</span>
