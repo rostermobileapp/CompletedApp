@@ -3070,8 +3070,19 @@ export class DatabaseStorage implements IStorage {
 
     for (const row of csvData) {
       try {
-        const firstName = (row.firstName || row['First Name'] || row.first_name || '').toString().trim();
-        const lastName  = (row.lastName  || row['Last Name']  || row.last_name  || '').toString().trim();
+        let firstName = (row.firstName || row['First Name'] || row.first_name || '').toString().trim();
+        let lastName  = (row.lastName  || row['Last Name']  || row.last_name  || '').toString().trim();
+
+        // Handle full-name columns (e.g. "Player Full Name*", "Full Name", "Name")
+        if (!firstName || !lastName) {
+          const fullName = (row.fullName || row['Full Name'] || row['Player Full Name'] || row['Player Full Name*'] || row['name'] || row.Name || '').toString().trim();
+          if (fullName) {
+            const parts = fullName.split(/\s+/);
+            firstName = parts[0] || '';
+            lastName  = parts.slice(1).join(' ') || '';
+          }
+        }
+
         const email = (row.email || row.Email || row.EMAIL || '').toString().trim() || null;
         const jerseyNumber = (row.jerseyNumber || row['Jersey Number'] || row.jersey_number || row['Jersey #'] || '').toString().trim() || null;
         const position = (row.position || row.Position || '').toString().trim() || null;

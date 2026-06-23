@@ -8229,23 +8229,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return fields;
     };
 
-    const rawHeaders = splitLine(lines[0]).map(h => h.trim());
-
     // Normalize a header to a canonical key
     const normalize = (h: string): string => {
-      const l = h.toLowerCase().replace(/[\s_-]/g, '');
+      const l = h.toLowerCase().replace(/[\s_*-]/g, '');
       if (l === 'firstname')    return 'firstName';
       if (l === 'lastname')     return 'lastName';
+      if (l.includes('fullname') || l === 'playername' || l === 'name' || l === 'playerfullname') return 'fullName';
       if (l === 'email')        return 'email';
-      if (l === 'jerseynumber' || l === 'jersey#') return 'jerseyNumber';
+      if (l === 'jerseynumber' || l.includes('jersey')) return 'jerseyNumber';
       if (l === 'position')     return 'position';
-      return h; // keep original for unknowns
+      return l; // normalised lowercase for unknowns
     };
 
-    const headers = rawHeaders.map(normalize);
+    // Find the real header row: scan up to first 10 rows for one that contains
+    // a recognisable player-data column name.
+    const KNOWN_HEADERS = ['firstname', 'lastname', 'fullname', 'playerfullname', 'playername', 'name', 'email', 'position', 'jersey'];
+    const allRows = lines.map(l => splitLine(l).map(v => v.trim()));
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(allRows.length, 10); i++) {
+      const normed = allRows[i].map(v => v.toLowerCase().replace(/[\s_*-]/g, ''));
+      if (normed.some(v => KNOWN_HEADERS.some(k => v.includes(k)))) {
+        headerRowIdx = i;
+        break;
+      }
+    }
 
-    return lines.slice(1).map(line => {
-      const vals = splitLine(line);
+    const headers = allRows[headerRowIdx].map(normalize);
+
+    return allRows.slice(headerRowIdx + 1).map(vals => {
       const row: Record<string, string> = {};
       headers.forEach((h, i) => {
         if (!(h in row)) row[h] = (vals[i] ?? '').trim(); // first occurrence wins
