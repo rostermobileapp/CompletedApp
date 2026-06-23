@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -14547,6 +14547,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
+
+        // Handle email-invited co-hosts (may or may not have accounts)
+        if (req.body.coHostEmails && Array.isArray(req.body.coHostEmails) && req.body.coHostEmails.length > 0) {
+          const creator = await storage.getUser(userId);
+          const creatorName = creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'A scrimmage organizer' : 'A scrimmage organizer';
+          for (const email of req.body.coHostEmails as string[]) {
+            try {
+              const [existingUser] = await storage.searchUsersByEmail(email, 1);
+              if (existingUser) {
+                await storage.addScrimmageCoHost({
+                  scrimmageId: parentScrimmage.id,
+                  userId: existingUser.id,
+                  canApproveRequests: true,
+                  canSendReminders: true,
+                  canManagePayments: true,
+                  addedBy: userId,
+                });
+                await storage.createNotification({
+                  userId: existingUser.id,
+                  type: 'scrimmage_cohost_added',
+                  title: `You're a co-host for ${scrimmageData.title}`,
+                  message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
+                  actionUrl: `/scrimmage/${parentScrimmage.id}`,
+                  scrimmageId: parentScrimmage.id,
+                });
+                broadcastNotificationUpdate(existingUser.id);
+              } else {
+                await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: scrimmageData.title });
+              }
+            } catch (emailCoHostError) {
+              console.error(`Failed to handle co-host email ${email}:`, emailCoHostError);
+            }
+          }
+        }
         
         // Create child scrimmages for remaining dates
         for (let i = 1; i < dates.length; i++) {
@@ -14715,6 +14749,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
               broadcastNotificationUpdate(coHostId);
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
+            }
+          }
+        }
+
+        // Handle email-invited co-hosts (may or may not have accounts)
+        if (req.body.coHostEmails && Array.isArray(req.body.coHostEmails) && req.body.coHostEmails.length > 0) {
+          const creator = await storage.getUser(userId);
+          const creatorName = creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'A scrimmage organizer' : 'A scrimmage organizer';
+          for (const email of req.body.coHostEmails as string[]) {
+            try {
+              const [existingUser] = await storage.searchUsersByEmail(email, 1);
+              if (existingUser) {
+                await storage.addScrimmageCoHost({
+                  scrimmageId: scrimmage.id,
+                  userId: existingUser.id,
+                  canApproveRequests: true,
+                  canSendReminders: true,
+                  canManagePayments: true,
+                  addedBy: userId,
+                });
+                await storage.createNotification({
+                  userId: existingUser.id,
+                  type: 'scrimmage_cohost_added',
+                  title: `You're a co-host for ${scrimmageData.title}`,
+                  message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
+                  actionUrl: `/scrimmage/${scrimmage.id}`,
+                  scrimmageId: scrimmage.id,
+                });
+                broadcastNotificationUpdate(existingUser.id);
+              } else {
+                await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: scrimmageData.title });
+              }
+            } catch (emailCoHostError) {
+              console.error(`Failed to handle co-host email ${email}:`, emailCoHostError);
             }
           }
         }
@@ -18787,6 +18855,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const users = await storage.searchUsersByEmail(email, 10);
       res.json(users);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      res.status(500).json({ message: 'Failed to search users' });
+    }
+  });
+
+  // Global user search by name OR email, with optional rink badge annotation
+  app.get('/api/users/search-all', isAuthenticated, async (req: any, res) => {
+    try {
+      const q = req.query.q as string;
+      const facilityId = req.query.facilityId as string | undefined;
+      const currentUserId = req.user?.id;
+
+      if (!q || q.trim().length < 2) {
+        return res.json([]);
+      }
+
+      const results = await storage.searchUsersByNameOrEmail(q.trim(), 10);
+
+      // Annotate with isAtRink flag if facilityId provided
+      let rinkMemberIds = new Set<string>();
+      if (facilityId) {
+        const members = await db
+          .select({ userId: facilityMemberships.userId })
+          .from(facilityMemberships)
+          .where(eq(facilityMemberships.facilityId, facilityId));
+        rinkMemberIds = new Set(members.map(m => m.userId));
+      }
+
+      const annotated = results
+        .filter(u => u.id !== currentUserId)
+        .map(u => ({
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          profileImageUrl: u.profileImageUrl,
+          isAtRink: rinkMemberIds.has(u.id),
+        }));
+
+      res.json(annotated);
     } catch (error) {
       console.error('Error searching users:', error);
       res.status(500).json({ message: 'Failed to search users' });

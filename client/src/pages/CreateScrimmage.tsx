@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, getImageUrl } from '@/lib/queryClient';
+import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp } from 'lucide-react';
@@ -83,8 +83,13 @@ export default function CreateScrimmage() {
   const [groupLoadedUserIds, setGroupLoadedUserIds] = useState<Set<string>>(new Set());
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
+  const [selectedCoHostUsers, setSelectedCoHostUsers] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
+  const [coHostEmails, setCoHostEmails] = useState<string[]>([]); // email-only invites (no account)
   const [coHostSearchTerm, setCoHostSearchTerm] = useState("");
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
+  const [coHostSearchResults, setCoHostSearchResults] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
+  const [coHostSearchLoading, setCoHostSearchLoading] = useState(false);
+  const coHostDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
   const [formInitialized, setFormInitialized] = useState(false);
   
@@ -323,6 +328,34 @@ export default function CreateScrimmage() {
     };
   }, [showCoHostDropdown]);
 
+  // Debounced co-host search
+  useEffect(() => {
+    if (coHostDebounceRef.current) clearTimeout(coHostDebounceRef.current);
+    if (!coHostSearchTerm || coHostSearchTerm.trim().length < 2) {
+      setCoHostSearchResults([]);
+      setCoHostSearchLoading(false);
+      return;
+    }
+    setCoHostSearchLoading(true);
+    coHostDebounceRef.current = setTimeout(async () => {
+      try {
+        const facilityId = leagueFacility?.id;
+        const params = new URLSearchParams({ q: coHostSearchTerm.trim() });
+        if (facilityId) params.set('facilityId', facilityId);
+        const res = await fetch(`/api/users/search-all?${params}`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          setCoHostSearchResults(data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setCoHostSearchLoading(false);
+      }
+    }, 350);
+    return () => { if (coHostDebounceRef.current) clearTimeout(coHostDebounceRef.current); };
+  }, [coHostSearchTerm, leagueFacility?.id]);
+
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
       // Guard against no leagues (only for create mode)
@@ -430,7 +463,8 @@ export default function CreateScrimmage() {
       ...data, 
       selectedMemberIds: selectedLeague ? selectedMemberIds : [],
       selectedEmails: selectedLeague ? selectedEmails : [],
-      coHostIds: selectedLeague ? selectedCoHostIds : [],
+      coHostIds: selectedCoHostIds,
+      coHostEmails,
     };
     createScrimmageRequest.mutate(formData);
   };
@@ -1223,126 +1257,139 @@ export default function CreateScrimmage() {
           </div>
         </div>
 
-        {/* Co-Host Selection - Only show if user has leagues */}
-        {selectedLeague && (
-          <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
-            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
-              <Crown className="w-5 h-5" />
-              Add Co-Hosts (Optional)
-            </h3>
-            <p className="text-sm text-muted-foreground mb-1">
-              Co-hosts can help manage this scrimmage - approve players, send reminders, and collect payments
-            </p>
+        {/* Co-Host Selection - Global user search */}
+        <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
+          <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
+            <Crown className="w-5 h-5" />
+            Add Co-Hosts (Optional)
+          </h3>
+          <p className="text-sm text-muted-foreground mb-1">
+            Co-hosts can help manage this scrimmage — approve players, send reminders, and collect payments
+          </p>
 
-            {membersLoading ? (
-              <div className="flex items-center gap-3 p-3 animate-pulse">
-                <div className="w-full h-10 bg-muted rounded"></div>
-              </div>
-            ) : (leagueMembers as any[]).filter((m: any) => m.user.id !== (user as any)?.id).length === 0 ? (
-              <div className="text-center py-1 text-muted-foreground">
-                No other league members available to add as co-hosts
-              </div>
-            ) : (
-              <>
-                {/* Selected co-hosts badges */}
-                {selectedCoHostIds.length > 0 && (
-                  <div className="mb-1 flex flex-wrap gap-2">
-                    {selectedCoHostIds.map(coHostId => {
-                      const member = (leagueMembers as any[]).find((m: any) => m.user.id === coHostId);
-                      if (!member) return null;
-                      return (
-                        <Badge 
-                          key={coHostId} 
-                          variant="secondary" 
-                          className="flex items-center gap-1 pr-1"
-                          data-testid={`badge-cohost-${coHostId}`}
-                        >
-                          <Crown className="w-3 h-3" />
-                          {member.user.firstName} {member.user.lastName}
-                          <button
-                            type="button"
-                            onClick={() => toggleCoHostSelection(coHostId)}
-                            className="ml-1 hover:bg-muted rounded p-0.5"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* Search input with dropdown */}
-                <div className="relative" ref={coHostSearchRef}>
-                  <Input
-                    type="text"
-                    placeholder="Search league members..."
-                    value={coHostSearchTerm}
-                    onChange={(e) => {
-                      setCoHostSearchTerm(e.target.value);
-                      setShowCoHostDropdown(true);
-                    }}
-                    onFocus={() => setShowCoHostDropdown(true)}
-                    data-testid="input-cohost-search"
-                  />
-                  
-                  {/* Dropdown results */}
-                  {showCoHostDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-auto">
-                      {(() => {
-                        const availableMembers = (leagueMembers as any[])
-                          .filter((member: any) => {
-                            // Exclude creator
-                            if (member.user.id === (user as any)?.id) return false;
-                            // Exclude already selected co-hosts
-                            if (selectedCoHostIds.includes(member.user.id)) return false;
-                            // Filter by search term
-                            if (coHostSearchTerm) {
-                              const fullName = `${member.user.firstName} ${member.user.lastName}`.toLowerCase();
-                              return fullName.includes(coHostSearchTerm.toLowerCase());
-                            }
-                            return true;
-                          });
-                        
-                        if (availableMembers.length === 0) {
-                          return (
-                            <div className="p-3 text-center text-muted-foreground text-sm">
-                              {coHostSearchTerm ? 'No members match your search' : 'All members are already selected'}
-                            </div>
-                          );
-                        }
-                        
-                        return availableMembers.map((member: any) => (
-                          <button
-                            key={member.user.id}
-                            type="button"
-                            onClick={() => {
-                              toggleCoHostSelection(member.user.id);
-                              setCoHostSearchTerm('');
-                              setShowCoHostDropdown(false);
-                            }}
-                            className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 text-left"
-                            data-testid={`cohost-option-${member.user.id}`}
-                          >
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={member.user.profileImageUrl || undefined} />
-                              <AvatarFallback className="text-xs">
-                                {member.user.firstName?.[0]}{member.user.lastName?.[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">
-                              {member.user.firstName} {member.user.lastName}
-                            </span>
-                          </button>
-                        ));
-                      })()}
-                    </div>
+          {/* Selected co-host badges */}
+          {(selectedCoHostIds.length > 0 || coHostEmails.length > 0) && (
+            <div className="mb-1 flex flex-wrap gap-2">
+              {selectedCoHostUsers.map(u => (
+                <Badge key={u.id} variant="secondary" className="flex items-center gap-1 pr-1">
+                  <Crown className="w-3 h-3" />
+                  {u.firstName} {u.lastName}
+                  {u.isAtRink && (
+                    <span className="ml-1 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded px-1">At rink</span>
                   )}
-                </div>
-              </>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCoHostIds(ids => ids.filter(id => id !== u.id));
+                      setSelectedCoHostUsers(users => users.filter(x => x.id !== u.id));
+                      form.setValue('coHostIds', selectedCoHostIds.filter(id => id !== u.id));
+                    }}
+                    className="ml-1 hover:bg-muted rounded p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+              {coHostEmails.map(email => (
+                <Badge key={email} variant="secondary" className="flex items-center gap-1 pr-1">
+                  <Mail className="w-3 h-3" />
+                  {email}
+                  <button
+                    type="button"
+                    onClick={() => setCoHostEmails(emails => emails.filter(e => e !== email))}
+                    className="ml-1 hover:bg-muted rounded p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Search input with dropdown */}
+          <div className="relative" ref={coHostSearchRef}>
+            <Input
+              type="text"
+              placeholder="Search by name or email..."
+              value={coHostSearchTerm}
+              onChange={(e) => {
+                setCoHostSearchTerm(e.target.value);
+                setShowCoHostDropdown(true);
+              }}
+              onFocus={() => setShowCoHostDropdown(true)}
+              data-testid="input-cohost-search"
+            />
+
+            {showCoHostDropdown && coHostSearchTerm.trim().length >= 2 && (
+              <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-auto">
+                {coHostSearchLoading ? (
+                  <div className="p-3 text-center text-muted-foreground text-sm">Searching…</div>
+                ) : (() => {
+                  const available = coHostSearchResults.filter(
+                    u => !selectedCoHostIds.includes(u.id)
+                  );
+                  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(coHostSearchTerm.trim());
+                  const emailAlreadySelected = coHostEmails.includes(coHostSearchTerm.trim());
+                  const emailHasAccount = coHostSearchResults.some(u => u.email?.toLowerCase() === coHostSearchTerm.trim().toLowerCase());
+
+                  return (
+                    <>
+                      {available.map(u => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCoHostIds(ids => [...ids, u.id]);
+                            setSelectedCoHostUsers(users => [...users, u]);
+                            form.setValue('coHostIds', [...selectedCoHostIds, u.id]);
+                            setCoHostSearchTerm('');
+                            setShowCoHostDropdown(false);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 text-left"
+                          data-testid={`cohost-option-${u.id}`}
+                        >
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={u.profileImageUrl || undefined} />
+                            <AvatarFallback className="text-xs">
+                              {u.firstName?.[0]}{u.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium">{u.firstName} {u.lastName}</span>
+                            {u.email && <span className="block text-xs text-muted-foreground truncate">{u.email}</span>}
+                          </div>
+                          {u.isAtRink && (
+                            <span className="text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded px-1.5 py-0.5 shrink-0">At this rink</span>
+                          )}
+                        </button>
+                      ))}
+                      {isValidEmail && !emailHasAccount && !emailAlreadySelected && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCoHostEmails(emails => [...emails, coHostSearchTerm.trim()]);
+                            setCoHostSearchTerm('');
+                            setShowCoHostDropdown(false);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 text-left border-t border-border"
+                        >
+                          <Mail className="w-5 h-5 text-muted-foreground shrink-0" />
+                          <div>
+                            <span className="font-medium">Invite</span> <span className="text-muted-foreground">{coHostSearchTerm.trim()}</span>
+                            <span className="block text-xs text-muted-foreground">They'll get a welcome email to join Rosters</span>
+                          </div>
+                        </button>
+                      )}
+                      {available.length === 0 && (!isValidEmail || emailHasAccount || emailAlreadySelected) && (
+                        <div className="p-3 text-center text-muted-foreground text-sm">No users found</div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (

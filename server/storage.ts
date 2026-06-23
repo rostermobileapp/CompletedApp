@@ -669,6 +669,7 @@ export interface IStorage {
   
   // User search operations
   searchUsersByEmail(email: string, limit?: number): Promise<User[]>;
+  searchUsersByNameOrEmail(query: string, limit?: number): Promise<User[]>;
   
   // Player stats operations
   getPlayerStats(leagueId: string, seasonId?: string): Promise<(PlayerStats & { user: User })[]>;
@@ -9723,6 +9724,25 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(and(ilike(users.email, `%${email}%`), isNull(users.deletedAt)))
+      .limit(limit);
+  }
+
+  async searchUsersByNameOrEmail(query: string, limit: number = 10): Promise<User[]> {
+    const q = `%${query}%`;
+    return await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          isNull(users.deletedAt),
+          or(
+            ilike(users.email, q),
+            ilike(users.firstName, q),
+            ilike(users.lastName, q),
+            sql`LOWER(CONCAT(${users.firstName}, ' ', ${users.lastName})) LIKE LOWER(${q})`
+          )
+        )
+      )
       .limit(limit);
   }
 
