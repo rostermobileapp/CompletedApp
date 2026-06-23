@@ -267,7 +267,7 @@ export default function CreateTeam() {
         <>
           {/* Independent Team Info Card */}
           <Card className="mb-6 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
-            <CardContent className="pt-6">
+            <CardContent className="p-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
                   <Users className="w-5 h-5 text-white" />
