@@ -152,15 +152,11 @@ export function ImageCropDialog({
   const minZoomRef = useRef(1);
   const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
 
-  // mediaSize is set by the Cropper via setMediaSize prop.
-  // computeSizes() fires twice:
-  //   1. When the image loads (state.mediaObjectFit is still undefined → uses 'contain' → WRONG)
-  //   2. As a setState callback when componentDidUpdate sets state.mediaObjectFit → CORRECT
-  // We always keep the LATEST value; after the second call it's correct.
-  const mediaSizeRef = useRef<MediaSize | null>(null);
+  // Natural image dimensions preloaded when the file is set.
+  const naturalDimsRef = useRef<{ nw: number; nh: number } | null>(null);
 
-  // Container geometry measured after dialog animation settles.
-  const containerDimsRef = useRef<{ width: number; height: number } | null>(null);
+  // mediaSize kept for use in handleSave fallback.
+  const mediaSizeRef = useRef<MediaSize | null>(null);
 
   useEffect(() => { fileRef.current = file; }, [file]);
   useEffect(() => { cropRef.current = crop; }, [crop]);
@@ -181,17 +177,33 @@ export function ImageCropDialog({
       setCropSize(null);
       cropSizeRef.current = null;
       mediaSizeRef.current = null;
-      containerDimsRef.current = null;
+      naturalDimsRef.current = null;
       setLoadError(null);
       return;
     }
     setLoadError(null);
     setCropSize(null);
     mediaSizeRef.current = null;
-    containerDimsRef.current = null;
+    naturalDimsRef.current = null;
 
     readFileAsDataUrl(file)
-      .then((dataUrl) => {
+      .then(async (dataUrl) => {
+        if (cancelled) return;
+
+        // Preload the image to get natural dimensions so we can compute the
+        // correct fit-zoom deterministically without relying on setMediaSize timing.
+        try {
+          const preloaded = await loadImage(dataUrl);
+          if (!cancelled) {
+            naturalDimsRef.current = {
+              nw: preloaded.naturalWidth,
+              nh: preloaded.naturalHeight,
+            };
+          }
+        } catch {
+          // Non-fatal — save will fall back to computed mediaSize.
+        }
+
         if (cancelled) return;
         setImageSrc(dataUrl);
         imageSrcRef.current = dataUrl;
@@ -201,17 +213,45 @@ export function ImageCropDialog({
         zoomRef.current = 1;
         setMinZoom(1);
         minZoomRef.current = 1;
-        // Delay Cropper mount until the Dialog's open animation finishes so that
-        // getBoundingClientRect() reflects the final container dimensions.
+
+        // Wait for the Dialog open animation to finish so getBoundingClientRect()
+        // reflects the final rendered container size.
         setTimeout(() => {
           if (cancelled || !cropContainerRef.current) return;
           const rect = cropContainerRef.current.getBoundingClientRect();
-          containerDimsRef.current = { width: rect.width, height: rect.height };
-          // Use the full container square so the circle fills the available space.
-          const side = Math.min(rect.width, rect.height);
+          const cw = rect.width;
+          const ch = rect.height;
+          const side = Math.min(cw, ch);
+
+          // Store crop size (used in handleSave geometry).
+          // We do NOT pass this as cropSize prop to the Cropper — instead we use
+          // aspect={1} so react-easy-crop computes the crop frame from its own
+          // container measurement (no mismatch possible).
           const cs = { width: side, height: side };
           setCropSize(cs);
           cropSizeRef.current = cs;
+
+          // Compute fit-zoom: the zoom level where the full image is visible inside
+          // the crop frame. Uses cover math to replicate what react-easy-crop computes:
+          //   coverScale = max(cw/nw, ch/nh)   → scale to cover the container
+          //   mediaSize  = {nw*coverScale, nh*coverScale}  at zoom=1
+          //   fitZoom    = min(side/mediaW, side/mediaH)   → both dims inside frame
+          const dims = naturalDimsRef.current;
+          if (dims && dims.nw > 0 && dims.nh > 0) {
+            const { nw, nh } = dims;
+            const coverScale = Math.max(cw / nw, ch / nh);
+            const mediaW = nw * coverScale;
+            const mediaH = nh * coverScale;
+            const fitZoom = Math.max(0.05, Math.min(1, Math.min(side / mediaW, side / mediaH)));
+            if (fitZoom < 0.999) {
+              minZoomRef.current = fitZoom;
+              setMinZoom(fitZoom);
+              zoomRef.current = fitZoom;
+              setZoom(fitZoom);
+              cropRef.current = { x: 0, y: 0 };
+              setCrop({ x: 0, y: 0 });
+            }
+          }
         }, 300);
       })
       .catch((err) => {
@@ -231,37 +271,9 @@ export function ImageCropDialog({
     zoomRef.current = z;
   }, []);
 
-  // setMediaSize fires each time computeSizes() runs. We always keep the latest
-  // value; the second (correct cover-mode) call overwrites the first (wrong contain-mode).
-  // After the second call we also compute the "fit zoom" — the minimum zoom at which the
-  // entire image is visible inside the crop frame — and apply it as both the initial zoom
-  // and the minZoom so the photo always starts fully inside the frame.
+  // Keep mediaSizeRef current for use in handleSave geometry fallback.
   const handleSetMediaSize = useCallback((ms: MediaSize) => {
     mediaSizeRef.current = ms;
-    const cs = cropSizeRef.current;
-    if (!cs || ms.width <= 0 || ms.height <= 0) return;
-
-    // fitZoom: zoom at which both image dimensions fit within the crop frame.
-    // With objectFit="cover", ms.width × ms.height is the rendered size at zoom=1.
-    // At zoom=fitZoom the rendered size equals (ms.width*fitZoom) × (ms.height*fitZoom).
-    // We want both ≤ cropFrame, so fitZoom = min(cropW/ms.width, cropH/ms.height).
-    const fitZoom = Math.min(cs.width / ms.width, cs.height / ms.height);
-    // Clamp to [0.1, 1]: can never be > 1 by definition (cover always fills the frame at 1),
-    // but guard against edge-cases with a small lower bound.
-    const clampedFit = Math.max(0.1, Math.min(1, fitZoom));
-
-    if (clampedFit < minZoomRef.current || Math.abs(clampedFit - minZoomRef.current) > 0.01) {
-      minZoomRef.current = clampedFit;
-      setMinZoom(clampedFit);
-      // Only pull the zoom down if the current zoom would show overflow.
-      if (zoomRef.current > clampedFit + 0.001) {
-        zoomRef.current = clampedFit;
-        setZoom(clampedFit);
-        // Reset pan so image stays centred.
-        cropRef.current = { x: 0, y: 0 };
-        setCrop({ x: 0, y: 0 });
-      }
-    }
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -271,43 +283,43 @@ export function ImageCropDialog({
     const currentFile = fileRef.current;
     const currentCrop = { ...cropRef.current };
     const currentZoom = zoomRef.current;
-    const currentCropSize = cropSizeRef.current;
     const currentMediaSize = mediaSizeRef.current;
-    const dims = containerDimsRef.current;
 
     if (!currentImageSrc || !currentFile) return;
-    if (!currentCropSize) {
+
+    // Measure the container live — it's definitely fully rendered when the user
+    // clicks Save, so getBoundingClientRect() is accurate here.
+    const containerEl = cropContainerRef.current;
+    if (!containerEl) {
       setLoadError("Crop area not ready. Please try again.");
       return;
     }
+    const liveRect = containerEl.getBoundingClientRect();
+    const containerW = liveRect.width;
+    const containerH = liveRect.height;
+    const side = Math.min(containerW, containerH);
 
     isSavingRef.current = true;
     setIsSaving(true);
     try {
       const img = await loadImage(currentImageSrc);
 
-      // Determine the mediaSize to use.
-      // Prefer the value from setMediaSize (Cropper's own computation), but fall back
-      // to computing it ourselves from natural dims + container dims if unavailable.
+      // Determine the mediaSize (image rendered CSS size at zoom=1).
+      // Prefer the value from setMediaSize (Cropper's own computation); fall back
+      // to cover math computed from natural dims + live container dims.
       let mediaSize: MediaSize;
       if (currentMediaSize && currentMediaSize.naturalWidth > 0 && currentMediaSize.width > 0) {
         mediaSize = currentMediaSize;
-      } else if (dims) {
+      } else {
         const nw = img.naturalWidth;
         const nh = img.naturalHeight;
-        const cw = dims.width;
-        const ch = dims.height;
-        const mediaAspect = nw / nh;
-        const containerAspect = cw / ch;
-        // Replicate react-easy-crop getObjectFit() + computeSizes() with objectFit="cover":
-        //   vertical-cover (mediaAspect >= containerAspect): width = ch * mediaAspect, height = ch
-        //   horizontal-cover (mediaAspect < containerAspect): width = cw, height = cw / mediaAspect
-        const mw = mediaAspect >= containerAspect ? ch * mediaAspect : cw;
-        const mh = mediaAspect >= containerAspect ? ch : cw / mediaAspect;
-        mediaSize = { width: mw, height: mh, naturalWidth: nw, naturalHeight: nh };
-      } else {
-        setLoadError("Crop area not ready. Please try again.");
-        return;
+        const coverScale = Math.max(containerW / nw, containerH / nh);
+        mediaSize = {
+          width: nw * coverScale,
+          height: nh * coverScale,
+          naturalWidth: nw,
+          naturalHeight: nh,
+        };
       }
 
       const canvas = document.createElement("canvas");
@@ -320,18 +332,14 @@ export function ImageCropDialog({
         ctx.fillRect(0, 0, outputSize, outputSize);
       }
 
-      // Use container dims for geometry; fall back to mediaSize dimensions if unavailable.
-      const containerW = dims?.width  ?? mediaSize.width;
-      const containerH = dims?.height ?? mediaSize.height;
-
       drawCrop(
         ctx,
         img,
         mediaSize,
         containerW,
         containerH,
-        currentCropSize.width,
-        currentCropSize.height,
+        side,
+        side,
         currentCrop.x,
         currentCrop.y,
         currentZoom,
@@ -393,7 +401,6 @@ export function ImageCropDialog({
                 crop={crop}
                 zoom={zoom}
                 aspect={1}
-                cropSize={cropSize}
                 cropShape={cropShape}
                 objectFit="cover"
                 showGrid={false}
