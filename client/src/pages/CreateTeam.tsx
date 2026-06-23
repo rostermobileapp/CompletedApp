@@ -415,7 +415,7 @@ export default function CreateTeam() {
                 Add players one at a time by entering their details
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pl-[4px] pr-[4px] pb-[4px]">
               <form onSubmit={handleAddManualPlayer} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
