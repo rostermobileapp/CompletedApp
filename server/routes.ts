@@ -6729,18 +6729,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teams/:id/members", async (req, res) => {
     try {
       const teamId = req.params.id;
-      const members = await storage.getTeamMembers(teamId);
-      
-      // Get all captains for this team to properly set isCaptain flag
-      const captainIds = await storage.getTeamCaptains(teamId);
-      
-      // Add isCaptain flag to each member based on captains list
-      const membersWithCaptainStatus = members.map(member => ({
+      const [members, captainIds, placeholders] = await Promise.all([
+        storage.getTeamMembers(teamId),
+        storage.getTeamCaptains(teamId),
+        db.select().from(placeholderPlayers).where(eq(placeholderPlayers.teamId, teamId)),
+      ]);
+
+      const realMembers = members.map(member => ({
         ...member,
-        isCaptain: captainIds.includes(member.userId)
+        isCaptain: captainIds.includes(member.userId),
       }));
-      
-      res.json(membersWithCaptainStatus);
+
+      // Shape placeholder players to match the member object so LineManager renders them
+      const placeholderMembers = placeholders.map(ph => ({
+        id: `placeholder:${ph.id}`,
+        userId: `placeholder:${ph.id}`,
+        teamId,
+        displayFirstName: ph.firstName,
+        displayLastName: ph.lastName,
+        position: ph.position ?? null,
+        jerseyNumber: ph.jerseyNumber ?? null,
+        status: 'placeholder',
+        isCaptain: false,
+        user: null,
+        isPlaceholder: true,
+      }));
+
+      res.json([...realMembers, ...placeholderMembers]);
     } catch (error) {
       console.error("Error fetching team members:", error);
       res.status(500).json({ message: "Failed to fetch team members" });

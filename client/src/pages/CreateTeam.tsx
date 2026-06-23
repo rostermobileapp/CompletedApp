@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
+import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ interface TeamResponse {
 
 export default function CreateTeam() {
   const [, setLocation] = useLocation();
+  const { setTeamSelection } = useDashboardSelection();
   const { toast } = useToast();
   const [teamName, setTeamName] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<RinkSelection | null>(null);
@@ -535,7 +537,10 @@ export default function CreateTeam() {
             <Button
               variant="outline"
               data-testid="button-view-team"
-              onClick={() => setLocation('/teams')}
+              onClick={() => {
+                if (createdTeam?.id) setTeamSelection(createdTeam.id);
+                setLocation('/teams');
+              }}
               className="flex-1"
             >
               View Team
