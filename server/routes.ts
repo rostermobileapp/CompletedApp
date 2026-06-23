@@ -6296,6 +6296,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      if (membershipId.startsWith('placeholder:')) {
+        const placeholderPlayerId = membershipId.slice('placeholder:'.length);
+        await db.delete(placeholderPlayers).where(eq(placeholderPlayers.id, placeholderPlayerId));
+        return res.json({ message: "Placeholder player removed successfully" });
+      }
       
       await storage.deleteLeagueMembership(membershipId);
       res.json({ message: "Player removed from league successfully" });
