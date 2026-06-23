@@ -500,7 +500,7 @@ export default function CreateTeam() {
                 Upload a CSV file to bulk import players to your team
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pl-[4px] pr-[4px] pb-[4px]">
               <div className="bg-muted p-4 rounded-md">
                 <p className="text-sm font-medium mb-2">CSV Template Format:</p>
                 <p className="text-sm text-muted-foreground mb-2">
