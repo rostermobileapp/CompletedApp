@@ -901,7 +901,7 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Recurring Event Settings */}
-            <div className="space-y-1 p-4 bg-muted/30 rounded-lg hairline elev-rest">
+            <div className="space-y-1 p-4 bg-muted/30 rounded-lg hairline elev-rest pt-[4px] pb-[4px]">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="isRecurring" className="text-base">Make this recurring</Label>
