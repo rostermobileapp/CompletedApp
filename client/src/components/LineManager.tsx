@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Users, UserPlus, Plus, Upload } from 'lucide-react';
+import { Users, UserPlus, Plus, Upload, Clock } from 'lucide-react';
 import { Link } from 'wouter';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthHeaders, queryClient } from '@/lib/queryClient';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface LineManagerProps {
   teamId: string;
@@ -160,40 +161,66 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                 const memberLastName = member.displayLastName || member.user?.lastName || '';
                 const memberJerseyNumber = member.jerseyNumber;
                 const isCaptain = member.isCaptain;
+                const isPlaceholder = member.isPlaceholder;
                 const profileImageUrl = member.user?.profileImageUrl;
                 const playerId = member.user?.id || member.userId;
+
+                const nameContent = (
+                  <div className="flex items-center gap-2 min-w-0">
+                    {memberJerseyNumber && (
+                      <span className="text-xs font-bold text-muted-foreground shrink-0">
+                        #{memberJerseyNumber}
+                      </span>
+                    )}
+                    <span className="text-sm font-medium truncate">
+                      {memberLastName}{memberFirstName ? `, ${memberFirstName.charAt(0)}.` : ''}
+                    </span>
+                    {isCaptain && (
+                      <span className="text-warning font-bold text-xs shrink-0">C</span>
+                    )}
+                  </div>
+                );
 
                 return (
                   <div
                     key={member.id || playerId}
-                    className="flex items-center pr-4 rounded-full hover:bg-muted/50 transition-colors bg-card hairline elev-rest overflow-hidden"
+                    className="flex items-center pr-2 rounded-full hover:bg-muted/50 transition-colors bg-card hairline elev-rest overflow-hidden"
                     data-testid={`roster-player-${playerId}`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <ClickableAvatar
-                        userId={playerId}
+                        userId={isPlaceholder ? undefined : playerId}
                         profileImageUrl={profileImageUrl}
                         firstName={memberFirstName}
                         lastName={memberLastName}
                         size="xs"
-                        className="!h-[45px] !w-[45px]"
+                        className="!h-[45px] !w-[45px] shrink-0"
                       />
-                      <Link
-                        href={`/user/${playerId}`}
-                        className="flex items-center gap-2 min-w-0 cursor-pointer"
-                      >
-                        {memberJerseyNumber && (
-                          <span className="text-xs font-bold text-muted-foreground shrink-0">
-                            #{memberJerseyNumber}
-                          </span>
-                        )}
-                        <span className="text-sm font-medium truncate">
-                          {memberLastName}{memberFirstName ? `, ${memberFirstName.charAt(0)}.` : ''}
-                        </span>
-                        {isCaptain && (
-                          <span className="text-warning font-bold text-xs shrink-0">C</span>
-                        )}
-                      </Link>
+                      {isPlaceholder ? (
+                        <div className="flex items-center gap-1 min-w-0 flex-1">
+                          {nameContent}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center gap-0.5 shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 px-1.5 py-0.5 text-[10px] font-semibold leading-none cursor-help select-none">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  Pending
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[200px] text-center text-xs">
+                                This spot is reserved but the player hasn't created an account yet.
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      ) : (
+                        <Link
+                          href={`/user/${playerId}`}
+                          className="flex items-center gap-2 min-w-0 cursor-pointer"
+                        >
+                          {nameContent}
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );
