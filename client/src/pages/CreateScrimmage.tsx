@@ -1100,7 +1100,7 @@ export default function CreateScrimmage() {
             )}
 
             {/* Reminder Settings */}
-            <div className="space-y-1 p-4 bg-muted/30 rounded-lg hairline elev-rest">
+            <div className="space-y-1 p-4 bg-muted/30 rounded-lg hairline elev-rest pt-[4px] pb-[4px]">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="enableReminders" className="text-base">Push Notifications</Label>
