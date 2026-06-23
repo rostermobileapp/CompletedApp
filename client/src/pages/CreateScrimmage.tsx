@@ -581,7 +581,7 @@ export default function CreateScrimmage() {
     <div className="min-h-screen flex flex-col pb-[100px]" data-testid="create-scrimmage-page">
       {/* Header */}
       <div className="p-6 pl-[8px] pr-[8px] mt-[0px] mb-[0px] pt-[8px] pb-[0px]">
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-1\.5">
           <button 
             onClick={() => {
               setPageTransitionDirection('down');
@@ -599,15 +599,15 @@ export default function CreateScrimmage() {
         </div>
       </div>
       {/* Form */}
-      <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
+      <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-1\.5">
         {/* Scrimmage Details */}
         <div className="rounded-xl hairline elev-rest p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
             <Calendar className="w-5 h-5" />
             Scrimmage Details
           </h3>
           
-          <div className="space-y-4">
+          <div className="space-y-1">
             <div>
               <Label htmlFor="title">Title</Label>
               <Input
@@ -635,7 +635,7 @@ export default function CreateScrimmage() {
             {/* Calendar Color Picker */}
             <div>
               <Label>Calendar Color</Label>
-              <p className="text-xs text-muted-foreground mb-2">Choose a color to identify this scrimmage on the calendar</p>
+              <p className="text-xs text-muted-foreground mb-1">Choose a color to identify this scrimmage on the calendar</p>
               <div className="flex gap-2 flex-wrap">
                 {SCRIMMAGE_COLORS.map((color) => (
                   <button
@@ -700,7 +700,7 @@ export default function CreateScrimmage() {
                           root: "text-black dark:text-white text-sm",
                           day: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 text-sm w-8 h-8 flex items-center justify-center cursor-pointer rounded",
                           nav_button: "text-black dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-700 w-7 h-7 flex items-center justify-center rounded",
-                          caption: "text-black dark:text-white font-medium text-sm mb-2",
+                          caption: "text-black dark:text-white font-medium text-sm mb-1",
                           head_cell: "text-black dark:text-white font-medium text-xs p-1",
                           table: "w-full border-collapse",
                           cell: "text-center p-0.5",
@@ -738,7 +738,7 @@ export default function CreateScrimmage() {
                       <div className="p-4">
                         <div className="flex items-start justify-center gap-3">
                           <div className="flex flex-col items-center">
-                            <div className="text-sm font-semibold mb-2 text-foreground">Hour</div>
+                            <div className="text-sm font-semibold mb-1 text-foreground">Hour</div>
                             <div className="h-32 w-12 overflow-y-auto hairline elev-rest rounded-lg bg-card">
                               {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => {
                                 const currentTime = form.watch('time') || '12:00';
@@ -777,9 +777,9 @@ export default function CreateScrimmage() {
                               })}
                             </div>
                           </div>
-                          <div className="flex items-center text-xl font-bold text-muted-foreground mt-8">:</div>
+                          <div className="flex items-center text-xl font-bold text-muted-foreground mt-1">:</div>
                           <div className="flex flex-col items-center">
-                            <div className="text-sm font-semibold mb-2 text-foreground">Min</div>
+                            <div className="text-sm font-semibold mb-1 text-foreground">Min</div>
                             <div className="h-32 w-12 overflow-y-auto hairline elev-rest rounded-lg bg-card">
                               {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => {
                                 const currentTime = form.watch('time') || '12:00';
@@ -806,7 +806,7 @@ export default function CreateScrimmage() {
                             </div>
                           </div>
                           <div className="flex flex-col items-center">
-                            <div className="text-sm font-semibold mb-2 text-foreground">Period</div>
+                            <div className="text-sm font-semibold mb-1 text-foreground">Period</div>
                             <div className="flex flex-col gap-2">
                               {['AM', 'PM'].map((period) => {
                                 const currentTime = form.watch('time') || '12:00';
@@ -849,7 +849,7 @@ export default function CreateScrimmage() {
                         <button
                           type="button"
                           onClick={() => setShowTimePicker(false)}
-                          className="w-full mt-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary"
+                          className="w-full mt-1 py-1 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary"
                         >
                           Done
                         </button>
@@ -864,7 +864,7 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Recurring Event Settings */}
-            <div className="space-y-4 p-4 bg-muted/30 rounded-lg hairline elev-rest">
+            <div className="space-y-1 p-4 bg-muted/30 rounded-lg hairline elev-rest">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="isRecurring" className="text-base">Make this recurring</Label>
@@ -883,14 +883,14 @@ export default function CreateScrimmage() {
               </div>
 
               {form.watch('isRecurring') && (
-                <div className="space-y-4 pt-2">
+                <div className="space-y-1 pt-1">
                   {/* Recurrence Type */}
                   <div>
                     <Label>Repeat</Label>
                     <RadioGroup
                       value={form.watch('recurrenceType')}
                       onValueChange={(value: any) => form.setValue('recurrenceType', value)}
-                      className="flex gap-4 mt-2"
+                      className="flex gap-4 mt-1"
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="daily" id="daily" data-testid="radio-daily" />
@@ -911,7 +911,7 @@ export default function CreateScrimmage() {
                   {form.watch('recurrenceType') === 'weekly' && (
                     <div>
                       <Label>Repeat on</Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-1">
                         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
                           <div key={day + index} className="flex items-center space-x-2">
                             <Checkbox
@@ -940,7 +940,7 @@ export default function CreateScrimmage() {
                     <RadioGroup
                       value={form.watch('recurrenceEndType')}
                       onValueChange={(value: any) => form.setValue('recurrenceEndType', value)}
-                      className="space-y-2 mt-2"
+                      className="space-y-1 mt-1"
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="never" id="endNever" data-testid="radio-end-never" />
@@ -984,7 +984,7 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Send Invite Now Option */}
-            <div className="space-y-4 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+            <div className="space-y-1 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="sendInviteNow" className="text-base">Send Invite Now</Label>
@@ -1003,7 +1003,7 @@ export default function CreateScrimmage() {
 
             {/* Invitation Scheduling for Recurring Scrimmages */}
             {form.watch('isRecurring') && (
-              <div className="space-y-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+              <div className="space-y-1 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="enableInviteScheduling" className="text-base">Schedule Future Invitations</Label>
@@ -1020,9 +1020,9 @@ export default function CreateScrimmage() {
                 </div>
 
                 {form.watch('enableInviteScheduling') && (
-                  <div className="space-y-4 pt-2">
+                  <div className="space-y-1 pt-1">
                     <div className="bg-muted/50 rounded-md p-3">
-                      <p className="text-sm text-foreground font-medium mb-2">How it works:</p>
+                      <p className="text-sm text-foreground font-medium mb-1">How it works:</p>
                       <p className="text-xs text-muted-foreground">
                         For each recurring scrimmage, a separate invitation will be sent to all league members at your scheduled time. 
                         For example, if you have a Friday scrimmage and set invites to go out 5 days before at 9:00 AM, 
@@ -1033,7 +1033,7 @@ export default function CreateScrimmage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="inviteDaysBefore" className="text-sm font-medium">Send invites</Label>
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-1">
                           <Input
                             id="inviteDaysBefore"
                             type="number"
@@ -1052,7 +1052,7 @@ export default function CreateScrimmage() {
                           id="inviteTimeOfDay"
                           type="time"
                           {...form.register('inviteTimeOfDay')}
-                          className="mt-2"
+                          className="mt-1"
                           data-testid="input-invite-time"
                         />
                       </div>
@@ -1063,7 +1063,7 @@ export default function CreateScrimmage() {
             )}
 
             {/* Reminder Settings */}
-            <div className="space-y-4 p-4 bg-muted/30 rounded-lg hairline elev-rest">
+            <div className="space-y-1 p-4 bg-muted/30 rounded-lg hairline elev-rest">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="enableReminders" className="text-base">Push Notifications</Label>
@@ -1078,7 +1078,7 @@ export default function CreateScrimmage() {
               </div>
 
               {form.watch('enableReminders') && (
-                <div className="pt-2">
+                <div className="pt-1">
                   <p className="text-sm text-muted-foreground">
                     Reminders will be sent 2 days before (at 6PM) and 2 hours before the scrimmage.
                   </p>
@@ -1090,12 +1090,12 @@ export default function CreateScrimmage() {
 
         {/* Rink Information */}
         <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[8px] mb-[8px]">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
             Rink Information
           </h3>
           
-          <div className="space-y-4">
+          <div className="space-y-1">
             <div>
               <Label htmlFor="venue">Rink</Label>
               <RinkPickerField
@@ -1143,16 +1143,16 @@ export default function CreateScrimmage() {
               </p>
             </div>
 
-            <div className="pt-2">
-              <p className="text-sm text-muted-foreground mb-3 font-bold">
+            <div className="pt-1">
+              <p className="text-sm text-muted-foreground mb-1\.5 font-bold">
                 By default, players will pay you using the Venmo and Cash App handles
                 on your profile. Use these optional overrides to send payments for this
                 scrimmage somewhere else (for example, a team treasurer).
               </p>
 
-              <div className="space-y-3">
+              <div className="space-y-1\.5">
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-1">
                     <Checkbox
                       id="toggleVenmo"
                       checked={showVenmoOverride}
@@ -1186,7 +1186,7 @@ export default function CreateScrimmage() {
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-1">
                     <Checkbox
                       id="toggleCashApp"
                       checked={showCashAppOverride}
@@ -1226,11 +1226,11 @@ export default function CreateScrimmage() {
         {/* Co-Host Selection - Only show if user has leagues */}
         {selectedLeague && (
           <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
-            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
               <Crown className="w-5 h-5" />
               Add Co-Hosts (Optional)
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-1">
               Co-hosts can help manage this scrimmage - approve players, send reminders, and collect payments
             </p>
 
@@ -1239,14 +1239,14 @@ export default function CreateScrimmage() {
                 <div className="w-full h-10 bg-muted rounded"></div>
               </div>
             ) : (leagueMembers as any[]).filter((m: any) => m.user.id !== (user as any)?.id).length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground">
+              <div className="text-center py-1 text-muted-foreground">
                 No other league members available to add as co-hosts
               </div>
             ) : (
               <>
                 {/* Selected co-hosts badges */}
                 {selectedCoHostIds.length > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-2">
+                  <div className="mb-1 flex flex-wrap gap-2">
                     {selectedCoHostIds.map(coHostId => {
                       const member = (leagueMembers as any[]).find((m: any) => m.user.id === coHostId);
                       if (!member) return null;
@@ -1347,18 +1347,18 @@ export default function CreateScrimmage() {
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (
           <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] mt-[8px] mb-[8px] pl-[8px] pr-[8px]">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Invite Members
             </h3>
 
           {/* Invite Group Selector - Always shown at top */}
-          <div className="mb-6 p-4 bg-muted/30 rounded-lg hairline elev-rest">
-            <Label htmlFor="invite-group" className="text-base font-semibold mb-2 block">
+          <div className="mb-1\.5 p-4 bg-muted/30 rounded-lg hairline elev-rest">
+            <Label htmlFor="invite-group" className="text-base font-semibold mb-1 block">
               Quick Load from Saved Group
             </Label>
             {(inviteGroups as any[]).length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div className="flex gap-2">
                   <Select
                     value={selectedInviteGroupId}
@@ -1430,7 +1430,7 @@ export default function CreateScrimmage() {
           </div>
 
           {/* Total selected count + clear all */}
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-1\.5 flex items-center justify-between">
             <p className="text-sm text-muted-foreground" data-testid="text-selected-count">
               {selectedMemberIds.length} member{selectedMemberIds.length !== 1 ? 's' : ''} selected
             </p>
@@ -1440,10 +1440,10 @@ export default function CreateScrimmage() {
           </div>
 
           {/* Goalies subsection */}
-          <div className="mb-5">
+          <div className="mb-1\.5">
             <button
               type="button"
-              className="w-full flex items-center gap-2 mb-2 text-left"
+              className="w-full flex items-center gap-2 mb-1 text-left"
               onClick={() => setGoaliesSectionOpen(o => !o)}
               data-testid="toggle-goalies-section"
             >
@@ -1455,7 +1455,7 @@ export default function CreateScrimmage() {
             </button>
             {goaliesSectionOpen && (
               <>
-                <div className="mb-2">
+                <div className="mb-1">
                   <Input
                     placeholder="Search goalies..."
                     value={goalieSearchTerm}
@@ -1463,7 +1463,7 @@ export default function CreateScrimmage() {
                     data-testid="input-search-goalies"
                   />
                 </div>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-1 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     {filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredGoalies.length} selected
                   </p>
@@ -1474,7 +1474,7 @@ export default function CreateScrimmage() {
                 </div>
                 <ScrollArea className="h-48">
                   {membersLoading ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {[...Array(3)].map((_, i) => (
                         <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
                           <div className="w-8 h-8 bg-muted rounded-full" />
@@ -1483,7 +1483,7 @@ export default function CreateScrimmage() {
                       ))}
                     </div>
                   ) : filteredGoalies.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground text-sm">
+                    <div className="text-center py-1\.5 text-muted-foreground text-sm">
                       {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
                     </div>
                   ) : (
@@ -1506,10 +1506,10 @@ export default function CreateScrimmage() {
           </div>
 
           {/* Skaters subsection */}
-          <div className="mb-5">
+          <div className="mb-1\.5">
             <button
               type="button"
-              className="w-full flex items-center gap-2 mb-2 text-left"
+              className="w-full flex items-center gap-2 mb-1 text-left"
               onClick={() => setSkatersSectionOpen(o => !o)}
               data-testid="toggle-skaters-section"
             >
@@ -1521,7 +1521,7 @@ export default function CreateScrimmage() {
             </button>
             {skatersSectionOpen && (
               <>
-                <div className="mb-2">
+                <div className="mb-1">
                   <Input
                     placeholder="Search skaters..."
                     value={skaterSearchTerm}
@@ -1529,7 +1529,7 @@ export default function CreateScrimmage() {
                     data-testid="input-search-skaters"
                   />
                 </div>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-1 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     {filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredSkaters.length} selected
                   </p>
@@ -1540,7 +1540,7 @@ export default function CreateScrimmage() {
                 </div>
                 <ScrollArea className="h-48">
                   {membersLoading ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {[...Array(3)].map((_, i) => (
                         <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
                           <div className="w-8 h-8 bg-muted rounded-full" />
@@ -1549,7 +1549,7 @@ export default function CreateScrimmage() {
                       ))}
                     </div>
                   ) : filteredSkaters.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground text-sm">
+                    <div className="text-center py-1\.5 text-muted-foreground text-sm">
                       {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
                     </div>
                   ) : (
@@ -1572,17 +1572,17 @@ export default function CreateScrimmage() {
           </div>
 
           {/* Email Invites Section */}
-          <div className="mt-6 border-t border-border pt-6">
-            <Label className="text-base mb-3 block">
+          <div className="mt-1\.5 border-t border-border pt-1\.5">
+            <Label className="text-base mb-1\.5 block">
               <Mail className="inline-block w-4 h-4 mr-2" />
               Invite by Email
             </Label>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-1">
               Invite users who aren't in the league yet
             </p>
 
             {/* Email Search */}
-            <div className="mb-4">
+            <div className="mb-1">
               <Label htmlFor="email-search" className="text-sm">Search by email</Label>
               <Input
                 id="email-search"
@@ -1590,13 +1590,13 @@ export default function CreateScrimmage() {
                 placeholder="Search existing users..."
                 value={emailSearchTerm}
                 onChange={(e) => setEmailSearchTerm(e.target.value)}
-                className="mt-2"
+                className="mt-1"
                 data-testid="input-search-email"
               />
               
               {/* Email Search Results */}
               {emailSearchTerm.length > 2 && (
-                <div className="mt-2 border border-border rounded-md max-h-32 overflow-y-auto">
+                <div className="mt-1 border border-border rounded-md max-h-32 overflow-y-auto">
                   {emailSearchLoading ? (
                     <div className="p-3 text-sm text-muted-foreground">Searching...</div>
                   ) : (emailSearchResults as any[]).length > 0 ? (
@@ -1631,9 +1631,9 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Manual Email Input */}
-            <div className="mb-4">
+            <div className="mb-1">
               <Label htmlFor="manual-email" className="text-sm">Or enter email manually</Label>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-1">
                 <Input
                   id="manual-email"
                   type="email"
@@ -1663,7 +1663,7 @@ export default function CreateScrimmage() {
             {/* Selected Emails Display */}
             {selectedEmails.length > 0 && (
               <div>
-                <Label className="text-sm mb-2 block">Email Invites ({selectedEmails.length})</Label>
+                <Label className="text-sm mb-1 block">Email Invites ({selectedEmails.length})</Label>
                 <div className="flex flex-wrap gap-2">
                   {selectedEmails.map((email) => (
                     <Badge
@@ -1690,17 +1690,17 @@ export default function CreateScrimmage() {
           </div>
 
             {selectedMemberIds.length === 0 && selectedEmails.length === 0 && (
-              <p className="text-sm text-destructive mt-4">Please select at least one member or add an email invite</p>
+              <p className="text-sm text-destructive mt-1">Please select at least one member or add an email invite</p>
             )}
           </div>
         ) : (
           <div className="bg-card rounded-xl hairline elev-rest p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
               <Users className="w-5 h-5" />
               League Required
             </h3>
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="mb-4">You need to join a league before you can schedule scrimmages.</p>
+            <div className="text-center py-1 text-muted-foreground">
+              <p className="mb-1">You need to join a league before you can schedule scrimmages.</p>
               <Button
                 type="button"
                 variant="outline"
