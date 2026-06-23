@@ -14524,7 +14524,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dateTime: dates[0],
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
         });
-        
+
+        // Auto-approve creator as a participant on the first occurrence
+        try {
+          await storage.createScrimmageRequest({
+            scrimmageId: parentScrimmage.id,
+            playerId: userId,
+            status: 'approved',
+            approvedAt: new Date(),
+          });
+        } catch (autoApproveError) {
+          console.error('[Scrimmage] Failed to auto-approve creator on parent scrimmage:', autoApproveError);
+        }
         
         // Add co-hosts if provided
         if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
@@ -14596,6 +14607,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
           });
+
+          // Auto-approve creator on each recurring child
+          try {
+            await storage.createScrimmageRequest({
+              scrimmageId: childScrimmage.id,
+              playerId: userId,
+              status: 'approved',
+              approvedAt: new Date(),
+            });
+          } catch (autoApproveChildError) {
+            console.error('[Scrimmage] Failed to auto-approve creator on child scrimmage:', autoApproveChildError);
+          }
           
           // Add co-hosts to child scrimmage as well
           if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
@@ -14729,7 +14752,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           announcementId,
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
         });
-        
+
+        // Auto-approve creator as a participant so they appear in the roster
+        try {
+          await storage.createScrimmageRequest({
+            scrimmageId: scrimmage.id,
+            playerId: userId,
+            status: 'approved',
+            approvedAt: new Date(),
+          });
+        } catch (autoApproveError) {
+          console.error('[Scrimmage] Failed to auto-approve creator as participant:', autoApproveError);
+        }
         
         // Add co-hosts if provided
         if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
