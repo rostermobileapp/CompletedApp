@@ -453,7 +453,7 @@ export default function CreateTeam() {
                     disabled={addManualPlayerMutation.isPending}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mt-[4px]">
                   <div>
                     <Label htmlFor="jerseyNumber">Jersey Number</Label>
                     <Input
