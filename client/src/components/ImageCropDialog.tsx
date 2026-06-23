@@ -48,17 +48,20 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 // Draws the crop to a canvas by replicating the Cropper's visual geometry directly.
-// This is equivalent to the computeCroppedArea math but expressed as a geometry
-// problem: given where the image is rendered and where the crop circle is, what
-// source rectangle do we sample from the original image?
 //
 //   image transform: translate(cropX, cropY) scale(zoom)
 //   image CSS size at zoom=1: mediaSize (width × height)
-//   container size: cw × ch  (the Cropper's container = our wrapper div)
-//   crop circle: centred in container, size cropW × cropH
+//   container size: containerWidth × containerHeight
+//   crop frame: centred in container, size cropW × cropH
 //
-// After the transform the image centre is at (cw/2 + cropX, ch/2 + cropY).
-// The image occupies (mw*zoom) × (mh*zoom) display pixels.
+// The image centre in display-px is (containerW/2 + cropX, containerH/2 + cropY).
+// The rendered image occupies (mw*zoom) × (mh*zoom) display pixels.
+//
+// When zoom < 1 (fit-mode for non-square images) the image may not fully cover the
+// crop frame.  In that case we compute the intersection of the image rect and the crop
+// frame rect, map it to the correct source rect in natural px and the correct destination
+// rect in the output canvas.  This leaves the non-overlapping parts of the output as
+// whatever was already drawn (white/transparent background).
 function drawCrop(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -75,33 +78,47 @@ function drawCrop(
 ): void {
   const { width: mw, height: mh, naturalWidth: nw, naturalHeight: nh } = mediaSize;
 
-  // Centre of image in display-px (after the Cropper's translate+scale transform)
-  const imgCx = containerWidth / 2 + cropX;
-  const imgCy = containerHeight / 2 + cropY;
+  // Rendered image size in display-px
+  const imgW = mw * zoom;
+  const imgH = mh * zoom;
 
-  // Top-left corner of the rendered image in display-px
-  const imgLeft = imgCx - (mw * zoom) / 2;
-  const imgTop  = imgCy - (mh * zoom) / 2;
+  // Image bounds in display-px
+  const imgCx   = containerWidth  / 2 + cropX;
+  const imgCy   = containerHeight / 2 + cropY;
+  const imgLeft  = imgCx - imgW / 2;
+  const imgTop   = imgCy - imgH / 2;
+  const imgRight  = imgLeft + imgW;
+  const imgBottom = imgTop  + imgH;
 
-  // Top-left corner of the crop circle in display-px
-  const cropLeft = containerWidth  / 2 - cropWidth  / 2;
-  const cropTop  = containerHeight / 2 - cropHeight / 2;
+  // Crop frame bounds in display-px
+  const cropLeft   = containerWidth  / 2 - cropWidth  / 2;
+  const cropTop    = containerHeight / 2 - cropHeight / 2;
+  const cropRight  = cropLeft + cropWidth;
+  const cropBottom = cropTop  + cropHeight;
 
-  // Position of the crop box relative to the rendered image, in display-px
-  const relX = cropLeft - imgLeft;
-  const relY = cropTop  - imgTop;
+  // Intersection of image rect and crop frame rect in display-px
+  const intLeft   = Math.max(cropLeft,   imgLeft);
+  const intTop    = Math.max(cropTop,    imgTop);
+  const intRight  = Math.min(cropRight,  imgRight);
+  const intBottom = Math.min(cropBottom, imgBottom);
+  const intW = Math.max(0, intRight  - intLeft);
+  const intH = Math.max(0, intBottom - intTop);
 
-  // Scale from display-px to natural image-px
-  const scaleX = nw / (mw * zoom);
-  const scaleY = nh / (mh * zoom);
+  if (intW <= 0 || intH <= 0) return; // image entirely outside crop frame — nothing to draw
 
-  // Source rectangle in natural image-px
-  const srcX = Math.max(0, relX * scaleX);
-  const srcY = Math.max(0, relY * scaleY);
-  const srcW = Math.min(cropWidth  * scaleX, nw - srcX);
-  const srcH = Math.min(cropHeight * scaleY, nh - srcY);
+  // Destination rect in output canvas: intersection position relative to crop frame, scaled to output.
+  const dstX = (intLeft - cropLeft) / cropWidth  * outputW;
+  const dstY = (intTop  - cropTop)  / cropHeight * outputH;
+  const dstW = intW / cropWidth  * outputW;
+  const dstH = intH / cropHeight * outputH;
 
-  ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outputW, outputH);
+  // Source rect in natural image pixels: intersection position relative to image, scaled to natural dims.
+  const srcX = (intLeft - imgLeft) / imgW * nw;
+  const srcY = (intTop  - imgTop)  / imgH * nh;
+  const srcW = intW / imgW * nw;
+  const srcH = intH / imgH * nh;
+
+  ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
 }
 
 export function ImageCropDialog({
@@ -382,7 +399,7 @@ export function ImageCropDialog({
                 showGrid={false}
                 minZoom={minZoom}
                 maxZoom={4}
-                restrictPosition={false}
+                restrictPosition={minZoom >= 1}
                 onCropChange={handleCropChange}
                 onZoomChange={handleZoomChange}
                 setMediaSize={handleSetMediaSize}
