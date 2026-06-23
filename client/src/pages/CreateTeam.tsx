@@ -416,8 +416,8 @@ export default function CreateTeam() {
               </CardDescription>
             </CardHeader>
             <CardContent className="!pl-[4px] !pr-[4px] !pb-[4px]">
-              <form onSubmit={handleAddManualPlayer} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleAddManualPlayer} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor="firstName">First Name *</Label>
                     <Input
@@ -441,7 +441,7 @@ export default function CreateTeam() {
                     />
                   </div>
                 </div>
-                <div className="mt-[4px]">
+                <div>
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -453,7 +453,7 @@ export default function CreateTeam() {
                     disabled={addManualPlayerMutation.isPending}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4 mt-[4px]">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label htmlFor="jerseyNumber">Jersey Number</Label>
                     <Input
