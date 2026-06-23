@@ -115,13 +115,31 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
           toast({ title: 'Error', description: 'CSV file is empty.', variant: 'destructive' });
           return;
         }
-        const normalized = (results.data as any[]).map((row: any) => ({
-          firstName: row.firstName ?? row['First Name'] ?? row.first_name ?? row['firstname'] ?? '',
-          lastName:  row.lastName  ?? row['Last Name']  ?? row.last_name  ?? row['lastname']  ?? '',
-          email:     row.email     ?? row.Email         ?? row.EMAIL       ?? '',
-          jerseyNumber: row.jerseyNumber ?? row['Jersey Number'] ?? row.jersey_number ?? row['Jersey #'] ?? '',
-          position:  row.position  ?? row.Position      ?? '',
-        }));
+        console.log('[CSV Import] Raw headers:', Object.keys(results.data[0] || {}));
+        console.log('[CSV Import] First raw row:', JSON.stringify(results.data[0]));
+        const normalized = (results.data as any[]).map((row: any) => {
+          const keys = Object.keys(row);
+          // Helper: find a value by trying multiple key variants (including PapaParse _1 renamed duplicates)
+          const pick = (...candidates: string[]) => {
+            for (const k of candidates) {
+              if (row[k] !== undefined && row[k] !== null && row[k] !== '') return row[k];
+            }
+            return '';
+          };
+          return {
+            firstName: pick('firstName', 'First Name', 'first_name', 'firstname', 'FirstName',
+              ...keys.filter(k => k.toLowerCase().startsWith('firstname') || k.toLowerCase().startsWith('first name'))),
+            lastName:  pick('lastName', 'Last Name', 'last_name', 'lastname', 'LastName',
+              ...keys.filter(k => k.toLowerCase().startsWith('lastname') || k.toLowerCase().startsWith('last name'))),
+            email:     pick('email', 'Email', 'EMAIL',
+              ...keys.filter(k => k.toLowerCase().startsWith('email'))),
+            jerseyNumber: pick('jerseyNumber', 'Jersey Number', 'jersey_number', 'Jersey #', 'JerseyNumber',
+              ...keys.filter(k => k.toLowerCase().startsWith('jersey'))),
+            position:  pick('position', 'Position', 'POSITION',
+              ...keys.filter(k => k.toLowerCase().startsWith('position'))),
+          };
+        });
+        console.log('[CSV Import] First normalized row:', JSON.stringify(normalized[0]));
         importPlayersMutation.mutate(normalized);
       },
       error: (error) => {
