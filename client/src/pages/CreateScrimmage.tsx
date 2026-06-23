@@ -1144,7 +1144,7 @@ export default function CreateScrimmage() {
             </div>
 
             <div className="pt-2">
-              <p className="text-sm text-muted-foreground mb-3">
+              <p className="text-sm text-muted-foreground mb-3 font-bold">
                 By default, players will pay you using the Venmo and Cash App handles
                 on your profile. Use these optional overrides to send payments for this
                 scrimmage somewhere else (for example, a team treasurer).
