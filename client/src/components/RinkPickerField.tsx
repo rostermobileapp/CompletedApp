@@ -208,7 +208,7 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
 
   if (mode === 'selected' && selected) {
     return (
-      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 pt-[4px] pb-[4px]">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
             <Check className="w-4 h-4 text-primary" />
