@@ -491,7 +491,7 @@ export default function CreateTeam() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="pl-[4px] pr-[4px] pt-[8px] pb-[4px] justify-center items-center">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Import Players (CSV)
