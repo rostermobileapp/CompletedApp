@@ -90,6 +90,7 @@ export default function CreateScrimmage() {
   const [coHostSearchResults, setCoHostSearchResults] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
   const [coHostSearchLoading, setCoHostSearchLoading] = useState(false);
   const coHostDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedRinkFacilityId, setSelectedRinkFacilityId] = useState<string | null>(null);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
   const [formInitialized, setFormInitialized] = useState(false);
   
@@ -339,10 +340,11 @@ export default function CreateScrimmage() {
     setCoHostSearchLoading(true);
     coHostDebounceRef.current = setTimeout(async () => {
       try {
-        const facilityId = leagueFacility?.id;
+        const facilityId = selectedRinkFacilityId || leagueFacility?.id;
         const params = new URLSearchParams({ q: coHostSearchTerm.trim() });
         if (facilityId) params.set('facilityId', facilityId);
-        const res = await fetch(`/api/users/search-all?${params}`, { headers: getAuthHeaders() });
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/users/search-all?${params}`, { headers });
         if (res.ok) {
           const data = await res.json();
           setCoHostSearchResults(data);
@@ -354,7 +356,7 @@ export default function CreateScrimmage() {
       }
     }, 350);
     return () => { if (coHostDebounceRef.current) clearTimeout(coHostDebounceRef.current); };
-  }, [coHostSearchTerm, leagueFacility?.id]);
+  }, [coHostSearchTerm, selectedRinkFacilityId, leagueFacility?.id]);
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
@@ -1134,7 +1136,10 @@ export default function CreateScrimmage() {
             <div>
               <Label htmlFor="venue">Rink</Label>
               <RinkPickerField
-                onSelect={(rink) => form.setValue('venue', rink ? rink.name : '')}
+                onSelect={(rink) => {
+                  form.setValue('venue', rink ? rink.name : '');
+                  setSelectedRinkFacilityId(rink ? rink.facilityId : null);
+                }}
                 initialSelection={
                   leagueFacility
                     ? { facilityId: leagueFacility.id, name: leagueFacility.name, address: leagueFacility.address || '' }
