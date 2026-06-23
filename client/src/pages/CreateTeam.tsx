@@ -441,7 +441,7 @@ export default function CreateTeam() {
                     />
                   </div>
                 </div>
-                <div>
+                <div className="mt-[4px]">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
