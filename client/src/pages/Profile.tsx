@@ -499,16 +499,6 @@ export default function Profile() {
                     {tierDisplay.label}
                   </span>
                   
-                  {/* Career Stats */}
-                  {userStats && (
-                    <span className="text-xs px-3 py-1 rounded-full font-semibold text-[#212121] dark:text-[#ffffff] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="stat-career">
-                      <span data-testid="stat-goals">{userStats.goals} G</span>
-                      <span className="mx-1">•</span>
-                      <span data-testid="stat-assists">{userStats.assists} A</span>
-                      <span className="mx-1">•</span>
-                      <span data-testid="stat-points">{userStats.points} P</span>
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
