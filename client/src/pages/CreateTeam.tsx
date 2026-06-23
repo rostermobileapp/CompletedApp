@@ -502,18 +502,20 @@ export default function CreateTeam() {
             </CardHeader>
             <CardContent className="space-y-4 pl-[4px] pr-[4px] pb-[4px]">
               <div className="bg-muted p-4 rounded-md">
-                <p className="text-sm font-medium mb-2">CSV Template Format:</p>
-                <p className="text-sm text-muted-foreground mb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">CSV Template Format:</p>
+                  <a
+                    href="/player-import-template.csv"
+                    download="player-import-template.csv"
+                    className="text-sm text-primary hover:underline font-bold"
+                    data-testid="link-download-template"
+                  >
+                    Download CSV Template
+                  </a>
+                </div>
+                <p className="text-sm text-muted-foreground">
                   firstName, lastName, email, jerseyNumber, position
                 </p>
-                <a
-                  href="/player-import-template.csv"
-                  download="player-import-template.csv"
-                  className="text-sm text-primary hover:underline"
-                  data-testid="link-download-template"
-                >
-                  Download CSV Template
-                </a>
               </div>
 
               <div className="space-y-3">
