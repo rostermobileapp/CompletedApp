@@ -380,8 +380,8 @@ export default function CreateTeam() {
           <Card className="border-green-500/50 bg-green-500/10">
             <CardContent className="space-y-4 pl-[12px] pr-[12px] pb-[12px]">
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Team ID (Share this with players)</p>
                 <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground whitespace-nowrap">Team ID</p>
                   <code className="text-3xl font-mono font-bold tracking-wider bg-muted px-4 py-2 rounded-md" data-testid="text-team-id">
                     {createdTeam.uniqueTeamId}
                   </code>
