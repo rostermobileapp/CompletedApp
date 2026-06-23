@@ -269,7 +269,7 @@ export default function CreateTeam() {
         <>
           {/* Independent Team Info Card */}
           <Card className="mb-6 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
-            <CardContent className="p-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
+            <CardContent className="!pl-[4px] !pr-[4px] !pt-[4px] !pb-[4px]">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
                   <Users className="w-5 h-5 text-white" />
@@ -287,13 +287,13 @@ export default function CreateTeam() {
           </Card>
 
           <Card>
-            <CardHeader className="pl-[20px] pr-[20px] pt-[8px] pb-[8px]">
+            <CardHeader className="!pl-[20px] !pr-[20px] !pt-[8px] !pb-[8px]">
               <CardTitle>Team Details</CardTitle>
               <CardDescription>
                 Create a team independent of any league. You can invite players and request to join a league later.
               </CardDescription>
             </CardHeader>
-            <CardContent className="pb-[8px] pl-[12px] pr-[12px] text-left">
+            <CardContent className="!pb-[8px] !pl-[12px] !pr-[12px] text-left">
               <form id="create-team-form" onSubmit={handleCreateTeam} className="space-y-4">
               <div>
                 <label htmlFor="teamName" className="block text-sm font-medium mb-2">
@@ -378,7 +378,7 @@ export default function CreateTeam() {
       ) : (
         <div className="space-y-6">
           <Card className="border-green-500/50 bg-green-500/10">
-            <CardContent className="space-y-4 pl-[12px] pr-[12px] pb-[12px]">
+            <CardContent className="space-y-4 !pl-[12px] !pr-[12px] !pb-[12px]">
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-muted-foreground whitespace-nowrap">Team ID</p>
@@ -406,7 +406,7 @@ export default function CreateTeam() {
           </Card>
 
           <Card>
-            <CardHeader className="mt-[0px] mb-[0px] pt-[8px] pb-[4px]">
+            <CardHeader className="!pt-[8px] !pb-[4px]">
               <CardTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
                 Add Players Manually
@@ -415,7 +415,7 @@ export default function CreateTeam() {
                 Add players one at a time by entering their details
               </CardDescription>
             </CardHeader>
-            <CardContent className="pl-[4px] pr-[4px] pb-[4px]">
+            <CardContent className="!pl-[4px] !pr-[4px] !pb-[4px]">
               <form onSubmit={handleAddManualPlayer} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -491,7 +491,7 @@ export default function CreateTeam() {
           </Card>
 
           <Card>
-            <CardHeader className="pl-[4px] pr-[4px] pt-[8px] pb-[4px] justify-center items-center">
+            <CardHeader className="!pl-[4px] !pr-[4px] !pt-[8px] !pb-[4px] justify-center items-center">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Import Players (CSV)
@@ -500,7 +500,7 @@ export default function CreateTeam() {
                 Upload a CSV file to bulk import players to your team
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 pl-[4px] pr-[4px] pb-[4px]">
+            <CardContent className="space-y-4 !pl-[4px] !pr-[4px] !pb-[4px]">
               <div className="bg-muted p-4 rounded-md">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium">CSV Template Format:</p>
