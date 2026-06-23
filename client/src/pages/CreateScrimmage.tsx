@@ -1021,7 +1021,7 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Send Invite Now Option */}
-            <div className="space-y-1 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+            <div className="space-y-1 p-4 bg-green-500/10 rounded-lg border border-green-500/30 pt-[4px] pb-[4px]">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="sendInviteNow" className="text-base">Send Invite Now</Label>
