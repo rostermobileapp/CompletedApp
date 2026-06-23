@@ -3099,8 +3099,19 @@ export class DatabaseStorage implements IStorage {
           createdMemberships.push(membership);
           successCount++;
         } else {
-          // User doesn't exist - skip for now (could create placeholder in future)
-          failedCount++;
+          // User doesn't exist — create a placeholder player so the roster
+          // isn't empty. They can claim it later when they sign up.
+          await db
+            .insert(placeholderPlayers)
+            .values({
+              teamId,
+              firstName,
+              lastName,
+              email: email || null,
+              position: position || null,
+              jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
+            });
+          successCount++;
         }
       } catch (error) {
         console.error('Error importing player:', error);
