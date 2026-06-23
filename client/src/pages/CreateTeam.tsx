@@ -406,7 +406,7 @@ export default function CreateTeam() {
           </Card>
 
           <Card>
-            <CardHeader className="mt-[0px] mb-[0px] pt-[8px]">
+            <CardHeader className="mt-[0px] mb-[0px] pt-[8px] pb-[4px]">
               <CardTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
                 Add Players Manually
