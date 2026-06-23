@@ -593,11 +593,6 @@ export default function CreateScrimmage() {
           </h1>
           <Calendar className="w-6 h-6 text-primary" />
         </div>
-        <p className="text-muted-foreground">
-          {isEditMode 
-            ? 'Update the scrimmage details below'
-            : 'Create a scrimmage request and invite league members to join'}
-        </p>
       </div>
       {/* Form */}
       <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-6">
