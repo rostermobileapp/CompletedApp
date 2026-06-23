@@ -545,7 +545,7 @@ export default function CreateTeam() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-4">
+          <div className="flex gap-4 mt-[4px]">
             <Button
               variant="outline"
               data-testid="button-view-team"
