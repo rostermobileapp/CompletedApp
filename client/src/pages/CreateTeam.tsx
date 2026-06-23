@@ -285,7 +285,7 @@ export default function CreateTeam() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="pl-[20px] pr-[20px] pt-[8px] pb-[8px]">
               <CardTitle>Team Details</CardTitle>
               <CardDescription>
                 Create a team independent of any league. You can invite players and request to join a league later.
