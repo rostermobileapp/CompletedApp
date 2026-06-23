@@ -109,12 +109,20 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
     Papa.parse(csvFile, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (header: string) => header.trim().replace(/\uFEFF/g, ''),
       complete: (results) => {
         if (results.data.length === 0) {
           toast({ title: 'Error', description: 'CSV file is empty.', variant: 'destructive' });
           return;
         }
-        importPlayersMutation.mutate(results.data);
+        const normalized = (results.data as any[]).map((row: any) => ({
+          firstName: row.firstName ?? row['First Name'] ?? row.first_name ?? row['firstname'] ?? '',
+          lastName:  row.lastName  ?? row['Last Name']  ?? row.last_name  ?? row['lastname']  ?? '',
+          email:     row.email     ?? row.Email         ?? row.EMAIL       ?? '',
+          jerseyNumber: row.jerseyNumber ?? row['Jersey Number'] ?? row.jersey_number ?? row['Jersey #'] ?? '',
+          position:  row.position  ?? row.Position      ?? '',
+        }));
+        importPlayersMutation.mutate(normalized);
       },
       error: (error) => {
         toast({ title: 'Error', description: `Failed to parse CSV: ${error.message}`, variant: 'destructive' });
