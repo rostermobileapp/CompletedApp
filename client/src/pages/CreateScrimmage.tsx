@@ -111,6 +111,8 @@ export default function CreateScrimmage() {
 
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showVenmoOverride, setShowVenmoOverride] = useState(false);
+  const [showCashAppOverride, setShowCashAppOverride] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   
   // Time picker state
@@ -264,6 +266,8 @@ export default function CreateScrimmage() {
       if (existingScrimmage.color) {
         setSelectedColor(existingScrimmage.color);
       }
+      if (existingScrimmage.venmoLinkOverride) setShowVenmoOverride(true);
+      if (existingScrimmage.cashappLinkOverride) setShowCashAppOverride(true);
       setFormInitialized(true);
     }
   }, [isEditMode, existingScrimmage, form, formInitialized]);
@@ -1148,40 +1152,70 @@ export default function CreateScrimmage() {
 
               <div className="space-y-3">
                 <div>
-                  <Label htmlFor="venmoLinkOverride">Venmo link override (Optional)</Label>
-                  <Input
-                    id="venmoLinkOverride"
-                    {...form.register('venmoLinkOverride')}
-                    type="text"
-                    placeholder="@treasurer or https://venmo.com/treasurer"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-testid="input-venmo-link-override"
-                  />
-                  {form.formState.errors.venmoLinkOverride && (
-                    <p className="text-sm text-destructive mt-1" data-testid="error-venmo-link-override">
-                      {form.formState.errors.venmoLinkOverride.message as string}
-                    </p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id="toggleVenmo"
+                      checked={showVenmoOverride}
+                      onCheckedChange={(checked) => {
+                        setShowVenmoOverride(!!checked);
+                        if (!checked) form.setValue('venmoLinkOverride', '');
+                      }}
+                      data-testid="checkbox-venmo-override"
+                    />
+                    <Label htmlFor="toggleVenmo" className="cursor-pointer">Override Venmo link</Label>
+                  </div>
+                  {showVenmoOverride && (
+                    <>
+                      <Input
+                        id="venmoLinkOverride"
+                        {...form.register('venmoLinkOverride')}
+                        type="text"
+                        placeholder="@treasurer or https://venmo.com/treasurer"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-testid="input-venmo-link-override"
+                      />
+                      {form.formState.errors.venmoLinkOverride && (
+                        <p className="text-sm text-destructive mt-1" data-testid="error-venmo-link-override">
+                          {form.formState.errors.venmoLinkOverride.message as string}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
                 <div>
-                  <Label htmlFor="cashappLinkOverride">Cash App link override (Optional)</Label>
-                  <Input
-                    id="cashappLinkOverride"
-                    {...form.register('cashappLinkOverride')}
-                    type="text"
-                    placeholder="$treasurer or https://cash.app/$treasurer"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-testid="input-cashapp-link-override"
-                  />
-                  {form.formState.errors.cashappLinkOverride && (
-                    <p className="text-sm text-destructive mt-1" data-testid="error-cashapp-link-override">
-                      {form.formState.errors.cashappLinkOverride.message as string}
-                    </p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id="toggleCashApp"
+                      checked={showCashAppOverride}
+                      onCheckedChange={(checked) => {
+                        setShowCashAppOverride(!!checked);
+                        if (!checked) form.setValue('cashappLinkOverride', '');
+                      }}
+                      data-testid="checkbox-cashapp-override"
+                    />
+                    <Label htmlFor="toggleCashApp" className="cursor-pointer">Override Cash App link</Label>
+                  </div>
+                  {showCashAppOverride && (
+                    <>
+                      <Input
+                        id="cashappLinkOverride"
+                        {...form.register('cashappLinkOverride')}
+                        type="text"
+                        placeholder="$treasurer or https://cash.app/$treasurer"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-testid="input-cashapp-link-override"
+                      />
+                      {form.formState.errors.cashappLinkOverride && (
+                        <p className="text-sm text-destructive mt-1" data-testid="error-cashapp-link-override">
+                          {form.formState.errors.cashappLinkOverride.message as string}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
