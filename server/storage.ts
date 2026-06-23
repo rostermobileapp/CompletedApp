@@ -9349,7 +9349,7 @@ export class DatabaseStorage implements IStorage {
       .from(scrimmageRequests)
       .innerJoin(users, eq(scrimmageRequests.playerId, users.id))
       .where(eq(scrimmageRequests.scrimmageId, scrimmageId))
-      .orderBy(scrimmageRequests.requestedAt);
+      .orderBy(asc(scrimmageRequests.requestedAt));
 
     return results.map(r => ({ ...r.scrimmage_requests, player: r.users }));
   }

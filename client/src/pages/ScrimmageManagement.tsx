@@ -251,8 +251,10 @@ export default function ScrimmageManagement() {
     };
   };
 
-  const getPendingRequests = (reqs: ScrimmageRequestWithPlayer[]) => reqs.filter(r => r.status === 'pending');
-  const getApprovedRequests = (reqs: ScrimmageRequestWithPlayer[]) => reqs.filter(r => r.status === 'approved');
+  const getPendingRequests = (reqs: ScrimmageRequestWithPlayer[]) =>
+    reqs.filter(r => r.status === 'pending').sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
+  const getApprovedRequests = (reqs: ScrimmageRequestWithPlayer[]) =>
+    reqs.filter(r => r.status === 'approved').sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
 
   // --- Calendar Logic ---
   const calendarDays = useMemo(() => {
