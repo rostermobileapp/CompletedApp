@@ -598,7 +598,9 @@ export default function ScrimmageManagement() {
                   <TabsContent value="pending" className="mt-4">
                     <ScrollArea className="h-64">
                       {getPendingRequests(requests).length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">No pending requests</div>
+                        <div className="text-center py-8 text-muted-foreground">No pending requests.
+
+                        Requests only show if a player has confirmed they want to participate.</div>
                       ) : (
                         <div className="space-y-3">
                           {getPendingRequests(requests).map((request) => (
