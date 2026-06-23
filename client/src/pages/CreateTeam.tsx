@@ -201,6 +201,7 @@ export default function CreateTeam() {
     Papa.parse(csvFile, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (header: string) => header.trim().replace(/\uFEFF/g, ''),
       complete: (results) => {
         if (results.data.length === 0) {
           toast({
@@ -210,9 +211,17 @@ export default function CreateTeam() {
           });
           return;
         }
+        // Normalize each row: map common header variants to the expected keys
+        const normalized = (results.data as any[]).map((row: any) => ({
+          firstName: row.firstName ?? row['First Name'] ?? row.first_name ?? row['firstname'] ?? '',
+          lastName:  row.lastName  ?? row['Last Name']  ?? row.last_name  ?? row['lastname']  ?? '',
+          email:     row.email     ?? row.Email         ?? row.EMAIL       ?? '',
+          jerseyNumber: row.jerseyNumber ?? row['Jersey Number'] ?? row.jersey_number ?? row['Jersey #'] ?? '',
+          position:  row.position  ?? row.Position      ?? '',
+        }));
         importPlayersMutation.mutate({
           teamId: createdTeam.id,
-          csvData: results.data,
+          csvData: normalized,
         });
       },
       error: (error) => {

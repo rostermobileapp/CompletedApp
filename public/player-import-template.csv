@@ -1,0 +1,3 @@
+firstName,lastName,email,jerseyNumber,position
+John,Doe,john.doe@example.com,23,Forward
+Jane,Smith,,10,Defense

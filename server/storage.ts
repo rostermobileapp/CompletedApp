@@ -3070,13 +3070,14 @@ export class DatabaseStorage implements IStorage {
 
     for (const row of csvData) {
       try {
-        const firstName = row.firstName || row['First Name'] || row.first_name;
-        const lastName = row.lastName || row['Last Name'] || row.last_name;
-        const email = row.email || row.Email;
-        const jerseyNumber = row.jerseyNumber || row['Jersey Number'] || row.jersey_number;
-        const position = row.position || row.Position;
+        const firstName = (row.firstName || row['First Name'] || row.first_name || '').toString().trim();
+        const lastName  = (row.lastName  || row['Last Name']  || row.last_name  || '').toString().trim();
+        const email = (row.email || row.Email || row.EMAIL || '').toString().trim() || null;
+        const jerseyNumber = (row.jerseyNumber || row['Jersey Number'] || row.jersey_number || row['Jersey #'] || '').toString().trim() || null;
+        const position = (row.position || row.Position || '').toString().trim() || null;
 
         if (!firstName || !lastName) {
+          console.error('importTeamPlayers: skipping row missing firstName/lastName:', JSON.stringify(row));
           failedCount++;
           continue;
         }
