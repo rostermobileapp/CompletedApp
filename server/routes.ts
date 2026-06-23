@@ -15019,6 +15019,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
+
+      // Handle co-host ID additions
+      if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
+        const league = existingScrimmage.leagueId ? await storage.getLeague(existingScrimmage.leagueId) : null;
+        for (const coHostId of req.body.coHostIds as string[]) {
+          try {
+            await storage.addScrimmageCoHost({
+              scrimmageId,
+              userId: coHostId,
+              canApproveRequests: true,
+              canSendReminders: true,
+              canManagePayments: true,
+              addedBy: userId,
+            });
+            await storage.createNotification({
+              userId: coHostId,
+              type: 'scrimmage_cohost_added',
+              title: `You're a co-host for ${updatedScrimmage.title}`,
+              message: `You have been added as a co-host for "${updatedScrimmage.title}"${league ? ` on ${formatFullDateTime(updatedScrimmage.dateTime, league.timezone)}` : ''}. You can now help manage players and payments.`,
+              actionUrl: `/scrimmage/${scrimmageId}`,
+              scrimmageId,
+            });
+            broadcastNotificationUpdate(coHostId);
+          } catch (coHostError) {
+            console.error(`Failed to add co-host ${coHostId} during update:`, coHostError);
+          }
+        }
+      }
+
+      // Handle email-invited co-hosts during update
+      if (req.body.coHostEmails && Array.isArray(req.body.coHostEmails) && req.body.coHostEmails.length > 0) {
+        const creator = await storage.getUser(userId);
+        const creatorName = creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'A scrimmage organizer' : 'A scrimmage organizer';
+        for (const email of req.body.coHostEmails as string[]) {
+          try {
+            const [existingUser] = await storage.searchUsersByEmail(email, 1);
+            if (existingUser) {
+              await storage.addScrimmageCoHost({
+                scrimmageId,
+                userId: existingUser.id,
+                canApproveRequests: true,
+                canSendReminders: true,
+                canManagePayments: true,
+                addedBy: userId,
+              });
+              await storage.createNotification({
+                userId: existingUser.id,
+                type: 'scrimmage_cohost_added',
+                title: `You're a co-host for ${updatedScrimmage.title}`,
+                message: `${creatorName} added you as a co-host for "${updatedScrimmage.title}".`,
+                actionUrl: `/scrimmage/${scrimmageId}`,
+                scrimmageId,
+              });
+              broadcastNotificationUpdate(existingUser.id);
+            } else {
+              await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: updatedScrimmage.title });
+            }
+          } catch (emailCoHostError) {
+            console.error(`Failed to handle co-host email ${email} during update:`, emailCoHostError);
+          }
+        }
+      }
+
       res.json(updatedScrimmage);
     } catch (error) {
       console.error('Error updating scrimmage:', error);
@@ -18866,7 +18929,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const q = req.query.q as string;
       const facilityId = req.query.facilityId as string | undefined;
-      const currentUserId = req.user?.id;
 
       if (!q || q.trim().length < 2) {
         return res.json([]);
@@ -18884,6 +18946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rinkMemberIds = new Set(members.map(m => m.userId));
       }
 
+      const currentUserId = req.user.claims.sub;
       const annotated = results
         .filter(u => u.id !== currentUserId)
         .map(u => ({

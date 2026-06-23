@@ -420,7 +420,8 @@ export default function CreateScrimmage() {
           leagueId: selectedLeague.id, // Required by server for new scrimmages
           selectedMemberIds: filteredMemberIds, // Include for targeted announcements/invitations
           selectedEmails: data.selectedEmails || [], // Include email invites
-          coHostIds: data.coHostIds || [], // Include co-hosts who can help manage
+          coHostIds: selectedCoHostIds, // Include co-hosts who can help manage
+          coHostEmails, // Email-invited co-hosts (may not have accounts yet)
           inviteGroupId: loadedInviteGroupId || null, // Persist group for recurring live-membership sends
           inviteUserIds: manuallySelectedIds, // Only manually-selected (non-group) users persisted
         });
