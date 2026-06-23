@@ -261,7 +261,7 @@ export default function CreateTeam() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl pb-48">
+    <div className="container mx-auto px-4 py-8 max-w-4xl pb-[4px] pt-[20px]">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6 whitespace-nowrap overflow-hidden text-ellipsis text-center">Create a Standalone Team</h1>
       {!createdTeam ? (
         <>
