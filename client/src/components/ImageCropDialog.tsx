@@ -101,16 +101,6 @@ function drawCrop(
   const srcW = Math.min(cropWidth  * scaleX, nw - srcX);
   const srcH = Math.min(cropHeight * scaleY, nh - srcY);
 
-  console.log("[ImageCrop] drawCrop", {
-    mediaSize: { mw, mh, nw, nh },
-    container: { containerWidth, containerHeight },
-    crop: { cropX, cropY, zoom, cropWidth, cropHeight },
-    imgTopLeft: { imgLeft, imgTop },
-    cropTopLeft: { cropLeft, cropTop },
-    relative: { relX, relY },
-    source: { srcX, srcY, srcW, srcH },
-  });
-
   ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outputW, outputH);
 }
 
@@ -129,6 +119,7 @@ export function ImageCropDialog({
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [minZoom, setMinZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cropSize, setCropSize] = useState<{ width: number; height: number } | null>(null);
@@ -141,6 +132,7 @@ export function ImageCropDialog({
   // Always-current refs for handleSave — avoids stale closure issues.
   const cropRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
+  const minZoomRef = useRef(1);
   const cropSizeRef = useRef<{ width: number; height: number } | null>(null);
 
   // mediaSize is set by the Cropper via setMediaSize prop.
@@ -167,6 +159,8 @@ export function ImageCropDialog({
       cropRef.current = { x: 0, y: 0 };
       setZoom(1);
       zoomRef.current = 1;
+      setMinZoom(1);
+      minZoomRef.current = 1;
       setCropSize(null);
       cropSizeRef.current = null;
       mediaSizeRef.current = null;
@@ -188,6 +182,8 @@ export function ImageCropDialog({
         cropRef.current = { x: 0, y: 0 };
         setZoom(1);
         zoomRef.current = 1;
+        setMinZoom(1);
+        minZoomRef.current = 1;
         // Delay Cropper mount until the Dialog's open animation finishes so that
         // getBoundingClientRect() reflects the final container dimensions.
         setTimeout(() => {
@@ -220,9 +216,35 @@ export function ImageCropDialog({
 
   // setMediaSize fires each time computeSizes() runs. We always keep the latest
   // value; the second (correct cover-mode) call overwrites the first (wrong contain-mode).
+  // After the second call we also compute the "fit zoom" — the minimum zoom at which the
+  // entire image is visible inside the crop frame — and apply it as both the initial zoom
+  // and the minZoom so the photo always starts fully inside the frame.
   const handleSetMediaSize = useCallback((ms: MediaSize) => {
     mediaSizeRef.current = ms;
-    console.log("[ImageCrop] setMediaSize called:", ms);
+    const cs = cropSizeRef.current;
+    if (!cs || ms.width <= 0 || ms.height <= 0) return;
+
+    // fitZoom: zoom at which both image dimensions fit within the crop frame.
+    // With objectFit="cover", ms.width × ms.height is the rendered size at zoom=1.
+    // At zoom=fitZoom the rendered size equals (ms.width*fitZoom) × (ms.height*fitZoom).
+    // We want both ≤ cropFrame, so fitZoom = min(cropW/ms.width, cropH/ms.height).
+    const fitZoom = Math.min(cs.width / ms.width, cs.height / ms.height);
+    // Clamp to [0.1, 1]: can never be > 1 by definition (cover always fills the frame at 1),
+    // but guard against edge-cases with a small lower bound.
+    const clampedFit = Math.max(0.1, Math.min(1, fitZoom));
+
+    if (clampedFit < minZoomRef.current || Math.abs(clampedFit - minZoomRef.current) > 0.01) {
+      minZoomRef.current = clampedFit;
+      setMinZoom(clampedFit);
+      // Only pull the zoom down if the current zoom would show overflow.
+      if (zoomRef.current > clampedFit + 0.001) {
+        zoomRef.current = clampedFit;
+        setZoom(clampedFit);
+        // Reset pan so image stays centred.
+        cropRef.current = { x: 0, y: 0 };
+        setCrop({ x: 0, y: 0 });
+      }
+    }
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -253,7 +275,6 @@ export function ImageCropDialog({
       let mediaSize: MediaSize;
       if (currentMediaSize && currentMediaSize.naturalWidth > 0 && currentMediaSize.width > 0) {
         mediaSize = currentMediaSize;
-        console.log("[ImageCrop] Using mediaSize from setMediaSize:", mediaSize);
       } else if (dims) {
         const nw = img.naturalWidth;
         const nh = img.naturalHeight;
@@ -267,20 +288,10 @@ export function ImageCropDialog({
         const mw = mediaAspect >= containerAspect ? ch * mediaAspect : cw;
         const mh = mediaAspect >= containerAspect ? ch : cw / mediaAspect;
         mediaSize = { width: mw, height: mh, naturalWidth: nw, naturalHeight: nh };
-        console.log("[ImageCrop] Computed mediaSize from natural+container dims:", mediaSize);
       } else {
         setLoadError("Crop area not ready. Please try again.");
         return;
       }
-
-      console.log("[ImageCrop] handleSave inputs:", {
-        crop: currentCrop,
-        zoom: currentZoom,
-        cropSize: currentCropSize,
-        containerDims: dims,
-        mediaSize,
-        naturalSize: { nw: img.naturalWidth, nh: img.naturalHeight },
-      });
 
       const canvas = document.createElement("canvas");
       canvas.width = outputSize;
@@ -369,9 +380,9 @@ export function ImageCropDialog({
                 cropShape={cropShape}
                 objectFit="cover"
                 showGrid={false}
-                minZoom={1}
+                minZoom={minZoom}
                 maxZoom={4}
-                restrictPosition={true}
+                restrictPosition={false}
                 onCropChange={handleCropChange}
                 onZoomChange={handleZoomChange}
                 setMediaSize={handleSetMediaSize}
@@ -387,11 +398,11 @@ export function ImageCropDialog({
             <ZoomOut className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             <Slider
               value={[zoom]}
-              min={1}
+              min={minZoom}
               max={4}
               step={0.01}
               onValueChange={(v) => {
-                const z = v[0] ?? 1;
+                const z = v[0] ?? minZoom;
                 setZoom(z);
                 zoomRef.current = z;
               }}
