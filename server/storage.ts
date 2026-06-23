@@ -12174,6 +12174,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(
         or(
           ilike(facilities.name, `%${options.search}%`),
+          ilike(facilities.address, `%${options.search}%`),
           ilike(facilities.city, `%${options.search}%`),
           ilike(facilities.state, `%${options.search}%`)
         )!
