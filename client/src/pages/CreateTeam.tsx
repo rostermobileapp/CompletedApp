@@ -376,12 +376,6 @@ export default function CreateTeam() {
       ) : (
         <div className="space-y-6">
           <Card className="border-green-500/50 bg-green-500/10">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                Team Created Successfully!
-              </CardTitle>
-            </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Team Name</p>
