@@ -291,7 +291,7 @@ export default function CreateTeam() {
                 Create a team independent of any league. You can invite players and request to join a league later.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-[8px] pl-[12px] pr-[12px] text-left">
               <form id="create-team-form" onSubmit={handleCreateTeam} className="space-y-4">
               <div>
                 <label htmlFor="teamName" className="block text-sm font-medium mb-2">
