@@ -262,7 +262,9 @@ export default function CreateTeam() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl pb-[4px] pt-[20px]">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6 whitespace-nowrap overflow-hidden text-ellipsis text-center">Create a Standalone Team</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 whitespace-nowrap overflow-hidden text-ellipsis text-center">
+        {createdTeam ? `Team Name: ${createdTeam.name}` : 'Create a Standalone Team'}
+      </h1>
       {!createdTeam ? (
         <>
           {/* Independent Team Info Card */}
@@ -377,10 +379,6 @@ export default function CreateTeam() {
         <div className="space-y-6">
           <Card className="border-green-500/50 bg-green-500/10">
             <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Team Name</p>
-                <p className="text-2xl font-bold" data-testid="text-team-name">{createdTeam.name}</p>
-              </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Team ID (Share this with players)</p>
                 <div className="flex items-center gap-2">
