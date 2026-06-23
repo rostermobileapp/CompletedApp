@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
-import Papa from 'papaparse';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, getAuthHeaders, queryClient } from '@/lib/queryClient';
 import { Upload, Copy, CheckCircle2, Users, UserPlus, Image as ImageIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
@@ -74,9 +74,20 @@ export default function CreateTeam() {
 
   // Import players mutation
   const importPlayersMutation = useMutation({
-    mutationFn: async ({ teamId, csvData }: { teamId: string; csvData: any[] }) => {
-      const response = await apiRequest('POST', `/api/teams/${teamId}/players/import`, { csvData });
-      return response.json();
+    mutationFn: async ({ teamId, file }: { teamId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/teams/${teamId}/players/import`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(err.message || res.statusText);
+      }
+      return res.json();
     },
     onSuccess: (data: { successCount: number; failedCount: number }) => {
       const message = [
@@ -197,41 +208,7 @@ export default function CreateTeam() {
 
   const handleImportPlayers = () => {
     if (!csvFile || !createdTeam) return;
-
-    Papa.parse(csvFile, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header: string) => header.trim().replace(/\uFEFF/g, ''),
-      complete: (results) => {
-        if (results.data.length === 0) {
-          toast({
-            title: 'Error',
-            description: 'CSV file is empty',
-            variant: 'destructive',
-          });
-          return;
-        }
-        // Normalize each row: map common header variants to the expected keys
-        const normalized = (results.data as any[]).map((row: any) => ({
-          firstName: row.firstName ?? row['First Name'] ?? row.first_name ?? row['firstname'] ?? '',
-          lastName:  row.lastName  ?? row['Last Name']  ?? row.last_name  ?? row['lastname']  ?? '',
-          email:     row.email     ?? row.Email         ?? row.EMAIL       ?? '',
-          jerseyNumber: row.jerseyNumber ?? row['Jersey Number'] ?? row.jersey_number ?? row['Jersey #'] ?? '',
-          position:  row.position  ?? row.Position      ?? '',
-        }));
-        importPlayersMutation.mutate({
-          teamId: createdTeam.id,
-          csvData: normalized,
-        });
-      },
-      error: (error) => {
-        toast({
-          title: 'Error',
-          description: `Failed to parse CSV: ${error.message}`,
-          variant: 'destructive',
-        });
-      },
-    });
+    importPlayersMutation.mutate({ teamId: createdTeam.id, file: csvFile });
   };
 
   const handleAddManualPlayer = (e: React.FormEvent) => {

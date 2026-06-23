@@ -8204,36 +8204,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/teams/:teamId/players/import', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { teamId } = req.params;
-      const { csvData } = req.body;
+  // Simple but robust server-side CSV parser that handles BOM, quoted fields,
+  // duplicate headers, and various whitespace issues.
+  function parseCSVBuffer(buf: Buffer): Record<string, string>[] {
+    const text = buf.toString('utf8').replace(/^\uFEFF/, ''); // strip BOM
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    if (lines.length < 2) return [];
 
-      // Verify team exists and user is the creator/captain/commissioner
-      const team = await storage.getTeam(teamId);
-      if (!team) {
-        return res.status(404).json({ message: 'Team not found' });
+    // Split a single CSV line respecting quoted fields
+    const splitLine = (line: string): string[] => {
+      const fields: string[] = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+          fields.push(cur.trim()); cur = '';
+        } else { cur += ch; }
       }
+      fields.push(cur.trim());
+      return fields;
+    };
 
-      const user = await storage.getUser(userId);
-      const isTeamCaptainOrCreator = team.captainId === userId || team.creatorId === userId;
-      const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+    const rawHeaders = splitLine(lines[0]).map(h => h.trim());
 
-      if (!isTeamCaptainOrCreator && !isCommissioner) {
-        return res.status(403).json({ message: 'Only team captain, creator, or commissioners can import players' });
+    // Normalize a header to a canonical key
+    const normalize = (h: string): string => {
+      const l = h.toLowerCase().replace(/[\s_-]/g, '');
+      if (l === 'firstname')    return 'firstName';
+      if (l === 'lastname')     return 'lastName';
+      if (l === 'email')        return 'email';
+      if (l === 'jerseynumber' || l === 'jersey#') return 'jerseyNumber';
+      if (l === 'position')     return 'position';
+      return h; // keep original for unknowns
+    };
+
+    const headers = rawHeaders.map(normalize);
+
+    return lines.slice(1).map(line => {
+      const vals = splitLine(line);
+      const row: Record<string, string> = {};
+      headers.forEach((h, i) => {
+        if (!(h in row)) row[h] = (vals[i] ?? '').trim(); // first occurrence wins
+      });
+      return row;
+    });
+  }
+
+  const teamImportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+  app.post('/api/teams/:teamId/players/import', isAuthenticated, (req: any, res, next) => {
+    teamImportUpload.single('file')(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: `Upload error: ${err.message}` });
+      try {
+        const userId = req.user.claims.sub;
+        const { teamId } = req.params;
+
+        const team = await storage.getTeam(teamId);
+        if (!team) return res.status(404).json({ message: 'Team not found' });
+
+        const user = await storage.getUser(userId);
+        const isTeamCaptainOrCreator = team.captainId === userId || team.creatorId === userId;
+        const isCommissioner = user && (user.role === 'commissioner' || user.role === 'secondary_commissioner' || user.specialPermissions?.includes('admin'));
+        if (!isTeamCaptainOrCreator && !isCommissioner) {
+          return res.status(403).json({ message: 'Only team captain, creator, or commissioners can import players' });
+        }
+
+        let csvData: Record<string, string>[];
+        if (req.file) {
+          // File upload path (new, reliable)
+          csvData = parseCSVBuffer(req.file.buffer);
+        } else if (req.body?.csvData && Array.isArray(req.body.csvData)) {
+          // JSON body fallback (legacy)
+          csvData = req.body.csvData;
+        } else {
+          return res.status(400).json({ message: 'No CSV file or data provided' });
+        }
+
+        if (csvData.length === 0) return res.status(400).json({ message: 'CSV file is empty' });
+
+        console.log(`[import] teamId=${teamId} rows=${csvData.length} first=${JSON.stringify(csvData[0])}`);
+        const result = await storage.importTeamPlayers(teamId, csvData);
+        res.json(result);
+      } catch (error) {
+        console.error('Error importing team players:', error);
+        res.status(500).json({ message: 'Failed to import players' });
       }
-
-      if (!Array.isArray(csvData) || csvData.length === 0) {
-        return res.status(400).json({ message: 'CSV data is required' });
-      }
-
-      const result = await storage.importTeamPlayers(teamId, csvData);
-      res.json(result);
-    } catch (error) {
-      console.error('Error importing team players:', error);
-      res.status(500).json({ message: 'Failed to import players' });
-    }
+    });
   });
 
   app.post('/api/teams/:teamId/players/manual', isAuthenticated, async (req: any, res) => {

@@ -10,8 +10,7 @@ import { Users, UserPlus, Plus, Upload } from 'lucide-react';
 import { Link } from 'wouter';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import Papa from 'papaparse';
+import { getAuthHeaders, queryClient } from '@/lib/queryClient';
 
 interface LineManagerProps {
   teamId: string;
@@ -60,9 +59,20 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
   });
 
   const importPlayersMutation = useMutation({
-    mutationFn: async (csvData: any[]) => {
-      const response = await apiRequest('POST', `/api/teams/${teamId}/players/import`, { csvData });
-      return response.json();
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/teams/${teamId}/players/import`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(err.message || res.statusText);
+      }
+      return res.json();
     },
     onSuccess: (data: { successCount: number; failedCount: number }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/teams', teamId, 'members'] });
@@ -106,46 +116,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
 
   const handleImportPlayers = () => {
     if (!csvFile) return;
-    Papa.parse(csvFile, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header: string) => header.trim().replace(/\uFEFF/g, ''),
-      complete: (results) => {
-        if (results.data.length === 0) {
-          toast({ title: 'Error', description: 'CSV file is empty.', variant: 'destructive' });
-          return;
-        }
-        console.log('[CSV Import] Raw headers:', Object.keys(results.data[0] || {}));
-        console.log('[CSV Import] First raw row:', JSON.stringify(results.data[0]));
-        const normalized = (results.data as any[]).map((row: any) => {
-          const keys = Object.keys(row);
-          // Helper: find a value by trying multiple key variants (including PapaParse _1 renamed duplicates)
-          const pick = (...candidates: string[]) => {
-            for (const k of candidates) {
-              if (row[k] !== undefined && row[k] !== null && row[k] !== '') return row[k];
-            }
-            return '';
-          };
-          return {
-            firstName: pick('firstName', 'First Name', 'first_name', 'firstname', 'FirstName',
-              ...keys.filter(k => k.toLowerCase().startsWith('firstname') || k.toLowerCase().startsWith('first name'))),
-            lastName:  pick('lastName', 'Last Name', 'last_name', 'lastname', 'LastName',
-              ...keys.filter(k => k.toLowerCase().startsWith('lastname') || k.toLowerCase().startsWith('last name'))),
-            email:     pick('email', 'Email', 'EMAIL',
-              ...keys.filter(k => k.toLowerCase().startsWith('email'))),
-            jerseyNumber: pick('jerseyNumber', 'Jersey Number', 'jersey_number', 'Jersey #', 'JerseyNumber',
-              ...keys.filter(k => k.toLowerCase().startsWith('jersey'))),
-            position:  pick('position', 'Position', 'POSITION',
-              ...keys.filter(k => k.toLowerCase().startsWith('position'))),
-          };
-        });
-        console.log('[CSV Import] First normalized row:', JSON.stringify(normalized[0]));
-        importPlayersMutation.mutate(normalized);
-      },
-      error: (error) => {
-        toast({ title: 'Error', description: `Failed to parse CSV: ${error.message}`, variant: 'destructive' });
-      },
-    });
+    importPlayersMutation.mutate(csvFile);
   };
 
   const sortedMembers = [...teamMembers].sort((a, b) => {
