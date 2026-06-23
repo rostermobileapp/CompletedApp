@@ -6,6 +6,8 @@ import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp } from 'lucide-react';
+import { RinkPickerField } from '@/components/RinkPickerField';
+import type { RinkSelection } from '@/components/RinkPickerField';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { useLocation, useRoute } from 'wouter';
@@ -125,11 +127,6 @@ export default function CreateScrimmage() {
     enabled: isEditMode,
   });
 
-  // Fetch user's facility memberships
-  const { data: facilityMemberships, isLoading: facilitiesLoading } = useQuery<Array<{ facility: { id: string; name: string; address: string; city: string; state: string } }>>({
-    queryKey: ['/api/users/me/facility-memberships'],
-    enabled: !!user,
-  });
 
   // 🚨 SUBSCRIPTION GATE REMOVED - ALL USERS CAN CREATE SCRIMMAGES 🚨
 
@@ -215,37 +212,6 @@ export default function CreateScrimmage() {
     `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(skaterSearchTerm.toLowerCase())
   );
 
-  // Combine league facility with user facility memberships
-  const allFacilities = (() => {
-    const facilities: Array<{ id: string; name: string; city?: string; isLeagueFacility: boolean }> = [];
-    
-    // Add league's facility first (if it exists)
-    if (leagueFacility) {
-      facilities.push({
-        id: leagueFacility.id,
-        name: leagueFacility.name,
-        city: leagueFacility.city,
-        isLeagueFacility: true
-      });
-    }
-    
-    // Add user's facility memberships (if they exist and not already included)
-    if (facilityMemberships && facilityMemberships.length > 0) {
-      facilityMemberships.forEach((membership: any) => {
-        // Don't add duplicates (league facility might also be in user's memberships)
-        if (!facilities.some(f => f.id === membership.facility.id)) {
-          facilities.push({
-            id: membership.facility.id,
-            name: membership.facility.name,
-            city: membership.facility.city,
-            isLeagueFacility: false
-          });
-        }
-      });
-    }
-    
-    return facilities;
-  })();
 
   // Set default venue to league facility when it loads (only for create mode)
   useEffect(() => {
@@ -1133,37 +1099,14 @@ export default function CreateScrimmage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="venue">Rink</Label>
-              {facilitiesLoading ? (
-                <div className="h-10 bg-muted rounded-md animate-pulse" />
-              ) : allFacilities.length > 0 ? (
-                <Select
-                  value={form.watch('venue')}
-                  onValueChange={(value) => form.setValue('venue', value)}
-                >
-                  <SelectTrigger data-testid="select-venue">
-                    <SelectValue placeholder="Select a facility" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allFacilities.map((facility) => (
-                      <SelectItem 
-                        key={facility.id} 
-                        value={facility.name}
-                      >
-                        {facility.name}
-                        {facility.city && ` - ${facility.city}`}
-                        {facility.isLeagueFacility && " (League Facility)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  id="venue"
-                  {...form.register('venue')}
-                  placeholder="Enter rink name (e.g., Metro Ice Center)"
-                  data-testid="input-venue"
-                />
-              )}
+              <RinkPickerField
+                onSelect={(rink) => form.setValue('venue', rink ? rink.name : '')}
+                initialSelection={
+                  leagueFacility
+                    ? { facilityId: leagueFacility.id, name: leagueFacility.name, address: leagueFacility.address || '' }
+                    : undefined
+                }
+              />
               {form.formState.errors.venue && (
                 <p className="text-sm text-destructive mt-1">{form.formState.errors.venue.message}</p>
               )}

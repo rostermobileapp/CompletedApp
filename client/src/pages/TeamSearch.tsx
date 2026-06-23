@@ -6,19 +6,20 @@ import { getImageUrl } from '@/lib/queryClient';
 
 export default function TeamSearch() {
   const [search, setSearch] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
   const [, navigate] = useLocation();
 
   const { data: teams, isLoading } = useQuery({
-    queryKey: ['/api/teams/search', { search }],
+    queryKey: ['/api/teams/search', { search: committedSearch }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
+      if (committedSearch) params.append('search', committedSearch);
       
       const response = await fetch(`/api/teams/search?${params}`);
       if (!response.ok) throw new Error('Failed to fetch teams');
       return response.json();
     },
-    enabled: search.trim().length > 0,
+    enabled: committedSearch.trim().length > 0,
   });
 
 
@@ -38,26 +39,35 @@ export default function TeamSearch() {
         </div>
         
         {/* Search Bar */}
-        <div className="mb-4">
+        <div className="flex gap-2 mb-4">
           <input 
             type="text" 
             placeholder="Search by team ID..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-input border border-border rounded-lg px-4 py-3 text-foreground"
+            onKeyDown={(e) => { if (e.key === 'Enter') setCommittedSearch(search.trim()); }}
+            className="flex-1 bg-input border border-border rounded-lg px-4 py-3 text-foreground"
             data-testid="input-search"
           />
+          <button
+            onClick={() => setCommittedSearch(search.trim())}
+            disabled={!search.trim()}
+            className="px-5 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            data-testid="button-find"
+          >
+            FIND
+          </button>
         </div>
       </div>
       
       {/* Team List */}
       <div className="flex-1 px-6">
-        {search.trim().length === 0 ? (
+        {committedSearch.trim().length === 0 ? (
           <div className="text-center py-12" data-testid="initial-search-message">
             <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Search for Teams</h3>
             <p className="text-muted-foreground">
-              Enter a team ID to find teams you can join
+              Enter a team ID and press FIND
             </p>
           </div>
         ) : isLoading ? (

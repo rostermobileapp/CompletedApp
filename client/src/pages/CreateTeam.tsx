@@ -1,19 +1,19 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Upload, Copy, CheckCircle2, Users, UserPlus, Image as ImageIcon, Building2, Plus } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Upload, Copy, CheckCircle2, Users, UserPlus, Image as ImageIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { getImageUrl } from '@/lib/queryClient';
+import { RinkPickerField } from '@/components/RinkPickerField';
+import type { RinkSelection } from '@/components/RinkPickerField';
 
 interface TeamResponse {
   id: string;
@@ -25,34 +25,17 @@ interface TeamResponse {
   facilityId?: string | null;
 }
 
-interface Facility {
-  id: string;
-  name: string;
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-}
 
 export default function CreateTeam() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [teamName, setTeamName] = useState('');
-  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('');
+  const [selectedFacility, setSelectedFacility] = useState<RinkSelection | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [createdTeam, setCreatedTeam] = useState<TeamResponse | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copiedTeamId, setCopiedTeamId] = useState(false);
-  const [showCreateFacility, setShowCreateFacility] = useState(false);
-  const [newFacilityName, setNewFacilityName] = useState('');
-  const [newFacilityAddress, setNewFacilityAddress] = useState('');
-  const [newFacilityCity, setNewFacilityCity] = useState('');
-  const [newFacilityState, setNewFacilityState] = useState('');
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const autocompleteServiceRef = useRef<any>(null);
-  const placesServiceRef = useRef<any>(null);
-  const addressInputRef = useRef<HTMLInputElement>(null);
 
   // Manual player addition state
   const [manualFirstName, setManualFirstName] = useState('');
@@ -60,43 +43,6 @@ export default function CreateTeam() {
   const [manualEmail, setManualEmail] = useState('');
   const [manualJerseyNumber, setManualJerseyNumber] = useState('');
   const [manualPosition, setManualPosition] = useState('');
-
-  // Initialize Google Maps API using dynamic script loading
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) return;
-
-    // Check if already loaded
-    if ((window as any).google?.maps?.places) {
-      autocompleteServiceRef.current = new (window as any).google.maps.places.AutocompleteService();
-      placesServiceRef.current = new (window as any).google.maps.places.PlacesService(
-        document.createElement('div')
-      );
-      return;
-    }
-
-    // Load the Google Maps script dynamically
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if ((window as any).google?.maps?.places) {
-        autocompleteServiceRef.current = new (window as any).google.maps.places.AutocompleteService();
-        placesServiceRef.current = new (window as any).google.maps.places.PlacesService(
-          document.createElement('div')
-        );
-      }
-    };
-    script.onerror = () => console.error('Failed to load Google Maps API');
-    document.head.appendChild(script);
-  }, []);
-
-  // Fetch facilities
-  const { data: facilities = [] } = useQuery<Facility[]>({
-    queryKey: ['/api/facilities'],
-    enabled: !createdTeam, // Only fetch when creating team
-  });
 
   // Create team mutation
   const createTeamMutation = useMutation({
@@ -114,34 +60,6 @@ export default function CreateTeam() {
       setCreatedTeam(data);
       toast({
         title: 'Team Created',
-        description: `${data.name} has been created successfully!`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Create facility mutation
-  const createFacilityMutation = useMutation({
-    mutationFn: async (facilityData: { name: string; address?: string; city?: string; state?: string }) => {
-      const response = await apiRequest('POST', '/api/facilities', facilityData);
-      return response.json();
-    },
-    onSuccess: (data: Facility) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/facilities'] });
-      setSelectedFacilityId(data.id);
-      setShowCreateFacility(false);
-      setNewFacilityName('');
-      setNewFacilityAddress('');
-      setNewFacilityCity('');
-      setNewFacilityState('');
-      toast({
-        title: 'Facility Created',
         description: `${data.name} has been created successfully!`,
       });
     },
@@ -228,7 +146,7 @@ export default function CreateTeam() {
     createTeamMutation.mutate({
       name: teamName.trim(),
       photoUrl: photoUrl || undefined,
-      facilityId: selectedFacilityId || undefined,
+      facilityId: selectedFacility?.facilityId || undefined,
     });
   };
 
@@ -327,130 +245,6 @@ export default function CreateTeam() {
       email: manualEmail.trim() || undefined,
       jerseyNumber: manualJerseyNumber.trim() || undefined,
       position: manualPosition.trim() || undefined,
-    });
-  };
-
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setNewFacilityAddress(value);
-
-    if (!autocompleteServiceRef.current || value.length < 3) {
-      setAddressSuggestions([]);
-      setShowAddressSuggestions(false);
-      return;
-    }
-
-    autocompleteServiceRef.current.getPlacePredictions(
-      {
-        input: value,
-        componentRestrictions: { country: 'us' },
-      },
-      (predictions: any[], status: any) => {
-        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && predictions) {
-          setAddressSuggestions(predictions);
-          setShowAddressSuggestions(true);
-        } else {
-          setAddressSuggestions([]);
-        }
-      }
-    );
-  };
-
-  const handleSelectAddress = (placeId: string) => {
-    if (!placesServiceRef.current) return;
-
-    placesServiceRef.current.getDetails(
-      { placeId, fields: ['formatted_address', 'address_components'] },
-      (place: any, status: any) => {
-        if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && place) {
-          setNewFacilityAddress(place.formatted_address || '');
-          
-          // Extract city and state from address components
-          let city = '';
-          let state = '';
-          place.address_components?.forEach((component: any) => {
-            if (component.types.includes('locality')) {
-              city = component.long_name;
-            }
-            if (component.types.includes('administrative_area_level_1')) {
-              state = component.short_name;
-            }
-          });
-
-          setNewFacilityCity(city);
-          setNewFacilityState(state);
-          setAddressSuggestions([]);
-          setShowAddressSuggestions(false);
-        }
-      }
-    );
-  };
-
-  const handleCreateFacility = (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newFacilityName.trim();
-    const address = newFacilityAddress.trim();
-    const city = newFacilityCity.trim();
-    const state = newFacilityState.trim();
-
-    if (!name) {
-      toast({
-        title: 'Error',
-        description: 'Facility name is required',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!address) {
-      toast({
-        title: 'Error',
-        description: 'Address is required',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!city) {
-      toast({
-        title: 'Error',
-        description: 'City is required',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!state) {
-      toast({
-        title: 'Error',
-        description: 'State is required',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Check for duplicate facilities
-    const duplicate = facilities.find(
-      facility =>
-        facility.address?.toLowerCase() === address.toLowerCase() &&
-        facility.city?.toLowerCase() === city.toLowerCase() &&
-        facility.state?.toLowerCase() === state.toLowerCase()
-    );
-
-    if (duplicate) {
-      toast({
-        title: 'Duplicate Facility',
-        description: 'This facility already exists',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    createFacilityMutation.mutate({
-      name,
-      address,
-      city,
-      state,
     });
   };
 
@@ -556,37 +350,12 @@ export default function CreateTeam() {
               </div>
 
               <div>
-                <label htmlFor="facility" className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-2">
                   Facility (Optional)
                 </label>
-                <div className="flex gap-2">
-                  <Select 
-                    value={selectedFacilityId || "none"} 
-                    onValueChange={(value) => setSelectedFacilityId(value === "none" ? "" : value)}
-                  >
-                    <SelectTrigger data-testid="select-facility" className="flex-1">
-                      <SelectValue placeholder="Select a facility" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No facility</SelectItem>
-                      {facilities.map((facility) => (
-                        <SelectItem key={facility.id} value={facility.id}>
-                          {facility.name}
-                          {facility.city && ` - ${facility.city}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    data-testid="button-create-facility"
-                    onClick={() => setShowCreateFacility(true)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New
-                  </Button>
-                </div>
+                <RinkPickerField
+                  onSelect={(rink) => setSelectedFacility(rink)}
+                />
               </div>
 
             </form>
@@ -800,7 +569,7 @@ export default function CreateTeam() {
                 setTeamName('');
                 setCsvFile(null);
                 setPhotoUrl('');
-                setSelectedFacilityId('');
+                setSelectedFacility(null);
               }}
               className="flex-1"
             >
@@ -810,101 +579,6 @@ export default function CreateTeam() {
         </div>
       )}
 
-      {/* Create Facility Dialog */}
-      <Dialog open={showCreateFacility} onOpenChange={setShowCreateFacility}>
-        <DialogContent data-testid="dialog-create-facility">
-          <DialogHeader>
-            <DialogTitle>Create New Facility</DialogTitle>
-            <DialogDescription>
-              Add a new facility to the system
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateFacility} className="space-y-4">
-            <div>
-              <Label htmlFor="facilityName">Facility Name *</Label>
-              <Input
-                id="facilityName"
-                data-testid="input-facility-name"
-                value={newFacilityName}
-                onChange={(e) => setNewFacilityName(e.target.value)}
-                placeholder="Enter facility name"
-                disabled={createFacilityMutation.isPending}
-              />
-            </div>
-            <div className="relative">
-              <Label htmlFor="facilityAddress">Address *</Label>
-              <Input
-                ref={addressInputRef}
-                id="facilityAddress"
-                data-testid="input-facility-address"
-                value={newFacilityAddress}
-                onChange={handleAddressChange}
-                onFocus={() => newFacilityAddress.length > 0 && setShowAddressSuggestions(true)}
-                placeholder="Start typing an address..."
-                disabled={createFacilityMutation.isPending}
-                autoComplete="off"
-              />
-              {showAddressSuggestions && addressSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {addressSuggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => handleSelectAddress(suggestion.place_id)}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors border-b last:border-b-0"
-                      data-testid={`suggestion-address-${index}`}
-                    >
-                      <div className="font-medium">{suggestion.main_text}</div>
-                      <div className="text-xs text-muted-foreground">{suggestion.secondary_text}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="facilityCity">City *</Label>
-                <Input
-                  id="facilityCity"
-                  data-testid="input-facility-city"
-                  value={newFacilityCity}
-                  onChange={(e) => setNewFacilityCity(e.target.value)}
-                  placeholder="New York"
-                  disabled={createFacilityMutation.isPending}
-                />
-              </div>
-              <div>
-                <Label htmlFor="facilityState">State *</Label>
-                <Input
-                  id="facilityState"
-                  data-testid="input-facility-state"
-                  value={newFacilityState}
-                  onChange={(e) => setNewFacilityState(e.target.value)}
-                  placeholder="NY"
-                  disabled={createFacilityMutation.isPending}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowCreateFacility(false)}
-                disabled={createFacilityMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                data-testid="button-submit-facility"
-                disabled={createFacilityMutation.isPending || !newFacilityName.trim() || !newFacilityAddress.trim() || !newFacilityCity.trim() || !newFacilityState.trim()}
-              >
-                {createFacilityMutation.isPending ? 'Creating...' : 'Create Facility'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

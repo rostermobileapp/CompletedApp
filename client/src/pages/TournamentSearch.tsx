@@ -173,7 +173,7 @@ export default function TournamentSearch() {
                 disabled={searchId.trim().length !== 8 || tournamentLoading}
                 data-testid="button-search"
               >
-                {tournamentLoading ? 'Searching...' : 'Search'}
+                {tournamentLoading ? 'Searching...' : 'FIND'}
               </Button>
             </form>
           </CardContent>

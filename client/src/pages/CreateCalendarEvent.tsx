@@ -46,19 +46,20 @@ export default function CreateCalendarEvent() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
 
   const { data: facilities, isLoading: facilitiesLoading } = useQuery<Facility[]>({
-    queryKey: ['/api/facilities', { search }],
+    queryKey: ['/api/facilities', { search: committedSearch }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
+      if (committedSearch) params.append('search', committedSearch);
       
       const response = await fetch(`/api/facilities?${params}`);
       if (!response.ok) throw new Error('Failed to fetch facilities');
       return response.json();
     },
-    enabled: search.trim().length > 0,
+    enabled: committedSearch.trim().length > 0,
   });
 
   const form = useForm<FormValues>({
@@ -184,13 +185,26 @@ export default function CreateCalendarEvent() {
                         </div>
                       ) : (
                         <>
-                          <Input
-                            placeholder="Search facilities by name or location..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            data-testid="input-facility-search"
-                          />
-                          {search.trim().length > 0 && (
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Search facilities by name or location..."
+                              value={search}
+                              onChange={(e) => setSearch(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setCommittedSearch(search.trim()); } }}
+                              data-testid="input-facility-search"
+                              className="flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setCommittedSearch(search.trim())}
+                              disabled={!search.trim()}
+                              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                              data-testid="button-find-facility"
+                            >
+                              FIND
+                            </button>
+                          </div>
+                          {committedSearch.trim().length > 0 && (
                             <div className="mt-2 border rounded-lg max-h-64 overflow-y-auto" data-testid="facility-search-results">
                               {facilitiesLoading ? (
                                 <div className="p-4 text-center text-muted-foreground" data-testid="loading-facilities">

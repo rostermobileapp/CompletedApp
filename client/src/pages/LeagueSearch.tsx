@@ -26,6 +26,7 @@ const sportBadgeColors: Record<string, string> = {
 
 export default function LeagueSearch() {
   const [search, setSearch] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
   const [selectedLeague, setSelectedLeague] = useState<any>(null);
   const [joinMessage, setJoinMessage] = useState('');
   const { user } = useAuth();
@@ -34,26 +35,20 @@ export default function LeagueSearch() {
   const queryClient = useQueryClient();
 
   const { data: leagues, isLoading, error } = useQuery({
-    queryKey: ['/api/leagues', { sport: 'hockey', search }],
+    queryKey: ['/api/leagues', { sport: 'hockey', search: committedSearch }],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append('sport', 'hockey');
-      if (search) params.append('search', search.trim());
+      if (committedSearch) params.append('search', committedSearch.trim());
       
       const fullUrl = `${API_BASE_URL}/api/leagues?${params}`;
-      console.log('League search - API Base URL:', API_BASE_URL);
-      console.log('League search - Full URL:', fullUrl);
-      
       const response = await fetch(fullUrl);
       if (!response.ok) {
-        console.error('League search failed:', response.status, response.statusText);
         throw new Error('Failed to fetch leagues');
       }
-      const data = await response.json();
-      console.log('League search - Results:', data);
-      return data;
+      return response.json();
     },
-    enabled: search.trim().length > 0, // Only fetch when there's a search term
+    enabled: committedSearch.trim().length > 0,
   });
 
   const joinLeagueMutation = useMutation({
@@ -113,27 +108,36 @@ export default function LeagueSearch() {
         </div>
         
         {/* Search Bar */}
-        <div className="mb-4">
+        <div className="flex gap-2 mb-4">
           <input 
             type="text" 
             placeholder="Search leagues..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-input border border-border rounded-lg px-4 py-3 text-foreground"
+            onKeyDown={(e) => { if (e.key === 'Enter') setCommittedSearch(search.trim()); }}
+            className="flex-1 bg-input border border-border rounded-lg px-4 py-3 text-foreground"
             data-testid="input-search"
           />
+          <button
+            onClick={() => setCommittedSearch(search.trim())}
+            disabled={!search.trim()}
+            className="px-5 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            data-testid="button-find"
+          >
+            FIND
+          </button>
         </div>
       </div>
       
       {/* League List */}
       <div className="flex-1 px-6">
-        {search.trim().length === 0 ? (
+        {committedSearch.trim().length === 0 ? (
           // No search performed yet - show initial message
           <div className="text-center py-12" data-testid="initial-search-message">
             <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Search for Leagues</h3>
             <p className="text-muted-foreground">
-              Enter a league name, location, or ID to find leagues in your area
+              Enter a league name, location, or ID and press FIND
             </p>
           </div>
         ) : isLoading ? (

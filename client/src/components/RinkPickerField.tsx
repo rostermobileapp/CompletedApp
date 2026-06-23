@@ -32,7 +32,7 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
     initialSelection ? 'selected' : 'idle'
   );
   const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [committedQuery, setCommittedQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selected, setSelected] = useState<Facility | null>(
     initialSelection
@@ -83,21 +83,22 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
     document.head.appendChild(script);
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300);
-    return () => clearTimeout(t);
-  }, [query]);
-
   const { data: searchResults = [], isFetching } = useQuery<Facility[]>({
-    queryKey: ['/api/facilities', 'search', debouncedQuery],
+    queryKey: ['/api/facilities', 'search', committedQuery],
     queryFn: async () => {
-      if (!debouncedQuery.trim()) return [];
-      const res = await fetch(`/api/facilities?search=${encodeURIComponent(debouncedQuery)}`);
+      if (!committedQuery.trim()) return [];
+      const res = await fetch(`/api/facilities?search=${encodeURIComponent(committedQuery)}`);
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: debouncedQuery.trim().length > 0,
+    enabled: committedQuery.trim().length > 0,
   });
+
+  const handleFind = () => {
+    if (!query.trim()) return;
+    setCommittedQuery(query.trim());
+    setShowDropdown(true);
+  };
 
   const handleAddressInput = useCallback((value: string) => {
     setNewAddress(value);
@@ -174,6 +175,7 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
     setMode('selected');
     setShowDropdown(false);
     setQuery('');
+    setCommittedQuery('');
     setDuplicateWarning(null);
     onSelect({ facilityId: f.id, name: f.name, address: formatAddress(f) });
   };
@@ -182,6 +184,7 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
     setSelected(null);
     setMode('idle');
     setQuery('');
+    setCommittedQuery('');
     setNewName('');
     setNewAddress('');
     setDuplicateWarning(null);
@@ -312,6 +315,7 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
             onClick={() => {
               setMode('idle');
               setQuery('');
+              setCommittedQuery('');
               setNewName('');
               setNewAddress('');
               setDuplicateWarning(null);
@@ -340,39 +344,46 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          value={query}
-          onChange={e => {
-            setQuery(e.target.value);
-            setShowDropdown(true);
-          }}
-          onFocus={() => { if (query.trim()) setShowDropdown(true); }}
-          className="w-full pr-10 py-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-          style={{ paddingLeft: '2.5rem' }}
-          placeholder="Search for a rink…"
-          autoComplete="off"
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => { setQuery(''); setShowDropdown(false); }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleFind(); } }}
+            className="w-full pr-8 py-3 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            style={{ paddingLeft: '2.5rem' }}
+            placeholder="Search for a rink…"
+            autoComplete="off"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => { setQuery(''); setCommittedQuery(''); setShowDropdown(false); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleFind}
+          disabled={!query.trim()}
+          className="px-4 py-3 bg-primary text-primary-foreground rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+        >
+          FIND
+        </button>
       </div>
 
-      {showDropdown && query.trim() && (
+      {showDropdown && committedQuery.trim() && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-[hsl(var(--hairline))] rounded-lg shadow-lg z-50 overflow-hidden max-h-64 overflow-y-auto">
           {isFetching && (
             <div className="px-4 py-3 text-sm text-muted-foreground">Searching…</div>
           )}
           {!isFetching && searchResults.length === 0 && (
-            <div className="px-4 py-3 text-sm text-muted-foreground">No rinks found for &quot;{query}&quot;</div>
+            <div className="px-4 py-3 text-sm text-muted-foreground">No rinks found for &quot;{committedQuery}&quot;</div>
           )}
           {!isFetching && searchResults.map(f => (
             <button
