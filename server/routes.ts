@@ -14697,17 +14697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
         });
 
-        // Auto-approve creator as a participant on the first occurrence
-        try {
-          await storage.createScrimmageRequest({
-            scrimmageId: parentScrimmage.id,
-            playerId: userId,
-            status: 'approved',
-            approvedAt: new Date(),
-          });
-        } catch (autoApproveError) {
-          console.error('[Scrimmage] Failed to auto-approve creator on parent scrimmage:', autoApproveError);
-        }
+        // Creator must explicitly RSVP to join their own scrimmage
         
         // Add co-hosts if provided
         if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
@@ -14925,17 +14915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
         });
 
-        // Auto-approve creator as a participant so they appear in the roster
-        try {
-          await storage.createScrimmageRequest({
-            scrimmageId: scrimmage.id,
-            playerId: userId,
-            status: 'approved',
-            approvedAt: new Date(),
-          });
-        } catch (autoApproveError) {
-          console.error('[Scrimmage] Failed to auto-approve creator as participant:', autoApproveError);
-        }
+        // Creator must explicitly RSVP to join their own scrimmage
         
         // Add co-hosts if provided
         if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
@@ -15495,10 +15475,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate request data
-      // If creator or co-host is joining their own scrimmage, auto-approve them
-      const isCreator = scrimmage.creatorId === userId;
+      // Co-hosts are auto-approved when they RSVP; everyone else (including the creator) is pending
       const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
-      const shouldAutoApprove = isCreator || isCoHost;
+      const shouldAutoApprove = isCoHost;
       
       let requestData;
       try {

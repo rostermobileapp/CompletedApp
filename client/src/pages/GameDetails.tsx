@@ -103,6 +103,52 @@ export default function GameDetails() {
     enabled: !!gameId && isScrimmage,
   });
 
+  // Derived flags used to gate management hooks below
+  const _scrimmageForHooks = (scrimmageData as any)?.scrimmage;
+  const _canManageForHooks = !!(scrimmageData as any)?.canManagePlayers ||
+    (_scrimmageForHooks?.creatorId === (user as any)?.id);
+
+  // Fetch pending requests for creator / co-host management panel
+  const { data: pendingRequests = [] } = useQuery<any[]>({
+    queryKey: ['/api/scrimmages', gameId, 'requests'],
+    enabled: !!gameId && isScrimmage && _canManageForHooks,
+  });
+
+  // Approve or decline a pending scrimmage request
+  const manageRequestMutation = useMutation({
+    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
+      const res = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/status`, { status, teamAssignment: null });
+      return res.json();
+    },
+    onSuccess: (_, { status }) => {
+      toast({
+        title: status === 'approved' ? 'Player approved' : 'Request declined',
+        description: status === 'approved' ? 'Player added to the roster.' : 'Request has been declined.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', gameId, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to process request', variant: 'destructive' });
+    },
+  });
+
+  // Finalize scrimmage roster
+  const finalizeScrimmageM = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      const res = await apiRequest('PUT', `/api/scrimmages/${scrimmageId}/finalize`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Roster Finalized!', description: 'Confirmation notifications sent to all players.' });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', gameId, 'requests'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to finalize scrimmage', variant: 'destructive' });
+    },
+  });
+
   // Compute captain team ID early for the RSVP summary query
   // Check membership isCaptain flag for multi-captain support, with fallback to legacy captainId
   const isEarlyCaptainOfHome = userTeamMemberships.find(m => m.teamId === game?.homeTeam?.id)?.isCaptain || 
@@ -446,12 +492,10 @@ export default function GameDetails() {
               </div>
             )}
 
-            {/* RSVP Buttons for players to join/leave */}
-            {scrimmage.creatorId !== (user as any)?.id && (
-              <div className="mt-6 pt-4 border-t border-border">
-                <ScrimmageRSVPButtons scrimmageId={gameId!} />
-              </div>
-            )}
+            {/* RSVP Buttons for all users — creators must also opt in explicitly */}
+            <div className="mt-6 pt-4 border-t border-border">
+              <ScrimmageRSVPButtons scrimmageId={gameId!} />
+            </div>
             </div>
           </div>
 
@@ -621,6 +665,90 @@ export default function GameDetails() {
               </p>
             )}
           </div>
+
+          {/* Creator / co-host management panel */}
+          {(isScrimmageCreator || canManagePlayers) && (
+            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  Manage Scrimmage
+                </h3>
+                <button
+                  onClick={() => {
+                    setPageTransitionDirection('right');
+                    navigate('/scrimmage-management');
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  Full view
+                </button>
+              </div>
+
+              {/* Pending requests */}
+              {(() => {
+                const pending = (pendingRequests as any[]).filter((r: any) => r.status === 'pending');
+                return (
+                  <div>
+                    <p className="text-sm font-medium mb-2 text-muted-foreground uppercase tracking-wide text-xs">
+                      Pending ({pending.length})
+                    </p>
+                    {pending.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No pending requests</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pending.map((request: any) => (
+                          <div key={request.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-semibold text-primary">
+                                {request.player?.firstName?.[0] || '?'}{request.player?.lastName?.[0] || ''}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">
+                                {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved' })}
+                                disabled={manageRequestMutation.isPending}
+                                className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center hover:bg-green-700 disabled:opacity-50"
+                                title="Approve"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })}
+                                disabled={manageRequestMutation.isPending}
+                                className="w-8 h-8 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-80 disabled:opacity-50"
+                                title="Decline"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Finalize & Invoice */}
+              <button
+                onClick={() => finalizeScrimmageM.mutate(scrimmage.id)}
+                disabled={finalizeScrimmageM.isPending}
+                className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
+              >
+                <Check className="w-4 h-4" />
+                {finalizeScrimmageM.isPending ? 'Finalizing…' : 'Finalize & Invoice'}
+              </button>
+              <p className="text-xs text-muted-foreground text-center -mt-2">
+                Confirm roster, send notifications & create payment requests
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -1590,7 +1590,10 @@ export default function CreateScrimmage() {
                             <AvatarImage src={member.user.profileImageUrl || undefined} />
                             <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                          <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>
+                            {member.user.firstName} {member.user.lastName}
+                            {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -1656,7 +1659,10 @@ export default function CreateScrimmage() {
                             <AvatarImage src={member.user.profileImageUrl || undefined} />
                             <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
                           </Avatar>
-                          <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>{member.user.firstName} {member.user.lastName}</span>
+                          <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>
+                            {member.user.firstName} {member.user.lastName}
+                            {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
+                          </span>
                         </div>
                       ))}
                     </div>
