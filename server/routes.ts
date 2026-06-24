@@ -15490,6 +15490,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Decline a scrimmage invite — creates a dismissed request so the invite disappears
+  app.post('/api/scrimmages/:id/decline-invite', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+
+      // Idempotent: if a request already exists (in any state), just return success
+      const existingRequest = await storage.getScrimmageRequest(scrimmageId, userId);
+      if (existingRequest) {
+        return res.json({ message: 'Already responded to this invite' });
+      }
+
+      const requestData = insertScrimmageRequestSchema.parse({
+        scrimmageId,
+        playerId: userId,
+        status: 'dismissed',
+      });
+
+      const request = await storage.createScrimmageRequest(requestData);
+      res.status(201).json(request);
+    } catch (error) {
+      console.error('[Scrimmage Decline] Error declining invite:', error);
+      res.status(500).json({ message: 'Failed to decline invite' });
+    }
+  });
+
   // Get approved players for scrimmage (Any league member)
   app.get('/api/scrimmages/:id/approved-players', isAuthenticated, async (req: any, res) => {
     try {

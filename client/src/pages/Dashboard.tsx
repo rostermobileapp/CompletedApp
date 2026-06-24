@@ -2370,23 +2370,47 @@ function DashboardMobile() {
     },
   });
 
-  // Scrimmage check-in mutation
+  // Scrimmage check-in mutation (RSVP "In")
   const scrimmageCheckInMutation = useMutation({
     mutationFn: async (scrimmageId: string) => {
       return await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
       toast({
-        title: "Checked In",
-        description: "Your check-in request has been submitted and is pending approval.",
+        title: "You're In!",
+        description: "Your join request has been submitted and is pending approval.",
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Check-in Failed",
-        description: error.message || "Failed to check in. Please try again.",
+        title: "Failed",
+        description: error.message || "Failed to send request. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Scrimmage decline mutation (RSVP "Out")
+  const scrimmageDeclineMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      return await apiRequest("POST", `/api/scrimmages/${scrimmageId}/decline-invite`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({
+        title: "Invite Declined",
+        description: "You've declined this scrimmage invite.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed",
+        description: error.message || "Failed to decline invite. Please try again.",
         variant: "destructive",
       });
     },
@@ -3153,19 +3177,23 @@ function DashboardMobile() {
               }).map((invite: any) => (
                 <div 
                   key={`invite-${invite.id}`}
-                  className="rounded-xl border border-yellow-500/50 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                  className="rounded-xl border border-yellow-500/50 elev-rest relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer hover:border-yellow-500 transition-colors"
                   data-testid={`card-scrimmage-invite-${invite.id}`}
+                  onClick={() => {
+                    setPageTransitionDirection('up');
+                    navigate(`/scrimmage/${invite.id}`);
+                  }}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
                       <Trophy className="w-6 h-6 text-black" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold" data-testid={`text-invite-title-${invite.id}`}>
+                        <h3 className="font-semibold truncate" data-testid={`text-invite-title-${invite.id}`}>
                           {invite.title}
                         </h3>
-                        <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded">Invite</span>
+                        <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">Invite</span>
                       </div>
                       <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
                         {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
@@ -3176,17 +3204,24 @@ function DashboardMobile() {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        scrimmageCheckInMutation.mutate(invite.id);
-                      }}
-                      disabled={scrimmageCheckInMutation.isPending}
-                      className="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm disabled:opacity-50"
-                      data-testid={`button-check-in-${invite.id}`}
-                    >
-                      Check In
-                    </button>
+                    <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => scrimmageCheckInMutation.mutate(invite.id)}
+                        disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm disabled:opacity-50"
+                        data-testid={`button-rsvp-in-${invite.id}`}
+                      >
+                        In
+                      </button>
+                      <button
+                        onClick={() => scrimmageDeclineMutation.mutate(invite.id)}
+                        disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm disabled:opacity-50"
+                        data-testid={`button-rsvp-out-${invite.id}`}
+                      >
+                        Out
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

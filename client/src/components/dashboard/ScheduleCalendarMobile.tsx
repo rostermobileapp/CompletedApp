@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   addMonths,
   endOfMonth,
@@ -12,6 +13,8 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Trophy, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { EVENT_COLORS } from '@/components/home-desktop/cardStyles';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 type EventKind =
   | 'invite'
@@ -31,6 +34,7 @@ interface MobileCalendarEvent {
   color: string;
   navigateTo?: string;
   teamAssignment?: string | null;
+  scrimmageId?: string;
 }
 
 interface ScheduleCalendarMobileProps {
@@ -87,6 +91,39 @@ export function ScheduleCalendarMobile({
   primaryTeam,
 }: ScheduleCalendarMobileProps) {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const joinInviteMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      return await apiRequest('POST', `/api/scrimmages/${scrimmageId}/requests`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({ title: "You're In!", description: 'Your join request has been submitted and is pending approval.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed', description: error.message || 'Failed to send request.', variant: 'destructive' });
+    },
+  });
+
+  const declineInviteMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      return await apiRequest('POST', `/api/scrimmages/${scrimmageId}/decline-invite`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      toast({ title: 'Invite Declined', description: "You've declined this scrimmage invite." });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed', description: error.message || 'Failed to decline invite.', variant: 'destructive' });
+    },
+  });
+
   const [cursorMonth, setCursorMonth] = useState<Date>(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -112,6 +149,8 @@ export function ScheduleCalendarMobile({
           title: i.title || 'Scrimmage Invite',
           subtitle: i.location || null,
           color: i.color || KIND_FALLBACK_COLOR.invite,
+          navigateTo: `/scrimmage/${i.id}`,
+          scrimmageId: i.id,
         });
       }
     }
@@ -376,22 +415,26 @@ export function ScheduleCalendarMobile({
             {selectedDayEvents.map((ev) => {
               const textColor = getReadableTextColor(ev.color);
               const Icon = ev.kind === 'reminder' ? Clock : Trophy;
+              const isInvite = ev.kind === 'invite' && !!ev.scrimmageId;
+              const isMutating = joinInviteMutation.isPending || declineInviteMutation.isPending;
               return (
-                <button
-                  type="button"
+                <div
                   key={ev.id}
-                  onClick={() => handleEventClick(ev)}
-                  disabled={!ev.navigateTo}
-                  className={`w-full text-left flex items-stretch gap-3 rounded-lg overflow-hidden border border-border bg-card ${
-                    ev.navigateTo ? 'hover:bg-muted/50 transition-colors cursor-pointer' : 'cursor-default'
-                  }`}
+                  className="w-full text-left flex items-stretch gap-3 rounded-lg overflow-hidden border border-border bg-card"
                   data-testid={`mobile-day-event-${ev.id}`}
                 >
                   <div
                     className="w-1.5 flex-shrink-0"
                     style={{ backgroundColor: ev.color }}
                   />
-                  <div className="flex items-center gap-3 flex-1 min-w-0 py-2 pr-3">
+                  <button
+                    type="button"
+                    onClick={() => handleEventClick(ev)}
+                    disabled={!ev.navigateTo}
+                    className={`flex items-center gap-3 flex-1 min-w-0 py-2 ${isInvite ? 'pr-1' : 'pr-3'} ${
+                      ev.navigateTo ? 'hover:bg-muted/50 transition-colors cursor-pointer' : 'cursor-default'
+                    }`}
+                  >
                     <div
                       className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: ev.color, color: textColor }}
@@ -429,8 +472,30 @@ export function ScheduleCalendarMobile({
                         </div>
                       )}
                     </div>
-                  </div>
-                </button>
+                  </button>
+                  {isInvite && (
+                    <div className="flex items-center gap-1.5 pr-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => joinInviteMutation.mutate(ev.scrimmageId!)}
+                        disabled={isMutating}
+                        className="bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition-colors font-semibold text-xs disabled:opacity-50"
+                        data-testid={`mobile-rsvp-in-${ev.id}`}
+                      >
+                        In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => declineInviteMutation.mutate(ev.scrimmageId!)}
+                        disabled={isMutating}
+                        className="bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 transition-colors font-semibold text-xs disabled:opacity-50"
+                        data-testid={`mobile-rsvp-out-${ev.id}`}
+                      >
+                        Out
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
