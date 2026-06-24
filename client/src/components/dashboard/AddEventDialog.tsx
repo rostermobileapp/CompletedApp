@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ImageIcon, X, Loader2 } from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getAuthHeaders } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { User, League } from '@shared/schema';
 
@@ -166,17 +166,17 @@ async function cropImageTo16x9(file: File): Promise<Blob> {
   });
 }
 
-async function uploadEventPhoto(file: File | Blob, filename?: string): Promise<string> {
-  const res = await apiRequest('POST', '/api/event-photos/upload', {});
-  const { uploadURL, path } = await res.json();
-  const putRes = await fetch(uploadURL, {
-    method: 'PUT',
-    body: file,
-    headers: { 'Content-Type': file.type || 'image/jpeg' },
+async function uploadEventPhoto(file: File | Blob, filename = 'photo.jpg'): Promise<string> {
+  const formData = new FormData();
+  formData.append('photo', file, filename);
+  const authHeaders = await getAuthHeaders();
+  const res = await fetch('/api/event-photos/upload', {
+    method: 'POST',
+    body: formData,
+    headers: authHeaders,
   });
-  if (!putRes.ok) {
-    throw new Error(`Photo upload failed: ${putRes.status} ${putRes.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Photo upload failed: ${res.status}`);
+  const { path } = await res.json();
   return path as string;
 }
 
