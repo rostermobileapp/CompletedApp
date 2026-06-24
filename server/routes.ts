@@ -6245,6 +6245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Notify the approved player (fire-and-forget)
       storage.getLeague(membership.leagueId).then(async (league) => {
         if (!league || !membership.userId) return;
+        broadcastNotificationUpdate(membership.userId);
         broadcastToUser(membership.userId, {
           type: 'membership_approved',
           leagueId: membership.leagueId,
@@ -8395,6 +8396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If the email matched a real registered user, send them a push notification
       const addedUserId = (membership as any).userId;
       if (addedUserId) {
+        broadcastNotificationUpdate(addedUserId);
         broadcastToUser(addedUserId, {
           type: 'added_to_team',
           teamId,
@@ -8572,6 +8574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Notify the team creator (fire-and-forget)
       storage.getTeam(theRequest.teamId).then(async (team) => {
         if (!team || !team.creatorId) return;
+        broadcastNotificationUpdate(team.creatorId);
         broadcastToUser(team.creatorId, {
           type: 'team_league_approved',
           leagueId: theRequest.leagueId,
@@ -8668,6 +8671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Notify the team creator (fire-and-forget)
       storage.getTeam(theRequest.teamId).then(async (team) => {
         if (!team || !team.creatorId) return;
+        broadcastNotificationUpdate(team.creatorId);
         broadcastToUser(team.creatorId, {
           type: 'team_league_approved',
           leagueId: theRequest.leagueId,
