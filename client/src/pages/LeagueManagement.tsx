@@ -733,6 +733,10 @@ export default function LeagueManagement() {
   const [coCommissionerEmail, setCoCommissionerEmail] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [statManagerEmail, setStatManagerEmail] = useState('');
+
+  // Transfer commissioner state
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<LeagueMember | null>(null);
   
   // Rink picker state for edit league form
   const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(null);
@@ -2421,6 +2425,37 @@ export default function LeagueManagement() {
       toast({
         title: 'Failed to Remove Stat Manager',
         description: 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Transfer commissioner mutation
+  const transferCommissionerMutation = useMutation({
+    mutationFn: async (targetUserId: string) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/transfer-commissioner`, {
+        targetUserId,
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to transfer commissioner role');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Commissioner Transferred',
+        description: 'The commissioner role has been transferred successfully.',
+      });
+      setTransferDialogOpen(false);
+      setTransferTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'members'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Transfer Failed',
+        description: error.message || 'Please try again.',
         variant: 'destructive',
       });
     },
@@ -5818,39 +5853,81 @@ export default function LeagueManagement() {
                   </div>
                 </div>
 
-                {/* Commissioner Transfer */}
+                {/* Commissioner Transfer — only visible to the actual commissioner, not co-commissioners */}
+                {league?.commissionerId === user?.id && (
                 <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3 text-orange-600/50">⚠️ Transfer Commissioner</h3>
+                  <h3 className="font-medium mb-1 text-orange-600/50">⚠️ Transfer Commissioner</h3>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Transfer ownership of this league to another user. You will lose all commissioner privileges for this league.
+                    Transfer ownership of this league to one of your co-commissioners. You will lose all commissioner privileges.
                   </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      placeholder="Enter new commissioner's email"
-                      className="flex-1 p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      data-testid="input-new-commissioner-email"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const email = (document.querySelector('[data-testid="input-new-commissioner-email"]') as HTMLInputElement)?.value;
-                        if (!email) {
-                          toast({ title: 'Please enter an email address', variant: 'destructive' });
-                          return;
-                        }
-                        if (confirm(`Are you sure you want to transfer commissioner privileges to ${email}? This action cannot be undone.`)) {
-                          // TODO: Implement commissioner transfer
-                          toast({ title: 'Commissioner transfer functionality coming soon!' });
-                        }
-                      }}
-                      className="px-4 py-2 bg-orange-500/50 text-white rounded-lg hover:bg-orange-600/50 text-sm font-medium"
-                      data-testid="button-transfer-commissioner"
-                    >
-                      Transfer
-                    </button>
-                  </div>
+                  {(() => {
+                    const coCommissioners = members.filter(m => m.leagueRole === 'secondary_commissioner');
+                    if (coCommissioners.length === 0) {
+                      return (
+                        <p className="text-sm text-muted-foreground italic">
+                          No co-commissioners yet. Add a co-commissioner above before transferring.
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {coCommissioners.map((m) => {
+                          const name = m.user?.displayName || `${m.user?.firstName || ''} ${m.user?.lastName || ''}`.trim() || m.user?.email || 'Unknown';
+                          const initials = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+                          return (
+                            <div key={m.id} className="flex items-center justify-between p-2 bg-card hairline elev-rest rounded-lg">
+                              <div className="flex items-center gap-2">
+                                {m.user?.profileImageUrl ? (
+                                  <img src={m.user.profileImageUrl} alt={name} className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-xs font-semibold text-orange-600">
+                                    {initials}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium">{name}</p>
+                                  <p className="text-xs text-muted-foreground">Co-Commissioner</p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => { setTransferTarget(m); setTransferDialogOpen(true); }}
+                                className="px-3 py-1.5 bg-orange-500/50 text-white rounded-lg hover:bg-orange-600/50 text-xs font-medium"
+                                data-testid={`button-transfer-to-${m.userId}`}
+                              >
+                                Transfer
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                  <AlertDialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Transfer Commissioner Role?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {transferTarget && (() => {
+                            const name = transferTarget.user?.displayName || `${transferTarget.user?.firstName || ''} ${transferTarget.user?.lastName || ''}`.trim() || transferTarget.user?.email || 'this user';
+                            return `Transfer commissioner privileges to ${name}? You will lose all commissioner privileges for this league. This cannot be undone.`;
+                          })()}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={transferCommissionerMutation.isPending}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => transferTarget && transferCommissionerMutation.mutate(transferTarget.userId)}
+                          disabled={transferCommissionerMutation.isPending}
+                          className="bg-orange-500 hover:bg-orange-600 text-white"
+                        >
+                          {transferCommissionerMutation.isPending ? 'Transferring...' : 'Yes, Transfer'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
+                )}
 
                 {/* League-Wide Player Pro — desktop browsers only (Apple policy) */}
                 {isDesktopWeb && (

@@ -5514,6 +5514,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/leagues/:leagueId/transfer-commissioner", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.params;
+      const { targetUserId } = req.body;
+
+      if (!targetUserId) {
+        return res.status(400).json({ message: "targetUserId is required" });
+      }
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: "Only the current commissioner can transfer this role" });
+      }
+
+      if (targetUserId === userId) {
+        return res.status(400).json({ message: "You are already the commissioner" });
+      }
+
+      // Verify target is a co-commissioner in this league
+      const members = await storage.getLeagueMembers(leagueId);
+      const targetMembership = members.find(m => m.userId === targetUserId);
+      if (!targetMembership || targetMembership.leagueRole !== 'secondary_commissioner') {
+        return res.status(400).json({ message: "Target user must be a co-commissioner of this league" });
+      }
+
+      // Find the current commissioner's membership to downgrade
+      const commissionerMembership = members.find(m => m.userId === userId);
+
+      // Update the league's commissionerId
+      await storage.updateLeague(leagueId, { commissionerId: targetUserId });
+
+      // Downgrade former commissioner's league role
+      if (commissionerMembership) {
+        await storage.updateLeagueMember(commissionerMembership.id, { leagueRole: 'free_tier' });
+      }
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error transferring commissioner:", error);
+      res.status(500).json({ message: "Failed to transfer commissioner role" });
+    }
+  });
+
   app.delete("/api/leagues/:leagueId/co-commissioner/:memberId", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
