@@ -629,6 +629,9 @@ export default function GameDetails() {
                         {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
                       </p>
                     </div>
+                    <span className="text-sm font-medium flex-shrink-0 truncate max-w-[120px]">
+                      {request.player?.firstName} {request.player?.lastName}
+                    </span>
                     {canManagePlayers ? (
                       <div className="flex gap-1 flex-shrink-0" data-testid={`team-assignment-controls-${request.id}`}>
                         <button
@@ -669,9 +672,6 @@ export default function GameDetails() {
                         </div>
                       )
                     )}
-                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded flex-shrink-0">
-                      ✓ Confirmed
-                    </div>
                     {(isScrimmageCreator || canManagePlayers) && (
                       <button
                         onClick={() => {
