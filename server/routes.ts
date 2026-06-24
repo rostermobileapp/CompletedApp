@@ -15831,13 +15831,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
       
-      // Allow deletion if user is the requester or the scrimmage creator
-      if (request.playerId !== userId && scrimmage.creatorId !== userId) {
+      // Allow deletion if user is the requester, the scrimmage creator, or a co-host
+      const isManager = scrimmage.creatorId === userId ||
+        await storage.isUserScrimmageCoHost(scrimmage.id, userId);
+      if (request.playerId !== userId && !isManager) {
         return res.status(403).json({ message: 'Unauthorized to delete this request' });
       }
-      
-      // Business invariant: Cannot delete approved request less than 24 hours before scrimmage
-      if (request.status === 'approved' && request.playerId === userId) {
+
+      // Business invariant: 24-hour lockout applies only to self-withdrawals, not manager removals
+      if (request.status === 'approved' && request.playerId === userId && !isManager) {
         const now = new Date();
         const hoursUntil = (new Date(scrimmage.dateTime).getTime() - now.getTime()) / (1000 * 60 * 60);
         
