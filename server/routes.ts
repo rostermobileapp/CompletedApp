@@ -5555,6 +5555,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateLeagueMember(commissionerMembership.id, { leagueRole: 'free_tier' });
       }
 
+      // Fetch user info for notification messages
+      const [formerCommissioner, newCommissioner] = await Promise.all([
+        storage.getUser(userId),
+        storage.getUser(targetUserId),
+      ]);
+      const formerName = formerCommissioner
+        ? `${formerCommissioner.firstName || ''} ${formerCommissioner.lastName || ''}`.trim() || 'The commissioner'
+        : 'The commissioner';
+
+      // In-app notification for the new commissioner
+      await storage.createNotification({
+        userId: targetUserId,
+        type: 'general',
+        title: 'You Are Now the Commissioner',
+        message: `${formerName} has transferred the commissioner role of ${league.name} to you.`,
+        actionUrl: `/league-management/${leagueId}`,
+        actionText: 'Go to League Management',
+      });
+      broadcastNotificationUpdate(targetUserId);
+
+      // In-app confirmation for the former commissioner
+      await storage.createNotification({
+        userId,
+        type: 'general',
+        title: 'Commissioner Role Transferred',
+        message: `You have successfully transferred the commissioner role of ${league.name} to ${newCommissioner ? `${newCommissioner.firstName || ''} ${newCommissioner.lastName || ''}`.trim() : 'the new commissioner'}.`,
+        actionUrl: `/league-management/${leagueId}`,
+        actionText: 'View League',
+      });
+      broadcastNotificationUpdate(userId);
+
+      // Push notification to the new commissioner
+      try {
+        const { sendCommissionerTransferPushNotification } = await import('./oneSignalNotifications');
+        const pushResult = await sendCommissionerTransferPushNotification(
+          targetUserId,
+          league.name,
+          leagueId
+        );
+        console.log(`[Push] Commissioner transfer notification to ${targetUserId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+      } catch (pushError) {
+        console.error('[Push] Failed to send commissioner transfer notification:', pushError);
+      }
+
       return res.json({ success: true });
     } catch (error) {
       console.error("Error transferring commissioner:", error);

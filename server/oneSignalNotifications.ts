@@ -775,3 +775,19 @@ export async function sendDraftStartingPushNotification(
     },
   });
 }
+
+export async function sendCommissionerTransferPushNotification(
+  newCommissionerId: string,
+  leagueName: string,
+  leagueId: string
+): Promise<boolean> {
+  return sendPushNotificationToUser({
+    userId: newCommissionerId,
+    title: `🏆 You're the Commissioner!`,
+    message: `You are now the commissioner of ${leagueName}`,
+    data: {
+      type: 'commissioner_transfer',
+      leagueId,
+    },
+  });
+}
