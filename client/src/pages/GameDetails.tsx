@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign, CreditCard, ChevronRight } from "lucide-react";
 import { SiVenmo, SiCashapp } from "react-icons/si";
 import { resolveVenmoLink, resolveCashAppLink } from "@/lib/paymentLinks";
 import { RSVPButtons } from "@/components/RSVPButtons";
@@ -111,6 +111,18 @@ export default function GameDetails() {
   // Fetch pending requests for creator / co-host management panel
   const { data: pendingRequests = [] } = useQuery<any[]>({
     queryKey: ['/api/scrimmages', gameId, 'requests'],
+    enabled: !!gameId && isScrimmage && _canManageForHooks,
+  });
+
+  // Payment requests received by this user — used to show "Payment Due" banner on scrimmage screen
+  const { data: receivedPaymentRequests = [] } = useQuery<any[]>({
+    queryKey: ['/api/payment-requests/received/by-me'],
+    enabled: !!gameId && isScrimmage,
+  });
+
+  // Payment requests for this scrimmage — manager-only view of per-player paid/unpaid status
+  const { data: scrimmagePaymentRequests = [] } = useQuery<any[]>({
+    queryKey: [`/api/scrimmages/${gameId}/payment-requests`],
     enabled: !!gameId && isScrimmage && _canManageForHooks,
   });
 
@@ -435,6 +447,26 @@ export default function GameDetails() {
     const scrimmageCreatorName = scrimmageCreator
       ? `${scrimmageCreator.firstName ?? ''} ${scrimmageCreator.lastName ?? ''}`.trim() || 'the organizer'
       : 'the organizer';
+    const isFinalized = scrimmage.status === 'roster_confirmed';
+
+    // Find an unpaid payment request for this scrimmage linked to the current user
+    const myUnpaidScrimmagePayment = (!isScrimmageCreator && !canManagePlayers)
+      ? (receivedPaymentRequests as any[]).find((pr: any) => {
+          if (pr.relatedScrimmageId !== gameId) return false;
+          const myRecipient = (pr.recipients || []).find((r: any) => r.userId === dbUserId);
+          return myRecipient && !myRecipient.paidAt;
+        })
+      : null;
+
+    // Build a map from userId → paidAt for manager's per-player payment status view
+    const playerPaymentStatus: Record<string, boolean> = {};
+    (scrimmagePaymentRequests as any[]).forEach((pr: any) => {
+      (pr.recipients || []).forEach((r: any) => {
+        if (r.userId) {
+          playerPaymentStatus[r.userId] = !!r.paidAt;
+        }
+      });
+    });
 
     return (
       <div className="min-h-screen bg-background pb-36">
@@ -550,6 +582,29 @@ export default function GameDetails() {
               </div>
             );
           })()}
+
+          {/* Payment Due banner — shown to non-creator approved players who have an unpaid invoice for this scrimmage */}
+          {myUnpaidScrimmagePayment && (
+            <button
+              onClick={() => {
+                setPageTransitionDirection('right');
+                navigate('/payments');
+              }}
+              className="w-full rounded-xl border border-orange-400 bg-orange-50 dark:bg-orange-950/40 shadow-[var(--elev-rest)] p-4 flex items-center gap-3 text-left"
+              data-testid="card-payment-due"
+            >
+              <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
+                <CreditCard className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-orange-700 dark:text-orange-400 text-sm">Payment Due</p>
+                <p className="text-xs text-orange-600 dark:text-orange-500 truncate">
+                  ${Number(myUnpaidScrimmagePayment.amountPerPerson).toFixed(2)} owed to {scrimmageCreatorName} · Tap to view
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-orange-500 flex-shrink-0" />
+            </button>
+          )}
 
           {/* Pay-the-organizer card — shown when the scrimmage has a cost
               and at least one payment link can be resolved. The override
@@ -672,6 +727,19 @@ export default function GameDetails() {
                         </div>
                       )
                     )}
+                    {(isScrimmageCreator || canManagePlayers) && (() => {
+                      const isPaid = playerPaymentStatus[request.player?.id || ''];
+                      const hasPaymentData = request.player?.id && request.player.id in playerPaymentStatus;
+                      return hasPaymentData ? (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${
+                          isPaid
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
+                            : 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400'
+                        }`}>
+                          {isPaid ? 'Paid' : 'Unpaid'}
+                        </span>
+                      ) : null;
+                    })()}
                     {(isScrimmageCreator || canManagePlayers) && (
                       <button
                         onClick={() => {
@@ -765,18 +833,42 @@ export default function GameDetails() {
                 );
               })()}
 
-              {/* Finalize & Invoice */}
-              <button
-                onClick={() => finalizeScrimmageM.mutate(scrimmage.id)}
-                disabled={finalizeScrimmageM.isPending}
-                className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
-              >
-                <Check className="w-4 h-4" />
-                {finalizeScrimmageM.isPending ? 'Finalizing…' : 'Finalize & Invoice'}
-              </button>
-              <p className="text-xs text-muted-foreground text-center -mt-2">
-                Confirm roster, send notifications & create payment requests
-              </p>
+              {/* Finalize & Invoice — or Finalized success state */}
+              {isFinalized ? (
+                <div className="rounded-lg bg-green-50 dark:bg-green-950/40 border border-green-400 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-semibold">
+                    <Check className="w-4 h-4" />
+                    Roster Finalized
+                  </div>
+                  <p className="text-xs text-green-600 dark:text-green-500">
+                    Payment requests have been sent to all players.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setPageTransitionDirection('right');
+                      navigate('/payments');
+                    }}
+                    className="w-full mt-1 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-green-700"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    View Payments
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => finalizeScrimmageM.mutate(scrimmage.id)}
+                    disabled={finalizeScrimmageM.isPending}
+                    className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
+                  >
+                    <Check className="w-4 h-4" />
+                    {finalizeScrimmageM.isPending ? 'Finalizing…' : 'Finalize & Invoice'}
+                  </button>
+                  <p className="text-xs text-muted-foreground text-center -mt-2">
+                    Confirm roster, send notifications & create payment requests
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
