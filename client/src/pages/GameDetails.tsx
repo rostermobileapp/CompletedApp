@@ -133,6 +133,22 @@ export default function GameDetails() {
     },
   });
 
+  // Creator removes an approved player from the roster
+  const removePlayerMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const res = await apiRequest('DELETE', `/api/scrimmage-requests/${requestId}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Player removed', description: 'Player has been removed from the roster.' });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', gameId, 'requests'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to remove player', variant: 'destructive' });
+    },
+  });
+
   // Finalize scrimmage roster
   const finalizeScrimmageM = useMutation({
     mutationFn: async (scrimmageId: string) => {
@@ -656,6 +672,20 @@ export default function GameDetails() {
                     <div className="bg-green-600 text-white text-xs px-2 py-1 rounded flex-shrink-0">
                       ✓ Confirmed
                     </div>
+                    {(isScrimmageCreator || canManagePlayers) && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Remove ${request.player?.firstName || 'this player'} from the roster?`)) {
+                            removePlayerMutation.mutate(request.id);
+                          }
+                        }}
+                        disabled={removePlayerMutation.isPending}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 flex-shrink-0"
+                        title="Remove player"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

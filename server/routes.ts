@@ -15839,7 +15839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Business invariant: Cannot delete approved request less than 24 hours before scrimmage
       if (request.status === 'approved' && request.playerId === userId) {
         const now = new Date();
-        const hoursUntil = (scrimmage.dateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const hoursUntil = (new Date(scrimmage.dateTime).getTime() - now.getTime()) / (1000 * 60 * 60);
         
         if (hoursUntil < 24) {
           return res.status(409).json({ 
@@ -15849,6 +15849,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.deleteScrimmageRequest(requestId);
+
+      // Notify creator (and co-hosts) when a player withdraws themselves
+      if (request.playerId === userId && scrimmage.creatorId !== userId) {
+        const playerName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'A player';
+        const scrimmageTitle = scrimmage.title || 'your scrimmage';
+        const notifMessage = `${playerName} has withdrawn from ${scrimmageTitle}.`;
+
+        const recipientIds = new Set<string>([scrimmage.creatorId]);
+        try {
+          const coHosts = await storage.getScrimmageCoHosts(scrimmage.id);
+          for (const ch of coHosts) recipientIds.add(ch.userId);
+        } catch (_) {}
+
+        for (const recipientId of recipientIds) {
+          try {
+            await storage.createNotification({
+              userId: recipientId,
+              type: 'general',
+              title: 'Player Withdrew from Scrimmage',
+              message: notifMessage,
+            });
+          } catch (_) {}
+        }
+      }
+
       res.json({ message: 'Request deleted successfully' });
     } catch (error) {
       console.error('Error deleting request:', error);
