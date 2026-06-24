@@ -60,7 +60,7 @@ A native Expo React Native app in the `/mobile` folder provides push notificatio
 
 -   **Supabase Authentication**: User authentication and session management.
 -   **Supabase Storage**: Cloud storage for user-uploaded media.
--   **Neon Database**: PostgreSQL hosting.
+-   **Supabase Database**: PostgreSQL hosting.
 -   **Stripe**: Payment processing and subscription management.
 -   **Resend**: Email delivery service.
 -   **OneSignal**: Push notification service for mobile app.

@@ -1,1 +1,2 @@
 - [Raw fetch auth pattern](raw-fetch-auth.md) — raw fetch() to backend must use getAuthHeaders() from queryClient; credentials:'include' does nothing (JWT not cookie).
+- [Database provider](db-provider.md) — PostgreSQL is hosted on Supabase, not Neon. DATABASE_URL points to Supabase's connection string.
