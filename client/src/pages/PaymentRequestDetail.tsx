@@ -244,15 +244,17 @@ export default function PaymentRequestDetail() {
         <div className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold" data-testid="text-recipients-title">
-              Recipients
+              {isCreator ? 'Recipients' : 'Your Status'}
             </h2>
-            <span className="text-xs text-muted-foreground">
-              {paidCount} / {totalRecipients} paid
-            </span>
+            {isCreator && (
+              <span className="text-xs text-muted-foreground">
+                {paidCount} / {totalRecipients} paid
+              </span>
+            )}
           </div>
 
           <div className="space-y-2">
-            {recipients.map((recipient: any) => {
+            {(isCreator ? recipients : recipients.filter((r: any) => r.userId === (user as any)?.id)).map((recipient: any) => {
               const isMe = recipient.userId === (user as any)?.id;
               const canUpdate = isCreator || isMe;
               const recipientTheme = recipient.isPaid ? STATUS_THEME.settled : theme;

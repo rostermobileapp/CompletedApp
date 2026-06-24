@@ -588,7 +588,7 @@ export default function GameDetails() {
             <button
               onClick={() => {
                 setPageTransitionDirection('right');
-                navigate('/payments');
+                navigate('/payment-requests');
               }}
               className="w-full rounded-xl border border-orange-400 bg-orange-50 dark:bg-orange-950/40 shadow-[var(--elev-rest)] p-4 flex items-center gap-3 text-left"
               data-testid="card-payment-due"
@@ -846,7 +846,7 @@ export default function GameDetails() {
                   <button
                     onClick={() => {
                       setPageTransitionDirection('right');
-                      navigate('/payments');
+                      navigate('/payment-requests');
                     }}
                     className="w-full mt-1 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-green-700"
                   >
