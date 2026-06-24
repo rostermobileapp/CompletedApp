@@ -198,19 +198,21 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
   // Photo state for reminder form
   const [reminderPhotoPreview, setReminderPhotoPreview] = useState<string | null>(null);
   const [reminderPhotoPath, setReminderPhotoPath] = useState<string | null>(null);
+  const [reminderPendingBlob, setReminderPendingBlob] = useState<Blob | null>(null);
   const [reminderPhotoUploading, setReminderPhotoUploading] = useState(false);
   const reminderPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Photo state for general event form
   const [generalEventPhotoPreview, setGeneralEventPhotoPreview] = useState<string | null>(null);
   const [generalEventPhotoPath, setGeneralEventPhotoPath] = useState<string | null>(null);
+  const [generalEventPendingBlob, setGeneralEventPendingBlob] = useState<Blob | null>(null);
   const [generalEventPhotoUploading, setGeneralEventPhotoUploading] = useState(false);
   const generalEventPhotoInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePhotoFile(
     file: File,
     setPreview: (url: string | null) => void,
-    setPath: (path: string | null) => void,
+    setPendingBlob: (blob: Blob | null) => void,
     setUploading: (v: boolean) => void,
   ) {
     if (!file.type.startsWith('image/')) return;
@@ -218,12 +220,29 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
     try {
       const cropped = await cropImageTo16x9(file);
       setPreview(URL.createObjectURL(cropped));
-      const path = await uploadEventPhoto(cropped);
+      setPendingBlob(cropped);
+    } catch {
+      toast({ title: 'Photo crop failed', description: 'Could not process photo.', variant: 'destructive' });
+      setPreview(null);
+      setPendingBlob(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function confirmPhoto(
+    blob: Blob,
+    setPath: (path: string | null) => void,
+    setPendingBlob: (blob: Blob | null) => void,
+    setUploading: (v: boolean) => void,
+  ) {
+    setUploading(true);
+    try {
+      const path = await uploadEventPhoto(blob);
       setPath(path);
+      setPendingBlob(null);
     } catch {
       toast({ title: 'Photo upload failed', description: 'Could not upload photo.', variant: 'destructive' });
-      setPreview(null);
-      setPath(null);
     } finally {
       setUploading(false);
     }
@@ -232,12 +251,14 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
   function resetReminderPhoto() {
     setReminderPhotoPreview(null);
     setReminderPhotoPath(null);
+    setReminderPendingBlob(null);
     if (reminderPhotoInputRef.current) reminderPhotoInputRef.current.value = '';
   }
 
   function resetGeneralEventPhoto() {
     setGeneralEventPhotoPreview(null);
     setGeneralEventPhotoPath(null);
+    setGeneralEventPendingBlob(null);
     if (generalEventPhotoInputRef.current) generalEventPhotoInputRef.current.value = '';
   }
 
@@ -600,28 +621,51 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handlePhotoFile(file, setReminderPhotoPreview, setReminderPhotoPath, setReminderPhotoUploading);
+                    if (file) handlePhotoFile(file, setReminderPhotoPreview, setReminderPendingBlob, setReminderPhotoUploading);
                   }}
                 />
                 {reminderPhotoPreview ? (
-                  <div className="relative w-full" style={{ aspectRatio: '16/9', maxHeight: 240 }}>
+                  <div className="relative w-full rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: 240 }}>
                     <img
                       src={reminderPhotoPreview}
                       alt="Cover photo preview"
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover"
                     />
                     {reminderPhotoUploading && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                         <Loader2 className="w-6 h-6 text-white animate-spin" />
                       </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={resetReminderPhoto}
-                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {!reminderPhotoUploading && reminderPendingBlob && (
+                      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2">
+                        <p className="text-white text-xs font-medium">16:9 crop preview</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => confirmPhoto(reminderPendingBlob, setReminderPhotoPath, setReminderPendingBlob, setReminderPhotoUploading)}
+                            className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1.5 rounded-full hover:bg-primary/90 transition-colors"
+                          >
+                            Crop & Use
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resetReminderPhoto}
+                            className="bg-black/60 text-white text-sm px-3 py-1.5 rounded-full hover:bg-black/80 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {!reminderPhotoUploading && !reminderPendingBlob && (
+                      <button
+                        type="button"
+                        onClick={resetReminderPhoto}
+                        className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -966,28 +1010,51 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handlePhotoFile(file, setGeneralEventPhotoPreview, setGeneralEventPhotoPath, setGeneralEventPhotoUploading);
+                    if (file) handlePhotoFile(file, setGeneralEventPhotoPreview, setGeneralEventPendingBlob, setGeneralEventPhotoUploading);
                   }}
                 />
                 {generalEventPhotoPreview ? (
-                  <div className="relative w-full" style={{ aspectRatio: '16/9', maxHeight: 240 }}>
+                  <div className="relative w-full rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: 240 }}>
                     <img
                       src={generalEventPhotoPreview}
                       alt="Cover photo preview"
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover"
                     />
                     {generalEventPhotoUploading && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                         <Loader2 className="w-6 h-6 text-white animate-spin" />
                       </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={resetGeneralEventPhoto}
-                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {!generalEventPhotoUploading && generalEventPendingBlob && (
+                      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2">
+                        <p className="text-white text-xs font-medium">16:9 crop preview</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => confirmPhoto(generalEventPendingBlob, setGeneralEventPhotoPath, setGeneralEventPendingBlob, setGeneralEventPhotoUploading)}
+                            className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1.5 rounded-full hover:bg-primary/90 transition-colors"
+                          >
+                            Crop & Use
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resetGeneralEventPhoto}
+                            className="bg-black/60 text-white text-sm px-3 py-1.5 rounded-full hover:bg-black/80 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {!generalEventPhotoUploading && !generalEventPendingBlob && (
+                      <button
+                        type="button"
+                        onClick={resetGeneralEventPhoto}
+                        className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button

@@ -422,6 +422,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } catch (err) {
     console.error('[Init] Failed to ensure scrimmages.invite_user_ids column:', err);
   }
+  // Ensure scrimmages.cover_photo exists (preset cover photo key for scrimmage creation)
+  try {
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS cover_photo text`);
+    console.log('[Init] scrimmages.cover_photo column ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure scrimmages.cover_photo column:', err);
+  }
   // Ensure scrimmage_requests.team_assignment exists (light/dark team colour assignment)
   try {
     await db.execute(sql`ALTER TABLE scrimmage_requests ADD COLUMN IF NOT EXISTS team_assignment varchar CHECK (team_assignment IN ('light', 'dark'))`);

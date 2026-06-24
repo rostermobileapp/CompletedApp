@@ -67,6 +67,7 @@ export default function TeamEventDetails() {
   const eventId = params?.id;
   const [substituteModalOpen, setSubstituteModalOpen] = useState(false);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
+  const [pendingCropBlob, setPendingCropBlob] = useState<Blob | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -140,10 +141,23 @@ export default function TeamEventDetails() {
     setIsUploadingPhoto(true);
     try {
       const cropped = await cropImageTo16x9(file);
-      const previewUrl = URL.createObjectURL(cropped);
-      setEditPhotoPreview(previewUrl);
+      setEditPhotoPreview(URL.createObjectURL(cropped));
+      setPendingCropBlob(cropped);
+    } catch {
+      toast({ title: "Error", description: "Failed to process photo.", variant: "destructive" });
+      setEditPhotoPreview(null);
+    } finally {
+      setIsUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }
+
+  async function confirmUploadPhoto() {
+    if (!pendingCropBlob) return;
+    setIsUploadingPhoto(true);
+    try {
       const formData = new FormData();
-      formData.append('photo', cropped, file.name);
+      formData.append('photo', pendingCropBlob, 'photo.jpg');
       const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/event-photos/upload', {
         method: 'POST',
@@ -152,14 +166,20 @@ export default function TeamEventDetails() {
       });
       if (!res.ok) throw new Error('Upload failed');
       const { path } = await res.json();
+      setPendingCropBlob(null);
       updatePhotoMutation.mutate(path);
     } catch {
       toast({ title: "Error", description: "Failed to upload photo.", variant: "destructive" });
       setEditPhotoPreview(null);
+      setPendingCropBlob(null);
     } finally {
       setIsUploadingPhoto(false);
-      if (photoInputRef.current) photoInputRef.current.value = '';
     }
+  }
+
+  function cancelPendingCrop() {
+    setEditPhotoPreview(null);
+    setPendingCropBlob(null);
   }
 
   if (isLoading) {
@@ -289,7 +309,26 @@ export default function TeamEventDetails() {
                   <p className="text-white text-sm font-medium">Uploading…</p>
                 </div>
               )}
-              {canEditPhoto && !isUploadingPhoto && (
+              {canEditPhoto && !isUploadingPhoto && pendingCropBlob && (
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2">
+                  <p className="text-white text-xs font-medium">16:9 crop preview</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={confirmUploadPhoto}
+                      className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1.5 rounded-full hover:bg-primary/90 transition-colors"
+                    >
+                      Crop & Use
+                    </button>
+                    <button
+                      onClick={cancelPendingCrop}
+                      className="bg-black/60 text-white text-sm px-3 py-1.5 rounded-full hover:bg-black/80 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              {canEditPhoto && !isUploadingPhoto && !pendingCropBlob && (
                 <div className="absolute bottom-3 right-3 flex gap-2">
                   <button
                     onClick={() => photoInputRef.current?.click()}
