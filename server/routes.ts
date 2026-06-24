@@ -14770,17 +14770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             announcementId: null, // Only first scrimmage has announcement
           });
 
-          // Auto-approve creator on each recurring child
-          try {
-            await storage.createScrimmageRequest({
-              scrimmageId: childScrimmage.id,
-              playerId: userId,
-              status: 'approved',
-              approvedAt: new Date(),
-            });
-          } catch (autoApproveChildError) {
-            console.error('[Scrimmage] Failed to auto-approve creator on child scrimmage:', autoApproveChildError);
-          }
+          // Creator must explicitly RSVP to join each recurring child scrimmage
           
           // Add co-hosts to child scrimmage as well
           if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
