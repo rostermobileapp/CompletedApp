@@ -15876,6 +15876,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Notify the removed player when a manager (creator or co-host) removes them
+      if (request.playerId !== userId) {
+        const scrimmageTitle = scrimmage.title || 'a scrimmage';
+        try {
+          await storage.createNotification({
+            userId: request.playerId,
+            type: 'general',
+            title: 'Removed from Scrimmage',
+            message: `You have been removed from ${scrimmageTitle}.`,
+          });
+        } catch (_) {}
+      }
+
       res.json({ message: 'Request deleted successfully' });
     } catch (error) {
       console.error('Error deleting request:', error);
