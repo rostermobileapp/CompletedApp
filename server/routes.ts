@@ -15710,19 +15710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`[Push] Scrimmage approval push to ${player.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
             
             
-            // Also send email if available
-            if (player.email && creator) {
-              await sendScrimmageApprovalEmail(player.email, {
-                scrimmageId: scrimmage.id,
-                title: scrimmage.title,
-                dateTime: new Date(scrimmage.dateTime),
-                location: scrimmage.location,
-                organizerName: `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer',
-                playerName: player.firstName || 'Player',
-                maxPlayers: scrimmage.maxPlayers,
-                currentPlayers: approvedCount,
-              });
-            }
+            // Email for scrimmage approval is intentionally disabled — push + in-app notification only
           }
         } catch (emailError) {
           // Log but don't fail the request if email fails
