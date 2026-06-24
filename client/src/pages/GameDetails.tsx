@@ -21,6 +21,7 @@ import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
+import { getScrimmageCoverSrc } from '@/lib/scrimmageCoverOptions';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
@@ -395,7 +396,16 @@ export default function GameDetails() {
 
         <div className="px-6 py-6 space-y-6">
           {/* Scrimmage Info */}
-          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] overflow-hidden">
+            {(() => {
+              const coverSrc = getScrimmageCoverSrc(scrimmage.coverPhoto);
+              return coverSrc ? (
+                <div className="w-full" style={{ aspectRatio: '16/9' }}>
+                  <img src={coverSrc} alt={scrimmage.title} className="w-full h-full object-cover" />
+                </div>
+              ) : null;
+            })()}
+            <div className="p-6">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                 <Trophy className="w-6 h-6 text-primary-foreground" />
@@ -442,6 +452,7 @@ export default function GameDetails() {
                 <ScrimmageRSVPButtons scrimmageId={gameId!} />
               </div>
             )}
+            </div>
           </div>
 
           {/* Team colour banner — shown only to approved players with an assignment */}

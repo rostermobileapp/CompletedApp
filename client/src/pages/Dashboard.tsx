@@ -96,13 +96,13 @@ const generalEventSchema = z.object({
   location: z.string().optional(),
 });
 
-async function cropImageTo3x5(file: File): Promise<Blob> {
+async function cropImageTo16x9(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const targetRatio = 3 / 5; // width / height
+      const targetRatio = 16 / 9; // width / height
       const srcRatio = img.width / img.height;
       let sx = 0, sy = 0, sw = img.width, sh = img.height;
       if (srcRatio > targetRatio) {
@@ -1309,7 +1309,7 @@ function DashboardMobile() {
   const handleReminderPhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const cropped = await cropImageTo3x5(file);
+    const cropped = await cropImageTo16x9(file);
     const croppedFile = new File([cropped], file.name, { type: cropped.type });
     setReminderPhotoFile(croppedFile);
     setReminderPhotoPreview(URL.createObjectURL(cropped));
@@ -1318,7 +1318,7 @@ function DashboardMobile() {
   const handleEventPhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const cropped = await cropImageTo3x5(file);
+    const cropped = await cropImageTo16x9(file);
     const croppedFile = new File([cropped], file.name, { type: cropped.type });
     setEventPhotoFile(croppedFile);
     setEventPhotoPreview(URL.createObjectURL(cropped));
@@ -3860,7 +3860,7 @@ function DashboardMobile() {
                   onChange={handleReminderPhotoChange}
                 />
                 {reminderPhotoPreview ? (
-                  <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '3/5' }}>
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '16/9' }}>
                     <img src={reminderPhotoPreview} alt="Cover preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -4112,7 +4112,7 @@ function DashboardMobile() {
                   onChange={handleEventPhotoChange}
                 />
                 {eventPhotoPreview ? (
-                  <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '3/5' }}>
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ aspectRatio: '16/9' }}>
                     <img src={eventPhotoPreview} alt="Cover preview" className="w-full h-full object-cover" />
                     <button
                       type="button"

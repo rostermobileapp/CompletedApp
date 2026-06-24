@@ -290,7 +290,7 @@ export default function Calendar() {
                     data-testid={`card-reminder-${event.id}`}
                   >
                     {event.photoUrl && (
-                      <div className="w-full" style={{ aspectRatio: '3/5' }}>
+                      <div className="w-full" style={{ aspectRatio: '16/9' }}>
                         <img
                           src={event.photoUrl}
                           alt={event.title}

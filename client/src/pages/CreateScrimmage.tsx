@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { SCRIMMAGE_COVER_OPTIONS } from '@/lib/scrimmageCoverOptions';
 import { RinkPickerField } from '@/components/RinkPickerField';
 import type { RinkSelection } from '@/components/RinkPickerField';
 import { DayPicker } from 'react-day-picker';
@@ -167,6 +168,7 @@ export default function CreateScrimmage() {
       // Reminder defaults
       enableReminders: true,
       reminderHoursBefore: [24], // Default to 24 hours before
+      coverPhoto: null,
     },
   });
 
@@ -271,6 +273,9 @@ export default function CreateScrimmage() {
       });
       if (existingScrimmage.color) {
         setSelectedColor(existingScrimmage.color);
+      }
+      if (existingScrimmage.coverPhoto) {
+        form.setValue('coverPhoto', existingScrimmage.coverPhoto);
       }
       if (existingScrimmage.venmoLinkOverride) setShowVenmoOverride(true);
       if (existingScrimmage.cashappLinkOverride) setShowCashAppOverride(true);
@@ -396,6 +401,8 @@ export default function CreateScrimmage() {
         sendInviteNow: !isEditMode && data.sendInviteNow,
         // Calendar color
         color: selectedColor || null,
+        // Cover photo
+        coverPhoto: data.coverPhoto || null,
       };
 
       if (isEditMode && scrimmageId) {
@@ -689,6 +696,41 @@ export default function CreateScrimmage() {
                     data-testid={`color-swatch-${color.label.toLowerCase()}`}
                   />
                 ))}
+              </div>
+            </div>
+
+            {/* Cover Photo Picker */}
+            <div>
+              <Label>Cover Photo (Optional)</Label>
+              <p className="text-xs text-muted-foreground mb-2">Choose a photo to display at the top of this scrimmage</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                {SCRIMMAGE_COVER_OPTIONS.map((option) => {
+                  const isSelected = form.watch('coverPhoto') === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => form.setValue('coverPhoto', isSelected ? null : option.id)}
+                      className="relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all"
+                      style={{
+                        width: 120,
+                        aspectRatio: '16/9',
+                        borderColor: isSelected ? 'hsl(var(--primary))' : 'transparent',
+                        boxShadow: isSelected ? '0 0 0 2px hsl(var(--primary))' : 'none',
+                      }}
+                      title={option.label}
+                    >
+                      <img src={option.src} alt={option.label} className="w-full h-full object-cover" />
+                      {isSelected && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <div className="bg-primary rounded-full p-1">
+                            <Check className="w-3 h-3 text-primary-foreground" />
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

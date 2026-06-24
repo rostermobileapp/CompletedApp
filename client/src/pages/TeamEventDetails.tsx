@@ -111,13 +111,13 @@ export default function TeamEventDetails() {
     },
   });
 
-  async function cropImageTo3x5(file: File): Promise<Blob> {
+  async function cropImageTo16x9(file: File): Promise<Blob> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const targetRatio = 3 / 5;
+        const targetRatio = 16 / 9;
         const srcRatio = img.width / img.height;
         let sx = 0, sy = 0, sw = img.width, sh = img.height;
         if (srcRatio > targetRatio) { sw = img.height * targetRatio; sx = (img.width - sw) / 2; }
@@ -139,7 +139,7 @@ export default function TeamEventDetails() {
     if (!file) return;
     setIsUploadingPhoto(true);
     try {
-      const cropped = await cropImageTo3x5(file);
+      const cropped = await cropImageTo16x9(file);
       const previewUrl = URL.createObjectURL(cropped);
       setEditPhotoPreview(previewUrl);
       const formData = new FormData();
@@ -278,7 +278,7 @@ export default function TeamEventDetails() {
 
           {/* Photo display / edit area */}
           {displayPhotoUrl ? (
-            <div className="relative w-full" style={{ aspectRatio: '3/5' }}>
+            <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
               <img
                 src={displayPhotoUrl}
                 alt={eventData.title}

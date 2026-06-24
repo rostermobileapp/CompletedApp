@@ -143,13 +143,36 @@ interface AddEventDialogProps {
  * this component does not introduce any new network requests on the desktop
  * code path.
  */
-async function uploadEventPhoto(file: File): Promise<string> {
+async function cropImageTo16x9(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const targetRatio = 16 / 9;
+      const srcRatio = img.width / img.height;
+      let sx = 0, sy = 0, sw = img.width, sh = img.height;
+      if (srcRatio > targetRatio) { sw = img.height * targetRatio; sx = (img.width - sw) / 2; }
+      else { sh = img.width / targetRatio; sy = (img.height - sh) / 2; }
+      const canvas = document.createElement('canvas');
+      canvas.width = sw; canvas.height = sh;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas not available'));
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('toBlob failed')), file.type || 'image/jpeg', 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
+async function uploadEventPhoto(file: File | Blob, filename?: string): Promise<string> {
   const res = await apiRequest('POST', '/api/event-photos/upload', {});
   const { uploadURL, path } = await res.json();
   const putRes = await fetch(uploadURL, {
     method: 'PUT',
     body: file,
-    headers: { 'Content-Type': file.type },
+    headers: { 'Content-Type': file.type || 'image/jpeg' },
   });
   if (!putRes.ok) {
     throw new Error(`Photo upload failed: ${putRes.status} ${putRes.statusText}`);
@@ -191,10 +214,11 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
     setUploading: (v: boolean) => void,
   ) {
     if (!file.type.startsWith('image/')) return;
-    setPreview(URL.createObjectURL(file));
     setUploading(true);
     try {
-      const path = await uploadEventPhoto(file);
+      const cropped = await cropImageTo16x9(file);
+      setPreview(URL.createObjectURL(cropped));
+      const path = await uploadEventPhoto(cropped);
       setPath(path);
     } catch {
       toast({ title: 'Photo upload failed', description: 'Could not upload photo.', variant: 'destructive' });
@@ -567,7 +591,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
               <div>
                 <label className="text-sm font-medium leading-none">Cover Photo (Optional)</label>
                 <p className="text-xs text-muted-foreground mt-1 mb-2">
-                  Displayed at 3:5 portrait ratio across the top of the event card
+                  Displayed at 16:9 landscape ratio across the top of the event card
                 </p>
                 <input
                   ref={reminderPhotoInputRef}
@@ -580,7 +604,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   }}
                 />
                 {reminderPhotoPreview ? (
-                  <div className="relative w-full" style={{ aspectRatio: '3/5', maxHeight: 240 }}>
+                  <div className="relative w-full" style={{ aspectRatio: '16/9', maxHeight: 240 }}>
                     <img
                       src={reminderPhotoPreview}
                       alt="Cover photo preview"
@@ -933,7 +957,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
               <div>
                 <label className="text-sm font-medium leading-none">Cover Photo (Optional)</label>
                 <p className="text-xs text-muted-foreground mt-1 mb-2">
-                  Displayed at 3:5 portrait ratio across the top of the event card
+                  Displayed at 16:9 landscape ratio across the top of the event card
                 </p>
                 <input
                   ref={generalEventPhotoInputRef}
@@ -946,7 +970,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
                   }}
                 />
                 {generalEventPhotoPreview ? (
-                  <div className="relative w-full" style={{ aspectRatio: '3/5', maxHeight: 240 }}>
+                  <div className="relative w-full" style={{ aspectRatio: '16/9', maxHeight: 240 }}>
                     <img
                       src={generalEventPhotoPreview}
                       alt="Cover photo preview"
