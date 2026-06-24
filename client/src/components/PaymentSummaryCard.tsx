@@ -87,6 +87,66 @@ export function PaymentSummaryCard({ request, isCreator, clickable = true }: Pay
       }
     : undefined;
 
+  if (!isCreator) {
+    // Recipient view — show only personal status, no group aggregates
+    const myRecipient = recipients[0]; // backend already filtered to only this user's row
+    const isPaid = myRecipient?.isPaid ?? false;
+    const recipientStatus: PaymentStatus = isPaid ? 'settled' : computePaymentStatus(recipients, deadline);
+    const recipientTheme = STATUS_THEME[recipientStatus];
+    const recipientDueLine = getDueLine(recipientStatus, deadline, isPaid && myRecipient?.paidAt ? new Date(myRecipient.paidAt) : null);
+
+    return (
+      <div
+        className={wrapperClass}
+        onClick={handleClick}
+        data-testid={`payment-request-card-${request.id}`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-base leading-tight truncate" data-testid={`text-request-title-${request.id}`}>
+              {request.title}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {formatMoney(amountPerPerson)} per player
+            </p>
+          </div>
+          <span
+            className={`shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${recipientTheme.pillBg} ${recipientTheme.pillText}`}
+            data-testid={`status-pill-${request.id}`}
+          >
+            {isPaid ? 'Paid' : recipientTheme.pillLabel}
+          </span>
+        </div>
+
+        <div className="mb-1.5">
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-xs text-muted-foreground">{isPaid ? 'Paid' : 'Amount Due'}</span>
+            <span className="text-sm font-medium" data-testid={`text-collected-${request.id}`}>
+              {formatMoney(amountPerPerson)}
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${recipientTheme.bar}`}
+              style={{ width: isPaid ? '100%' : '0%' }}
+              data-testid={`progress-bar-${request.id}`}
+            />
+          </div>
+        </div>
+
+        {recipientDueLine && (
+          <p
+            className={`text-xs ${recipientStatus === 'overdue' ? recipientTheme.text : 'text-muted-foreground'}`}
+            data-testid={`text-due-line-${request.id}`}
+          >
+            {recipientDueLine}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Creator view — show full aggregate tracking
   return (
     <div
       className={wrapperClass}

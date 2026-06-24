@@ -19288,7 +19288,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const paymentRequests = await storage.getPaymentRequestsByRecipient(userId);
-      res.json(paymentRequests);
+      // Non-creators only see their own recipient row in each request
+      const filtered = paymentRequests.map((pr: any) => ({
+        ...pr,
+        recipients: pr.recipients.filter((r: any) => r.userId === userId),
+      }));
+      res.json(filtered);
     } catch (error) {
       console.error("Error fetching received payment requests:", error);
       res.status(500).json({ message: "Failed to fetch payment requests" });
@@ -19327,7 +19332,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You do not have access to this payment request" });
       }
 
-      res.json(paymentRequest);
+      // Non-creators only see their own recipient row — never other players' statuses
+      const responseData = isCreator
+        ? paymentRequest
+        : { ...paymentRequest, recipients: paymentRequest.recipients.filter((r: any) => r.userId === userId) };
+
+      res.json(responseData);
     } catch (error) {
       console.error("Error fetching payment request:", error);
       res.status(500).json({ message: "Failed to fetch payment request" });
@@ -19361,7 +19371,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const paymentRequests = await storage.getPaymentRequestsByScrimmage(scrimmageId);
-      res.json(paymentRequests);
+      // Non-creators only see their own recipient row
+      const responseData = isCreator
+        ? paymentRequests
+        : paymentRequests.map((pr: any) => ({
+            ...pr,
+            recipients: pr.recipients.filter((r: any) => r.userId === userId),
+          }));
+      res.json(responseData);
     } catch (error) {
       console.error("Error fetching scrimmage payment requests:", error);
       res.status(500).json({ message: "Failed to fetch payment requests" });
