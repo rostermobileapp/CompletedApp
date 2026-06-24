@@ -5420,8 +5420,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteLeague(league.id);
       res.json({ message: "League deleted successfully" });
     } catch (error: any) {
-      console.error("Error deleting league:", error?.message || error);
-      res.status(500).json({ message: "Failed to delete league" });
+      const detail = error?.message || String(error);
+      console.error("Error deleting league:", detail, error?.detail, error?.constraint);
+      res.status(500).json({ message: "Failed to delete league", detail, constraint: error?.constraint });
     }
   });
 
