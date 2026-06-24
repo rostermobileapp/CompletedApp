@@ -12,6 +12,7 @@ import type { User } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
+import { fireFirstRsvpTrigger } from "@/lib/firstRsvpTrigger";
 
 interface TeamEventData {
   id: string;
@@ -83,6 +84,7 @@ export default function TeamEventDetails() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/team-events/${eventId}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
+      fireFirstRsvpTrigger();
       toast({
         title: "RSVP Updated",
         description: "Your attendance status has been updated.",

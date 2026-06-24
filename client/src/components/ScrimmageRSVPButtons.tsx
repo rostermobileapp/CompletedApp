@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { fireFirstRsvpTrigger } from "@/lib/firstRsvpTrigger";
 import { ScrimmageRequest } from "@shared/schema";
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ export function ScrimmageRSVPButtons({ scrimmageId, className }: ScrimmageRSVPBu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", "scrimmage-requests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scrimmages", scrimmageId, "requests"] });
+      fireFirstRsvpTrigger();
       toast({
         title: "Request Sent",
         description: "Your request to join this scrimmage has been sent to the creator.",

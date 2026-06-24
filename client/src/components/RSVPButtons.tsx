@@ -10,6 +10,7 @@ import { apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { setPageTransitionDirection } from "@/components/PageTransition";
 import { SubstituteRequestDetailsModal } from "./SubstituteRequestDetailsModal";
+import { fireFirstRsvpTrigger } from "@/lib/firstRsvpTrigger";
 
 interface Substitute {
   requestId: string;
@@ -128,6 +129,7 @@ export function RSVPButtons({ gameId, userId, userTeamId, className, onRequestSu
     onSuccess: (_, status) => {
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp?teamId=${userTeamId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/rsvp-summary?teamId=${userTeamId}`] });
+      fireFirstRsvpTrigger();
       toast({
         title: "RSVP Updated",
         description: status === 'attending' 
