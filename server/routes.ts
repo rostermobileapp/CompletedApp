@@ -6241,6 +6241,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const membership = await storage.approveLeagueMembership(membershipId, userId);
       res.json(membership);
+
+      // Notify the approved player (fire-and-forget)
+      storage.getLeague(membership.leagueId).then(async (league) => {
+        if (!league || !membership.userId) return;
+        broadcastToUser(membership.userId, {
+          type: 'membership_approved',
+          leagueId: membership.leagueId,
+          leagueName: league.name,
+        });
+        const { sendLeagueMemberApprovedPushNotification } = await import('./oneSignalNotifications');
+        sendLeagueMemberApprovedPushNotification(
+          membership.userId,
+          league.name,
+          membership.leagueId
+        ).catch(console.error);
+      }).catch(err => console.error('[Notifications] Failed to send league approval notification:', err));
     } catch (error) {
       console.error("Error approving membership:", error);
       res.status(500).json({ message: "Failed to approve membership" });
@@ -8375,6 +8391,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }).catch((err: Error) => console.error('[TeamInvite] Email send failed:', err));
         });
       }
+
+      // If the email matched a real registered user, send them a push notification
+      const addedUserId = (membership as any).userId;
+      if (addedUserId) {
+        broadcastToUser(addedUserId, {
+          type: 'added_to_team',
+          teamId,
+          teamName: team.name,
+        });
+        import('./oneSignalNotifications').then(({ sendAddedToTeamPushNotification }) => {
+          sendAddedToTeamPushNotification(addedUserId, team.name, teamId)
+            .catch((err: Error) => console.error('[TeamAdd] Push send failed:', err));
+        }).catch(console.error);
+      }
     } catch (error) {
       console.error('Error adding manual player:', error);
       res.status(500).json({ message: error instanceof Error ? error.message : 'Failed to add player' });
@@ -8538,6 +8568,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const approvedRequest = await storage.approveTeamJoinLeague(requestId, userId);
       res.json(approvedRequest);
+
+      // Notify the team creator (fire-and-forget)
+      storage.getTeam(theRequest.teamId).then(async (team) => {
+        if (!team || !team.creatorId) return;
+        broadcastToUser(team.creatorId, {
+          type: 'team_league_approved',
+          leagueId: theRequest.leagueId,
+          teamId: team.id,
+          leagueName: league.name,
+          teamName: team.name,
+        });
+        const { sendTeamLeagueApprovedPushNotification } = await import('./oneSignalNotifications');
+        sendTeamLeagueApprovedPushNotification(
+          team.creatorId,
+          team.name,
+          league.name,
+          theRequest.leagueId
+        ).catch(console.error);
+      }).catch(err => console.error('[Notifications] Failed to send team league approval notification:', err));
     } catch (error) {
       console.error('Error approving team league request:', error);
       res.status(500).json({ message: 'Failed to approve team league request' });
@@ -8615,6 +8664,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const approvedRequest = await storage.approveTeamJoinLeague(requestId, userId);
       res.json(approvedRequest);
+
+      // Notify the team creator (fire-and-forget)
+      storage.getTeam(theRequest.teamId).then(async (team) => {
+        if (!team || !team.creatorId) return;
+        broadcastToUser(team.creatorId, {
+          type: 'team_league_approved',
+          leagueId: theRequest.leagueId,
+          teamId: team.id,
+          leagueName: league.name,
+          teamName: team.name,
+        });
+        const { sendTeamLeagueApprovedPushNotification } = await import('./oneSignalNotifications');
+        sendTeamLeagueApprovedPushNotification(
+          team.creatorId,
+          team.name,
+          league.name,
+          theRequest.leagueId
+        ).catch(console.error);
+      }).catch(err => console.error('[Notifications] Failed to send team league approval notification:', err));
     } catch (error) {
       console.error('Error approving team league request:', error);
       res.status(500).json({ message: 'Failed to approve team league request' });

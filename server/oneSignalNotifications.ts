@@ -257,6 +257,76 @@ export async function sendJoinRequestPushNotification(
   });
 }
 
+export async function sendLeagueMemberApprovedPushNotification(
+  recipientId: string,
+  leagueName: string,
+  leagueId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.joinRequests === false) {
+    console.log(`[OneSignal] Join/approval notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🎉 League Request Approved`,
+    message: `You've been approved to join ${leagueName}!`,
+    data: {
+      type: 'membership_approved',
+      leagueId,
+    },
+  });
+}
+
+export async function sendTeamLeagueApprovedPushNotification(
+  recipientId: string,
+  teamName: string,
+  leagueName: string,
+  leagueId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.joinRequests === false) {
+    console.log(`[OneSignal] Join/approval notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🎉 Team Request Approved`,
+    message: `${teamName} has been approved to join ${leagueName}!`,
+    data: {
+      type: 'team_league_approved',
+      leagueId,
+    },
+  });
+}
+
+export async function sendAddedToTeamPushNotification(
+  recipientId: string,
+  teamName: string,
+  teamId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.joinRequests === false) {
+    console.log(`[OneSignal] Join/approval notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏒 Added to Team`,
+    message: `You've been added to ${teamName}!`,
+    data: {
+      type: 'added_to_team',
+      teamId,
+    },
+  });
+}
+
 export async function sendScheduleReminderPushNotification(
   recipientId: string,
   eventTitle: string,
