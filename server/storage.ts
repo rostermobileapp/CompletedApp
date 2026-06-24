@@ -2452,10 +2452,13 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // 25. Delete league memberships
+    // 25. Delete placeholder players for this league
+    await db.delete(placeholderPlayers).where(eq(placeholderPlayers.leagueId, id));
+
+    // 26. Delete league memberships
     await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, id));
     
-    // 26. Finally, delete the league itself
+    // 27. Finally, delete the league itself
     await db.delete(leagues).where(eq(leagues.id, id));
   }
 
