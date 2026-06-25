@@ -3101,12 +3101,14 @@ function DashboardMobile() {
             // the usual eligibility filter (scrimmages, user-team games, subs, tournaments).
             let calendarGames: any[];
             if (scheduleScope === 'league') {
-              calendarGames = Array.isArray(scheduleGames) ? (scheduleGames as any[]) : [];
+              calendarGames = Array.isArray(scheduleGames)
+                ? (scheduleGames as any[]).filter((game: any) => !game.isScrimmage)
+                : [];
             } else {
               const userTeamIds = Array.isArray(userTeams) ? userTeams.map((t: any) => t.id) : [];
               calendarGames = Array.isArray(scheduleGames)
                 ? (scheduleGames as any[]).filter((game: any) => {
-                    if (game.isScrimmage) return true;
+                    if (game.isScrimmage) return false;
                     const isOnTeam =
                       userTeamIds.includes(game.homeTeamId) ||
                       userTeamIds.includes(game.awayTeamId);
