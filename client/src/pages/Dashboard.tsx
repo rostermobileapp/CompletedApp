@@ -3212,7 +3212,6 @@ function DashboardMobile() {
                             <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">
                               {isOwnScrimmage ? 'My Scrimmage' : 'Invite'}
                             </span>
-                            {isOwnScrimmage && <ScrimmageRequestsBadge scrimmageId={invite.id} />}
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
                             {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
@@ -3246,6 +3245,11 @@ function DashboardMobile() {
                       </div>
                     );
                   })()}
+                  {invite.creatorId === (userProfile as any)?.id && (
+                    <div className="absolute bottom-2 right-2">
+                      <ScrimmageRequestsBadge scrimmageId={invite.id} />
+                    </div>
+                  )}
                 </div>
               ))}
               
