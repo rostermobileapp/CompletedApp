@@ -3249,9 +3249,12 @@ function DashboardMobile() {
                           <Trophy className="w-6 h-6 text-primary-foreground" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
-                            {scrimmage.title}
-                          </h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
+                              {scrimmage.title}
+                            </h3>
+                            <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded flex-shrink-0">Scrimmage</span>
+                          </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
                             {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}
                           </p>
@@ -3335,9 +3338,10 @@ function DashboardMobile() {
                   );
                 })}
               
-              {/* Show team events (general events and scrimmages) */}
+              {/* Show team events (general events only — scrimmages handled above) */}
               {Array.isArray(teamEvents) && teamEvents
                 .filter((event: any) => {
+                  if (event.eventType === 'scrimmage') return false;
                   const eventDate = new Date(event.scheduledAt);
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
