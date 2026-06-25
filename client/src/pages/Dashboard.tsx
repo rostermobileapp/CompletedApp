@@ -31,6 +31,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import PastSeasonsModal from '@/components/PastSeasonsModal';
 import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
 import { ScheduleCalendarMobile } from '@/components/dashboard/ScheduleCalendarMobile';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
