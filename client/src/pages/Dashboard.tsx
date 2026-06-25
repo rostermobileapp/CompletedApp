@@ -3238,6 +3238,8 @@ function DashboardMobile() {
               {scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests
                 .filter((request: any) => {
                   if (request.status !== 'approved' || !request.scrimmage) return false;
+                  // Creator's own scrimmages already appear in the invites section above — skip here
+                  if (request.scrimmage.creatorId === (userProfile as any)?.id) return false;
                   const eventDate = new Date(request.scrimmage.dateTime);
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
