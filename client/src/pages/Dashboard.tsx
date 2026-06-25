@@ -1174,7 +1174,7 @@ function ScrimmageRequestsBadge({ scrimmageId }: { scrimmageId: string }) {
   const pendingCount = (requests as any[]).filter((r: any) => r.status === 'pending').length;
   if (pendingCount === 0) return null;
   return (
-    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex-shrink-0">
+    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white font-bold flex-shrink-0 text-[14px]">
       {pendingCount}
     </span>
   );
