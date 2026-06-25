@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,13 @@ export function ScrimmageRSVPButtons({ scrimmageId, className }: ScrimmageRSVPBu
 
   const currentRequest = userRequests.find(req => req.scrimmageId === scrimmageId);
   const currentStatus = currentRequest?.status || 'no_request';
+
+  // Fire the first-RSVP OneSignal trigger when approval is confirmed
+  useEffect(() => {
+    if (currentStatus === 'approved') {
+      fireFirstRsvpTrigger();
+    }
+  }, [currentStatus]);
 
   // Join scrimmage mutation
   const joinMutation = useMutation({

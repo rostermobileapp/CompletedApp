@@ -439,6 +439,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch { /* constraint already exists — no-op */ }
   }
 
+  // Ensure users.first_rsvp_triggered exists (tracks first-ever RSVP for OneSignal in-app trigger)
+  try {
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_rsvp_triggered boolean DEFAULT false`);
+  } catch (err) {
+    console.error('[Init] Failed to ensure users.first_rsvp_triggered column:', err);
+  }
+
   // Initialize user registration count table
   try {
     await db.execute(sql`
@@ -768,6 +775,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Mark first RSVP — returns { isFirst: true } the very first time, { isFirst: false } thereafter
+  app.post('/api/user/first-rsvp-trigger', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const result = await db.execute(
+        sql`SELECT first_rsvp_triggered FROM users WHERE id = ${userId}`
+      );
+      const row = result.rows[0] as any;
+      if (!row) return res.status(404).json({ message: 'User not found' });
+
+      if (row.first_rsvp_triggered) {
+        return res.json({ isFirst: false });
+      }
+
+      await db.execute(
+        sql`UPDATE users SET first_rsvp_triggered = true WHERE id = ${userId}`
+      );
+      return res.json({ isFirst: true });
+    } catch (error) {
+      console.error('Error in first-rsvp-trigger:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Admin/support reset — clears the first_rsvp_triggered flag for a user by displayId
+  app.post('/api/admin/reset-first-rsvp/:displayId', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const requestingUser = await storage.getUser(requestingUserId);
+      if (!requestingUser?.specialPermissions?.includes('support_staff' as any) &&
+          requestingUser?.role !== 'commissioner') {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      const { displayId } = req.params;
+      const result = await db.execute(
+        sql`UPDATE users SET first_rsvp_triggered = false WHERE display_id = ${displayId} RETURNING display_id`
+      );
+      if (!result.rows.length) {
+        return res.status(404).json({ message: `No user found with displayId ${displayId}` });
+      }
+      res.json({ message: `first_rsvp_triggered reset for ${displayId}` });
+    } catch (error) {
+      console.error('Error resetting first-rsvp-trigger:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
 

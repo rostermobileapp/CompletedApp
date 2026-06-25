@@ -1,23 +1,34 @@
-const STORAGE_KEY = 'rosters_first_rsvp_fired';
+import { getAuthHeaders } from '@/lib/queryClient';
 
 /**
  * Fire the OneSignal in-app trigger "first_rsvp_completed = true" exactly once
- * per device. Safe to call on every RSVP success — a localStorage flag prevents
- * it from firing more than once.
+ * per user (tracked server-side so it survives reinstalls and multi-device use).
  *
  * In the OneSignal dashboard set:
  *   In-App Trigger  key: first_rsvp_completed  is  true
  */
-export function fireFirstRsvpTrigger(): void {
+export async function fireFirstRsvpTrigger(): Promise<void> {
   if (typeof window === 'undefined') return;
 
-  if (localStorage.getItem(STORAGE_KEY)) return;
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/user/first-rsvp-trigger', {
+      method: 'POST',
+      headers,
+    });
 
-  localStorage.setItem(STORAGE_KEY, '1');
+    if (!res.ok) return;
 
-  const key = 'first_rsvp_completed';
-  const value = 'true';
+    const { isFirst } = await res.json();
+    if (!isFirst) return;
 
+    setOneSignalTrigger('first_rsvp_completed', 'true');
+  } catch (err) {
+    console.warn('[OneSignal] fireFirstRsvpTrigger error:', err);
+  }
+}
+
+function setOneSignalTrigger(key: string, value: string): void {
   const hasNativelySDK = typeof (window as any).NativelyNotifications === 'function';
 
   if (hasNativelySDK) {
@@ -25,10 +36,10 @@ export function fireFirstRsvpTrigger(): void {
       const notifications = new (window as any).NativelyNotifications();
       if (typeof notifications.addTrigger === 'function') {
         notifications.addTrigger(key, value);
-        console.log('[OneSignal] first_rsvp_completed trigger set via Natively');
+        console.log(`[OneSignal] ${key} trigger set via Natively`);
       }
     } catch (err) {
-      console.warn('[OneSignal] Could not set first_rsvp trigger via Natively:', err);
+      console.warn('[OneSignal] Could not set trigger via Natively:', err);
     }
     return;
   }
@@ -37,9 +48,9 @@ export function fireFirstRsvpTrigger(): void {
     (window as any).OneSignalDeferred.push((OneSignal: any) => {
       try {
         OneSignal.InAppMessages?.addTrigger(key, value);
-        console.log('[OneSignal] first_rsvp_completed trigger set via web SDK');
+        console.log(`[OneSignal] ${key} trigger set via web SDK`);
       } catch (err) {
-        console.warn('[OneSignal] Could not set first_rsvp trigger via web SDK:', err);
+        console.warn('[OneSignal] Could not set trigger via web SDK:', err);
       }
     });
   }
