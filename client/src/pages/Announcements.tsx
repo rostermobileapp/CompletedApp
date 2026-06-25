@@ -930,7 +930,8 @@ function AnnouncementCard({
             </div>
             <ScrimmageRSVPButtons 
               scrimmageId={matchingScrimmage.id} 
-              className="justify-start" 
+              className="justify-start"
+              isCreator={matchingScrimmage.creatorId === currentUserId}
             />
           </div>
         ) : (

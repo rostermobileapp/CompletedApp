@@ -542,7 +542,7 @@ export default function GameDetails() {
 
             {/* RSVP Buttons for all users — creators must also opt in explicitly */}
             <div className="mt-6 pt-4 border-t border-border">
-              <ScrimmageRSVPButtons scrimmageId={gameId!} />
+              <ScrimmageRSVPButtons scrimmageId={gameId!} isCreator={isScrimmageCreator} />
             </div>
             </div>
           </div>

@@ -16264,37 +16264,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only the creator can cancel the scrimmage' });
       }
       
-      // Get approved players before deleting
-      const requests = await storage.getScrimmageRequests(scrimmageId);
-      const approvedRequests = requests.filter(req => req.status === 'approved');
-      
-      // Delete the scrimmage (this will cascade delete requests)
+      // Gather all players to notify before deleting:
+      // 1) approved join-requests, 2) checked-in invitees — excluding the creator
+      const [requests, invites] = await Promise.all([
+        storage.getScrimmageRequests(scrimmageId),
+        storage.getScrimmageInvites(scrimmageId),
+      ]);
+      const approvedPlayerIds = requests
+        .filter(r => r.status === 'approved' && r.playerId !== userId)
+        .map(r => r.playerId);
+      const checkedInInviteeIds = invites
+        .filter(i => i.checkedIn && i.inviteeId !== userId)
+        .map(i => i.inviteeId);
+      const targetUserIds = [...new Set([...approvedPlayerIds, ...checkedInInviteeIds])];
+
+      // Delete the scrimmage (cascades requests + invites)
       await storage.deleteScrimmage(scrimmageId);
       
-      // Send cancellation notification to approved players
-      if (approvedRequests.length > 0) {
-        // Get league timezone for proper date formatting
+      // Notify all confirmed players (if any and if scrimmage is league-linked)
+      if (targetUserIds.length > 0 && scrimmage.leagueId) {
         const league = await storage.getLeague(scrimmage.leagueId);
         const timezone = league?.timezone || 'America/New_York';
-        
-        const targetUserIds = approvedRequests.map(req => req.playerId);
         const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location} has been cancelled by the organizer.`;
         
         try {
-          // Create announcement
           const announcement = await storage.createAnnouncement({
             content: announcementContent,
             leagueId: scrimmage.leagueId,
             authorId: userId,
             isPinned: false,
           });
-          
-          // Create visibility records for approved players
           await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
-          
         } catch (announcementError) {
           console.error('Error sending cancellation notifications:', announcementError);
-          // Don't fail the deletion if announcement fails
         }
       }
       

@@ -22,9 +22,10 @@ import { useState } from "react";
 interface ScrimmageRSVPButtonsProps {
   scrimmageId: string;
   className?: string;
+  isCreator?: boolean;
 }
 
-export function ScrimmageRSVPButtons({ scrimmageId, className }: ScrimmageRSVPButtonsProps) {
+export function ScrimmageRSVPButtons({ scrimmageId, className, isCreator }: ScrimmageRSVPButtonsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -37,12 +38,12 @@ export function ScrimmageRSVPButtons({ scrimmageId, className }: ScrimmageRSVPBu
   const currentRequest = userRequests.find(req => req.scrimmageId === scrimmageId);
   const currentStatus = currentRequest?.status || 'no_request';
 
-  // Fire the first-RSVP OneSignal trigger when approval is confirmed
+  // Fire the first-RSVP OneSignal trigger when approval is confirmed (skip if creator joining own scrimmage)
   useEffect(() => {
-    if (currentStatus === 'approved') {
+    if (currentStatus === 'approved' && !isCreator) {
       fireFirstRsvpTrigger();
     }
-  }, [currentStatus]);
+  }, [currentStatus, isCreator]);
 
   // Join scrimmage mutation
   const joinMutation = useMutation({
@@ -52,7 +53,7 @@ export function ScrimmageRSVPButtons({ scrimmageId, className }: ScrimmageRSVPBu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", "scrimmage-requests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scrimmages", scrimmageId, "requests"] });
-      fireFirstRsvpTrigger();
+      if (!isCreator) fireFirstRsvpTrigger();
       toast({
         title: "Request Sent",
         description: "Your request to join this scrimmage has been sent to the creator.",
