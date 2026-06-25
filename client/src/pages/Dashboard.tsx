@@ -2949,7 +2949,7 @@ function DashboardMobile() {
                       <Clipboard className="w-5 h-5 text-white" />
                     </div>
                     <div className="text-left">
-                      <p className="text-[16px] text-[#212121]">Scorekeeper</p>
+                      <p className="text-[#212121] text-[12px] font-medium">Scorekeeper</p>
                     </div>
                   </button>
                 </div>
