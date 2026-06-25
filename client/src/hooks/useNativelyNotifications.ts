@@ -151,25 +151,33 @@ export function useNativelyNotifications() {
   // Set or remove the In-App trigger based on permission status
   // This triggers OneSignal In-App messages when permission is NOT enabled
   const updateInAppTrigger = useCallback((hasPermission: boolean) => {
+    let triggeredViaNatively = false;
+
     if (isNativeSDK) {
       const notifications = getNativelyInstance();
       if (notifications && 'addTrigger' in notifications) {
         if (!hasPermission) {
           (notifications as any).addTrigger?.("permission_not_enabled", "true");
-          console.log('[OneSignal] Set in-app trigger: permission_not_enabled = true');
+          console.log('[OneSignal] Set in-app trigger: permission_not_enabled = true (Natively)');
         } else {
           (notifications as any).removeTrigger?.("permission_not_enabled");
-          console.log('[OneSignal] Removed in-app trigger: permission_not_enabled');
+          console.log('[OneSignal] Removed in-app trigger: permission_not_enabled (Natively)');
         }
+        triggeredViaNatively = true;
+      } else {
+        console.log('[OneSignal] Natively instance has no addTrigger — falling through to web SDK');
       }
-    } else if (window.OneSignalDeferred) {
+    }
+
+    // Always try the web SDK too — it works in the Natively WebView on https://www.roster-app.com
+    if (!triggeredViaNatively && window.OneSignalDeferred) {
       window.OneSignalDeferred.push((OneSignal) => {
         if (!hasPermission) {
           (OneSignal as any).InAppMessages?.addTrigger("permission_not_enabled", "true");
-          console.log('[OneSignal] Set in-app trigger: permission_not_enabled = true');
+          console.log('[OneSignal] Set in-app trigger: permission_not_enabled = true (web SDK)');
         } else {
           (OneSignal as any).InAppMessages?.removeTrigger("permission_not_enabled");
-          console.log('[OneSignal] Removed in-app trigger: permission_not_enabled');
+          console.log('[OneSignal] Removed in-app trigger: permission_not_enabled (web SDK)');
         }
       });
     }

@@ -29,21 +29,23 @@ export async function fireFirstRsvpTrigger(): Promise<void> {
 }
 
 function setOneSignalTrigger(key: string, value: string): void {
+  // Try Natively SDK first (native app context)
   const hasNativelySDK = typeof (window as any).NativelyNotifications === 'function';
-
   if (hasNativelySDK) {
     try {
       const notifications = new (window as any).NativelyNotifications();
       if (typeof notifications.addTrigger === 'function') {
         notifications.addTrigger(key, value);
         console.log(`[OneSignal] ${key} trigger set via Natively`);
+        return;
       }
+      console.log(`[OneSignal] Natively instance has no addTrigger — falling through to web SDK`);
     } catch (err) {
       console.warn('[OneSignal] Could not set trigger via Natively:', err);
     }
-    return;
   }
 
+  // Always try the web SDK (works on https://www.roster-app.com in both browser and Natively WebView)
   if ((window as any).OneSignalDeferred) {
     (window as any).OneSignalDeferred.push((OneSignal: any) => {
       try {
