@@ -16300,40 +16300,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete the scrimmage (cascades requests + invites)
       await storage.deleteScrimmage(scrimmageId);
       
-      // Notify all confirmed players (if any)
+      // Notify all confirmed players via direct in-app notification (bell icon only, never The Wall)
       if (targetUserIds.length > 0) {
-        if (scrimmage.leagueId) {
-          // League-linked scrimmage: post as a league announcement visible only to affected players
-          const league = await storage.getLeague(scrimmage.leagueId);
-          const timezone = league?.timezone || 'America/New_York';
-          const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location} has been cancelled by the organizer.`;
-          try {
-            const announcement = await storage.createAnnouncement({
-              content: announcementContent,
-              leagueId: scrimmage.leagueId,
-              authorId: userId,
-              isPinned: false,
-            });
-            await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
-          } catch (announcementError) {
-            console.error('Error sending league cancellation announcement:', announcementError);
-          }
-        } else {
-          // Standalone scrimmage (no league): send a direct in-app notification to each player
-          const notifTitle = '❌ Scrimmage Cancelled';
-          const notifMessage = `"${scrimmage.title}" at ${scrimmage.location} has been cancelled by the organizer.`;
-          await Promise.allSettled(
-            targetUserIds.map(uid =>
-              storage.createNotification({
-                userId: uid,
-                type: 'scrimmage_canceled',
-                title: notifTitle,
-                message: notifMessage,
-                scrimmageId: scrimmageId,
-              })
-            )
-          );
-        }
+        const notifTitle = '❌ Scrimmage Cancelled';
+        const notifMessage = `"${scrimmage.title}" at ${scrimmage.location} has been cancelled by the organizer.`;
+        await Promise.allSettled(
+          targetUserIds.map(uid =>
+            storage.createNotification({
+              userId: uid,
+              type: 'scrimmage_canceled',
+              title: notifTitle,
+              message: notifMessage,
+              scrimmageId: scrimmageId,
+            })
+          )
+        );
       }
       
       res.json({ message: 'Scrimmage cancelled successfully' });
