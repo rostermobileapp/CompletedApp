@@ -3183,45 +3183,54 @@ function DashboardMobile() {
                     navigate(`/scrimmage/${invite.id}`);
                   }}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Trophy className="w-6 h-6 text-black" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold truncate" data-testid={`text-invite-title-${invite.id}`}>
-                          {invite.title}
-                        </h3>
-                        <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">Invite</span>
+                  {(() => {
+                    const isOwnScrimmage = invite.creatorId === (userProfile as any)?.id;
+                    return (
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Trophy className="w-6 h-6 text-black" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold truncate" data-testid={`text-invite-title-${invite.id}`}>
+                              {invite.title}
+                            </h3>
+                            <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">
+                              {isOwnScrimmage ? 'My Scrimmage' : 'Invite'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
+                            {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
+                          </p>
+                          {invite.location && (
+                            <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>
+                              {invite.location}
+                            </p>
+                          )}
+                        </div>
+                        {!isOwnScrimmage && (
+                          <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => scrimmageCheckInMutation.mutate(invite.id)}
+                              disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
+                              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm disabled:opacity-50"
+                              data-testid={`button-rsvp-in-${invite.id}`}
+                            >
+                              In
+                            </button>
+                            <button
+                              onClick={() => scrimmageDeclineMutation.mutate(invite.id)}
+                              disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
+                              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm disabled:opacity-50"
+                              data-testid={`button-rsvp-out-${invite.id}`}
+                            >
+                              Out
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
-                        {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
-                      </p>
-                      {invite.location && (
-                        <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>
-                          {invite.location}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => scrimmageCheckInMutation.mutate(invite.id)}
-                        disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm disabled:opacity-50"
-                        data-testid={`button-rsvp-in-${invite.id}`}
-                      >
-                        In
-                      </button>
-                      <button
-                        onClick={() => scrimmageDeclineMutation.mutate(invite.id)}
-                        disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm disabled:opacity-50"
-                        data-testid={`button-rsvp-out-${invite.id}`}
-                      >
-                        Out
-                      </button>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               ))}
               

@@ -9432,12 +9432,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]> {
-    // Get scrimmages where user is invited (has announcement visibility) but hasn't responded yet
-    const results = await db
-      .select({
-        scrimmage: scrimmages,
-        creator: users,
-      })
+    const now = new Date();
+
+    // 1) Scrimmages where user was directly invited via announcement visibility
+    const invitedResults = await db
+      .select({ scrimmage: scrimmages, creator: users })
       .from(announcementVisibility)
       .innerJoin(announcements, eq(announcementVisibility.announcementId, announcements.id))
       .innerJoin(scrimmages, eq(announcements.id, scrimmages.announcementId))
@@ -9445,12 +9444,11 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(announcementVisibility.userId, userId),
-          gte(scrimmages.dateTime, new Date()), // Only future scrimmages
-          // Only get scrimmages where user hasn't responded yet (no scrimmage request exists)
+          gte(scrimmages.dateTime, now),
           not(
             sql`EXISTS (
-              SELECT 1 FROM ${scrimmageRequests} 
-              WHERE ${scrimmageRequests.scrimmageId} = ${scrimmages.id} 
+              SELECT 1 FROM ${scrimmageRequests}
+              WHERE ${scrimmageRequests.scrimmageId} = ${scrimmages.id}
               AND ${scrimmageRequests.playerId} = ${userId}
             )`
           )
@@ -9458,10 +9456,30 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(asc(scrimmages.dateTime));
 
-    return results.map(r => ({
-      ...r.scrimmage,
-      creator: r.creator
-    }));
+    // 2) Scrimmages the user created themselves — they should always see their own
+    const createdResults = await db
+      .select({ scrimmage: scrimmages, creator: users })
+      .from(scrimmages)
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .where(
+        and(
+          eq(scrimmages.creatorId, userId),
+          gte(scrimmages.dateTime, now),
+          sql`${scrimmages.status} != 'cancelled'`
+        )
+      )
+      .orderBy(asc(scrimmages.dateTime));
+
+    // Merge and deduplicate by scrimmage id
+    const seen = new Set<string>();
+    const merged: (Scrimmage & { creator: User })[] = [];
+    for (const r of [...invitedResults, ...createdResults]) {
+      if (!seen.has(r.scrimmage.id)) {
+        seen.add(r.scrimmage.id);
+        merged.push({ ...r.scrimmage, creator: r.creator });
+      }
+    }
+    return merged.sort((a, b) => new Date(a.dateTime as string).getTime() - new Date(b.dateTime as string).getTime());
   }
 
   // Invite group operations

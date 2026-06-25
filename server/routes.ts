@@ -15564,11 +15564,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!scrimmage) {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
-      
-      // Verify user is a member of the league
-      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(403).json({ message: "Must be a league member to view scrimmage details" });
+
+      // Access check: league-linked scrimmages require league membership;
+      // standalone scrimmages (no leagueId) allow creator, co-hosts, or anyone with an invite/request.
+      if (scrimmage.leagueId) {
+        const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+        if (!membership || membership.status !== 'approved') {
+          return res.status(403).json({ message: "Must be a league member to view scrimmage details" });
+        }
+      } else {
+        const isCreator = scrimmage.creatorId === userId;
+        if (!isCreator) {
+          const [allRequests, allInvites, coHost] = await Promise.all([
+            storage.getScrimmageRequests(scrimmageId),
+            storage.getScrimmageInvites(scrimmageId),
+            storage.getScrimmageCoHost(scrimmageId, userId),
+          ]);
+          const hasAccess =
+            allRequests.some((r: any) => r.playerId === userId) ||
+            allInvites.some((i: any) => i.inviteeId === userId) ||
+            !!coHost;
+          if (!hasAccess) {
+            return res.status(403).json({ message: "Not authorized to view this scrimmage" });
+          }
+        }
       }
 
       // Get only approved requests
