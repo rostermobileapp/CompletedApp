@@ -713,15 +713,28 @@ function AnnouncementCard({
       return await apiRequest('DELETE', `/api/announcements/${announcement.id}`);
     },
     onSuccess: () => {
+      // Immediately remove from cache so the card vanishes without waiting for refetch
+      const removeFromCache = (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) return old.filter((a: any) => a.id !== announcement.id);
+        return { ...old, announcements: (old.announcements ?? []).filter((a: any) => a.id !== announcement.id) };
+      };
       if (tournamentId) {
+        queryClient.setQueryData(['/api/tournaments', tournamentId, 'announcements'], removeFromCache);
         queryClient.invalidateQueries({ queryKey: ['/api/tournaments', tournamentId, 'announcements'] });
       } else {
+        queryClient.setQueryData(['/api/leagues', leagueId, 'announcements'], removeFromCache);
         queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'announcements'] });
       }
       toast({ title: 'Announcement deleted successfully!' });
       setShowDeleteConfirm(false);
     },
-    onError: () => {
+    onError: (error: any) => {
+      // 404 means it was already deleted — treat as success
+      if (error?.status === 404 || error?.message?.includes('404')) {
+        setShowDeleteConfirm(false);
+        return;
+      }
       toast({ title: 'Failed to delete announcement', variant: 'destructive' });
     }
   });
