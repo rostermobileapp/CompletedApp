@@ -1166,6 +1166,20 @@ function NeedsAttentionTasks({ leagueId, onNavigate }: {
  * desktop home. The shared add-event dialog flow is rendered at this level so
  * the desktop schedule's "+ Add" button keeps working.
  */
+
+function ScrimmageRequestsBadge({ scrimmageId }: { scrimmageId: string }) {
+  const { data: requests = [] } = useQuery<any[]>({
+    queryKey: ['/api/scrimmages', scrimmageId, 'requests'],
+  });
+  const pendingCount = (requests as any[]).filter((r: any) => r.status === 'pending').length;
+  if (pendingCount === 0) return null;
+  return (
+    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none flex-shrink-0">
+      {pendingCount}
+    </span>
+  );
+}
+
 export default function Dashboard() {
   const isDesktopWeb = useIsDesktopWeb();
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
@@ -3198,6 +3212,7 @@ function DashboardMobile() {
                             <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">
                               {isOwnScrimmage ? 'My Scrimmage' : 'Invite'}
                             </span>
+                            {isOwnScrimmage && <ScrimmageRequestsBadge scrimmageId={invite.id} />}
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
                             {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
