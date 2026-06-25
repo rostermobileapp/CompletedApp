@@ -15447,29 +15447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete scrimmage (Creator only)
-  app.delete('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const scrimmageId = req.params.id;
-      const userId = req.user.claims.sub;
-
-      // Get scrimmage to check ownership and status
-      const scrimmage = await storage.getScrimmage(scrimmageId);
-      if (!scrimmage) {
-        return res.status(404).json({ message: 'Scrimmage not found' });
-      }
-
-      if (scrimmage.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only the creator can delete this scrimmage' });
-      }
-
-      await storage.deleteScrimmage(scrimmageId);
-      res.json({ message: 'Scrimmage deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting scrimmage:', error);
-      res.status(500).json({ message: 'Failed to delete scrimmage' });
-    }
-  });
+  // Delete scrimmage (Creator only) — notification logic is in the route defined later
 
   // Create scrimmage request (join request)
   app.post('/api/scrimmages/:id/requests', isAuthenticated, async (req: any, res) => {
