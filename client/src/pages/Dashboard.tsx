@@ -2528,7 +2528,7 @@ function DashboardMobile() {
           </div>
         {/* Team/League/Tournament Selection Dropdown */}
         {((Array.isArray(userTeamsAll) && userTeamsAll.length > 0) || (Array.isArray(leaguesWithoutTeams) && leaguesWithoutTeams.length > 0) || (Array.isArray(userPaidTournaments) && userPaidTournaments.length > 0) || hasPastSeasons) && (
-          <div className="px-6 mb-4">
+          <div className="px-6 mt-[4px] mb-[8px]">
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
