@@ -16274,7 +16274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(r => r.status === 'approved' && r.playerId !== userId)
         .map(r => r.playerId);
       const checkedInInviteeIds = invites
-        .filter(i => i.checkedIn && i.inviteeId !== userId)
+        .filter(i => i.inviteeId !== userId)
         .map(i => i.inviteeId);
       const targetUserIds = [...new Set([...approvedPlayerIds, ...checkedInInviteeIds])];
 
