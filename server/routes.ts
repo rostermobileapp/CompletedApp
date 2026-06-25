@@ -16071,7 +16071,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             },
             approvedUserIds
           );
-          
+
+          // Send the same push notification that "Remind Unpaid" sends
+          const creatorName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'Someone';
+          const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+          await Promise.all(
+            approvedUserIds.map(recipientId =>
+              sendPaymentRequestPushNotification(
+                recipientId,
+                creatorName,
+                scrimmage.costPerPlayer!,
+                paymentRequest.description || paymentRequest.title,
+                paymentRequest.id,
+              ).catch(err => {
+                console.error(`[finalize] Failed to push payment notification to ${recipientId}:`, err);
+              })
+            )
+          );
+
         } catch (paymentError) {
           console.error('Error creating payment request:', paymentError);
           // Don't fail the finalization if payment request creation fails
