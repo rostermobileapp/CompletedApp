@@ -783,7 +783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const result = await db.execute(
-        sql`SELECT first_rsvp_triggered FROM users WHERE id = ${userId}`
+        sql`SELECT first_rsvp_triggered, display_id FROM users WHERE id = ${userId}`
       );
       const row = result.rows[0] as any;
       if (!row) return res.status(404).json({ message: 'User not found' });
@@ -795,6 +795,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.execute(
         sql`UPDATE users SET first_rsvp_triggered = true WHERE id = ${userId}`
       );
+
+      // Set a persistent OneSignal tag server-side so the in-app message fires
+      // regardless of which SDK is running on the client (Natively or web).
+      // In the OneSignal dashboard the in-app message should target:
+      //   User Tag  first_rsvp_completed  is  true
+      if (row.display_id) {
+        const { setOneSignalUserTag } = await import('./oneSignalNotifications');
+        setOneSignalUserTag(row.display_id, 'first_rsvp_completed', 'true').catch(err =>
+          console.error('[first-rsvp-trigger] setOneSignalUserTag error:', err)
+        );
+      }
+
       return res.json({ isFirst: true });
     } catch (error) {
       console.error('Error in first-rsvp-trigger:', error);
@@ -16056,6 +16068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Automatically create payment request if there's a cost
+      console.log(`[finalize] scrimmage ${scrimmageId} costPerPlayer=${scrimmage.costPerPlayer} approvedCount=${approvedUserIds.length}`);
       if (scrimmage.costPerPlayer && parseFloat(scrimmage.costPerPlayer) > 0) {
         try {
           const paymentRequest = await storage.createPaymentRequest(

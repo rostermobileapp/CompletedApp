@@ -792,6 +792,56 @@ export async function sendCommissionerTransferPushNotification(
   });
 }
 
+/**
+ * Set a persistent tag on a OneSignal user identified by their external ID
+ * (i.e. the user's displayId). Uses the v2 User Model API so the tag is
+ * immediately visible to in-app message audience filters in the dashboard.
+ *
+ * In the OneSignal dashboard configure the in-app message to display when:
+ *   User Tag  first_rsvp_completed  is  true
+ */
+export async function setOneSignalUserTag(
+  externalId: string,
+  key: string,
+  value: string,
+): Promise<boolean> {
+  const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
+  const oneSignalRestApiKey = process.env.ONESIGNAL_REST_API_KEY;
+
+  if (!oneSignalAppId || !oneSignalRestApiKey) {
+    console.log('[OneSignal] Not configured — skipping setOneSignalUserTag');
+    return false;
+  }
+
+  try {
+    const url = `https://api.onesignal.com/apps/${oneSignalAppId}/users/by/external_id/${encodeURIComponent(externalId)}`;
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `OS-APIKEY ${oneSignalRestApiKey}`,
+      },
+      body: JSON.stringify({
+        properties: {
+          tags: { [key]: value },
+        },
+      }),
+    });
+
+    const body = await response.json().catch(() => ({}));
+    if (response.ok) {
+      console.log(`[OneSignal] Tag set for externalId ${externalId}: ${key}=${value}`);
+      return true;
+    } else {
+      console.warn(`[OneSignal] setOneSignalUserTag failed (${response.status}):`, body);
+      return false;
+    }
+  } catch (err) {
+    console.error('[OneSignal] setOneSignalUserTag error:', err);
+    return false;
+  }
+}
+
 export async function sendScrimmageCancellationPushNotification(
   recipientId: string,
   scrimmageTitle: string,
