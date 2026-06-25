@@ -791,3 +791,26 @@ export async function sendCommissionerTransferPushNotification(
     },
   });
 }
+
+export async function sendScrimmageCancellationPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  scrimmageId: string
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `❌ Scrimmage Cancelled`,
+    message: `"${scrimmageTitle}" has been cancelled by the organizer.`,
+    data: {
+      type: 'scrimmage_canceled',
+      scrimmageId,
+    },
+  });
+}

@@ -15357,23 +15357,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.deleteScrimmage(scrimmageId);
           deleted++;
 
-          // Send cancellation notification to approved players (mirrors single-delete logic)
+          // Send cancellation notification to approved players: bell + push
           if (approvedRequests.length > 0) {
             try {
-              const league = await storage.getLeague(scrimmage.leagueId);
-              const timezone = league?.timezone || 'America/New_York';
-              const targetUserIds = approvedRequests.map(r => r.playerId);
-              const announcementContent = `❌ Scrimmage Cancelled: "${scrimmage.title}" scheduled for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location} has been cancelled by the organizer.`;
-              const announcement = await storage.createAnnouncement({
-                content: announcementContent,
-                leagueId: scrimmage.leagueId,
-                authorId: userId,
-                isPinned: false,
-              });
-              await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+              const targetUserIds = approvedRequests
+                .map(r => r.playerId)
+                .filter(pid => pid !== userId);
+              const notifTitle = '❌ Scrimmage Cancelled';
+              const notifMessage = `"${scrimmage.title}" at ${scrimmage.location} has been cancelled by the organizer.`;
+              const { sendScrimmageCancellationPushNotification } = await import('./oneSignalNotifications');
+              await Promise.allSettled([
+                ...targetUserIds.map(uid =>
+                  storage.createNotification({
+                    userId: uid,
+                    type: 'scrimmage_canceled',
+                    title: notifTitle,
+                    message: notifMessage,
+                    scrimmageId,
+                  })
+                ),
+                ...targetUserIds.map(uid =>
+                  sendScrimmageCancellationPushNotification(uid, scrimmage.title, scrimmageId)
+                ),
+              ]);
             } catch (notifyErr) {
               console.error(`Error sending cancellation notifications for scrimmage ${scrimmageId}:`, notifyErr);
-              // Don't fail the deletion if notification fails
             }
           }
         } catch (err) {
@@ -15421,20 +15429,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.deleteScrimmage(scrimmage.id);
       }
 
-      // Send a single series-cancellation notification to all affected players
+      // Send a single series-cancellation notification to all affected players: bell + push
       if (allApprovedPlayerIds.size > 0) {
         try {
-          const league = await storage.getLeague(representative.leagueId);
-          const timezone = league?.timezone || 'America/New_York';
-          const targetUserIds = Array.from(allApprovedPlayerIds);
-          const announcementContent = `❌ Recurring Series Cancelled: The entire "${representative.title}" recurring scrimmage series has been cancelled by the organizer. All ${seriesScrimmages.length} occurrence(s) have been removed.`;
-          const announcement = await storage.createAnnouncement({
-            content: announcementContent,
-            leagueId: representative.leagueId,
-            authorId: userId,
-            isPinned: false,
-          });
-          await storage.createAnnouncementVisibility(announcement.id, targetUserIds);
+          const targetUserIds = Array.from(allApprovedPlayerIds).filter(pid => pid !== userId);
+          const notifTitle = '❌ Recurring Series Cancelled';
+          const notifMessage = `The entire "${representative.title}" recurring scrimmage series has been cancelled by the organizer.`;
+          const { sendScrimmageCancellationPushNotification } = await import('./oneSignalNotifications');
+          await Promise.allSettled([
+            ...targetUserIds.map(uid =>
+              storage.createNotification({
+                userId: uid,
+                type: 'scrimmage_canceled',
+                title: notifTitle,
+                message: notifMessage,
+                scrimmageId: representative.id,
+              })
+            ),
+            ...targetUserIds.map(uid =>
+              sendScrimmageCancellationPushNotification(uid, representative.title, representative.id)
+            ),
+          ]);
         } catch (notifyErr) {
           console.error(`Error sending series cancellation notifications for series ${parentId}:`, notifyErr);
         }
@@ -16300,12 +16315,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete the scrimmage (cascades requests + invites)
       await storage.deleteScrimmage(scrimmageId);
       
-      // Notify all confirmed players via direct in-app notification (bell icon only, never The Wall)
+      // Notify all confirmed players: bell notification + OneSignal push
       if (targetUserIds.length > 0) {
         const notifTitle = '❌ Scrimmage Cancelled';
         const notifMessage = `"${scrimmage.title}" at ${scrimmage.location} has been cancelled by the organizer.`;
-        await Promise.allSettled(
-          targetUserIds.map(uid =>
+        const { sendScrimmageCancellationPushNotification } = await import('./oneSignalNotifications');
+        await Promise.allSettled([
+          ...targetUserIds.map(uid =>
             storage.createNotification({
               userId: uid,
               type: 'scrimmage_canceled',
@@ -16313,8 +16329,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               message: notifMessage,
               scrimmageId: scrimmageId,
             })
-          )
-        );
+          ),
+          ...targetUserIds.map(uid =>
+            sendScrimmageCancellationPushNotification(uid, scrimmage.title, scrimmageId)
+          ),
+        ]);
       }
       
       res.json({ message: 'Scrimmage cancelled successfully' });
