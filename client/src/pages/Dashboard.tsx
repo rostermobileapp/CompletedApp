@@ -3859,8 +3859,8 @@ function DashboardMobile() {
             {canScheduleGames && (
               <Button
                 onClick={() => {
-                  setEventType('scrimmage');
                   setShowAddEventDialog(false);
+                  navigate('/create-scrimmage');
                 }}
                 className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
                 data-testid="button-select-scrimmage"
