@@ -2910,33 +2910,53 @@ function DashboardMobile() {
             )}
           </div>
         )}
-        {/* Quick Stats */}
-        {primaryTeam && (
+        {/* Quick Stats — left: Games Left (team) or Scorekeeper (stat manager); right: Alerts */}
+        {(primaryTeam || hasStatManagerAccess()) && (
           <div className="px-6 mb-2">
             <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
-                    {primaryTeam?.logoUrl ? (
-                      <img 
-                        src={getImageUrl(primaryTeam.logoUrl) || ''} 
-                        alt={`${primaryTeam.name} logo`}
-                        className="w-full h-full rounded-lg object-cover bg-transparent"
-                        data-testid="img-team-logo"
-                      />
-                    ) : (
-                      <Trophy className="w-5 h-5 text-primary-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                      {(teamRecord as any)?.gamesRemaining ?? 0}
-                    </p>
-                    <p className="text-muted-foreground text-[16px]">Games Left</p>
+              {/* Left column */}
+              {primaryTeam ? (
+                <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+                      {primaryTeam?.logoUrl ? (
+                        <img 
+                          src={getImageUrl(primaryTeam.logoUrl) || ''} 
+                          alt={`${primaryTeam.name} logo`}
+                          className="w-full h-full rounded-lg object-cover bg-transparent"
+                          data-testid="img-team-logo"
+                        />
+                      ) : (
+                        <Trophy className="w-5 h-5 text-primary-foreground" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold" data-testid="text-games-remaining">
+                        {(teamRecord as any)?.gamesRemaining ?? 0}
+                      </p>
+                      <p className="text-muted-foreground text-[16px]">Games Left</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
+              ) : (
+                <div className="rounded-xl hairline elev-rest pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
+                  <button
+                    onClick={() => navigate('/scorekeeper')}
+                    className="w-full h-full flex items-center gap-3 rounded-xl"
+                    data-testid="button-scorekeeper-link"
+                  >
+                    <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Clipboard className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-2xl font-bold leading-none">SK</p>
+                      <p className="text-muted-foreground text-[16px]">Scorekeeper</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* Right column — Alerts, always visible */}
               {effectiveLeagueId && (
                 <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
                   {isLoadingNeedsAttention ? (
@@ -2970,29 +2990,6 @@ function DashboardMobile() {
                   ) : null}
                 </div>
               )}
-            </div>
-          </div>
-        )}
-        {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
-        {!primaryTeam && hasStatManagerAccess() && (
-          <div className="px-6 mb-[8px]">
-            <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
-              <button
-                onClick={() => navigate('/scorekeeper')}
-                className="w-full h-full flex items-center justify-between rounded-xl px-4 py-3"
-                data-testid="button-scorekeeper-link"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                    <Clipboard className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <span className="font-medium text-sm text-[#212121] dark:text-white block">Scorekeeper Dashboard</span>
-                    <span className="text-xs text-muted-foreground">Manage game scores</span>
-                  </div>
-                </div>
-                <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white rotate-[-90deg]" />
-              </button>
             </div>
           </div>
         )}
