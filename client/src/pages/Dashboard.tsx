@@ -2975,7 +2975,7 @@ function DashboardMobile() {
         )}
         {/* Scorekeeper Link Box - Show for users with scorekeeper access but no team */}
         {!primaryTeam && hasStatManagerAccess() && (
-          <div className="px-6 mb-6">
+          <div className="px-6 mb-[8px]">
             <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
               <button
                 onClick={() => navigate('/scorekeeper')}
