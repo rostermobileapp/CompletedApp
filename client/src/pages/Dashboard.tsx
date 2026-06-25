@@ -3478,12 +3478,12 @@ function DashboardMobile() {
                   if (eventDateOnly < yesterday) {
                     return false;
                   }
+                  // Scrimmages are shown in their own dedicated section above — skip here to avoid duplicates
+                  if (game.isScrimmage) {
+                    return false;
+                  }
                   // In league scope show all games in the league without team filtering
                   if (scheduleScope === 'league') {
-                    return true;
-                  }
-                  // Always show scrimmages (user is already approved)
-                  if (game.isScrimmage) {
                     return true;
                   }
                   // For regular games, ensure we only show games for teams the user is currently on
