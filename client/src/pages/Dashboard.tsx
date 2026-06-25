@@ -2788,7 +2788,7 @@ function DashboardMobile() {
         {/* 4-Card Section — hidden while a pre-window tournament countdown
             is active so the player only sees the timer below. */}
         {!isTournamentCountdownActive && (
-        <div className="px-6 mb-6">
+        <div className="px-6 mb-[8px]">
           <div className="grid grid-cols-4 gap-3">
             {/* Announcements Card */}
             <div 
