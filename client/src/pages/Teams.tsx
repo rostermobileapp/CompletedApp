@@ -690,23 +690,30 @@ export default function Teams() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <CardTitle className="text-2xl" data-testid={`text-team-name-${team.id}`}>
-                              {team.name}
-                            </CardTitle>
-                            {((team.captainId === (user as any)?.id) || 
-                              hasRole('secondary_commissioner')) && (
-                              <button
-                                onClick={() => {
-                                  setIsEditingTeamName(true);
-                                  setEditedTeamName(team.name);
-                                  setTeamSelection(team.id);
-                                }}
-                                className="p-1 text-muted-foreground hover:text-foreground rounded"
-                                data-testid={`button-edit-team-name-${team.id}`}
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CardTitle className="text-2xl" data-testid={`text-team-name-${team.id}`}>
+                                {team.name}
+                              </CardTitle>
+                              {((team.captainId === (user as any)?.id) || 
+                                hasRole('secondary_commissioner')) && (
+                                <button
+                                  onClick={() => {
+                                    setIsEditingTeamName(true);
+                                    setEditedTeamName(team.name);
+                                    setTeamSelection(team.id);
+                                  }}
+                                  className="p-1 text-muted-foreground hover:text-foreground rounded"
+                                  data-testid={`button-edit-team-name-${team.id}`}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            {team.uniqueTeamId && (
+                              <span className="text-xs font-mono text-muted-foreground ml-2">
+                                {team.uniqueTeamId}
+                              </span>
                             )}
                           </div>
                         )}

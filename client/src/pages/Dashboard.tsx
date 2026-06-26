@@ -2107,8 +2107,8 @@ function DashboardMobile() {
       : null;
     
     if (league) {
-      const leagueIdSuffix = league.uniqueLeagueId ? ` - ${league.uniqueLeagueId}` : '';
-      return `${league.name}: ${team.name}${leagueIdSuffix}`;
+      const seasonSuffix = league.season ? ` - ${league.season}` : '';
+      return `${league.name}: ${team.name}${seasonSuffix}`;
     }
     
     // Fallback if league not found (shouldn't happen)
