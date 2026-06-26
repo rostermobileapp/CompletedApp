@@ -3713,7 +3713,7 @@ function DashboardMobile() {
             className="flex-1 bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary font-medium text-sm"
             data-testid="button-send-feedback"
           >
-            Send Feedback
+            Feedback
           </button>
         </div>
         {/* Mobile-only spacer so the HPIB banner + bottom nav don't cover the
