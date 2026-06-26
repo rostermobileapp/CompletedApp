@@ -138,6 +138,7 @@ type LeagueMember = {
     email: string;
     profileImageUrl?: string;
     timezone?: string;
+    displayId?: string;
   };
 };
 
@@ -3027,6 +3028,9 @@ export default function LeagueManagement() {
             {league && (
               <p className="text-muted-foreground text-sm" data-testid="text-league-name">
                 {league.name}
+                {league.uniqueLeagueId && (
+                  <span className="ml-2 font-mono font-bold text-xs opacity-70">{league.uniqueLeagueId}</span>
+                )}
               </p>
             )}
             {/* League-provided Player Pro seat badge — visible only to members
@@ -3935,9 +3939,14 @@ export default function LeagueManagement() {
                             </span>
                           )}
                         </div>
-                        {member.position && (
-                          <p className="text-xs text-muted-foreground">{member.position}</p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {member.user.displayId && (
+                            <span className="text-xs font-mono text-muted-foreground/70">{member.user.displayId}</span>
+                          )}
+                          {member.position && (
+                            <p className="text-xs text-muted-foreground">{member.position}</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         {member.skillLevel && (
