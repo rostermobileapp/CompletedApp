@@ -266,15 +266,13 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                 <Plus className="w-3.5 h-3.5" />
                 Create Post
               </button>
-              <div className="ml-auto">
-                <button
-                  onClick={() => setView('report-bug')}
-                  className="flex items-center gap-1.5 text-xs font-bold text-[#878a8c] hover:text-[#1c1c1c] px-3 py-1.5 rounded-full border border-[#edeff1] hover:border-[#878a8c] bg-white transition-colors"
-                >
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  Bug
-                </button>
-              </div>
+              <button
+                onClick={() => setView('report-bug')}
+                className="flex items-center gap-1.5 text-xs font-bold text-[#878a8c] hover:text-[#1c1c1c] px-3 py-1.5 rounded-full border border-[#edeff1] hover:border-[#878a8c] bg-white transition-colors"
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                Bug
+              </button>
             </>
           )}
         </div>
