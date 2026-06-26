@@ -250,14 +250,13 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               <ArrowLeft className="w-4 h-4 text-[#878a8c]" />
             </button>
           )}
-          <div>
+          {view !== 'board' && (
             <DialogTitle className="text-sm font-bold text-[#1c1c1c]">
-              {view === 'board' && 'r/rosters'}
               {view === 'report-bug' && 'Report a Bug'}
               {view === 'new-request' && 'Create Post'}
             </DialogTitle>
-            {view === 'board' && <p className="text-[11px] text-[#878a8c]">Feature Requests</p>}
-          </div>
+          )}
+          {view === 'board' && <DialogTitle className="sr-only">Feature Requests</DialogTitle>}
           {view === 'board' && (
             <div className="ml-auto flex items-center gap-2">
               <button
