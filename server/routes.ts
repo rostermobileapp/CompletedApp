@@ -138,6 +138,33 @@ export function broadcastNotificationUpdate(userId: string) {
   });
 }
 
+// Helper function to broadcast schedule change to a user
+// Triggers the client to refetch calendar/schedule data without manual pull-to-refresh
+export function broadcastScheduleUpdate(userId: string) {
+  broadcastToUser(userId, {
+    type: 'schedule_update',
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Broadcast schedule update to all approved members of a team
+async function broadcastScheduleUpdateToTeam(teamId: string) {
+  try {
+    const members = await db
+      .select({ userId: teamMemberships.userId })
+      .from(teamMemberships)
+      .where(and(
+        eq(teamMemberships.teamId, teamId),
+        eq(teamMemberships.status, 'approved')
+      ));
+    for (const m of members) {
+      broadcastScheduleUpdate(m.userId);
+    }
+  } catch {
+    // best-effort — don't fail the request
+  }
+}
+
 // In-memory map of subscribed users per tournament (tournamentId -> Set<userId>)
 const tournamentSubscribers = new Map<string, Set<string>>();
 
@@ -9788,7 +9815,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Error sending RSVP notification:', notifError);
         // Don't fail the RSVP if notification fails
       }
-      
+
+      // Broadcast real-time schedule update to the player who RSVPed
+      broadcastScheduleUpdate(userId);
+
       res.json(rsvp);
     } catch (error) {
       console.error('Error updating RSVP:', error);
@@ -20690,6 +20720,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (notificationError) {
         console.error("Error sending team event notifications:", notificationError);
       }
+
+      // Broadcast real-time schedule update to all team members
+      broadcastScheduleUpdateToTeam(validatedData.teamId).catch(() => {});
       
       res.status(201).json({
         ...newEvent,
@@ -20753,6 +20786,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(teamEvents.id, id))
         .returning();
+
+      // Broadcast real-time schedule update to all team members
+      broadcastScheduleUpdateToTeam(existingEvent.teamId).catch(() => {});
       
       res.json({
         ...updatedEvent,
@@ -20815,6 +20851,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db
         .delete(teamEvents)
         .where(eq(teamEvents.id, id));
+
+      // Broadcast real-time schedule update to all team members
+      broadcastScheduleUpdateToTeam(existingEvent.teamId).catch(() => {});
       
       res.json({ success: true, message: "Event deleted successfully" });
     } catch (error) {
@@ -20883,6 +20922,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             respondedAt: new Date(),
           })
           .returning();
+      }
+
+      // Broadcast real-time update to the user who RSVPed and the event creator
+      broadcastScheduleUpdate(userId);
+      if (event.creatorId && event.creatorId !== userId) {
+        broadcastScheduleUpdate(event.creatorId);
       }
       
       res.json(rsvp);

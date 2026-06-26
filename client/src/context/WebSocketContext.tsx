@@ -101,6 +101,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
           queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });
           queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
         }
       }, FALLBACK_POLL_INTERVAL);
     };
@@ -147,6 +150,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const data = JSON.parse(event.data);
 
           switch (data.type) {
+            case 'schedule_update':
+              queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
+              break;
+
             case 'message':
               queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
               queryClient.invalidateQueries({ queryKey: ['/api/conversations', data.conversationId, 'messages'] });
