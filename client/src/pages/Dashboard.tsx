@@ -3364,10 +3364,9 @@ function DashboardMobile() {
                   );
                 })}
               
-              {/* Show team events (general events only — scrimmages handled above) */}
+              {/* Show team events (all types including scrimmage-type team events) */}
               {Array.isArray(teamEvents) && teamEvents
                 .filter((event: any) => {
-                  if (event.eventType === 'scrimmage') return false;
                   const eventDate = new Date(event.scheduledAt);
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
