@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
-import { AlertCircle, ThumbsUp, Plus, ArrowLeft, Loader2, Send, MessageSquare } from 'lucide-react';
+import { AlertCircle, Plus, ArrowLeft, Loader2, ArrowUp, ArrowDown, MessageSquare, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface FeedbackModalProps {
@@ -36,17 +36,11 @@ type View = 'board' | 'report-bug' | 'new-request';
 
 const FOUNDER_EMAIL = 'founder@rosterhockey.com';
 
-// Per-card reply section — fetches lazily when expanded
-function ReplySection({
-  requestId,
-  isFounder,
-}: {
-  requestId: string;
-  isFounder: boolean;
-}) {
+function ReplySection({ requestId, isFounder }: { requestId: string; isFounder: boolean }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [replyText, setReplyText] = useState('');
+  const [showComposer, setShowComposer] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const { data: replies = [], isLoading } = useQuery<Reply[]>({
@@ -72,6 +66,7 @@ function ReplySection({
         (old = []) => [...old, newReply],
       );
       setReplyText('');
+      setShowComposer(false);
       setExpanded(true);
     },
     onError: () => {
@@ -80,73 +75,80 @@ function ReplySection({
   });
 
   const hasReplies = replies.length > 0;
-
-  // Founder always sees the reply composer; other users only see the toggle when there are replies
-  const showToggle = !isFounder && hasReplies;
-  const showComposer = isFounder;
   const showReplies = isFounder || expanded;
 
-  if (!showToggle && !showComposer) return null;
-
   return (
-    <div className="mt-2 border-t border-border pt-2 space-y-2">
-      {/* Toggle for non-founders */}
-      {showToggle && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1 text-[11px] text-primary hover:underline"
-        >
-          <MessageSquare className="w-3 h-3" />
-          {expanded ? 'Hide' : `${replies.length} reply from Rosters`}
-        </button>
-      )}
-
-      {/* Replies list */}
-      {showReplies && (
-        <div className="space-y-1.5">
-          {isLoading && (
-            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" /> Loading…
-            </div>
-          )}
-          {replies.map((r) => (
-            <div
-              key={r.id}
-              className="bg-primary/8 border border-primary/20 rounded-md px-3 py-2"
-            >
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-bold text-primary uppercase tracking-wide">Rosters</span>
-                <span className="text-[10px] text-muted-foreground">
-                  · {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
-                </span>
-              </div>
-              <p className="text-xs text-foreground leading-relaxed">{r.body}</p>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="mt-1.5 flex flex-col gap-2">
+      {/* Action row */}
+      <div className="flex items-center gap-3">
+        {/* Founder reply button */}
+        {isFounder && (
+          <button
+            onClick={() => setShowComposer((v) => !v)}
+            className="flex items-center gap-1 text-xs font-bold text-[#878a8c] hover:text-[#0079d3] transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            Reply
+          </button>
+        )}
+        {/* Non-founder: toggle existing replies */}
+        {!isFounder && hasReplies && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1 text-xs font-bold text-[#0079d3] hover:underline transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            {expanded ? 'Hide' : `${replies.length} reply from Rosters`}
+          </button>
+        )}
+      </div>
 
       {/* Founder composer */}
-      {showComposer && (
-        <div className="flex gap-2 items-end">
+      {isFounder && showComposer && (
+        <div className="ml-4 border-l-2 border-[#0079d3] pl-3 flex flex-col gap-2">
           <Textarea
             placeholder="Reply as Rosters…"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            className="min-h-[60px] resize-none text-sm flex-1"
+            className="min-h-[72px] resize-none text-sm bg-[#f6f7f8] border-[#edeff1] focus:bg-white"
             maxLength={2000}
           />
-          <Button
-            size="sm"
-            onClick={() => {
-              if (replyText.trim()) postReply.mutate(replyText.trim());
-            }}
-            disabled={postReply.isPending || !replyText.trim()}
-            className="flex-shrink-0 h-9 px-3"
-            aria-label="Send reply"
-          >
-            {postReply.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </Button>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setShowComposer(false); setReplyText(''); }}
+              className="text-xs font-bold text-[#878a8c] hover:text-[#1c1c1c] px-3 py-1.5 rounded-full hover:bg-[#edeff1] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { if (replyText.trim()) postReply.mutate(replyText.trim()); }}
+              disabled={postReply.isPending || !replyText.trim()}
+              className="text-xs font-bold text-white bg-[#0079d3] hover:bg-[#006cbf] disabled:opacity-40 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1"
+            >
+              {postReply.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              Reply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Replies list */}
+      {showReplies && (
+        <div className="ml-4 border-l-2 border-[#edeff1] pl-3 flex flex-col gap-3">
+          {isLoading && (
+            <div className="flex items-center gap-1 text-xs text-[#878a8c]">
+              <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+            </div>
+          )}
+          {replies.map((r) => (
+            <div key={r.id} className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-[#0079d3]">Rosters</span>
+                <span className="text-[11px] text-[#878a8c]">· {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}</span>
+              </div>
+              <p className="text-sm text-[#1c1c1c] leading-relaxed">{r.body}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -189,10 +191,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       return res.json() as Promise<FeatureRequestItem>;
     },
     onSuccess: (newItem: FeatureRequestItem) => {
-      queryClient.setQueryData<FeatureRequestItem[]>(['/api/feature-requests'], (old = []) => [
-        ...old,
-        newItem,
-      ]);
+      queryClient.setQueryData<FeatureRequestItem[]>(['/api/feature-requests'], (old = []) => [...old, newItem]);
       queryClient.invalidateQueries({ queryKey: ['/api/feature-requests'] });
       toast({ title: 'Request Submitted', description: 'Your feature request has been added!' });
       setNewTitle('');
@@ -238,209 +237,223 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     onClose();
   };
 
-  const handleBugSubmit = () => {
-    if (!bugMessage.trim()) {
-      toast({ title: 'Message Required', description: 'Please describe the issue.', variant: 'destructive' });
-      return;
-    }
-    bugMutation.mutate(bugMessage.trim());
-  };
-
-  const handleNewRequest = () => {
-    if (!newTitle.trim()) {
-      toast({ title: 'Title Required', description: 'Please enter a title for your request.', variant: 'destructive' });
-      return;
-    }
-    createMutation.mutate({ title: newTitle.trim(), description: newDescription.trim() || undefined });
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
-        className="w-screen h-screen max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 sm:w-screen sm:h-screen sm:max-w-none sm:rounded-none"
+        className="w-screen h-screen max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 bg-[#dae0e6] sm:w-screen sm:h-screen sm:max-w-none sm:rounded-none"
         data-testid="dialog-feedback"
       >
-        {/* Header */}
-        <DialogHeader className="px-5 pt-5 pb-3 border-b flex-shrink-0">
-          <div className="flex items-center gap-2">
-            {view !== 'board' && (
-              <button
-                onClick={() => setView('board')}
-                className="p-1 rounded hover:bg-muted transition-colors"
-                aria-label="Back"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-            )}
-            <DialogTitle className="text-base font-semibold">
-              {view === 'board' && 'Feature Requests'}
+        {/* Reddit-style header bar */}
+        <div className="bg-white border-b border-[#edeff1] px-4 py-2 flex items-center gap-3 flex-shrink-0">
+          {view !== 'board' && (
+            <button onClick={() => setView('board')} className="p-1 rounded hover:bg-[#f6f7f8] transition-colors" aria-label="Back">
+              <ArrowLeft className="w-4 h-4 text-[#878a8c]" />
+            </button>
+          )}
+          <div>
+            <DialogTitle className="text-sm font-bold text-[#1c1c1c]">
+              {view === 'board' && 'r/rosters'}
               {view === 'report-bug' && 'Report a Bug'}
-              {view === 'new-request' && 'New Feature Request'}
+              {view === 'new-request' && 'Create Post'}
             </DialogTitle>
+            {view === 'board' && <p className="text-[11px] text-[#878a8c]">Feature Requests</p>}
           </div>
-        </DialogHeader>
+          {view === 'board' && (
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setView('report-bug')}
+                className="flex items-center gap-1.5 text-xs font-bold text-[#878a8c] hover:text-[#1c1c1c] px-3 py-1.5 rounded-full border border-[#edeff1] hover:border-[#878a8c] bg-white transition-colors"
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                Bug
+              </button>
+              <button
+                onClick={() => setView('new-request')}
+                className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#ff4500] hover:bg-[#e03d00] px-3 py-1.5 rounded-full transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create Post
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Board view */}
         {view === 'board' && (
-          <>
-            <div className="px-5 py-3 flex gap-2 flex-shrink-0 border-b">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-                onClick={() => setView('report-bug')}
-                data-testid="button-report-bug"
-              >
-                <AlertCircle className="w-4 h-4" />
-                Report a Bug
-              </Button>
-              <Button
-                size="sm"
-                className="flex items-center gap-1.5 ml-auto"
-                onClick={() => setView('new-request')}
-                data-testid="button-new-request"
-              >
-                <Plus className="w-4 h-4" />
-                New Request
-              </Button>
-            </div>
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {isLoading && (
+              <div className="flex items-center justify-center py-16 text-[#878a8c]">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading…
+              </div>
+            )}
+            {!isLoading && requests.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-[#878a8c]">
+                <p className="font-bold text-base text-[#1c1c1c]">No posts yet</p>
+                <p className="text-sm mt-1">Be the first to suggest a feature!</p>
+              </div>
+            )}
 
-            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2 min-h-0">
-              {isLoading && (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  Loading...
-                </div>
-              )}
-              {!isLoading && requests.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p className="font-medium">No feature requests yet</p>
-                  <p className="text-sm mt-1">Be the first to suggest one!</p>
-                </div>
-              )}
+            {/* Posts — Reddit list style */}
+            <div className="max-w-2xl mx-auto py-3 px-2 flex flex-col gap-2">
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="bg-card border border-border rounded-lg p-3"
+                  className="bg-white rounded border border-[#ccc] hover:border-[#898989] transition-colors"
                   data-testid={`feature-request-${req.id}`}
                 >
-                  <div className="flex gap-3 items-start">
-                    {/* Vote button */}
-                    <button
-                      onClick={() => voteMutation.mutate(req.id)}
-                      disabled={voteMutation.isPending}
-                      className={`flex flex-col items-center gap-0.5 flex-shrink-0 px-2 py-1.5 rounded-md border transition-colors min-w-[48px] ${
-                        req.userVoted
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'border-border hover:border-primary/50 text-muted-foreground hover:text-primary'
-                      }`}
-                      aria-label={req.userVoted ? 'Remove vote' : 'Upvote'}
-                      data-testid={`vote-button-${req.id}`}
-                    >
-                      <ThumbsUp className={`w-4 h-4 ${req.userVoted ? 'fill-primary' : ''}`} />
-                      <span className="text-xs font-bold leading-none">{req.voteCount}</span>
-                    </button>
+                  <div className="flex">
+                    {/* Vote column */}
+                    <div className="w-10 bg-[#f8f9fa] rounded-l flex flex-col items-center pt-2 gap-0.5 border-r border-[#edeff1]">
+                      <button
+                        onClick={() => voteMutation.mutate(req.id)}
+                        disabled={voteMutation.isPending}
+                        className={`p-0.5 rounded transition-colors hover:bg-[#edeff1] ${req.userVoted ? 'text-[#ff4500]' : 'text-[#878a8c] hover:text-[#ff4500]'}`}
+                        aria-label="Upvote"
+                        data-testid={`vote-button-${req.id}`}
+                      >
+                        <ArrowUp className="w-5 h-5" />
+                      </button>
+                      <span className={`text-xs font-bold leading-none ${req.userVoted ? 'text-[#ff4500]' : 'text-[#1c1c1c]'}`}>
+                        {req.voteCount}
+                      </span>
+                      <button
+                        className="p-0.5 rounded text-[#878a8c] hover:text-[#7193ff] hover:bg-[#edeff1] transition-colors"
+                        aria-label="Downvote"
+                        disabled
+                      >
+                        <ArrowDown className="w-5 h-5 opacity-40" />
+                      </button>
+                    </div>
 
                     {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm leading-tight">{req.title}</p>
-                      {req.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{req.description}</p>
-                      )}
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        {req.submitterName} · {formatDistanceToNow(new Date(req.createdAt), { addSuffix: true })}
+                    <div className="flex-1 p-2 min-w-0">
+                      <p className="text-xs text-[#878a8c] mb-1">
+                        Posted by <span className="hover:underline cursor-pointer">{req.submitterName}</span>
+                        {' · '}
+                        {formatDistanceToNow(new Date(req.createdAt), { addSuffix: true })}
                       </p>
+                      <h3 className="text-base font-semibold text-[#1c1c1c] leading-snug">{req.title}</h3>
+                      {req.description && (
+                        <p className="text-sm text-[#474747] mt-1 leading-relaxed">{req.description}</p>
+                      )}
+
+                      {/* Reply section */}
+                      <ReplySection requestId={req.id} isFounder={isFounder} />
                     </div>
                   </div>
-
-                  {/* Reply section */}
-                  <ReplySection requestId={req.id} isFounder={isFounder} />
                 </div>
               ))}
             </div>
-          </>
+          </div>
         )}
 
         {/* Report Bug view */}
         {view === 'report-bug' && (
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-            <p className="text-sm text-muted-foreground">
-              Describe the bug you encountered. Include what you were doing and what happened.
-            </p>
-            <div>
-              <Label htmlFor="bug-message" className="text-sm font-medium mb-1.5 block">Description</Label>
-              <Textarea
-                id="bug-message"
-                placeholder="Describe the issue..."
-                value={bugMessage}
-                onChange={(e) => setBugMessage(e.target.value)}
-                className="min-h-[140px] resize-none"
-                maxLength={5000}
-                data-testid="textarea-bug-message"
-              />
-              <p className="text-xs text-muted-foreground mt-1">{bugMessage.length} / 5000</p>
-            </div>
-            <div className="flex gap-3 justify-end pt-1">
-              <Button variant="outline" onClick={() => setView('board')} disabled={bugMutation.isPending}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleBugSubmit}
-                disabled={bugMutation.isPending || !bugMessage.trim()}
-                data-testid="button-submit-bug"
-              >
-                {bugMutation.isPending ? 'Sending...' : 'Send Report'}
-              </Button>
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4">
+            <div className="max-w-2xl mx-auto bg-white rounded border border-[#ccc] p-4 space-y-4">
+              <p className="text-sm text-[#878a8c]">
+                Describe the bug you encountered. Include what you were doing and what happened.
+              </p>
+              <div>
+                <Label htmlFor="bug-message" className="text-sm font-bold text-[#1c1c1c] mb-1.5 block">Description</Label>
+                <Textarea
+                  id="bug-message"
+                  placeholder="Describe the issue..."
+                  value={bugMessage}
+                  onChange={(e) => setBugMessage(e.target.value)}
+                  className="min-h-[140px] resize-none bg-[#f6f7f8] border-[#edeff1] focus:bg-white"
+                  maxLength={5000}
+                  data-testid="textarea-bug-message"
+                />
+                <p className="text-xs text-[#878a8c] mt-1">{bugMessage.length} / 5000</p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setView('board')}
+                  disabled={bugMutation.isPending}
+                  className="text-sm font-bold text-[#878a8c] hover:text-[#1c1c1c] px-4 py-2 rounded-full hover:bg-[#edeff1] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!bugMessage.trim()) {
+                      toast({ title: 'Message Required', description: 'Please describe the issue.', variant: 'destructive' });
+                      return;
+                    }
+                    bugMutation.mutate(bugMessage.trim());
+                  }}
+                  disabled={bugMutation.isPending || !bugMessage.trim()}
+                  className="text-sm font-bold text-white bg-[#ff4500] hover:bg-[#e03d00] disabled:opacity-40 px-4 py-2 rounded-full transition-colors"
+                  data-testid="button-submit-bug"
+                >
+                  {bugMutation.isPending ? 'Sending…' : 'Send Report'}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* New Request view */}
         {view === 'new-request' && (
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-            <p className="text-sm text-muted-foreground">
-              Suggest a feature you'd like to see. Others can upvote it to show support.
-            </p>
-            <div>
-              <Label htmlFor="req-title" className="text-sm font-medium mb-1.5 block">
-                Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="req-title"
-                placeholder="Short, clear title..."
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                maxLength={200}
-                data-testid="input-request-title"
-              />
-              <p className="text-xs text-muted-foreground mt-1">{newTitle.length} / 200</p>
-            </div>
-            <div>
-              <Label htmlFor="req-desc" className="text-sm font-medium mb-1.5 block">
-                Description <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Textarea
-                id="req-desc"
-                placeholder="Add more detail if helpful..."
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                className="min-h-[100px] resize-none"
-                maxLength={2000}
-                data-testid="textarea-request-description"
-              />
-              <p className="text-xs text-muted-foreground mt-1">{newDescription.length} / 2000</p>
-            </div>
-            <div className="flex gap-3 justify-end pt-1">
-              <Button variant="outline" onClick={() => setView('board')} disabled={createMutation.isPending}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleNewRequest}
-                disabled={createMutation.isPending || !newTitle.trim()}
-                data-testid="button-submit-request"
-              >
-                {createMutation.isPending ? 'Submitting...' : 'Submit Request'}
-              </Button>
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4">
+            <div className="max-w-2xl mx-auto bg-white rounded border border-[#ccc] p-4 space-y-4">
+              <p className="text-sm text-[#878a8c]">
+                Suggest a feature you'd like to see. Others can upvote it to show support.
+              </p>
+              <div>
+                <Label htmlFor="req-title" className="text-sm font-bold text-[#1c1c1c] mb-1.5 block">
+                  Title <span className="text-[#ff4500]">*</span>
+                </Label>
+                <Input
+                  id="req-title"
+                  placeholder="An interesting title"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  maxLength={200}
+                  className="bg-[#f6f7f8] border-[#edeff1] focus:bg-white"
+                  data-testid="input-request-title"
+                />
+                <p className="text-xs text-[#878a8c] mt-1">{newTitle.length} / 200</p>
+              </div>
+              <div>
+                <Label htmlFor="req-desc" className="text-sm font-bold text-[#1c1c1c] mb-1.5 block">
+                  Description <span className="text-[#878a8c] font-normal">(optional)</span>
+                </Label>
+                <Textarea
+                  id="req-desc"
+                  placeholder="Text (optional)"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  className="min-h-[100px] resize-none bg-[#f6f7f8] border-[#edeff1] focus:bg-white"
+                  maxLength={2000}
+                  data-testid="textarea-request-description"
+                />
+                <p className="text-xs text-[#878a8c] mt-1">{newDescription.length} / 2000</p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setView('board')}
+                  disabled={createMutation.isPending}
+                  className="text-sm font-bold text-[#878a8c] hover:text-[#1c1c1c] px-4 py-2 rounded-full hover:bg-[#edeff1] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!newTitle.trim()) {
+                      toast({ title: 'Title Required', description: 'Please enter a title for your request.', variant: 'destructive' });
+                      return;
+                    }
+                    createMutation.mutate({ title: newTitle.trim(), description: newDescription.trim() || undefined });
+                  }}
+                  disabled={createMutation.isPending || !newTitle.trim()}
+                  className="text-sm font-bold text-white bg-[#0079d3] hover:bg-[#006cbf] disabled:opacity-40 px-4 py-2 rounded-full transition-colors"
+                  data-testid="button-submit-request"
+                >
+                  {createMutation.isPending ? 'Posting…' : 'Post'}
+                </button>
+              </div>
             </div>
           </div>
         )}
