@@ -797,8 +797,8 @@ export interface IStorage {
   getUsersWithCoordinates(): Promise<{ lat: string; lng: string }[]>;
 }
 
-// Helper function to generate unique 6-character alphanumeric display ID
-const generateDisplayId = customAlphabet('0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz', 6);
+// Helper function to generate unique 6-character alphanumeric display ID (uppercase only)
+const generateDisplayId = customAlphabet('0123456789ABCDEFGHJKLMNPQRSTUVWXYZ', 6);
 
 // In-memory cache for city geocoding results (city name → lat/lng).
 // Pre-warmed on startup from DB records via warmCityGeoCache(); subsequently

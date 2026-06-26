@@ -20958,32 +20958,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
-      // Get all teams the user is a member of
-      const userMemberships = await db
-        .select({ teamId: teamMemberships.teamId })
-        .from(teamMemberships)
-        .where(and(
-          eq(teamMemberships.userId, userId),
-          eq(teamMemberships.status, 'approved')
-        ));
-      
-      const teamIds = userMemberships.map(m => m.teamId);
+      // Get all teams the user is a member of (direct team_memberships OR league-assigned)
+      const [directMemberships, leagueAssignments] = await Promise.all([
+        db
+          .select({ teamId: teamMemberships.teamId, isCaptain: teamMemberships.isCaptain })
+          .from(teamMemberships)
+          .where(and(
+            eq(teamMemberships.userId, userId),
+            eq(teamMemberships.status, 'approved')
+          )),
+        db
+          .select({ teamId: leagueMemberships.assignedTeamId })
+          .from(leagueMemberships)
+          .where(and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved'),
+            isNotNull(leagueMemberships.assignedTeamId)
+          ))
+      ]);
+
+      const teamIds = [
+        ...new Set([
+          ...directMemberships.map(m => m.teamId),
+          ...leagueAssignments.map(m => m.teamId).filter(Boolean)
+        ])
+      ] as string[];
       
       if (teamIds.length === 0) {
         return res.json([]);
       }
       
-      // Get full membership info including captain status
-      const userMembershipsWithRole = await db
-        .select({ 
-          teamId: teamMemberships.teamId, 
-          isCaptain: teamMemberships.isCaptain 
-        })
-        .from(teamMemberships)
-        .where(and(
-          eq(teamMemberships.userId, userId),
-          eq(teamMemberships.status, 'approved')
-        ));
+      // Build captain map from direct memberships only (league-assigned users aren't captains)
+      const userMembershipsWithRole = directMemberships;
       
       const membershipMap = new Map(userMembershipsWithRole.map(m => [m.teamId, m.isCaptain]));
       
