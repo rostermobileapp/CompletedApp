@@ -1,4 +1,3 @@
-import { customAlphabet } from 'nanoid';
 import {
   users,
   leagues,
@@ -221,45 +220,6 @@ import {
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists } from "drizzle-orm";
 
-// Helper function to generate unique 6-character alphanumeric team IDs (ABC123 format)
-async function generateUniqueTeamId(): Promise<string> {
-  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars: I, O, 0, 1
-  let attempts = 0;
-  const maxAttempts = 100;
-  
-  while (attempts < maxAttempts) {
-    // Generate a 6-character ID (3 letters + 3 numbers for ABC123 format)
-    let teamId = '';
-    
-    // First 3 characters: letters (indices 0-22)
-    for (let i = 0; i < 3; i++) {
-      const randomIndex = Math.floor(Math.random() * 23); // 23 letters (excluding I and O)
-      teamId += characters[randomIndex];
-    }
-    
-    // Last 3 characters: numbers (indices 24-31, representing digits 2-9)
-    for (let i = 0; i < 3; i++) {
-      const randomIndex = Math.floor(Math.random() * 8) + 24; // 8 numbers (2-9, excluding 0 and 1)
-      teamId += characters[randomIndex];
-    }
-    
-    // Check if this ID already exists
-    const existingTeam = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.uniqueTeamId, teamId))
-      .limit(1);
-    
-    if (existingTeam.length === 0) {
-      return teamId;
-    }
-    
-    attempts++;
-  }
-  
-  throw new Error('Failed to generate unique team ID after maximum attempts');
-}
-
 // Recipient row hydrated with either the real user or the placeholder player.
 // Exactly one of `user` / `placeholderPlayer` is populated for any given row.
 export type HydratedPaymentRequestRecipient = PaymentRequestRecipient & {
@@ -285,6 +245,11 @@ export type InvoiceablePlayer = {
 };
 
 export interface IStorage {
+  // Display ID generators
+  generateUniqueDisplayId(): Promise<string>;
+  generateLeagueDisplayId(): Promise<string>;
+  generateTeamDisplayId(): Promise<string>;
+
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -797,8 +762,6 @@ export interface IStorage {
   getUsersWithCoordinates(): Promise<{ lat: string; lng: string }[]>;
 }
 
-// Helper function to generate unique 6-character alphanumeric display ID (uppercase only)
-const generateDisplayId = customAlphabet('0123456789ABCDEFGHJKLMNPQRSTUVWXYZ', 6);
 
 // In-memory cache for city geocoding results (city name → lat/lng).
 // Pre-warmed on startup from DB records via warmCityGeoCache(); subsequently
@@ -833,29 +796,40 @@ export async function warmCityGeoCache(): Promise<void> {
 }
 
 export class DatabaseStorage implements IStorage {
-  // Generate a unique display ID for a user
+  // Generate the next sequential user display ID: U00001, U00002, …
   async generateUniqueDisplayId(): Promise<string> {
-    let displayId: string;
-    let attempts = 0;
-    const maxAttempts = 10;
-    
-    do {
-      displayId = generateDisplayId();
-      // Check if this display ID already exists
-      const [existing] = await db
-        .select()
-        .from(users)
-        .where(eq(users.displayId, displayId))
-        .limit(1);
-      
-      if (!existing) {
-        return displayId;
-      }
-      attempts++;
-    } while (attempts < maxAttempts);
-    
-    // If we still haven't found a unique ID after max attempts, throw an error
-    throw new Error('Unable to generate unique display ID after multiple attempts');
+    const result = await db.execute(sql`
+      SELECT COALESCE(MAX(CAST(SUBSTRING(display_id FROM 2) AS INTEGER)), 0) AS max_num
+      FROM users
+      WHERE display_id ~ '^U[0-9]{5}$'
+    `);
+    const maxNum = Number((result.rows[0] as any)?.max_num ?? 0);
+    const next = isNaN(maxNum) ? 1 : maxNum + 1;
+    return `U${String(next).padStart(5, '0')}`;
+  }
+
+  // Generate the next sequential league display ID: L00001, L00002, …
+  async generateLeagueDisplayId(): Promise<string> {
+    const result = await db.execute(sql`
+      SELECT COALESCE(MAX(CAST(SUBSTRING(unique_league_id FROM 2) AS INTEGER)), 0) AS max_num
+      FROM leagues
+      WHERE unique_league_id ~ '^L[0-9]{5}$'
+    `);
+    const maxNum = Number((result.rows[0] as any)?.max_num ?? 0);
+    const next = isNaN(maxNum) ? 1 : maxNum + 1;
+    return `L${String(next).padStart(5, '0')}`;
+  }
+
+  // Generate the next sequential team display ID: T00001, T00002, …
+  async generateTeamDisplayId(): Promise<string> {
+    const result = await db.execute(sql`
+      SELECT COALESCE(MAX(CAST(SUBSTRING(unique_team_id FROM 2) AS INTEGER)), 0) AS max_num
+      FROM teams
+      WHERE unique_team_id ~ '^T[0-9]{5}$'
+    `);
+    const maxNum = Number((result.rows[0] as any)?.max_num ?? 0);
+    const next = isNaN(maxNum) ? 1 : maxNum + 1;
+    return `T${String(next).padStart(5, '0')}`;
   }
 
   // User operations
@@ -3010,7 +2984,7 @@ export class DatabaseStorage implements IStorage {
     photoUrl?: string | null, 
     facilityId?: string | null
   ): Promise<Team> {
-    const uniqueTeamId = await generateUniqueTeamId();
+    const uniqueTeamId = await this.generateTeamDisplayId();
     
     const [newTeam] = await db
       .insert(teams)

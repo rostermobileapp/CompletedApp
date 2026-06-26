@@ -5427,7 +5427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate unique league ID if not provided
       if (!leagueData.uniqueLeagueId) {
-        leagueData.uniqueLeagueId = nanoid(8);
+        leagueData.uniqueLeagueId = await storage.generateLeagueDisplayId();
       }
       
       // Check if unique league ID already exists
