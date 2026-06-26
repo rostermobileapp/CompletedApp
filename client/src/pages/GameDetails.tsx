@@ -764,7 +764,7 @@ export default function GameDetails() {
 
           {/* Creator / co-host management panel */}
           {(isScrimmageCreator || canManagePlayers) && (
-            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 space-y-4">
+            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 space-y-4 mt-[8px] pt-[8px] pb-[8px] pr-[8px] pl-[8px]">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" />
