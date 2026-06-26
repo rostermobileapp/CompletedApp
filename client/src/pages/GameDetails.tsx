@@ -514,14 +514,18 @@ export default function GameDetails() {
               </div>
             </div>
 
-            {scrimmage.location && (
-              <div className="flex items-center gap-2 mb-3">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-location">
-                  <LocationLink location={scrimmage.location} />
-                </p>
-              </div>
-            )}
+            <div className="flex items-center gap-2 mb-3">
+              {scrimmage.location && (
+                <>
+                  <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground flex-1" data-testid="text-scrimmage-location">
+                    <LocationLink location={scrimmage.location} />
+                  </p>
+                </>
+              )}
+              {/* RSVP Buttons — inline to the right of the rink */}
+              <ScrimmageRSVPButtons scrimmageId={gameId!} isCreator={isScrimmageCreator} className="ml-auto flex-shrink-0" />
+            </div>
 
             {scrimmage.notes && (
               <div className="mt-4 p-4 bg-muted rounded-lg">
@@ -539,11 +543,6 @@ export default function GameDetails() {
                 </p>
               </div>
             )}
-
-            {/* RSVP Buttons for all users — creators must also opt in explicitly */}
-            <div className="mt-6 pt-4 border-t border-border">
-              <ScrimmageRSVPButtons scrimmageId={gameId!} isCreator={isScrimmageCreator} />
-            </div>
             </div>
           </div>
 
