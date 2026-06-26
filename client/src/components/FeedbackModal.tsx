@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { AlertCircle, Plus, ArrowLeft, Loader2, ArrowUp, ArrowDown, MessageSquare, Send } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -327,9 +327,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                     {/* Content */}
                     <div className="flex-1 p-2 min-w-0">
                       <p className="text-xs text-[#878a8c] mb-1">
-                        Posted by <span className="hover:underline cursor-pointer">{req.submitterName}</span>
-                        {' · '}
-                        {formatDistanceToNow(new Date(req.createdAt), { addSuffix: true })}
+                        {format(new Date(req.createdAt), 'MMM d, yyyy')}
                       </p>
                       <h3 className="text-base font-semibold text-[#1c1c1c] leading-snug">{req.title}</h3>
                       {req.description && (
