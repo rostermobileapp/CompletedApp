@@ -327,7 +327,12 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                     {/* Content */}
                     <div className="flex-1 p-2 min-w-0">
                       <p className="text-xs text-[#878a8c] mb-1">
-                        {format(new Date(req.createdAt), 'MMM d, yyyy')}
+                        {(() => {
+                          const parts = (req.submitterName || '').split(' ');
+                          const first = parts[0] || '';
+                          const lastInitial = parts[1] ? parts[1][0] : '';
+                          return `${first}${lastInitial ? `, ${lastInitial}` : ''}`;
+                        })()} · {format(new Date(req.createdAt), 'MMM d, yyyy')}
                       </p>
                       <h3 className="text-base font-semibold text-[#1c1c1c] leading-snug">{req.title}</h3>
                       {req.description && (
