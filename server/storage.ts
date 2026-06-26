@@ -1939,6 +1939,10 @@ export class DatabaseStorage implements IStorage {
 
   // League operations
   async createLeague(league: InsertLeague): Promise<League> {
+    // Always ensure a sequential L##### display ID is present before insert
+    if (!league.uniqueLeagueId) {
+      league = { ...league, uniqueLeagueId: await this.generateLeagueDisplayId() };
+    }
     const [newLeague] = await db.insert(leagues).values(league).returning();
     return newLeague;
   }
@@ -2575,6 +2579,10 @@ export class DatabaseStorage implements IStorage {
 
   // Team operations
   async createTeam(team: InsertTeam): Promise<Team> {
+    // Always ensure a sequential T##### display ID is present before insert
+    if (!team.uniqueTeamId) {
+      team = { ...team, uniqueTeamId: await this.generateTeamDisplayId() };
+    }
     const [newTeam] = await db.insert(teams).values(team).returning();
     return newTeam;
   }
