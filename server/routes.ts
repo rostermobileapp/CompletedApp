@@ -7199,9 +7199,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get game IDs where user is an approved substitute
       const substituteGameIds = await storage.getUserSubstituteGameIds(userId);
       
-      // Get approved scrimmages for the user
+      // Get approved and pending scrimmages for the user
       const scrimmageRequests = await storage.getScrimmageRequestsByPlayer(userId);
-      const approvedScrimmageRequests = scrimmageRequests.filter(req => req.status === 'approved');
+      const approvedScrimmageRequests = scrimmageRequests.filter(req => req.status === 'approved' || req.status === 'pending');
       
       
       // Create a set of existing game IDs for deduplication
@@ -7252,7 +7252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      // Add approved scrimmages as schedule items (filter by league timezone)
+      // Add approved and pending scrimmages as schedule items (filter by league timezone)
       const formattedScrimmages = [];
       for (const req of approvedScrimmageRequests) {
         // Get league timezone (use cache)
@@ -7270,6 +7270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             scheduledAt: req.scrimmage.dateTime,
             location: req.scrimmage.location,
             isScrimmage: true,
+            isPending: req.status === 'pending',
             scrimmageTitle: req.scrimmage.title,
             scrimmageCreator: req.scrimmage.creator,
             isSubstitute: false,
@@ -15757,6 +15758,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status, undefined, teamAssignment ?? null);
       
+      // Send rejection push notification
+      if (status === 'rejected') {
+        try {
+          const player = await storage.getUser(request.playerId);
+          if (player) {
+            const league = await storage.getLeague(scrimmage.leagueId);
+            const timezone = league?.timezone || 'America/New_York';
+            const { date: rejDate, time: rejTime } = formatDayAndTime(scrimmage.dateTime, timezone);
+            await storage.createNotification({
+              userId: player.id,
+              type: 'scrimmage_rejected',
+              title: `Not selected for ${scrimmage.title}`,
+              message: `Unfortunately you were not selected for "${scrimmage.title}" on ${rejDate} at ${rejTime}.`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Scrimmage',
+              scrimmageId: scrimmage.id,
+            });
+            broadcastNotificationUpdate(player.id);
+            const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+            await sendPushNotificationToUser(
+              player.id,
+              `Not selected for ${scrimmage.title}`,
+              `Unfortunately you were not selected for "${scrimmage.title}" on ${rejDate} at ${rejTime}.`,
+              `/scrimmage/${scrimmage.id}`
+            );
+          }
+        } catch (err) {
+          console.error('Failed to send scrimmage rejection notification:', err);
+        }
+      }
+
       // Send approval notification email if request was approved
       if (status === 'approved') {
         try {

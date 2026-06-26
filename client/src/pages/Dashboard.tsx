@@ -3174,7 +3174,7 @@ function DashboardMobile() {
             };
             const hasGames = Array.isArray(scheduleGames) && (scheduleGames as any[]).filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0;
             const hasInvites = scheduleScope === 'team' && Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0;
-            const hasRequests = scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => r.status === 'approved' && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
+            const hasRequests = scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => (r.status === 'approved' || r.status === 'pending') && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
             const hasReminders = scheduleScope === 'team' && Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0;
             return hasGames || hasInvites || hasRequests || hasReminders || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
           })() ? (
@@ -3253,10 +3253,10 @@ function DashboardMobile() {
                 </div>
               ))}
               
-              {/* Show approved scrimmages (yesterday and future - visible until day after) */}
+              {/* Show approved and pending scrimmages (yesterday and future - visible until day after) */}
               {scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests
                 .filter((request: any) => {
-                  if (request.status !== 'approved' || !request.scrimmage) return false;
+                  if ((request.status !== 'approved' && request.status !== 'pending') || !request.scrimmage) return false;
                   // Creator's own scrimmages already appear in the invites section above — skip here
                   if (request.scrimmage.creatorId === (userProfile as any)?.id) return false;
                   const eventDate = new Date(request.scrimmage.dateTime);
@@ -3269,23 +3269,26 @@ function DashboardMobile() {
                 .slice(0, 5)
                 .map((request: any) => {
                   const scrimmage = request.scrimmage;
+                  const isPending = request.status === 'pending';
                   return (
                     <div 
                       key={`scrimmage-${scrimmage.id}`}
-                      className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                      className={`rounded-xl elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${isPending ? 'border border-amber-500/50' : 'hairline'}`}
                       onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
                       data-testid={`card-scrimmage-${scrimmage.id}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                          <Trophy className="w-6 h-6 text-primary-foreground" />
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isPending ? 'bg-amber-500' : 'bg-primary'}`}>
+                          <Trophy className="w-6 h-6 text-white" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
                               {scrimmage.title}
                             </h3>
-                            <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded flex-shrink-0">Scrimmage</span>
+                            <span className={`text-xs text-white px-2 py-0.5 rounded flex-shrink-0 ${isPending ? 'bg-amber-500' : 'bg-orange-500'}`}>
+                              {isPending ? 'Pending' : 'Scrimmage'}
+                            </span>
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
                             {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}

@@ -35,6 +35,7 @@ interface MobileCalendarEvent {
   navigateTo?: string;
   teamAssignment?: string | null;
   scrimmageId?: string;
+  isPending?: boolean;
 }
 
 interface ScheduleCalendarMobileProps {
@@ -157,7 +158,7 @@ export function ScheduleCalendarMobile({
 
     if (Array.isArray(scrimmageRequests)) {
       for (const r of scrimmageRequests) {
-        if (r?.status !== 'approved' || !r.scrimmage?.dateTime) continue;
+        if ((r?.status !== 'approved' && r?.status !== 'pending') || !r.scrimmage?.dateTime) continue;
         const s = r.scrimmage;
         const d = new Date(s.dateTime);
         if (Number.isNaN(d.getTime())) continue;
@@ -167,9 +168,10 @@ export function ScheduleCalendarMobile({
           kind: 'scrimmage',
           title: s.title || 'Scrimmage',
           subtitle: s.location || null,
-          color: s.color || KIND_FALLBACK_COLOR.scrimmage,
+          color: r.status === 'pending' ? '#f59e0b' : (s.color || KIND_FALLBACK_COLOR.scrimmage),
           navigateTo: `/scrimmage/${s.id}`,
           teamAssignment: r.teamAssignment ?? null,
+          isPending: r.status === 'pending',
         });
       }
     }
@@ -452,12 +454,17 @@ export function ScheduleCalendarMobile({
                         >
                           {KIND_BADGE_LABEL[ev.kind]}
                         </span>
-                        {ev.kind === 'scrimmage' && ev.teamAssignment === 'light' && (
+                        {ev.kind === 'scrimmage' && ev.isPending && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-500 text-white">
+                            Pending
+                          </span>
+                        )}
+                        {ev.kind === 'scrimmage' && !ev.isPending && ev.teamAssignment === 'light' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-white text-gray-800 border border-gray-300">
                             Team Light
                           </span>
                         )}
-                        {ev.kind === 'scrimmage' && ev.teamAssignment === 'dark' && (
+                        {ev.kind === 'scrimmage' && !ev.isPending && ev.teamAssignment === 'dark' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-800 text-white">
                             Team Dark
                           </span>
