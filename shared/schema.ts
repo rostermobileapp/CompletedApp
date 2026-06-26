@@ -4075,3 +4075,31 @@ export const hpibEvents = pgTable("hpib_events", {
 ]);
 
 export type HpibEvent = typeof hpibEvents.$inferSelect;
+
+// Feature request board — community-submitted and upvoteable feature requests
+export const featureRequests = pgTable("feature_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_feature_requests_user").on(table.userId),
+  index("idx_feature_requests_created").on(table.createdAt),
+]);
+
+export const insertFeatureRequestSchema = createInsertSchema(featureRequests).omit({ id: true, createdAt: true });
+export type InsertFeatureRequest = z.infer<typeof insertFeatureRequestSchema>;
+export type FeatureRequest = typeof featureRequests.$inferSelect;
+
+export const featureRequestVotes = pgTable("feature_request_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  featureRequestId: varchar("feature_request_id").references(() => featureRequests.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("uq_feature_request_votes_user_request").on(table.userId, table.featureRequestId),
+  index("idx_feature_request_votes_request").on(table.featureRequestId),
+]);
+
+export type FeatureRequestVote = typeof featureRequestVotes.$inferSelect;

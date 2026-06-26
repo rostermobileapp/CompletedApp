@@ -446,6 +446,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure users.first_rsvp_triggered column:', err);
   }
 
+  // Ensure feature_requests and feature_request_votes tables exist
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS feature_requests (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title varchar(200) NOT NULL,
+        description text,
+        created_at timestamp DEFAULT NOW() NOT NULL
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS feature_request_votes (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        feature_request_id varchar NOT NULL REFERENCES feature_requests(id) ON DELETE CASCADE,
+        created_at timestamp DEFAULT NOW() NOT NULL,
+        CONSTRAINT uq_feature_request_votes_user_request UNIQUE (user_id, feature_request_id)
+      )
+    `);
+    console.log('[Init] feature_requests and feature_request_votes tables ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure feature request tables:', err);
+  }
+
   // Initialize user registration count table
   try {
     await db.execute(sql`
@@ -19067,6 +19092,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error submitting feedback:", error);
       res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // Feature Request Board — GET all requests with vote count + user-voted flag
+  app.get('/api/feature-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rows = await db.execute(sql`
+        SELECT
+          fr.id,
+          fr.title,
+          fr.description,
+          fr.created_at,
+          u.first_name,
+          u.last_name,
+          COUNT(v.id)::int AS vote_count,
+          MAX(CASE WHEN v.user_id = ${userId} THEN 1 ELSE 0 END)::int AS user_voted
+        FROM feature_requests fr
+        JOIN users u ON u.id = fr.user_id
+        LEFT JOIN feature_request_votes v ON v.feature_request_id = fr.id
+        GROUP BY fr.id, fr.title, fr.description, fr.created_at, u.first_name, u.last_name
+        ORDER BY vote_count DESC, fr.created_at DESC
+      `);
+      res.json(rows.rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        createdAt: r.created_at,
+        submitterName: [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Anonymous',
+        voteCount: Number(r.vote_count),
+        userVoted: Number(r.user_voted) === 1,
+      })));
+    } catch (error) {
+      console.error('[Feature Requests] GET error:', error);
+      res.status(500).json({ message: 'Failed to load feature requests' });
+    }
+  });
+
+  // Feature Request Board — POST create a new request
+  app.post('/api/feature-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const schema = z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional(),
+      });
+      const { title, description } = schema.parse(req.body);
+      const result = await db.execute(sql`
+        INSERT INTO feature_requests (user_id, title, description)
+        VALUES (${userId}, ${title}, ${description ?? null})
+        RETURNING id, title, description, created_at
+      `);
+      const row = result.rows[0] as any;
+      res.status(201).json({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        createdAt: row.created_at,
+        voteCount: 0,
+        userVoted: false,
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: 'Invalid request', errors: error.errors });
+      }
+      console.error('[Feature Requests] POST error:', error);
+      res.status(500).json({ message: 'Failed to create feature request' });
+    }
+  });
+
+  // Feature Request Board — POST toggle vote (add if not exists, remove if exists)
+  app.post('/api/feature-requests/:id/vote', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const requestId = req.params.id;
+      // Check if vote exists
+      const existing = await db.execute(sql`
+        SELECT id FROM feature_request_votes
+        WHERE user_id = ${userId} AND feature_request_id = ${requestId}
+      `);
+      if (existing.rows.length > 0) {
+        await db.execute(sql`
+          DELETE FROM feature_request_votes
+          WHERE user_id = ${userId} AND feature_request_id = ${requestId}
+        `);
+        const countRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS cnt FROM feature_request_votes WHERE feature_request_id = ${requestId}
+        `);
+        return res.json({ voted: false, voteCount: Number((countRes.rows[0] as any).cnt) });
+      } else {
+        await db.execute(sql`
+          INSERT INTO feature_request_votes (user_id, feature_request_id)
+          VALUES (${userId}, ${requestId})
+          ON CONFLICT DO NOTHING
+        `);
+        const countRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS cnt FROM feature_request_votes WHERE feature_request_id = ${requestId}
+        `);
+        return res.json({ voted: true, voteCount: Number((countRes.rows[0] as any).cnt) });
+      }
+    } catch (error) {
+      console.error('[Feature Requests] VOTE error:', error);
+      res.status(500).json({ message: 'Failed to toggle vote' });
     }
   });
 
