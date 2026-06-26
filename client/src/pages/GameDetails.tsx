@@ -487,7 +487,6 @@ export default function GameDetails() {
             <h1 className="text-xl font-semibold">Scrimmage Details</h1>
           </div>
         </div>
-
         <div className="px-6 py-6 space-y-6">
           {/* Scrimmage Info */}
           <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] overflow-hidden">
@@ -499,7 +498,7 @@ export default function GameDetails() {
                 </div>
               ) : null;
             })()}
-            <div className="p-6">
+            <div className="p-6 pb-[0px] pt-[8px] pl-[8px] pr-[8px]">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
                 <Trophy className="w-6 h-6 text-primary-foreground" />
