@@ -351,7 +351,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
 export const leagues = pgTable("leagues", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
-  uniqueLeagueId: varchar("unique_league_id").unique().notNull(), // For players to search and join
+  uniqueLeagueId: varchar("unique_league_id", { length: 6 }).unique().notNull(), // L##### sequential display ID
   sport: sportEnum("sport").notNull(),
   description: text("description"),
   location: varchar("location"),
@@ -386,7 +386,7 @@ export const seasons = pgTable("seasons", {
 export const teams = pgTable("teams", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
-  uniqueTeamId: varchar("unique_team_id").unique(), // ABC123 format for standalone teams to be searchable
+  uniqueTeamId: varchar("unique_team_id", { length: 6 }).unique(), // T##### sequential display ID
   leagueId: varchar("league_id").references(() => leagues.id), // Made nullable for standalone teams
   seasonId: varchar("season_id").references(() => seasons.id), // Made nullable for safe migration
   captainId: varchar("captain_id").references(() => users.id, { onDelete: 'cascade' }),

@@ -796,40 +796,52 @@ export async function warmCityGeoCache(): Promise<void> {
 }
 
 export class DatabaseStorage implements IStorage {
-  // Generate the next sequential user display ID: U00001, U00002, …
+  // Generate the next available user display ID (U00001, U00002, …).
+  // Reads MAX, proposes MAX+1, then checks it is not already taken.
+  // Retries up to 10 times so concurrent inserts never produce a duplicate.
   async generateUniqueDisplayId(): Promise<string> {
-    const result = await db.execute(sql`
-      SELECT COALESCE(MAX(CAST(SUBSTRING(display_id FROM 2) AS INTEGER)), 0) AS max_num
-      FROM users
-      WHERE display_id ~ '^U[0-9]{5}$'
-    `);
-    const maxNum = Number((result.rows[0] as any)?.max_num ?? 0);
-    const next = isNaN(maxNum) ? 1 : maxNum + 1;
-    return `U${String(next).padStart(5, '0')}`;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const maxResult = await db.execute(sql`
+        SELECT COALESCE(MAX(CAST(SUBSTRING(display_id FROM 2) AS INTEGER)), 0) AS max_num
+        FROM users WHERE display_id ~ '^U[0-9]{5}$'
+      `);
+      const maxNum = Number((maxResult.rows[0] as any)?.max_num ?? 0);
+      const candidate = `U${String(isNaN(maxNum) ? 1 : maxNum + 1).padStart(5, '0')}`;
+      const taken = await db.execute(sql`SELECT 1 FROM users WHERE display_id = ${candidate} LIMIT 1`);
+      if (taken.rows.length === 0) return candidate;
+      // Candidate was taken by a concurrent insert; loop re-reads MAX
+    }
+    throw new Error('Failed to generate unique user display ID after 10 attempts');
   }
 
-  // Generate the next sequential league display ID: L00001, L00002, …
+  // Generate the next available league display ID (L00001, L00002, …).
   async generateLeagueDisplayId(): Promise<string> {
-    const result = await db.execute(sql`
-      SELECT COALESCE(MAX(CAST(SUBSTRING(unique_league_id FROM 2) AS INTEGER)), 0) AS max_num
-      FROM leagues
-      WHERE unique_league_id ~ '^L[0-9]{5}$'
-    `);
-    const maxNum = Number((result.rows[0] as any)?.max_num ?? 0);
-    const next = isNaN(maxNum) ? 1 : maxNum + 1;
-    return `L${String(next).padStart(5, '0')}`;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const maxResult = await db.execute(sql`
+        SELECT COALESCE(MAX(CAST(SUBSTRING(unique_league_id FROM 2) AS INTEGER)), 0) AS max_num
+        FROM leagues WHERE unique_league_id ~ '^L[0-9]{5}$'
+      `);
+      const maxNum = Number((maxResult.rows[0] as any)?.max_num ?? 0);
+      const candidate = `L${String(isNaN(maxNum) ? 1 : maxNum + 1).padStart(5, '0')}`;
+      const taken = await db.execute(sql`SELECT 1 FROM leagues WHERE unique_league_id = ${candidate} LIMIT 1`);
+      if (taken.rows.length === 0) return candidate;
+    }
+    throw new Error('Failed to generate unique league display ID after 10 attempts');
   }
 
-  // Generate the next sequential team display ID: T00001, T00002, …
+  // Generate the next available team display ID (T00001, T00002, …).
   async generateTeamDisplayId(): Promise<string> {
-    const result = await db.execute(sql`
-      SELECT COALESCE(MAX(CAST(SUBSTRING(unique_team_id FROM 2) AS INTEGER)), 0) AS max_num
-      FROM teams
-      WHERE unique_team_id ~ '^T[0-9]{5}$'
-    `);
-    const maxNum = Number((result.rows[0] as any)?.max_num ?? 0);
-    const next = isNaN(maxNum) ? 1 : maxNum + 1;
-    return `T${String(next).padStart(5, '0')}`;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const maxResult = await db.execute(sql`
+        SELECT COALESCE(MAX(CAST(SUBSTRING(unique_team_id FROM 2) AS INTEGER)), 0) AS max_num
+        FROM teams WHERE unique_team_id ~ '^T[0-9]{5}$'
+      `);
+      const maxNum = Number((maxResult.rows[0] as any)?.max_num ?? 0);
+      const candidate = `T${String(isNaN(maxNum) ? 1 : maxNum + 1).padStart(5, '0')}`;
+      const taken = await db.execute(sql`SELECT 1 FROM teams WHERE unique_team_id = ${candidate} LIMIT 1`);
+      if (taken.rows.length === 0) return candidate;
+    }
+    throw new Error('Failed to generate unique team display ID after 10 attempts');
   }
 
   // User operations
