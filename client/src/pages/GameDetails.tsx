@@ -756,7 +756,7 @@ export default function GameDetails() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-4">
+              <p className="text-muted-foreground text-center py-4 pt-[4px] pb-[4px]">
                 No players confirmed yet
               </p>
             )}
