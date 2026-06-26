@@ -2107,7 +2107,7 @@ function DashboardMobile() {
       : null;
     
     if (league) {
-      const seasonSuffix = league.season ? ` - ${league.season}` : '';
+      const seasonSuffix = league.seasonName ? ` - ${league.seasonName}` : '';
       return `${league.name}: ${team.name}${seasonSuffix}`;
     }
     
