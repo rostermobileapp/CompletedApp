@@ -710,11 +710,9 @@ export default function Teams() {
                                 </button>
                               )}
                             </div>
-                            {team.uniqueTeamId && (
-                              <span className="text-xs font-mono text-muted-foreground ml-2">
-                                {team.uniqueTeamId}
-                              </span>
-                            )}
+                            <span className="text-xs font-mono text-muted-foreground ml-2">
+                              {team.uniqueTeamId}
+                            </span>
                           </div>
                         )}
                       </div>
