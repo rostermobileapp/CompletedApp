@@ -56,14 +56,16 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { title: string; description?: string }) => {
-      return apiRequest('POST', '/api/feature-requests', data);
+    mutationFn: async (data: { title: string; description?: string }): Promise<FeatureRequestItem> => {
+      const res = await apiRequest('POST', '/api/feature-requests', data);
+      return res.json() as Promise<FeatureRequestItem>;
     },
-    onSuccess: (newItem: any) => {
+    onSuccess: (newItem: FeatureRequestItem) => {
       queryClient.setQueryData<FeatureRequestItem[]>(['/api/feature-requests'], (old = []) => [
         ...old,
         newItem,
       ]);
+      queryClient.invalidateQueries({ queryKey: ['/api/feature-requests'] });
       toast({ title: 'Request Submitted', description: 'Your feature request has been added!' });
       setNewTitle('');
       setNewDescription('');
