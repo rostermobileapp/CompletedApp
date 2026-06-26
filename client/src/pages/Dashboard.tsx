@@ -3201,9 +3201,6 @@ function DashboardMobile() {
                     const isOwnScrimmage = invite.creatorId === (userProfile as any)?.id;
                     return (
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Trophy className="w-6 h-6 text-black" />
-                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold truncate" data-testid={`text-invite-title-${invite.id}`}>
@@ -3278,9 +3275,6 @@ function DashboardMobile() {
                       data-testid={`card-scrimmage-${scrimmage.id}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isPending ? 'bg-amber-500' : 'bg-primary'}`}>
-                          <Trophy className="w-6 h-6 text-white" />
-                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold" data-testid={`text-scrimmage-title-${scrimmage.id}`}>
@@ -3337,9 +3331,6 @@ function DashboardMobile() {
                         data-testid={`card-reminder-${reminder.id}`}
                       >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                          <Clock className="w-6 h-6 text-white" />
-                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold" data-testid={`text-reminder-title-${reminder.id}`}>
@@ -3398,15 +3389,6 @@ function DashboardMobile() {
                     data-testid={`card-team-event-${event.id}`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                        event.eventType === 'scrimmage' ? 'bg-orange-500' : 'bg-blue-500'
-                      }`}>
-                        {event.eventType === 'scrimmage' ? (
-                          <Trophy className="w-6 h-6 text-white" />
-                        ) : (
-                          <Calendar className="w-6 h-6 text-white" />
-                        )}
-                      </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold" data-testid={`text-team-event-title-${event.id}`}>
@@ -3479,9 +3461,6 @@ function DashboardMobile() {
                   data-testid={`card-bracket-${tournament.id}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-[#FFD700]">
-                      <Trophy className="w-6 h-6 text-black" />
-                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold" data-testid={`text-bracket-name-${tournament.id}`}>
