@@ -3461,6 +3461,17 @@ function DashboardMobile() {
                   data-testid={`card-bracket-${tournament.id}`}
                 >
                   <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${tournament.opponentLogoUrl ? 'bg-transparent' : 'bg-[#FFD700]'}`}>
+                      {tournament.opponentLogoUrl ? (
+                        <img
+                          src={getImageUrl(tournament.opponentLogoUrl) || ''}
+                          alt="Opponent logo"
+                          className="w-full h-full rounded-lg object-cover bg-transparent"
+                        />
+                      ) : (
+                        <Trophy className="w-6 h-6 text-black" />
+                      )}
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold" data-testid={`text-bracket-name-${tournament.id}`}>
