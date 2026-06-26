@@ -656,7 +656,7 @@ export default function GameDetails() {
           )}
 
           {/* Approved Players */}
-          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[8px] pt-[8px] pb-[8px] pl-[8px]">
             <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">
