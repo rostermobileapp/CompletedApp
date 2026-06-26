@@ -7386,7 +7386,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scrimmageRequests,
         substituteRequests,
         personalReminders,
-        userMemberships
+        directMemberships,
+        leagueAssignments
       ] = await Promise.all([
         storage.getUserTeams(userId),
         storage.getAllUserGames(userId),
@@ -7394,17 +7395,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getScrimmageRequestsByPlayer(userId),
         storage.getSubstituteRequests({ status: 'approved', userId }),
         storage.getUserPersonalReminders(userId),
+        // Direct team_memberships rows
         db
           .select({ teamId: teamMemberships.teamId })
           .from(teamMemberships)
           .where(and(
             eq(teamMemberships.userId, userId),
             eq(teamMemberships.status, 'approved')
+          )),
+        // Teams assigned via league_memberships.assigned_team_id
+        db
+          .select({ teamId: leagueMemberships.assignedTeamId })
+          .from(leagueMemberships)
+          .where(and(
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.status, 'approved'),
+            isNotNull(leagueMemberships.assignedTeamId)
           ))
       ]);
 
-      // Fetch team events for all teams the user belongs to
-      const memberTeamIds = userMemberships.map((m: any) => m.teamId);
+      // Combine both sources of team IDs, deduplicated
+      const memberTeamIds = [
+        ...new Set([
+          ...directMemberships.map((m: any) => m.teamId),
+          ...leagueAssignments.map((m: any) => m.teamId).filter(Boolean)
+        ])
+      ];
       let calendarTeamEvents: any[] = [];
       if (memberTeamIds.length > 0) {
         calendarTeamEvents = await db
