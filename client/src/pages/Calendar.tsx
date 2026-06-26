@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft, Clock, Users, ChevronRight } from "lucide-react";
+import { Trophy, ArrowLeft, Clock, Users, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,7 @@ export default function Calendar() {
     scrimmageRequests: (ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[];
     mySubstitutions: any[];
     personalReminders: any[];
+    teamEvents: any[];
   }
   
   const { data: calendarData, isLoading: gamesLoading } = useQuery<CalendarData>({
@@ -74,6 +75,7 @@ export default function Calendar() {
   const scrimmageRequests = calendarData?.scrimmageRequests || [];
   const mySubstitutions = calendarData?.mySubstitutions || [];
   const personalReminders = calendarData?.personalReminders || [];
+  const calendarTeamEvents = calendarData?.teamEvents || [];
 
   // Get active team based on Dashboard selection (or first team if none selected/invalid)
   const activeTeam = (() => {
@@ -168,12 +170,13 @@ export default function Calendar() {
         }))
     : [];
 
-  // Combine games, scrimmages, personal reminders, and substitute games, then sort chronologically
+  // Combine games, scrimmages, personal reminders, substitute games, and team events, then sort chronologically
   const allEvents = [
     ...userGames.map((game: any) => ({ ...game, type: 'game' as const })),
     ...userScrimmages,
     ...substituteGames,
-    ...(Array.isArray(personalReminders) ? personalReminders.map((reminder: any) => ({ ...reminder, type: 'reminder' as const })) : [])
+    ...(Array.isArray(personalReminders) ? personalReminders.map((reminder: any) => ({ ...reminder, type: 'reminder' as const })) : []),
+    ...(Array.isArray(calendarTeamEvents) ? calendarTeamEvents.map((event: any) => ({ ...event, type: 'team-event' as const })) : [])
   ].sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
   // Find the index to scroll to (between last event and next event)
@@ -370,6 +373,46 @@ export default function Calendar() {
                         className="w-8 h-8 text-primary"
                         data-testid={`icon-view-details-substitute-${game.id}`}
                       />
+                    </div>
+                  </div>
+                );
+              }
+
+              // Handle team events
+              if (event.type === 'team-event') {
+                return (
+                  <div
+                    key={`team-event-${event.id}`}
+                    className="rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                    onClick={() => navigate(`/team-event/${event.id}`)}
+                    data-testid={`card-team-event-${event.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-12 h-12 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: event.color || '#6366f1' }}
+                      >
+                        <CalendarIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold" data-testid={`text-team-event-title-${event.id}`}>
+                            {event.title}
+                          </h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
+                            {event.teamName}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground" data-testid={`text-team-event-time-${event.id}`}>
+                          {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                        </p>
+                        {event.location && (
+                          <p className="text-xs text-muted-foreground" data-testid={`text-team-event-location-${event.id}`}>
+                            <LocationLink location={event.location} />
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight className="w-8 h-8 text-primary" />
                     </div>
                   </div>
                 );

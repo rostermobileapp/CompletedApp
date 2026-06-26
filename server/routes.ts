@@ -7358,15 +7358,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdScrimmages,
         scrimmageRequests,
         substituteRequests,
-        personalReminders
+        personalReminders,
+        userMemberships
       ] = await Promise.all([
         storage.getUserTeams(userId),
         storage.getAllUserGames(userId),
         storage.getUserScrimmages(userId),
         storage.getScrimmageRequestsByPlayer(userId),
         storage.getSubstituteRequests({ status: 'approved', userId }),
-        storage.getUserPersonalReminders(userId)
+        storage.getUserPersonalReminders(userId),
+        db
+          .select({ teamId: teamMemberships.teamId })
+          .from(teamMemberships)
+          .where(and(
+            eq(teamMemberships.userId, userId),
+            eq(teamMemberships.status, 'approved')
+          ))
       ]);
+
+      // Fetch team events for all teams the user belongs to
+      const memberTeamIds = userMemberships.map((m: any) => m.teamId);
+      let calendarTeamEvents: any[] = [];
+      if (memberTeamIds.length > 0) {
+        calendarTeamEvents = await db
+          .select({
+            id: teamEvents.id,
+            teamId: teamEvents.teamId,
+            creatorId: teamEvents.creatorId,
+            eventType: teamEvents.eventType,
+            title: teamEvents.title,
+            description: teamEvents.description,
+            scheduledAt: teamEvents.scheduledAt,
+            endTime: teamEvents.endTime,
+            location: teamEvents.location,
+            opponentName: teamEvents.opponentName,
+            color: teamEvents.color,
+            teamName: teams.name,
+          })
+          .from(teamEvents)
+          .innerJoin(teams, eq(teamEvents.teamId, teams.id))
+          .where(inArray(teamEvents.teamId, memberTeamIds))
+          .orderBy(teamEvents.scheduledAt);
+      }
       
       // Filter substitute requests to only include those where user is the substitute
       const mySubstitutions = substituteRequests.filter(
@@ -7382,7 +7415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdScrimmages,
         scrimmageRequests,
         mySubstitutions,
-        personalReminders
+        personalReminders,
+        teamEvents: calendarTeamEvents
       });
     } catch (error) {
       console.error("Error fetching calendar data:", error);
