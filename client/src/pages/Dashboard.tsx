@@ -3254,8 +3254,12 @@ function DashboardMobile() {
               {scheduleScope === 'team' && Array.isArray(scrimmageRequests) && scrimmageRequests
                 .filter((request: any) => {
                   if ((request.status !== 'approved' && request.status !== 'pending') || !request.scrimmage) return false;
-                  // Creator's own scrimmages already appear in the invites section above — skip here
-                  if (request.scrimmage.creatorId === (userProfile as any)?.id) return false;
+                  // Only skip creator-owned scrimmages if they already appear in the invites list above.
+                  // If the scrimmage has aged off the invites feed (past dateTime) it won't be in
+                  // scrimmageInvites, so we must still show it here to avoid a gap between views.
+                  const alreadyInInvites = Array.isArray(scrimmageInvites) &&
+                    scrimmageInvites.some((i: any) => i.id === request.scrimmage.id);
+                  if (alreadyInInvites) return false;
                   const eventDate = new Date(request.scrimmage.dateTime);
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
