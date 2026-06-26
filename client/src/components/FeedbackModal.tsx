@@ -131,7 +131,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col p-0 gap-0" data-testid="dialog-feedback">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 sm:w-screen sm:h-screen sm:max-w-none sm:rounded-none" data-testid="dialog-feedback">
 
         {/* Header */}
         <DialogHeader className="px-5 pt-5 pb-3 border-b flex-shrink-0">

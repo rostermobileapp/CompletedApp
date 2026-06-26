@@ -19113,7 +19113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         JOIN users u ON u.id = fr.user_id
         LEFT JOIN feature_request_votes v ON v.feature_request_id = fr.id
         GROUP BY fr.id, fr.title, fr.description, fr.created_at, u.first_name, u.last_name
-        ORDER BY vote_count DESC, fr.created_at DESC
+        ORDER BY vote_count DESC, fr.created_at ASC
       `);
       res.json(rows.rows.map((r: any) => ({
         id: r.id,
@@ -19145,11 +19145,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING id, title, description, created_at
       `);
       const row = result.rows[0] as any;
+      const user = await storage.getUser(userId);
+      const submitterName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Anonymous';
       res.status(201).json({
         id: row.id,
         title: row.title,
         description: row.description,
         createdAt: row.created_at,
+        submitterName,
         voteCount: 0,
         userVoted: false,
       });
