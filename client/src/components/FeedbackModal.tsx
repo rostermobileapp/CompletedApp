@@ -7,12 +7,19 @@ import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
-import { AlertCircle, ThumbsUp, Plus, X, ArrowLeft, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { AlertCircle, ThumbsUp, Plus, ArrowLeft, Loader2, Send, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface Reply {
+  id: string;
+  body: string;
+  createdAt: string;
 }
 
 interface FeatureRequestItem {
@@ -27,6 +34,125 @@ interface FeatureRequestItem {
 
 type View = 'board' | 'report-bug' | 'new-request';
 
+const FOUNDER_EMAIL = 'founder@rosterhockey.com';
+
+// Per-card reply section — fetches lazily when expanded
+function ReplySection({
+  requestId,
+  isFounder,
+}: {
+  requestId: string;
+  isFounder: boolean;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [replyText, setReplyText] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: replies = [], isLoading } = useQuery<Reply[]>({
+    queryKey: ['/api/feature-requests', requestId, 'replies'],
+    queryFn: async () => {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/feature-requests/${requestId}/replies`, { headers });
+      if (!res.ok) throw new Error('Failed to load replies');
+      return res.json();
+    },
+    enabled: expanded || isFounder,
+    staleTime: 60_000,
+  });
+
+  const postReply = useMutation({
+    mutationFn: async (body: string) => {
+      const res = await apiRequest('POST', `/api/feature-requests/${requestId}/replies`, { body });
+      return res.json() as Promise<Reply>;
+    },
+    onSuccess: (newReply) => {
+      queryClient.setQueryData<Reply[]>(
+        ['/api/feature-requests', requestId, 'replies'],
+        (old = []) => [...old, newReply],
+      );
+      setReplyText('');
+      setExpanded(true);
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to post reply.', variant: 'destructive' });
+    },
+  });
+
+  const hasReplies = replies.length > 0;
+
+  // Founder always sees the reply composer; other users only see the toggle when there are replies
+  const showToggle = !isFounder && hasReplies;
+  const showComposer = isFounder;
+  const showReplies = isFounder || expanded;
+
+  if (!showToggle && !showComposer) return null;
+
+  return (
+    <div className="mt-2 border-t border-border pt-2 space-y-2">
+      {/* Toggle for non-founders */}
+      {showToggle && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+        >
+          <MessageSquare className="w-3 h-3" />
+          {expanded ? 'Hide' : `${replies.length} reply from Rosters`}
+        </button>
+      )}
+
+      {/* Replies list */}
+      {showReplies && (
+        <div className="space-y-1.5">
+          {isLoading && (
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+            </div>
+          )}
+          {replies.map((r) => (
+            <div
+              key={r.id}
+              className="bg-primary/8 border border-primary/20 rounded-md px-3 py-2"
+            >
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wide">Rosters</span>
+                <span className="text-[10px] text-muted-foreground">
+                  · {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
+                </span>
+              </div>
+              <p className="text-xs text-foreground leading-relaxed">{r.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Founder composer */}
+      {showComposer && (
+        <div className="flex gap-2 items-end">
+          <Textarea
+            placeholder="Reply as Rosters…"
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            className="min-h-[60px] resize-none text-sm flex-1"
+            maxLength={2000}
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              if (replyText.trim()) postReply.mutate(replyText.trim());
+            }}
+            disabled={postReply.isPending || !replyText.trim()}
+            className="flex-shrink-0 h-9 px-3"
+            aria-label="Send reply"
+          >
+            {postReply.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [view, setView] = useState<View>('board');
   const [bugMessage, setBugMessage] = useState('');
@@ -34,6 +160,8 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [newDescription, setNewDescription] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isFounder = (user as any)?.email === FOUNDER_EMAIL;
 
   const { data: requests = [], isLoading } = useQuery<FeatureRequestItem[]>({
     queryKey: ['/api/feature-requests'],
@@ -78,12 +206,7 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
   const voteMutation = useMutation({
     mutationFn: async (requestId: string) => {
-      const headers = await getAuthHeaders();
-      const res = await fetch(`/api/feature-requests/${requestId}/vote`, {
-        method: 'POST',
-        headers,
-      });
-      if (!res.ok) throw new Error('Vote failed');
+      const res = await apiRequest('POST', `/api/feature-requests/${requestId}/vote`);
       return res.json() as Promise<{ voted: boolean; voteCount: number }>;
     },
     onMutate: async (requestId) => {
@@ -133,8 +256,10 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 sm:w-screen sm:h-screen sm:max-w-none sm:rounded-none" data-testid="dialog-feedback">
-
+      <DialogContent
+        className="w-screen h-screen max-w-none max-h-none rounded-none flex flex-col p-0 gap-0 sm:w-screen sm:h-screen sm:max-w-none sm:rounded-none"
+        data-testid="dialog-feedback"
+      >
         {/* Header */}
         <DialogHeader className="px-5 pt-5 pb-3 border-b flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -158,7 +283,6 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
         {/* Board view */}
         {view === 'board' && (
           <>
-            {/* Action buttons */}
             <div className="px-5 py-3 flex gap-2 flex-shrink-0 border-b">
               <Button
                 variant="outline"
@@ -181,7 +305,6 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               </Button>
             </div>
 
-            {/* Request list */}
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2 min-h-0">
               {isLoading && (
                 <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -198,35 +321,40 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="flex gap-3 items-start bg-card border border-border rounded-lg p-3"
+                  className="bg-card border border-border rounded-lg p-3"
                   data-testid={`feature-request-${req.id}`}
                 >
-                  {/* Vote button */}
-                  <button
-                    onClick={() => voteMutation.mutate(req.id)}
-                    disabled={voteMutation.isPending}
-                    className={`flex flex-col items-center gap-0.5 flex-shrink-0 px-2 py-1.5 rounded-md border transition-colors min-w-[48px] ${
-                      req.userVoted
-                        ? 'bg-primary/10 border-primary text-primary'
-                        : 'border-border hover:border-primary/50 text-muted-foreground hover:text-primary'
-                    }`}
-                    aria-label={req.userVoted ? 'Remove vote' : 'Upvote'}
-                    data-testid={`vote-button-${req.id}`}
-                  >
-                    <ThumbsUp className={`w-4 h-4 ${req.userVoted ? 'fill-primary' : ''}`} />
-                    <span className="text-xs font-bold leading-none">{req.voteCount}</span>
-                  </button>
+                  <div className="flex gap-3 items-start">
+                    {/* Vote button */}
+                    <button
+                      onClick={() => voteMutation.mutate(req.id)}
+                      disabled={voteMutation.isPending}
+                      className={`flex flex-col items-center gap-0.5 flex-shrink-0 px-2 py-1.5 rounded-md border transition-colors min-w-[48px] ${
+                        req.userVoted
+                          ? 'bg-primary/10 border-primary text-primary'
+                          : 'border-border hover:border-primary/50 text-muted-foreground hover:text-primary'
+                      }`}
+                      aria-label={req.userVoted ? 'Remove vote' : 'Upvote'}
+                      data-testid={`vote-button-${req.id}`}
+                    >
+                      <ThumbsUp className={`w-4 h-4 ${req.userVoted ? 'fill-primary' : ''}`} />
+                      <span className="text-xs font-bold leading-none">{req.voteCount}</span>
+                    </button>
 
-                  {/* Content */}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm leading-tight line-clamp-2">{req.title}</p>
-                    {req.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{req.description}</p>
-                    )}
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      {req.submitterName} · {formatDistanceToNow(new Date(req.createdAt), { addSuffix: true })}
-                    </p>
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm leading-tight">{req.title}</p>
+                      {req.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{req.description}</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {req.submitterName} · {formatDistanceToNow(new Date(req.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Reply section */}
+                  <ReplySection requestId={req.id} isFounder={isFounder} />
                 </div>
               ))}
             </div>

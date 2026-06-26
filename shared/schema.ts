@@ -4103,3 +4103,17 @@ export const featureRequestVotes = pgTable("feature_request_votes", {
 ]);
 
 export type FeatureRequestVote = typeof featureRequestVotes.$inferSelect;
+
+// Founder replies on feature requests — only the founder account can post;
+// all authenticated users can read.
+export const featureRequestReplies = pgTable("feature_request_replies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  featureRequestId: varchar("feature_request_id").references(() => featureRequests.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_feature_request_replies_request").on(table.featureRequestId),
+]);
+
+export type FeatureRequestReply = typeof featureRequestReplies.$inferSelect;

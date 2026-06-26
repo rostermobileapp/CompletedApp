@@ -467,6 +467,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       )
     `);
     console.log('[Init] feature_requests and feature_request_votes tables ensured');
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS feature_request_replies (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        feature_request_id varchar NOT NULL REFERENCES feature_requests(id) ON DELETE CASCADE,
+        user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body text NOT NULL,
+        created_at timestamp DEFAULT NOW() NOT NULL
+      )
+    `);
+    console.log('[Init] feature_request_replies table ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure feature request tables:', err);
   }
@@ -19162,6 +19172,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error('[Feature Requests] POST error:', error);
       res.status(500).json({ message: 'Failed to create feature request' });
+    }
+  });
+
+  // Feature Request Board — GET replies for a request (all authenticated users)
+  app.get('/api/feature-requests/:id/replies', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestId = req.params.id;
+      const rows = await db.execute(sql`
+        SELECT r.id, r.body, r.created_at
+        FROM feature_request_replies r
+        WHERE r.feature_request_id = ${requestId}
+        ORDER BY r.created_at ASC
+      `);
+      res.json(rows.rows.map((r: any) => ({
+        id: r.id,
+        body: r.body,
+        createdAt: r.created_at,
+      })));
+    } catch (error) {
+      console.error('[Feature Requests] GET replies error:', error);
+      res.status(500).json({ message: 'Failed to load replies' });
+    }
+  });
+
+  // Feature Request Board — POST reply (founder only)
+  app.post('/api/feature-requests/:id/replies', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (user?.email !== 'founder@rosterhockey.com') {
+        return res.status(403).json({ message: 'Only the Rosters team can reply to feature requests' });
+      }
+      const requestId = req.params.id;
+      const schema = z.object({ body: z.string().min(1).max(2000) });
+      const { body } = schema.parse(req.body);
+      const result = await db.execute(sql`
+        INSERT INTO feature_request_replies (feature_request_id, user_id, body)
+        VALUES (${requestId}, ${userId}, ${body})
+        RETURNING id, body, created_at
+      `);
+      const row = result.rows[0] as any;
+      res.status(201).json({ id: row.id, body: row.body, createdAt: row.created_at });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: 'Invalid reply', errors: error.errors });
+      }
+      console.error('[Feature Requests] POST reply error:', error);
+      res.status(500).json({ message: 'Failed to post reply' });
     }
   });
 
