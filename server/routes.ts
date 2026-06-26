@@ -423,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     `);
     // Seed the founder account
     await db.execute(sql`
-      UPDATE users SET fee_exempt = true WHERE email = 'founder@rosterhockey.com'
+      UPDATE users SET fee_exempt = true WHERE email = 'tobin@rosterhockey.com'
     `);
     console.log('[Init] fee_exempt column ensured; founder account seeded');
   } catch (err) {
@@ -19281,7 +19281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      if (user?.email !== 'founder@rosterhockey.com') {
+      if (user?.email !== 'tobin@rosterhockey.com') {
         return res.status(403).json({ message: 'Only the Rosters team can reply to feature requests' });
       }
       const requestId = req.params.id;
@@ -25070,7 +25070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   startTournamentAccessJob();
 
   // ─── Admin Metrics Dashboard (founder-only) ──────────────────────────────
-  const ADMIN_EMAIL = 'founder@rosterhockey.com';
+  const ADMIN_EMAIL = 'tobin@rosterhockey.com';
   const PLAYER_PRO_MONTHLY_CENTS = 649; // $6.49/month (new pricing since 2026-05-15)
 
   const requireFounder = (req: any, res: any, next: any) => {
