@@ -2118,8 +2118,8 @@ function DashboardMobile() {
   // Helper function to get league display name
   const getLeagueDisplayName = React.useCallback((league: any) => {
     if (!league) return 'Select League';
-    const idSuffix = league.uniqueLeagueId ? ` - ${league.uniqueLeagueId}` : '';
-    return `${league.name}${idSuffix}`;
+    const seasonSuffix = league.seasonName ? ` - ${league.seasonName}` : '';
+    return `${league.name}${seasonSuffix}`;
   }, []);
   
   // Helper function to get tournament display name
