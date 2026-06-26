@@ -711,7 +711,7 @@ export default function Teams() {
                               )}
                             </div>
                             <span className="text-xs font-mono text-muted-foreground ml-2">
-                              {team.uniqueTeamId}
+                              {team.uniqueTeamId || team.id}
                             </span>
                           </div>
                         )}
