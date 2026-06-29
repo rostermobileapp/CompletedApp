@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import CreatePaymentRequestPage from '@/pages/CreatePaymentRequest';
-import { ArrowLeft, DollarSign, Plus, Users } from 'lucide-react';
+import { ArrowLeft, DollarSign, Lock, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { apiRequest } from '@/lib/queryClient';
@@ -15,55 +15,14 @@ import { PaymentSummaryCard } from '@/components/PaymentSummaryCard';
 export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const { openOverlay } = useSlideUpOverlay();
-  const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
   const { selectedType, selectedTeamId, selectedLeagueId } = useDashboardSelection();
   const { canAccessPremiumFeatures } = usePermissions();
 
-  // FREE TIER RESTRICTION: Block access to Payments page for free tier users
   const isFreeTier = !canAccessPremiumFeatures();
 
-  if (isFreeTier) {
-    return (
-      <div className="min-h-screen bg-background pb-20">
-        <div className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setPageTransitionDirection('down');
-                navigate('/');
-              }}
-              className="p-2"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <h1 className="text-xl font-semibold">Payment Requests</h1>
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-center p-8 mt-12">
-          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <DollarSign className="w-8 h-8 text-primary" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">Premium Feature</h3>
-          <p className="text-muted-foreground text-center max-w-sm mb-6">
-            Access to payment management is available with a Player Pro or Commissioner subscription.
-          </p>
-          <Button
-            onClick={() => {
-              setPageTransitionDirection('up');
-              navigate('/subscription');
-            }}
-            size="lg"
-            data-testid="button-upgrade-payments"
-          >
-            Upgrade to Manage Payments
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const [activeTab, setActiveTab] = useState<'created' | 'received'>(
+    isFreeTier ? 'received' : 'created'
+  );
 
   // Fetch unpaid count for badge
   const { data: unpaidCount } = useQuery({
@@ -108,6 +67,7 @@ export default function PaymentRequests() {
 
   const { data: allCreatedRequests = [], isLoading: createdLoading } = useQuery({
     queryKey: ['/api/payment-requests/created/by-me'],
+    enabled: !isFreeTier,
   });
 
   const { data: allReceivedRequests = [], isLoading: receivedLoading } = useQuery({
@@ -174,14 +134,16 @@ export default function PaymentRequests() {
             </div>
           </div>
 
-          <Button
-            onClick={() => openOverlay('/create-payment-request', <CreatePaymentRequestPage />)}
-            size="sm"
-            data-testid="button-create-payment-request"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Create
-          </Button>
+          {!isFreeTier && (
+            <Button
+              onClick={() => openOverlay('/create-payment-request', <CreatePaymentRequestPage />)}
+              size="sm"
+              data-testid="button-create-payment-request"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Create
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -203,7 +165,26 @@ export default function PaymentRequests() {
           </TabsList>
 
           <TabsContent value="created" className="space-y-3">
-            {createdLoading ? (
+            {isFreeTier ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Lock className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Premium Feature</h3>
+                <p className="text-muted-foreground max-w-sm mb-6">
+                  Creating payment requests is available with a Player Pro or Commissioner subscription.
+                </p>
+                <Button
+                  onClick={() => {
+                    setPageTransitionDirection('up');
+                    navigate('/subscription');
+                  }}
+                  data-testid="button-upgrade-payments"
+                >
+                  Upgrade to Create Requests
+                </Button>
+              </div>
+            ) : createdLoading ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">Loading...</p>
               </div>
@@ -247,4 +228,3 @@ export default function PaymentRequests() {
     </div>
   );
 }
-
