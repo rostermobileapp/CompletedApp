@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -16,13 +16,19 @@ export default function PaymentRequests() {
   const [, navigate] = useLocation();
   const { openOverlay } = useSlideUpOverlay();
   const { selectedType, selectedTeamId, selectedLeagueId } = useDashboardSelection();
-  const { canAccessPremiumFeatures } = usePermissions();
+  const { canAccessPremiumFeatures, isLoading: permissionsLoading } = usePermissions();
 
-  const isFreeTier = !canAccessPremiumFeatures();
+  const isFreeTier = !permissionsLoading && !canAccessPremiumFeatures();
 
-  const [activeTab, setActiveTab] = useState<'created' | 'received'>(
-    isFreeTier ? 'received' : 'created'
-  );
+  const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
+
+  // Once permissions have loaded, switch free-tier users to "Requests for Me".
+  // useEffect so we never read a transient pre-load permission value into permanent state.
+  useEffect(() => {
+    if (!permissionsLoading && !canAccessPremiumFeatures()) {
+      setActiveTab('received');
+    }
+  }, [permissionsLoading]);
 
   // Fetch unpaid count for badge
   const { data: unpaidCount } = useQuery({
