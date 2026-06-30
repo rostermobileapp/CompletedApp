@@ -3301,11 +3301,9 @@ export default function LeagueManagement() {
         {/* Player Management Tab */}
         {activeTab === 'players' && (
           <div className="space-y-6">
-            {/* Draft call-to-action: shown only while no player has been manually
-                assigned to a team yet (once assignment begins the draft would
-                conflict, so we hide it). Requires ≥2 teams so the wizard can
-                build a proper draft order. */}
-            {selectedSeasonId && teams.length >= 2 && isDraftEnabled(league?.uniqueLeagueId || leagueId) && !commissionerDisplayMembers.some((m: LeagueMember) => m.assignedTeamId) && (
+            {/* Draft call-to-action: visible until the draft is completed.
+                Requires ≥2 teams so the wizard can build a proper draft order. */}
+            {selectedSeasonId && teams.length >= 2 && isDraftEnabled(league?.uniqueLeagueId || leagueId) && (!existingDraft || existingDraft.status !== 'completed') && (
               <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Crown className="w-4 h-4 text-primary shrink-0" />
@@ -3314,7 +3312,7 @@ export default function LeagueManagement() {
                       ? 'Draft is configured and ready — launch it when you\'re set.'
                       : existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status)
                       ? 'A draft is currently in progress.'
-                      : 'No players assigned to teams yet — want to run a draft instead?'}
+                      : 'Want to assign players to teams using a draft?'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -3979,9 +3977,8 @@ export default function LeagueManagement() {
         {/* Team Management Tab */}
         {activeTab === 'teams' && (
           <div className="space-y-6">
-            {/* Draft call-to-action: mirrors the one on the Players tab.
-                Hidden once any player has been manually assigned. */}
-            {selectedSeasonId && teams.length >= 2 && !commissionerDisplayMembers.some((m: LeagueMember) => m.assignedTeamId) && (
+            {/* Draft call-to-action: visible until the draft is completed. */}
+            {selectedSeasonId && teams.length >= 2 && (!existingDraft || existingDraft.status !== 'completed') && (
               <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Crown className="w-4 h-4 text-primary shrink-0" />
@@ -3990,7 +3987,7 @@ export default function LeagueManagement() {
                       ? 'Draft is configured and ready — launch it when you\'re set.'
                       : existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status)
                       ? 'A draft is currently in progress.'
-                      : 'Players aren\'t assigned to teams yet — run a draft to fill the rosters?'}
+                      : 'Want to assign players to teams using a draft?'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
