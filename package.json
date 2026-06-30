@@ -84,6 +84,7 @@
     "google-auth-library": "^10.3.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
+    "jimp": "^1.6.1",
     "jose": "^6.2.2",
     "jspdf": "^3.0.4",
     "leaflet": "^1.9.4",
