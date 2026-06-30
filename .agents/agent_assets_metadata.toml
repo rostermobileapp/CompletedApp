@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "pMPC6qL0-8COTfVGEYcI4"
+uri = "file://roster-app-qr.png"
+type = "image"
+title = "QR Code — roster-app.com/hpib"
