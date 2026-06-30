@@ -3,7 +3,7 @@
  * Only leagues in this list can see and use the draft tool.
  * To open it up to everyone, set this to null.
  */
-const DRAFT_ALLOWED_LEAGUE_IDS: string[] | null = ["fqWG3Dko"];
+const DRAFT_ALLOWED_LEAGUE_IDS: string[] | null = null;
 
 function isDraftEnabled(leagueId: string): boolean {
   if (DRAFT_ALLOWED_LEAGUE_IDS === null) return true;
@@ -4399,6 +4399,73 @@ export default function LeagueManagement() {
         {/* Game Scheduling Tab */}
         {activeTab === 'games' && (
           <div className="space-y-6">
+            {selectedSeasonId && teams.length >= 2 && (!existingDraft || existingDraft.status !== 'completed') && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Crown className="w-4 h-4 text-primary shrink-0" />
+                  <span>
+                    {existingDraft && existingDraft.status === 'pending'
+                      ? 'Draft is configured and ready — launch it when you\'re set.'
+                      : existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status)
+                      ? 'A draft is currently in progress.'
+                      : 'Want to assign players to teams using a draft?'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {(!existingDraft || existingDraft.status === 'completed') && (
+                    <button
+                      onClick={() => setShowDraftWizard(true)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                      data-testid="button-setup-draft-games-tab"
+                    >
+                      Set up draft
+                    </button>
+                  )}
+                  {existingDraft && existingDraft.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Delete this draft? All setup will be permanently removed. This cannot be undone.')) {
+                            deleteDraftMutation.mutate(existingDraft.id);
+                          }
+                        }}
+                        disabled={deleteDraftMutation.isPending}
+                        className="px-3 py-1.5 bg-card border border-red-500/40 hover:bg-red-500/10 text-red-500 rounded-md text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                        data-testid="button-delete-draft-games-tab"
+                        title="Delete this draft"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setShowDraftWizard(true)}
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                        data-testid="button-edit-draft-games-tab"
+                      >
+                        Set up draft
+                      </button>
+                      <button
+                        onClick={() => launchDraftMutation.mutate(existingDraft.id)}
+                        disabled={launchDraftMutation.isPending}
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium disabled:opacity-50"
+                        data-testid="button-launch-draft-games-tab"
+                      >
+                        {launchDraftMutation.isPending ? 'Launching…' : 'Launch Draft'}
+                      </button>
+                    </>
+                  )}
+                  {existingDraft && ['awaiting_captains', 'active', 'paused'].includes(existingDraft.status) && (
+                    <button
+                      onClick={() => navigate(`/draft/${existingDraft.id}`)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
+                      data-testid="button-view-draft-games-tab"
+                    >
+                      View Draft
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="bg-card rounded-xl hairline elev-rest p-6 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-4">
