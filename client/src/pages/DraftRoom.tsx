@@ -733,13 +733,17 @@ export default function DraftRoom() {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/finalize`, {});
       return res.json();
     },
-    onSuccess: (data: { ok: boolean; assigned: number }) => {
+    onSuccess: (data: { ok: boolean; assigned: number; keeperCount: number; pickCount: number }) => {
       setFinalizeOpen(false);
       toast({
         title: "Draft finalized",
         description:
           data.assigned > 0
-            ? `${data.assigned} player${data.assigned === 1 ? "" : "s"} assigned and notified.`
+            ? `${data.assigned} player${data.assigned === 1 ? "" : "s"} assigned to their teams${
+                data.keeperCount > 0
+                  ? ` — ${data.keeperCount} keeper${data.keeperCount === 1 ? "" : "s"} + ${data.pickCount} pick${data.pickCount === 1 ? "" : "s"}`
+                  : ""
+              }.`
             : "Rosters were already up to date.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
@@ -819,6 +823,24 @@ export default function DraftRoom() {
       toast({ title: "Lobby cancelled", description: "Draft is back in setup." }),
     onError: (err: any) =>
       toast({ title: "Failed to cancel", description: err?.message, variant: "destructive" }),
+  });
+  const [keeperEditorOpen, setKeeperEditorOpen] = useState(false);
+  const [keeperEdits, setKeeperEdits] = useState<Record<string, string[]>>({});
+  const saveKeepersMutation = useMutation({
+    mutationFn: async (keepersByTeam: Record<string, string[]>) => {
+      const res = await apiRequest("PUT", `/api/drafts/${draftId}/keepers`, { keepersByTeam });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Keepers saved", description: "Keeper designations have been updated." });
+      setKeeperEditorOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+      if (draft?.leagueId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId, "teams"] });
+      }
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to save keepers", description: err?.message, variant: "destructive" }),
   });
   const terminateMutation = useMutation({
     mutationFn: async () => {
@@ -1042,6 +1064,26 @@ export default function DraftRoom() {
                   <Snowflake className="w-4 h-4" /> Start
                 </button>
               </>
+            )}
+            {isCommissioner && (draft.status === "pending" || draft.status === "awaiting_captains") && (
+              <button
+                onClick={() => {
+                  const currentKeepers: Record<string, string[]> = {};
+                  for (const k of bundle.keepers || []) {
+                    const pid = k.userId || k.placeholderPlayerId;
+                    if (!pid) continue;
+                    if (!currentKeepers[k.teamId]) currentKeepers[k.teamId] = [];
+                    currentKeepers[k.teamId].push(pid);
+                  }
+                  setKeeperEdits(currentKeepers);
+                  setKeeperEditorOpen(true);
+                }}
+                className="p-2 hover:bg-muted rounded"
+                title="Edit keeper designations"
+                data-testid="button-edit-keepers"
+              >
+                <Snowflake className="w-5 h-5 text-blue-500" />
+              </button>
             )}
             {isCommissioner && draft.status === "awaiting_captains" && (() => {
               const ready = (draft.captainReadyState || {}) as Record<string, boolean>;
@@ -1483,7 +1525,7 @@ export default function DraftRoom() {
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className="h-full rounded-3xl border-2 border-primary/70 bg-card flex items-center gap-3 px-4 cursor-pointer hover:border-primary"
+                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 cursor-pointer ${m.keptByTeamId ? "border-blue-500/50 hover:border-blue-500 bg-blue-500/5" : "border-primary/70 hover:border-primary"}`}
                       onClick={() => setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
@@ -1559,8 +1601,14 @@ export default function DraftRoom() {
                         </div>
                       </div>
 
-                      {/* DRAFT button — opens a confirm dialog before picking */}
-                      {canPick && draft.status === "active" && (
+                      {/* DRAFT button — or "Kept by" badge for designated keepers */}
+                      {m.keptByTeamId ? (
+                        <div className="flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold tracking-wide text-center">
+                          <Snowflake className="w-3.5 h-3.5" />
+                          <span>Kept by</span>
+                          <span className="max-w-[60px] truncate">{teamById.get(m.keptByTeamId)?.name || "a team"}</span>
+                        </div>
+                      ) : canPick && draft.status === "active" ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1574,7 +1622,7 @@ export default function DraftRoom() {
                         >
                           DRAFT
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -1783,15 +1831,17 @@ export default function DraftRoom() {
 
               {isCommissioner && (
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => resendInvitesMutation.mutate()}
-                    disabled={resendInvitesMutation.isPending}
-                    className="flex-1 px-3 py-2 bg-card border border-border rounded text-sm font-medium hover-elevate active-elevate-2 disabled:opacity-50"
-                    data-testid="button-resend-invites"
-                  >
-                    Resend reminders
-                  </button>
+                  {secsLeft == null && (
+                    <button
+                      type="button"
+                      onClick={() => resendInvitesMutation.mutate()}
+                      disabled={resendInvitesMutation.isPending}
+                      className="flex-1 px-3 py-2 bg-card border border-border rounded text-sm font-medium hover-elevate active-elevate-2 disabled:opacity-50"
+                      data-testid="button-resend-invites"
+                    >
+                      Resend reminders
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -2277,6 +2327,101 @@ export default function DraftRoom() {
               data-testid="button-confirm-finalize"
             >
               {finalizeMutation.isPending ? "Finalizing…" : "Finalize & notify"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Keeper editor dialog (commissioner: pending / awaiting_captains) */}
+      <AlertDialog open={keeperEditorOpen} onOpenChange={setKeeperEditorOpen}>
+        <AlertDialogContent className="max-w-lg flex flex-col max-h-[80dvh]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Keeper Designations</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select players each team carries over from the previous season.
+              Keepers are reserved before the draft begins and skip the pick queue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 py-2 min-h-0">
+            {(draft.draftOrder || []).map((teamId: string) => {
+              const team = teamById.get(teamId);
+              const teamPlayers = members.filter((m: any) => m.membership.assignedTeamId === teamId);
+              const keptIds = new Set<string>(keeperEdits[teamId] || []);
+              return (
+                <div key={teamId} className="space-y-1">
+                  <div className="text-xs font-semibold text-muted-foreground px-1 uppercase tracking-wider">
+                    {team?.name || "Team"}
+                  </div>
+                  {teamPlayers.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-1 italic">
+                      No players assigned to this team yet.
+                    </p>
+                  ) : (
+                    teamPlayers.map((m: any) => {
+                      const pid: string = m.user.id;
+                      const name =
+                        [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") ||
+                        m.user.displayName ||
+                        m.user.email ||
+                        "Unknown";
+                      const isKept = keptIds.has(pid);
+                      return (
+                        <button
+                          key={pid}
+                          type="button"
+                          onClick={() =>
+                            setKeeperEdits((prev) => {
+                              const existing = prev[teamId] || [];
+                              return isKept
+                                ? { ...prev, [teamId]: existing.filter((id) => id !== pid) }
+                                : { ...prev, [teamId]: [...existing, pid] };
+                            })
+                          }
+                          className={`w-full flex items-center gap-2 p-2 rounded-lg border text-left transition-colors ${
+                            isKept
+                              ? "bg-blue-500/10 border-blue-500/40 text-blue-700 dark:text-blue-300"
+                              : "bg-card border-border hover:border-primary"
+                          }`}
+                          data-testid={`keeper-editor-toggle-${pid}`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {(name[0] || "?").toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{name}</div>
+                            {m.membership.skillLevel && (
+                              <div className="text-[10px] text-muted-foreground">
+                                Skill: {m.membership.skillLevel}
+                              </div>
+                            )}
+                          </div>
+                          {isKept && <Snowflake className="w-4 h-4 flex-shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              );
+            })}
+            {(draft.draftOrder || []).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No teams in this draft yet.
+              </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saveKeepersMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                saveKeepersMutation.mutate(keeperEdits);
+              }}
+              disabled={saveKeepersMutation.isPending}
+              data-testid="button-save-keepers"
+            >
+              {saveKeepersMutation.isPending ? "Saving…" : "Save keepers"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

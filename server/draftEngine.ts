@@ -14,7 +14,7 @@ import {
   type DraftBuddyPair,
   type User,
 } from "@shared/schema";
-import { eq, and, asc, desc, isNull, inArray } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
 
 // How long after a pick the commissioner can undo it (milliseconds)
 export const UNDO_WINDOW_MS = 30_000;
@@ -695,9 +695,11 @@ async function completeDraft(draftId: string) {
 export async function finalizeDraft(draftId: string): Promise<{
   ok: boolean;
   assigned: number;
+  keeperCount: number;
+  pickCount: number;
 }> {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
-  if (!draft) return { ok: false, assigned: 0 };
+  if (!draft) return { ok: false, assigned: 0, keeperCount: 0, pickCount: 0 };
   const newlyAssigned = await assignDraftedPlayersToTeams(draftId);
   if (draft.status !== "completed") {
     await db
@@ -709,9 +711,26 @@ export async function finalizeDraft(draftId: string): Promise<{
   // Keepers receive a placement notice when they are newly assigned.
   const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
   void notifyKeeperPlayers(newKeepers, draft.leagueId);
+
+  // Count total keepers and picks in this draft so the commissioner gets a
+  // summary breakdown in the finalize dialog (newly-assigned vs already placed).
+  const [keeperCountRow] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(draftKeepers)
+    .where(eq(draftKeepers.draftId, draftId));
+  const [pickCountRow] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(draftPicks)
+    .where(and(eq(draftPicks.draftId, draftId), eq(draftPicks.forfeited, false)));
+
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
-  return { ok: true, assigned: newlyAssigned.length };
+  return {
+    ok: true,
+    assigned: newlyAssigned.length,
+    keeperCount: Number(keeperCountRow?.n ?? 0),
+    pickCount: Number(pickCountRow?.n ?? 0),
+  };
 }
 
 async function applyPick(

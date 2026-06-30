@@ -18,7 +18,7 @@ import {
 } from "@shared/schema";
 import { eq, and, or, asc, desc, ne, sql, inArray, isNull } from "drizzle-orm";
 import { storage } from "./storage";
-import { broadcastNotificationUpdate } from "./routes";
+import { broadcastNotificationUpdate } from "./notificationBroadcast";
 import { sendDraftStartingPushNotification } from "./oneSignalNotifications";
 import {
   startDraft,
@@ -222,8 +222,8 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
         return res.status(403).json({ message: "Only the commissioner can set keepers" });
       }
-      if (draft.status !== "pending") {
-        return res.status(400).json({ message: "Keepers can only be changed before the draft starts" });
+      if (!["pending", "awaiting_captains"].includes(draft.status)) {
+        return res.status(400).json({ message: "Keepers can only be changed before the draft goes live" });
       }
       const { keepersByTeam } = req.body as { keepersByTeam: Record<string, string[]> };
       // Validate that all teamIds belong to this draft's league
@@ -262,6 +262,51 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           }
         }
       }
+
+      // Notify newly designated keepers (real users only — placeholders have no account).
+      // Best-effort: errors per user are swallowed so one failure doesn't block the rest.
+      try {
+        const { sendPushNotificationToUser } = await import("./oneSignalNotifications");
+        const [leagueRow] = await db.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, draft.leagueId));
+        const leagueName = leagueRow?.name || "the league";
+        const realKeeperPairs = Object.entries(keepersByTeam ?? {})
+          .flatMap(([teamId, pids]) =>
+            pids.filter((pid) => !pid.startsWith("placeholder:")).map((pid) => ({ pid, teamId })),
+          );
+        if (realKeeperPairs.length > 0) {
+          const teamIds = [...new Set(realKeeperPairs.map((k) => k.teamId))];
+          const teamRows = await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds));
+          const teamNameById = new Map(teamRows.map((t) => [t.id, t.name]));
+          await Promise.allSettled(
+            realKeeperPairs.map(({ pid, teamId }) => {
+              const teamName = teamNameById.get(teamId) || "your team";
+              const notify = async () => {
+                await storage.createNotification({
+                  userId: pid,
+                  type: "general",
+                  title: "You're a keeper!",
+                  message: `You've been designated as a keeper for ${teamName} in the ${leagueName} draft.`,
+                  actionUrl: "",
+                  actionText: "",
+                });
+                broadcastNotificationUpdate(pid);
+                return sendPushNotificationToUser({
+                  userId: pid,
+                  title: "📋 You're a keeper!",
+                  message: `You've been designated as a keeper for ${teamName} in the ${leagueName} draft.`,
+                  data: { type: "draft_keeper", leagueId: draft.leagueId },
+                });
+              };
+              return notify().catch((e) =>
+                console.error(`[draft] keeper notify failed for user ${pid}:`, e),
+              );
+            }),
+          );
+        }
+      } catch (e) {
+        console.error("[draft] keeper notification batch failed:", e);
+      }
+
       return res.json({ ok: true });
     } catch (err) {
       console.error("PUT draft keepers error:", err);
@@ -368,22 +413,34 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         isPlaceholderPlayer: true,
       }));
 
-      // ── When a draftId is provided, exclude designated keepers from the pool ──
-      // (Team assignments from prior seasons are NOT used to gate eligibility —
-      //  picks and keepers handle all exclusion logic.)
+      // ── When a draftId is provided, annotate designated keepers with their team ──
+      // Keepers stay in the list so the UI can display "Kept by [Team]" rather
+      // than silently hiding the player and leaving users wondering where they went.
       const draftIdParam = (req.query?.draftId as string | undefined) || null;
+      const keeperTeamByUser = new Map<string, string>();
+      const keeperTeamByPlaceholder = new Map<string, string>();
       if (draftIdParam) {
         const keeperRows = await db
-          .select({ userId: draftKeepers.userId, placeholderPlayerId: draftKeepers.placeholderPlayerId })
+          .select({
+            userId: draftKeepers.userId,
+            placeholderPlayerId: draftKeepers.placeholderPlayerId,
+            teamId: draftKeepers.teamId,
+          })
           .from(draftKeepers)
           .where(eq(draftKeepers.draftId, draftIdParam));
-        const keeperUserIds = new Set(keeperRows.map((k) => k.userId).filter(Boolean) as string[]);
-        const keeperPlaceholderIds = new Set(keeperRows.map((k) => k.placeholderPlayerId).filter(Boolean) as string[]);
-        enriched = enriched.filter((r) => !keeperUserIds.has(r.user.id));
-        placeholderRows = placeholderRows.filter((r) => !keeperPlaceholderIds.has(r.membership.id));
+        for (const k of keeperRows) {
+          if (k.userId) keeperTeamByUser.set(k.userId, k.teamId);
+          if (k.placeholderPlayerId) keeperTeamByPlaceholder.set(k.placeholderPlayerId, k.teamId);
+        }
       }
 
-      return res.json([...enriched, ...placeholderRows]);
+      return res.json([
+        ...enriched.map((r) => ({ ...r, keptByTeamId: keeperTeamByUser.get(r.user.id) ?? null })),
+        ...placeholderRows.map((r) => ({
+          ...r,
+          keptByTeamId: keeperTeamByPlaceholder.get(r.membership.id) ?? null,
+        })),
+      ]);
     } catch (err) {
       console.error("List draft players error:", err);
       res.status(500).json({ message: "Failed to fetch players" });

@@ -104,6 +104,7 @@ import { startScrimmageInviteJob } from "./scrimmageInviteJob";
 import { getUncachableResendClient } from "./resend";
 import { sendTeamEventPushNotification, resolveTeamLogoUrl } from "./oneSignalNotifications";
 import { registerDraftRoutes, canViewDraft, canChatInDraft } from "./draftRoutes";
+import { setNotificationBroadcaster } from "./notificationBroadcast";
 import { registerReferralRoutes } from "./referralRoutes";
 import {
   setDraftBroadcaster,
@@ -387,6 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Draft tool: setup wizard, draft engine routes, live draft room
+  setNotificationBroadcaster(broadcastNotificationUpdate);
   registerDraftRoutes(app, isAuthenticated);
   setDraftBroadcaster(broadcastToUser);
 
