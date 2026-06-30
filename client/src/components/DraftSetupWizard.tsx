@@ -15,6 +15,8 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Check,
   Plus,
   Trash2,
   Sparkles,
@@ -149,6 +151,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // Keepers — players designated to stay on their team without going through the draft
   // Record<teamId, userId[]>
   const [keepersByTeam, setKeepersByTeam] = useState<Record<string, string[]>>({});
+  // Which team keeper dropdowns are open
+  const [openKeeperDropdowns, setOpenKeeperDropdowns] = useState<Set<string>>(new Set());
 
   // Buddy add-row filter (replaces the old <select>)
   const [buddySearch, setBuddySearch] = useState("");
@@ -838,6 +842,15 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 );
                 const kept = keepersByTeam[team.id] || [];
                 if (teamMembers.length === 0) return null;
+                const isOpen = openKeeperDropdowns.has(team.id);
+                const toggleDropdown = () =>
+                  setOpenKeeperDropdowns((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(team.id)) next.delete(team.id);
+                    else next.add(team.id);
+                    return next;
+                  });
+                const keptMembers = teamMembers.filter((m) => kept.includes(m.user.id));
                 return (
                   <div
                     key={team.id}
@@ -846,51 +859,115 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold">{team.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {kept.length} / {teamMembers.length} kept
-                      </span>
+                      {kept.length > 0 && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          {kept.length} kept
+                        </span>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      {teamMembers.map((m) => {
-                        const isKept = kept.includes(m.user.id);
-                        return (
-                          <button
+
+                    {/* Dropdown trigger */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={toggleDropdown}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-background border border-border rounded-lg text-sm text-left hover:bg-muted/50 transition-colors"
+                        data-testid={`keeper-dropdown-${team.id}`}
+                      >
+                        <span className="text-muted-foreground truncate">
+                          {kept.length === 0
+                            ? "Select players to keep…"
+                            : `${kept.length} player${kept.length !== 1 ? "s" : ""} selected`}
+                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {/* Dropdown list */}
+                      {isOpen && (
+                        <>
+                          {/* backdrop to close on outside click */}
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() =>
+                              setOpenKeeperDropdowns((prev) => {
+                                const next = new Set(prev);
+                                next.delete(team.id);
+                                return next;
+                              })
+                            }
+                          />
+                          <div className="absolute z-20 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+                            {teamMembers.map((m) => {
+                              const isKept = kept.includes(m.user.id);
+                              return (
+                                <button
+                                  key={m.user.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setKeepersByTeam((prev) => {
+                                      const cur = prev[team.id] || [];
+                                      const next = isKept
+                                        ? cur.filter((id) => id !== m.user.id)
+                                        : [...cur, m.user.id];
+                                      return { ...prev, [team.id]: next };
+                                    });
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-muted/60 transition-colors border-b border-border/50 last:border-0"
+                                  data-testid={`keeper-toggle-${m.user.id}`}
+                                >
+                                  <div
+                                    className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                                      isKept
+                                        ? "bg-blue-500 border-blue-500"
+                                        : "border-border bg-background"
+                                    }`}
+                                  >
+                                    {isKept && <Check className="w-3 h-3 text-white" />}
+                                  </div>
+                                  <span className="flex-1 truncate">{memberName(m)}</span>
+                                  {m.membership.isGoalie && (
+                                    <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">
+                                      G
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Kept player chips */}
+                    {keptMembers.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {keptMembers.map((m) => (
+                          <span
                             key={m.user.id}
-                            type="button"
-                            onClick={() => {
-                              setKeepersByTeam((prev) => {
-                                const cur = prev[team.id] || [];
-                                const next = isKept
-                                  ? cur.filter((id) => id !== m.user.id)
-                                  : [...cur, m.user.id];
-                                return { ...prev, [team.id]: next };
-                              });
-                            }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                              isKept
-                                ? "bg-blue-500/15 border border-blue-500/50 text-blue-700 dark:text-blue-300"
-                                : "bg-muted/40 border border-border hover:bg-muted/70"
-                            }`}
-                            data-testid={`keeper-toggle-${m.user.id}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 rounded-full text-xs text-blue-700 dark:text-blue-300"
                           >
-                            <Snowflake
-                              className={`w-3.5 h-3.5 shrink-0 ${isKept ? "text-blue-500" : "text-muted-foreground"}`}
-                            />
-                            <span className="flex-1 truncate">{memberName(m)}</span>
-                            {m.membership.isGoalie && (
-                              <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">
-                                G
-                              </span>
-                            )}
-                            {isKept && (
-                              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
-                                KEPT
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                            <Snowflake className="w-3 h-3 shrink-0" />
+                            {memberName(m)}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setKeepersByTeam((prev) => ({
+                                  ...prev,
+                                  [team.id]: (prev[team.id] || []).filter(
+                                    (id) => id !== m.user.id,
+                                  ),
+                                }))
+                              }
+                              className="ml-0.5 hover:opacity-70"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
