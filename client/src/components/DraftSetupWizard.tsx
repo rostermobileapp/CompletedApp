@@ -162,9 +162,6 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // notes textareas.
   const hydratedRef = useRef(false);
 
-  // Tracks whether the user has manually edited totalRounds. If they have, we
-  // stop auto-suggesting rounds based on goalie method / roster size.
-  const userOverrodeRoundsRef = useRef(false);
 
   // Load league members
   const { data: members = [] } = useQuery<Member[]>({
@@ -204,8 +201,6 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       if (Array.isArray(d.draftOrder) && d.draftOrder.length) setDraftOrder(d.draftOrder);
       if (d.totalRounds) {
         setTotalRounds(d.totalRounds);
-        // Persisted rounds count as a user override — preserve it.
-        userOverrodeRoundsRef.current = true;
       }
       if (existing.buddyPairs?.length) setBuddyPairs(existing.buddyPairs.map((p) => p.userIds));
       // Hydrate saved keepers so re-opening the wizard shows the correct state.
@@ -217,24 +212,16 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     }
   }, [existing]);
 
-  // Auto-suggest totalRounds based on roster size + goalie method, until the
-  // user manually edits the value. The suggestion uses (skaters / teams)
-  // when goalies are pulled out (commissioner_assigned / random_draw) and
-  // ((skaters + goalies) / teams) when goalies are drafted as skaters.
+  // Rounds are always formula-driven: ⌈total members / teams⌉
   const suggestedRounds = useMemo(() => {
     const teamCount = Math.max(1, draftOrder.length || 0);
-    const skaters = members.filter((m) => !m.membership.isGoalie).length;
-    const goalies = members.filter((m) => m.membership.isGoalie).length;
-    const drafterPool =
-      goalieMethod === "included_with_skaters" ? skaters + goalies : skaters;
-    if (drafterPool === 0) return 8;
-    return Math.max(1, Math.ceil(drafterPool / teamCount));
-  }, [members, draftOrder.length, goalieMethod]);
+    const totalPlayers = members.length;
+    if (totalPlayers === 0) return 1;
+    return Math.max(1, Math.ceil(totalPlayers / teamCount));
+  }, [members.length, draftOrder.length]);
 
   useEffect(() => {
-    if (!userOverrodeRoundsRef.current) {
-      setTotalRounds(suggestedRounds);
-    }
+    setTotalRounds(suggestedRounds);
   }, [suggestedRounds]);
 
   // Initialize skillLevels from existing memberships
@@ -586,19 +573,21 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Total Rounds</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={totalRounds}
-                  onChange={(e) => {
-                    userOverrodeRoundsRef.current = true;
-                    setTotalRounds(parseInt(e.target.value) || 1);
-                  }}
-                  className="w-32 p-2 bg-card border border-border rounded-lg"
-                  data-testid="input-total-rounds"
-                />
+                <label className="block text-sm font-medium mb-1">Total Rounds</label>
+                <div className="flex items-center gap-3">
+                  <span
+                    className="inline-flex items-center justify-center w-14 h-10 rounded-lg bg-primary/10 border border-primary/30 text-lg font-bold text-primary"
+                    data-testid="input-total-rounds"
+                  >
+                    {totalRounds}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    ⌈ {members.length} players ÷ {Math.max(1, draftOrder.length)} teams ⌉
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Calculated automatically — updates as players or teams change.
+                </p>
               </div>
 
               <div>
