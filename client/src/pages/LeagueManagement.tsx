@@ -6437,6 +6437,13 @@ export default function LeagueManagement() {
                       </p>
                     </div>
 
+                    <div className="flex gap-2 items-start rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
+                      <span className="mt-0.5 shrink-0">⚠️</span>
+                      <span>
+                        <strong>Placeholder accounts won't carry over.</strong> Only players with a real Rosters account will transfer to the new season. Any placeholder-only entries will be removed automatically.
+                      </span>
+                    </div>
+
                     <div className="flex items-center justify-between text-sm">
                       <div className="text-muted-foreground" data-testid="text-returning-count">
                         {returningCount} returning · {notReturningMemberIds.size} not returning
