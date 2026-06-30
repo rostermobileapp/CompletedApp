@@ -11810,6 +11810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   if (player.position) phUpdateData.position = player.position;
                   if (player.jerseyNumber !== null) phUpdateData.jerseyNumber = player.jerseyNumber;
                   if (player.teamId) phUpdateData.teamId = player.teamId;
+                  // Always update seasonId so re-imported placeholders show in the current season
+                  if (resolvedSeasonId) phUpdateData.seasonId = resolvedSeasonId;
                   if (Object.keys(phUpdateData).length > 0) {
                     await db.update(placeholderPlayers)
                       .set(phUpdateData)

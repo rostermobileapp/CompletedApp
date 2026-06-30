@@ -1124,6 +1124,12 @@ export default function LeagueManagement() {
 
     return all.filter((m: any) => {
       if (m.isPlaceholderPlayer) {
+        // Unassigned placeholders are free agents — always show so commissioners
+        // can assign them, regardless of which season is selected.
+        if (!m.assignedTeamId) return true;
+        // Assigned placeholders: show if their team belongs to this season,
+        // OR if they have no explicit season (legacy / null-season anchoring).
+        if (seasonTeamIds.has(m.assignedTeamId)) return true;
         return (
           m.seasonId === selectedSeasonId ||
           (m.seasonId == null && selectedSeasonId === firstCreatedSeasonId)
