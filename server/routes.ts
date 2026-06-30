@@ -11407,6 +11407,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
       const file = req.file;
+      // seasonId may be sent as a form field alongside the CSV file
+      const importSeasonId: string | null = req.body?.seasonId || null;
 
       if (!file) {
         return res.status(400).json({ message: 'No file uploaded' });
@@ -11427,6 +11429,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (leagueSeasonsForImport.length === 0) {
         return res.status(400).json({ message: "A season must exist before importing players. Create a season first." });
       }
+
+      // getSeasonsByLeague already returns seasons newest-first.
+      // Use the season the commissioner has selected (sent as importSeasonId),
+      // falling back to the newest season so placeholders show in the active view.
+      const resolvedSeasonId: string | null =
+        importSeasonId ?? leagueSeasonsForImport[0]?.id ?? null;
 
       // Read and parse the CSV file
       let fileContent = fs.readFileSync(file.path, 'utf8');
@@ -11810,6 +11818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else {
                   await storage.addLeaguePlaceholderPlayer({
                     leagueId,
+                    seasonId: resolvedSeasonId,
                     teamId: player.teamId || null,
                     firstName: player.firstName,
                     lastName: player.lastName,

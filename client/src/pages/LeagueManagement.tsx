@@ -1636,6 +1636,9 @@ export default function LeagueManagement() {
 
       const formData = new FormData();
       formData.append('playerFile', file);
+      if (selectedSeasonId) {
+        formData.append('seasonId', selectedSeasonId);
+      }
 
       // Get auth headers from supabase
       const { supabase } = await import('@/lib/supabase');
