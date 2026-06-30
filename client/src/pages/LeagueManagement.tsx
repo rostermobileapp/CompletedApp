@@ -1129,11 +1129,11 @@ export default function LeagueManagement() {
           (m.seasonId == null && selectedSeasonId === firstCreatedSeasonId)
         );
       }
-      // Real member: only show if they are assigned to a team in the selected season.
-      // Unassigned league-wide members have no season scope and are not shown in
-      // any season-specific view — they do not belong to a particular season until
-      // a commissioner assigns them to a team.
-      return !!m.assignedTeamId && seasonTeamIds.has(m.assignedTeamId);
+      // Real member: show if assigned to a team in the selected season,
+      // OR if they have no team assignment (free agents are always visible
+      // so commissioners can assign them to a team).
+      if (!m.assignedTeamId) return true;
+      return seasonTeamIds.has(m.assignedTeamId);
     });
   }, [members, selectedSeasonId, allTeams, firstCreatedSeasonId]);
 
