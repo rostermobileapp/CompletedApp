@@ -3345,10 +3345,10 @@ export default function LeagueManagement() {
                       </button>
                       <button
                         onClick={() => setShowDraftWizard(true)}
-                        className="px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-xs font-medium"
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
                         data-testid="button-edit-draft-players-tab"
                       >
-                        Edit
+                        Set up draft
                       </button>
                       <button
                         onClick={() => launchDraftMutation.mutate(existingDraft.id)}
@@ -4021,10 +4021,10 @@ export default function LeagueManagement() {
                       </button>
                       <button
                         onClick={() => setShowDraftWizard(true)}
-                        className="px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-xs font-medium"
+                        className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium"
                         data-testid="button-edit-draft-teams-tab"
                       >
-                        Edit
+                        Set up draft
                       </button>
                       <button
                         onClick={() => launchDraftMutation.mutate(existingDraft.id)}
