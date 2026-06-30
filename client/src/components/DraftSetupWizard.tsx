@@ -201,6 +201,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       if (Array.isArray(d.draftOrder) && d.draftOrder.length) setDraftOrder(d.draftOrder);
       if (d.totalRounds) {
         setTotalRounds(d.totalRounds);
+        userOverrodeRoundsRef.current = true;
       }
       if (existing.buddyPairs?.length) setBuddyPairs(existing.buddyPairs.map((p) => p.userIds));
       // Hydrate saved keepers so re-opening the wizard shows the correct state.
@@ -212,7 +213,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     }
   }, [existing]);
 
-  // Rounds are always formula-driven: ⌈total members / teams⌉
+  // Tracks whether the user has manually overridden totalRounds. If so, we
+  // stop updating it when the formula changes.
+  const userOverrodeRoundsRef = useRef(false);
+
+  // Default rounds = ⌈total members / teams⌉; stays live until user edits.
   const suggestedRounds = useMemo(() => {
     const teamCount = Math.max(1, draftOrder.length || 0);
     const totalPlayers = members.length;
@@ -221,7 +226,9 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   }, [members.length, draftOrder.length]);
 
   useEffect(() => {
-    setTotalRounds(suggestedRounds);
+    if (!userOverrodeRoundsRef.current) {
+      setTotalRounds(suggestedRounds);
+    }
   }, [suggestedRounds]);
 
   // Initialize skillLevels from existing memberships
@@ -573,21 +580,32 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Total Rounds</label>
+                <label className="block text-sm font-medium mb-2">Total Rounds</label>
                 <div className="flex items-center gap-3">
-                  <span
-                    className="inline-flex items-center justify-center w-14 h-10 rounded-lg bg-primary/10 border border-primary/30 text-lg font-bold text-primary"
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={totalRounds}
+                    onChange={(e) => {
+                      userOverrodeRoundsRef.current = true;
+                      setTotalRounds(parseInt(e.target.value) || 1);
+                    }}
+                    className="w-20 p-2 bg-card border border-border rounded-lg text-center font-medium"
                     data-testid="input-total-rounds"
-                  >
-                    {totalRounds}
-                  </span>
+                  />
                   <span className="text-sm text-muted-foreground">
-                    ⌈ {members.length} players ÷ {Math.max(1, draftOrder.length)} teams ⌉
+                    {userOverrodeRoundsRef.current
+                      ? `default: ${suggestedRounds} · `
+                      : ""}
+                    ⌈ {members.length} ÷ {Math.max(1, draftOrder.length)} teams ⌉
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Calculated automatically — updates as players or teams change.
-                </p>
+                {!userOverrodeRoundsRef.current && (
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Auto-calculated from your roster size. Edit to override.
+                  </p>
+                )}
               </div>
 
               <div>
