@@ -490,6 +490,11 @@ async function maybeFireScheduledAutoPick(
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft || draft.status !== "active" || !draft.skillRankingEnabled) return false;
 
+  // Rank-based auto-picks are only applicable to positional draft styles,
+  // not auction, which uses a completely different pick mechanism.
+  const style = draft.draftStyle || draft.roundType || "snake";
+  if (style === "auction") return false;
+
   const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
   if (!schedule) return false;
 
@@ -1206,8 +1211,11 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   // Rebuild the auto-pick schedule at start time (not save time) so any
   // post-save keeper/skill-level edits are captured. Also stamps the current
   // skill-tier rank onto each draft_keepers row for record-keeping.
+  // Auto-pick schedule only applies to positional styles (snake/linear/3rd_round_reversal),
+  // never to auction drafts.
+  const startDraftStyle = draft.draftStyle || draft.roundType || "snake";
   let freshSchedule: AutoPickSchedule | null = null;
-  if (draft.skillRankingEnabled && draft.skillScale) {
+  if (draft.skillRankingEnabled && draft.skillScale && startDraftStyle !== "auction") {
     const memberships = await db
       .select({ userId: leagueMemberships.userId, skillLevel: leagueMemberships.skillLevel })
       .from(leagueMemberships)

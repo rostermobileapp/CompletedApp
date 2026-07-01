@@ -2220,7 +2220,13 @@ export default function DraftRoom() {
                       </button>
                       {isCommissioner && draft.status === "active" && !p.isAutoBuddy && (
                         <button
-                          onClick={() => flagPickMutation.mutate({ pickId: p.id })}
+                          onClick={() => {
+                            const pm = p.playerId ? memberById.get(p.playerId) : null;
+                            const name = pm?.user.firstName || pm?.user.displayName || "this pick";
+                            if (window.confirm(`Reject ${name}? This will remove the pick and reopen the slot for a manual pick.`)) {
+                              flagPickMutation.mutate({ pickId: p.id });
+                            }
+                          }}
                           disabled={flagPickMutation.isPending}
                           title="Reject pick"
                           className="shrink-0 p-2 rounded-lg text-destructive hover:bg-destructive/10 disabled:opacity-40"

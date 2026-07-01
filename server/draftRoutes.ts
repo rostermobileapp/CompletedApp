@@ -240,11 +240,17 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         .from(leagueMemberships)
         .where(and(eq(leagueMemberships.leagueId, draft.leagueId), eq(leagueMemberships.status, "approved")));
       const leagueMemberIds = new Set(leagueMembers.map((m) => m.userId));
+      // Normalize keeper entries — both legacy string IDs and {userId, rank?} objects are accepted.
+      type KeeperInput = string | { userId: string; rank?: string };
+      const normalizeKeeper = (entry: KeeperInput): { pid: string; rank?: string } =>
+        typeof entry === "string" ? { pid: entry } : { pid: entry.userId, rank: entry.rank };
+
       for (const [teamId, playerIds] of Object.entries(keepersByTeam ?? {})) {
         if (!leagueTeamIds.has(teamId)) {
           return res.status(400).json({ message: `Team ${teamId} does not belong to this league` });
         }
-        for (const pid of playerIds) {
+        for (const raw of playerIds) {
+          const { pid } = normalizeKeeper(raw as KeeperInput);
           if (!pid.startsWith("placeholder:") && !leagueMemberIds.has(pid)) {
             return res.status(400).json({ message: `Player ${pid} is not a member of this league` });
           }
@@ -254,13 +260,14 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const seen = new Set<string>();
       await db.delete(draftKeepers).where(eq(draftKeepers.draftId, draftId));
       for (const [teamId, playerIds] of Object.entries(keepersByTeam ?? {})) {
-        for (const pid of playerIds) {
+        for (const raw of playerIds) {
+          const { pid, rank } = normalizeKeeper(raw as KeeperInput);
           if (seen.has(pid)) continue;
           seen.add(pid);
           if (pid.startsWith("placeholder:")) {
             await db.insert(draftKeepers).values({ draftId, userId: null, placeholderPlayerId: pid, teamId });
           } else {
-            await db.insert(draftKeepers).values({ draftId, userId: pid, placeholderPlayerId: null, teamId });
+            await db.insert(draftKeepers).values({ draftId, userId: pid, placeholderPlayerId: null, teamId, rank: rank ?? null });
           }
         }
       }
@@ -273,7 +280,10 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         const leagueName = leagueRow?.name || "the league";
         const realKeeperPairs = Object.entries(keepersByTeam ?? {})
           .flatMap(([teamId, pids]) =>
-            pids.filter((pid) => !pid.startsWith("placeholder:")).map((pid) => ({ pid, teamId })),
+            pids
+              .map((raw) => normalizeKeeper(raw as KeeperInput))
+              .filter(({ pid }) => !pid.startsWith("placeholder:"))
+              .map(({ pid }) => ({ pid, teamId })),
           );
         if (realKeeperPairs.length > 0) {
           const teamIds = [...new Set(realKeeperPairs.map((k) => k.teamId))];
@@ -538,13 +548,17 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           draftRow = created;
         }
 
-        // Replace keepers (idempotent) — supports both real user IDs and placeholder IDs
+        // Replace keepers (idempotent) — supports both legacy string IDs and {userId, rank?} objects.
+        type KeeperInputCfg = string | { userId: string; rank?: string };
+        const normalizeKeeperCfg = (entry: KeeperInputCfg): { pid: string; rank?: string } =>
+          typeof entry === "string" ? { pid: entry } : { pid: entry.userId, rank: entry.rank };
+
         await db.delete(draftKeepers).where(eq(draftKeepers.draftId, draftRow.id));
         if (config.keepersByTeam) {
           for (const [teamId, playerIds] of Object.entries(config.keepersByTeam)) {
-            for (const pid of playerIds) {
+            for (const raw of playerIds) {
+              const { pid, rank } = normalizeKeeperCfg(raw as KeeperInputCfg);
               if (pid.startsWith("placeholder:")) {
-                // Placeholder player — store in placeholderPlayerId column
                 await db.insert(draftKeepers).values({
                   draftId: draftRow.id,
                   userId: null,
@@ -552,12 +566,12 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
                   teamId,
                 });
               } else {
-                // Real user account
                 await db.insert(draftKeepers).values({
                   draftId: draftRow.id,
                   userId: pid,
                   placeholderPlayerId: null,
                   teamId,
+                  rank: rank ?? null,
                 });
               }
             }
