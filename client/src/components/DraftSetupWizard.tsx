@@ -181,7 +181,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   const { data: existing } = useQuery<{
     draft: any;
     buddyPairs: { id: string; userIds: string[] }[];
-    keepersByTeam?: Record<string, string[]>;
+    keepersByTeam?: Record<string, { userId: string; rank?: string }[]>;
   }>({
     queryKey: ["/api/leagues", leagueId, "seasons", seasonId, "draft"],
     enabled: !!leagueId && !!seasonId,
@@ -216,7 +216,16 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       // Always set (including empty map) so previously-cleared keepers don't
       // linger in local state from a stale render before data arrived.
       if (existing.keepersByTeam !== undefined) {
-        setKeepersByTeam(existing.keepersByTeam);
+        // Server now returns {userId, rank?}[] per team — extract just the userId strings
+        // for the internal string[] state (rank is always derived from skillLevels in UI).
+        setKeepersByTeam(
+          Object.fromEntries(
+            Object.entries(existing.keepersByTeam).map(([teamId, entries]) => [
+              teamId,
+              entries.map((e) => (typeof e === "string" ? e : e.userId)),
+            ]),
+          ),
+        );
       }
     }
   }, [existing]);
@@ -366,7 +375,14 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
             : Object.keys(captainAssignments).length
               ? captainAssignments
               : undefined,
-        keepersByTeam: Object.keys(keepersByTeam).length ? keepersByTeam : undefined,
+        keepersByTeam: Object.keys(keepersByTeam).length
+          ? Object.fromEntries(
+              Object.entries(keepersByTeam).map(([teamId, userIds]) => [
+                teamId,
+                userIds.map((uid) => ({ userId: uid, ...(skillLevels[uid] ? { rank: skillLevels[uid] } : {}) })),
+              ]),
+            )
+          : undefined,
         draftOrder,
         totalRounds,
       };

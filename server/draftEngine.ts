@@ -1502,6 +1502,8 @@ export async function flagPick(
 
   const [pick] = await db.select().from(draftPicks).where(eq(draftPicks.id, pickId));
   if (!pick || !pick.playerId) return { ok: false, error: "Pick not found" };
+  // Verify this pick belongs to the draft being acted on — prevents cross-draft pick mutations.
+  if (pick.draftId !== draftId) return { ok: false, error: "Pick does not belong to this draft" };
   if (pick.isAutoBuddy) {
     return { ok: false, error: "Cannot flag auto-buddy picks directly — flag the primary pick" };
   }

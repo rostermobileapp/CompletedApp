@@ -149,13 +149,14 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           .select()
           .from(draftKeepers)
           .where(eq(draftKeepers.draftId, draft.id));
-        // Reconstruct keepersByTeam map: teamId -> [userId or placeholderPlayerId, ...]
-        const keepersByTeam: Record<string, string[]> = {};
+        // Reconstruct keepersByTeam map: teamId -> {userId, rank?}[]
+        // Placeholder entries are represented as {userId: placeholderId} for backward compat.
+        const keepersByTeam: Record<string, { userId: string; rank?: string }[]> = {};
         for (const k of keeperRows) {
           const pid = k.userId ?? k.placeholderPlayerId;
           if (!pid) continue;
           if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
-          keepersByTeam[k.teamId].push(pid);
+          keepersByTeam[k.teamId].push({ userId: pid, ...(k.rank ? { rank: k.rank } : {}) });
         }
         return res.json({ draft, buddyPairs, keepersByTeam });
       } catch (err) {
@@ -199,13 +200,14 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         .select()
         .from(draftKeepers)
         .where(eq(draftKeepers.draftId, draftId));
-      // Reconstruct keepersByTeam map: teamId -> [userId or placeholderPlayerId, ...]
-      const keepersByTeam: Record<string, string[]> = {};
+      // Reconstruct keepersByTeam map: teamId -> {userId, rank?}[]
+      // Placeholder entries are represented as {userId: placeholderId} for backward compat.
+      const keepersByTeam: Record<string, { userId: string; rank?: string }[]> = {};
       for (const k of rows) {
         const pid = k.userId ?? k.placeholderPlayerId;
         if (!pid) continue;
         if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
-        keepersByTeam[k.teamId].push(pid);
+        keepersByTeam[k.teamId].push({ userId: pid, ...(k.rank ? { rank: k.rank } : {}) });
       }
       return res.json({ keepersByTeam });
     } catch (err) {

@@ -168,9 +168,11 @@ export function validateKeeperRanks(
   keeperIds: string[],
   skillLevels: Record<string, string>,
 ): string[] {
-  const players = captainId ? [captainId, ...keeperIds] : [...keeperIds];
+  // Only block duplicate keeper ranks within the same team.
+  // Captain vs keeper rank collisions are handled by schedule rollover priority at pick time,
+  // not blocked during setup — captainId is intentionally excluded here.
   const rankCount = new Map<string, number>();
-  for (const pid of players) {
+  for (const pid of keeperIds) {
     if (pid.startsWith("placeholder:")) continue;
     const rank = skillLevels[pid];
     if (!rank) continue;
