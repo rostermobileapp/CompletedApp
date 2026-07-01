@@ -1250,6 +1250,23 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
       }
     }
 
+    // Server-side invariant: block start if any team has duplicate keeper ranks.
+    // This mirrors the client-side wizard check and cannot be bypassed via the API.
+    for (const [teamId, keepers] of Object.entries(keepersByTeam)) {
+      const rankCount = new Map<string, number>();
+      for (const k of keepers) {
+        if (!k.rank) continue;
+        rankCount.set(k.rank, (rankCount.get(k.rank) || 0) + 1);
+      }
+      const dupes = [...rankCount.entries()].filter(([, n]) => n > 1).map(([r]) => r);
+      if (dupes.length > 0) {
+        return {
+          ok: false,
+          error: `Team ${teamId} has keepers with duplicate skill ranks (${dupes.join(", ")}). Resolve before starting.`,
+        };
+      }
+    }
+
     freshSchedule = buildAutoPickSchedule({
       draftOrder,
       totalRounds: draft.totalRounds,
@@ -1508,6 +1525,29 @@ export async function flagPick(
     return { ok: false, error: "Cannot flag auto-buddy picks directly — flag the primary pick" };
   }
   if (pick.forfeited) return { ok: false, error: "Cannot flag a forfeited slot" };
+
+  // Guard: only the most recently committed pick slot may be flagged.
+  // Allowing arbitrary historical picks would leave later picks dangling with no valid slot order.
+  const laterPicks = await db
+    .select({ id: draftPicks.id })
+    .from(draftPicks)
+    .where(
+      and(
+        eq(draftPicks.draftId, draftId),
+        eq(draftPicks.forfeited, false),
+        isNotNull(draftPicks.playerId),
+        or(
+          gt(draftPicks.round, pick.round),
+          and(eq(draftPicks.round, pick.round), gt(draftPicks.pickInRound, pick.pickInRound)),
+        ),
+      ),
+    );
+  if (laterPicks.length > 0) {
+    return {
+      ok: false,
+      error: "Only the most recent pick can be rejected. Undo any later picks first.",
+    };
+  }
 
   const buddyChildren = await db.select().from(draftPicks).where(
     and(

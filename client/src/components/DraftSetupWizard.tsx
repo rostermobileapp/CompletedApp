@@ -1192,6 +1192,17 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
 
           {stepId === "skill" && (
             <div className="space-y-4" data-testid="step-skill">
+              {(() => {
+                const scaleLocked =
+                  existing?.draft?.status === "awaiting_captains" ||
+                  existing?.draft?.status === "active";
+                return (
+                  <>
+                    {scaleLocked && (
+                      <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                        Skill scale and tier assignments are locked once captains are in the lobby. Individual player tiers can still be updated.
+                      </p>
+                    )}
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Star className="w-4 h-4" /> Skill Tier Ranking
@@ -1201,6 +1212,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     type="checkbox"
                     checked={skillRankingEnabled}
                     onChange={(e) => setSkillRankingEnabled(e.target.checked)}
+                    disabled={scaleLocked}
                     data-testid="checkbox-skill-enabled"
                   />
                   Enable
@@ -1214,7 +1226,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     <div className="flex gap-2">
                       <button
                         onClick={() => setSkillScale("numbers")}
-                        className={`px-3 py-2 rounded-lg border text-sm ${
+                        disabled={scaleLocked}
+                        className={`px-3 py-2 rounded-lg border text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                           skillScale === "numbers"
                             ? "border-primary bg-primary/10"
                             : "border-border"
@@ -1225,7 +1238,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                       </button>
                       <button
                         onClick={() => setSkillScale("letters")}
-                        className={`px-3 py-2 rounded-lg border text-sm ${
+                        disabled={scaleLocked}
+                        className={`px-3 py-2 rounded-lg border text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                           skillScale === "letters"
                             ? "border-primary bg-primary/10"
                             : "border-border"
@@ -1337,6 +1351,9 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   )}
                 </>
               )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
