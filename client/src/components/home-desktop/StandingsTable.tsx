@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
@@ -21,8 +20,6 @@ interface StandingsTableProps {
   userTeamIdsInLeague: string[];
   seasonLabel?: string;
   seasonId?: string | null;
-  /** Full list of seasons for this league (passed from HomeDesktop to avoid refetch). */
-  seasons?: any[];
 }
 
 export function StandingsTable({
@@ -30,23 +27,12 @@ export function StandingsTable({
   userTeamIdsInLeague,
   seasonLabel,
   seasonId,
-  seasons,
 }: StandingsTableProps) {
-  // Let user pick a prior season; default to the active season passed in.
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(
-    seasonId ?? null,
-  );
-
-  // Re-sync when the parent season or league changes (e.g., user switches league).
-  useEffect(() => {
-    setSelectedSeasonId(seasonId ?? null);
-  }, [seasonId, effectiveLeagueId]);
-
   const { data: standings, isLoading } = useQuery<StandingsRow[]>({
-    queryKey: ['/api/leagues', effectiveLeagueId, 'standings', selectedSeasonId ?? null],
+    queryKey: ['/api/leagues', effectiveLeagueId, 'standings', seasonId ?? null],
     queryFn: async () => {
-      const url = selectedSeasonId
-        ? `/api/leagues/${effectiveLeagueId}/standings?seasonId=${selectedSeasonId}`
+      const url = seasonId
+        ? `/api/leagues/${effectiveLeagueId}/standings?seasonId=${seasonId}`
         : `/api/leagues/${effectiveLeagueId}/standings`;
       const res = await apiRequest('GET', url);
       return res.json();
@@ -55,12 +41,7 @@ export function StandingsTable({
     staleTime: 60_000,
   });
 
-  // Label for the currently selected season
-  const displayLabel = (() => {
-    if (!Array.isArray(seasons) || !seasons.length) return seasonLabel;
-    const found = seasons.find((s) => s.id === selectedSeasonId);
-    return found?.name || seasonLabel;
-  })();
+  const displayLabel = seasonLabel;
 
   // Sort: points desc, then GF-GA desc, then wins desc
   const sorted = (() => {
@@ -78,25 +59,11 @@ export function StandingsTable({
     <div className={`${cardClass} h-full`} style={cardStyle} data-testid="card-standings">
       <div className="flex items-center justify-between gap-2">
         <div className={sectionTitleClass}>Standings</div>
-        {Array.isArray(seasons) && seasons.length > 1 ? (
-          <select
-            value={selectedSeasonId ?? ''}
-            onChange={(e) => setSelectedSeasonId(e.target.value || null)}
-            className="text-[12px] text-[#444] bg-black/[0.04] border-0 rounded-md px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#3b82f6] cursor-pointer"
-            data-testid="standings-season-select"
-            aria-label="Select season"
-          >
-            {seasons.map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        ) : displayLabel ? (
+        {displayLabel && (
           <span className="text-[12px] text-[#666]" data-testid="standings-season">
             {displayLabel}
           </span>
-        ) : null}
+        )}
       </div>
 
       {!effectiveLeagueId ? (

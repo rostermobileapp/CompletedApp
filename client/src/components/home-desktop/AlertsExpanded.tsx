@@ -34,6 +34,8 @@ interface AlertsExpandedProps {
   userTeamIds?: string[];
   /** Compact mode: reduced padding, capped list, condensed rows for narrow column layouts. */
   compact?: boolean;
+  /** When set, restrict game-based alerts (verify score, award stars) to this season. */
+  seasonId?: string | null;
 }
 
 function formatGameDate(value?: string | Date | null): string | null {
@@ -83,6 +85,7 @@ export function AlertsExpanded({
   effectiveLeagueId,
   userTeamIds = [],
   compact = false,
+  seasonId,
 }: AlertsExpandedProps) {
   const [, navigate] = useLocation();
 
@@ -137,13 +140,16 @@ export function AlertsExpanded({
   });
 
   const { data: gamesNeedingVerification } = useQuery<any[]>({
-    queryKey: ['/api/leagues', effectiveLeagueId, 'games-needing-verification'],
+    queryKey: ['/api/leagues', effectiveLeagueId, 'games-needing-verification', seasonId ?? null],
     enabled: !!effectiveLeagueId,
     queryFn: async () => {
       try {
+        const params = new URLSearchParams();
+        if (seasonId) params.append('seasonId', seasonId);
+        const qs = params.toString() ? `?${params.toString()}` : '';
         const res = await apiRequest(
           'GET',
-          `/api/leagues/${effectiveLeagueId}/games-needing-verification`,
+          `/api/leagues/${effectiveLeagueId}/games-needing-verification${qs}`,
         );
         if (!res.ok) return [];
         return await res.json();
@@ -177,13 +183,16 @@ export function AlertsExpanded({
   });
 
   const { data: gamesNeedingStars } = useQuery<any[]>({
-    queryKey: ['/api/user/games-needing-stars', effectiveLeagueId],
+    queryKey: ['/api/user/games-needing-stars', effectiveLeagueId, seasonId ?? null],
     enabled: !!effectiveLeagueId,
     queryFn: async () => {
       try {
+        const params = new URLSearchParams();
+        if (effectiveLeagueId) params.append('leagueId', effectiveLeagueId);
+        if (seasonId) params.append('seasonId', seasonId);
         const res = await apiRequest(
           'GET',
-          `/api/user/games-needing-stars?leagueId=${effectiveLeagueId}`,
+          `/api/user/games-needing-stars?${params.toString()}`,
         );
         if (!res.ok) return [];
         return await res.json();

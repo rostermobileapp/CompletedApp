@@ -19,6 +19,8 @@ interface UpNextCardProps {
   selectedTournamentId?: string | null;
   /** Compact mode: reduced padding and condensed content for narrow column layouts. */
   compact?: boolean;
+  /** When set, restrict to games belonging to this season. */
+  seasonId?: string | null;
 }
 
 interface UpcomingItem {
@@ -47,6 +49,7 @@ export function UpNextCard({
   leagueTeamIds,
   selectedTournamentId,
   compact = false,
+  seasonId,
 }: UpNextCardProps) {
   const [, navigate] = useLocation();
 
@@ -81,6 +84,7 @@ export function UpNextCard({
         if (g.isCompleted) return false;
         const t = new Date(g.scheduledAt).getTime();
         if (Number.isNaN(t)) return false;
+        if (seasonId && (g as any).seasonId && (g as any).seasonId !== seasonId) return false;
         return t + 2 * 60 * 60 * 1000 >= now;
       });
     };

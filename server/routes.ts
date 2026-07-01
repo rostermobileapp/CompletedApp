@@ -6573,6 +6573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leagues/:id/games", async (req, res) => {
     try {
       const leagueId = req.params.id;
+      const { seasonId: leagueGamesSeasonId } = req.query as { seasonId?: string };
       const games = await storage.getGamesByLeague(leagueId);
       
       const tournamentLinkedGames = await db
@@ -6581,7 +6582,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(isNotNull(tournamentMatches.gameId));
       const tournamentGameIds = new Set(tournamentLinkedGames.map(t => t.gameId).filter(Boolean));
       
-      const filteredGames = games.filter((game: any) => !tournamentGameIds.has(game.id));
+      const filteredGames = games.filter((game: any) => {
+        if (tournamentGameIds.has(game.id)) return false;
+        if (leagueGamesSeasonId && game.seasonId !== leagueGamesSeasonId) return false;
+        return true;
+      });
       const formattedGames = filteredGames.map(formatGameForResponse);
       res.json(formattedGames);
     } catch (error) {
@@ -6636,12 +6641,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       
+      const { seasonId: seasonIdParam } = req.query as { seasonId?: string };
+
       // Filter games that started more than 1 hour ago (exclude scrimmages,
       // tournament-linked games, and games belonging to inactive seasons).
       const pastGames = games.filter((game: any) => {
         if (game.isScrimmage) return false;
         if (tournamentGameIds.has(game.id)) return false;
         if (game.seasonId && inactiveSeasonIds.has(game.seasonId)) return false;
+        if (seasonIdParam && game.seasonId !== seasonIdParam) return false;
         const gameStart = new Date(game.scheduledAt);
         return gameStart <= oneHourAgo;
       });
@@ -8293,12 +8301,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all games where user is a team captain
       const allGames = await storage.getAllUserGames(userId);
       
+      const { seasonId: starsSeasonId } = req.query as { leagueId?: string; seasonId?: string };
+
       // Filter down to completed games with scores, not tied, and optionally by league
       const completedGamesWithScores = allGames.filter((game: any) => {
         if (game.isScrimmage) return false;
         if (!game.isCompleted || game.homeScore === null || game.awayScore === null) return false;
         if (game.homeScore === game.awayScore) return false;
         if (leagueId && game.leagueId !== leagueId) return false;
+        if (starsSeasonId && game.seasonId !== starsSeasonId) return false;
         return true;
       });
       

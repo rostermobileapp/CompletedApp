@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Trophy, Clipboard, ChevronRight } from 'lucide-react';
@@ -114,22 +114,26 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
     return seasons.find((s) => s?.isActive) || seasons[0] || null;
   }, [seasons]);
 
-  // Effective season id: prefer the selected team's own seasonId, fall back to the
-  // league's active season. This ensures standings (and other season-scoped data)
-  // always show data for the season the user currently has selected, not all-time.
-  const effectiveSeasonId = useMemo<string | null>(() => {
-    if (isTournamentScope) return null;
-    if (selectedType === 'team' && selectedTeamId && Array.isArray(userTeams)) {
-      const t = userTeams.find((x: any) => x.id === selectedTeamId);
-      if (t?.seasonId) return t.seasonId;
-    }
-    return activeSeason?.id || null;
-  }, [isTournamentScope, selectedType, selectedTeamId, userTeams, activeSeason]);
-
   const seasonLabel: string | undefined =
     activeSeason?.name ||
     (activeSeason?.year ? String(activeSeason.year) : undefined) ||
     String(new Date().getFullYear());
+
+  // Shared season selector state — initialized from active season, resets when
+  // the user switches leagues or the active season changes.
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(
+    activeSeason?.id ?? null,
+  );
+  useEffect(() => {
+    setSelectedSeasonId(activeSeason?.id ?? null);
+  }, [activeSeason?.id, effectiveLeagueId]);
+
+  // Display label for the currently-selected season
+  const selectedSeasonLabel = useMemo(() => {
+    if (!Array.isArray(seasons)) return seasonLabel;
+    const found = seasons.find((s) => s.id === selectedSeasonId);
+    return found?.name || seasonLabel;
+  }, [seasons, selectedSeasonId, seasonLabel]);
 
   return (
     <div
@@ -138,6 +142,25 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
       data-testid="home-desktop"
     >
       <div className="mx-auto w-full max-w-[1280px] px-6 py-6 flex flex-col gap-4">
+        {/* Shared season selector — shown above all cards when the league has
+            multiple seasons and the user is NOT in tournament scope */}
+        {!isTournamentScope && Array.isArray(seasons) && seasons.length > 1 && effectiveLeagueId && (
+          <div className="flex items-center justify-end gap-2" data-testid="shared-season-selector-row">
+            <span className="text-[13px] text-[#666]">Season</span>
+            <select
+              value={selectedSeasonId ?? ''}
+              onChange={(e) => setSelectedSeasonId(e.target.value || null)}
+              className="text-[13px] text-[#444] bg-white border border-[rgba(0,0,0,0.12)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] cursor-pointer shadow-sm"
+              data-testid="season-selector"
+              aria-label="Select season"
+            >
+              {seasons.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {isTournamentScope ? (
           <>
             {/* Tournament Row 1: Up Next + Alerts full-width */}
@@ -185,27 +208,27 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                   isLeagueScope={isLeagueScope}
                   leagueTeamIds={userTeamIdsInLeague}
                   selectedTournamentId={selectedTournamentId}
+                  seasonId={selectedSeasonId}
                 />
                 <AlertsExpanded
                   compact
                   effectiveLeagueId={effectiveLeagueId}
                   userTeamIds={allUserTeamIds}
+                  seasonId={selectedSeasonId}
                 />
               </div>
               {/* Right column: Stats + Standings side by side, full height */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr] lg:items-stretch">
                 <TeamLeadersCard
                   effectiveLeagueId={effectiveLeagueId}
-                  seasonId={activeSeason?.id || null}
-                  seasonLabel={seasonLabel}
-                  seasons={seasons ?? undefined}
+                  seasonId={selectedSeasonId}
+                  seasonLabel={selectedSeasonLabel}
                 />
                 <StandingsTable
                   effectiveLeagueId={effectiveLeagueId}
                   userTeamIdsInLeague={userTeamIdsInLeague}
-                  seasonLabel={seasonLabel}
-                  seasonId={effectiveSeasonId}
-                  seasons={seasons ?? undefined}
+                  seasonLabel={selectedSeasonLabel}
+                  seasonId={selectedSeasonId}
                 />
               </div>
             </div>
@@ -219,6 +242,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 leagueTeamIds={userTeamIdsInLeague}
                 onAddEvent={onAddEvent}
                 selectedTournamentId={selectedTournamentId}
+                seasonId={selectedSeasonId}
               />
             </div>
           </>

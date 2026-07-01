@@ -22,6 +22,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { setPageTransitionDirection } from '@/components/PageTransition';
+import { apiRequest } from '@/lib/queryClient';
 import {
   cardClass,
   cardStyle,
@@ -43,6 +44,8 @@ interface ScheduleCalendarProps {
   /** When set, restrict the calendar/list to this tournament's matches and
    *  hide league/team events entirely. */
   selectedTournamentId?: string | null;
+  /** When set, restrict games to this season. */
+  seasonId?: string | null;
 }
 
 export type EventType = 'game' | 'practice' | 'social' | 'tournament';
@@ -69,6 +72,7 @@ export function ScheduleCalendar({
   leagueTeamIds,
   onAddEvent,
   selectedTournamentId,
+  seasonId,
 }: ScheduleCalendarProps) {
   const [, navigate] = useLocation();
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
@@ -90,10 +94,13 @@ export function ScheduleCalendar({
   // When a league is selected, fetch ALL games for that league so commissioners
   // can see every scheduled game (not just their own team's games).
   const { data: leagueGames } = useQuery<any[]>({
-    queryKey: ['/api/leagues', effectiveLeagueId, 'games'],
+    queryKey: ['/api/leagues', effectiveLeagueId, 'games', seasonId ?? null],
     enabled: isLeagueScope && !!effectiveLeagueId,
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games`);
+      const params = new URLSearchParams();
+      if (seasonId) params.append('seasonId', seasonId);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const res = await apiRequest('GET', `/api/leagues/${effectiveLeagueId}/games${qs}`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -104,6 +111,9 @@ export function ScheduleCalendar({
   const events = useMemo<ScheduleEvent[]>(() => {
     const out: ScheduleEvent[] = [];
     const userTeamSet = new Set(userTeamIds);
+
+    // Helper: return true if the game belongs to the selected season (or no filter set)
+    const inSeason = (g: any) => !seasonId || !g?.seasonId || g.seasonId === seasonId;
 
     // Helper: build a game title from a raw game object, optionally
     // showing "vs Opponent" when the user is a player in the game.
@@ -198,6 +208,7 @@ export function ScheduleCalendar({
         if (!g?.scheduledAt) continue;
         const d = new Date(g.scheduledAt);
         if (Number.isNaN(d.getTime())) continue;
+        if (!inSeason(g)) continue;
         if (selectedTournamentId) {
           if (g.tournamentId !== selectedTournamentId) continue;
         } else if (selectedTeamId) {
@@ -258,6 +269,7 @@ export function ScheduleCalendar({
     isLeagueScope,
     leagueTeamIds,
     selectedTournamentId,
+    seasonId,
   ]);
 
   // Group events by yyyy-MM-dd
