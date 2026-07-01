@@ -112,8 +112,9 @@ export function ScheduleCalendar({
     const out: ScheduleEvent[] = [];
     const userTeamSet = new Set(userTeamIds);
 
-    // Helper: return true if the game belongs to the selected season (or no filter set)
-    const inSeason = (g: any) => !seasonId || !g?.seasonId || g.seasonId === seasonId;
+    // Strict season check: when seasonId is set, only pass games that match it.
+    // Scrimmages and team events are excluded from this check (not season-specific).
+    const inSeason = (g: any) => !seasonId || g?.isScrimmage || g?.seasonId === seasonId;
 
     // Helper: build a game title from a raw game object, optionally
     // showing "vs Opponent" when the user is a player in the game.

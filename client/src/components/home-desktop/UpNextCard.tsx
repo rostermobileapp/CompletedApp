@@ -84,7 +84,8 @@ export function UpNextCard({
         if (g.isCompleted) return false;
         const t = new Date(g.scheduledAt).getTime();
         if (Number.isNaN(t)) return false;
-        if (seasonId && (g as any).seasonId && (g as any).seasonId !== seasonId) return false;
+        // Scrimmages are not season-specific; exclude non-matching league games.
+        if (seasonId && !(g as any).isScrimmage && (g as any).seasonId !== seasonId) return false;
         return t + 2 * 60 * 60 * 1000 >= now;
       });
     };

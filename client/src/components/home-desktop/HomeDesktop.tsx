@@ -102,10 +102,24 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
   // any of the user's teams within that league instead of a single team.
   const isLeagueScope = selectedType === 'league' && !selectedTeamId;
 
+  // When in tournament scope, fetch the tournament so we can derive its
+  // leagueId and look up seasons for the shared selector.
+  const { data: tournamentData } = useQuery<any>({
+    queryKey: ['/api/tournaments', selectedTournamentId],
+    enabled: isTournamentScope && !!selectedTournamentId,
+    staleTime: 30_000,
+  });
+
+  // The league used exclusively for seasons lookup — in tournament scope we
+  // use the tournament's own leagueId so the season selector stays available.
+  const seasonLeagueId = isTournamentScope
+    ? (tournamentData?.leagueId || null)
+    : effectiveLeagueId;
+
   // Fetch active season for the league for the season label / leaders sort
   const { data: seasons } = useQuery<any[]>({
-    queryKey: [`/api/leagues/${effectiveLeagueId}/seasons`],
-    enabled: !!effectiveLeagueId,
+    queryKey: [`/api/leagues/${seasonLeagueId}/seasons`],
+    enabled: !!seasonLeagueId,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -143,8 +157,8 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
     >
       <div className="mx-auto w-full max-w-[1280px] px-6 py-6 flex flex-col gap-4">
         {/* Shared season selector — shown above all cards when the league has
-            multiple seasons and the user is NOT in tournament scope */}
-        {!isTournamentScope && Array.isArray(seasons) && seasons.length > 1 && effectiveLeagueId && (
+            multiple seasons (league and tournament scopes both supported) */}
+        {Array.isArray(seasons) && seasons.length > 1 && seasonLeagueId && (
           <div className="flex items-center justify-end gap-2" data-testid="shared-season-selector-row">
             <span className="text-[13px] text-[#666]">Season</span>
             <select
@@ -172,10 +186,12 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 isLeagueScope={isLeagueScope}
                 leagueTeamIds={userTeamIdsInLeague}
                 selectedTournamentId={selectedTournamentId}
+                seasonId={selectedSeasonId}
               />
               <AlertsExpanded
                 effectiveLeagueId={effectiveLeagueId}
                 userTeamIds={allUserTeamIds}
+                seasonId={selectedSeasonId}
               />
             </div>
             {/* Tournament Row 2: Schedule (unchanged) */}
@@ -188,6 +204,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 leagueTeamIds={userTeamIdsInLeague}
                 onAddEvent={onAddEvent}
                 selectedTournamentId={selectedTournamentId}
+                seasonId={selectedSeasonId}
               />
             </div>
             {/* Tournament Row 3: Bracket + Scorekeeper */}
