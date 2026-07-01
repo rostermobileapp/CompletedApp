@@ -1,0 +1,169 @@
+# Draft Tool — Rank-Based Auto-Pick Logic
+
+## Context
+Step 6 of 9 in the Draft Setup wizard ("Skill Tier Ranking") is where each player gets assigned a tier rank — currently a fixed "Numbers (1-5)" or "Letters (A-D)" scale, set via a dropdown per player (see screenshot: Mike Elrod, Tobin Kern, Brent Kallay, TJ Kern, Tobin Kern, Rico Piccirillo, each with a rank dropdown).
+
+These ranks, combined with buddy and keep designations from earlier setup steps, must **directly and automatically drive draft-day picks** — this is not a suggestion engine. When a captain's, buddy's, or keep's designated round comes up during the live draft, the pick is made automatically with zero manual action required. This spec covers (a) making the tier scale formula-based instead of fixed, (b) wiring those tier ranks + buddy/keep data into forced automatic picks during the live draft, (c) commissioner override/flag capability on live picks, and (d) a new final wizard step summarizing the whole draft sequence before it goes live.
+
+---
+
+## 1. Dynamic Rank Scale (formula-based, not hardcoded)
+
+Rank scale size must be calculated per draft, not fixed at 1–5 / A–D.
+
+```
+rankScaleSize = ceil(totalPlayers / numTeams)
+```
+
+Example: 90 players, 10 teams → `ceil(90/10) = 9` → ranks run 1–9 (or A–I).
+
+- Support both numeric (1, 2, 3...) and letter (A, B, C...) rank formats, mapped to the same underlying integer scale internally (A=1, B=2, etc.).
+- Rank scale should recalculate whenever the player pool or team count changes pre-draft, and lock once the draft starts.
+
+**UI change needed on Step 6 ("Skill Tier Ranking"):** The "Tier Scale" toggle currently hardcodes "Numbers (1-5)" / "Letters (A-D)". Replace with dynamically generated options based on `rankScaleSize` calculated above — e.g., for the 90-player/10-team example, the toggle should read "Numbers (1-9)" / "Letters (A-I)", and each player's rank dropdown should offer exactly that many options.
+
+---
+
+## 2. Non-Auto-Pick Rounds
+
+- Rounds not governed by Sections 3–5 (self/buddy/keeps) are fully open — captain manually selects any available player, no default or pre-highlighted pick imposed.
+- **Rounds governed by Sections 3–5 are NOT suggestions.** They are forced, automatic, non-overridable picks — no manual action or confirmation step for the captain. (Commissioners can still flag/reject these after the fact — see Section 7.)
+
+---
+
+## 3. Captain Self Auto-Pick (rank-based)
+
+- Every captain has their own rank (1 to rankScaleSize).
+- **Rule:** In the draft round number matching the captain's own rank, that captain's pick is automatically filled with themselves.
+  - Rank 1/A captain → Round 1 pick = self, no manual selection needed/allowed.
+  - Rank 3 captain → Round 3 pick = self.
+  - Rank N captain → Round N pick = self.
+
+---
+
+## 4. Buddy Auto-Pick
+
+- Captains can designate one "buddy" pre-draft.
+- **Rule:** In the round number matching the buddy's rank, that captain's pick is automatically filled with the buddy (assuming buddy is still available — see Section 6 for what "available" means).
+  - Example: Rank 1 captain, buddy ranked 5 → Round 1 = self (auto, per Section 3), Round 5 = buddy (auto).
+
+---
+
+## 5. Keep Auto-Pick(s) — supports multiple keeps
+
+- Captains can designate **multiple** "keeps" (protected players) pre-draft — not limited to one.
+- **Rule:** For each keep, in the round number matching that keep's individual rank, the captain's pick is automatically filled with that keep (assuming the keep is still available — see Section 6).
+  - Example: Captain has Keep A ranked 2 and Keep B ranked 6 → Round 2 auto = Keep A, Round 6 auto = Keep B. Both fire independently, no limit on count as long as each keep has a distinct designated round.
+- Data model note: `captain.keeps` should be an array of `{ player, rank }`, not a single object.
+
+---
+
+## 6. Player Availability Display (applies to all players, including buddies/keeps)
+
+- Once any player is drafted — by any team, for any reason (auto or manual) — they remain **visible** in the roster/player pool list. They are never removed from view.
+- A drafted player displays **greyed out**, and their "Draft" button becomes **disabled/non-clickable**.
+- This is universal behavior, not special-cased for buddies or keeps. If a captain's buddy or a keep is drafted by another team before that captain's designated auto-pick round arrives, this greyed-out state is simply how it's reflected — the player was already visibly unavailable in the pool leading up to that round.
+- **Practical effect:** if a buddy/keep is drafted by another team before the designated round, the auto-pick for that specific slot simply has no player to select — that round proceeds as a normal, fully open manual pick for the captain (per Section 2). No separate "conflict" state or fallback logic is needed beyond this.
+
+---
+
+## 7. Commissioner Pick Flag / Reject (new)
+
+- During the live draft, the commissioner has a **"Flag"** action available on every pick as it happens in real time — whether the pick was manual or an automatic self/buddy/keep pick.
+- Flagging a pick opens a reject/confirm step. On confirmed rejection:
+  - The picked player is returned to the available pool (un-drafted, no longer greyed out).
+  - That round is reopened for the same captain to make a **new manual selection** — even if the original pick was an auto-pick, the re-pick after a flag is always manual (prevents the same auto-pick logic from immediately re-triggering and looping).
+  - The rejection should be logged (who flagged it, which pick, timestamp) for the draft history/audit trail.
+- UI: a "Flag" icon/button should appear next to each pick as it streams into the live draft board (Realtime feed), visible only to the commissioner role.
+
+---
+
+## 8. Conflict Resolution (self / buddy / multiple keeps landing on the same round)
+
+Since self-rank, buddy-rank, and one or more keep-ranks could theoretically collide on the same round number for the same captain, priority order:
+
+1. **Self** (captain's own rank) — highest priority, always honored first.
+2. **Keeps** — second priority. If two keeps share the same rank (setup-time data conflict), flag this during Step 6/setup validation and require the commissioner to resolve it before the draft can start — don't let it reach live-draft time.
+3. **Buddy** — third priority.
+4. If a lower-priority auto-pick gets bumped out of its designated round by a collision, it **rolls to the captain's next available pick** rather than being dropped. It does not force a manual round in its place.
+
+---
+
+## 9. Pseudocode Outline
+
+```
+onRoundStart(round, team):
+  captain = team.captain
+  autoPick = null
+
+  if captain.rank == round:
+    autoPick = captain (self)
+  else:
+    matchingKeep = captain.keeps.find(k => k.rank == round && k.player.available)
+    if matchingKeep:
+      autoPick = matchingKeep.player
+    else if captain.buddy && captain.buddy.rank == round && captain.buddy.available:
+      autoPick = captain.buddy
+
+  if autoPick:
+    executePick(team, autoPick, auto=true) // no confirmation, no manual override
+    // commissioner may still flag/reject after the fact — see Section 7
+  else:
+    presentPickUI(team) // fully open manual round, no default/pre-highlighted pick
+```
+
+---
+
+## 10. Edge Cases to Handle
+
+- Captain's own rank exceeds total number of rounds (e.g., rank 9 in a draft that only runs 8 rounds) — self auto-pick should trigger in the final round instead, or be configurable.
+- Two keeps assigned the same rank for one captain — must be caught and flagged at setup time (Step 6/7), not at draft time.
+- Buddy or a keep already drafted by another team before their round — handled per Section 6 (greyed out, round becomes open manual, no special void logic).
+- Captain has no buddy or no keeps designated — logic simply skips that check, no error.
+- Rank scale recalculation mid-setup (roster changes before lock) — ranks assigned to players/captains should re-validate against the new scale and flag any rank that's now out of bounds.
+- Commissioner flags an auto-pick (self/buddy/keep) — re-pick is manual only, doesn't re-trigger the same forced logic (see Section 7).
+
+---
+
+## 11. New Wizard Step: Draft Summary (Step 10, before draft goes live)
+
+Add a new final step to the Draft Setup wizard — comes after the current Step 9, right before the "Start Draft" action. Update the wizard header/progress bar from "Step X of 9" to "Step X of 10" across all steps.
+
+**Purpose:** Give the commissioner/captains a full preview of exactly what the draft will do before it's locked in and goes live — since Sections 3–5 mean a chunk of picks happen automatically with no further input.
+
+**Screen should show, per team:**
+- Team name and captain.
+- Draft order position (which pick number they go in each round, based on snake/auction order already configured).
+- A round-by-round breakdown flagging which rounds are auto-picks vs. open/manual, e.g.:
+  - Round 1: **Auto — Self** (Captain, rank 1)
+  - Round 2: **Auto — Keep** (Player name, rank 2)
+  - Round 3: Open
+  - Round 5: **Auto — Buddy** (Player name, rank 5)
+  - Round 6: **Auto — Keep** (Player name, rank 6)
+- Any conflicts resolved per the Section 8 priority rules should be visibly flagged here too (e.g., "Buddy auto-pick shifted from Round 3 to Round 4 due to conflict with Keep").
+
+**Actions on this screen:**
+- "Back" — returns to Step 9 to adjust setup.
+- "Start Draft" — locks in the configuration and initiates the live draft using this exact sequence.
+
+This is the last checkpoint for the commissioner to catch a bad tier ranking, buddy pairing, or keep assignment before it's irreversible mid-draft.
+
+---
+
+## 12. Acceptance Criteria / Test Cases
+
+1. 90 players, 10 teams → rank scale = 1–9 (or A–I). Confirm UI reflects this, not the old fixed 1–5/A–D.
+2. Captain ranked 1 → auto-selected as own Round 1 pick, no manual action possible.
+3. Captain ranked 3 → auto-selected as own Round 3 pick; Rounds 1–2 and 4+ behave normally.
+4. Captain ranked 1 with buddy ranked 5 → Round 1 auto = self, Round 5 auto = buddy.
+5. Captain ranked 1 with a single keep ranked 2 → Round 1 auto = self, Round 2 auto = keep.
+6. Captain has two keeps (ranked 2 and 6) plus a buddy (ranked 5) plus own rank 1 → Rounds 1, 2, 5, and 6 all auto-fire correctly with no interference.
+7. Buddy gets drafted by a different team before the designated round → that player shows greyed out with disabled Draft button well before the round arrives; when the round comes, it's simply a normal open manual pick.
+8. Non-auto-pick rounds are fully open manual picks — no default/pre-highlighted player imposed, captain free to take anyone available.
+9. Commissioner flags a manual pick mid-draft → pick reverts, player returns to pool (no longer greyed out), captain must pick again manually.
+10. Commissioner flags an auto-pick (e.g., a self-pick) → pick reverts, captain must select manually for that round; the same auto-pick logic does not immediately re-fire.
+11. Two keeps for the same captain assigned the same rank during setup → system blocks/flags this before the draft can be started, not mid-draft.
+
+---
+
+**Note to dev (Replit):** Please confirm the conflict-resolution rollover behavior in Section 8 (bumped auto-picks rolling to the captain's next available pick) before implementing — this affects the state machine for round transitions, and also what gets displayed on the new Step 10 summary screen.
