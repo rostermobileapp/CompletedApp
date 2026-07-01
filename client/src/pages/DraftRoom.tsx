@@ -62,6 +62,7 @@ interface Draft {
   playerNotes: Record<string, string>;
   skillRankingEnabled: boolean;
   skillScale: string | null;
+  resolvedAutoPickSchedule?: Record<string, Record<string, { type: string; playerId: string; originalRound: number; rolled: boolean }>> | null;
   captainReadyState?: Record<string, boolean> | null;
   buzzerExtensionState?: {
     currentPickExtended?: boolean;
@@ -80,6 +81,7 @@ interface DraftPick {
   pick: number;
   pickInRound: number;
   isAutoBuddy: boolean;
+  isAutoPick: boolean;
   expiredAutoPick: boolean;
   forfeited: boolean;
   pickedAt: string;
@@ -557,8 +559,23 @@ export default function DraftRoom() {
     return s;
   }, [bundle?.buddyPairs]);
 
+  // Players whose auto-pick slot is in the schedule — remain visible (greyed) even after being drafted
+  const scheduledPlayerIds = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    const schedule = draft?.resolvedAutoPickSchedule;
+    if (!schedule) return s;
+    for (const teamSchedule of Object.values(schedule)) {
+      for (const slot of Object.values(teamSchedule)) {
+        if (slot?.playerId) s.add(slot.playerId);
+      }
+    }
+    return s;
+  }, [draft?.resolvedAutoPickSchedule]);
+
   // All members for the carousel — drafted players & excluded goalies are
   // removed entirely so the rolodex always shows the live "remaining pool".
+  // Exception: players with a scheduled auto-pick slot remain visible but
+  // greyed/disabled so the commissioner can see if they've been drafted early.
   // Supports client-side filter (position, handed, min-points, skill) and sort.
   const allMembersForCarousel = useMemo(() => {
     if (!members.length) return [];
@@ -568,7 +585,9 @@ export default function DraftRoom() {
       m.membership.isGoalie;
 
     let list = members.filter(
-      (m: any) => !draftedSet.has(m.user.id) && !isExcludedGoalie(m),
+      (m: any) =>
+        (!draftedSet.has(m.user.id) || scheduledPlayerIds.has(m.user.id)) &&
+        !isExcludedGoalie(m),
     );
 
     // Position multi-select filter (empty = all positions shown)
@@ -686,7 +705,7 @@ export default function DraftRoom() {
     });
 
     return list;
-  }, [members, draftedSet, draft, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
+  }, [members, draftedSet, scheduledPlayerIds, draft, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
 
   const pickMutation = useMutation({
     mutationFn: async (playerId: string) => {
@@ -779,6 +798,18 @@ export default function DraftRoom() {
     },
     onError: (err: any) =>
       toast({ title: "Failed to undo", description: err?.message, variant: "destructive" }),
+  });
+  const flagPickMutation = useMutation({
+    mutationFn: async ({ pickId, reason }: { pickId: string; reason?: string }) => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/picks/${pickId}/flag`, { reason });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Pick rejected", description: "The pick was removed and the slot reopened for a manual pick." });
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to reject pick", description: err?.message, variant: "destructive" }),
   });
   const captainReadyMutation = useMutation({
     mutationFn: async () => {
@@ -998,6 +1029,23 @@ export default function DraftRoom() {
               >
                 <Undo2 className="w-4 h-4" />
                 <span className="font-mono">{undoSecondsLeft}s</span>
+              </button>
+            )}
+            {isCommissioner && draft.status === "active" && lastPrimaryPick && (
+              <button
+                onClick={() => {
+                  const pickedMember = lastPrimaryPick.playerId ? memberById.get(lastPrimaryPick.playerId) : null;
+                  const name = pickedMember?.user.firstName || pickedMember?.user.displayName || "this pick";
+                  if (window.confirm(`Reject ${name}? This will remove the pick and reopen the slot for a manual pick.`)) {
+                    flagPickMutation.mutate({ pickId: lastPrimaryPick.id });
+                  }
+                }}
+                disabled={flagPickMutation.isPending}
+                className="p-1.5 hover:bg-muted rounded text-xs font-medium flex items-center gap-1 text-red-600 dark:text-red-400 disabled:opacity-50"
+                title="Reject last pick (commissioner)"
+                data-testid="button-flag-pick"
+              >
+                <OctagonX className="w-4 h-4" />
               </button>
             )}
             {isCommissioner && draft.status === "active" && (
@@ -1458,6 +1506,7 @@ export default function DraftRoom() {
 
               {allMembersForCarousel.map((m: any) => {
                 const hasBuddy = buddyUserIds.has(m.user.id);
+                const isAlreadyDrafted = draftedSet.has(m.user.id);
                 const initial = (m.user.firstName?.[0] || m.user.email?.[0] || "?").toUpperCase();
                 // Compute age — prefer user.age, otherwise derive from
                 // dateOfBirth (YYYY-MM-DD or ISO). Fall back to "N/A".
@@ -1525,8 +1574,8 @@ export default function DraftRoom() {
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 cursor-pointer ${m.keptByTeamId ? "border-blue-500/50 hover:border-blue-500 bg-blue-500/5" : "border-primary/70 hover:border-primary"}`}
-                      onClick={() => setCardUserId(m.user.id)}
+                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 ${isAlreadyDrafted ? "border-muted-foreground/30 opacity-50 cursor-not-allowed" : `cursor-pointer ${m.keptByTeamId ? "border-blue-500/50 hover:border-blue-500 bg-blue-500/5" : "border-primary/70 hover:border-primary"}`}`}
+                      onClick={isAlreadyDrafted ? undefined : () => setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
                         transition: "border-color 200ms ease-out",

@@ -1648,6 +1648,7 @@ export const drafts = pgTable("drafts", {
   completedAt: timestamp("completed_at"),
   resolvedAutoPickSchedule: jsonb("resolved_auto_pick_schedule"),
   flaggedAutoPickSlots: jsonb("flagged_auto_pick_slots").default([]),
+  flaggedPicks: jsonb("flagged_picks").default([]),
   createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1700,6 +1701,8 @@ export const draftKeepers = pgTable("draft_keepers", {
   // For placeholder players (imported players without accounts) — nullable
   placeholderPlayerId: varchar("placeholder_player_id"),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
+  // Skill tier rank inherited from the commissioner's skill-ranking step (e.g. "1", "A")
+  rank: varchar("rank"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_draft_keepers_draft").on(table.draftId),

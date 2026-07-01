@@ -30,6 +30,7 @@ import {
   postChat,
   getDraftStateBundle,
   undoLastPick,
+  flagPick,
   requestCaptainReady,
   markCaptainReady,
   cancelDraftToPending,
@@ -1226,36 +1227,25 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     }
   });
 
-  // === Toggle a flagged auto-pick slot (commissioner only) ===
-  // Flagging a (round, teamId) slot prevents the engine from firing the
-  // scheduled auto-pick for that turn; the captain must pick manually instead.
-  app.post("/api/drafts/:draftId/picks/flag", isAuthenticated, async (req: any, res) => {
+  // === Flag (reject) a pick by ID — commissioner only, no time-window restriction ===
+  // Removes the pick and any auto-buddy children, reverts the draft to that
+  // pick's round/turn for a manual redo, and logs the rejection to flaggedPicks.
+  app.post("/api/drafts/:draftId/picks/:pickId/flag", isAuthenticated, async (req: any, res) => {
     try {
-      const { draftId } = req.params;
+      const { draftId, pickId } = req.params;
       const userId = req.user.claims.sub;
-      const { round, teamId } = req.body || {};
-      if (typeof round !== "number" || !teamId) {
-        return res.status(400).json({ message: "round (number) and teamId required" });
-      }
+      const { reason } = req.body || {};
       const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
       if (!draft) return res.status(404).json({ message: "Draft not found" });
       if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
-        return res.status(403).json({ message: "Only the commissioner can flag auto-picks" });
+        return res.status(403).json({ message: "Only the commissioner can flag picks" });
       }
-      const current = (draft.flaggedAutoPickSlots as { round: number; teamId: string }[]) || [];
-      const exists = current.some((f) => f.round === round && f.teamId === teamId);
-      const updated = exists
-        ? current.filter((f) => !(f.round === round && f.teamId === teamId))
-        : [...current, { round, teamId }];
-      const [saved] = await db
-        .update(drafts)
-        .set({ flaggedAutoPickSlots: updated, updatedAt: new Date() })
-        .where(eq(drafts.id, draftId))
-        .returning();
-      res.json({ ok: true, flagged: !exists, flaggedAutoPickSlots: saved.flaggedAutoPickSlots });
+      const result = await flagPick(draftId, pickId, userId, reason);
+      if (!result.ok) return res.status(400).json({ message: result.error });
+      res.json({ ok: true });
     } catch (err) {
-      console.error("Flag auto-pick error:", err);
-      res.status(500).json({ message: "Failed to flag auto-pick slot" });
+      console.error("Flag pick error:", err);
+      res.status(500).json({ message: "Failed to flag pick" });
     }
   });
 

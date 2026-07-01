@@ -99,8 +99,8 @@ const ALL_STEPS = [
   { id: "skill", label: "Skill" },
   { id: "buddies", label: "Buddies" },
   { id: "notes", label: "Notes" },
-  { id: "preview", label: "Preview" },
   { id: "review", label: "Review" },
+  { id: "preview", label: "Preview" },
 ] as const;
 
 type StepId = (typeof ALL_STEPS)[number]["id"];

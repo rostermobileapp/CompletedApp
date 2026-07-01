@@ -65,6 +65,7 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
   }
 
   const taken = new Set<string>();
+  const scheduledPlayers = new Set<string>();
 
   const tryAllocate = (
     teamId: string,
@@ -72,12 +73,14 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
     slotBase: Pick<ScheduledSlot, "type" | "playerId">,
   ): void => {
     if (preferredRound < 1) return;
+    if (scheduledPlayers.has(slotBase.playerId)) return;
     const originalRound = preferredRound;
     let round = preferredRound;
     while (round <= totalRounds) {
       const key = `${teamId}:${round}`;
       if (!taken.has(key)) {
         taken.add(key);
+        scheduledPlayers.add(slotBase.playerId);
         if (!schedule[teamId]) schedule[teamId] = {};
         schedule[teamId][String(round)] = {
           ...slotBase,

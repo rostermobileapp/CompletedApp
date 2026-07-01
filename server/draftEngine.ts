@@ -15,7 +15,7 @@ import {
   type User,
 } from "@shared/schema";
 import { eq, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
-import type { AutoPickSchedule, FlaggedSlot } from "@shared/autoPickSchedule";
+import { buildAutoPickSchedule, type AutoPickSchedule, type FlaggedSlot } from "@shared/autoPickSchedule";
 
 // How long after a pick the commissioner can undo it (milliseconds)
 export const UNDO_WINDOW_MS = 30_000;
@@ -1203,6 +1203,46 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   // Cancel any pending auto-launch timer — commissioner may begin early
   cancelLaunchTimer(draftId);
 
+  // Rebuild the auto-pick schedule at start time (not save time) so any
+  // post-save keeper/skill-level edits are captured. Also stamps the current
+  // skill-tier rank onto each draft_keepers row for record-keeping.
+  let freshSchedule: AutoPickSchedule | null = null;
+  if (draft.skillRankingEnabled && draft.skillScale) {
+    const memberships = await db
+      .select({ userId: leagueMemberships.userId, skillLevel: leagueMemberships.skillLevel })
+      .from(leagueMemberships)
+      .where(and(eq(leagueMemberships.leagueId, draft.leagueId), eq(leagueMemberships.status, "approved")));
+    const skillLevels: Record<string, string> = {};
+    for (const m of memberships) {
+      if (m.userId && m.skillLevel) skillLevels[m.userId] = m.skillLevel;
+    }
+
+    const keeperRows = await db.select().from(draftKeepers).where(eq(draftKeepers.draftId, draftId));
+    const keepersByTeam: Record<string, string[]> = {};
+    for (const k of keeperRows) {
+      if (!k.userId) continue;
+      if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
+      keepersByTeam[k.teamId].push(k.userId);
+      const rank = skillLevels[k.userId];
+      if (rank && rank !== k.rank) {
+        await db.update(draftKeepers).set({ rank }).where(eq(draftKeepers.id, k.id));
+      }
+    }
+
+    const buddyRows = await db.select().from(draftBuddyPairs).where(eq(draftBuddyPairs.draftId, draftId));
+    const buddyPairs = buddyRows.map((r) => r.userIds as string[]);
+
+    freshSchedule = buildAutoPickSchedule({
+      draftOrder,
+      totalRounds: draft.totalRounds,
+      captainAssignments: (draft.captainAssignments as Record<string, string>) || {},
+      skillLevels,
+      skillScale: draft.skillScale as "numbers" | "letters",
+      keepersByTeam,
+      buddyPairs,
+    });
+  }
+
   await db
     .update(drafts)
     .set({
@@ -1212,9 +1252,21 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
       currentTurn: 1,
       launchAt: null,
       updatedAt: new Date(),
+      ...(freshSchedule !== null ? { resolvedAutoPickSchedule: freshSchedule } : {}),
     })
     .where(eq(drafts.id, draftId));
   await setTurnDeadline(draftId);
+
+  // Check if round 1 / pick 1 has a scheduled auto-pick before starting the timer
+  const firstTeamId = draftOrder[0] ?? null;
+  if (firstTeamId && freshSchedule) {
+    const didAutoPick = await maybeFireScheduledAutoPick(draftId, 1, firstTeamId);
+    if (didAutoPick) {
+      broadcastToDraft(draftId, { type: "draft_started", payload: { draftId } });
+      return { ok: true };
+    }
+  }
+
   await startTurnTimer(draftId);
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_started", payload: { draftId } });
@@ -1408,6 +1460,109 @@ export async function undoLastPick(
     },
   });
 
+  return { ok: true };
+}
+
+/**
+ * Commissioner-only: reject (flag) any pick by ID regardless of age.
+ * The pick is deleted, any auto-buddy children and their forfeit row are
+ * removed, and the draft reverts to that pick's round/turn so it can be
+ * replayed as a manual pick. The rejection is logged to `flaggedPicks` jsonb.
+ */
+export async function flagPick(
+  draftId: string,
+  pickId: string,
+  flaggedBy: string,
+  reason?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { ok: false, error: "Draft not found" };
+  if (draft.status !== "active") {
+    return { ok: false, error: "Can only flag picks while the draft is active" };
+  }
+
+  const [pick] = await db.select().from(draftPicks).where(eq(draftPicks.id, pickId));
+  if (!pick || !pick.playerId) return { ok: false, error: "Pick not found" };
+  if (pick.isAutoBuddy) {
+    return { ok: false, error: "Cannot flag auto-buddy picks directly — flag the primary pick" };
+  }
+  if (pick.forfeited) return { ok: false, error: "Cannot flag a forfeited slot" };
+
+  const buddyChildren = await db.select().from(draftPicks).where(
+    and(
+      eq(draftPicks.draftId, draftId),
+      eq(draftPicks.teamId, pick.teamId),
+      eq(draftPicks.round, pick.round),
+      eq(draftPicks.pickInRound, pick.pickInRound),
+      eq(draftPicks.isAutoBuddy, true),
+    ),
+  );
+
+  let buddyForfeit: DraftPick | null = null;
+  if (buddyChildren.length > 0) {
+    const candidates = await db.select().from(draftPicks).where(
+      and(
+        eq(draftPicks.draftId, draftId),
+        eq(draftPicks.teamId, pick.teamId),
+        eq(draftPicks.round, pick.round + 1),
+        eq(draftPicks.forfeited, true),
+        isNull(draftPicks.playerId),
+      ),
+    );
+    buddyForfeit = candidates[0] || null;
+  }
+
+  const flagEntry = {
+    pickId: pick.id,
+    playerId: pick.playerId,
+    teamId: pick.teamId,
+    round: pick.round,
+    pickInRound: pick.pickInRound,
+    flaggedBy,
+    flaggedAt: new Date().toISOString(),
+    ...(reason ? { reason } : {}),
+  };
+
+  await db.transaction(async (tx) => {
+    for (const c of buddyChildren) {
+      await tx.delete(draftPicks).where(eq(draftPicks.id, c.id));
+    }
+    if (buddyForfeit) {
+      await tx.delete(draftPicks).where(eq(draftPicks.id, buddyForfeit.id));
+    }
+    await tx.delete(draftPicks).where(eq(draftPicks.id, pick.id));
+
+    const forfeited = { ...((draft.forfeitedRounds as Record<string, number[]>) || {}) };
+    if (buddyForfeit && forfeited[pick.teamId]) {
+      const arr = [...forfeited[pick.teamId]];
+      const idx = arr.indexOf(pick.round + 1);
+      if (idx >= 0) arr.splice(idx, 1);
+      if (arr.length) forfeited[pick.teamId] = arr;
+      else delete forfeited[pick.teamId];
+    }
+
+    const existingFlags = (draft.flaggedPicks as any[]) || [];
+    const newDeadline = new Date(Date.now() + (draft.timePerPick || 60) * 1000);
+    await tx
+      .update(drafts)
+      .set({
+        currentRound: pick.round,
+        currentTurn: pick.pickInRound,
+        currentTurnDeadline: newDeadline,
+        nextTimerOverride: null,
+        forfeitedRounds: forfeited,
+        flaggedPicks: [...existingFlags, flagEntry],
+        updatedAt: new Date(),
+      })
+      .where(eq(drafts.id, draftId));
+  });
+
+  await startTurnTimer(draftId);
+  await broadcastState(draftId);
+  broadcastToDraft(draftId, {
+    type: "draft_pick_flagged",
+    payload: { draftId, ...flagEntry },
+  });
   return { ok: true };
 }
 

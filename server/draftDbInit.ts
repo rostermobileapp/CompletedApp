@@ -11,7 +11,12 @@ export async function initDraftDb(): Promise<void> {
     await db.execute(sql`
       ALTER TABLE drafts
         ADD COLUMN IF NOT EXISTS resolved_auto_pick_schedule jsonb,
-        ADD COLUMN IF NOT EXISTS flagged_auto_pick_slots jsonb DEFAULT '[]'::jsonb
+        ADD COLUMN IF NOT EXISTS flagged_auto_pick_slots jsonb DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS flagged_picks jsonb DEFAULT '[]'::jsonb
+    `);
+    await db.execute(sql`
+      ALTER TABLE draft_keepers
+        ADD COLUMN IF NOT EXISTS rank varchar
     `);
     console.log("[Draft] Auto-pick schedule columns ensured");
   } catch (err) {
