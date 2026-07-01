@@ -38,13 +38,16 @@ export function buildRankScaleOptions(
   return Array.from({ length: capped }, (_, i) => String(i + 1));
 }
 
+/** Keepers may be plain userId strings (legacy) or enriched objects with an optional rank override. */
+export type KeeperEntry = string | { userId: string; rank?: string };
+
 export interface AutoPickInput {
   draftOrder: string[];
   totalRounds: number;
   captainAssignments: Record<string, string>;
   skillLevels: Record<string, string>;
   skillScale: "numbers" | "letters";
-  keepersByTeam: Record<string, string[]>;
+  keepersByTeam: Record<string, KeeperEntry[]>;
   buddyPairs?: string[][];
 }
 
@@ -103,12 +106,27 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
     tryAllocate(teamId, round, { type: "self", playerId: captainId });
   }
 
+  // Normalize KeeperEntry[] → plain userId strings per team (rank override wins over skillLevels lookup)
+  const keeperIdsByTeam: Record<string, string[]> = {};
+  const keeperRankOverride: Record<string, string> = {};
   for (const teamId of draftOrder) {
-    const keepers = keepersByTeam[teamId] || [];
+    const entries = keepersByTeam[teamId] || [];
+    keeperIdsByTeam[teamId] = entries.map((e) => {
+      if (typeof e === "string") return e;
+      if (e.rank) keeperRankOverride[e.userId] = e.rank;
+      return e.userId;
+    });
+  }
+
+  const resolveRank = (userId: string): string | undefined =>
+    keeperRankOverride[userId] ?? skillLevels[userId];
+
+  for (const teamId of draftOrder) {
+    const keepers = keeperIdsByTeam[teamId] || [];
     for (const keeperId of keepers) {
       if (keeperId.startsWith("placeholder:")) continue;
       if (captainAssignments[teamId] === keeperId) continue;
-      const rank = skillLevels[keeperId];
+      const rank = resolveRank(keeperId);
       if (!rank) continue;
       const round = rankToRound(rank, skillScale);
       if (round < 1 || round > totalRounds) continue;
@@ -116,19 +134,26 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
     }
   }
 
+  // Buddy pass — for each buddy pair, if ONE member belongs to a team (as captain or keeper),
+  // schedule the OTHER member (the buddy target) using the buddy target's rank.
   for (const pair of buddyPairs) {
+    if (pair.length < 2) continue;
     for (const teamId of draftOrder) {
-      const keepersForTeam = keepersByTeam[teamId] || [];
-      for (const memberId of pair) {
-        if (memberId === captainAssignments[teamId]) continue;
-        if (!keepersForTeam.includes(memberId)) continue;
-        if (memberId.startsWith("placeholder:")) continue;
-        const rank = skillLevels[memberId];
-        if (!rank) continue;
-        const round = rankToRound(rank, skillScale);
-        if (round < 1 || round > totalRounds) continue;
-        tryAllocate(teamId, round, { type: "buddy", playerId: memberId });
-      }
+      const captainId = captainAssignments[teamId];
+      const keeperIds = keeperIdsByTeam[teamId] || [];
+      // Find if any member of the pair is on this team (captain or keeper)
+      const teamMember = pair.find(
+        (uid) => uid === captainId || keeperIds.includes(uid)
+      );
+      if (!teamMember) continue;
+      // The buddy target is the OTHER person in the pair
+      const buddyTarget = pair.find((uid) => uid !== teamMember);
+      if (!buddyTarget || buddyTarget.startsWith("placeholder:")) continue;
+      const rank = resolveRank(buddyTarget);
+      if (!rank) continue;
+      const round = rankToRound(rank, skillScale);
+      if (round < 1 || round > totalRounds) continue;
+      tryAllocate(teamId, round, { type: "buddy", playerId: buddyTarget });
     }
   }
 

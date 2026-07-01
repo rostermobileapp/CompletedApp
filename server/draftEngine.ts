@@ -1218,12 +1218,12 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
     }
 
     const keeperRows = await db.select().from(draftKeepers).where(eq(draftKeepers.draftId, draftId));
-    const keepersByTeam: Record<string, string[]> = {};
+    const keepersByTeam: Record<string, { userId: string; rank?: string }[]> = {};
     for (const k of keeperRows) {
       if (!k.userId) continue;
-      if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
-      keepersByTeam[k.teamId].push(k.userId);
       const rank = skillLevels[k.userId];
+      if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
+      keepersByTeam[k.teamId].push({ userId: k.userId, rank: rank || k.rank || undefined });
       if (rank && rank !== k.rank) {
         await db.update(draftKeepers).set({ rank }).where(eq(draftKeepers.id, k.id));
       }
@@ -1542,6 +1542,13 @@ export async function flagPick(
     }
 
     const existingFlags = (draft.flaggedPicks as any[]) || [];
+    const existingSlotFlags = (draft.flaggedAutoPickSlots as { round: number; teamId: string }[]) || [];
+    const slotAlreadyFlagged = existingSlotFlags.some(
+      (s) => s.round === pick.round && s.teamId === pick.teamId,
+    );
+    const updatedSlotFlags = slotAlreadyFlagged
+      ? existingSlotFlags
+      : [...existingSlotFlags, { round: pick.round, teamId: pick.teamId }];
     const newDeadline = new Date(Date.now() + (draft.timePerPick || 60) * 1000);
     await tx
       .update(drafts)
@@ -1552,6 +1559,7 @@ export async function flagPick(
         nextTimerOverride: null,
         forfeitedRounds: forfeited,
         flaggedPicks: [...existingFlags, flagEntry],
+        flaggedAutoPickSlots: updatedSlotFlags,
         updatedAt: new Date(),
       })
       .where(eq(drafts.id, draftId));

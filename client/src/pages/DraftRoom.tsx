@@ -2183,45 +2183,57 @@ export default function DraftRoom() {
                   const player = p.playerId ? memberById.get(p.playerId) : null;
                   if (!player) return null;
                   return (
-                    <button
-                      key={p.id}
-                      onClick={() => p.playerId && setCardUserId(p.playerId)}
-                      className="w-full flex items-center gap-2 p-2 bg-card border border-border rounded-lg text-left hover:border-primary"
-                      data-testid={`team-panel-pick-${p.id}`}
-                    >
-                      <span className="text-[10px] text-muted-foreground font-mono w-6 text-right">
-                        R{p.round}
-                      </span>
-                      {player.user.profileImageUrl ? (
-                        <img
-                          src={getImageUrl(player.user.profileImageUrl) || ""}
-                          alt=""
-                          className="w-9 h-9 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                          {(player.user.firstName?.[0] || "?").toUpperCase()}
+                    <div key={p.id} className="flex items-center gap-1">
+                      <button
+                        onClick={() => p.playerId && setCardUserId(p.playerId)}
+                        className="flex-1 min-w-0 flex items-center gap-2 p-2 bg-card border border-border rounded-lg text-left hover:border-primary"
+                        data-testid={`team-panel-pick-${p.id}`}
+                      >
+                        <span className="text-[10px] text-muted-foreground font-mono w-6 text-right">
+                          R{p.round}
+                        </span>
+                        {player.user.profileImageUrl ? (
+                          <img
+                            src={getImageUrl(player.user.profileImageUrl) || ""}
+                            alt=""
+                            className="w-9 h-9 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {(player.user.firstName?.[0] || "?").toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">
+                            {player.user.firstName} {player.user.lastName}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            {p.isAutoBuddy && (
+                              <span className="text-pink-600 dark:text-pink-300">♥ buddy</span>
+                            )}
+                            {p.expiredAutoPick && (
+                              <span className="text-amber-600 dark:text-amber-300">⏱ auto</span>
+                            )}
+                            {draft.skillRankingEnabled && player.membership.skillLevel && (
+                              <span className="px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded font-bold">
+                                {player.membership.skillLevel}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      </button>
+                      {isCommissioner && draft.status === "active" && !p.isAutoBuddy && (
+                        <button
+                          onClick={() => flagPickMutation.mutate({ pickId: p.id })}
+                          disabled={flagPickMutation.isPending}
+                          title="Reject pick"
+                          className="shrink-0 p-2 rounded-lg text-destructive hover:bg-destructive/10 disabled:opacity-40"
+                          data-testid={`flag-pick-${p.id}`}
+                        >
+                          <OctagonX className="w-4 h-4" />
+                        </button>
                       )}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium truncate">
-                          {player.user.firstName} {player.user.lastName}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          {p.isAutoBuddy && (
-                            <span className="text-pink-600 dark:text-pink-300">♥ buddy</span>
-                          )}
-                          {p.expiredAutoPick && (
-                            <span className="text-amber-600 dark:text-amber-300">⏱ auto</span>
-                          )}
-                          {draft.skillRankingEnabled && player.membership.skillLevel && (
-                            <span className="px-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded font-bold">
-                              {player.membership.skillLevel}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
