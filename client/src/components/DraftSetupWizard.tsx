@@ -180,7 +180,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // Pre-load existing draft config (if any)
   const { data: existing } = useQuery<{
     draft: any;
-    buddyPairs: { id: string; userIds: string[] }[];
+    buddyPairs: { id: string; userIds: string[]; ranks?: Record<string, string> | null }[];
     keepersByTeam?: Record<string, { userId: string; rank?: string }[]>;
   }>({
     queryKey: ["/api/leagues", leagueId, "seasons", seasonId, "draft"],
@@ -226,6 +226,35 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
             ]),
           ),
         );
+      }
+      // Seed skillLevels from saved keeper ranks and buddy pair ranks so the
+      // preview step works even when membership.skillLevel hasn't been set yet
+      // (e.g. draft was previously saved with skill ranking disabled).
+      const rankSeed: Record<string, string> = {};
+      if (existing.keepersByTeam) {
+        for (const entries of Object.values(existing.keepersByTeam)) {
+          for (const e of entries) {
+            if (typeof e !== "string" && e.rank) rankSeed[e.userId] = e.rank;
+          }
+        }
+      }
+      if (existing.buddyPairs) {
+        for (const bp of existing.buddyPairs) {
+          if (bp.ranks) {
+            for (const [uid, rank] of Object.entries(bp.ranks)) {
+              rankSeed[uid] = rank;
+            }
+          }
+        }
+      }
+      if (Object.keys(rankSeed).length) {
+        setSkillLevels((prev) => {
+          const next = { ...prev };
+          for (const [uid, rank] of Object.entries(rankSeed)) {
+            if (!next[uid]) next[uid] = rank;
+          }
+          return next;
+        });
       }
     }
   }, [existing]);
