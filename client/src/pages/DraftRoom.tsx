@@ -63,6 +63,7 @@ interface Draft {
   skillRankingEnabled: boolean;
   skillScale: string | null;
   resolvedAutoPickSchedule?: Record<string, Record<string, { type: string; playerId: string; originalRound: number; rolled: boolean }>> | null;
+  flaggedAutoPickSlots?: { round: number; teamId: string }[] | null;
   captainReadyState?: Record<string, boolean> | null;
   buzzerExtensionState?: {
     currentPickExtended?: boolean;
@@ -807,6 +808,18 @@ export default function DraftRoom() {
     onError: (err: any) =>
       toast({ title: "Failed to reject pick", description: err?.message, variant: "destructive" }),
   });
+  const flagSlotMutation = useMutation({
+    mutationFn: async ({ round, teamId }: { round: number; teamId: string }) => {
+      const res = await apiRequest("POST", `/api/drafts/${draftId}/picks/flag`, { round, teamId });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Auto-pick blocked", description: "The slot will proceed as an open manual pick." });
+      queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to block auto-pick", description: err?.message, variant: "destructive" }),
+  });
   const captainReadyMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/captain-ready`, {});
@@ -1250,6 +1263,101 @@ export default function DraftRoom() {
             <Hourglass className="w-3 h-3" /> Waiting for captains to confirm READY
           </div>
         )}
+
+        {/* ── Current Round Strip ── */}
+        {(draft.status === "active" || draft.status === "paused") && draft.resolvedAutoPickSchedule && (() => {
+          const schedule = draft.resolvedAutoPickSchedule!;
+          const flaggedSlots = draft.flaggedAutoPickSlots || [];
+          const hasAnyAutoSlotThisRound = (draft.draftOrder || []).some(
+            (tid) => schedule[tid]?.[String(draft.currentRound)],
+          );
+          if (!hasAnyAutoSlotThisRound) return null;
+          return (
+            <div
+              className="flex gap-1.5 overflow-x-auto px-3 pb-2 scrollbar-none"
+              data-testid="round-strip"
+            >
+              {(draft.draftOrder || []).map((tid) => {
+                const slot = schedule[tid]?.[String(draft.currentRound)];
+                if (!slot) return null;
+                const team = teamById.get(tid);
+                const isPicking = bundle.pickingTeamId === tid;
+                const alreadyPicked = bundle.picks.some(
+                  (p) => p.teamId === tid && p.round === draft.currentRound && !p.forfeited,
+                );
+                if (alreadyPicked) return null;
+                const isFlagged = flaggedSlots.some(
+                  (s) => s.round === draft.currentRound && s.teamId === tid,
+                );
+                const slotPlayer = memberById.get(slot.playerId);
+                const playerName =
+                  slotPlayer?.user.firstName ||
+                  slotPlayer?.user.displayName ||
+                  "Auto";
+                const typeLabel =
+                  slot.type === "self" ? "Captain" : slot.type === "keep" ? "Keeper" : "Buddy";
+                return (
+                  <div
+                    key={tid}
+                    className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] font-medium transition-colors ${
+                      isFlagged
+                        ? "border-destructive/40 bg-destructive/5 text-destructive/60"
+                        : isPicking
+                        ? "border-amber-400 bg-amber-400/10 text-amber-700 dark:text-amber-300"
+                        : "border-border bg-muted/60 text-muted-foreground"
+                    }`}
+                    title={`${team?.name ?? tid}: Auto-pick ${typeLabel} (${playerName}) R${draft.currentRound}${isFlagged ? " — BLOCKED" : ""}`}
+                    data-testid={`round-strip-slot-${tid}`}
+                  >
+                    <Zap className={`w-3 h-3 shrink-0 ${isFlagged ? "opacity-40" : "text-amber-500"}`} />
+                    <span className={isFlagged ? "line-through" : ""}>
+                      {team?.name ?? tid.slice(0, 6)}
+                    </span>
+                    <span className={`px-1 rounded text-[10px] font-bold ${isFlagged ? "opacity-40 bg-muted" : "bg-amber-500/20 text-amber-700 dark:text-amber-300"}`}>
+                      Auto
+                    </span>
+                    {isCommissioner && !isFlagged && draft.status === "active" && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Block auto-pick for ${team?.name ?? "this team"} in round ${draft.currentRound}? The slot will open for a manual pick.`)) {
+                            flagSlotMutation.mutate({ round: draft.currentRound, teamId: tid });
+                          }
+                        }}
+                        disabled={flagSlotMutation.isPending}
+                        title="Block this auto-pick slot"
+                        className="ml-0.5 text-destructive hover:text-destructive/70 disabled:opacity-40"
+                        data-testid={`flag-slot-${tid}`}
+                      >
+                        <OctagonX className="w-3 h-3" />
+                      </button>
+                    )}
+                    {isFlagged && (
+                      <span className="text-[10px] text-destructive/70 font-semibold">blocked</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Auto-pick blocked banner — shown when the team on the clock had its slot pre-flagged */}
+        {draft.status === "active" && bundle.pickingTeamId && (() => {
+          const flaggedSlots = draft.flaggedAutoPickSlots || [];
+          const isFlagged = flaggedSlots.some(
+            (s) => s.round === draft.currentRound && s.teamId === bundle.pickingTeamId,
+          );
+          if (!isFlagged) return null;
+          return (
+            <div
+              className="mx-3 mb-1 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive flex items-center gap-2 text-xs font-semibold"
+              data-testid="banner-auto-pick-blocked"
+            >
+              <OctagonX className="w-3.5 h-3.5 shrink-0" />
+              Auto-pick blocked — pick manually
+            </div>
+          );
+        })()}
       </div>
 
       {/* Main content — carousel layout for active/paused, scroll layout otherwise */}
@@ -2203,11 +2311,19 @@ export default function DraftRoom() {
                           <div className="text-sm font-medium truncate">
                             {player.user.firstName} {player.user.lastName}
                           </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                            {p.isAutoPick && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold"
+                                data-testid={`badge-auto-pick-${p.id}`}
+                              >
+                                <Zap className="w-2.5 h-2.5" /> Auto
+                              </span>
+                            )}
                             {p.isAutoBuddy && (
                               <span className="text-pink-600 dark:text-pink-300">♥ buddy</span>
                             )}
-                            {p.expiredAutoPick && (
+                            {p.expiredAutoPick && !p.isAutoPick && (
                               <span className="text-amber-600 dark:text-amber-300">⏱ auto</span>
                             )}
                             {draft.skillRankingEnabled && player.membership.skillLevel && (

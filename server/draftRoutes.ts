@@ -37,6 +37,7 @@ import {
   computePickingTeam,
   terminateDraft,
   finalizeDraft,
+  broadcastState,
 } from "./draftEngine";
 
 // Auth middleware will be passed from caller
@@ -1250,6 +1251,36 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     } catch (err) {
       console.error("Post chat error:", err);
       res.status(500).json({ message: "Failed to post chat" });
+    }
+  });
+
+  // === Pre-fire flag: block an auto-pick slot before the engine fires it ===
+  // Adds {round, teamId} to flaggedAutoPickSlots so the engine skips the auto-pick
+  // and treats that turn as an open manual pick instead.
+  app.post("/api/drafts/:draftId/picks/flag", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const { round, teamId } = req.body || {};
+      if (!round || !teamId) return res.status(400).json({ message: "round and teamId are required" });
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can flag auto-pick slots" });
+      }
+      const existing = (draft.flaggedAutoPickSlots as { round: number; teamId: string }[]) || [];
+      const alreadyFlagged = existing.some((s) => s.round === round && s.teamId === teamId);
+      if (!alreadyFlagged) {
+        await db
+          .update(drafts)
+          .set({ flaggedAutoPickSlots: [...existing, { round, teamId }] })
+          .where(eq(drafts.id, draftId));
+      }
+      await broadcastState(draftId);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Pre-flag slot error:", err);
+      res.status(500).json({ message: "Failed to flag auto-pick slot" });
     }
   });
 

@@ -220,7 +220,7 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
   };
 }
 
-async function broadcastState(draftId: string) {
+export async function broadcastState(draftId: string) {
   const bundle = await getDraftStateBundle(draftId);
   if (!bundle) return;
   broadcastToDraft(draftId, { type: "draft_state", payload: bundle });
