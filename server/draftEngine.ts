@@ -1232,6 +1232,16 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
     const buddyRows = await db.select().from(draftBuddyPairs).where(eq(draftBuddyPairs.draftId, draftId));
     const buddyPairs = buddyRows.map((r) => r.userIds as string[]);
 
+    // Merge persisted buddy ranks from draft_buddy_pairs.ranks into a flat userId→rank map.
+    const buddyRanksByUser: Record<string, string> = {};
+    for (const row of buddyRows) {
+      const persisted = row.ranks as Record<string, string> | null;
+      if (!persisted) continue;
+      for (const [uid, rank] of Object.entries(persisted)) {
+        if (rank && !buddyRanksByUser[uid]) buddyRanksByUser[uid] = rank;
+      }
+    }
+
     freshSchedule = buildAutoPickSchedule({
       draftOrder,
       totalRounds: draft.totalRounds,
@@ -1240,6 +1250,7 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
       skillScale: draft.skillScale as "numbers" | "letters",
       keepersByTeam,
       buddyPairs,
+      buddyRanksByUser,
     });
   }
 
@@ -1523,6 +1534,13 @@ export async function flagPick(
     ...(reason ? { reason } : {}),
   };
 
+  // Collect all affected (userId, teamId) pairs so we can reverse membership side-effects.
+  const affectedPairs: { userId: string; teamId: string }[] = [];
+  if (pick.playerId) affectedPairs.push({ userId: pick.playerId, teamId: pick.teamId });
+  for (const c of buddyChildren) {
+    if (c.playerId) affectedPairs.push({ userId: c.playerId, teamId: c.teamId });
+  }
+
   await db.transaction(async (tx) => {
     for (const c of buddyChildren) {
       await tx.delete(draftPicks).where(eq(draftPicks.id, c.id));
@@ -1531,6 +1549,51 @@ export async function flagPick(
       await tx.delete(draftPicks).where(eq(draftPicks.id, buddyForfeit.id));
     }
     await tx.delete(draftPicks).where(eq(draftPicks.id, pick.id));
+
+    // Reverse membership side-effects for each affected player.
+    // If no other picks remain for them on this team and they're not a keeper, undo assignment.
+    for (const { userId, teamId } of affectedPairs) {
+      const remainingPicks = await tx
+        .select({ id: draftPicks.id })
+        .from(draftPicks)
+        .where(
+          and(
+            eq(draftPicks.draftId, draftId),
+            eq(draftPicks.playerId, userId),
+            eq(draftPicks.teamId, teamId),
+          ),
+        );
+      if (remainingPicks.length > 0) continue;
+
+      const keeperCheck = await tx
+        .select({ id: draftKeepers.id })
+        .from(draftKeepers)
+        .where(
+          and(
+            eq(draftKeepers.draftId, draftId),
+            eq(draftKeepers.userId, userId),
+            eq(draftKeepers.teamId, teamId),
+          ),
+        )
+        .limit(1);
+      if (keeperCheck.length > 0) continue;
+
+      await tx
+        .delete(teamMemberships)
+        .where(
+          and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, userId)),
+        );
+      await tx
+        .update(leagueMemberships)
+        .set({ assignedTeamId: null })
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, draft.leagueId),
+            eq(leagueMemberships.userId, userId),
+            eq(leagueMemberships.assignedTeamId, teamId),
+          ),
+        );
+    }
 
     const forfeited = { ...((draft.forfeitedRounds as Record<string, number[]>) || {}) };
     if (buddyForfeit && forfeited[pick.teamId]) {

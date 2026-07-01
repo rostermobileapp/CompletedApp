@@ -18,6 +18,10 @@ export async function initDraftDb(): Promise<void> {
       ALTER TABLE draft_keepers
         ADD COLUMN IF NOT EXISTS rank varchar
     `);
+    await db.execute(sql`
+      ALTER TABLE draft_buddy_pairs
+        ADD COLUMN IF NOT EXISTS ranks jsonb
+    `);
     console.log("[Draft] Auto-pick schedule columns ensured");
   } catch (err) {
     console.error("[Draft] Failed to init auto-pick schedule columns:", err);

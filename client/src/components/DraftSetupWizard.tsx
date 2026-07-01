@@ -234,9 +234,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   }, [members.length, draftOrder.length]);
 
   // Rank scale size mirrors the number of rounds so each rank maps 1:1 to a round.
+  // Letters cap at 26 (A–Z); numbers can go up to 99.
   const rankScaleSize = useMemo(
-    () => Math.max(1, Math.min(26, totalRounds || suggestedRounds)),
-    [totalRounds, suggestedRounds],
+    () => Math.max(1, Math.min(skillScale === "letters" ? 26 : 99, totalRounds || suggestedRounds)),
+    [skillScale, totalRounds, suggestedRounds],
   );
 
   // Keeper / captain rank conflict: two players on the same team share a rank.

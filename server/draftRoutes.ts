@@ -564,11 +564,21 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           }
         }
 
-        // Replace buddy pairs (idempotent)
+        // Replace buddy pairs (idempotent). Persist ranks from skillLevels so the
+        // auto-pick schedule can use them even after skillLevels change.
         await db.delete(draftBuddyPairs).where(eq(draftBuddyPairs.draftId, draftRow.id));
         if (config.buddyPairs && config.buddyPairs.length) {
+          const sl = (config.skillLevels as Record<string, string>) || {};
           for (const pair of config.buddyPairs) {
-            await db.insert(draftBuddyPairs).values({ draftId: draftRow.id, userIds: pair });
+            const ranks: Record<string, string> = {};
+            for (const uid of pair) {
+              if (sl[uid]) ranks[uid] = sl[uid];
+            }
+            await db.insert(draftBuddyPairs).values({
+              draftId: draftRow.id,
+              userIds: pair,
+              ranks: Object.keys(ranks).length ? ranks : null,
+            });
           }
         }
 

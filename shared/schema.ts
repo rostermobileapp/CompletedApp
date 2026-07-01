@@ -1675,6 +1675,7 @@ export const draftBuddyPairs = pgTable("draft_buddy_pairs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
   userIds: text("user_ids").array().notNull(), // 2+ user IDs linked together
+  ranks: jsonb("ranks"), // {[userId]: rank} — persisted ranks for auto-pick schedule
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_draft_buddy_pairs_draft").on(table.draftId),
@@ -2816,10 +2817,14 @@ export const draftSetupConfigSchema = z.object({
   skillLevels: z.record(z.string(), z.string()).optional(), // userId -> tier
   playerNotes: z.record(z.string(), z.string().max(200)).optional(),
   buddyPairs: z.array(z.array(z.string()).min(2)).optional(),
+  buddyRanksByUser: z.record(z.string(), z.string()).optional(), // userId -> rank (persisted from buddy config)
   goalieAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
   captainAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
   draftOrder: z.array(z.string()).optional(), // teamId order
-  keepersByTeam: z.record(z.string(), z.array(z.string())).optional(), // teamId -> [userId]
+  keepersByTeam: z.record(
+    z.string(),
+    z.array(z.union([z.string(), z.object({ userId: z.string(), rank: z.string().optional() })])),
+  ).optional(), // teamId -> [userId | {userId, rank}]
   resolvedAutoPickSchedule: z.record(z.string(), z.record(z.string(), z.any())).optional(),
 });
 export type DraftSetupConfig = z.infer<typeof draftSetupConfigSchema>;

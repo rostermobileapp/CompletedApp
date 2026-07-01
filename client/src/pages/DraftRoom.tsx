@@ -572,10 +572,8 @@ export default function DraftRoom() {
     return s;
   }, [draft?.resolvedAutoPickSchedule]);
 
-  // All members for the carousel — drafted players & excluded goalies are
-  // removed entirely so the rolodex always shows the live "remaining pool".
-  // Exception: players with a scheduled auto-pick slot remain visible but
-  // greyed/disabled so the commissioner can see if they've been drafted early.
+  // All members for the carousel — excluded goalies are removed; drafted players
+  // remain visible but greyed/disabled so the rolodex always shows the full pool.
   // Supports client-side filter (position, handed, min-points, skill) and sort.
   const allMembersForCarousel = useMemo(() => {
     if (!members.length) return [];
@@ -585,9 +583,7 @@ export default function DraftRoom() {
       m.membership.isGoalie;
 
     let list = members.filter(
-      (m: any) =>
-        (!draftedSet.has(m.user.id) || scheduledPlayerIds.has(m.user.id)) &&
-        !isExcludedGoalie(m),
+      (m: any) => !isExcludedGoalie(m),
     );
 
     // Position multi-select filter (empty = all positions shown)

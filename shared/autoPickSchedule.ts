@@ -49,6 +49,8 @@ export interface AutoPickInput {
   skillScale: "numbers" | "letters";
   keepersByTeam: Record<string, KeeperEntry[]>;
   buddyPairs?: string[][];
+  /** Persisted per-user buddy ranks (override skillLevels for buddy target scheduling). */
+  buddyRanksByUser?: Record<string, string>;
 }
 
 export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
@@ -60,6 +62,7 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
     skillScale,
     keepersByTeam,
     buddyPairs = [],
+    buddyRanksByUser = {},
   } = params;
 
   const schedule: AutoPickSchedule = {};
@@ -119,7 +122,7 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
   }
 
   const resolveRank = (userId: string): string | undefined =>
-    keeperRankOverride[userId] ?? skillLevels[userId];
+    keeperRankOverride[userId] ?? buddyRanksByUser[userId] ?? skillLevels[userId];
 
   for (const teamId of draftOrder) {
     const keepers = keeperIdsByTeam[teamId] || [];
