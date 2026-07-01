@@ -5418,9 +5418,17 @@ export class DatabaseStorage implements IStorage {
     goalsFor: number;
     goalsAgainst: number;
   }>> {
-    // Get all teams in the league
-    const teams = await this.getTeamsByLeague(leagueId);
-    const teamIdSet = new Set(teams.map(t => t.id));
+    // Get teams in the league; when a season is selected, scope to that season only
+    // so standings don't show teams from other seasons or unassigned teams.
+    let teamRows: Team[];
+    if (seasonId) {
+      teamRows = await db.select().from(teams).where(
+        and(eq(teams.leagueId, leagueId), eq(teams.seasonId, seasonId))
+      );
+    } else {
+      teamRows = await this.getTeamsByLeague(leagueId);
+    }
+    const teamIdSet = new Set(teamRows.map((t) => t.id));
     
     // Get all completed games for this league, optionally filtered by season
     // Query all games that either have this league_id OR involve teams from this league
@@ -5482,7 +5490,7 @@ export class DatabaseStorage implements IStorage {
     // Calculate standings for each team
     const standings = [];
     
-    for (const team of teams) {
+    for (const team of teamRows) {
       let gamesPlayed = 0;
       let wins = 0;
       let losses = 0;

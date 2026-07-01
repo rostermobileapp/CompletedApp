@@ -17797,13 +17797,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   )
               `),
               // Games needing score verification (only for users who can verify)
+              // Exclude games from inactive seasons so stale test/old-season data
+              // doesn't inflate the badge indefinitely.
               canVerify
                 ? db.execute(sql`
                     SELECT COUNT(DISTINCT g.id)::int AS count
                     FROM games g
+                    LEFT JOIN seasons s ON s.id = g.season_id
                     WHERE g.league_id = ${leagueId}
                       AND g.is_scrimmage = false
                       AND g.scheduled_at <= NOW() - INTERVAL '1 hour'
+                      AND (g.season_id IS NULL OR s.is_active = true)
                       AND g.id NOT IN (
                         SELECT game_id FROM tournament_matches WHERE game_id IS NOT NULL
                       )
