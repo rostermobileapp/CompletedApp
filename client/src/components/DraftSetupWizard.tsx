@@ -1486,6 +1486,20 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     const team = teams.find((t) => t.id === teamId);
                     const teamSchedule = previewSchedule?.[teamId] ?? {};
                     const rounds = totalRounds || suggestedRounds;
+
+                    // Build per-team auto-pick summary (captain + keepers + buddy targets)
+                    const captainId = captainAssignments[teamId];
+                    const teamKeeperIds = keepersByTeam[teamId] || [];
+                    // Buddy targets: any buddy pair where the captain OR a keeper is one side
+                    const teamBuddyTargets = buddyPairs
+                      .filter((pair) => pair.some((uid) => uid === captainId || teamKeeperIds.includes(uid)))
+                      .map((pair) => pair.find((uid) => uid !== captainId && !teamKeeperIds.includes(uid)))
+                      .filter((uid): uid is string => !!uid);
+                    const autoPickCandidates: { uid: string; role: string }[] = [];
+                    if (captainId) autoPickCandidates.push({ uid: captainId, role: "Captain" });
+                    teamKeeperIds.forEach((uid) => autoPickCandidates.push({ uid, role: "Keeper" }));
+                    teamBuddyTargets.forEach((uid) => autoPickCandidates.push({ uid, role: "Buddy" }));
+
                     return (
                       <div
                         key={teamId}
@@ -1494,6 +1508,42 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         <div className="bg-muted px-3 py-2 text-sm font-medium">
                           {teamIdx + 1}. {team?.name ?? teamId}
                         </div>
+                        {/* Per-team auto-pick candidates summary */}
+                        {autoPickCandidates.length > 0 && (
+                          <div className="px-3 py-2 bg-muted/40 border-b border-border space-y-1">
+                            {autoPickCandidates.map(({ uid, role }) => {
+                              const m = members.find((x) => x.user.id === uid);
+                              const name = m ? memberName(m) : uid.slice(0, 8);
+                              const tier = skillLevels[uid];
+                              const round = tier
+                                ? rankToRound(tier, (skillScale ?? "numbers") as "numbers" | "letters")
+                                : null;
+                              return (
+                                <div key={uid} className="flex items-center gap-2 text-xs">
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded-full font-medium ${
+                                      role === "Captain"
+                                        ? "bg-primary/10 text-primary"
+                                        : role === "Keeper"
+                                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                          : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                    }`}
+                                  >
+                                    {role}
+                                  </span>
+                                  <span className="text-foreground">{name}</span>
+                                  {round ? (
+                                    <span className="text-muted-foreground">→ Round {round}</span>
+                                  ) : (
+                                    <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                      ⚠ no tier set
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                         <div className="divide-y divide-border">
                           {Array.from({ length: rounds }, (_, i) => i + 1).map((round) => {
                             const slot = teamSchedule[String(round)];
