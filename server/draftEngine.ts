@@ -14,7 +14,7 @@ import {
   type DraftBuddyPair,
   type User,
 } from "@shared/schema";
-import { eq, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, isNotNull, inArray, sql, or, gt } from "drizzle-orm";
 import { buildAutoPickSchedule, type AutoPickSchedule, type FlaggedSlot } from "@shared/autoPickSchedule";
 
 // How long after a pick the commissioner can undo it (milliseconds)
@@ -1526,10 +1526,10 @@ export async function flagPick(
   }
   if (pick.forfeited) return { ok: false, error: "Cannot flag a forfeited slot" };
 
-  // Guard: only the most recently committed pick slot may be flagged.
-  // Allowing arbitrary historical picks would leave later picks dangling with no valid slot order.
-  const laterPicks = await db
-    .select({ id: draftPicks.id })
+  // Collect later picks (slots after the flagged pick by round/pickInRound order).
+  // These must also be deleted to maintain consistent slot ordering — a safe rollback.
+  const laterNonForfeitedPicks = await db
+    .select()
     .from(draftPicks)
     .where(
       and(
@@ -1542,13 +1542,8 @@ export async function flagPick(
         ),
       ),
     );
-  if (laterPicks.length > 0) {
-    return {
-      ok: false,
-      error: "Only the most recent pick can be rejected. Undo any later picks first.",
-    };
-  }
 
+  // Buddy children for the flagged pick (auto-buddy picks in the same slot).
   const buddyChildren = await db.select().from(draftPicks).where(
     and(
       eq(draftPicks.draftId, draftId),
@@ -1584,20 +1579,31 @@ export async function flagPick(
     ...(reason ? { reason } : {}),
   };
 
-  // Collect all affected (userId, teamId) pairs so we can reverse membership side-effects.
+  // Collect ALL affected (userId, teamId) pairs: flagged pick + buddy children + all later picks.
   const affectedPairs: { userId: string; teamId: string }[] = [];
   if (pick.playerId) affectedPairs.push({ userId: pick.playerId, teamId: pick.teamId });
   for (const c of buddyChildren) {
     if (c.playerId) affectedPairs.push({ userId: c.playerId, teamId: c.teamId });
   }
+  for (const lp of laterNonForfeitedPicks) {
+    if (lp.playerId) affectedPairs.push({ userId: lp.playerId, teamId: lp.teamId });
+  }
 
   await db.transaction(async (tx) => {
+    // Delete all later picks first (rollback subsequent rounds/turns).
+    if (laterNonForfeitedPicks.length > 0) {
+      await tx.delete(draftPicks).where(
+        inArray(draftPicks.id, laterNonForfeitedPicks.map((p) => p.id)),
+      );
+    }
+    // Delete buddy children and forfeit row for the flagged pick.
     for (const c of buddyChildren) {
       await tx.delete(draftPicks).where(eq(draftPicks.id, c.id));
     }
     if (buddyForfeit) {
       await tx.delete(draftPicks).where(eq(draftPicks.id, buddyForfeit.id));
     }
+    // Delete the flagged pick itself.
     await tx.delete(draftPicks).where(eq(draftPicks.id, pick.id));
 
     // Reverse membership side-effects for each affected player.
