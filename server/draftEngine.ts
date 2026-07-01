@@ -15,6 +15,7 @@ import {
   type User,
 } from "@shared/schema";
 import { eq, and, asc, desc, isNull, inArray, sql } from "drizzle-orm";
+import type { AutoPickSchedule, FlaggedSlot } from "@shared/autoPickSchedule";
 
 // How long after a pick the commissioner can undo it (milliseconds)
 export const UNDO_WINDOW_MS = 30_000;
@@ -327,13 +328,28 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
     .where(eq(draftKeepers.draftId, draftId));
   const keeperSet = new Set<string>(keeperRows.map((k) => k.userId).filter(Boolean) as string[]);
 
+  // When skillRankingEnabled, players in the auto-pick schedule are in the live
+  // draft pool (they get auto-picked at their ranked round). Traditional keepers
+  // without a schedule entry remain excluded.
+  const scheduledPlayerIds = new Set<string>();
+  if (draft.skillRankingEnabled) {
+    const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
+    if (schedule) {
+      for (const teamSlots of Object.values(schedule)) {
+        for (const slot of Object.values(teamSlots)) {
+          if (slot?.playerId) scheduledPlayerIds.add(slot.playerId);
+        }
+      }
+    }
+  }
+
   const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
   const assignedGoalieIds = new Set(Object.values(goalieAssignments));
 
   const goalieMethod = draft.goalieMethod || "included_with_skaters";
   const result = members
     .filter((m) => !draftedSet.has(m.userId))
-    .filter((m) => !keeperSet.has(m.userId))
+    .filter((m) => !keeperSet.has(m.userId) || scheduledPlayerIds.has(m.userId))
     .filter((m) => !assignedGoalieIds.has(m.userId))
     .filter((m) => {
       // if commissioner_assigned or random_draw, exclude goalies entirely from pickable pool
@@ -465,6 +481,35 @@ async function setTurnDeadline(draftId: string, durationSeconds?: number) {
     .where(eq(drafts.id, draftId));
 }
 
+async function maybeFireScheduledAutoPick(
+  draftId: string,
+  round: number,
+  pickingTeamId: string | null,
+): Promise<boolean> {
+  if (!pickingTeamId) return false;
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft || draft.status !== "active" || !draft.skillRankingEnabled) return false;
+
+  const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
+  if (!schedule) return false;
+
+  const teamSchedule = schedule[pickingTeamId];
+  if (!teamSchedule) return false;
+
+  const slot = teamSchedule[String(round)];
+  if (!slot?.playerId) return false;
+
+  const flagged = (draft.flaggedAutoPickSlots as FlaggedSlot[]) || [];
+  if (flagged.some((f) => f.round === round && f.teamId === pickingTeamId)) return false;
+
+  const available = await listAvailablePlayers(draftId);
+  const found = available.find((a) => a.userId === slot.playerId);
+  if (!found) return false;
+
+  await applyPick(draftId, pickingTeamId, slot.playerId, { isAutoScheduled: true });
+  return true;
+}
+
 async function advanceTurn(draftId: string, resetTimer: boolean) {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return;
@@ -480,6 +525,12 @@ async function advanceTurn(draftId: string, resetTimer: boolean) {
     .set({ currentRound: next.round, currentTurn: next.pickInRound, updatedAt: new Date() })
     .where(eq(drafts.id, draftId));
   if (resetTimer) await setTurnDeadline(draftId);
+
+  // If a scheduled auto-pick fires, it calls applyPick → advanceTurn for the
+  // next turn, so we skip timer start + broadcast here (the chain handles them).
+  const didAutoPick = await maybeFireScheduledAutoPick(draftId, next.round, next.teamId ?? null);
+  if (didAutoPick) return;
+
   await startTurnTimer(draftId);
   await broadcastState(draftId);
 }
@@ -737,7 +788,7 @@ async function applyPick(
   draftId: string,
   teamId: string,
   playerId: string,
-  opts?: { expired?: boolean; isAutoBuddy?: boolean }
+  opts?: { expired?: boolean; isAutoBuddy?: boolean; isAutoScheduled?: boolean }
 ) {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return;
@@ -861,7 +912,7 @@ async function applyPick(
       playerId,
       round: draft.currentRound,
       pick: overall,
-      isAutoPick: !!opts?.expired,
+      isAutoPick: !!opts?.expired || !!opts?.isAutoScheduled,
     },
   });
 

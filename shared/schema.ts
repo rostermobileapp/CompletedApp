@@ -1646,6 +1646,8 @@ export const drafts = pgTable("drafts", {
   startedAt: timestamp("started_at"),
   lockedAt: timestamp("locked_at"),
   completedAt: timestamp("completed_at"),
+  resolvedAutoPickSchedule: jsonb("resolved_auto_pick_schedule"),
+  flaggedAutoPickSlots: jsonb("flagged_auto_pick_slots").default([]),
   createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -2815,6 +2817,7 @@ export const draftSetupConfigSchema = z.object({
   captainAssignments: z.record(z.string(), z.string()).optional(), // teamId -> userId
   draftOrder: z.array(z.string()).optional(), // teamId order
   keepersByTeam: z.record(z.string(), z.array(z.string())).optional(), // teamId -> [userId]
+  resolvedAutoPickSchedule: z.record(z.string(), z.record(z.string(), z.any())).optional(),
 });
 export type DraftSetupConfig = z.infer<typeof draftSetupConfigSchema>;
 

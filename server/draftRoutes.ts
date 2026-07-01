@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { db } from "./db";
+import { buildAutoPickSchedule } from "@shared/autoPickSchedule";
 import {
   drafts,
   draftPicks,
@@ -611,6 +612,34 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           }
         }
 
+        // Build and persist the auto-pick schedule when skill ranking is enabled.
+        // This is computed server-side so the draft engine can use it without
+        // re-computing from raw membership/keeper data on every turn.
+        if (config.skillRankingEnabled && config.skillLevels) {
+          const schedule = buildAutoPickSchedule({
+            draftOrder,
+            totalRounds,
+            captainAssignments: config.captainAssignments ?? {},
+            skillLevels: config.skillLevels,
+            skillScale: (config.skillScale ?? "numbers") as "numbers" | "letters",
+            keepersByTeam: config.keepersByTeam ?? {},
+            buddyPairs: config.buddyPairs ?? [],
+          });
+          const [updatedWithSchedule] = await db
+            .update(drafts)
+            .set({ resolvedAutoPickSchedule: schedule, updatedAt: new Date() })
+            .where(eq(drafts.id, draftRow.id))
+            .returning();
+          draftRow = updatedWithSchedule;
+        } else {
+          const [cleared] = await db
+            .update(drafts)
+            .set({ resolvedAutoPickSchedule: null, updatedAt: new Date() })
+            .where(eq(drafts.id, draftRow.id))
+            .returning();
+          draftRow = cleared;
+        }
+
         const buddyPairs = await db
           .select()
           .from(draftBuddyPairs)
@@ -1194,6 +1223,39 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
     } catch (err) {
       console.error("Post chat error:", err);
       res.status(500).json({ message: "Failed to post chat" });
+    }
+  });
+
+  // === Toggle a flagged auto-pick slot (commissioner only) ===
+  // Flagging a (round, teamId) slot prevents the engine from firing the
+  // scheduled auto-pick for that turn; the captain must pick manually instead.
+  app.post("/api/drafts/:draftId/picks/flag", isAuthenticated, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userId = req.user.claims.sub;
+      const { round, teamId } = req.body || {};
+      if (typeof round !== "number" || !teamId) {
+        return res.status(400).json({ message: "round (number) and teamId required" });
+      }
+      const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!(await isLeagueCommissioner(draft.leagueId, userId))) {
+        return res.status(403).json({ message: "Only the commissioner can flag auto-picks" });
+      }
+      const current = (draft.flaggedAutoPickSlots as { round: number; teamId: string }[]) || [];
+      const exists = current.some((f) => f.round === round && f.teamId === teamId);
+      const updated = exists
+        ? current.filter((f) => !(f.round === round && f.teamId === teamId))
+        : [...current, { round, teamId }];
+      const [saved] = await db
+        .update(drafts)
+        .set({ flaggedAutoPickSlots: updated, updatedAt: new Date() })
+        .where(eq(drafts.id, draftId))
+        .returning();
+      res.json({ ok: true, flagged: !exists, flaggedAutoPickSlots: saved.flaggedAutoPickSlots });
+    } catch (err) {
+      console.error("Flag auto-pick error:", err);
+      res.status(500).json({ message: "Failed to flag auto-pick slot" });
     }
   });
 

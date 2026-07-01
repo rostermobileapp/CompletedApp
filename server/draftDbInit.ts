@@ -1,0 +1,20 @@
+/**
+ * Draft system database column migrations.
+ * Adds columns that cannot be applied via interactive drizzle-kit push.
+ * Runs once at server startup before routes are registered.
+ */
+import { db } from "./db";
+import { sql } from "drizzle-orm";
+
+export async function initDraftDb(): Promise<void> {
+  try {
+    await db.execute(sql`
+      ALTER TABLE drafts
+        ADD COLUMN IF NOT EXISTS resolved_auto_pick_schedule jsonb,
+        ADD COLUMN IF NOT EXISTS flagged_auto_pick_slots jsonb DEFAULT '[]'::jsonb
+    `);
+    console.log("[Draft] Auto-pick schedule columns ensured");
+  } catch (err) {
+    console.error("[Draft] Failed to init auto-pick schedule columns:", err);
+  }
+}

@@ -22,7 +22,14 @@ import {
   Sparkles,
   Crown,
   Shuffle,
+  Eye,
 } from "lucide-react";
+import {
+  buildAutoPickSchedule,
+  buildRankScaleOptions,
+  validateKeeperRanks,
+  type AutoPickSchedule,
+} from "@shared/autoPickSchedule";
 
 type DraftStyle = "snake" | "linear" | "auction" | "3rd_round_reversal";
 type GoalieMethod = "commissioner_assigned" | "random_draw" | "included_with_skaters";
@@ -92,6 +99,7 @@ const ALL_STEPS = [
   { id: "skill", label: "Skill" },
   { id: "buddies", label: "Buddies" },
   { id: "notes", label: "Notes" },
+  { id: "preview", label: "Preview" },
   { id: "review", label: "Review" },
 ] as const;
 
@@ -224,6 +232,47 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     if (totalPlayers === 0) return 1;
     return Math.max(1, Math.ceil(totalPlayers / teamCount));
   }, [members.length, draftOrder.length]);
+
+  // Rank scale size mirrors the number of rounds so each rank maps 1:1 to a round.
+  const rankScaleSize = useMemo(
+    () => Math.max(1, Math.min(26, totalRounds || suggestedRounds)),
+    [totalRounds, suggestedRounds],
+  );
+
+  // Keeper / captain rank conflict: two players on the same team share a rank.
+  const hasKeeperRankConflict = useMemo(() => {
+    if (!skillRankingEnabled) return false;
+    for (const team of teams) {
+      const captainId = captainAssignments[team.id];
+      const keeperIds = keepersByTeam[team.id] || [];
+      if (validateKeeperRanks(captainId, keeperIds, skillLevels).length > 0) return true;
+    }
+    return false;
+  }, [skillRankingEnabled, teams, captainAssignments, keepersByTeam, skillLevels]);
+
+  // Preview schedule (client-side) for the preview step.
+  const previewSchedule = useMemo<AutoPickSchedule | null>(() => {
+    if (!skillRankingEnabled) return null;
+    return buildAutoPickSchedule({
+      draftOrder,
+      totalRounds: totalRounds || suggestedRounds,
+      captainAssignments,
+      skillLevels,
+      skillScale: (skillScale ?? "numbers") as "numbers" | "letters",
+      keepersByTeam,
+      buddyPairs,
+    });
+  }, [
+    skillRankingEnabled,
+    draftOrder,
+    totalRounds,
+    suggestedRounds,
+    captainAssignments,
+    skillLevels,
+    skillScale,
+    keepersByTeam,
+    buddyPairs,
+  ]);
 
   useEffect(() => {
     if (!userOverrodeRoundsRef.current) {
@@ -1155,7 +1204,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         }`}
                         data-testid="button-scale-numbers"
                       >
-                        Numbers (1-5)
+                        Numbers (1–{rankScaleSize})
                       </button>
                       <button
                         onClick={() => setSkillScale("letters")}
@@ -1166,7 +1215,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         }`}
                         data-testid="button-scale-letters"
                       >
-                        Letters (A-D)
+                        Letters (A–{String.fromCharCode(64 + rankScaleSize)})
                       </button>
                     </div>
                   </div>
@@ -1174,10 +1223,10 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   <div className="border border-border rounded-lg max-h-72 overflow-y-auto divide-y divide-border">
                     {members.map((m) => {
                       const tier = skillLevels[m.user.id] || "";
-                      const options =
-                        skillScale === "letters"
-                          ? ["A", "B", "C", "D"]
-                          : ["1", "2", "3", "4", "5"];
+                      const options = buildRankScaleOptions(
+                        rankScaleSize,
+                        (skillScale ?? "numbers") as "numbers" | "letters",
+                      );
                       return (
                         <div key={m.user.id} className="flex items-center gap-2 p-2">
                           <span className="text-sm flex-1 truncate">{memberName(m)}</span>
@@ -1203,7 +1252,169 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                       );
                     })}
                   </div>
+
+                  {/* Keeper + captain rank conflict indicators */}
+                  {teams.some(
+                    (t) =>
+                      captainAssignments[t.id] ||
+                      (keepersByTeam[t.id] || []).length > 0,
+                  ) && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Keeper / Captain ranks
+                      </p>
+                      {teams.map((team) => {
+                        const captainId = captainAssignments[team.id];
+                        const keeperIds = keepersByTeam[team.id] || [];
+                        const allIds = captainId
+                          ? [captainId, ...keeperIds]
+                          : keeperIds;
+                        if (allIds.length === 0) return null;
+                        const dupes = validateKeeperRanks(captainId, keeperIds, skillLevels);
+                        return (
+                          <div
+                            key={team.id}
+                            className={`p-3 border rounded-lg ${dupes.length > 0 ? "border-destructive/60 bg-destructive/5" : "border-border"}`}
+                          >
+                            <p className="text-xs font-medium mb-2">{team.name}</p>
+                            {allIds.map((pid) => {
+                              const isCapt = pid === captainId;
+                              const member = members.find((m) => m.user.id === pid);
+                              const rank = skillLevels[pid] || "—";
+                              const isDupe = dupes.includes(rank) && rank !== "—";
+                              return (
+                                <div
+                                  key={pid}
+                                  className="flex items-center justify-between text-xs py-0.5"
+                                >
+                                  <span className="flex items-center gap-1 text-muted-foreground">
+                                    {isCapt ? (
+                                      <Crown className="w-3 h-3 text-amber-500" />
+                                    ) : (
+                                      <Snowflake className="w-3 h-3 text-blue-400" />
+                                    )}
+                                    {member ? memberName(member) : pid.slice(0, 8)}
+                                  </span>
+                                  <span
+                                    className={`font-mono px-1.5 py-0.5 rounded-full ${
+                                      isDupe
+                                        ? "bg-destructive/20 text-destructive"
+                                        : "bg-muted text-muted-foreground"
+                                    }`}
+                                  >
+                                    {rank}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {dupes.length > 0 && (
+                              <p className="text-xs text-destructive mt-1">
+                                Duplicate rank{dupes.length > 1 ? "s" : ""}:{" "}
+                                {dupes.join(", ")} — each player must have a unique rank.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
+              )}
+            </div>
+          )}
+
+          {stepId === "preview" && (
+            <div className="space-y-4" data-testid="step-preview">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Eye className="w-4 h-4" /> Draft Preview
+              </h3>
+              {!skillRankingEnabled ? (
+                <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+                  Skill Tier Ranking is off — all picks will be manual. Enable it in the Skill step
+                  to see a round-by-round auto-pick schedule.
+                </div>
+              ) : draftOrder.length === 0 ? (
+                <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+                  Add teams to the draft order to see the schedule.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Auto-picks fire without captain input. Flagged or unavailable slots become Open
+                    (manual) picks.
+                  </p>
+                  {draftOrder.map((teamId, teamIdx) => {
+                    const team = teams.find((t) => t.id === teamId);
+                    const teamSchedule = previewSchedule?.[teamId] ?? {};
+                    const rounds = totalRounds || suggestedRounds;
+                    return (
+                      <div
+                        key={teamId}
+                        className="border border-border rounded-lg overflow-hidden"
+                      >
+                        <div className="bg-muted px-3 py-2 text-sm font-medium">
+                          {teamIdx + 1}. {team?.name ?? teamId}
+                        </div>
+                        <div className="divide-y divide-border">
+                          {Array.from({ length: rounds }, (_, i) => i + 1).map((round) => {
+                            const slot = teamSchedule[String(round)];
+                            const member = slot
+                              ? members.find((m) => m.user.id === slot.playerId)
+                              : null;
+                            const pName = member
+                              ? memberName(member)
+                              : slot?.playerId?.slice(0, 8) ?? "";
+                            return (
+                              <div
+                                key={round}
+                                className="flex items-center gap-3 px-3 py-2 text-sm"
+                              >
+                                <span className="w-20 text-muted-foreground shrink-0">
+                                  Round {round}
+                                </span>
+                                {slot ? (
+                                  <span className="flex items-center gap-2 flex-wrap">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        slot.type === "self"
+                                          ? "bg-primary/10 text-primary"
+                                          : slot.type === "keep"
+                                            ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                            : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                      }`}
+                                    >
+                                      {slot.type === "self"
+                                        ? "Auto · Self"
+                                        : slot.type === "keep"
+                                          ? "Auto · Keep"
+                                          : "Auto · Buddy"}
+                                    </span>
+                                    <span
+                                      className={
+                                        slot.rolled
+                                          ? "text-amber-600 dark:text-amber-400"
+                                          : ""
+                                      }
+                                    >
+                                      {pName}
+                                    </span>
+                                    {slot.rolled && (
+                                      <span className="text-xs text-muted-foreground">
+                                        (bumped from R{slot.originalRound})
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">Open</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
@@ -1426,7 +1637,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
           {stepIdx < STEPS.length - 1 ? (
             <button
               onClick={next}
-              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center justify-center gap-1"
+              disabled={stepId === "skill" && hasKeeperRankConflict}
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-wizard-next"
             >
               Next <ArrowRight className="w-4 h-4" />
