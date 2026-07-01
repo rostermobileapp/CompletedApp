@@ -1485,7 +1485,6 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   })()}
                   {draftOrder.map((teamId, teamIdx) => {
                     const team = teams.find((t) => t.id === teamId);
-                    const teamSchedule = previewSchedule?.[teamId] ?? {};
                     const rounds = totalRounds || suggestedRounds;
 
                     // Build per-team auto-pick summary (captain + keepers + buddy targets)
@@ -1500,6 +1499,33 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     if (captainId) autoPickCandidates.push({ uid: captainId, role: "Captain" });
                     teamKeeperIds.forEach((uid) => autoPickCandidates.push({ uid, role: "Keeper" }));
                     teamBuddyTargets.forEach((uid) => autoPickCandidates.push({ uid, role: "Buddy" }));
+
+                    // Build the round-table slot map inline (same computation as summary above,
+                    // avoids relying on the previewSchedule useMemo which may lag behind).
+                    const scale = (skillScale ?? "numbers") as "numbers" | "letters";
+                    const localSlots: Record<number, { type: "self" | "keep" | "buddy"; playerId: string; originalRound: number; rolled: boolean }> = {};
+                    if (skillRankingEnabled) {
+                      const takenR = new Set<number>();
+                      const schedPids = new Set<string>();
+                      for (const { uid, role } of autoPickCandidates) {
+                        const tier = skillLevels[uid];
+                        if (!tier) continue;
+                        const preferred = rankToRound(tier, scale);
+                        if (preferred < 1) continue;
+                        if (schedPids.has(uid)) continue;
+                        let r = preferred;
+                        while (r <= rounds) {
+                          if (!takenR.has(r)) {
+                            takenR.add(r);
+                            schedPids.add(uid);
+                            const slotType = role === "Captain" ? "self" : role === "Keeper" ? "keep" : "buddy";
+                            localSlots[r] = { type: slotType, playerId: uid, originalRound: preferred, rolled: r !== preferred };
+                            break;
+                          }
+                          r++;
+                        }
+                      }
+                    }
 
                     return (
                       <div
@@ -1547,7 +1573,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         )}
                         <div className="divide-y divide-border">
                           {Array.from({ length: rounds }, (_, i) => i + 1).map((round) => {
-                            const slot = teamSchedule[String(round)];
+                            const slot = localSlots[round];
                             const member = slot
                               ? members.find((m) => m.user.id === slot.playerId)
                               : null;
