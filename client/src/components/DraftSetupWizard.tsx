@@ -1287,9 +1287,45 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         rankScaleSize,
                         (skillScale ?? "numbers") as "numbers" | "letters",
                       );
+                      // Badges: is this player a captain, keeper, or buddy target?
+                      const isCaptain = Object.values(captainAssignments).includes(m.user.id);
+                      const isKeeper = Object.values(keepersByTeam).some((ids) =>
+                        ids.includes(m.user.id),
+                      );
+                      const isBuddyTarget = buddyPairs.some((pair) => pair.includes(m.user.id));
+                      const needsRank = (isCaptain || isKeeper || isBuddyTarget) && !tier;
                       return (
-                        <div key={m.user.id} className="flex items-center gap-2 p-2">
-                          <span className="text-sm flex-1 truncate">{memberName(m)}</span>
+                        <div
+                          key={m.user.id}
+                          className={`flex items-center gap-2 p-2 ${needsRank ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}
+                        >
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="text-sm truncate">{memberName(m)}</span>
+                            {(isCaptain || isKeeper || isBuddyTarget) && (
+                              <div className="flex gap-1 mt-0.5 flex-wrap">
+                                {isCaptain && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                                    Captain
+                                  </span>
+                                )}
+                                {isKeeper && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+                                    Keeper
+                                  </span>
+                                )}
+                                {isBuddyTarget && !isCaptain && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium">
+                                    Buddy
+                                  </span>
+                                )}
+                                {needsRank && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium">
+                                    ⚠ needs tier
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <select
                             value={tier}
                             onChange={(e) =>
@@ -1298,7 +1334,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                                 [m.user.id]: e.target.value,
                               }))
                             }
-                            className="p-1.5 bg-card border border-border rounded text-sm"
+                            className={`p-1.5 bg-card border rounded text-sm shrink-0 ${needsRank ? "border-amber-400 dark:border-amber-600" : "border-border"}`}
                             data-testid={`select-skill-${m.user.id}`}
                           >
                             <option value="">—</option>
@@ -1406,6 +1442,46 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     Auto-picks fire without captain input. Flagged or unavailable slots become Open
                     (manual) picks.
                   </p>
+                  {/* Warn about keepers / buddy targets with no tier assigned */}
+                  {(() => {
+                    const allKeeperIds = Object.values(keepersByTeam).flat();
+                    const allBuddyIds = buddyPairs.flat();
+                    const importantIds = new Set([
+                      ...Object.values(captainAssignments),
+                      ...allKeeperIds,
+                      ...allBuddyIds,
+                    ]);
+                    const missingRank = [...importantIds].filter((uid) => uid && !skillLevels[uid]);
+                    if (!missingRank.length) return null;
+                    return (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 rounded-lg text-sm">
+                        <p className="font-medium text-amber-800 dark:text-amber-300 mb-1">
+                          ⚠ Missing skill tiers — these players won't auto-schedule:
+                        </p>
+                        <ul className="list-disc list-inside space-y-0.5 text-amber-700 dark:text-amber-400">
+                          {missingRank.map((uid) => {
+                            const m = members.find((x) => x.user.id === uid);
+                            const label = m ? memberName(m) : uid.slice(0, 8);
+                            const roles: string[] = [];
+                            if (Object.values(captainAssignments).includes(uid)) roles.push("Captain");
+                            if (allKeeperIds.includes(uid)) roles.push("Keeper");
+                            if (allBuddyIds.includes(uid)) roles.push("Buddy");
+                            return (
+                              <li key={uid}>
+                                {label}
+                                {roles.length > 0 && (
+                                  <span className="ml-1 text-xs opacity-70">({roles.join(", ")})</span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                          Go back to the Skill step and assign a tier to each player listed above.
+                        </p>
+                      </div>
+                    );
+                  })()}
                   {draftOrder.map((teamId, teamIdx) => {
                     const team = teams.find((t) => t.id === teamId);
                     const teamSchedule = previewSchedule?.[teamId] ?? {};
