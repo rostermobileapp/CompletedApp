@@ -24,6 +24,7 @@ import {
   Crown,
   Shuffle,
   Eye,
+  AlertTriangle,
 } from "lucide-react";
 import {
   buildAutoPickSchedule,
@@ -117,6 +118,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [stepIdx, setStepIdx] = useState(0);
+  const [skillOptionalWarning, setSkillOptionalWarning] = useState(false);
 
   // Captains
   const [captainAssignments, setCaptainAssignments] = useState<Record<string, string>>(() => {
@@ -289,6 +291,34 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     }
     return false;
   }, [skillRankingEnabled, teams, captainAssignments, keepersByTeam, skillLevels]);
+
+  // Which auto-pick participants (captains/keepers/buddies) are missing tiers,
+  // and which optional players are missing tiers — used to gate/warn on Next.
+  const { skillRequiredMissing, skillOptionalMissing } = useMemo(() => {
+    if (!skillRankingEnabled) return { skillRequiredMissing: [], skillOptionalMissing: [] };
+    const requiredUids = new Set<string>();
+    for (const uid of Object.values(captainAssignments)) {
+      if (uid) requiredUids.add(uid);
+    }
+    for (const ids of Object.values(keepersByTeam)) {
+      for (const uid of ids) requiredUids.add(uid);
+    }
+    for (const pair of buddyPairs) {
+      for (const uid of pair) {
+        if (uid && !uid.startsWith("placeholder:")) requiredUids.add(uid);
+      }
+    }
+    const requiredMissing = Array.from(requiredUids).filter((uid) => !skillLevels[uid]);
+    const optionalMissing = members
+      .filter((m) => !requiredUids.has(m.user.id) && !skillLevels[m.user.id])
+      .map((m) => m.user.id);
+    return { skillRequiredMissing: requiredMissing, skillOptionalMissing: optionalMissing };
+  }, [skillRankingEnabled, captainAssignments, keepersByTeam, buddyPairs, skillLevels, members]);
+
+  // Reset the optional-tier warning whenever the user navigates away from the skill step.
+  useEffect(() => {
+    setSkillOptionalWarning(false);
+  }, [stepIdx]);
 
   // Preview schedule (client-side) for the preview step.
   const previewSchedule = useMemo<AutoPickSchedule | null>(() => {
@@ -1222,6 +1252,19 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
 
           {stepId === "skill" && (
             <div className="space-y-4" data-testid="step-skill">
+              {skillOptionalWarning && skillOptionalMissing.length > 0 && (
+                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      {skillOptionalMissing.length} player{skillOptionalMissing.length !== 1 ? "s" : ""} without a tier
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      That's fine — they'll be available in regular draft rounds. Click <strong>Next</strong> again to continue anyway.
+                    </p>
+                  </div>
+                </div>
+              )}
               {(() => {
                 const scaleLocked =
                   existing?.draft?.status === "awaiting_captains" ||
@@ -1852,7 +1895,23 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
           )}
           {stepIdx < STEPS.length - 1 ? (
             <button
-              onClick={next}
+              onClick={() => {
+                if (stepId === "skill" && skillRankingEnabled) {
+                  if (skillRequiredMissing.length > 0) {
+                    toast({
+                      title: "Tier required",
+                      description: `${skillRequiredMissing.length} captain/keeper/buddy player${skillRequiredMissing.length !== 1 ? "s" : ""} still need a tier (highlighted in amber).`,
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  if (skillOptionalMissing.length > 0 && !skillOptionalWarning) {
+                    setSkillOptionalWarning(true);
+                    return;
+                  }
+                }
+                next();
+              }}
               disabled={stepId === "skill" && hasKeeperRankConflict}
               className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-wizard-next"
