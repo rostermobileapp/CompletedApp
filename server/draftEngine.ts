@@ -954,21 +954,48 @@ async function validateStartPrereqs(draft: Draft): Promise<{ ok: boolean; error?
   const draftOrder = (draft.draftOrder as string[]) || [];
   if (draftOrder.length === 0) return { ok: false, error: "Draft order is empty" };
   if (draft.skillRankingEnabled) {
-    const missing = await db
-      .select({ id: leagueMemberships.id })
-      .from(leagueMemberships)
-      .where(
-        and(
-          eq(leagueMemberships.leagueId, draft.leagueId),
-          eq(leagueMemberships.status, "approved"),
-          isNull(leagueMemberships.skillLevel),
-        ),
-      );
-    if (missing.length) {
-      return {
-        ok: false,
-        error: `Cannot start: ${missing.length} player(s) are missing a skill tier`,
-      };
+    // Only auto-pick participants (captains, keepers, buddy-pair members) need tiers.
+    const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+    const keepersByTeam = (draft.keepersByTeam as Record<string, { userId: string; rank?: string }[] | string[]>) || {};
+    const buddyPairs = (draft.buddyPairs as { userIds: string[] }[] | string[][]) || [];
+
+    const autoPickUserIds = new Set<string>();
+    for (const uid of Object.values(captainAssignments)) {
+      if (uid) autoPickUserIds.add(uid);
+    }
+    for (const entries of Object.values(keepersByTeam)) {
+      for (const e of entries) {
+        const uid = typeof e === "string" ? e : e.userId;
+        if (uid) autoPickUserIds.add(uid);
+      }
+    }
+    for (const pair of buddyPairs) {
+      const uids = Array.isArray(pair) && typeof pair[0] === "string"
+        ? (pair as string[])
+        : (pair as { userIds: string[] }).userIds || [];
+      for (const uid of uids) {
+        if (uid && !uid.startsWith("placeholder:")) autoPickUserIds.add(uid);
+      }
+    }
+
+    if (autoPickUserIds.size > 0) {
+      const rows = await db
+        .select({ userId: leagueMemberships.userId, skillLevel: leagueMemberships.skillLevel })
+        .from(leagueMemberships)
+        .where(
+          and(
+            eq(leagueMemberships.leagueId, draft.leagueId),
+            inArray(leagueMemberships.userId, Array.from(autoPickUserIds)),
+          ),
+        );
+      const tierByUser = Object.fromEntries(rows.map((r) => [r.userId, r.skillLevel]));
+      const missingTier = Array.from(autoPickUserIds).filter((uid) => !tierByUser[uid]);
+      if (missingTier.length) {
+        return {
+          ok: false,
+          error: `Cannot start: ${missingTier.length} auto-pick participant(s) are missing a skill tier`,
+        };
+      }
     }
   }
   if (draft.goalieMethod === "commissioner_assigned") {
