@@ -32,7 +32,7 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
   const pendingPathRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
   const { user, canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
-  const isFounder = user?.email === 'founder@rosterhockey.com';
+  const isFounder = !!(user as any)?.feeExempt;
 
   const isControlled = externalOpen !== undefined && externalOnOpenChange !== undefined;
   const open = isControlled ? externalOpen : internalOpen;
