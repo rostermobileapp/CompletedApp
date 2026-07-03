@@ -292,11 +292,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     return false;
   }, [skillRankingEnabled, teams, captainAssignments, keepersByTeam, skillLevels]);
 
-  // Deduplicated member list for the skill step.
+  // Deduplicated member list used for all step renders.
   // Pass 1: deduplicate by user.id (handles same user with multiple team memberships).
   // Pass 2: deduplicate by full name, preferring real users over placeholder entries,
-  //         so a placeholder named "Tobin Kern" doesn't shadow/duplicate the real one.
-  const dedupedSkillMembers = useMemo(() => {
+  //         so a placeholder named "Tobin Kern" doesn't duplicate the real one.
+  const dedupedMembers = useMemo(() => {
     const byId = Array.from(new Map(members.map((m) => [m.user.id, m])).values());
     const byName = new Map<string, typeof byId[0]>();
     for (const m of byId) {
@@ -330,11 +330,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       }
     }
     const requiredMissing = Array.from(requiredUids).filter((uid) => !skillLevels[uid]);
-    const optionalMissing = dedupedSkillMembers
+    const optionalMissing = dedupedMembers
       .filter((m) => !requiredUids.has(m.user.id) && !skillLevels[m.user.id])
       .map((m) => m.user.id);
     return { skillRequiredMissing: requiredMissing, skillOptionalMissing: optionalMissing };
-  }, [skillRankingEnabled, captainAssignments, keepersByTeam, buddyPairs, skillLevels, dedupedSkillMembers]);
+  }, [skillRankingEnabled, captainAssignments, keepersByTeam, buddyPairs, skillLevels, dedupedMembers]);
 
   // Reset the optional-tier warning whenever the user navigates away from the skill step.
   useEffect(() => {
@@ -386,12 +386,12 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   }, [members]);
 
   const skaters = useMemo(
-    () => members.filter((m) => !m.membership.isGoalie),
-    [members],
+    () => dedupedMembers.filter((m) => !m.membership.isGoalie),
+    [dedupedMembers],
   );
   const goalies = useMemo(
-    () => members.filter((m) => m.membership.isGoalie),
-    [members],
+    () => dedupedMembers.filter((m) => m.membership.isGoalie),
+    [dedupedMembers],
   );
 
   // The "goalie_assign" step only matters when goalies are pulled out of the
@@ -997,7 +997,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   : null;
 
                 // Players already assigned to this team (excluding captain)
-                const assignedNonCaptains = members.filter(
+                const assignedNonCaptains = dedupedMembers.filter(
                   (m) =>
                     m.membership.assignedTeamId === team.id &&
                     m.user.id !== captainUserId,
@@ -1010,7 +1010,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     .filter(([tid]) => tid !== team.id)
                     .flatMap(([, ids]) => ids),
                 );
-                const availableFreeAgents = members.filter(
+                const availableFreeAgents = dedupedMembers.filter(
                   (m) =>
                     !m.membership.assignedTeamId &&
                     m.user.id !== captainUserId &&
@@ -1022,8 +1022,8 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
 
                 // Members selected as additional keepers (resolved to member objects)
                 const keptMembers = kept
-                  .map((id) => members.find((m) => m.user.id === id))
-                  .filter(Boolean) as typeof members;
+                  .map((id) => dedupedMembers.find((m) => m.user.id === id))
+                  .filter(Boolean) as typeof dedupedMembers;
 
                 const isOpen = openKeeperDropdowns.has(team.id);
                 const closeDropdown = () =>
@@ -1346,7 +1346,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   </div>
 
                   <div className="border border-border rounded-lg max-h-72 overflow-y-auto divide-y divide-border">
-                    {dedupedSkillMembers.map((m) => {
+                    {dedupedMembers.map((m) => {
                       const tier = skillLevels[m.user.id] || "";
                       const options = buildRankScaleOptions(
                         rankScaleSize,
@@ -1752,7 +1752,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   data-testid="input-buddy-search"
                 />
                 <div className="max-h-48 overflow-y-auto border border-border rounded divide-y divide-border bg-card">
-                  {members
+                  {dedupedMembers
                     .filter((m) => {
                       if (pendingPair.includes(m.user.id)) return false;
                       if (buddyPairs.some((p) => p.includes(m.user.id))) return false;
@@ -1775,7 +1775,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         + {memberName(m)}
                       </button>
                     ))}
-                  {members.filter((m) => {
+                  {dedupedMembers.filter((m) => {
                     if (pendingPair.includes(m.user.id)) return false;
                     if (buddyPairs.some((p) => p.includes(m.user.id))) return false;
                     const q = buddySearch.trim().toLowerCase();
@@ -1814,7 +1814,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 These notes appear on the trading-card overlay during the draft. Max 200 chars per player.
               </p>
               <div className="border border-border rounded-lg max-h-96 overflow-y-auto divide-y divide-border">
-                {members.map((m) => {
+                {dedupedMembers.map((m) => {
                   const noteVal = playerNotes[m.user.id] || "";
                   const remaining = 200 - noteVal.length;
                   return (
