@@ -503,6 +503,7 @@ export const placeholderPlayers = pgTable("placeholder_players", {
   position: varchar("position"),
   jerseyNumber: integer("jersey_number"),
   skillLevel: varchar("skill_level"),
+  isGoalie: boolean("is_goalie").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   addedBy: varchar("added_by").references(() => users.id, { onDelete: 'cascade' }), // Who added this placeholder
 });

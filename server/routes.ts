@@ -475,6 +475,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure users.first_rsvp_triggered column:', err);
   }
 
+  // Ensure placeholder_players.is_goalie exists (goalie flag for placeholder/csv players)
+  try {
+    await db.execute(sql`ALTER TABLE placeholder_players ADD COLUMN IF NOT EXISTS is_goalie boolean NOT NULL DEFAULT false`);
+    console.log('[Init] placeholder_players.is_goalie column ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure placeholder_players.is_goalie column:', err);
+  }
+
   // Ensure feature_requests and feature_request_votes tables exist
   try {
     await db.execute(sql`
@@ -6211,7 +6219,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updates = req.body;
-      console.log("[PATCH member] memberId:", memberId, "updates:", JSON.stringify(updates));
 
       // Placeholder players have synthetic IDs prefixed with "placeholder:"
       // They live in placeholder_players, not league_memberships.
@@ -6224,6 +6231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           jerseyNumber: updates.jerseyNumber != null ? Number(updates.jerseyNumber) : undefined,
           skillLevel: updates.skillLevel ?? undefined,
           teamId: updates.assignedTeamId ?? undefined,
+          isGoalie: updates.isGoalie !== undefined ? Boolean(updates.isGoalie) : undefined,
         });
         // Return a synthetic member-shaped response so the frontend is happy
         return res.json({ id: memberId, ...updates, updated });
@@ -6273,9 +6281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (field in updates) membershipUpdates[field] = updates[field];
       }
 
-      console.log("[PATCH member] membershipUpdates being saved:", JSON.stringify(membershipUpdates));
       const updatedMember = await storage.updateLeagueMember(memberId, membershipUpdates);
-      console.log("[PATCH member] updatedMember returned:", JSON.stringify({ id: updatedMember?.id, isGoalie: updatedMember?.isGoalie, isSkater: updatedMember?.isSkater }));
       
       // If team assignment changed, sync team chats and enforce captain integrity
       if (oldTeamId !== newTeamId) {
