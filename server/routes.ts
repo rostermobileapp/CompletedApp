@@ -6258,8 +6258,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Track if team assignment is changing to sync chats
       const oldTeamId = membership.assignedTeamId;
       const newTeamId = updates.assignedTeamId;
-      
-      const updatedMember = await storage.updateLeagueMember(memberId, updates);
+
+      // Only pass fields that exist in leagueMemberships to Drizzle's .set().
+      // Extra keys like `timezone` (a user-profile field handled above) cause
+      // Drizzle to throw an "unknown column" error and silently abort the update.
+      const membershipUpdates: Record<string, unknown> = {};
+      const allowedMembershipFields = [
+        'assignedTeamId', 'position', 'skillLevel', 'jerseyNumber', 'notes',
+        'isGoalie', 'isSkater', 'displayFirstName', 'displayLastName',
+        'status', 'leagueRole',
+      ];
+      for (const field of allowedMembershipFields) {
+        if (field in updates) membershipUpdates[field] = updates[field];
+      }
+
+      const updatedMember = await storage.updateLeagueMember(memberId, membershipUpdates);
       
       // If team assignment changed, sync team chats and enforce captain integrity
       if (oldTeamId !== newTeamId) {
