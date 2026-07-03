@@ -1659,7 +1659,10 @@ export const draftPicks = pgTable("draft_picks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   draftId: varchar("draft_id").references(() => drafts.id, { onDelete: 'cascade' }).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
+  // For real user accounts — null when this pick is a placeholder player.
   playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }),
+  // For placeholder/imported players — null when this pick is a real user.
+  placeholderPlayerId: varchar("placeholder_player_id").references(() => placeholderPlayers.id, { onDelete: 'cascade' }),
   round: integer("round").notNull(),
   pick: integer("pick").notNull(), // Overall pick number
   pickInRound: integer("pick_in_round").notNull(), // Pick number within round

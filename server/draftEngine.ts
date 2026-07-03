@@ -312,14 +312,15 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
       ),
     );
 
-  // Already picked in this draft
+  // Already picked in this draft (real users via playerId, imported players via placeholderPlayerId)
   const drafted = await db
-    .select({ playerId: draftPicks.playerId })
+    .select({ playerId: draftPicks.playerId, placeholderPlayerId: draftPicks.placeholderPlayerId })
     .from(draftPicks)
     .where(and(eq(draftPicks.draftId, draftId)));
   const draftedSet = new Set<string>();
   for (const p of drafted) {
     if (p.playerId) draftedSet.add(p.playerId);
+    if (p.placeholderPlayerId) draftedSet.add(`placeholder:${p.placeholderPlayerId}`);
   }
 
   // Keepers: designated to stay on their team, not pickable
@@ -352,12 +353,17 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
   const assignedGoalieIds = new Set(Object.values(goalieAssignments));
 
+  // Captains are pre-assigned to their teams and must never be in the draft pool.
+  const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+  const captainIds = new Set(Object.values(captainAssignments).filter(Boolean));
+
   const goalieMethod = draft.goalieMethod || "included_with_skaters";
   const realResult = members
     .filter((m) => m.userId !== null)
     .filter((m) => !draftedSet.has(m.userId!))
     .filter((m) => !keeperSet.has(m.userId!) || scheduledPlayerIds.has(m.userId!))
     .filter((m) => !assignedGoalieIds.has(m.userId!))
+    .filter((m) => !captainIds.has(m.userId!))
     .filter((m) => {
       if (goalieMethod !== "included_with_skaters" && m.isGoalie) return false;
       return true;
@@ -818,10 +824,15 @@ async function applyPick(
   const draftOrder = (draft.draftOrder as string[]) || [];
   const overall = (draft.currentRound - 1) * draftOrder.length + draft.currentTurn;
 
+  const isPlaceholderPick = playerId.startsWith("placeholder:");
+  const realPlayerId = isPlaceholderPick ? null : playerId;
+  const phPickId = isPlaceholderPick ? playerId.replace("placeholder:", "") : null;
+
   await db.insert(draftPicks).values({
     draftId,
     teamId,
-    playerId,
+    playerId: realPlayerId,
+    placeholderPlayerId: phPickId,
     round: draft.currentRound,
     pick: overall,
     pickInRound: draft.currentTurn,
@@ -830,9 +841,9 @@ async function applyPick(
     pickedAt: new Date(),
   });
 
-  if (playerId.startsWith("placeholder:")) {
+  if (isPlaceholderPick) {
     // Placeholder player — update their team assignment in placeholderPlayers table.
-    const phId = playerId.replace("placeholder:", "");
+    const phId = phPickId!;
     await db
       .update(placeholderPlayers)
       .set({ teamId })

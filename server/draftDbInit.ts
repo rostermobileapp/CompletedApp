@@ -22,6 +22,11 @@ export async function initDraftDb(): Promise<void> {
       ALTER TABLE draft_buddy_pairs
         ADD COLUMN IF NOT EXISTS ranks jsonb
     `);
+    await db.execute(sql`
+      ALTER TABLE draft_picks
+        ADD COLUMN IF NOT EXISTS placeholder_player_id varchar
+          REFERENCES placeholder_players(id) ON DELETE CASCADE
+    `);
     console.log("[Draft] Auto-pick schedule columns ensured");
   } catch (err) {
     console.error("[Draft] Failed to init auto-pick schedule columns:", err);

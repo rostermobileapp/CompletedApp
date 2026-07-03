@@ -573,18 +573,38 @@ export default function DraftRoom() {
     return s;
   }, [draft?.resolvedAutoPickSchedule]);
 
-  // All members for the carousel — excluded goalies are removed; drafted players
-  // remain visible but greyed/disabled so the rolodex always shows the full pool.
-  // Supports client-side filter (position, handed, min-points, skill) and sort.
+  // Available players for the carousel — drafted players, captains, and excluded
+  // goalies are removed so only genuinely pickable players appear.
+  // Supports dedup (real user beats same-named placeholder), plus client-side
+  // filter (position, handed, min-points, skill) and sort.
   const allMembersForCarousel = useMemo(() => {
     if (!members.length) return [];
+
+    // ── Dedup by user.id then by full name (real user beats placeholder) ──
+    const byId = Array.from(new Map(members.map((m: any) => [m.user.id, m])).values()) as any[];
+    const byName = new Map<string, any>();
+    for (const m of byId) {
+      const name = [m.user.firstName, m.user.lastName].filter(Boolean).join(" ").trim().toLowerCase() || (m.user.displayName || "").toLowerCase();
+      const existing = byName.get(name);
+      const isPlaceholder = (m.user.id as string).startsWith("placeholder:");
+      if (!existing) {
+        byName.set(name, m);
+      } else if (!isPlaceholder && (existing.user.id as string).startsWith("placeholder:")) {
+        byName.set(name, m);
+      }
+    }
+    const deduped = Array.from(byName.values());
+
+    // ── Exclude drafted players and captains from the pick pool ──
+    const captainIds = new Set(Object.values((draft?.captainAssignments as Record<string, string>) || {}).filter(Boolean));
+
     const isExcludedGoalie = (m: any) =>
       draft?.goalieMethod &&
       draft.goalieMethod !== "included_with_skaters" &&
       m.membership.isGoalie;
 
-    let list = members.filter(
-      (m: any) => !isExcludedGoalie(m),
+    let list = deduped.filter(
+      (m: any) => !isExcludedGoalie(m) && !draftedSet.has(m.user.id) && !captainIds.has(m.user.id),
     );
 
     // Position multi-select filter (empty = all positions shown)
@@ -1610,7 +1630,6 @@ export default function DraftRoom() {
 
               {allMembersForCarousel.map((m: any) => {
                 const hasBuddy = buddyUserIds.has(m.user.id);
-                const isAlreadyDrafted = draftedSet.has(m.user.id);
                 const initial = (m.user.firstName?.[0] || m.user.email?.[0] || "?").toUpperCase();
                 // Compute age — prefer user.age, otherwise derive from
                 // dateOfBirth (YYYY-MM-DD or ISO). Fall back to "N/A".
@@ -1678,8 +1697,8 @@ export default function DraftRoom() {
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 ${isAlreadyDrafted ? "border-muted-foreground/30 opacity-50 cursor-not-allowed" : `cursor-pointer ${m.keptByTeamId ? "border-blue-500/50 hover:border-blue-500 bg-blue-500/5" : "border-primary/70 hover:border-primary"}`}`}
-                      onClick={isAlreadyDrafted ? undefined : () => setCardUserId(m.user.id)}
+                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 cursor-pointer ${m.keptByTeamId ? "border-blue-500/50 hover:border-blue-500 bg-blue-500/5" : "border-primary/70 hover:border-primary"}`}
+                      onClick={() => setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
                         transition: "border-color 200ms ease-out",
