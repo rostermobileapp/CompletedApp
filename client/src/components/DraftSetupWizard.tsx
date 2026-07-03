@@ -174,10 +174,12 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   const hydratedRef = useRef(false);
 
 
-  // Load league members
+  // Load league members — always fetch fresh so the wizard never shows a
+  // stale empty list from a previous failed/empty cache entry.
   const { data: members = [] } = useQuery<Member[]>({
     queryKey: ["/api/leagues", leagueId, "draft-players"],
     enabled: !!leagueId,
+    staleTime: 0,
   });
 
   // Pre-load existing draft config (if any)

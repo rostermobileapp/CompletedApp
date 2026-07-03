@@ -1840,6 +1840,17 @@ export default function DraftRoom() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1">
+                      {(() => {
+                        const captainId = (draft?.captainAssignments as Record<string, string>)?.[teamId];
+                        const captain = captainId ? memberById.get(captainId) : null;
+                        if (!captain) return null;
+                        return (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded text-[11px]">
+                            <Crown className="w-2.5 h-2.5" />
+                            {captain.user.firstName || captain.user.displayName}
+                          </span>
+                        );
+                      })()}
                       {goalie && (
                         <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded text-[11px]">
                           {goalie.user.firstName || goalie.user.displayName} (G)
@@ -2124,6 +2135,17 @@ export default function DraftRoom() {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
+                    {(() => {
+                      const captainId = (draft?.captainAssignments as Record<string, string>)?.[teamId];
+                      const captain = captainId ? memberById.get(captainId) : null;
+                      if (!captain) return null;
+                      return (
+                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded text-[11px]">
+                          <Crown className="w-2.5 h-2.5" />
+                          {captain.user.firstName || captain.user.displayName}
+                        </span>
+                      );
+                    })()}
                     {goalie && (
                       <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded text-[11px]">
                         {goalie.user.firstName || goalie.user.displayName} (G)
