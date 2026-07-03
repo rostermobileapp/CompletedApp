@@ -978,7 +978,7 @@ export default function DraftRoom() {
     lastPrimaryPick?.playerId ? memberById.get(lastPrimaryPick.playerId) : null;
 
   return (
-    <div className="h-dvh flex flex-col bg-background overflow-hidden">
+    <div className="h-dvh flex flex-col bg-blue-600 dark:bg-blue-900 overflow-hidden">
       {/* Buzzer banner — shown for ~6s after a halve_next timer expiry */}
       {buzzerBanner && (
         <div

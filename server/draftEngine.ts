@@ -8,6 +8,7 @@ import {
   teams,
   teamMemberships,
   leagueMemberships,
+  placeholderPlayers,
   users,
   type Draft,
   type DraftPick,
@@ -322,11 +323,16 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   }
 
   // Keepers: designated to stay on their team, not pickable
+  // Include both real-user keepers (userId) and placeholder keepers (placeholderPlayerId).
   const keeperRows = await db
-    .select({ userId: draftKeepers.userId })
+    .select({ userId: draftKeepers.userId, placeholderPlayerId: draftKeepers.placeholderPlayerId })
     .from(draftKeepers)
     .where(eq(draftKeepers.draftId, draftId));
-  const keeperSet = new Set<string>(keeperRows.map((k) => k.userId).filter(Boolean) as string[]);
+  const keeperSet = new Set<string>();
+  for (const k of keeperRows) {
+    if (k.userId) keeperSet.add(k.userId);
+    if (k.placeholderPlayerId) keeperSet.add(`placeholder:${k.placeholderPlayerId}`);
+  }
 
   // When skillRankingEnabled, players in the auto-pick schedule are in the live
   // draft pool (they get auto-picked at their ranked round). Traditional keepers
@@ -347,18 +353,30 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const assignedGoalieIds = new Set(Object.values(goalieAssignments));
 
   const goalieMethod = draft.goalieMethod || "included_with_skaters";
-  const result = members
-    .filter((m) => !draftedSet.has(m.userId))
-    .filter((m) => !keeperSet.has(m.userId) || scheduledPlayerIds.has(m.userId))
-    .filter((m) => !assignedGoalieIds.has(m.userId))
+  const realResult = members
+    .filter((m) => m.userId !== null)
+    .filter((m) => !draftedSet.has(m.userId!))
+    .filter((m) => !keeperSet.has(m.userId!) || scheduledPlayerIds.has(m.userId!))
+    .filter((m) => !assignedGoalieIds.has(m.userId!))
     .filter((m) => {
-      // if commissioner_assigned or random_draw, exclude goalies entirely from pickable pool
       if (goalieMethod !== "included_with_skaters" && m.isGoalie) return false;
       return true;
     })
-    .map((m) => ({ userId: m.userId, isGoalie: m.isGoalie }));
+    .map((m) => ({ userId: m.userId!, isGoalie: m.isGoalie }));
 
-  console.log(`[Draft ${draftId}] listAvailablePlayers: ${result.length} available (${members.length} total members, ${draftedSet.size} drafted, ${keeperSet.size} keepers, goalieMethod=${goalieMethod})`);
+  // Also include placeholder players (imported players without real accounts).
+  const phPlayers = await db
+    .select({ id: placeholderPlayers.id })
+    .from(placeholderPlayers)
+    .where(eq(placeholderPlayers.leagueId, draft.leagueId));
+
+  const phResult = phPlayers
+    .map((ph) => ({ userId: `placeholder:${ph.id}`, isGoalie: false }))
+    .filter(({ userId }) => !draftedSet.has(userId))
+    .filter(({ userId }) => !keeperSet.has(userId) || scheduledPlayerIds.has(userId));
+
+  const result = [...realResult, ...phResult];
+  console.log(`[Draft ${draftId}] listAvailablePlayers: ${result.length} available (${members.length} real, ${phPlayers.length} placeholder, ${draftedSet.size} drafted, ${keeperSet.size} keepers, goalieMethod=${goalieMethod})`);
   return result;
 }
 
@@ -812,37 +830,44 @@ async function applyPick(
     pickedAt: new Date(),
   });
 
-  // Immediately assign the drafted player to their team — same effect as
-  // a commissioner manually adding a player to a team roster.
-  const [lm] = await db
-    .select()
-    .from(leagueMemberships)
-    .where(
-      and(
-        eq(leagueMemberships.leagueId, draft.leagueId),
-        eq(leagueMemberships.userId, playerId),
-      ),
-    )
-    .limit(1);
-  if (lm) {
+  if (playerId.startsWith("placeholder:")) {
+    // Placeholder player — update their team assignment in placeholderPlayers table.
+    const phId = playerId.replace("placeholder:", "");
     await db
-      .update(leagueMemberships)
-      .set({ assignedTeamId: teamId })
-      .where(eq(leagueMemberships.id, lm.id));
-  }
-  // Ensure a teamMemberships row exists too (mirrors the league-management flow).
-  const existingTM = await db
-    .select()
-    .from(teamMemberships)
-    .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, playerId)))
-    .limit(1);
-  if (existingTM.length === 0) {
-    await db.insert(teamMemberships).values({
-      teamId,
-      userId: playerId,
-      isCaptain: false,
-      status: "approved" as any,
-    });
+      .update(placeholderPlayers)
+      .set({ teamId })
+      .where(eq(placeholderPlayers.id, phId));
+  } else {
+    // Real user — assign league membership and ensure teamMemberships row exists.
+    const [lm] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(
+        and(
+          eq(leagueMemberships.leagueId, draft.leagueId),
+          eq(leagueMemberships.userId, playerId),
+        ),
+      )
+      .limit(1);
+    if (lm) {
+      await db
+        .update(leagueMemberships)
+        .set({ assignedTeamId: teamId })
+        .where(eq(leagueMemberships.id, lm.id));
+    }
+    const existingTM = await db
+      .select()
+      .from(teamMemberships)
+      .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, playerId)))
+      .limit(1);
+    if (existingTM.length === 0) {
+      await db.insert(teamMemberships).values({
+        teamId,
+        userId: playerId,
+        isCaptain: false,
+        status: "approved" as any,
+      });
+    }
   }
 
   // Buddy enforcement: if this player has buddies, auto-pick them all to the
