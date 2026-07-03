@@ -292,6 +292,27 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
     return false;
   }, [skillRankingEnabled, teams, captainAssignments, keepersByTeam, skillLevels]);
 
+  // Deduplicated member list for the skill step.
+  // Pass 1: deduplicate by user.id (handles same user with multiple team memberships).
+  // Pass 2: deduplicate by full name, preferring real users over placeholder entries,
+  //         so a placeholder named "Tobin Kern" doesn't shadow/duplicate the real one.
+  const dedupedSkillMembers = useMemo(() => {
+    const byId = Array.from(new Map(members.map((m) => [m.user.id, m])).values());
+    const byName = new Map<string, typeof byId[0]>();
+    for (const m of byId) {
+      const name = memberName(m).trim().toLowerCase();
+      const existing = byName.get(name);
+      const isPlaceholder = m.user.id.startsWith("placeholder:");
+      if (!existing) {
+        byName.set(name, m);
+      } else if (!isPlaceholder && existing.user.id.startsWith("placeholder:")) {
+        // Real user beats placeholder with same name
+        byName.set(name, m);
+      }
+    }
+    return Array.from(byName.values());
+  }, [members]);
+
   // Which auto-pick participants (captains/keepers/buddies) are missing tiers,
   // and which optional players are missing tiers — used to gate/warn on Next.
   const { skillRequiredMissing, skillOptionalMissing } = useMemo(() => {
@@ -309,16 +330,11 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       }
     }
     const requiredMissing = Array.from(requiredUids).filter((uid) => !skillLevels[uid]);
-    const seenOptional = new Set<string>();
-    const optionalMissing = members
-      .filter((m) => {
-        if (seenOptional.has(m.user.id)) return false;
-        seenOptional.add(m.user.id);
-        return !requiredUids.has(m.user.id) && !skillLevels[m.user.id];
-      })
+    const optionalMissing = dedupedSkillMembers
+      .filter((m) => !requiredUids.has(m.user.id) && !skillLevels[m.user.id])
       .map((m) => m.user.id);
     return { skillRequiredMissing: requiredMissing, skillOptionalMissing: optionalMissing };
-  }, [skillRankingEnabled, captainAssignments, keepersByTeam, buddyPairs, skillLevels, members]);
+  }, [skillRankingEnabled, captainAssignments, keepersByTeam, buddyPairs, skillLevels, dedupedSkillMembers]);
 
   // Reset the optional-tier warning whenever the user navigates away from the skill step.
   useEffect(() => {
@@ -1330,7 +1346,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   </div>
 
                   <div className="border border-border rounded-lg max-h-72 overflow-y-auto divide-y divide-border">
-                    {Array.from(new Map(members.map((m) => [m.user.id, m])).values()).map((m) => {
+                    {dedupedSkillMembers.map((m) => {
                       const tier = skillLevels[m.user.id] || "";
                       const options = buildRankScaleOptions(
                         rankScaleSize,
