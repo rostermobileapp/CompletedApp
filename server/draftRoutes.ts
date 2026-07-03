@@ -48,7 +48,7 @@ type IsAuth = (req: any, res: any, next: any) => void;
  * While the draft tool is being tested, only leagues in this list can access it.
  * To open it up to all leagues, set this to null.
  */
-const DRAFT_ALLOWED_LEAGUE_IDS: string[] | null = null;
+const DRAFT_ALLOWED_LEAGUE_IDS: string[] | null = ["f9581a26-b02f-4dd0-a5aa-7869b93c5622"]; // L00002 Draft Test
 
 function isDraftAllowed(leagueId: string): boolean {
   if (DRAFT_ALLOWED_LEAGUE_IDS === null) return true;
