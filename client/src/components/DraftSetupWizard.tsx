@@ -309,8 +309,13 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       }
     }
     const requiredMissing = Array.from(requiredUids).filter((uid) => !skillLevels[uid]);
+    const seenOptional = new Set<string>();
     const optionalMissing = members
-      .filter((m) => !requiredUids.has(m.user.id) && !skillLevels[m.user.id])
+      .filter((m) => {
+        if (seenOptional.has(m.user.id)) return false;
+        seenOptional.add(m.user.id);
+        return !requiredUids.has(m.user.id) && !skillLevels[m.user.id];
+      })
       .map((m) => m.user.id);
     return { skillRequiredMissing: requiredMissing, skillOptionalMissing: optionalMissing };
   }, [skillRankingEnabled, captainAssignments, keepersByTeam, buddyPairs, skillLevels, members]);
@@ -1325,7 +1330,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   </div>
 
                   <div className="border border-border rounded-lg max-h-72 overflow-y-auto divide-y divide-border">
-                    {members.map((m) => {
+                    {Array.from(new Map(members.map((m) => [m.user.id, m])).values()).map((m) => {
                       const tier = skillLevels[m.user.id] || "";
                       const options = buildRankScaleOptions(
                         rankScaleSize,
