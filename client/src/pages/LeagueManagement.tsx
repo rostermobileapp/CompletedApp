@@ -1502,7 +1502,18 @@ export default function LeagueManagement() {
       const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/members/${memberId}`, updates);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedMembership) => {
+      // Immediately patch the cached member list with the server's returned data
+      // so reopening the modal never shows stale values (fixes isGoalie race condition)
+      queryClient.setQueryData(
+        ['/api/leagues', leagueId, 'members'],
+        (old: LeagueMember[] | undefined) => {
+          if (!old) return old;
+          return old.map((m) =>
+            m.id === updatedMembership?.id ? { ...m, ...updatedMembership } : m
+          );
+        }
+      );
       toast({
         title: 'Player Updated',
         description: 'Player details have been updated successfully.',
