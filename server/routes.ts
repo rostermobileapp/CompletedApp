@@ -6211,6 +6211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updates = req.body;
+      console.log("[PATCH member] memberId:", memberId, "updates:", JSON.stringify(updates));
 
       // Placeholder players have synthetic IDs prefixed with "placeholder:"
       // They live in placeholder_players, not league_memberships.
@@ -6272,7 +6273,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (field in updates) membershipUpdates[field] = updates[field];
       }
 
+      console.log("[PATCH member] membershipUpdates being saved:", JSON.stringify(membershipUpdates));
       const updatedMember = await storage.updateLeagueMember(memberId, membershipUpdates);
+      console.log("[PATCH member] updatedMember returned:", JSON.stringify({ id: updatedMember?.id, isGoalie: updatedMember?.isGoalie, isSkater: updatedMember?.isSkater }));
       
       // If team assignment changed, sync team chats and enforce captain integrity
       if (oldTeamId !== newTeamId) {

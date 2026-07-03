@@ -1499,8 +1499,11 @@ export default function LeagueManagement() {
 
   const updatePlayerMutation = useMutation({
     mutationFn: async ({ memberId, updates }: { memberId: string; updates: any }) => {
+      console.log("[updatePlayer] sending PATCH for", memberId, "updates:", JSON.stringify(updates));
       const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/members/${memberId}`, updates);
-      return response.json();
+      const data = await response.json();
+      console.log("[updatePlayer] server response:", JSON.stringify(data));
+      return data;
     },
     onSuccess: (updatedMembership) => {
       // Immediately patch the cached member list with the server's returned data
