@@ -39,6 +39,7 @@ import {
   OctagonX,
   Link2,
   List,
+  Trash2,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -530,8 +531,12 @@ export default function DraftRoom() {
 
   const availablePlayers = useMemo(() => {
     if (!members) return [];
+    const captainIds = new Set(Object.values((draft?.captainAssignments as Record<string, string>) || {}).filter(Boolean));
+    const keeperUserIds = new Set((bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean));
     return members.filter((m: any) => {
       if (draftedSet.has(m.user.id)) return false;
+      if (captainIds.has(m.user.id)) return false;
+      if (keeperUserIds.has(m.user.id)) return false;
       if (
         draft?.goalieMethod &&
         draft.goalieMethod !== "included_with_skaters" &&
@@ -541,7 +546,7 @@ export default function DraftRoom() {
       }
       return true;
     });
-  }, [members, draftedSet, draft]);
+  }, [members, draftedSet, draft, bundle?.keepers]);
 
   const teamById = useMemo(() => {
     const m = new Map<string, any>();
@@ -905,6 +910,10 @@ export default function DraftRoom() {
   const terminateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/terminate`, {});
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as any)?.message || `Server error ${res.status}`);
+      }
       return res.json();
     },
     onSuccess: () =>
@@ -1111,7 +1120,7 @@ export default function DraftRoom() {
                 title="Terminate draft early"
                 data-testid="button-terminate-draft"
               >
-                <OctagonX className="w-5 h-5" />
+                <Trash2 className="w-5 h-5" />
               </button>
             )}
             {isCommissioner && draft.status === "pending" && (
@@ -1697,8 +1706,8 @@ export default function DraftRoom() {
                     data-testid={`carousel-slot-${m.user.id}`}
                   >
                     <div
-                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 cursor-pointer ${m.keptByTeamId ? "border-blue-500/50 hover:border-blue-500 bg-blue-500/5" : "border-primary/70 hover:border-primary"}`}
-                      onClick={() => setCardUserId(m.user.id)}
+                      className={`h-full rounded-3xl border-2 bg-card flex items-center gap-3 px-4 cursor-pointer ${m.keptByTeamId ? "border-border opacity-50 cursor-default" : "border-primary/70 hover:border-primary"}`}
+                      onClick={() => !m.keptByTeamId && setCardUserId(m.user.id)}
                       data-testid={`player-card-${m.user.id}`}
                       style={{
                         transition: "border-color 200ms ease-out",
@@ -1773,11 +1782,11 @@ export default function DraftRoom() {
                         </div>
                       </div>
 
-                      {/* DRAFT button — or "Kept by" badge for designated keepers */}
+                      {/* DRAFT button — or "Keeper for" label for designated keepers */}
                       {m.keptByTeamId ? (
-                        <div className="flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold tracking-wide text-center">
+                        <div className="flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl bg-muted border border-border text-muted-foreground text-[10px] font-bold tracking-wide text-center">
                           <Snowflake className="w-3.5 h-3.5" />
-                          <span>Kept by</span>
+                          <span>Keeper for</span>
                           <span className="max-w-[60px] truncate">{teamById.get(m.keptByTeamId)?.name || "a team"}</span>
                         </div>
                       ) : canPick && draft.status === "active" ? (
