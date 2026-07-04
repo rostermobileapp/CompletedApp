@@ -6347,6 +6347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jerseyNumber: ph.jerseyNumber ?? undefined,
         displayFirstName: ph.firstName,
         displayLastName: ph.lastName,
+        isGoalie: ph.isGoalie ?? false,
         isPlaceholderPlayer: true,
         placeholderPlayerId: ph.id,
         user: {
