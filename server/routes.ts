@@ -475,12 +475,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure users.first_rsvp_triggered column:', err);
   }
 
-  // Ensure placeholder_players.is_goalie exists (goalie flag for placeholder/csv players)
+  // Ensure placeholder_players.is_goalie / is_skater exist
   try {
     await db.execute(sql`ALTER TABLE placeholder_players ADD COLUMN IF NOT EXISTS is_goalie boolean NOT NULL DEFAULT false`);
-    console.log('[Init] placeholder_players.is_goalie column ensured');
+    await db.execute(sql`ALTER TABLE placeholder_players ADD COLUMN IF NOT EXISTS is_skater boolean NOT NULL DEFAULT true`);
+    console.log('[Init] placeholder_players.is_goalie + is_skater columns ensured');
   } catch (err) {
-    console.error('[Init] Failed to ensure placeholder_players.is_goalie column:', err);
+    console.error('[Init] Failed to ensure placeholder_players goalie/skater columns:', err);
   }
 
   // Ensure feature_requests and feature_request_votes tables exist
@@ -6232,6 +6233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           skillLevel: updates.skillLevel ?? undefined,
           teamId: updates.assignedTeamId ?? undefined,
           isGoalie: updates.isGoalie !== undefined ? Boolean(updates.isGoalie) : undefined,
+          isSkater: updates.isSkater !== undefined ? Boolean(updates.isSkater) : undefined,
         });
         // Return a synthetic member-shaped response so the frontend is happy
         return res.json({ id: memberId, ...updates, updated });
@@ -6348,6 +6350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         displayFirstName: ph.firstName,
         displayLastName: ph.lastName,
         isGoalie: ph.isGoalie ?? false,
+        isSkater: ph.isSkater ?? true,
         isPlaceholderPlayer: true,
         placeholderPlayerId: ph.id,
         user: {

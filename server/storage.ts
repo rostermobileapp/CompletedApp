@@ -343,6 +343,7 @@ export interface IStorage {
     skillLevel?: string | null;
     teamId?: string | null;
     isGoalie?: boolean;
+    isSkater?: boolean;
   }): Promise<PlaceholderPlayer | undefined>;
   getTeamsByLeague(leagueId: string): Promise<Team[]>;
   getTeam(id: string): Promise<Team | undefined>;
@@ -3271,6 +3272,7 @@ export class DatabaseStorage implements IStorage {
     skillLevel?: string | null;
     teamId?: string | null;
     isGoalie?: boolean;
+    isSkater?: boolean;
   }): Promise<PlaceholderPlayer | undefined> {
     const setValues: Record<string, any> = {};
     if (updates.firstName !== undefined) setValues.firstName = updates.firstName;
@@ -3280,6 +3282,7 @@ export class DatabaseStorage implements IStorage {
     if (updates.skillLevel !== undefined) setValues.skillLevel = updates.skillLevel;
     if (updates.teamId !== undefined) setValues.teamId = updates.teamId;
     if (updates.isGoalie !== undefined) setValues.isGoalie = updates.isGoalie;
+    if (updates.isSkater !== undefined) setValues.isSkater = updates.isSkater;
     if (Object.keys(setValues).length === 0) return undefined;
     const [row] = await db
       .update(placeholderPlayers)

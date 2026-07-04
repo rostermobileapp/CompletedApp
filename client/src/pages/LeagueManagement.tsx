@@ -5236,19 +5236,15 @@ export default function LeagueManagement() {
                   {/* Skater */}
                   <div className="flex items-center space-x-3">
                     <input
-                      type="checkbox"
-                      id="skater-checkbox"
-                      checked={playerEditForm.isSkater}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          // When selecting Skater, deselect Goalie
-                          setPlayerEditForm(prev => ({ ...prev, isSkater: true, isGoalie: false }));
-                        }
-                      }}
-                      className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                      type="radio"
+                      id="skater-radio"
+                      name="player-role"
+                      checked={playerEditForm.isSkater && !playerEditForm.isGoalie}
+                      onChange={() => setPlayerEditForm(prev => ({ ...prev, isSkater: true, isGoalie: false }))}
+                      className="h-4 w-4 text-primary border-border focus:ring-primary"
                       data-testid="checkbox-skater"
                     />
-                    <label htmlFor="skater-checkbox" className="text-sm font-medium">
+                    <label htmlFor="skater-radio" className="text-sm font-medium">
                       Skater
                     </label>
                   </div>
@@ -5256,19 +5252,15 @@ export default function LeagueManagement() {
                   {/* Goalie */}
                   <div className="flex items-center space-x-3">
                     <input
-                      type="checkbox"
-                      id="goalie-checkbox"
+                      type="radio"
+                      id="goalie-radio"
+                      name="player-role"
                       checked={playerEditForm.isGoalie}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          // When selecting Goalie, deselect Skater
-                          setPlayerEditForm(prev => ({ ...prev, isGoalie: true, isSkater: false }));
-                        }
-                      }}
-                      className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
+                      onChange={() => setPlayerEditForm(prev => ({ ...prev, isGoalie: true, isSkater: false }))}
+                      className="h-4 w-4 text-primary border-border focus:ring-primary"
                       data-testid="checkbox-goalie"
                     />
-                    <label htmlFor="goalie-checkbox" className="text-sm font-medium">
+                    <label htmlFor="goalie-radio" className="text-sm font-medium">
                       Goalie
                     </label>
                   </div>
