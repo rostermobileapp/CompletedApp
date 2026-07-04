@@ -610,6 +610,9 @@ export async function assignDraftedPlayersToTeams(
   }
   for (const [teamId, userId] of Object.entries(goalieAssignments)) {
     if (!userId) continue;
+    // Placeholder goalies (format "placeholder:UUID") have no real user account;
+    // skip them so we don't attempt a FK-violating insert into team_memberships.
+    if (userId.startsWith("placeholder:")) continue;
     pairs.push({ userId, teamId, isKeeper: false });
   }
 
@@ -740,8 +743,6 @@ async function completeDraft(draftId: string) {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
   if (!draft) return;
 
-  // Already completed? Don't re-notify, but still expose a way to re-run
-  // assignment via the public `finalizeDraft` helper below.
   const wasAlreadyCompleted = draft.status === "completed";
 
   const newlyAssigned = await assignDraftedPlayersToTeams(draftId);

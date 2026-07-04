@@ -1003,9 +1003,9 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       }
       await terminateDraft(draftId);
       res.json({ ok: true });
-    } catch (err) {
-      console.error("Terminate draft error:", err);
-      res.status(500).json({ message: "Failed to terminate draft" });
+    } catch (err: any) {
+      console.error("Terminate draft error:", err?.message, err?.stack || err);
+      res.status(500).json({ message: err?.message || "Failed to terminate draft" });
     }
   });
 
