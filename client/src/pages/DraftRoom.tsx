@@ -1259,15 +1259,39 @@ export default function DraftRoom() {
         </div>
 
         {/* YOUR TURN banner — shown only to the captain who is on the clock */}
-        {draft.status === "active" && isCaptainOfPickingTeam && (
-          <div
-            className="mx-3 mb-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground flex items-center justify-center gap-2 font-black text-sm tracking-wide animate-pulse"
-            data-testid="banner-your-turn"
-          >
-            <Crown className="w-4 h-4 flex-shrink-0" />
-            IT'S YOUR TURN TO PICK!
-          </div>
-        )}
+        {draft.status === "active" && isCaptainOfPickingTeam && (() => {
+          const schedule = draft.resolvedAutoPickSchedule;
+          const pickingTeamId = bundle.pickingTeamId!;
+          const flaggedSlots = draft.flaggedAutoPickSlots || [];
+          const autoSlot = schedule?.[pickingTeamId]?.[String(draft.currentRound)];
+          const isFlagged = flaggedSlots.some(
+            (s) => s.round === draft.currentRound && s.teamId === pickingTeamId,
+          );
+          const typeLabel =
+            autoSlot?.type === "self" ? "Self" :
+            autoSlot?.type === "keep" ? "Keeper" :
+            autoSlot?.type === "buddy" ? "Buddy" : null;
+          if (autoSlot && !isFlagged && typeLabel) {
+            return (
+              <div
+                className="mx-3 mb-1 px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-700 dark:text-amber-300 flex items-center justify-center gap-2 text-sm font-semibold"
+                data-testid="banner-auto-pick-incoming"
+              >
+                <Zap className="w-4 h-4 flex-shrink-0" />
+                Auto · {typeLabel} — pick fires automatically
+              </div>
+            );
+          }
+          return (
+            <div
+              className="mx-3 mb-1 px-3 py-2 rounded-lg bg-primary text-primary-foreground flex items-center justify-center gap-2 font-black text-sm tracking-wide animate-pulse"
+              data-testid="banner-your-turn"
+            >
+              <Crown className="w-4 h-4 flex-shrink-0" />
+              IT'S YOUR TURN TO PICK!
+            </div>
+          );
+        })()}
 
         {/* Timer bar */}
         {draft.status === "active" && (
@@ -1935,6 +1959,7 @@ export default function DraftRoom() {
                             {player?.user.firstName || player?.user.displayName || "?"}
                             {p.isAutoBuddy && " ♥"}
                             {p.expiredAutoPick && " ⏱"}
+                            {p.isAutoPick && !p.isAutoBuddy && !p.expiredAutoPick && " ⚡"}
                           </span>
                         );
                       })}
@@ -2212,6 +2237,7 @@ export default function DraftRoom() {
                           {player?.user.firstName || player?.user.displayName || "?"}
                           {p.isAutoBuddy && " ♥"}
                           {p.expiredAutoPick && " ⏱"}
+                          {p.isAutoPick && !p.isAutoBuddy && !p.expiredAutoPick && " ⚡"}
                         </span>
                       );
                     })}
