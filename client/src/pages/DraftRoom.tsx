@@ -555,10 +555,14 @@ export default function DraftRoom() {
       ...(bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
       ...(bundle?.keepers || []).map((k: any) => k.placeholderPlayerId).filter(Boolean),
     ]);
+    const buddyIds = new Set<string>(
+      (bundle?.buddyPairs || []).flatMap((p: any) => p.userIds as string[]),
+    );
     return members.filter((m: any) => {
       if (draftedSet.has(m.user.id)) return false;
       if (captainIds.has(m.user.id)) return false;
       if (keeperUserIds.has(m.user.id)) return false;
+      if (buddyIds.has(m.user.id)) return false;
       if (
         draft?.goalieMethod &&
         draft.goalieMethod !== "included_with_skaters" &&
@@ -568,7 +572,7 @@ export default function DraftRoom() {
       }
       return true;
     });
-  }, [members, draftedSet, draft, bundle?.keepers, bundle?.draftOrderTeams]);
+  }, [members, draftedSet, draft, bundle?.keepers, bundle?.draftOrderTeams, bundle?.buddyPairs]);
 
   const teamById = useMemo(() => {
     const m = new Map<string, any>();
@@ -645,7 +649,8 @@ export default function DraftRoom() {
         !isExcludedGoalie(m) &&
         !draftedSet.has(m.user.id) &&
         !captainIds.has(m.user.id) &&
-        !keeperUserIds.has(m.user.id),
+        !keeperUserIds.has(m.user.id) &&
+        !buddyUserIds.has(m.user.id),
     );
 
     // Position multi-select filter (empty = all positions shown)
@@ -763,7 +768,7 @@ export default function DraftRoom() {
     });
 
     return list;
-  }, [members, draftedSet, scheduledPlayerIds, draft, bundle?.keepers, bundle?.draftOrderTeams, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
+  }, [members, draftedSet, scheduledPlayerIds, draft, bundle?.keepers, bundle?.draftOrderTeams, buddyUserIds, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
 
   const pickMutation = useMutation({
     mutationFn: async (playerId: string) => {

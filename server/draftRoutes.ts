@@ -435,6 +435,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const captainUserIdSet = new Set<string>();
       const keeperUserIdSet = new Set<string>();
       const keeperPlaceholderIdSet = new Set<string>();
+      const buddyUserIdSet = new Set<string>();
 
       if (draftIdParam) {
         // Load captain assignments from the draft record, falling back to
@@ -480,11 +481,21 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           if (k.userId) keeperUserIdSet.add(k.userId);
           if (k.placeholderPlayerId) keeperPlaceholderIdSet.add(k.placeholderPlayerId);
         }
+
+        // Load buddy pairs — all users in any pair are pre-assigned together and
+        // must not appear individually in the draft pool.
+        const buddyPairRows = await db
+          .select({ userIds: draftBuddyPairs.userIds })
+          .from(draftBuddyPairs)
+          .where(eq(draftBuddyPairs.draftId, draftIdParam));
+        for (const row of buddyPairRows) {
+          for (const uid of row.userIds) buddyUserIdSet.add(uid);
+        }
       }
 
       return res.json([
         ...enriched
-          .filter((r) => !captainUserIdSet.has(r.user.id) && !keeperUserIdSet.has(r.user.id))
+          .filter((r) => !captainUserIdSet.has(r.user.id) && !keeperUserIdSet.has(r.user.id) && !buddyUserIdSet.has(r.user.id))
           .map((r) => ({ ...r, keptByTeamId: null })),
         ...placeholderRows
           .filter((r) => {
