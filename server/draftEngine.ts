@@ -564,10 +564,75 @@ async function advanceTurn(draftId: string, resetTimer: boolean) {
   await broadcastState(draftId);
 }
 
-// Public alias used by the /terminate route so the commissioner can end
-// the draft early; produces identical results to a natural completion.
+/**
+ * Commissioner-initiated early termination — intentionally different from
+ * natural completion.
+ *
+ * Natural completion  → all picks committed to team rosters.
+ * Early termination   → picks are discarded; ONLY captains are placed on their
+ *                       assigned teams.  Everyone else remains a free agent.
+ *
+ * Steps:
+ *  1. Stop the timer and mark the draft completed.
+ *  2. For each captain in captainAssignments: upsert into team_memberships
+ *     (isCaptain = true) and set league_memberships.assignedTeamId.
+ *  3. Broadcast the final state so all open clients see "completed".
+ */
 export async function terminateDraft(draftId: string) {
-  return completeDraft(draftId);
+  clearDraftTimer(draftId);
+
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return;
+
+  // Mark completed immediately so no more picks can land.
+  await db
+    .update(drafts)
+    .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+    .where(eq(drafts.id, draftId));
+
+  // Place only the captains on their teams.
+  const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+  for (const [teamId, userId] of Object.entries(captainAssignments)) {
+    if (!userId || userId.startsWith("placeholder:")) continue;
+
+    // 1) team_memberships
+    const [existing] = await db
+      .select()
+      .from(teamMemberships)
+      .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, userId)))
+      .limit(1);
+    if (!existing) {
+      await db.insert(teamMemberships).values({
+        teamId,
+        userId,
+        isCaptain: true,
+        status: "approved" as any,
+      });
+    } else {
+      await db
+        .update(teamMemberships)
+        .set({ isCaptain: true })
+        .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, userId)));
+    }
+
+    // 2) league_memberships.assignedTeamId
+    const [lm] = await db
+      .select()
+      .from(leagueMemberships)
+      .where(
+        and(eq(leagueMemberships.leagueId, draft.leagueId), eq(leagueMemberships.userId, userId)),
+      )
+      .limit(1);
+    if (lm && lm.assignedTeamId !== teamId) {
+      await db
+        .update(leagueMemberships)
+        .set({ assignedTeamId: teamId })
+        .where(eq(leagueMemberships.id, lm.id));
+    }
+  }
+
+  await broadcastState(draftId);
+  broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
 }
 
 /**

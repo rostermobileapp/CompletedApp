@@ -1109,7 +1109,7 @@ export default function DraftRoom() {
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Terminate this draft? All picks made so far will be committed to team rosters and the draft will end immediately. This cannot be undone."
+                      "Terminate this draft? All picks will be discarded. Only the assigned captains will be placed on their teams — everyone else returns as a free agent. This cannot be undone."
                     )
                   ) {
                     terminateMutation.mutate();
