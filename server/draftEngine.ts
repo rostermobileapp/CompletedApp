@@ -187,17 +187,22 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
       ? computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style)
       : null;
 
-  // Always include the teams from draftOrder with authoritative captainId from
-  // draft.captainAssignments (persisted on the draft record). This eliminates
-  // any dependency on teams.captainId being up-to-date.
+  // Build draftOrderTeams using captainAssignments as the primary source and
+  // teams.captainId as a fallback. Some drafts are set up without going through
+  // the captain-assignments wizard step, leaving captainAssignments as {} while
+  // teams.captainId is correctly populated.
   const captainAssignmentsMap = (draft.captainAssignments as Record<string, string>) || {};
   const draftOrderTeams: { id: string; name: string; captainId: string | null }[] =
     draftOrder.length > 0
       ? (await db
-          .select({ id: teams.id, name: teams.name })
+          .select({ id: teams.id, name: teams.name, captainId: teams.captainId })
           .from(teams)
           .where(inArray(teams.id, draftOrder)))
-          .map((t) => ({ id: t.id, name: t.name, captainId: captainAssignmentsMap[t.id] ?? null }))
+          .map((t) => ({
+            id: t.id,
+            name: t.name,
+            captainId: captainAssignmentsMap[t.id] ?? t.captainId ?? null,
+          }))
       : [];
 
   const keeperRows = await db
@@ -356,8 +361,21 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   // slot exists for them (type "self"), so maybeFireScheduledAutoPick can find them.
   // Manual pick routes have an additional guard that rejects captains even if they
   // appear here, preventing accidental or malicious manual drafting.
+  // Fall back to teams.captainId for drafts where captainAssignments was never
+  // filled in (wizard step skipped).
   const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
   const captainIds = new Set(Object.values(captainAssignments).filter(Boolean));
+  const draftOrder = (draft.draftOrder as string[]) || [];
+  const uncoveredTeamIds = draftOrder.filter((tid) => !captainAssignments[tid]);
+  if (uncoveredTeamIds.length > 0) {
+    const teamRows = await db
+      .select({ captainId: teams.captainId })
+      .from(teams)
+      .where(inArray(teams.id, uncoveredTeamIds));
+    for (const t of teamRows) {
+      if (t.captainId) captainIds.add(t.captainId);
+    }
+  }
 
   const goalieMethod = draft.goalieMethod || "included_with_skaters";
   const realResult = members

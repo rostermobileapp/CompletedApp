@@ -437,14 +437,34 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const keeperPlaceholderIdSet = new Set<string>();
 
       if (draftIdParam) {
-        // Load captain assignments from the draft record.
+        // Load captain assignments from the draft record, falling back to
+        // teams.captainId for any team whose entry is missing from the map.
+        // Some drafts are set up without the captain-assignments wizard step,
+        // leaving captainAssignments as {} while teams.captainId is populated.
         const [draftRow] = await db
-          .select({ captainAssignments: drafts.captainAssignments })
+          .select({ captainAssignments: drafts.captainAssignments, draftOrder: drafts.draftOrder })
           .from(drafts)
           .where(eq(drafts.id, draftIdParam));
-        if (draftRow?.captainAssignments) {
-          for (const uid of Object.values(draftRow.captainAssignments as Record<string, string>)) {
+        if (draftRow) {
+          const assignmentsMap = (draftRow.captainAssignments as Record<string, string>) || {};
+          // Add all explicitly assigned captains.
+          for (const uid of Object.values(assignmentsMap)) {
             if (uid && !uid.startsWith("placeholder:")) captainUserIdSet.add(uid);
+          }
+          // Fallback: for any team in the draft order not covered by the map,
+          // read captainId directly from the teams table.
+          const draftOrder = (draftRow.draftOrder as string[]) || [];
+          const uncoveredTeamIds = draftOrder.filter((tid) => !assignmentsMap[tid]);
+          if (uncoveredTeamIds.length > 0) {
+            const teamRows = await db
+              .select({ captainId: teams.captainId })
+              .from(teams)
+              .where(inArray(teams.id, uncoveredTeamIds));
+            for (const t of teamRows) {
+              if (t.captainId && !t.captainId.startsWith("placeholder:")) {
+                captainUserIdSet.add(t.captainId);
+              }
+            }
           }
         }
 
