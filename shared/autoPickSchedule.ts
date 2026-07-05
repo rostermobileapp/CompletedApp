@@ -127,7 +127,6 @@ export function buildAutoPickSchedule(params: AutoPickInput): AutoPickSchedule {
   for (const teamId of draftOrder) {
     const keepers = keeperIdsByTeam[teamId] || [];
     for (const keeperId of keepers) {
-      if (keeperId.startsWith("placeholder:")) continue;
       if (captainAssignments[teamId] === keeperId) continue;
       const rank = resolveRank(keeperId);
       if (!rank) continue;

@@ -16,7 +16,7 @@ import {
   type User,
 } from "@shared/schema";
 import { eq, and, asc, desc, isNull, isNotNull, inArray, sql, or, gt } from "drizzle-orm";
-import { buildAutoPickSchedule, type AutoPickSchedule, type FlaggedSlot } from "@shared/autoPickSchedule";
+import { buildAutoPickSchedule, rankToRound, type AutoPickSchedule, type FlaggedSlot } from "@shared/autoPickSchedule";
 
 // How long after a pick the commissioner can undo it (milliseconds)
 export const UNDO_WINDOW_MS = 30_000;
@@ -548,24 +548,57 @@ async function maybeFireScheduledAutoPick(
   const style = draft.draftStyle || draft.roundType || "snake";
   if (style === "auction") return false;
 
+  // Path 1: resolvedAutoPickSchedule (captain self-picks, real-user keepers, buddy pairs).
   const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
-  if (!schedule) return false;
+  if (schedule) {
+    const slot = schedule[pickingTeamId]?.[String(round)];
+    if (slot?.playerId) {
+      const flagged = (draft.flaggedAutoPickSlots as FlaggedSlot[]) || [];
+      if (!flagged.some((f) => f.round === round && f.teamId === pickingTeamId)) {
+        const available = await listAvailablePlayers(draftId);
+        const found = available.find((a) => a.userId === slot.playerId);
+        if (found) {
+          await applyPick(draftId, pickingTeamId, slot.playerId, { isAutoScheduled: true });
+          return true;
+        }
+      }
+    }
+  }
 
-  const teamSchedule = schedule[pickingTeamId];
-  if (!teamSchedule) return false;
+  // Path 2: Placeholder keeper whose stored rank maps to this round.
+  // Handles drafts started before placeholder keepers were included in the schedule
+  // and is the primary fallback mechanism for placeholder keepers going forward.
+  const skillScale = (draft.skillScale as "numbers" | "letters" | null) || "numbers";
+  const phKeeperRows = await db
+    .select()
+    .from(draftKeepers)
+    .where(
+      and(
+        eq(draftKeepers.draftId, draftId),
+        eq(draftKeepers.teamId, pickingTeamId),
+        isNotNull(draftKeepers.placeholderPlayerId),
+      ),
+    );
+  for (const pk of phKeeperRows) {
+    if (!pk.rank || !pk.placeholderPlayerId) continue;
+    if (rankToRound(pk.rank, skillScale) !== round) continue;
+    // Ensure it hasn't already been drafted.
+    const [alreadyPicked] = await db
+      .select()
+      .from(draftPicks)
+      .where(
+        and(
+          eq(draftPicks.draftId, draftId),
+          eq(draftPicks.placeholderPlayerId, pk.placeholderPlayerId),
+        ),
+      )
+      .limit(1);
+    if (alreadyPicked) continue;
+    await applyPick(draftId, pickingTeamId, `placeholder:${pk.placeholderPlayerId}`, { isAutoScheduled: true });
+    return true;
+  }
 
-  const slot = teamSchedule[String(round)];
-  if (!slot?.playerId) return false;
-
-  const flagged = (draft.flaggedAutoPickSlots as FlaggedSlot[]) || [];
-  if (flagged.some((f) => f.round === round && f.teamId === pickingTeamId)) return false;
-
-  const available = await listAvailablePlayers(draftId);
-  const found = available.find((a) => a.userId === slot.playerId);
-  if (!found) return false;
-
-  await applyPick(draftId, pickingTeamId, slot.playerId, { isAutoScheduled: true });
-  return true;
+  return false;
 }
 
 async function advanceTurn(draftId: string, resetTimer: boolean) {
@@ -1433,12 +1466,21 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
     const keeperRows = await db.select().from(draftKeepers).where(eq(draftKeepers.draftId, draftId));
     const keepersByTeam: Record<string, { userId: string; rank?: string }[]> = {};
     for (const k of keeperRows) {
-      if (!k.userId) continue;
-      const rank = skillLevels[k.userId];
-      if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
-      keepersByTeam[k.teamId].push({ userId: k.userId, rank: rank || k.rank || undefined });
-      if (rank && rank !== k.rank) {
-        await db.update(draftKeepers).set({ rank }).where(eq(draftKeepers.id, k.id));
+      if (k.userId) {
+        // Real-user keeper: stamp current skill rank onto the row for record-keeping.
+        const rank = skillLevels[k.userId];
+        if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
+        keepersByTeam[k.teamId].push({ userId: k.userId, rank: rank || k.rank || undefined });
+        if (rank && rank !== k.rank) {
+          await db.update(draftKeepers).set({ rank }).where(eq(draftKeepers.id, k.id));
+        }
+      } else if (k.placeholderPlayerId) {
+        // Placeholder keeper: no skillLevels entry — use the rank stored in draft_keepers.
+        if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
+        keepersByTeam[k.teamId].push({
+          userId: `placeholder:${k.placeholderPlayerId}`,
+          rank: k.rank || undefined,
+        });
       }
     }
 
@@ -1580,8 +1622,17 @@ export async function resumeDraft(draftId: string): Promise<{ ok: boolean }> {
       updatedAt: new Date(),
     })
     .where(eq(drafts.id, draftId));
-  await startTurnTimer(draftId);
-  await broadcastState(draftId);
+
+  // Check whether the turn we're resuming onto has a scheduled auto-pick
+  // (e.g. a placeholder keeper) — if so, fire it instead of opening the timer.
+  const draftOrder = (draft.draftOrder as string[]) || [];
+  const draftStyle = draft.draftStyle || draft.roundType || "snake";
+  const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, draftStyle);
+  const didAutoPick = await maybeFireScheduledAutoPick(draftId, draft.currentRound, pickingTeamId);
+  if (!didAutoPick) {
+    await startTurnTimer(draftId);
+    await broadcastState(draftId);
+  }
   return { ok: true };
 }
 
