@@ -917,6 +917,7 @@ export default function DraftRoom() {
       queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
       if (draft?.leagueId) {
         queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId, "teams"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/leagues", draft.leagueId] });
       }
     },
     onError: (err: any) =>

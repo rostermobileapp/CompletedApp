@@ -428,33 +428,50 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         isPlaceholderPlayer: true,
       }));
 
-      // ── When a draftId is provided, annotate designated keepers with their team ──
-      // Keepers stay in the list so the UI can display "Kept by [Team]" rather
-      // than silently hiding the player and leaving users wondering where they went.
+      // ── When a draftId is provided, exclude captains and keepers entirely ──
+      // Captains are pre-assigned to their teams and must never be in the draft
+      // pool. Keepers are also pre-assigned — they cannot be picked by any team.
       const draftIdParam = (req.query?.draftId as string | undefined) || null;
-      const keeperTeamByUser = new Map<string, string>();
-      const keeperTeamByPlaceholder = new Map<string, string>();
+      const captainUserIdSet = new Set<string>();
+      const keeperUserIdSet = new Set<string>();
+      const keeperPlaceholderIdSet = new Set<string>();
+
       if (draftIdParam) {
+        // Load captain assignments from the draft record.
+        const [draftRow] = await db
+          .select({ captainAssignments: drafts.captainAssignments })
+          .from(drafts)
+          .where(eq(drafts.id, draftIdParam));
+        if (draftRow?.captainAssignments) {
+          for (const uid of Object.values(draftRow.captainAssignments as Record<string, string>)) {
+            if (uid && !uid.startsWith("placeholder:")) captainUserIdSet.add(uid);
+          }
+        }
+
+        // Load keeper designations.
         const keeperRows = await db
           .select({
             userId: draftKeepers.userId,
             placeholderPlayerId: draftKeepers.placeholderPlayerId,
-            teamId: draftKeepers.teamId,
           })
           .from(draftKeepers)
           .where(eq(draftKeepers.draftId, draftIdParam));
         for (const k of keeperRows) {
-          if (k.userId) keeperTeamByUser.set(k.userId, k.teamId);
-          if (k.placeholderPlayerId) keeperTeamByPlaceholder.set(k.placeholderPlayerId, k.teamId);
+          if (k.userId) keeperUserIdSet.add(k.userId);
+          if (k.placeholderPlayerId) keeperPlaceholderIdSet.add(k.placeholderPlayerId);
         }
       }
 
       return res.json([
-        ...enriched.map((r) => ({ ...r, keptByTeamId: keeperTeamByUser.get(r.user.id) ?? null })),
-        ...placeholderRows.map((r) => ({
-          ...r,
-          keptByTeamId: keeperTeamByPlaceholder.get(r.membership.id) ?? null,
-        })),
+        ...enriched
+          .filter((r) => !captainUserIdSet.has(r.user.id) && !keeperUserIdSet.has(r.user.id))
+          .map((r) => ({ ...r, keptByTeamId: null })),
+        ...placeholderRows
+          .filter((r) => {
+            const rawId = (r.membership.id as string).replace("placeholder:", "");
+            return !keeperPlaceholderIdSet.has(rawId);
+          })
+          .map((r) => ({ ...r, keptByTeamId: null })),
       ]);
     } catch (err) {
       console.error("List draft players error:", err);
