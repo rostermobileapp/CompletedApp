@@ -185,6 +185,7 @@ export default function DraftRoom() {
   }, [buzzerBanner]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const serverDriftRef = useRef(0);
+  const draftPlayersInvalidatedRef = useRef(false);
 
   // Initial fetch — poll every 5 s as a fallback safety net so late-joiners
   // and mobile browsers that backgrounded the app stay in sync even if their
@@ -210,6 +211,19 @@ export default function DraftRoom() {
         setLaunchAt(ms > Date.now() ? ms : null);
       } else {
         setLaunchAt(null);
+      }
+      // Force a fresh draft-players fetch the first time we see status=active so
+      // any pre-launch cached snapshot (which may include captains/keepers) is
+      // replaced with the correctly-filtered live list.
+      if (
+        initialBundle.draft?.status === "active" &&
+        !draftPlayersInvalidatedRef.current &&
+        initialBundle.draft?.leagueId
+      ) {
+        draftPlayersInvalidatedRef.current = true;
+        queryClient.invalidateQueries({
+          queryKey: ["/api/leagues", initialBundle.draft.leagueId],
+        });
       }
     }
   }, [initialBundle]);
@@ -497,6 +511,7 @@ export default function DraftRoom() {
       `draft-players?draftId=${draftId ?? ""}${draft?.seasonId ? `&seasonId=${draft.seasonId}` : ""}`,
     ],
     enabled: !!draft?.leagueId && !!draftId,
+    staleTime: 0,
   });
   const { data: league } = useQuery<any>({
     queryKey: ["/api/leagues", draft?.leagueId],

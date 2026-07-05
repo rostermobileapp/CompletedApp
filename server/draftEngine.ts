@@ -335,17 +335,16 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
     if (k.placeholderPlayerId) keeperSet.add(`placeholder:${k.placeholderPlayerId}`);
   }
 
-  // When skillRankingEnabled, players in the auto-pick schedule are in the live
-  // draft pool (they get auto-picked at their ranked round). Traditional keepers
-  // without a schedule entry remain excluded.
+  // Players in the auto-pick schedule are in the live draft pool — they get
+  // auto-picked at their scheduled round. This applies regardless of whether
+  // skillRankingEnabled is set; captain/keeper/buddy schedules must fire even
+  // when the general skill-ranking feature is off.
   const scheduledPlayerIds = new Set<string>();
-  if (draft.skillRankingEnabled) {
-    const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
-    if (schedule) {
-      for (const teamSlots of Object.values(schedule)) {
-        for (const slot of Object.values(teamSlots)) {
-          if (slot?.playerId) scheduledPlayerIds.add(slot.playerId);
-        }
+  const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
+  if (schedule) {
+    for (const teamSlots of Object.values(schedule)) {
+      for (const slot of Object.values(teamSlots)) {
+        if (slot?.playerId) scheduledPlayerIds.add(slot.playerId);
       }
     }
   }
@@ -512,7 +511,7 @@ async function maybeFireScheduledAutoPick(
 ): Promise<boolean> {
   if (!pickingTeamId) return false;
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
-  if (!draft || draft.status !== "active" || !draft.skillRankingEnabled) return false;
+  if (!draft || draft.status !== "active") return false;
 
   // Rank-based auto-picks are only applicable to positional draft styles,
   // not auction, which uses a completely different pick mechanism.
@@ -1377,11 +1376,13 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
   // Rebuild the auto-pick schedule at start time (not save time) so any
   // post-save keeper/skill-level edits are captured. Also stamps the current
   // skill-tier rank onto each draft_keepers row for record-keeping.
-  // Auto-pick schedule only applies to positional styles (snake/linear/3rd_round_reversal),
-  // never to auction drafts.
+  // Auto-pick schedule applies to all positional styles (snake/linear/3rd_round_reversal).
+  // It is built unconditionally — captain self-picks, keeper placements, and buddy
+  // auto-picks must fire regardless of whether the general skillRankingEnabled flag is set.
+  // Auction drafts use a completely different pick mechanism and are excluded.
   const startDraftStyle = draft.draftStyle || draft.roundType || "snake";
   let freshSchedule: AutoPickSchedule | null = null;
-  if (draft.skillRankingEnabled && draft.skillScale && startDraftStyle !== "auction") {
+  if (startDraftStyle !== "auction") {
     const memberships = await db
       .select({ userId: leagueMemberships.userId, skillLevel: leagueMemberships.skillLevel })
       .from(leagueMemberships)
@@ -1417,32 +1418,44 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
     }
 
     // Server-side invariant: block start if any team has duplicate keeper ranks.
-    // This mirrors the client-side wizard check and cannot be bypassed via the API.
-    for (const [teamId, keepers] of Object.entries(keepersByTeam)) {
-      const rankCount = new Map<string, number>();
-      for (const k of keepers) {
-        if (!k.rank) continue;
-        rankCount.set(k.rank, (rankCount.get(k.rank) || 0) + 1);
-      }
-      const dupes = [...rankCount.entries()].filter(([, n]) => n > 1).map(([r]) => r);
-      if (dupes.length > 0) {
-        return {
-          ok: false,
-          error: `Team ${teamId} has keepers with duplicate skill ranks (${dupes.join(", ")}). Resolve before starting.`,
-        };
+    // Only enforced when skillRankingEnabled — without it, ranks may be absent/partial.
+    if (draft.skillRankingEnabled) {
+      for (const [teamId, keepers] of Object.entries(keepersByTeam)) {
+        const rankCount = new Map<string, number>();
+        for (const k of keepers) {
+          if (!k.rank) continue;
+          rankCount.set(k.rank, (rankCount.get(k.rank) || 0) + 1);
+        }
+        const dupes = [...rankCount.entries()].filter(([, n]) => n > 1).map(([r]) => r);
+        if (dupes.length > 0) {
+          return {
+            ok: false,
+            error: `Team ${teamId} has keepers with duplicate skill ranks (${dupes.join(", ")}). Resolve before starting.`,
+          };
+        }
       }
     }
 
-    freshSchedule = buildAutoPickSchedule({
+    // Default to "numbers" scale when not explicitly set so buildAutoPickSchedule
+    // can still map captain/keeper/buddy ranks to rounds even without full skill ranking.
+    const skillScale = (draft.skillScale as "numbers" | "letters" | null) || "numbers";
+    const builtSchedule = buildAutoPickSchedule({
       draftOrder,
       totalRounds: draft.totalRounds,
       captainAssignments: (draft.captainAssignments as Record<string, string>) || {},
       skillLevels,
-      skillScale: draft.skillScale as "numbers" | "letters",
+      skillScale,
       keepersByTeam,
       buddyPairs,
       buddyRanksByUser,
     });
+
+    // Only persist the schedule if it contains at least one slot, so we don't
+    // silently overwrite a previously valid schedule with an empty one.
+    const hasSlots = Object.values(builtSchedule).some(
+      (slots) => Object.keys(slots).length > 0,
+    );
+    freshSchedule = hasSlots ? builtSchedule : null;
   }
 
   await db
