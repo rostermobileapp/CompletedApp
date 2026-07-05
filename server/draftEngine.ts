@@ -339,7 +339,9 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const keeperSet = new Set<string>();
   for (const k of keeperRows) {
     if (k.userId) keeperSet.add(k.userId);
-    if (k.placeholderPlayerId) keeperSet.add(`placeholder:${k.placeholderPlayerId}`);
+    // draft_keepers.placeholder_player_id is stored WITH the "placeholder:" prefix,
+    // so add it directly — do NOT prepend the prefix again (would double it).
+    if (k.placeholderPlayerId) keeperSet.add(k.placeholderPlayerId);
   }
 
   // Players in the auto-pick schedule are in the live draft pool — they get
@@ -579,6 +581,7 @@ async function maybeFireScheduledAutoPick(
         isNotNull(draftKeepers.placeholderPlayerId),
       ),
     );
+  console.log(`[Draft][AutoPick] Path2 team=${pickingTeamId} round=${round} phKeepers=${phKeeperRows.length}`);
   for (const pk of phKeeperRows) {
     if (!pk.placeholderPlayerId) continue;
     // pk.placeholderPlayerId is stored as "placeholder:{uuid}" (with prefix).
@@ -593,9 +596,12 @@ async function maybeFireScheduledAutoPick(
         .where(eq(placeholderPlayers.id, phUuid))
         .limit(1);
       rank = ph?.skillLevel ?? null;
+      console.log(`[Draft][AutoPick] Path2 ph=${phUuid} storedRank=${pk.rank} skillLevel=${ph?.skillLevel} resolvedRank=${rank}`);
     }
-    if (!rank) continue;
-    if (rankToRound(rank, skillScale) !== round) continue;
+    if (!rank) { console.log(`[Draft][AutoPick] Path2 skip ph=${phUuid} no rank`); continue; }
+    const mapped = rankToRound(rank, skillScale);
+    console.log(`[Draft][AutoPick] Path2 ph=${phUuid} rank=${rank} mappedRound=${mapped} currentRound=${round}`);
+    if (mapped !== round) continue;
     // Ensure it hasn't already been drafted.
     // draft_picks.placeholder_player_id stores the bare UUID (applyPick strips the prefix).
     const [alreadyPicked] = await db
@@ -608,7 +614,8 @@ async function maybeFireScheduledAutoPick(
         ),
       )
       .limit(1);
-    if (alreadyPicked) continue;
+    if (alreadyPicked) { console.log(`[Draft][AutoPick] Path2 skip ph=${phUuid} already picked`); continue; }
+    console.log(`[Draft][AutoPick] Path2 FIRING auto-pick for ph=${phUuid}`);
     // Pass "placeholder:{uuid}" directly — applyPick expects the prefixed form.
     await applyPick(draftId, pickingTeamId, pk.placeholderPlayerId, { isAutoScheduled: true });
     return true;
@@ -2021,6 +2028,17 @@ export async function rehydrateActiveDraftTimers() {
 
     // Rehydrate turn timers for active drafts
     if (draft.status === "active") {
+      // Before restarting the timer, check if the current turn should be auto-picked
+      // (e.g. a placeholder keeper whose auto-pick was lost when the server restarted).
+      const draftOrder = (draft.draftOrder as string[]) || [];
+      const draftStyle = draft.draftStyle || draft.roundType || "snake";
+      const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, draftStyle);
+      const didAutoPick = await maybeFireScheduledAutoPick(draft.id, draft.currentRound, pickingTeamId);
+      if (didAutoPick) {
+        console.log(`[Draft] Rehydrate: auto-picked scheduled slot for draft ${draft.id} round ${draft.currentRound}`);
+        continue;
+      }
+
       if (draft.currentTurnDeadline && new Date(draft.currentTurnDeadline).getTime() > Date.now()) {
         await startTurnTimer(draft.id);
       } else if (draft.currentTurnDeadline) {
