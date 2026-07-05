@@ -182,8 +182,10 @@ export async function getDraftStateBundle(draftId: string): Promise<DraftStateBu
 
   const draftOrder = (draft.draftOrder as string[]) || [];
   const style = draft.draftStyle || draft.roundType || "snake";
+  // Compute the picking team for both active and paused drafts so the UI
+  // can always show which team is on the clock (or up next when paused).
   const pickingTeamId =
-    draft.status === "active"
+    draft.status === "active" || draft.status === "paused"
       ? computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style)
       : null;
 

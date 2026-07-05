@@ -1088,11 +1088,20 @@ export default function DraftRoom() {
               Round {draft.currentRound} of {draft.totalRounds}
             </div>
             <div className="text-sm font-bold truncate">
-              {pickingTeam?.name || "Waiting…"}{" "}
-              {pickingCaptain && (
-                <span className="text-muted-foreground font-normal">
-                  · {pickingCaptain.user.firstName || pickingCaptain.user.displayName}
-                </span>
+              {pickingTeam ? (
+                <>
+                  {draft.status === "paused" && (
+                    <span className="text-muted-foreground font-normal text-xs mr-1">Up next:</span>
+                  )}
+                  {pickingTeam.name}
+                  {pickingCaptain && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}· {pickingCaptain.user.firstName || pickingCaptain.user.displayName}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Waiting…"
               )}
             </div>
           </div>
