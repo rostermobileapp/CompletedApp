@@ -352,7 +352,10 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
   const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
   const assignedGoalieIds = new Set(Object.values(goalieAssignments));
 
-  // Captains are pre-assigned to their teams and must never be in the draft pool.
+  // Captains are pre-assigned; they only enter the pool when a scheduled auto-pick
+  // slot exists for them (type "self"), so maybeFireScheduledAutoPick can find them.
+  // Manual pick routes have an additional guard that rejects captains even if they
+  // appear here, preventing accidental or malicious manual drafting.
   const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
   const captainIds = new Set(Object.values(captainAssignments).filter(Boolean));
 
@@ -362,7 +365,7 @@ export async function listAvailablePlayers(draftId: string): Promise<{ userId: s
     .filter((m) => !draftedSet.has(m.userId!))
     .filter((m) => !keeperSet.has(m.userId!) || scheduledPlayerIds.has(m.userId!))
     .filter((m) => !assignedGoalieIds.has(m.userId!))
-    .filter((m) => !captainIds.has(m.userId!))
+    .filter((m) => !captainIds.has(m.userId!) || scheduledPlayerIds.has(m.userId!))
     .filter((m) => {
       if (goalieMethod !== "included_with_skaters" && m.isGoalie) return false;
       return true;
@@ -412,6 +415,13 @@ export async function makePick(
     // Engine-level check; route may pre-allow commissioner override
     console.log(`[Draft ${draftId}] makePick FAILED: picker ${pickerUserId} is not captain of team ${pickingTeamId} (captain is ${team.captainId})`);
     return { ok: false, error: "You are not the captain of the picking team" };
+  }
+
+  // Block manual picks of captains — they are placed via scheduled auto-pick only.
+  const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+  const allCaptainIds = new Set(Object.values(captainAssignments).filter(Boolean));
+  if (allCaptainIds.has(playerId)) {
+    return { ok: false, error: "Player not available" };
   }
 
   const available = await listAvailablePlayers(draftId);
@@ -1075,6 +1085,14 @@ export async function commissionerPick(
   const style = draft.draftStyle || draft.roundType || "snake";
   const pickingTeamId = computePickingTeam(draftOrder, draft.currentRound, draft.currentTurn, style);
   if (!pickingTeamId) return { ok: false, error: "No active pick" };
+
+  // Block manual picks of captains — they are placed via scheduled auto-pick only.
+  const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+  const allCaptainIds = new Set(Object.values(captainAssignments).filter(Boolean));
+  if (allCaptainIds.has(playerId)) {
+    return { ok: false, error: "Player not available" };
+  }
+
   const available = await listAvailablePlayers(draftId);
   const found = available.find((a) => a.userId === playerId);
   if (!found) {
