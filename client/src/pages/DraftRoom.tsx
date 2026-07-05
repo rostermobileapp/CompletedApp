@@ -558,11 +558,17 @@ export default function DraftRoom() {
     const buddyIds = new Set<string>(
       (bundle?.buddyPairs || []).flatMap((p: any) => p.userIds as string[]),
     );
+    // Players already assigned to one of this draft's teams are pre-placed
+    // and must never appear as draftable.
+    const draftTeamIds = new Set<string>(
+      (bundle?.draftOrderTeams || []).map((t: any) => t.id as string),
+    );
     return members.filter((m: any) => {
       if (draftedSet.has(m.user.id)) return false;
       if (captainIds.has(m.user.id)) return false;
       if (keeperUserIds.has(m.user.id)) return false;
       if (buddyIds.has(m.user.id)) return false;
+      if (m.membership.assignedTeamId && draftTeamIds.has(m.membership.assignedTeamId)) return false;
       if (
         draft?.goalieMethod &&
         draft.goalieMethod !== "included_with_skaters" &&
@@ -644,13 +650,17 @@ export default function DraftRoom() {
       draft.goalieMethod !== "included_with_skaters" &&
       m.membership.isGoalie;
 
+    const draftTeamIds = new Set<string>(
+      (bundle?.draftOrderTeams || []).map((t: any) => t.id as string),
+    );
     let list = deduped.filter(
       (m: any) =>
         !isExcludedGoalie(m) &&
         !draftedSet.has(m.user.id) &&
         !captainIds.has(m.user.id) &&
         !keeperUserIds.has(m.user.id) &&
-        !buddyUserIds.has(m.user.id),
+        !buddyUserIds.has(m.user.id) &&
+        !(m.membership.assignedTeamId && draftTeamIds.has(m.membership.assignedTeamId)),
     );
 
     // Position multi-select filter (empty = all positions shown)

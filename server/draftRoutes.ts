@@ -436,6 +436,9 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const keeperUserIdSet = new Set<string>();
       const keeperPlaceholderIdSet = new Set<string>();
       const buddyUserIdSet = new Set<string>();
+      // Team IDs that belong to this draft — any member already assigned to one
+      // of these teams is pre-placed and must be excluded from the pick pool.
+      let draftTeamIds = new Set<string>();
 
       if (draftIdParam) {
         // Load captain assignments from the draft record, falling back to
@@ -452,9 +455,10 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           for (const uid of Object.values(assignmentsMap)) {
             if (uid && !uid.startsWith("placeholder:")) captainUserIdSet.add(uid);
           }
-          // Fallback: for any team in the draft order not covered by the map,
+            // Fallback: for any team in the draft order not covered by the map,
           // read captainId directly from the teams table.
           const draftOrder = (draftRow.draftOrder as string[]) || [];
+          draftTeamIds = new Set(draftOrder);
           const uncoveredTeamIds = draftOrder.filter((tid) => !assignmentsMap[tid]);
           if (uncoveredTeamIds.length > 0) {
             const teamRows = await db
@@ -495,13 +499,20 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
 
       return res.json([
         ...enriched
-          .filter((r) => !captainUserIdSet.has(r.user.id) && !keeperUserIdSet.has(r.user.id) && !buddyUserIdSet.has(r.user.id))
+          .filter((r) =>
+            !captainUserIdSet.has(r.user.id) &&
+            !keeperUserIdSet.has(r.user.id) &&
+            !buddyUserIdSet.has(r.user.id) &&
+            // Auto-exclude any player already assigned to one of the draft's teams —
+            // they are pre-placed and should never appear in the pick pool.
+            !(r.membership.assignedTeamId && draftTeamIds.has(r.membership.assignedTeamId)),
+          )
           .map((r) => ({ ...r, keptByTeamId: null })),
         ...placeholderRows
           .filter((r) => {
-            // membership.id is "placeholder:<uuid>" and placeholderPlayerId in
-            // draft_keepers is stored with the same prefix, so compare directly.
-            return !keeperPlaceholderIdSet.has(r.membership.id as string);
+            if (keeperPlaceholderIdSet.has(r.membership.id as string)) return false;
+            if (r.membership.assignedTeamId && draftTeamIds.has(r.membership.assignedTeamId)) return false;
+            return true;
           })
           .map((r) => ({ ...r, keptByTeamId: null })),
       ]);
