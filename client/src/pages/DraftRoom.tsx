@@ -549,9 +549,12 @@ export default function DraftRoom() {
     const captainIds = new Set<string>(
       (bundle?.draftOrderTeams || []).map((t: any) => t.captainId).filter(Boolean),
     );
-    const keeperUserIds = new Set<string>(
-      (bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
-    );
+    // Include both real-user keeper IDs and placeholder keeper IDs so that
+    // placeholder keepers (stored as "placeholder:<uuid>") are also excluded.
+    const keeperUserIds = new Set<string>([
+      ...(bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
+      ...(bundle?.keepers || []).map((k: any) => k.placeholderPlayerId).filter(Boolean),
+    ]);
     return members.filter((m: any) => {
       if (draftedSet.has(m.user.id)) return false;
       if (captainIds.has(m.user.id)) return false;
@@ -625,9 +628,12 @@ export default function DraftRoom() {
     const captainIds = new Set<string>(
       (bundle?.draftOrderTeams || []).map((t: any) => t.captainId).filter(Boolean),
     );
-    const keeperUserIds = new Set<string>(
-      (bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
-    );
+    // Include both real-user keeper IDs and placeholder keeper IDs so that
+    // placeholder keepers (stored as "placeholder:<uuid>") are also excluded.
+    const keeperUserIds = new Set<string>([
+      ...(bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
+      ...(bundle?.keepers || []).map((k: any) => k.placeholderPlayerId).filter(Boolean),
+    ]);
 
     const isExcludedGoalie = (m: any) =>
       draft?.goalieMethod &&

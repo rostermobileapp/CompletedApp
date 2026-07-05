@@ -488,8 +488,9 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           .map((r) => ({ ...r, keptByTeamId: null })),
         ...placeholderRows
           .filter((r) => {
-            const rawId = (r.membership.id as string).replace("placeholder:", "");
-            return !keeperPlaceholderIdSet.has(rawId);
+            // membership.id is "placeholder:<uuid>" and placeholderPlayerId in
+            // draft_keepers is stored with the same prefix, so compare directly.
+            return !keeperPlaceholderIdSet.has(r.membership.id as string);
           })
           .map((r) => ({ ...r, keptByTeamId: null })),
       ]);
