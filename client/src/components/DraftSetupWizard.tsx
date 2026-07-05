@@ -613,8 +613,9 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   className="p-3 bg-muted/40 border border-border rounded-lg text-sm text-muted-foreground"
                   data-testid="commissioner-mode-notice"
                 >
-                  You'll physically draft each player for every team. Captain
-                  assignments are not needed and will be cleared.
+                  You'll physically draft each player for every team. You can still
+                  designate one pre-assigned player per team below — they'll be excluded
+                  from the draft pool and placed directly on their team.
                 </div>
               )}
 
@@ -624,7 +625,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 </p>
               )}
 
-              {pickMode === "captains" && members.length > 0 && (
+              {members.length > 0 && (
                 <input
                   type="text"
                   value={captainSearch}
@@ -635,7 +636,6 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 />
               )}
 
-              {pickMode === "captains" && (
               <div className="space-y-2">
                 {teams.map((team) => {
                   const assignedId = captainAssignments[team.id] || "";
@@ -675,7 +675,9 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                         className="w-full p-2 bg-background border border-border rounded text-sm"
                         data-testid={`select-captain-${team.id}`}
                       >
-                        <option value="">— Select captain —</option>
+                        <option value="">
+                          {pickMode === "commissioner" ? "— None —" : "— Select captain —"}
+                        </option>
                         {filtered.map((m) => (
                           <option key={m.user.id} value={m.user.id}>
                             {memberName(m)}
@@ -686,7 +688,6 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   );
                 })}
               </div>
-              )}
 
               {pickMode === "captains" && teams.some((t) => !captainAssignments[t.id]) && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
