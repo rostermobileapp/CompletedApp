@@ -451,13 +451,12 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
         buddyPairs: buddyPairs.length ? buddyPairs : undefined,
         goalieAssignments:
           goalieMethod === "included_with_skaters" ? undefined : goalieAssignments,
-        // In commissioner mode there are no captains — never send assignments.
-        captainAssignments:
-          pickMode === "commissioner"
-            ? undefined
-            : Object.keys(captainAssignments).length
-              ? captainAssignments
-              : undefined,
+        // Send captain assignments in all pick modes — captains are pre-assigned
+        // to their teams and must be excluded from the draft pick pool regardless
+        // of whether the commissioner or the captains themselves make picks.
+        captainAssignments: Object.keys(captainAssignments).length
+          ? captainAssignments
+          : undefined,
         keepersByTeam: Object.keys(keepersByTeam).length
           ? Object.fromEntries(
               Object.entries(keepersByTeam).map(([teamId, userIds]) => [
