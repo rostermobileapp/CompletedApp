@@ -565,9 +565,9 @@ async function maybeFireScheduledAutoPick(
     }
   }
 
-  // Path 2: Placeholder keeper whose stored rank maps to this round.
-  // Handles drafts started before placeholder keepers were included in the schedule
-  // and is the primary fallback mechanism for placeholder keepers going forward.
+  // Path 2: Placeholder keeper whose rank maps to this round.
+  // draft_keepers.rank is never populated for placeholder keepers by either save path —
+  // their rank lives in placeholder_players.skill_level instead.
   const skillScale = (draft.skillScale as "numbers" | "letters" | null) || "numbers";
   const phKeeperRows = await db
     .select()
@@ -580,21 +580,37 @@ async function maybeFireScheduledAutoPick(
       ),
     );
   for (const pk of phKeeperRows) {
-    if (!pk.rank || !pk.placeholderPlayerId) continue;
-    if (rankToRound(pk.rank, skillScale) !== round) continue;
+    if (!pk.placeholderPlayerId) continue;
+    // pk.placeholderPlayerId is stored as "placeholder:{uuid}" (with prefix).
+    // Strip the prefix to query the placeholder_players table (id is bare UUID).
+    const phUuid = pk.placeholderPlayerId.replace(/^placeholder:/, "");
+    // Prefer the stamped rank on the keeper row; fall back to the player's skill_level.
+    let rank = pk.rank;
+    if (!rank) {
+      const [ph] = await db
+        .select({ skillLevel: placeholderPlayers.skillLevel })
+        .from(placeholderPlayers)
+        .where(eq(placeholderPlayers.id, phUuid))
+        .limit(1);
+      rank = ph?.skillLevel ?? null;
+    }
+    if (!rank) continue;
+    if (rankToRound(rank, skillScale) !== round) continue;
     // Ensure it hasn't already been drafted.
+    // draft_picks.placeholder_player_id stores the bare UUID (applyPick strips the prefix).
     const [alreadyPicked] = await db
       .select()
       .from(draftPicks)
       .where(
         and(
           eq(draftPicks.draftId, draftId),
-          eq(draftPicks.placeholderPlayerId, pk.placeholderPlayerId),
+          eq(draftPicks.placeholderPlayerId, phUuid),
         ),
       )
       .limit(1);
     if (alreadyPicked) continue;
-    await applyPick(draftId, pickingTeamId, `placeholder:${pk.placeholderPlayerId}`, { isAutoScheduled: true });
+    // Pass "placeholder:{uuid}" directly — applyPick expects the prefixed form.
+    await applyPick(draftId, pickingTeamId, pk.placeholderPlayerId, { isAutoScheduled: true });
     return true;
   }
 
@@ -1475,11 +1491,24 @@ export async function startDraft(draftId: string): Promise<{ ok: boolean; error?
           await db.update(draftKeepers).set({ rank }).where(eq(draftKeepers.id, k.id));
         }
       } else if (k.placeholderPlayerId) {
-        // Placeholder keeper: no skillLevels entry — use the rank stored in draft_keepers.
+        // draft_keepers.placeholder_player_id stores "placeholder:{uuid}" (with prefix).
+        // Strip the prefix to query placeholder_players (id is bare UUID),
+        // and use the value as-is for keepersByTeam (buildAutoPickSchedule expects the prefixed form).
+        const phUuid = k.placeholderPlayerId.replace(/^placeholder:/, "");
+        // draft_keepers.rank is never populated for placeholder keepers — fall back to skill_level.
+        let phRank = k.rank;
+        if (!phRank) {
+          const [ph] = await db
+            .select({ skillLevel: placeholderPlayers.skillLevel })
+            .from(placeholderPlayers)
+            .where(eq(placeholderPlayers.id, phUuid))
+            .limit(1);
+          phRank = ph?.skillLevel ?? null;
+        }
         if (!keepersByTeam[k.teamId]) keepersByTeam[k.teamId] = [];
         keepersByTeam[k.teamId].push({
-          userId: `placeholder:${k.placeholderPlayerId}`,
-          rank: k.rank || undefined,
+          userId: k.placeholderPlayerId,   // already "placeholder:{uuid}"
+          rank: phRank || undefined,
         });
       }
     }
