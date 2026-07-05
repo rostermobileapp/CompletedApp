@@ -590,12 +590,56 @@ export async function terminateDraft(draftId: string) {
     .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
     .where(eq(drafts.id, draftId));
 
-  // Place only the captains on their teams.
   const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
+
+  // Build the set of real captain userIds so we can exclude them from the reset.
+  const captainUserIds = Object.values(captainAssignments).filter(
+    (uid) => uid && !uid.startsWith("placeholder:"),
+  );
+
+  // ── Step 1: free ALL non-captain players in this league ──────────────────
+  // Get all team IDs that belong to this league (so we only touch this league).
+  const leagueTeams = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.leagueId, draft.leagueId));
+  const leagueTeamIds = leagueTeams.map((t) => t.id);
+
+  if (leagueTeamIds.length > 0) {
+    // Remove non-captains from team_memberships for every team in this league.
+    const tmWhere =
+      captainUserIds.length > 0
+        ? and(
+            inArray(teamMemberships.teamId, leagueTeamIds),
+            sql`${teamMemberships.userId} NOT IN (${sql.join(
+              captainUserIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})`,
+          )
+        : inArray(teamMemberships.teamId, leagueTeamIds);
+
+    await db.delete(teamMemberships).where(tmWhere);
+  }
+
+  // Clear assignedTeamId for non-captains in league_memberships.
+  const lmWhere =
+    captainUserIds.length > 0
+      ? and(
+          eq(leagueMemberships.leagueId, draft.leagueId),
+          sql`${leagueMemberships.userId} NOT IN (${sql.join(
+            captainUserIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+        )
+      : eq(leagueMemberships.leagueId, draft.leagueId);
+
+  await db.update(leagueMemberships).set({ assignedTeamId: null }).where(lmWhere);
+
+  // ── Step 2: place only the captains on their teams ────────────────────────
   for (const [teamId, userId] of Object.entries(captainAssignments)) {
     if (!userId || userId.startsWith("placeholder:")) continue;
 
-    // 1) team_memberships
+    // team_memberships
     const [existing] = await db
       .select()
       .from(teamMemberships)
@@ -615,20 +659,13 @@ export async function terminateDraft(draftId: string) {
         .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.userId, userId)));
     }
 
-    // 2) league_memberships.assignedTeamId
-    const [lm] = await db
-      .select()
-      .from(leagueMemberships)
+    // league_memberships.assignedTeamId
+    await db
+      .update(leagueMemberships)
+      .set({ assignedTeamId: teamId })
       .where(
         and(eq(leagueMemberships.leagueId, draft.leagueId), eq(leagueMemberships.userId, userId)),
-      )
-      .limit(1);
-    if (lm && lm.assignedTeamId !== teamId) {
-      await db
-        .update(leagueMemberships)
-        .set({ assignedTeamId: teamId })
-        .where(eq(leagueMemberships.id, lm.id));
-    }
+      );
   }
 
   await broadcastState(draftId);
