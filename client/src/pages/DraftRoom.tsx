@@ -79,6 +79,7 @@ interface DraftPick {
   draftId: string;
   teamId: string;
   playerId: string | null;
+  placeholderPlayerId?: string | null;
   round: number;
   pick: number;
   pickInRound: number;
@@ -591,6 +592,12 @@ export default function DraftRoom() {
     return m;
   }, [members]);
 
+  const getPickMember = (p: DraftPick) => {
+    if (p.playerId) return memberById.get(p.playerId);
+    if (p.placeholderPlayerId) return memberById.get(`placeholder:${p.placeholderPlayerId}`);
+    return null;
+  };
+
   const buddyUserIds = useMemo(() => {
     const s = new Set<string>();
     bundle?.buddyPairs.forEach((pair) => pair.userIds.forEach((uid) => s.add(uid)));
@@ -1056,7 +1063,7 @@ export default function DraftRoom() {
   const canUndo =
     isCommissioner && draft.status === "active" && !!lastPrimaryPick && undoSecondsLeft > 0;
   const undonePlayer =
-    lastPrimaryPick?.playerId ? memberById.get(lastPrimaryPick.playerId) : null;
+    lastPrimaryPick ? getPickMember(lastPrimaryPick) : null;
 
   return (
     <div className="h-dvh flex flex-col bg-blue-600 dark:bg-blue-900 overflow-hidden">
@@ -1133,7 +1140,7 @@ export default function DraftRoom() {
             {isCommissioner && draft.status === "active" && lastPrimaryPick && (
               <button
                 onClick={() => {
-                  const pickedMember = lastPrimaryPick.playerId ? memberById.get(lastPrimaryPick.playerId) : null;
+                  const pickedMember = getPickMember(lastPrimaryPick);
                   const name = pickedMember?.user.firstName || pickedMember?.user.displayName || "this pick";
                   if (window.confirm(`Reject ${name}? This will remove the pick and reopen the slot for a manual pick.`)) {
                     flagPickMutation.mutate({ pickId: lastPrimaryPick.id });
@@ -1975,7 +1982,7 @@ export default function DraftRoom() {
                               R{p.round} forfeit
                             </span>
                           );
-                        const player = p.playerId ? memberById.get(p.playerId) : null;
+                        const player = getPickMember(p);
                         return (
                           <span
                             key={p.id}
@@ -2253,7 +2260,7 @@ export default function DraftRoom() {
                             R{p.round} forfeit
                           </span>
                         );
-                      const player = p.playerId ? memberById.get(p.playerId) : null;
+                      const player = getPickMember(p);
                       return (
                         <span
                           key={p.id}
@@ -2421,7 +2428,7 @@ export default function DraftRoom() {
                       </div>
                     );
                   }
-                  const player = p.playerId ? memberById.get(p.playerId) : null;
+                  const player = getPickMember(p);
                   if (!player) return null;
                   return (
                     <div key={p.id} className="flex items-center gap-1">
@@ -2474,7 +2481,7 @@ export default function DraftRoom() {
                       {isCommissioner && draft.status === "active" && !p.isAutoBuddy && (
                         <button
                           onClick={() => {
-                            const pm = p.playerId ? memberById.get(p.playerId) : null;
+                            const pm = getPickMember(p);
                             const name = pm?.user.firstName || pm?.user.displayName || "this pick";
                             if (window.confirm(`Reject ${name}? This will remove the pick and reopen the slot for a manual pick.`)) {
                               flagPickMutation.mutate({ pickId: p.id });
