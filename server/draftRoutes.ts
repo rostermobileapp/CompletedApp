@@ -268,7 +268,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
           if (seen.has(pid)) continue;
           seen.add(pid);
           if (pid.startsWith("placeholder:")) {
-            await db.insert(draftKeepers).values({ draftId, userId: null, placeholderPlayerId: pid, teamId });
+            await db.insert(draftKeepers).values({ draftId, userId: null, placeholderPlayerId: pid, teamId, rank: rank ?? null });
           } else {
             await db.insert(draftKeepers).values({ draftId, userId: pid, placeholderPlayerId: null, teamId, rank: rank ?? null });
           }
@@ -627,6 +627,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
                   userId: null,
                   placeholderPlayerId: pid,
                   teamId,
+                  rank: rank ?? null,
                 });
               } else {
                 await db.insert(draftKeepers).values({
