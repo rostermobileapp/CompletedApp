@@ -531,8 +531,12 @@ export default function DraftRoom() {
 
   const availablePlayers = useMemo(() => {
     if (!members) return [];
-    const captainIds = new Set(Object.values((draft?.captainAssignments as Record<string, string>) || {}).filter(Boolean));
-    const keeperUserIds = new Set((bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean));
+    const captainIds = new Set<string>(
+      (bundle?.draftOrderTeams || []).map((t: any) => t.captainId).filter(Boolean),
+    );
+    const keeperUserIds = new Set<string>(
+      (bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
+    );
     return members.filter((m: any) => {
       if (draftedSet.has(m.user.id)) return false;
       if (captainIds.has(m.user.id)) return false;
@@ -546,7 +550,7 @@ export default function DraftRoom() {
       }
       return true;
     });
-  }, [members, draftedSet, draft, bundle?.keepers]);
+  }, [members, draftedSet, draft, bundle?.keepers, bundle?.draftOrderTeams]);
 
   const teamById = useMemo(() => {
     const m = new Map<string, any>();
@@ -600,8 +604,15 @@ export default function DraftRoom() {
     }
     const deduped = Array.from(byName.values());
 
-    // ── Exclude drafted players and captains from the pick pool ──
-    const captainIds = new Set(Object.values((draft?.captainAssignments as Record<string, string>) || {}).filter(Boolean));
+    // ── Exclude drafted players, captains, and keepers from the pick pool ──
+    // Use draftOrderTeams (pre-resolved by server) for captain IDs — more
+    // reliable than re-parsing captainAssignments directly.
+    const captainIds = new Set<string>(
+      (bundle?.draftOrderTeams || []).map((t: any) => t.captainId).filter(Boolean),
+    );
+    const keeperUserIds = new Set<string>(
+      (bundle?.keepers || []).map((k: any) => k.userId).filter(Boolean),
+    );
 
     const isExcludedGoalie = (m: any) =>
       draft?.goalieMethod &&
@@ -609,7 +620,11 @@ export default function DraftRoom() {
       m.membership.isGoalie;
 
     let list = deduped.filter(
-      (m: any) => !isExcludedGoalie(m) && !draftedSet.has(m.user.id) && !captainIds.has(m.user.id),
+      (m: any) =>
+        !isExcludedGoalie(m) &&
+        !draftedSet.has(m.user.id) &&
+        !captainIds.has(m.user.id) &&
+        !keeperUserIds.has(m.user.id),
     );
 
     // Position multi-select filter (empty = all positions shown)
@@ -727,7 +742,7 @@ export default function DraftRoom() {
     });
 
     return list;
-  }, [members, draftedSet, scheduledPlayerIds, draft, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
+  }, [members, draftedSet, scheduledPlayerIds, draft, bundle?.keepers, bundle?.draftOrderTeams, filterPositions, filterHanded, filterMinPoints, filterMaxPoints, filterMaxAge, filterSkills, sortField, sortDir]);
 
   const pickMutation = useMutation({
     mutationFn: async (playerId: string) => {
