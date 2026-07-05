@@ -3384,7 +3384,7 @@ export class DatabaseStorage implements IStorage {
   // (leagueId set) or via a team in the league.
   async getLeaguePlaceholderPlayers(leagueId: string): Promise<PlaceholderPlayer[]> {
     const rows = await db
-      .select({ ph: placeholderPlayers })
+      .select({ ph: placeholderPlayers, resolvedTeamId: teams.id })
       .from(placeholderPlayers)
       .leftJoin(teams, eq(placeholderPlayers.teamId, teams.id))
       .where(or(
@@ -3397,7 +3397,15 @@ export class DatabaseStorage implements IStorage {
     for (const r of rows) {
       if (seen.has(r.ph.id)) continue;
       seen.add(r.ph.id);
-      out.push(r.ph);
+      // If the placeholder has a team_id but the team no longer exists (was
+      // deleted), the left-join produces a null resolvedTeamId.  Treat it as
+      // a free agent by clearing the stale reference so the player shows up
+      // in the Free Agents bucket instead of disappearing entirely.
+      if (r.ph.teamId !== null && r.resolvedTeamId === null) {
+        out.push({ ...r.ph, teamId: null });
+      } else {
+        out.push(r.ph);
+      }
     }
     return out;
   }
