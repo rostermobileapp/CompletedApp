@@ -268,13 +268,19 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // stop updating it when the formula changes.
   const userOverrodeRoundsRef = useRef(false);
 
-  // Default rounds = ⌈total members / teams⌉; stays live until user edits.
+  // Default rounds = ⌈draftable players / teams⌉; stays live until user edits.
+  // When goalies are pre-assigned (not "included_with_skaters"), they are exempt
+  // from the draft pool so they are excluded from the player count.
   const suggestedRounds = useMemo(() => {
     const teamCount = Math.max(1, draftOrder.length || 0);
-    const totalPlayers = members.length;
-    if (totalPlayers === 0) return 1;
-    return Math.max(1, Math.ceil(totalPlayers / teamCount));
-  }, [members.length, draftOrder.length]);
+    const goalieCount =
+      goalieMethod !== "included_with_skaters"
+        ? members.filter((m) => m.membership.isGoalie).length
+        : 0;
+    const draftablePlayers = Math.max(0, members.length - goalieCount);
+    if (draftablePlayers === 0) return 1;
+    return Math.max(1, Math.ceil(draftablePlayers / teamCount));
+  }, [members, draftOrder.length, goalieMethod]);
 
   // Rank scale size mirrors the number of rounds so each rank maps 1:1 to a round.
   // Letters cap at 26 (A–Z); numbers can go up to 99.
