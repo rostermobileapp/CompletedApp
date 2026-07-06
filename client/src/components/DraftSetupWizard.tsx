@@ -16,7 +16,6 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Check,
   Plus,
   Trash2,
@@ -165,8 +164,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
   // Keepers — players designated to stay on their team without going through the draft
   // Record<teamId, userId[]>
   const [keepersByTeam, setKeepersByTeam] = useState<Record<string, string[]>>({});
-  // Which team keeper dropdowns are open
-  const [openKeeperDropdowns, setOpenKeeperDropdowns] = useState<Set<string>>(new Set());
+  const [keeperSearch, setKeeperSearch] = useState<Record<string, string>>({});
 
   // Buddy add-row filter (replaces the old <select>)
   const [buddySearch, setBuddySearch] = useState("");
@@ -1126,20 +1124,14 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                   .map((id) => dedupedMembers.find((m) => m.user.id === id))
                   .filter(Boolean) as typeof dedupedMembers;
 
-                const isOpen = openKeeperDropdowns.has(team.id);
-                const closeDropdown = () =>
-                  setOpenKeeperDropdowns((prev) => {
-                    const next = new Set(prev);
-                    next.delete(team.id);
-                    return next;
-                  });
-                const toggleDropdown = () =>
-                  setOpenKeeperDropdowns((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(team.id)) next.delete(team.id);
-                    else next.add(team.id);
-                    return next;
-                  });
+                const searchQ = (keeperSearch[team.id] || "").trim().toLowerCase();
+                const filteredAssigned = assignedNonCaptains.filter(
+                  (m) => !searchQ || memberName(m).toLowerCase().includes(searchQ),
+                );
+                const filteredFreeAgents = availableFreeAgents.filter(
+                  (m) => !searchQ || memberName(m).toLowerCase().includes(searchQ),
+                );
+                const showList = dropdownOptions.length > 0 && (searchQ.length > 0 || dropdownOptions.length <= 12);
 
                 return (
                   <div
@@ -1167,121 +1159,114 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                       </div>
                     )}
 
-                    {/* Multi-select dropdown */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={toggleDropdown}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-background border border-border rounded-lg text-sm text-left hover:bg-muted/50 transition-colors"
-                        data-testid={`keeper-dropdown-${team.id}`}
-                      >
-                        <span className="text-muted-foreground truncate">
-                          {kept.length === 0
-                            ? "Add additional keepers…"
-                            : `${kept.length} additional player${kept.length !== 1 ? "s" : ""} kept`}
-                        </span>
-                        <ChevronDown
-                          className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                        />
-                      </button>
+                    {/* Search input */}
+                    <input
+                      type="text"
+                      placeholder={dropdownOptions.length === 0 ? "No players available" : "Search players to keep…"}
+                      disabled={dropdownOptions.length === 0}
+                      value={keeperSearch[team.id] || ""}
+                      onChange={(e) =>
+                        setKeeperSearch((prev) => ({ ...prev, [team.id]: e.target.value }))
+                      }
+                      className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid={`keeper-search-${team.id}`}
+                    />
 
-                      {isOpen && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={closeDropdown} />
-                          <div className="absolute z-20 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                            {dropdownOptions.length === 0 ? (
-                              <div className="px-3 py-3 text-sm text-muted-foreground text-center">
-                                No players available
-                              </div>
-                            ) : (
-                              <>
-                                {/* Section header: assigned players */}
-                                {assignedNonCaptains.length > 0 && availableFreeAgents.length > 0 && (
-                                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 border-b border-border/50">
-                                    On this team
-                                  </div>
-                                )}
-                                {assignedNonCaptains.map((m) => {
-                                  const isKept = kept.includes(m.user.id);
-                                  return (
-                                    <button
-                                      key={m.user.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setKeepersByTeam((prev) => {
-                                          const cur = prev[team.id] || [];
-                                          const next = isKept
-                                            ? cur.filter((id) => id !== m.user.id)
-                                            : [...cur, m.user.id];
-                                          return { ...prev, [team.id]: next };
-                                        });
-                                      }}
-                                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-muted/60 transition-colors border-b border-border/50 last:border-0"
-                                      data-testid={`keeper-toggle-${m.user.id}`}
-                                    >
-                                      <div
-                                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                                          isKept
-                                            ? "bg-blue-500 border-blue-500"
-                                            : "border-border bg-background"
-                                        }`}
-                                      >
-                                        {isKept && <Check className="w-3 h-3 text-white" />}
-                                      </div>
-                                      <span className="flex-1 truncate">{memberName(m)}</span>
-                                      {m.membership.isGoalie && (
-                                        <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">G</span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                                {/* Section header: free agents */}
-                                {availableFreeAgents.length > 0 && (
-                                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 border-b border-border/50">
-                                    Free agents
-                                  </div>
-                                )}
-                                {availableFreeAgents.map((m) => {
-                                  const isKept = kept.includes(m.user.id);
-                                  return (
-                                    <button
-                                      key={m.user.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setKeepersByTeam((prev) => {
-                                          const cur = prev[team.id] || [];
-                                          const next = isKept
-                                            ? cur.filter((id) => id !== m.user.id)
-                                            : [...cur, m.user.id];
-                                          return { ...prev, [team.id]: next };
-                                        });
-                                      }}
-                                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-muted/60 transition-colors border-b border-border/50 last:border-0"
-                                      data-testid={`keeper-toggle-${m.user.id}`}
-                                    >
-                                      <div
-                                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                                          isKept
-                                            ? "bg-blue-500 border-blue-500"
-                                            : "border-border bg-background"
-                                        }`}
-                                      >
-                                        {isKept && <Check className="w-3 h-3 text-white" />}
-                                      </div>
-                                      <span className="flex-1 truncate">{memberName(m)}</span>
-                                      <span className="text-[10px] text-muted-foreground shrink-0">FA</span>
-                                      {m.membership.isGoalie && (
-                                        <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">G</span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </>
-                            )}
+                    {/* Inline filtered player list */}
+                    {showList && (
+                      <div className="border border-border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                        {filteredAssigned.length === 0 && filteredFreeAgents.length === 0 ? (
+                          <div className="px-3 py-3 text-sm text-muted-foreground text-center">
+                            No players match "{keeperSearch[team.id]}"
                           </div>
-                        </>
-                      )}
-                    </div>
+                        ) : (
+                          <>
+                            {filteredAssigned.length > 0 && filteredFreeAgents.length > 0 && (
+                              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 border-b border-border/50">
+                                On this team
+                              </div>
+                            )}
+                            {filteredAssigned.map((m) => {
+                              const isKept = kept.includes(m.user.id);
+                              return (
+                                <button
+                                  key={m.user.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setKeepersByTeam((prev) => {
+                                      const cur = prev[team.id] || [];
+                                      const next = isKept
+                                        ? cur.filter((id) => id !== m.user.id)
+                                        : [...cur, m.user.id];
+                                      return { ...prev, [team.id]: next };
+                                    });
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-muted/60 transition-colors border-b border-border/50 last:border-0"
+                                  data-testid={`keeper-toggle-${m.user.id}`}
+                                >
+                                  <div
+                                    className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                                      isKept ? "bg-blue-500 border-blue-500" : "border-border bg-background"
+                                    }`}
+                                  >
+                                    {isKept && <Check className="w-3 h-3 text-white" />}
+                                  </div>
+                                  <span className="flex-1 truncate">{memberName(m)}</span>
+                                  {m.membership.isGoalie && (
+                                    <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">G</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                            {filteredFreeAgents.length > 0 && (
+                              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 border-b border-border/50">
+                                Free agents
+                              </div>
+                            )}
+                            {filteredFreeAgents.map((m) => {
+                              const isKept = kept.includes(m.user.id);
+                              return (
+                                <button
+                                  key={m.user.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setKeepersByTeam((prev) => {
+                                      const cur = prev[team.id] || [];
+                                      const next = isKept
+                                        ? cur.filter((id) => id !== m.user.id)
+                                        : [...cur, m.user.id];
+                                      return { ...prev, [team.id]: next };
+                                    });
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-muted/60 transition-colors border-b border-border/50 last:border-0"
+                                  data-testid={`keeper-toggle-${m.user.id}`}
+                                >
+                                  <div
+                                    className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                                      isKept ? "bg-blue-500 border-blue-500" : "border-border bg-background"
+                                    }`}
+                                  >
+                                    {isKept && <Check className="w-3 h-3 text-white" />}
+                                  </div>
+                                  <span className="flex-1 truncate">{memberName(m)}</span>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">FA</span>
+                                  {m.membership.isGoalie && (
+                                    <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1 rounded font-medium">G</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Hint when list is hidden (many players, no query yet) */}
+                    {dropdownOptions.length > 12 && !searchQ && (
+                      <p className="text-xs text-muted-foreground">
+                        Type a name above to find a player to keep.
+                      </p>
+                    )}
 
                     {/* Additional keeper chips (excluding captain — shown separately above) */}
                     {keptMembers.length > 0 && (
