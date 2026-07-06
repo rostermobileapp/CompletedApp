@@ -905,7 +905,11 @@ export default function DraftRoom() {
         const captain = captainId ? memberById.get(captainId) : null;
         const teamKeepers: any[] = (bundle.keepers || []).filter((k: any) => k.teamId === teamId);
         const keeperPlayerIds = new Set(teamKeepers.map((k: any) => k.userId).filter(Boolean));
-        const keeperPlaceholderIds = new Set(teamKeepers.map((k: any) => k.placeholderPlayerId).filter(Boolean));
+        const keeperPlaceholderIds = new Set(
+          teamKeepers
+            .map((k: any) => (k.placeholderPlayerId || "").replace(/^placeholder:/, ""))
+            .filter(Boolean),
+        );
         const validPicks = teamPicks.filter((p: any) => !p.forfeited).length;
 
         const card = document.createElement("div");
@@ -2165,7 +2169,9 @@ export default function DraftRoom() {
                   teamKeepers.map((k: any) => k.userId).filter(Boolean),
                 );
                 const keeperPlaceholderIds = new Set<string>(
-                  teamKeepers.map((k: any) => k.placeholderPlayerId).filter(Boolean),
+                  teamKeepers
+                    .map((k: any) => (k.placeholderPlayerId || "").replace(/^placeholder:/, ""))
+                    .filter(Boolean),
                 );
 
                 return (
