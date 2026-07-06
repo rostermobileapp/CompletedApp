@@ -979,9 +979,9 @@ export default function DraftRoom() {
               `border-radius:10px;font-size:10px;font-weight:600;">Forfeit</span>`;
           } else {
             let bg = "#d1fae5"; let clr = "#065f46"; let badge = "Open";
-            if (isKeeper)           { bg = "#dbeafe"; clr = "#1e40af"; badge = "Auto · Keep"; }
+            if (isKeeper)           { bg = "#dbeafe"; clr = "#1e40af"; badge = "🔒 Keep"; }
             else if (isCaptainSelf) { bg = "#e0f2fe"; clr = "#0369a1"; badge = "Auto · Self"; }
-            else if (pick.isAutoBuddy) { bg = "#ede9fe"; clr = "#6d28d9"; badge = "Auto · Buddy"; }
+            else if (pick.isAutoBuddy) { bg = "#ede9fe"; clr = "#6d28d9"; badge = "👥 Buddy"; }
             else if (pick.isAutoPick) { bg = "#ecfdf5"; clr = "#065f46"; badge = "Auto"; }
             const name = player ? fullName(player) : "?";
             const expired = pick.expiredAutoPick
@@ -2161,7 +2161,7 @@ export default function DraftRoom() {
                         )}
                         {teamKeepers.length > 0 && (
                           <span className="flex items-center gap-0.5 text-blue-600 dark:text-blue-300">
-                            <Snowflake className="w-3 h-3" />{teamKeepers.length}
+                            <Lock className="w-3 h-3" />{teamKeepers.length}
                           </span>
                         )}
                         <span className="text-muted-foreground">{teamPicks.filter((p) => !p.forfeited).length} picks</span>
@@ -2214,22 +2214,22 @@ export default function DraftRoom() {
                           !!captainId &&
                           pick.playerId === captainId;
 
-                        let badgeText: string;
+                        let badgeNode: JSX.Element;
                         let badgeClass: string;
                         if (pick.isAutoBuddy) {
-                          badgeText = "Auto · Buddy";
+                          badgeNode = <><Users className="w-2.5 h-2.5" /> Buddy</>;
                           badgeClass = "bg-purple-500/10 text-purple-600 dark:text-purple-400";
                         } else if (isKeeper) {
-                          badgeText = "Auto · Keep";
+                          badgeNode = <><Lock className="w-2.5 h-2.5" /> Keep</>;
                           badgeClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400";
                         } else if (isCaptainPick) {
-                          badgeText = "Auto · Self";
+                          badgeNode = <>Auto · Self</>;
                           badgeClass = "bg-primary/10 text-primary";
                         } else if (pick.isAutoPick) {
-                          badgeText = "Auto";
+                          badgeNode = <>Auto</>;
                           badgeClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
                         } else {
-                          badgeText = "Open";
+                          badgeNode = <>Open</>;
                           badgeClass = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
                         }
 
@@ -2240,8 +2240,8 @@ export default function DraftRoom() {
                             data-testid={`pick-row-${pick.id}`}
                           >
                             <span className="w-16 text-muted-foreground shrink-0 text-xs">Round {round}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${badgeClass}`}>
-                              {badgeText}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${badgeClass}`}>
+                              {badgeNode}
                             </span>
                             <span className="text-foreground truncate">
                               {playerName ?? "?"}
@@ -2449,7 +2449,7 @@ export default function DraftRoom() {
         })()}
 
         {/* Teams + their picks (for non-active states: pending, awaiting_captains, completed) */}
-        <section>
+        <section className="bg-background rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold">Rosters</h2>
             <button
@@ -2511,20 +2511,28 @@ export default function DraftRoom() {
                           </span>
                         );
                       const player = getPickMember(p);
+                      const teamKeepersOuter = (bundle.keepers || []).filter((k: any) => k.teamId === teamId);
+                      const isKeeperPick =
+                        teamKeepersOuter.some((k: any) =>
+                          (k.userId && k.userId === p.playerId) ||
+                          (k.placeholderPlayerId && k.placeholderPlayerId === p.placeholderPlayerId),
+                        );
                       return (
                         <span
                           key={p.id}
-                          className={`px-2 py-0.5 rounded text-[11px] ${
+                          className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] ${
                             p.isAutoBuddy
                               ? "bg-pink-500/15 text-pink-700 dark:text-pink-300"
-                              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                              : isKeeperPick
+                                ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                           }`}
                           data-testid={`pick-chip-${p.id}`}
                         >
+                          {p.isAutoBuddy && <Users className="w-2.5 h-2.5 shrink-0" />}
+                          {isKeeperPick && !p.isAutoBuddy && <Lock className="w-2.5 h-2.5 shrink-0" />}
                           {player ? fullName(player) : "?"}
-                          {p.isAutoBuddy && " ♥"}
                           {p.expiredAutoPick && " ⏱"}
-                          {p.isAutoPick && !p.isAutoBuddy && !p.expiredAutoPick && " ⚡"}
                         </span>
                       );
                     })}

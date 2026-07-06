@@ -1050,7 +1050,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
             <div className="space-y-4" data-testid="step-keepers">
               <div>
                 <h3 className="font-semibold flex items-center gap-2">
-                  <Snowflake className="w-4 h-4 text-blue-500" /> Keeper Designations
+                  <Lock className="w-4 h-4 text-blue-500" /> Keeper Designations
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   Captains are automatically kept. Use the dropdowns to claim additional
@@ -1067,7 +1067,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                 return (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs font-medium text-blue-700 dark:text-blue-300">
-                      <Snowflake className="w-3 h-3" />
+                      <Lock className="w-3 h-3" />
                       Kept {totalKept}
                     </span>
                     <span className="text-xs text-muted-foreground">•</span>
@@ -1276,7 +1276,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                             key={m.user.id}
                             className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 border border-blue-500/30 rounded-full text-xs text-blue-700 dark:text-blue-300"
                           >
-                            <Snowflake className="w-3 h-3 shrink-0" />
+                            <Lock className="w-3 h-3 shrink-0" />
                             {memberName(m)}
                             {!m.membership.assignedTeamId && (
                               <span className="opacity-60 text-[10px]">FA</span>
@@ -1788,7 +1788,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
           {stepId === "buddies" && (
             <div className="space-y-3" data-testid="step-buddies">
               <h3 className="font-semibold flex items-center gap-2">
-                <Heart className="w-4 h-4" /> Buddy Pairs
+                <Users className="w-4 h-4" /> Buddy Pairs
               </h3>
               <p className="text-sm text-muted-foreground">
                 Buddied players go to the same team. Drafting one auto-adds the others, and the
