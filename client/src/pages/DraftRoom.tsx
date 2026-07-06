@@ -40,6 +40,7 @@ import {
   Link2,
   List,
   Trash2,
+  ImageDown,
 } from "lucide-react";
 
 const UNDO_WINDOW_MS = 30_000;
@@ -157,6 +158,8 @@ export default function DraftRoom() {
   const [sortField, setSortField] = useState<"name" | "points" | "position" | "age" | "skill" | "handed">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const carouselRef = useRef<HTMLDivElement>(null);
+  const rostersExportRef = useRef<HTMLElement>(null);
+  const [isExportingRosters, setIsExportingRosters] = useState<"jpg" | "pdf" | null>(null);
   // Pick announcement modal: shown for 2s whenever any captain makes a pick
   // so every other captain gets a quick "X drafted by Team Y" notice.
   const [lastPick, setLastPick] = useState<{
@@ -866,6 +869,46 @@ export default function DraftRoom() {
     onError: (err: any) =>
       toast({ title: "Failed to finalize", description: err?.message, variant: "destructive" }),
   });
+
+  const exportRosters = async (format: "jpg" | "pdf") => {
+    if (!rostersExportRef.current || isExportingRosters) return;
+    setIsExportingRosters(format);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(rostersExportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+      });
+      const date = new Date().toISOString().slice(0, 10);
+      const filename = `draft-rosters-${draftId}-${date}`;
+      if (format === "jpg") {
+        const link = document.createElement("a");
+        link.download = `${filename}.jpg`;
+        link.href = canvas.toDataURL("image/jpeg", 0.92);
+        link.click();
+      } else {
+        const { jsPDF } = await import("jspdf");
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        const pxW = canvas.width / 2;
+        const pxH = canvas.height / 2;
+        const pdf = new jsPDF({
+          orientation: pxW >= pxH ? "landscape" : "portrait",
+          unit: "px",
+          format: [pxW, pxH],
+        });
+        pdf.addImage(imgData, "JPEG", 0, 0, pxW, pxH);
+        pdf.save(`${filename}.pdf`);
+      }
+    } catch (e) {
+      console.error("Export failed", e);
+      toast({ title: "Export failed", description: "Could not capture the rosters.", variant: "destructive" });
+    } finally {
+      setIsExportingRosters(null);
+    }
+  };
+
   const pauseMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/pause`, {});
@@ -1375,17 +1418,39 @@ export default function DraftRoom() {
               <Trophy className="inline w-4 h-4 mr-1" /> Draft complete! Rosters finalized.
             </div>
             {isCommissioner && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setFinalizeOpen(true)}
-                disabled={finalizeMutation.isPending}
-                data-testid="button-finalize-draft"
-              >
-                {finalizeMutation.isPending
-                  ? "Finalizing…"
-                  : "Re-finalize & notify drafted players"}
-              </Button>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFinalizeOpen(true)}
+                  disabled={finalizeMutation.isPending}
+                  data-testid="button-finalize-draft"
+                >
+                  {finalizeMutation.isPending
+                    ? "Finalizing…"
+                    : "Re-finalize & notify drafted players"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => exportRosters("jpg")}
+                  disabled={isExportingRosters !== null}
+                  data-testid="button-export-rosters-jpg"
+                >
+                  <ImageDown className="w-3.5 h-3.5 mr-1" />
+                  {isExportingRosters === "jpg" ? "Exporting…" : "Save as Image"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => exportRosters("pdf")}
+                  disabled={isExportingRosters !== null}
+                  data-testid="button-export-rosters-pdf"
+                >
+                  <ImageDown className="w-3.5 h-3.5 mr-1" />
+                  {isExportingRosters === "pdf" ? "Exporting…" : "Save as PDF"}
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -2256,7 +2321,7 @@ export default function DraftRoom() {
         })()}
 
         {/* Teams + their picks (for non-active states: pending, awaiting_captains, completed) */}
-        <section>
+        <section ref={draft.status === "completed" ? rostersExportRef : undefined}>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold">Rosters</h2>
             <button
