@@ -514,6 +514,15 @@ export default function DraftRoom() {
     enabled: !!draft?.leagueId && !!draftId,
     staleTime: 0,
   });
+  const { data: allLeagueMembers = [] } = useQuery<any[]>({
+    queryKey: [
+      "/api/leagues",
+      draft?.leagueId,
+      draft?.seasonId ? `draft-players?seasonId=${draft.seasonId}` : "draft-players",
+    ],
+    enabled: !!draft?.leagueId,
+    staleTime: 60_000,
+  });
   const { data: league } = useQuery<any>({
     queryKey: ["/api/leagues", draft?.leagueId],
     enabled: !!draft?.leagueId,
@@ -588,9 +597,10 @@ export default function DraftRoom() {
   }, [teams]);
   const memberById = useMemo(() => {
     const m = new Map<string, any>();
+    for (const mm of allLeagueMembers) m.set(mm.user.id, mm);
     for (const mm of members) m.set(mm.user.id, mm);
     return m;
-  }, [members]);
+  }, [allLeagueMembers, members]);
 
   const getPickMember = (p: DraftPick) => {
     if (p.playerId) return memberById.get(p.playerId);
@@ -1912,94 +1922,139 @@ export default function DraftRoom() {
               {(draft.draftOrder || []).map((teamId: string, idx: number) => {
                 const team = teamById.get(teamId);
                 const teamPicks = bundle.picks.filter((p) => p.teamId === teamId);
-                const teamKeepers = (bundle.keepers || []).filter((k) => k.teamId === teamId);
+                const teamKeepers = (bundle.keepers || []).filter((k: any) => k.teamId === teamId);
                 const goalieId = draft.goalieAssignments?.[teamId];
                 const goalie = goalieId ? memberById.get(goalieId) : null;
                 const isPicking = bundle.pickingTeamId === teamId;
+                const totalRounds = draft.totalRounds || 1;
+                const captainId = (draft?.captainAssignments as Record<string, string>)?.[teamId];
+                const captain = captainId ? memberById.get(captainId) : null;
+
+                const keeperPlayerIds = new Set<string>(
+                  teamKeepers.map((k: any) => k.userId).filter(Boolean),
+                );
+                const keeperPlaceholderIds = new Set<string>(
+                  teamKeepers.map((k: any) => k.placeholderPlayerId).filter(Boolean),
+                );
+
                 return (
                   <button
                     key={teamId}
                     onClick={() => setTeamPanelId(teamId)}
-                    className={`w-full text-left p-3 rounded-lg border ${
+                    className={`w-full text-left rounded-lg border overflow-hidden ${
                       isPicking
                         ? "border-amber-400 bg-card ring-2 ring-amber-400/40"
                         : "border-border bg-card"
                     } hover:border-primary transition-colors`}
                     data-testid={`team-roster-${teamId}`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    {/* Card header */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
                       <div className="text-sm font-bold flex items-center gap-1.5">
                         <span className="text-muted-foreground text-xs">#{idx + 1}</span>
                         {team?.name || "Team"}
                         {isPicking && <Crown className="w-4 h-4 text-amber-500" />}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs">
+                        {captain && (
+                          <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+                            <Crown className="w-3 h-3" />
+                            {captain.user.firstName || captain.user.displayName}
+                          </span>
+                        )}
                         {teamKeepers.length > 0 && (
                           <span className="flex items-center gap-0.5 text-blue-600 dark:text-blue-300">
                             <Snowflake className="w-3 h-3" />{teamKeepers.length}
                           </span>
                         )}
-                        <span>{teamPicks.filter((p) => !p.forfeited).length} picks</span>
+                        <span className="text-muted-foreground">{teamPicks.filter((p) => !p.forfeited).length} picks</span>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {(() => {
-                        const captainId = (draft?.captainAssignments as Record<string, string>)?.[teamId];
-                        const captain = captainId ? memberById.get(captainId) : null;
-                        if (!captain) return null;
-                        return (
-                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded text-[11px]">
-                            <Crown className="w-2.5 h-2.5" />
-                            {captain.user.firstName || captain.user.displayName}
-                          </span>
-                        );
-                      })()}
-                      {goalie && (
-                        <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded text-[11px]">
-                          {goalie.user.firstName || goalie.user.displayName} (G)
+
+                    {/* Goalie row (pre-assigned, not a draft pick) */}
+                    {goalieId && (
+                      <div className="flex items-center gap-3 px-3 py-2 text-sm border-b border-border">
+                        <span className="w-16 text-muted-foreground shrink-0 text-xs">Goalie</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">G</span>
+                        <span className="text-foreground text-sm">
+                          {goalie
+                            ? (goalie.user.firstName || goalie.user.displayName || "—")
+                            : "—"}
                         </span>
-                      )}
-                      {teamKeepers.map((k) => {
-                        const keeperMember = k.userId ? memberById.get(k.userId) : null;
-                        const keeperName = keeperMember
-                          ? (keeperMember.user.firstName || keeperMember.user.displayName || "?")
-                          : k.placeholderPlayerId
-                          ? k.placeholderPlayerId.replace("placeholder:", "").split("-").slice(0, 2).join(" ")
-                          : "?";
-                        return (
-                          <span
-                            key={k.userId || k.placeholderPlayerId}
-                            className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 rounded text-[11px]"
-                            data-testid={`keeper-chip-${k.userId || k.placeholderPlayerId}`}
-                          >
-                            <Snowflake className="w-2.5 h-2.5" />
-                            {keeperName}
-                          </span>
-                        );
-                      })}
-                      {teamPicks.map((p) => {
-                        if (p.forfeited)
+                      </div>
+                    )}
+
+                    {/* Round-by-round pick rows */}
+                    <div className="divide-y divide-border">
+                      {Array.from({ length: totalRounds }, (_, i) => i + 1).map((round) => {
+                        const pick = teamPicks.find((p) => p.round === round);
+                        const player = pick ? getPickMember(pick) : null;
+                        const playerName = player
+                          ? (player.user.firstName || player.user.displayName || "?")
+                          : null;
+
+                        if (!pick) {
                           return (
-                            <span key={p.id} className="px-2 py-0.5 bg-muted text-muted-foreground rounded text-[11px] italic">
-                              R{p.round} forfeit
-                            </span>
+                            <div key={round} className="flex items-center gap-3 px-3 py-2 text-sm">
+                              <span className="w-16 text-muted-foreground shrink-0 text-xs">Round {round}</span>
+                              <span className="text-muted-foreground text-xs">—</span>
+                            </div>
                           );
-                        const player = getPickMember(p);
+                        }
+
+                        if (pick.forfeited) {
+                          return (
+                            <div key={round} className="flex items-center gap-3 px-3 py-2 text-sm">
+                              <span className="w-16 text-muted-foreground shrink-0 text-xs">Round {round}</span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground italic">Forfeit</span>
+                            </div>
+                          );
+                        }
+
+                        const isKeeper =
+                          keeperPlayerIds.has(pick.playerId || "") ||
+                          keeperPlaceholderIds.has(pick.placeholderPlayerId || "");
+                        const isCaptainPick =
+                          pick.isAutoPick &&
+                          !pick.isAutoBuddy &&
+                          !isKeeper &&
+                          !!captainId &&
+                          pick.playerId === captainId;
+
+                        let badgeText: string;
+                        let badgeClass: string;
+                        if (pick.isAutoBuddy) {
+                          badgeText = "Auto · Buddy";
+                          badgeClass = "bg-purple-500/10 text-purple-600 dark:text-purple-400";
+                        } else if (isKeeper) {
+                          badgeText = "Auto · Keep";
+                          badgeClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+                        } else if (isCaptainPick) {
+                          badgeText = "Auto · Self";
+                          badgeClass = "bg-primary/10 text-primary";
+                        } else if (pick.isAutoPick) {
+                          badgeText = "Auto";
+                          badgeClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+                        } else {
+                          badgeText = "Open";
+                          badgeClass = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+                        }
+
                         return (
-                          <span
-                            key={p.id}
-                            className={`px-2 py-0.5 rounded text-[11px] ${
-                              p.isAutoBuddy
-                                ? "bg-pink-500/15 text-pink-700 dark:text-pink-300"
-                                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                            }`}
-                            data-testid={`pick-chip-${p.id}`}
+                          <div
+                            key={round}
+                            className="flex items-center gap-3 px-3 py-2 text-sm"
+                            data-testid={`pick-row-${pick.id}`}
                           >
-                            {player?.user.firstName || player?.user.displayName || "?"}
-                            {p.isAutoBuddy && " ♥"}
-                            {p.expiredAutoPick && " ⏱"}
-                            {p.isAutoPick && !p.isAutoBuddy && !p.expiredAutoPick && " ⚡"}
-                          </span>
+                            <span className="w-16 text-muted-foreground shrink-0 text-xs">Round {round}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${badgeClass}`}>
+                              {badgeText}
+                            </span>
+                            <span className="text-foreground truncate">
+                              {playerName ?? "?"}
+                              {pick.expiredAutoPick && " ⏱"}
+                            </span>
+                          </div>
                         );
                       })}
                     </div>
