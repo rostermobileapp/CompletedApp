@@ -560,7 +560,10 @@ async function maybeFireScheduledAutoPick(
         const available = await listAvailablePlayers(draftId);
         const found = available.find((a) => a.userId === slot.playerId);
         if (found) {
-          await applyPick(draftId, pickingTeamId, slot.playerId, { isAutoScheduled: true });
+          await applyPick(draftId, pickingTeamId, slot.playerId, {
+            isAutoScheduled: true,
+            isAutoBuddy: slot.type === "buddy",
+          });
           return true;
         }
       }
@@ -1069,8 +1072,10 @@ async function applyPick(
     }
   }
 
-  // Buddy enforcement: if this player has buddies, auto-pick them all to the
-  // same team and mark this captain's NEXT round (one-time) as forfeited.
+  // Buddy enforcement: if this player has buddies, handle co-drafting.
+  // Buddies with a rank in the resolvedAutoPickSchedule will fire automatically
+  // at their own rank-based round — do NOT also fire them immediately or forfeit.
+  // Only buddies absent from the schedule need the old immediate-fire + forfeit logic.
   if (!opts?.isAutoBuddy) {
     const buddyPairs = await db
       .select()
@@ -1084,14 +1089,27 @@ async function applyPick(
         .from(draftPicks)
         .where(eq(draftPicks.draftId, draftId));
       const draftedSet = new Set(drafted.map((d) => d.playerId).filter(Boolean) as string[]);
-      // Auto-buddy adds share the SAME overall pick / round / pickInRound as
-      // the parent pick, distinguished only by `isAutoBuddy=true`. This avoids
-      // colliding with the next captain's overall pick number when the turn
-      // advances. Insertion order (pickedAt) preserves stable sub-ordering.
+
+      // Build a set of all player IDs already present in the auto-pick schedule.
+      // Buddies that are scheduled will fire at their own rank round — skip them here.
+      const schedule = draft.resolvedAutoPickSchedule as AutoPickSchedule | null;
+      const scheduledPlayerIds = new Set<string>();
+      if (schedule) {
+        for (const teamSchedule of Object.values(schedule)) {
+          for (const slot of Object.values(teamSchedule as Record<string, ScheduledSlot>)) {
+            if (slot?.playerId) scheduledPlayerIds.add(slot.playerId);
+          }
+        }
+      }
+
+      // Only immediately fire buddies that have no scheduled rank slot.
+      const immediateIds = otherIds.filter(
+        (id) => !draftedSet.has(id) && !scheduledPlayerIds.has(id),
+      );
+
       const baseTime = Date.now();
       let subOffset = 1;
-      for (const buddyId of otherIds) {
-        if (draftedSet.has(buddyId)) continue;
+      for (const buddyId of immediateIds) {
         await db.insert(draftPicks).values({
           draftId,
           teamId,
@@ -1104,31 +1122,33 @@ async function applyPick(
         });
         subOffset += 1;
       }
-      // Forfeit captain's next-round pick. Track on the draft row AND insert
-      // a placeholder draft_picks row marked `forfeited=true` so the UI (which
-      // renders forfeits from draft_picks) shows the skip explicitly.
-      const forfeited = (draft.forfeitedRounds as Record<string, number[]>) || {};
-      const nextRound = draft.currentRound + 1;
-      if (nextRound <= (draft.totalRounds || 1)) {
-        forfeited[teamId] = [...(forfeited[teamId] || []), nextRound];
-        await db
-          .update(drafts)
-          .set({ forfeitedRounds: forfeited, updatedAt: new Date() })
-          .where(eq(drafts.id, draftId));
-        const draftOrder = (draft.draftOrder as string[]) || [];
-        const numTeams = draftOrder.length || 1;
-        const turnInNextRound = draftOrder.indexOf(teamId) + 1 || 1;
-        const nextOverall = (nextRound - 1) * numTeams + turnInNextRound;
-        await db.insert(draftPicks).values({
-          draftId,
-          teamId,
-          playerId: null,
-          round: nextRound,
-          pick: nextOverall,
-          pickInRound: turnInNextRound,
-          forfeited: true,
-          pickedAt: new Date(baseTime + subOffset),
-        });
+      // Forfeit captain's NEXT round only when an immediate same-round buddy fired.
+      // When all buddies are rank-scheduled, no forfeit is created — the buddy pick
+      // simply uses whichever round its rank maps to.
+      if (immediateIds.length > 0) {
+        const forfeited = (draft.forfeitedRounds as Record<string, number[]>) || {};
+        const nextRound = draft.currentRound + 1;
+        if (nextRound <= (draft.totalRounds || 1)) {
+          forfeited[teamId] = [...(forfeited[teamId] || []), nextRound];
+          await db
+            .update(drafts)
+            .set({ forfeitedRounds: forfeited, updatedAt: new Date() })
+            .where(eq(drafts.id, draftId));
+          const draftOrder = (draft.draftOrder as string[]) || [];
+          const numTeams = draftOrder.length || 1;
+          const turnInNextRound = draftOrder.indexOf(teamId) + 1 || 1;
+          const nextOverall = (nextRound - 1) * numTeams + turnInNextRound;
+          await db.insert(draftPicks).values({
+            draftId,
+            teamId,
+            playerId: null,
+            round: nextRound,
+            pick: nextOverall,
+            pickInRound: turnInNextRound,
+            forfeited: true,
+            pickedAt: new Date(baseTime + subOffset),
+          });
+        }
       }
     }
   }
