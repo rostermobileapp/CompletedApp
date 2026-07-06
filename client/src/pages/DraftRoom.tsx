@@ -1921,7 +1921,9 @@ export default function DraftRoom() {
                     key={teamId}
                     onClick={() => setTeamPanelId(teamId)}
                     className={`w-full text-left p-3 rounded-lg border ${
-                      isPicking ? "border-primary bg-primary/5" : "border-border bg-card"
+                      isPicking
+                        ? "border-amber-400 bg-card ring-2 ring-amber-400/40"
+                        : "border-border bg-card"
                     } hover:border-primary transition-colors`}
                     data-testid={`team-roster-${teamId}`}
                   >
