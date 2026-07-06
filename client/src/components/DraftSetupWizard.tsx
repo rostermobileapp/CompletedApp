@@ -25,6 +25,9 @@ import {
   Shuffle,
   Eye,
   AlertTriangle,
+  ImageDown,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import {
   buildAutoPickSchedule,
@@ -263,6 +266,47 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
       }
     }
   }, [existing]);
+
+  // Export state for the preview step
+  const [isExporting, setIsExporting] = useState<"jpg" | "pdf" | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const exportPreview = async (format: "jpg" | "pdf") => {
+    if (!previewRef.current || isExporting) return;
+    setIsExporting(format);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+      });
+      const filename = "draft-preview";
+      if (format === "jpg") {
+        const link = document.createElement("a");
+        link.download = `${filename}.jpg`;
+        link.href = canvas.toDataURL("image/jpeg", 0.92);
+        link.click();
+      } else {
+        const { jsPDF } = await import("jspdf");
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        const pxW = canvas.width / 2;
+        const pxH = canvas.height / 2;
+        const pdf = new jsPDF({
+          orientation: pxW >= pxH ? "landscape" : "portrait",
+          unit: "px",
+          format: [pxW, pxH],
+        });
+        pdf.addImage(imgData, "JPEG", 0, 0, pxW, pxH);
+        pdf.save(`${filename}.pdf`);
+      }
+    } catch (e) {
+      console.error("Export failed", e);
+    } finally {
+      setIsExporting(null);
+    }
+  };
 
   // Tracks whether the user has manually overridden totalRounds. If so, we
   // stop updating it when the formula changes.
@@ -556,13 +600,46 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground p-1"
-            data-testid="button-close-draft-wizard"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {stepId === "preview" && (
+              <>
+                <button
+                  onClick={() => exportPreview("jpg")}
+                  disabled={!!isExporting}
+                  title="Save as JPG"
+                  className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted disabled:opacity-40"
+                  data-testid="button-export-jpg"
+                >
+                  {isExporting === "jpg" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ImageDown className="w-4 h-4" />
+                  )}
+                </button>
+                <button
+                  onClick={() => exportPreview("pdf")}
+                  disabled={!!isExporting}
+                  title="Save as PDF"
+                  className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted disabled:opacity-40"
+                  data-testid="button-export-pdf"
+                >
+                  {isExporting === "pdf" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
+                </button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground p-1"
+              data-testid="button-close-draft-wizard"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-1 px-5 pt-3">
@@ -1496,7 +1573,7 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
           )}
 
           {stepId === "preview" && (
-            <div className="space-y-4" data-testid="step-preview">
+            <div className="space-y-4" data-testid="step-preview" ref={previewRef}>
               <h3 className="font-semibold flex items-center gap-2">
                 <Eye className="w-4 h-4" /> Draft Preview
               </h3>
