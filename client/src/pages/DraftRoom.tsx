@@ -611,6 +611,11 @@ export default function DraftRoom() {
     return null;
   };
 
+  const fullName = (m: any): string =>
+    `${m?.user?.firstName || ""} ${m?.user?.lastName || ""}`.trim() ||
+    m?.user?.displayName ||
+    "?";
+
   const buddyUserIds = useMemo(() => {
     const s = new Set<string>();
     bundle?.buddyPairs.forEach((pair) => pair.userIds.forEach((uid) => s.add(uid)));
@@ -871,18 +876,141 @@ export default function DraftRoom() {
   });
 
   const exportRosters = async (format: "jpg" | "pdf") => {
-    if (!rostersExportRef.current || isExportingRosters) return;
+    if (isExportingRosters) return;
     setIsExportingRosters(format);
     try {
+      // Build a clean off-screen div with inline styles (no CSS vars / Tailwind)
+      const wrap = document.createElement("div");
+      wrap.style.cssText =
+        "position:fixed;top:-9999px;left:-9999px;width:820px;" +
+        "background:#fff;padding:36px;font-family:system-ui,Arial,sans-serif;" +
+        "color:#111;font-size:13px;line-height:1.5;box-sizing:border-box;";
+
+      // Title row
+      const titleEl = document.createElement("div");
+      titleEl.style.cssText = "display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px;";
+      titleEl.innerHTML =
+        `<span style="font-size:18px;font-weight:700;">Draft Rosters</span>` +
+        `<span style="font-size:11px;color:#6b7280;">${new Date().toLocaleDateString()}</span>`;
+      wrap.appendChild(titleEl);
+
+      const captainAssignments: Record<string, string> = (draft.captainAssignments as any) || {};
+
+      for (const teamId of (draft.draftOrder || [])) {
+        const team = teamById.get(teamId);
+        const teamPicks = bundle.picks.filter((p: any) => p.teamId === teamId);
+        const goalieId = draft.goalieAssignments?.[teamId];
+        const captainId = captainAssignments[teamId];
+        const goalie = goalieId ? memberById.get(goalieId) : null;
+        const captain = captainId ? memberById.get(captainId) : null;
+        const teamKeepers: any[] = (bundle.keepers || []).filter((k: any) => k.teamId === teamId);
+        const keeperPlayerIds = new Set(teamKeepers.map((k: any) => k.userId).filter(Boolean));
+        const keeperPlaceholderIds = new Set(teamKeepers.map((k: any) => k.placeholderPlayerId).filter(Boolean));
+        const validPicks = teamPicks.filter((p: any) => !p.forfeited).length;
+
+        const card = document.createElement("div");
+        card.style.cssText =
+          "margin-bottom:20px;border:1px solid #e5e7eb;border-radius:8px;" +
+          "overflow:hidden;page-break-inside:avoid;";
+
+        // Team header
+        const hdr = document.createElement("div");
+        hdr.style.cssText =
+          "background:#f9fafb;padding:9px 14px;display:flex;justify-content:space-between;" +
+          "align-items:center;border-bottom:1px solid #e5e7eb;";
+        const hdrLeft = document.createElement("span");
+        hdrLeft.style.cssText = "font-weight:700;font-size:14px;";
+        hdrLeft.textContent = team?.name || "Team";
+        const hdrRight = document.createElement("span");
+        hdrRight.style.cssText = "font-size:11px;color:#6b7280;";
+        const capName = captain ? fullName(captain) : null;
+        hdrRight.textContent = capName
+          ? `Captain: ${capName} · ${validPicks} picks`
+          : `${validPicks} picks`;
+        hdr.appendChild(hdrLeft);
+        hdr.appendChild(hdrRight);
+        card.appendChild(hdr);
+
+        // Goalie row
+        if (goalie) {
+          const row = document.createElement("div");
+          row.style.cssText =
+            "display:flex;align-items:center;gap:10px;padding:7px 14px;" +
+            "border-bottom:1px solid #f3f4f6;font-size:12px;";
+          row.innerHTML =
+            `<span style="color:#9ca3af;width:64px;flex-shrink:0;font-size:11px;">Goalie</span>` +
+            `<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;` +
+            `font-size:10px;font-weight:600;flex-shrink:0;">G</span>` +
+            `<span>${fullName(goalie)}</span>`;
+          card.appendChild(row);
+        }
+
+        // Round rows
+        const totalRounds = draft.totalRounds || 1;
+        for (let round = 1; round <= totalRounds; round++) {
+          const pick: any = teamPicks.find((p: any) => p.round === round);
+          const player = pick ? getPickMember(pick) : null;
+          const isKeeper =
+            pick
+              ? keeperPlayerIds.has(pick.playerId || "") ||
+                keeperPlaceholderIds.has(pick.placeholderPlayerId || "")
+              : false;
+          const isCaptainSelf =
+            pick?.isAutoPick &&
+            !pick.isAutoBuddy &&
+            !isKeeper &&
+            !!captainId &&
+            pick.playerId === captainId;
+
+          const row = document.createElement("div");
+          const isLast = round === totalRounds;
+          row.style.cssText =
+            `display:flex;align-items:center;gap:10px;padding:7px 14px;` +
+            `${!isLast ? "border-bottom:1px solid #f3f4f6;" : ""}font-size:12px;`;
+
+          const roundLbl =
+            `<span style="color:#9ca3af;width:64px;flex-shrink:0;font-size:11px;">Round ${round}</span>`;
+
+          if (!pick) {
+            row.innerHTML = `${roundLbl}<span style="color:#d1d5db;">—</span>`;
+          } else if (pick.forfeited) {
+            row.innerHTML =
+              `${roundLbl}<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;` +
+              `border-radius:10px;font-size:10px;font-weight:600;">Forfeit</span>`;
+          } else {
+            let bg = "#d1fae5"; let clr = "#065f46"; let badge = "Open";
+            if (isKeeper)           { bg = "#dbeafe"; clr = "#1e40af"; badge = "Auto · Keep"; }
+            else if (isCaptainSelf) { bg = "#e0f2fe"; clr = "#0369a1"; badge = "Auto · Self"; }
+            else if (pick.isAutoBuddy) { bg = "#ede9fe"; clr = "#6d28d9"; badge = "Auto · Buddy"; }
+            else if (pick.isAutoPick) { bg = "#ecfdf5"; clr = "#065f46"; badge = "Auto"; }
+            const name = player ? fullName(player) : "?";
+            const expired = pick.expiredAutoPick
+              ? ` <span style="color:#ef4444;font-size:10px;">⏱</span>` : "";
+            row.innerHTML =
+              `${roundLbl}` +
+              `<span style="background:${bg};color:${clr};padding:2px 8px;border-radius:10px;` +
+              `font-size:10px;font-weight:600;flex-shrink:0;">${badge}</span>` +
+              `<span>${name}${expired}</span>`;
+          }
+          card.appendChild(row);
+        }
+
+        wrap.appendChild(card);
+      }
+
+      document.body.appendChild(wrap);
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(rostersExportRef.current, {
+      const canvas = await html2canvas(wrap, {
         scale: 2,
         backgroundColor: "#ffffff",
         useCORS: true,
         logging: false,
       });
-      const date = new Date().toISOString().slice(0, 10);
-      const filename = `draft-rosters-${draftId}-${date}`;
+      document.body.removeChild(wrap);
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `draft-rosters-${draftId}-${dateStr}`;
+
       if (format === "jpg") {
         const link = document.createElement("a");
         link.download = `${filename}.jpg`;
@@ -894,7 +1022,7 @@ export default function DraftRoom() {
         const pxW = canvas.width / 2;
         const pxH = canvas.height / 2;
         const pdf = new jsPDF({
-          orientation: pxW >= pxH ? "landscape" : "portrait",
+          orientation: "portrait",
           unit: "px",
           format: [pxW, pxH],
         });
@@ -903,7 +1031,11 @@ export default function DraftRoom() {
       }
     } catch (e) {
       console.error("Export failed", e);
-      toast({ title: "Export failed", description: "Could not capture the rosters.", variant: "destructive" });
+      toast({
+        title: "Export failed",
+        description: "Could not generate the roster export.",
+        variant: "destructive",
+      });
     } finally {
       setIsExportingRosters(null);
     }
@@ -1841,7 +1973,7 @@ export default function DraftRoom() {
                 // league). Defaults to 0/0 when no prior season exists.
                 const priorGoals: number = m.priorStats?.goals ?? 0;
                 const priorAssists: number = m.priorStats?.assists ?? 0;
-                const fullName =
+                const playerFullName =
                   [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") ||
                   m.user.displayName ||
                   m.user.email ||
@@ -1905,7 +2037,7 @@ export default function DraftRoom() {
                           className="text-lg font-black leading-tight truncate tracking-tight"
                           data-testid={`player-name-${m.user.id}`}
                         >
-                          {fullName}
+                          {playerFullName}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                           <span
@@ -1983,7 +2115,7 @@ export default function DraftRoom() {
 
           {/* ── Rosters tab ── */}
           {activeView === "rosters" && (
-            <div className="flex-1 overflow-y-auto p-3 pb-6 space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 pb-6 space-y-2 bg-background">
               {(draft.draftOrder || []).map((teamId: string, idx: number) => {
                 const team = teamById.get(teamId);
                 const teamPicks = bundle.picks.filter((p) => p.teamId === teamId);
@@ -2024,7 +2156,7 @@ export default function DraftRoom() {
                         {captain && (
                           <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
                             <Crown className="w-3 h-3" />
-                            {captain.user.firstName || captain.user.displayName}
+                            {fullName(captain)}
                           </span>
                         )}
                         {teamKeepers.length > 0 && (
@@ -2042,9 +2174,7 @@ export default function DraftRoom() {
                         <span className="w-16 text-muted-foreground shrink-0 text-xs">Goalie</span>
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">G</span>
                         <span className="text-foreground text-sm">
-                          {goalie
-                            ? (goalie.user.firstName || goalie.user.displayName || "—")
-                            : "—"}
+                          {goalie ? fullName(goalie) : "—"}
                         </span>
                       </div>
                     )}
@@ -2054,9 +2184,7 @@ export default function DraftRoom() {
                       {Array.from({ length: totalRounds }, (_, i) => i + 1).map((round) => {
                         const pick = teamPicks.find((p) => p.round === round);
                         const player = pick ? getPickMember(pick) : null;
-                        const playerName = player
-                          ? (player.user.firstName || player.user.displayName || "?")
-                          : null;
+                        const playerName = player ? fullName(player) : null;
 
                         if (!pick) {
                           return (
@@ -2321,7 +2449,7 @@ export default function DraftRoom() {
         })()}
 
         {/* Teams + their picks (for non-active states: pending, awaiting_captains, completed) */}
-        <section ref={draft.status === "completed" ? rostersExportRef : undefined}>
+        <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-bold">Rosters</h2>
             <button
@@ -2366,13 +2494,13 @@ export default function DraftRoom() {
                       return (
                         <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded text-[11px]">
                           <Crown className="w-2.5 h-2.5" />
-                          {captain.user.firstName || captain.user.displayName}
+                          {fullName(captain)}
                         </span>
                       );
                     })()}
                     {goalie && (
                       <span className="px-2 py-0.5 bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded text-[11px]">
-                        {goalie.user.firstName || goalie.user.displayName} (G)
+                        {fullName(goalie)} (G)
                       </span>
                     )}
                     {teamPicks.map((p) => {
@@ -2393,7 +2521,7 @@ export default function DraftRoom() {
                           }`}
                           data-testid={`pick-chip-${p.id}`}
                         >
-                          {player?.user.firstName || player?.user.displayName || "?"}
+                          {player ? fullName(player) : "?"}
                           {p.isAutoBuddy && " ♥"}
                           {p.expiredAutoPick && " ⏱"}
                           {p.isAutoPick && !p.isAutoBuddy && !p.expiredAutoPick && " ⚡"}
@@ -2436,7 +2564,7 @@ export default function DraftRoom() {
                   <h3 className="font-bold truncate">{team?.name || "Team"}</h3>
                   {captain && (
                     <div className="text-xs text-muted-foreground truncate">
-                      Captain: {captain.user.firstName || captain.user.displayName || captain.user.email}
+                      Captain: {fullName(captain) || captain.user.email}
                     </div>
                   )}
                 </div>
