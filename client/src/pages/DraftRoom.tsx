@@ -984,41 +984,44 @@ export default function DraftRoom() {
             continue;
           }
 
-          // Primary (non-buddy) pick row
+          // Build ordered list: primary first, then buddy picks.
+          // If no primary pick exists (buddy is the only pick at this round),
+          // the first buddy pick gets the "Round N" label; others get a blank label.
+          const pickRows: Array<{ pick: any; showRoundLabel: boolean }> = [];
           if (primaryPick) {
-            const isKeeper =
-              keeperPlayerIds.has(primaryPick.playerId || "") ||
-              keeperPlaceholderIds.has(primaryPick.placeholderPlayerId || "");
-            const isCaptainSelf =
-              primaryPick.isAutoPick && !primaryPick.isAutoBuddy && !isKeeper &&
-              !!captainId && primaryPick.playerId === captainId;
-            const player = getPickMember(primaryPick);
-            const name = player ? fullName(player) : "?";
-            const expired = primaryPick.expiredAutoPick
-              ? ` <span style="color:#ef4444;font-size:10px;">⏱</span>` : "";
-
-            let bg = "#d1fae5"; let clr = "#065f46"; let badge = "Drafted";
-            if (isKeeper)            { bg = "#dbeafe"; clr = "#1e40af"; badge = "🔒 Keep"; }
-            else if (isCaptainSelf)  { bg = "#e0f2fe"; clr = "#0369a1"; badge = "Auto · Self"; }
-            else if (primaryPick.isAutoPick) { bg = "#ecfdf5"; clr = "#065f46"; badge = "Auto"; }
-
-            const row = makeRow();
-            row.innerHTML =
-              `${roundLbl(round)}` +
-              `<span style="${badgeStyle(bg, clr)}">${badge}</span>` +
-              `<span>${name}${expired}</span>`;
-            card.appendChild(row);
+            pickRows.push({ pick: primaryPick, showRoundLabel: true });
+            buddyPicks.forEach((bp) => pickRows.push({ pick: bp, showRoundLabel: false }));
+          } else {
+            buddyPicks.forEach((bp, i) => pickRows.push({ pick: bp, showRoundLabel: i === 0 }));
           }
 
-          // Buddy pick sub-rows (share the same round as the parent)
-          for (const buddyPick of buddyPicks) {
-            const buddyPlayer = getPickMember(buddyPick);
-            const buddyName = buddyPlayer ? fullName(buddyPlayer) : "?";
+          for (const { pick: p, showRoundLabel } of pickRows) {
+            const isBuddy = !!p.isAutoBuddy;
+            const isKeeper =
+              !isBuddy &&
+              (keeperPlayerIds.has(p.playerId || "") ||
+              keeperPlaceholderIds.has(p.placeholderPlayerId || ""));
+            const isCaptainSelf =
+              !isBuddy && p.isAutoPick && !isKeeper &&
+              !!captainId && p.playerId === captainId;
+            const player = getPickMember(p);
+            const name = player ? fullName(player) : "?";
+            const expired = p.expiredAutoPick
+              ? ` <span style="color:#ef4444;font-size:10px;">⏱</span>` : "";
+
+            let bg: string; let clr: string; let badge: string;
+            if (isBuddy)          { bg = "#ede9fe"; clr = "#6d28d9"; badge = "👥 Buddy"; }
+            else if (isKeeper)    { bg = "#dbeafe"; clr = "#1e40af"; badge = "🔒 Keep"; }
+            else if (isCaptainSelf) { bg = "#e0f2fe"; clr = "#0369a1"; badge = "Auto · Self"; }
+            else if (p.isAutoPick){ bg = "#ecfdf5"; clr = "#065f46"; badge = "Auto"; }
+            else                  { bg = "#d1fae5"; clr = "#065f46"; badge = "Drafted"; }
+
+            const lbl = showRoundLabel ? roundLbl(round) : emptyLbl;
             const row = makeRow();
             row.innerHTML =
-              `${emptyLbl}` +
-              `<span style="${badgeStyle("#ede9fe","#6d28d9")}">👥 Buddy</span>` +
-              `<span>${buddyName}</span>`;
+              `${lbl}` +
+              `<span style="${badgeStyle(bg, clr)}">${badge}</span>` +
+              `<span>${name}${expired}</span>`;
             card.appendChild(row);
           }
         }
@@ -2233,24 +2236,39 @@ export default function DraftRoom() {
                           return rows;
                         }
 
-                        // Primary (non-buddy) pick
+                        // Build ordered list: primary first, then buddies.
+                        // If no primary pick at this round, the first buddy gets the
+                        // "Round N" label (buddy is the sole pick at that round).
+                        const pickRows: Array<{ pick: any; showRoundLabel: boolean }> = [];
                         if (primaryPick) {
+                          pickRows.push({ pick: primaryPick, showRoundLabel: true });
+                          buddyPicksInRound.forEach((bp) => pickRows.push({ pick: bp, showRoundLabel: false }));
+                        } else {
+                          buddyPicksInRound.forEach((bp, i) => pickRows.push({ pick: bp, showRoundLabel: i === 0 }));
+                        }
+
+                        pickRows.forEach(({ pick: p, showRoundLabel }, rowIdx) => {
+                          const isBuddy = !!p.isAutoBuddy;
                           const isKeeper =
-                            keeperPlayerIds.has(primaryPick.playerId || "") ||
-                            keeperPlaceholderIds.has(primaryPick.placeholderPlayerId || "");
+                            !isBuddy &&
+                            (keeperPlayerIds.has(p.playerId || "") ||
+                            keeperPlaceholderIds.has(p.placeholderPlayerId || ""));
                           const isCaptainPick =
-                            primaryPick.isAutoPick && !primaryPick.isAutoBuddy && !isKeeper &&
-                            !!captainId && primaryPick.playerId === captainId;
+                            !isBuddy && p.isAutoPick && !isKeeper &&
+                            !!captainId && p.playerId === captainId;
 
                           let badgeNode: JSX.Element;
                           let badgeClass: string;
-                          if (isKeeper) {
+                          if (isBuddy) {
+                            badgeNode = <><Users className="w-2.5 h-2.5" /> Buddy</>;
+                            badgeClass = "bg-purple-500/10 text-purple-600 dark:text-purple-400";
+                          } else if (isKeeper) {
                             badgeNode = <><Lock className="w-2.5 h-2.5" /> Keep</>;
                             badgeClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400";
                           } else if (isCaptainPick) {
                             badgeNode = <>Auto · Self</>;
                             badgeClass = "bg-primary/10 text-primary";
-                          } else if (primaryPick.isAutoPick) {
+                          } else if (p.isAutoPick) {
                             badgeNode = <>Auto</>;
                             badgeClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
                           } else {
@@ -2258,40 +2276,23 @@ export default function DraftRoom() {
                             badgeClass = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
                           }
 
-                          const player = getPickMember(primaryPick);
+                          const player = getPickMember(p);
                           rows.push(
                             <div
-                              key={`r${round}-primary`}
+                              key={`r${round}-row${rowIdx}`}
                               className="flex items-center gap-3 px-3 py-2 text-sm"
-                              data-testid={`pick-row-${primaryPick.id}`}
+                              data-testid={`pick-row-${p.id}`}
                             >
-                              <span className="w-16 text-muted-foreground shrink-0 text-xs">Round {round}</span>
+                              {showRoundLabel
+                                ? <span className="w-16 text-muted-foreground shrink-0 text-xs">Round {round}</span>
+                                : <span className="w-16 shrink-0" />
+                              }
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${badgeClass}`}>
                                 {badgeNode}
                               </span>
                               <span className="text-foreground truncate">
                                 {player ? fullName(player) : "?"}
-                                {primaryPick.expiredAutoPick && " ⏱"}
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        // Buddy picks at the same round (sub-rows, no round label)
-                        buddyPicksInRound.forEach((buddyPick, bi) => {
-                          const buddyPlayer = getPickMember(buddyPick);
-                          rows.push(
-                            <div
-                              key={`r${round}-buddy${bi}`}
-                              className="flex items-center gap-3 px-3 py-2 text-sm"
-                              data-testid={`pick-row-${buddyPick.id}`}
-                            >
-                              <span className="w-16 shrink-0" />
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                                <Users className="w-2.5 h-2.5" /> Buddy
-                              </span>
-                              <span className="text-foreground truncate">
-                                {buddyPlayer ? fullName(buddyPlayer) : "?"}
+                                {p.expiredAutoPick && " ⏱"}
                               </span>
                             </div>
                           );
