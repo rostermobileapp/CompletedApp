@@ -830,7 +830,15 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     {userOverrodeRoundsRef.current
                       ? `default: ${suggestedRounds} · `
                       : ""}
-                    ⌈ {members.length} ÷ {Math.max(1, draftOrder.length)} teams ⌉
+                    {(() => {
+                      const teamCount = Math.max(1, draftOrder.length);
+                      const goalieCount =
+                        goalieMethod !== "included_with_skaters"
+                          ? members.filter((m) => m.membership.isGoalie).length
+                          : 0;
+                      const draftable = Math.max(0, members.length - goalieCount);
+                      return `⌈ ${draftable} ÷ ${teamCount} teams ⌉`;
+                    })()}
                   </span>
                 </div>
                 {!userOverrodeRoundsRef.current && (
@@ -838,6 +846,14 @@ export function DraftSetupWizard({ leagueId, seasonId, teams, onClose, onLaunche
                     Auto-calculated from your roster size. Edit to override.
                   </p>
                 )}
+                {goalieMethod !== "included_with_skaters" && (() => {
+                  const goalieCount = members.filter((m) => m.membership.isGoalie).length;
+                  return goalieCount > 0 ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {members.length} total players − {goalieCount} goalie{goalieCount !== 1 ? "s" : ""} pre-assigned (not drafted) = {members.length - goalieCount} draftable
+                    </p>
+                  ) : null;
+                })()}
               </div>
 
               <div>
