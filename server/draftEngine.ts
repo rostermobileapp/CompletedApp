@@ -944,10 +944,10 @@ async function completeDraft(draftId: string) {
       .where(eq(drafts.id, draftId));
   }
 
-  // Push notifications to drafted picks are intentionally disabled per
-  // commissioner request. Keepers, however, always get a placement notice.
   const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
+  const newPicks  = newlyAssigned.filter((a) => !a.isKeeper);
   void notifyKeeperPlayers(newKeepers, draft.leagueId);
+  void notifyDraftedPlayers(newPicks, draft.leagueId);
 
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
@@ -978,10 +978,10 @@ export async function finalizeDraft(draftId: string): Promise<{
       .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
       .where(eq(drafts.id, draftId));
   }
-  // Drafted pick notifications are disabled per commissioner request.
-  // Keepers receive a placement notice when they are newly assigned.
   const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
+  const newPicks  = newlyAssigned.filter((a) => !a.isKeeper);
   void notifyKeeperPlayers(newKeepers, draft.leagueId);
+  void notifyDraftedPlayers(newPicks, draft.leagueId);
 
   // Count total keepers and picks in this draft so the commissioner gets a
   // summary breakdown in the finalize dialog (newly-assigned vs already placed).

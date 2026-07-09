@@ -1598,7 +1598,7 @@ export default function DraftRoom() {
                 >
                   {finalizeMutation.isPending
                     ? "Finalizing…"
-                    : "Re-finalize & notify drafted players"}
+                    : "Finalize Rosters and Notify Players"}
                 </Button>
                 <Button
                   size="sm"
