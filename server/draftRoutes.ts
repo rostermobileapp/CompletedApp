@@ -1039,10 +1039,13 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
   });
 
   // === Commissioner finalizes a completed (or in-progress) draft ===
-  // Idempotent: re-runs the assign-players-to-teams logic and re-fires push
-  // notifications for anything that wasn't already assigned. Safe to call
-  // multiple times; existing assignments are not duplicated and players who
-  // were already on their team won't receive a second notification.
+  // Idempotent: re-runs the assign-players-to-teams logic (fills in any gaps,
+  // never duplicates) and re-fires push notifications for anyone who hasn't
+  // successfully received one yet — tracked independently of roster
+  // assignment, so this reliably (re)notifies players even though rosters
+  // are usually already assigned automatically by the time this is clicked.
+  // Safe to call multiple times: already-notified players aren't spammed,
+  // but anyone whose previous notification failed will be retried.
   app.post("/api/drafts/:draftId/finalize", isAuthenticated, async (req: any, res) => {
     try {
       const { draftId } = req.params;

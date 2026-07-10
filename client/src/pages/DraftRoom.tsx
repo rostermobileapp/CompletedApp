@@ -850,18 +850,26 @@ export default function DraftRoom() {
       const res = await apiRequest("POST", `/api/drafts/${draftId}/finalize`, {});
       return res.json();
     },
-    onSuccess: (data: { ok: boolean; assigned: number; keeperCount: number; pickCount: number }) => {
+    onSuccess: (data: { ok: boolean; assigned: number; notified: number; keeperCount: number; pickCount: number }) => {
       setFinalizeOpen(false);
+      const parts: string[] = [];
+      if (data.assigned > 0) {
+        parts.push(
+          `${data.assigned} player${data.assigned === 1 ? "" : "s"} assigned to their teams${
+            data.keeperCount > 0
+              ? ` — ${data.keeperCount} keeper${data.keeperCount === 1 ? "" : "s"} + ${data.pickCount} pick${data.pickCount === 1 ? "" : "s"}`
+              : ""
+          }`,
+        );
+      }
+      parts.push(
+        data.notified > 0
+          ? `${data.notified} player${data.notified === 1 ? "" : "s"} notified`
+          : "everyone was already notified",
+      );
       toast({
         title: "Draft finalized",
-        description:
-          data.assigned > 0
-            ? `${data.assigned} player${data.assigned === 1 ? "" : "s"} assigned to their teams${
-                data.keeperCount > 0
-                  ? ` — ${data.keeperCount} keeper${data.keeperCount === 1 ? "" : "s"} + ${data.pickCount} pick${data.pickCount === 1 ? "" : "s"}`
-                  : ""
-              }.`
-            : "Rosters were already up to date.",
+        description: `${parts.join(" — ")}.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/drafts", draftId] });
       if (draft?.leagueId) {
@@ -2946,9 +2954,10 @@ export default function DraftRoom() {
             <AlertDialogTitle>Finalize draft?</AlertDialogTitle>
             <AlertDialogDescription>
               This will assign every drafted player to their team in the
-              league and send each one a push notification congratulating
-              them on their new team. It's safe to run more than once —
-              players already on the right team won't be re-notified.
+              league and send a push notification to anyone who hasn't
+              received one yet. It's safe to run more than once — already
+              notified players won't get a duplicate, but anyone whose
+              notification failed will be retried.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

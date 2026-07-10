@@ -4,3 +4,4 @@
 - [Draft keeper ID format](draft-keeper-id-format.md) — draft_keepers.placeholder_player_id stores "placeholder:{uuid}" WITH the prefix; draft_picks.placeholder_player_id stores bare UUID (applyPick strips prefix). Never add the prefix again when reading from draft_keepers.
 - [Draft rehydrate vs active-drafts scope](draft-rehydrate-scope.md) — active-drafts endpoint includes "paused" status but rehydrateActiveDraftTimers only queries "active"/"awaiting_captains" — paused drafts are not auto-recovered on server restart.
 - [Team captain data model quirk](team-captain-data-model.md) — captain status lives in both teams.captainId and team_memberships.isCaptain; stale rows from team creation can show a phantom captain.
+- [Draft notification decoupling](draft-notification-decoupling.md) — notify actions must track delivery separately from roster/team assignment state, or auto-completion silently swallows notifications.

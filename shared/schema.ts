@@ -1651,6 +1651,14 @@ export const drafts = pgTable("drafts", {
   resolvedAutoPickSchedule: jsonb("resolved_auto_pick_schedule"),
   flaggedAutoPickSlots: jsonb("flagged_auto_pick_slots").default([]),
   flaggedPicks: jsonb("flagged_picks").default([]),
+  // userIds who have already been sent a "you were drafted/kept" push
+  // notification for this draft. Tracked separately from team-membership
+  // assignment (which happens automatically the instant the draft
+  // completes) so the commissioner's "Finalize Rosters and Notify Players"
+  // button can still guarantee delivery — e.g. retrying anyone whose
+  // notification failed the first time — instead of silently no-op'ing
+  // just because rosters were already assigned.
+  notifiedUserIds: jsonb("notified_user_ids").default([]),
   createdBy: varchar("created_by").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -761,24 +761,16 @@ export async function terminateDraft(draftId: string) {
 }
 
 /**
- * Idempotently assign every drafted player to their team.
- *
- * Writes to BOTH stores so the rosters appear everywhere:
- *  1. `team_memberships` — direct team roster.
- *  2. `league_memberships.assignedTeamId` — the **authoritative** source the
- *     league management UI reads from (storage.getTeamsByLeague treats this
- *     as the priority source). Without this, drafted players showed up
- *     orphaned at the league level — the bug the user hit.
- *
- * Keeper assignments (draft_keepers rows with a real userId) are included so
- * that finalize is the single, idempotent source of truth for all roster
- * placements — drafted picks, commissioner goalies, and keepers alike.
- *
- * Returns the list of assignments applied for the *first time* this run (so
- * the caller can send notifications without spamming on idempotent re-runs),
- * with an `isKeeper` flag to let callers distinguish keepers from picks.
+ * Build the full list of (userId, teamId, isKeeper) pairs for every
+ * real-user roster placement in a draft — drafted picks, commissioner
+ * goalie assignments, and keepers. Placeholder players (no real account)
+ * are excluded. This is the shared source of truth used both for roster
+ * assignment (`assignDraftedPlayersToTeams`) and for notification
+ * eligibility (`notifyUnnotifiedDraftPlayers`) — those two concerns are
+ * tracked independently (see `notifiedUserIds` below) so one doesn't
+ * silently suppress the other.
  */
-export async function assignDraftedPlayersToTeams(
+async function getDraftResultPairs(
   draftId: string,
 ): Promise<{ userId: string; teamId: string; isKeeper: boolean }[]> {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
@@ -789,9 +781,6 @@ export async function assignDraftedPlayersToTeams(
     .from(draftPicks)
     .where(eq(draftPicks.draftId, draftId));
 
-  // (userId, teamId, isKeeper) pairs to assign — drafted picks + commissioner
-  // goalies + keepers (real-user keepers only; placeholder players have no
-  // account to assign or notify).
   const goalieAssignments = (draft.goalieAssignments as Record<string, string>) || {};
   const pairs: { userId: string; teamId: string; isKeeper: boolean }[] = [];
   for (const pick of picks) {
@@ -815,6 +804,40 @@ export async function assignDraftedPlayersToTeams(
     if (!k.userId) continue;
     pairs.push({ userId: k.userId, teamId: k.teamId, isKeeper: true });
   }
+
+  return pairs;
+}
+
+/**
+ * Idempotently assign every drafted player to their team.
+ *
+ * Writes to BOTH stores so the rosters appear everywhere:
+ *  1. `team_memberships` — direct team roster.
+ *  2. `league_memberships.assignedTeamId` — the **authoritative** source the
+ *     league management UI reads from (storage.getTeamsByLeague treats this
+ *     as the priority source). Without this, drafted players showed up
+ *     orphaned at the league level — the bug the user hit.
+ *
+ * Keeper assignments (draft_keepers rows with a real userId) are included so
+ * that finalize is the single, idempotent source of truth for all roster
+ * placements — drafted picks, commissioner goalies, and keepers alike.
+ *
+ * Returns the list of assignments applied for the *first time* this run
+ * (surfaced to the commissioner in the finalize summary). NOTE: this is
+ * about roster placement only — do NOT use "newly assigned" as a proxy for
+ * "needs a notification". Team assignment happens automatically the instant
+ * the draft completes, well before a commissioner ever presses "Finalize",
+ * so by the time they click it everyone is typically already assigned. Use
+ * `notifyUnnotifiedDraftPlayers` (tracked via `drafts.notifiedUserIds`) for
+ * notification eligibility instead.
+ */
+export async function assignDraftedPlayersToTeams(
+  draftId: string,
+): Promise<{ userId: string; teamId: string; isKeeper: boolean }[]> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return [];
+
+  const pairs = await getDraftResultPairs(draftId);
 
   const newlyAssigned: { userId: string; teamId: string; isKeeper: boolean }[] = [];
 
@@ -863,15 +886,18 @@ export async function assignDraftedPlayersToTeams(
 }
 
 /**
- * Send a push notification to each newly drafted player congratulating them
- * on the team they landed on. Best-effort — failures are swallowed per user
- * so one bad subscription doesn't block the rest.
+ * Send a "you were drafted/kept" push notification to each given pair.
+ * Best-effort — failures are swallowed per user so one bad subscription
+ * doesn't block the rest. Returns the userIds that were *successfully*
+ * delivered (per OneSignal's response) so the caller can persist only those
+ * as notified — anyone who fails (e.g. no push subscription registered yet)
+ * stays eligible to be retried on a later call.
  */
-async function notifyDraftedPlayers(
-  pairs: { userId: string; teamId: string }[],
+async function sendDraftResultNotifications(
+  pairs: { userId: string; teamId: string; isKeeper: boolean }[],
   leagueId: string,
-) {
-  if (pairs.length === 0) return;
+): Promise<string[]> {
+  if (pairs.length === 0) return [];
   // Lazy import to avoid a circular dep with storage at module load time.
   const { sendPushNotificationToUser } = await import("./oneSignalNotifications");
   const teamIds = Array.from(new Set(pairs.map((p) => p.teamId)));
@@ -880,52 +906,75 @@ async function notifyDraftedPlayers(
     : [];
   const teamNameById = new Map(teamRows.map((t) => [t.id, t.name]));
 
-  await Promise.allSettled(
-    pairs.map(({ userId, teamId }) => {
-      const teamName = teamNameById.get(teamId) || "your new team";
-      return sendPushNotificationToUser({
+  const results = await Promise.allSettled(
+    pairs.map(async ({ userId, teamId, isKeeper }) => {
+      const teamName = teamNameById.get(teamId) || (isKeeper ? "your team" : "your new team");
+      const ok = await sendPushNotificationToUser({
         userId,
-        title: "🎉 You've been drafted!",
-        message: `Congratulations — you were drafted to ${teamName}.`,
+        title: isKeeper ? "📋 You've been placed on a team!" : "🎉 You've been drafted!",
+        message: isKeeper
+          ? `You've been kept and placed on ${teamName}.`
+          : `Congratulations — you were drafted to ${teamName}.`,
         data: { type: "draft_result", leagueId, teamId },
       }).catch((e) => {
         console.error(`[Draft] push notify failed for user ${userId}:`, e);
         return false;
       });
+      return { userId, ok };
     }),
   );
+
+  return results
+    .filter(
+      (r): r is PromiseFulfilledResult<{ userId: string; ok: boolean }> =>
+        r.status === "fulfilled" && r.value.ok,
+    )
+    .map((r) => r.value.userId);
+}
+
+async function markDraftUsersNotified(draftId: string, userIds: string[]) {
+  if (userIds.length === 0) return;
+  const [draft] = await db
+    .select({ notifiedUserIds: drafts.notifiedUserIds })
+    .from(drafts)
+    .where(eq(drafts.id, draftId));
+  const existing = new Set(((draft?.notifiedUserIds as string[] | null) ?? []));
+  userIds.forEach((id) => existing.add(id));
+  await db
+    .update(drafts)
+    .set({ notifiedUserIds: Array.from(existing) })
+    .where(eq(drafts.id, draftId));
 }
 
 /**
- * Send a push notification to each keeper that was just placed on their team
- * during finalization. Best-effort — failures are swallowed per user.
+ * Notify every real-user pick/keeper/goalie in the draft who hasn't
+ * successfully received their "you were drafted/kept" push yet.
+ *
+ * This is intentionally decoupled from `assignDraftedPlayersToTeams`'s
+ * "newly assigned" bookkeeping: roster assignment happens automatically the
+ * instant the draft completes (before a commissioner ever gets a chance to
+ * click "Finalize"), so gating notifications on "newly assigned" meant the
+ * explicit Finalize button was a no-op for everyone in the normal flow —
+ * exactly the bug where players reported never being notified. Eligibility
+ * here is tracked via `drafts.notifiedUserIds`, so this can be called
+ * automatically on completion AND safely re-run from the Finalize button —
+ * anyone not yet successfully notified (including previous failures) is
+ * retried, and no one is double-notified.
  */
-async function notifyKeeperPlayers(
-  pairs: { userId: string; teamId: string }[],
-  leagueId: string,
-) {
-  if (pairs.length === 0) return;
-  const { sendPushNotificationToUser } = await import("./oneSignalNotifications");
-  const teamIds = Array.from(new Set(pairs.map((p) => p.teamId)));
-  const teamRows = teamIds.length
-    ? await db.select().from(teams).where(inArray(teams.id, teamIds))
-    : [];
-  const teamNameById = new Map(teamRows.map((t) => [t.id, t.name]));
+async function notifyUnnotifiedDraftPlayers(
+  draftId: string,
+): Promise<{ notifiedCount: number }> {
+  const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+  if (!draft) return { notifiedCount: 0 };
 
-  await Promise.allSettled(
-    pairs.map(({ userId, teamId }) => {
-      const teamName = teamNameById.get(teamId) || "your team";
-      return sendPushNotificationToUser({
-        userId,
-        title: "📋 You've been placed on a team!",
-        message: `You've been kept and placed on ${teamName}.`,
-        data: { type: "draft_result", leagueId, teamId },
-      }).catch((e) => {
-        console.error(`[Draft] keeper push notify failed for user ${userId}:`, e);
-        return false;
-      });
-    }),
-  );
+  const allPairs = await getDraftResultPairs(draftId);
+  const alreadyNotified = new Set(((draft.notifiedUserIds as string[] | null) ?? []));
+  const pending = allPairs.filter((p) => !alreadyNotified.has(p.userId));
+  if (pending.length === 0) return { notifiedCount: 0 };
+
+  const notifiedIds = await sendDraftResultNotifications(pending, draft.leagueId);
+  await markDraftUsersNotified(draftId, notifiedIds);
+  return { notifiedCount: notifiedIds.length };
 }
 
 async function completeDraft(draftId: string) {
@@ -935,7 +984,7 @@ async function completeDraft(draftId: string) {
 
   const wasAlreadyCompleted = draft.status === "completed";
 
-  const newlyAssigned = await assignDraftedPlayersToTeams(draftId);
+  await assignDraftedPlayersToTeams(draftId);
 
   if (!wasAlreadyCompleted) {
     await db
@@ -944,33 +993,36 @@ async function completeDraft(draftId: string) {
       .where(eq(drafts.id, draftId));
   }
 
-  const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
-  const newPicks  = newlyAssigned.filter((a) => !a.isKeeper);
-  void notifyKeeperPlayers(newKeepers, draft.leagueId);
-  void notifyDraftedPlayers(newPicks, draft.leagueId);
+  // Fire-and-forget: don't block draft completion on notification delivery.
+  // Anything that fails here remains eligible for the commissioner's
+  // "Finalize Rosters and Notify Players" button to retry.
+  void notifyUnnotifiedDraftPlayers(draftId);
 
   await broadcastState(draftId);
   broadcastToDraft(draftId, { type: "draft_completed", payload: { draftId } });
 }
 
 /**
- * Public, idempotent re-run of the assignment + completion flow. Used by the
- * commissioner-facing "Finalize" button as a safety net in case the automatic
- * completion left anything unassigned (e.g. data added after completion, or
- * a legacy completed draft from before this assignment fix shipped).
+ * Public, idempotent re-run of the assignment + notification flow. Used by
+ * the commissioner-facing "Finalize Rosters and Notify Players" button.
  *
- * Keeper assignments are included alongside drafted picks. Keepers that have
- * not yet been placed on their teams are assigned here and receive a push
- * notification; subsequent runs are silent (idempotent).
+ * Roster assignment (team_memberships / assignedTeamId) is idempotent and
+ * safe to re-run — it only ever fills in gaps. Notifications are tracked
+ * separately via `drafts.notifiedUserIds`, so pressing this button always
+ * guarantees an attempt for anyone not yet successfully notified, even if
+ * their roster placement already happened automatically when the draft
+ * completed. That makes this a reliable "notify/retry" action rather than a
+ * silent no-op once everyone's already on a team.
  */
 export async function finalizeDraft(draftId: string): Promise<{
   ok: boolean;
   assigned: number;
+  notified: number;
   keeperCount: number;
   pickCount: number;
 }> {
   const [draft] = await db.select().from(drafts).where(eq(drafts.id, draftId));
-  if (!draft) return { ok: false, assigned: 0, keeperCount: 0, pickCount: 0 };
+  if (!draft) return { ok: false, assigned: 0, notified: 0, keeperCount: 0, pickCount: 0 };
   const newlyAssigned = await assignDraftedPlayersToTeams(draftId);
   if (draft.status !== "completed") {
     await db
@@ -978,10 +1030,8 @@ export async function finalizeDraft(draftId: string): Promise<{
       .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
       .where(eq(drafts.id, draftId));
   }
-  const newKeepers = newlyAssigned.filter((a) => a.isKeeper);
-  const newPicks  = newlyAssigned.filter((a) => !a.isKeeper);
-  void notifyKeeperPlayers(newKeepers, draft.leagueId);
-  void notifyDraftedPlayers(newPicks, draft.leagueId);
+
+  const { notifiedCount } = await notifyUnnotifiedDraftPlayers(draftId);
 
   // Count total keepers and picks in this draft so the commissioner gets a
   // summary breakdown in the finalize dialog (newly-assigned vs already placed).
@@ -999,6 +1049,7 @@ export async function finalizeDraft(draftId: string): Promise<{
   return {
     ok: true,
     assigned: newlyAssigned.length,
+    notified: notifiedCount,
     keeperCount: Number(keeperCountRow?.n ?? 0),
     pickCount: Number(pickCountRow?.n ?? 0),
   };
