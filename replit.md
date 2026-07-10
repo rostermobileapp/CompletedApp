@@ -46,7 +46,7 @@ Key features include subscription gating, payment management, a "Needs Attention
 
 A comprehensive scrimmage notification system includes in-app push notifications (via a `NotificationCenter` component) and email notifications for invites, reminders, approvals, and cancellations. A unified event reminder system sends push notifications for games and scrimmages. Scrimmage creators can designate co-hosts with granular permissions.
 
-A founder-only real-time alert (`server/oneSignalNotifications.ts` → `sendNewSignupAlertPushNotification`) pushes a notification to user `U00001` every time a brand-new user record is created, including the signup's name and (when a zip code is on file) their city/state resolved via `server/zipLookup.ts`. Not a user-configurable preference — hardcoded to the single founder recipient.
+A founder-only real-time alert (`server/oneSignalNotifications.ts` → `sendNewSignupAlertPushNotification`) pushes a notification to user `U00001` every time a brand-new user record is created, including the signup's name and (when a zip code is on file) their city/state resolved via `server/zipLookup.ts`. The recipient is hardcoded to the single founder account, but whether the alert fires is controllable via a `newSignupAlerts` key in that user's `notification_preferences.notificationSettings` (defaults to `true`, so behavior is unchanged unless explicitly turned off). A matching toggle ("New Signup Alerts") renders in `NotificationPreferencesModal.tsx`, but only when the logged-in user's `displayId === 'U00001'` — it is invisible to every other account.
 
 ## Direct Message Scoping
 

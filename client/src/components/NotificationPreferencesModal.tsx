@@ -45,6 +45,7 @@ interface NotificationSettings {
   newsAnnouncements: boolean;
   playerRsvpUpdates?: boolean;
   photoTagNotifications?: boolean;
+  newSignupAlerts?: boolean;
 }
 
 interface NotificationPreferences {
@@ -69,7 +70,11 @@ const defaultSettings: NotificationSettings = {
   newsAnnouncements: true,
   playerRsvpUpdates: true,
   photoTagNotifications: true,
+  newSignupAlerts: true,
 };
+
+// Founder-only alert: real-time push whenever a brand-new user signs up.
+const FOUNDER_DISPLAY_ID = 'U00001';
 
 export function NotificationPreferencesModal({ open, onOpenChange }: NotificationPreferencesModalProps) {
   const { toast } = useToast();
@@ -105,6 +110,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
     enabled: open,
   });
   const isCaptain = (captainTeams?.length ?? 0) > 0;
+  const isFounder = userData?.displayId === FOUNDER_DISPLAY_ID;
 
   const { data: preferences, isLoading } = useQuery<NotificationPreferences>({
     queryKey: ['/api/notification-preferences'],
@@ -404,6 +410,23 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   </div>
                 ))}
                 
+                {/* Founder-only: New Signup Alerts */}
+                {isFounder && (
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 border-t mt-2 pt-3">
+                    <div className="flex items-center gap-3">
+                      <BellRing className="w-4 h-4 text-pink-500" />
+                      <div>
+                        <Label className="text-sm cursor-pointer font-normal">New Signup Alerts</Label>
+                        <p className="text-xs text-muted-foreground">Founder only</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={localSettings.newSignupAlerts ?? true}
+                      onCheckedChange={() => handleToggle('newSignupAlerts')}
+                    />
+                  </div>
+                )}
+
                 {/* Captain-only: Player RSVP Updates */}
                 {isCaptain && (
                   <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 border-t mt-2 pt-3">

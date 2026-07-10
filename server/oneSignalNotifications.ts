@@ -141,6 +141,13 @@ export async function sendNewSignupAlertPushNotification(newUser: {
       return false;
     }
 
+    const adminPrefs = await storage.getNotificationPreferences(admin.id);
+    const adminSettings = adminPrefs?.notificationSettings as Record<string, boolean> | undefined;
+    if (adminSettings?.newSignupAlerts === false) {
+      console.log('[OneSignal] New-signup alerts disabled by recipient - skipping');
+      return false;
+    }
+
     const name = [newUser.firstName, newUser.lastName].filter(Boolean).join(' ').trim() || newUser.email || 'A new user';
 
     let locationSuffix = '';
