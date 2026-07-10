@@ -41,7 +41,7 @@ export function DesktopMenuColumn() {
     isCoCommissionerOfAnyLeague,
     isLoading,
   } = usePermissions();
-  const isFounder = user?.email === 'founder@rosterhockey.com';
+  const isFounder = user?.email === 'tobin@rosterhockey.com';
 
   const isCommissioner = canManageLeague();
   const isPlayerPro = canAccessPremiumFeatures();

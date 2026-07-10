@@ -34,7 +34,7 @@ interface FeatureRequestItem {
 
 type View = 'board' | 'report-bug' | 'new-request';
 
-const FOUNDER_EMAIL = 'founder@rosterhockey.com';
+const FOUNDER_EMAIL = 'tobin@rosterhockey.com';
 
 function ReplySection({ requestId, isFounder }: { requestId: string; isFounder: boolean }) {
   const { toast } = useToast();

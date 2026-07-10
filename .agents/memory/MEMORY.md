@@ -6,3 +6,4 @@
 - [Team captain data model quirk](team-captain-data-model.md) — captain status lives in both teams.captainId and team_memberships.isCaptain; stale rows from team creation can show a phantom captain.
 - [Draft notification decoupling](draft-notification-decoupling.md) — notify actions must track delivery separately from roster/team assignment state, or auto-completion silently swallows notifications.
 - [storage.ts / oneSignalNotifications.ts cycle](storage-onesignal-circular-import.md) — oneSignalNotifications.ts imports storage; call it back from storage.ts via dynamic `await import()`, never a static import.
+- [Founder email constant](founder-email-constant.md) — founder's real login email is tobin@rosterhockey.com, not founder@rosterhockey.com; several founder-gate checks had the wrong hardcoded value.

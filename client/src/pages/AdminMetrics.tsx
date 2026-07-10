@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Users, DollarSign, BarChart2, Handshake, QrCode } from 'lucide-react';
 
-const ADMIN_EMAIL = 'founder@rosterhockey.com';
+const ADMIN_EMAIL = 'tobin@rosterhockey.com';
 
 function fmt(n: number) {
   return n.toLocaleString();
