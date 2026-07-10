@@ -663,11 +663,51 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         // Apply captain assignments directly to teams (commissioner-trusted, pre-draft).
         // In commissioner pick-mode, captains are unused — clear any prior assignments
         // so the awaiting-captains lobby doesn't gate-keep on stale captains.
+        const { teamMemberships: teamMembershipsTbl } = await import("@shared/schema");
+
+        // Team creation auto-adds the creator (often the commissioner) as an
+        // approved team_memberships row with isCaptain=true so the team shows up
+        // in their selector. If that user was never actually rostered onto the
+        // team (no leagueMemberships.assignedTeamId pointing here) and isn't the
+        // newly-assigned draft captain, that row is a stale artifact — clear its
+        // captain flag so the commissioner doesn't keep showing up as captain.
+        const clearPhantomCaptainFlags = async (teamId: string, newCaptainId: string | null) => {
+          const flaggedRows = await db
+            .select({ id: teamMembershipsTbl.id, userId: teamMembershipsTbl.userId })
+            .from(teamMembershipsTbl)
+            .where(and(eq(teamMembershipsTbl.teamId, teamId), eq(teamMembershipsTbl.isCaptain, true)));
+          for (const row of flaggedRows) {
+            if (newCaptainId && row.userId === newCaptainId) continue;
+            const [rosterAssignment] = await db
+              .select({ id: leagueMemberships.id })
+              .from(leagueMemberships)
+              .where(
+                and(
+                  eq(leagueMemberships.userId, row.userId),
+                  eq(leagueMemberships.assignedTeamId, teamId),
+                ),
+              );
+            if (!rosterAssignment) {
+              await db
+                .update(teamMembershipsTbl)
+                .set({ isCaptain: false })
+                .where(eq(teamMembershipsTbl.id, row.id));
+            }
+          }
+        };
+
         if ((config.pickMode ?? "captains") === "commissioner") {
+          const teamsInLeague = await db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(eq(teams.leagueId, leagueId));
           await db
             .update(teams)
             .set({ captainId: null })
             .where(eq(teams.leagueId, leagueId));
+          for (const t of teamsInLeague) {
+            await clearPhantomCaptainFlags(t.id, null);
+          }
         } else {
           // Captain mode: apply the submitted assignments. Also explicitly CLEAR
           // captainId for any team in draftOrder that was NOT given an assignment —
@@ -683,6 +723,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
               // No captain selected for this team — clear any stale assignment
               await db.update(teams).set({ captainId: null }).where(eq(teams.id, teamId));
             }
+            await clearPhantomCaptainFlags(teamId, captainUserId ?? null);
           }
         }
 

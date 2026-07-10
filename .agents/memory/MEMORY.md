@@ -3,3 +3,4 @@
 - [Placeholder player orphaned teamId](placeholder-orphaned-teamid.md) — placeholder_players can have stale team_id pointing to deleted teams; fix is in getLeaguePlaceholderPlayers to null-out via LEFT JOIN detection.
 - [Draft keeper ID format](draft-keeper-id-format.md) — draft_keepers.placeholder_player_id stores "placeholder:{uuid}" WITH the prefix; draft_picks.placeholder_player_id stores bare UUID (applyPick strips prefix). Never add the prefix again when reading from draft_keepers.
 - [Draft rehydrate vs active-drafts scope](draft-rehydrate-scope.md) — active-drafts endpoint includes "paused" status but rehydrateActiveDraftTimers only queries "active"/"awaiting_captains" — paused drafts are not auto-recovered on server restart.
+- [Team captain data model quirk](team-captain-data-model.md) — captain status lives in both teams.captainId and team_memberships.isCaptain; stale rows from team creation can show a phantom captain.
