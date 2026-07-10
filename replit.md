@@ -46,6 +46,8 @@ Key features include subscription gating, payment management, a "Needs Attention
 
 A comprehensive scrimmage notification system includes in-app push notifications (via a `NotificationCenter` component) and email notifications for invites, reminders, approvals, and cancellations. A unified event reminder system sends push notifications for games and scrimmages. Scrimmage creators can designate co-hosts with granular permissions.
 
+A founder-only real-time alert (`server/oneSignalNotifications.ts` → `sendNewSignupAlertPushNotification`) pushes a notification to user `U00001` every time a brand-new user record is created, including the signup's name and (when a zip code is on file) their city/state resolved via `server/zipLookup.ts`. Not a user-configurable preference — hardcoded to the single founder recipient.
+
 ## Direct Message Scoping
 
 Direct message threads are strictly scoped to the dashboard's `(leagueId, teamId, tournamentId)` selection that was active when the thread was created. Two users can therefore have multiple separate DM threads — one per scope tuple — and switching the dashboard selector switches which thread is visible. The conversations table stores the full tuple; the `POST /api/conversations/direct` route normalizes scope server-side (tournament wins outright; team selection always canonicalizes leagueId from the team record), and `messagingService.findDirectConversation` uses exact `isNull`/`eq` matching per field so duplicate detection and visibility always agree.

@@ -5,3 +5,4 @@
 - [Draft rehydrate vs active-drafts scope](draft-rehydrate-scope.md) — active-drafts endpoint includes "paused" status but rehydrateActiveDraftTimers only queries "active"/"awaiting_captains" — paused drafts are not auto-recovered on server restart.
 - [Team captain data model quirk](team-captain-data-model.md) — captain status lives in both teams.captainId and team_memberships.isCaptain; stale rows from team creation can show a phantom captain.
 - [Draft notification decoupling](draft-notification-decoupling.md) — notify actions must track delivery separately from roster/team assignment state, or auto-completion silently swallows notifications.
+- [storage.ts / oneSignalNotifications.ts cycle](storage-onesignal-circular-import.md) — oneSignalNotifications.ts imports storage; call it back from storage.ts via dynamic `await import()`, never a static import.

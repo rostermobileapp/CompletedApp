@@ -253,6 +253,7 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByDisplayId(displayId: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'shoots' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
@@ -901,6 +902,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByDisplayId(displayId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.displayId, displayId));
+    return user;
+  }
+
   private async migrateUserForeignKeys(oldId: string, newId: string): Promise<void> {
     await db.transaction(async (tx) => {
       await tx.execute(sql`DELETE FROM user_online_status WHERE user_id = ${oldId}`);
@@ -1109,6 +1115,24 @@ export class DatabaseStorage implements IStorage {
           await this.claimPlaceholdersForUser(user.id);
         } catch (claimErr) {
           console.error('[Storage] claimPlaceholdersForUser failed for new user:', claimErr);
+        }
+
+        // Alert the founder (user U00001) in real time whenever a brand-new
+        // user signs up. Dynamically imported to avoid a circular import
+        // (oneSignalNotifications.ts imports `storage` from this file).
+        try {
+          const { sendNewSignupAlertPushNotification } = await import('./oneSignalNotifications');
+          sendNewSignupAlertPushNotification({
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            zipCode: (user as any).zipCode,
+          }).catch((notifyErr) => {
+            console.error('[Storage] sendNewSignupAlertPushNotification failed:', notifyErr);
+          });
+        } catch (notifyErr) {
+          console.error('[Storage] Failed to load oneSignalNotifications for new-signup alert:', notifyErr);
         }
       }
 

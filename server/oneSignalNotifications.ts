@@ -1,4 +1,10 @@
 import { storage } from './storage';
+import { lookupCityStateFromZip } from './zipLookup';
+
+// DisplayId of the sole admin who should receive real-time new-signup alerts.
+// Intentionally hardcoded (not a settings toggle) since this is an internal
+// founder-only alert, not a user-configurable notification preference.
+const NEW_SIGNUP_ALERT_RECIPIENT_DISPLAY_ID = 'U00001';
 
 // Public, absolute URLs to the brand icons used by OneSignal for web push.
 //
@@ -112,6 +118,48 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
     }
   } catch (error) {
     console.error(`[OneSignal] Error sending push to user ${userId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Fires a real-time push alert to the founder (user U00001) whenever a
+ * brand-new user record is created. Not user-configurable — see the
+ * NEW_SIGNUP_ALERT_RECIPIENT_DISPLAY_ID constant above.
+ */
+export async function sendNewSignupAlertPushNotification(newUser: {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  zipCode?: string | null;
+}): Promise<boolean> {
+  try {
+    const admin = await storage.getUserByDisplayId(NEW_SIGNUP_ALERT_RECIPIENT_DISPLAY_ID);
+    if (!admin) {
+      console.log(`[OneSignal] New-signup alert recipient ${NEW_SIGNUP_ALERT_RECIPIENT_DISPLAY_ID} not found - skipping`);
+      return false;
+    }
+
+    const name = [newUser.firstName, newUser.lastName].filter(Boolean).join(' ').trim() || newUser.email || 'A new user';
+
+    let locationSuffix = '';
+    const place = await lookupCityStateFromZip(newUser.zipCode);
+    if (place) {
+      locationSuffix = ` from ${place.city}, ${place.state}`;
+    }
+
+    return sendPushNotificationToUser({
+      userId: admin.id,
+      title: '🎉 New signup!',
+      message: `${name} just signed up${locationSuffix}`,
+      data: {
+        type: 'admin_new_signup',
+        newUserId: newUser.id,
+      },
+    });
+  } catch (error) {
+    console.error('[OneSignal] Failed to send new-signup alert:', error);
     return false;
   }
 }
