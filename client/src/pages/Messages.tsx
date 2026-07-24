@@ -1,6 +1,7 @@
 // 🚨 SUBSCRIPTION SYSTEM REMOVED - ALL FEATURES FREE! 🚨
 // import { SubscriptionGate } from '@/components/SubscriptionGate'; // DELETED
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -2640,14 +2641,21 @@ export default function Messages() {
                 ))}
               </div>
             ) : (
-              timelineItems.map((item) => {
+              <AnimatePresence initial={false}>
+              {timelineItems.map((item) => {
                 if (item.type === 'payment') {
                   return (
-                    <PaymentRequestCard 
+                    <motion.div
                       key={item.data.id}
-                      paymentRequestId={item.data.id}
-                      currentUserId={currentUserId}
-                    />
+                      initial={{ opacity: 0, scale: 0.72, y: 8 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 18 }}
+                    >
+                      <PaymentRequestCard 
+                        paymentRequestId={item.data.id}
+                        currentUserId={currentUserId}
+                      />
+                    </motion.div>
                   );
                 }
                 
@@ -2656,11 +2664,14 @@ export default function Messages() {
                 const isFirstUnread = firstUnreadMessage?.id === message.id;
                 
                 return (
-                  <div 
-                    key={message.id} 
+                  <motion.div
+                    key={message.id}
                     ref={isFirstUnread ? firstUnreadMessageRef : null}
-                    className={`flex gap-3 items-start ${isCurrentUser ? 'justify-end' : 'justify-start'}`} 
+                    className={`flex gap-3 items-start ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                     data-testid={`message-${message.id}`}
+                    initial={{ opacity: 0, scale: 0.72, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 18 }}
                   >
                     {!isCurrentUser && message.sender && (
                       <div className="order-1">
@@ -2816,9 +2827,10 @@ export default function Messages() {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
-              })
+              })}
+              </AnimatePresence>
             )}
             
             {/* Typing indicators */}
