@@ -631,13 +631,18 @@ export default function Messages() {
   // dialogLeagueId and dialogLeagues are computed below from the dashboard context
   // Founder-only: search any user by display ID
   const [founderSearchQuery, setFounderSearchQuery] = useState('');
+  const [debouncedFounderQuery, setDebouncedFounderQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedFounderQuery(founderSearchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [founderSearchQuery]);
   const { data: founderSearchResults = [], isFetching: founderSearchLoading } = useQuery<any[]>({
-    queryKey: ['/api/admin/users/search', founderSearchQuery],
+    queryKey: ['/api/admin/users/search', debouncedFounderQuery],
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/admin/users/search?q=${encodeURIComponent(founderSearchQuery)}`);
+      const res = await apiRequest('GET', `/api/admin/users/search?q=${encodeURIComponent(debouncedFounderQuery)}`);
       return res.json();
     },
-    enabled: isFounder && founderSearchQuery.length >= 2,
+    enabled: isFounder && debouncedFounderQuery.length >= 2,
     staleTime: 5000,
   });
 
@@ -651,6 +656,7 @@ export default function Messages() {
       setGroupTitle('');
       setSearchQuery('');
       setFounderSearchQuery('');
+      setDebouncedFounderQuery('');
     }
   }, [showContactDiscovery]);
   const [conversationType, setConversationType] = useState<'direct' | 'team_group' | 'custom_group' | 'captain_only'>('direct');
@@ -898,6 +904,14 @@ export default function Messages() {
 
     return allConversations.filter(conv => {
       if (isDirect(conv)) {
+        // Global-scope direct conversations (no league or tournament tag) are
+        // always visible regardless of the current dashboard selection. These
+        // are founder-initiated DMs that intentionally have null scope so they
+        // surface under every dashboard context for both the founder and the
+        // recipient.
+        if ((conv.leagueId ?? null) === null && (conv.tournamentId ?? null) === null) {
+          return true;
+        }
         // Direct conversations: match by league + tournament only.
         return (
           (conv.leagueId ?? null) === effectiveDmScope.leagueId &&
@@ -1010,6 +1024,7 @@ export default function Messages() {
     setGroupTitle('');
     setSearchQuery('');
     setFounderSearchQuery('');
+    setDebouncedFounderQuery('');
   };
 
   // Create new conversation mutation
