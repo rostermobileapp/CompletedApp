@@ -157,6 +157,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               break;
 
             case 'message':
+              // If the WebSocket payload includes the full message object, write it
+              // directly into the cache so it appears instantly without a round-trip.
+              if (data.conversationId && data.message?.id) {
+                const cacheKey = ['/api/conversations', data.conversationId, 'messages'];
+                const existing = queryClient.getQueryData<any[]>(cacheKey);
+                if (existing) {
+                  // Avoid duplicates (sender may have already added it via mutation)
+                  const alreadyPresent = existing.some((m: any) => m.id === data.message.id);
+                  if (!alreadyPresent) {
+                    queryClient.setQueryData(cacheKey, [...existing, data.message]);
+                  }
+                }
+              }
+              // Invalidate for full reconciliation (ordering, attachments, etc.)
               queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
               queryClient.invalidateQueries({ queryKey: ['/api/conversations', data.conversationId, 'messages'] });
               queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count'] });

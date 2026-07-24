@@ -846,7 +846,7 @@ export default function Messages() {
     queryKey: ['/api/conversations'],
     staleTime: 0,
     refetchOnMount: 'always',
-    refetchInterval: 10000,
+    refetchInterval: 5000,
     enabled: true // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
@@ -995,7 +995,8 @@ export default function Messages() {
     queryKey: ['/api/conversations', selectedConversation, 'messages'],
     staleTime: 0,
     refetchOnMount: 'always',
-    refetchInterval: 8000,
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true,
     enabled: !!selectedConversation // 🚨 FREE ACCESS - NO GATES! 🚨
   });
 
