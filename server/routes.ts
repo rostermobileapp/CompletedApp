@@ -17478,12 +17478,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      // Free tier restriction: can only send messages in team_group conversations
+      // Free tier restriction: can only send messages in team_group conversations,
+      // EXCEPT when the founder (U00001) is a participant — then any user may reply.
       const senderUser = await storage.getUser(userId);
       if (senderUser && (senderUser.role === 'free_tier' || !senderUser.role)) {
         const conversation = await messagingService.getConversation(conversationId);
         if (!conversation || conversation.type !== 'team_group') {
-          return res.status(403).json({ message: 'A Player Pro subscription is required to reply in this conversation.' });
+          // Check whether founder is a participant — if so, bypass the gate
+          const participants = await messagingService.getConversationParticipants(conversationId);
+          const hasFounder = participants.some(
+            (p) => (p.user as any)?.displayId === 'U00001'
+          );
+          if (!hasFounder) {
+            return res.status(403).json({ message: 'A Player Pro subscription is required to reply in this conversation.' });
+          }
         }
       }
       
