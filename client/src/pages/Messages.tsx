@@ -82,6 +82,7 @@ interface ConversationParticipant {
   joinedAt: string;
   user?: {
     id: string;
+    displayId?: string;
     displayName: string;
     email: string;
     profileImageUrl?: string;
@@ -591,11 +592,12 @@ function ConversationRail({
 export default function Messages() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, hasRole } = usePermissions();
-  const { data: dbUser } = useQuery<{ id: string }>({
+  const { data: dbUser } = useQuery<{ id: string; displayId?: string }>({
     queryKey: ['/api/user'],
     enabled: !!user,
   });
   const currentUserId = dbUser?.id || (user as any)?.id;
+  const isFounder = dbUser?.displayId === 'U00001';
   const params = useParams();
   const [location, navigate] = useLocation();
   const isMessagesRouteActive = location === '/messages' || location.startsWith('/messages/');
@@ -627,6 +629,18 @@ export default function Messages() {
 
   // Pre-select the league when the new conversation dialog opens, based on dashboard selection
   // dialogLeagueId and dialogLeagues are computed below from the dashboard context
+  // Founder-only: search any user by display ID
+  const [founderSearchQuery, setFounderSearchQuery] = useState('');
+  const { data: founderSearchResults = [], isFetching: founderSearchLoading } = useQuery<any[]>({
+    queryKey: ['/api/admin/users/search', founderSearchQuery],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/admin/users/search?q=${encodeURIComponent(founderSearchQuery)}`);
+      return res.json();
+    },
+    enabled: isFounder && founderSearchQuery.length >= 2,
+    staleTime: 5000,
+  });
+
   // We need a separate state reset when dialog closes
   useEffect(() => {
     if (!showContactDiscovery) {
@@ -636,6 +650,7 @@ export default function Messages() {
       setSelectedContacts([]);
       setGroupTitle('');
       setSearchQuery('');
+      setFounderSearchQuery('');
     }
   }, [showContactDiscovery]);
   const [conversationType, setConversationType] = useState<'direct' | 'team_group' | 'custom_group' | 'captain_only'>('direct');
@@ -994,6 +1009,7 @@ export default function Messages() {
     setSelectedContacts([]);
     setGroupTitle('');
     setSearchQuery('');
+    setFounderSearchQuery('');
   };
 
   // Create new conversation mutation
@@ -1800,31 +1816,41 @@ export default function Messages() {
   // Use cached conversation if available, otherwise use fetched data
   const currentConversation = cachedConversation || fetchedConversation;
   
+  // Whether the current conversation includes the founder (U00001) as a participant.
+  // Used to bypass the free-tier message gate so any user can reply to the founder.
+  const conversationHasFounder = useMemo(() => {
+    if (!currentConversation?.participants) return false;
+    return currentConversation.participants.some(
+      (p) => (p.user as any)?.displayId === 'U00001'
+    );
+  }, [currentConversation]);
+
   // Whether the current user can send/reply in the current conversation.
-  // Free tier users can only send messages in their own team group chats.
+  // Free tier users can only send messages in their own team group chats,
+  // EXCEPT when the founder (U00001) is a participant — then anyone can reply.
   // Defaults to false (safe) when free tier and conversation metadata has not yet loaded.
   const canSendMessage = useMemo(() => {
     if (!isFreeTier) return true;
     if (!selectedConversation) return true;
     if (!currentConversation) return false;
+    if (conversationHasFounder) return true;
     return currentConversation.type === 'team_group' && userTeamIds.includes(currentConversation.teamId);
-  }, [isFreeTier, selectedConversation, currentConversation, userTeamIds]);
+  }, [isFreeTier, selectedConversation, currentConversation, userTeamIds, conversationHasFounder]);
 
   // Free-tier users get a fully blurred thread view (with an "Upgrade to view"
   // CTA) on every conversation they're a participant in EXCEPT the team group
-  // chats they themselves belong to. This gates the entire reading experience,
-  // not just the reply input — when locked we also suppress the message input
-  // and the legacy "Upgrade to reply" banner so the overlay's CTA is the only
-  // path forward.
+  // chats they themselves belong to, and EXCEPT threads where the founder
+  // is a participant (so they can read and reply to founder messages freely).
   const isThreadLocked = useMemo(() => {
     if (!isFreeTier) return false;
     if (!selectedConversation) return false;
     if (!currentConversation) return true;
+    if (conversationHasFounder) return false;
     const isOwnTeamChat =
       currentConversation.type === 'team_group' &&
       userTeamIds.includes(currentConversation.teamId);
     return !isOwnTeamChat;
-  }, [isFreeTier, selectedConversation, currentConversation, userTeamIds]);
+  }, [isFreeTier, selectedConversation, currentConversation, userTeamIds, conversationHasFounder]);
 
   // Mark all unread messages as read when conversation is opened.
   // Skip for free-tier users when the thread is locked behind the
@@ -2002,9 +2028,73 @@ export default function Messages() {
           </DialogHeader>
           
           <div className="space-y-4">
-            
+
+            {/* Founder-only: Find Any User by User ID */}
+            {isFounder && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium block">Find Any User</label>
+                <Input
+                  placeholder="Search by User ID (e.g. U00042)..."
+                  value={founderSearchQuery}
+                  onChange={(e) => setFounderSearchQuery(e.target.value)}
+                  data-testid="input-founder-user-search"
+                />
+                {founderSearchLoading && (
+                  <p className="text-xs text-muted-foreground pl-1">Searching...</p>
+                )}
+                {founderSearchResults.length > 0 && (
+                  <div className="space-y-1">
+                    {founderSearchResults.map((result: any) => (
+                      <div
+                        key={result.id}
+                        className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+                        onClick={() => {
+                          createConversationMutation.mutate({
+                            otherUserId: result.id,
+                            leagueId: null,
+                            teamId: null,
+                            tournamentId: null,
+                          });
+                        }}
+                        data-testid={`founder-user-result-${result.id}`}
+                      >
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={result.profileImageUrl || undefined} />
+                          <AvatarFallback>
+                            {getInitials(`${result.firstName || ''} ${result.lastName || ''}`.trim() || result.displayId || '?')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {result.firstName || result.lastName
+                              ? `${result.firstName || ''} ${result.lastName || ''}`.trim()
+                              : '(No name)'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{result.displayId}</p>
+                        </div>
+                        <UserPlus className="w-4 h-4 text-muted-foreground shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {founderSearchQuery.length >= 2 && !founderSearchLoading && founderSearchResults.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">No users found</p>
+                )}
+                {dialogLeagues.length > 0 && (
+                  <div className="relative py-1">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-background px-2 text-xs text-muted-foreground">or message league contacts</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Fallback content if no leagues but user is authenticated */}
-            {dialogLeagues.length === 0 && !userLeaguesLoading && (
+            {dialogLeagues.length === 0 && !userLeaguesLoading && !isFounder && (
               <div className="p-4 bg-muted rounded-md text-center">
                 <Users className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">
@@ -2309,7 +2399,7 @@ export default function Messages() {
           <div className="sticky top-0 z-50 p-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border pt-[12px] pb-[12px] mt-[12px] mb-[12px] pl-[36px] pr-[36px]">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold" data-testid="text-page-title">Messages</h1>
-{canAccessPremiumFeatures() ? (
+{(canAccessPremiumFeatures() || isFounder) ? (
                 <button 
                   className="text-primary" 
                   data-testid="button-new-message"

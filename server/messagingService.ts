@@ -83,6 +83,7 @@ export class MessagingService {
         userLastName: users.lastName,
         userProfileImageUrl: users.profileImageUrl,
         userDeletedAt: users.deletedAt,
+        userDisplayId: users.displayId,
         displayFirstName: leagueMemberships.displayFirstName,
         displayLastName: leagueMemberships.displayLastName,
       })
@@ -117,6 +118,7 @@ export class MessagingService {
       user: {
         id: row.userId2,
         email: row.userEmail,
+        displayId: row.userDisplayId,
         firstName: row.displayFirstName || row.userFirstName,
         lastName: row.displayLastName || row.userLastName,
         profileImageUrl: row.userProfileImageUrl,

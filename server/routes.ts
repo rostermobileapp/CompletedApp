@@ -25137,6 +25137,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  app.get('/api/admin/users/search', isAuthenticated, requireFounder, async (req: any, res) => {
+    try {
+      const q = ((req.query.q as string) || '').trim();
+      if (q.length < 2) return res.json([]);
+      const results = await db
+        .select({
+          id: users.id,
+          displayId: users.displayId,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(
+          and(
+            isNull(users.deletedAt),
+            sql`LOWER(display_id) LIKE LOWER(${`%${q}%`})`
+          )
+        )
+        .limit(10);
+      res.json(results);
+    } catch (error) {
+      console.error('Error searching users (admin):', error);
+      res.status(500).json({ message: 'Failed to search users' });
+    }
+  });
+
   app.get('/api/admin/metrics', isAuthenticated, requireFounder, async (req: any, res) => {
     try {
       // Month boundaries use the browser's timezone (passed via query param)
