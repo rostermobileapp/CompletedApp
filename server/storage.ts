@@ -798,6 +798,12 @@ export async function warmCityGeoCache(): Promise<void> {
   }
 }
 
+// Module-level set to deduplicate new-signup push notifications.
+// Node.js is single-threaded, so checking + adding to this Set is atomic —
+// only the first of any concurrent upsertUser calls for a given user ID will
+// pass the guard and fire the notification.
+const _signupNotifiedIds = new Set<string>();
+
 export class DatabaseStorage implements IStorage {
   // Generate the next available user display ID (U00001, U00002, …).
   // Reads MAX, proposes MAX+1, then checks it is not already taken.
@@ -1006,7 +1012,6 @@ export class DatabaseStorage implements IStorage {
       // Check if this is a genuinely new user (not seen before by ID or email)
       const existingById = userData.id ? await this.getUser(userData.id) : undefined;
       const existingByEmailCheck = userData.email ? await this.getUserByEmail(userData.email) : undefined;
-      const isNewUser = !existingById && !existingByEmailCheck;
 
       // First, check if a user with this email already exists (handles re-signup with new Supabase ID)
       if (userData.email) {
@@ -1095,9 +1100,17 @@ export class DatabaseStorage implements IStorage {
         })
         .returning();
       
-      // Increment user registration counter only for genuinely new authenticated (non-placeholder) users
+      // Determine if this was a genuinely new user based on pre-insert checks.
+      // The _signupNotifiedIds Set is the authoritative dedup guard: Node.js is
+      // single-threaded so the has()+add() pair is atomic — only the very first
+      // concurrent upsertUser call for a given ID passes through, even when many
+      // requests fire simultaneously on a fresh signup.
       const isPlaceholder = userData.email?.includes('@placeholder.roster');
-      if (isNewUser && !isPlaceholder) {
+      const isNewUser = !existingById && !existingByEmailCheck;
+      const isFirstNotification = isNewUser && !isPlaceholder && !_signupNotifiedIds.has(user.id);
+      if (isFirstNotification) {
+        _signupNotifiedIds.add(user.id);
+
         try {
           await db.execute(sql`
             UPDATE user_registration_count 
