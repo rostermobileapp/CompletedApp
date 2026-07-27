@@ -448,27 +448,24 @@ export default function Profile() {
     <div className="min-h-screen flex flex-col" data-testid="profile-page">
       {/* Fixed Header Section - Profile Info and Banner */}
       <div className="sticky top-0 z-10 bg-background">
-        {/* Top bar with refresh */}
-        <div className="flex items-center justify-end px-6 pt-[10px] pb-[2px]">
-          <button
-            onClick={async () => {
-              setIsRefreshing(true);
-              await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-              await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-              await queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
-              await queryClient.invalidateQueries({ queryKey: ['/api/teams'] });
-              setTimeout(() => setIsRefreshing(false), 600);
-            }}
-            className="p-1 text-muted-foreground hover:text-foreground rounded-lg"
-            data-testid="button-refresh-profile"
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
         {/* Profile Info */}
-        <div className="px-6 pt-[6px] pb-[8px]">
-          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
+        <div className="px-6 pt-[24px] pb-[8px]">
+          <div className="relative bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 flex items-center gap-4 text-left pl-[2px] pr-[2px] pt-[2px] pb-[2px]" data-testid="card-profile-info">
+            <button
+              onClick={async () => {
+                setIsRefreshing(true);
+                await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/teams'] });
+                setTimeout(() => setIsRefreshing(false), 600);
+              }}
+              className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground rounded-lg"
+              data-testid="button-refresh-profile"
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
             <div className="relative flex-shrink-0">
               <div className={`w-20 h-20 rounded-full flex items-center justify-center ${(user as any)?.profileImageUrl ? 'bg-transparent' : 'bg-primary'}`}>
                 {(user as any)?.profileImageUrl ? (
