@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, Flag, Edit2, X } from 'lucide-react';
+import { Trophy, Users, Star, Upload, Coffee, Target, Award, TrendingUp, Apple, Flag, Edit2, X, RefreshCw } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { LineManager } from '@/components/LineManager';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ export default function Teams() {
   const { toast } = useToast();
   const { selectedTeamId, selectedLeagueId, selectedType, selectedTournamentId, setTeamSelection } = useDashboardSelection();
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [editedTeamName, setEditedTeamName] = useState('');
 
   // Get user's teams
@@ -710,11 +711,27 @@ export default function Teams() {
                                 </button>
                               )}
                             </div>
-                            {team.uniqueTeamId && (
-                              <span className="text-xs font-mono text-muted-foreground ml-2">
-                                {team.uniqueTeamId}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={async () => {
+                                  setIsRefreshing(true);
+                                  await queryClient.invalidateQueries({ queryKey: ['/api/teams'] });
+                                  await queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+                                  await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+                                  setTimeout(() => setIsRefreshing(false), 600);
+                                }}
+                                className="p-1 text-muted-foreground hover:text-foreground rounded"
+                                data-testid="button-refresh-team"
+                                disabled={isRefreshing}
+                              >
+                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                              </button>
+                              {team.uniqueTeamId && (
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {team.uniqueTeamId}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>

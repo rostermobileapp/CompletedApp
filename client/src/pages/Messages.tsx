@@ -3,7 +3,7 @@
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'wouter';
@@ -625,6 +625,7 @@ export default function Messages() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [showContactDiscovery, setShowContactDiscovery] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
 
@@ -2416,6 +2417,20 @@ export default function Messages() {
           <div className="sticky top-0 z-50 p-6 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border pt-[12px] pb-[12px] mt-[12px] mb-[12px] pl-[36px] pr-[36px]">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold" data-testid="text-page-title">Messages</h1>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={async () => {
+                    setIsRefreshing(true);
+                    await queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+                    await queryClient.invalidateQueries({ queryKey: ['/api/messages/unread-count-per-conversation'] });
+                    setTimeout(() => setIsRefreshing(false), 600);
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid="button-refresh-messages"
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
 {(canAccessPremiumFeatures() || isFounder) ? (
                 <button 
                   className="text-primary" 
@@ -2441,6 +2456,7 @@ export default function Messages() {
                   <Edit className="w-5 h-5" />
                 </button>
               )}
+              </div>
             </div>
           </div>
           

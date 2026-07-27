@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { notifyDashboardSelectionChange, DASHBOARD_SELECTION_CHANGE_EVENT } from '@/hooks/useDashboardSelection';
 import { useLocation, Link } from 'wouter';
-import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, BrickWall, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2 } from 'lucide-react';
+import { Trophy, Users, TrendingUp, Clock, Search, Coffee, Check, X, Beer, BrickWall, BarChart3, Award, ChevronDown, ChevronRight, AlertCircle, Settings, UserCheck, Shield, Crown, Star, Plus, Pizza, UtensilsCrossed, Cookie, IceCream, Wine, CupSoda, Milk, Wrench, Clipboard, Package, ShoppingBag, Camera, Heart, Smile, ThumbsUp, Flag, Music, Menu, Calendar, LucideIcon, UserPlus, Target, ArrowRight, Bell, XCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -1224,6 +1224,7 @@ function DashboardMobile() {
   });
   const [showDropdown, setShowDropdown] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showPastSeasonsModal, setShowPastSeasonsModal] = useState(false);
   const isDesktopWeb = useIsDesktopWeb();
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -2510,6 +2511,18 @@ function DashboardMobile() {
                       {(userProfile as any)?.firstName?.[0] || 'U'}
                     </span>
                   )}
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsRefreshing(true);
+                    await queryClient.invalidateQueries();
+                    setTimeout(() => setIsRefreshing(false), 600);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-card/50 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                  data-testid="button-refresh-home"
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
                 <button
                   onClick={() => setShowHamburgerMenu(true)}

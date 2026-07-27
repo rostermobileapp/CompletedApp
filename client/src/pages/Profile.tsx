@@ -15,7 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
@@ -73,6 +73,7 @@ export default function Profile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEditingPaymentMethods, setIsEditingPaymentMethods] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTeamForLeagueRequest, setSelectedTeamForLeagueRequest] = useState<string | null>(null);
@@ -498,9 +499,23 @@ export default function Profile() {
                   >
                     {tierDisplay.label}
                   </span>
-                  
                 </div>
               </div>
+              <button
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+                  await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+                  await queryClient.invalidateQueries({ queryKey: ['/api/leagues'] });
+                  await queryClient.invalidateQueries({ queryKey: ['/api/teams'] });
+                  setTimeout(() => setIsRefreshing(false), 600);
+                }}
+                className="flex-shrink-0 p-2 text-muted-foreground hover:text-foreground rounded-lg"
+                data-testid="button-refresh-profile"
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
             </div>
             {/* Upgrade button removed as everyone is commissioner now */}
           </div>
