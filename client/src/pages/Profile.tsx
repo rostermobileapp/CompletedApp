@@ -460,7 +460,7 @@ export default function Profile() {
                 await queryClient.invalidateQueries({ queryKey: ['/api/teams'] });
                 setTimeout(() => setIsRefreshing(false), 600);
               }}
-              className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground rounded-lg"
+              className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground rounded-lg ml-[25px] mr-[25px] pr-[8px]"
               data-testid="button-refresh-profile"
               disabled={isRefreshing}
             >
