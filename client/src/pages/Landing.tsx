@@ -308,7 +308,7 @@ export default function Landing() {
         </div>
       </section>
       {/* How It Works */}
-      <section className="py-24 px-6 bg-white pb-[4px]" id="how-it-works">
+      <section className="py-24 px-6 bg-white pb-[4px] pt-[4px]" id="how-it-works">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900">
