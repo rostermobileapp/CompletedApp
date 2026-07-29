@@ -64,6 +64,11 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isIos = useIsIosDevice();
 
+  // Scroll-scrub video refs
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
+  const triggerRef = useRef<HTMLParagraphElement>(null);
+  const scrubActiveRef = useRef(false);
+
   useSeo({
     title: 'Roster — Hockey Team Management App',
     description: 'Roster is the all-in-one hockey team management app. Scheduling, RSVP reminders, player substitutions, stats, standings, and in-app payments — no ads, ever. Free to start.',
@@ -75,6 +80,50 @@ export default function Landing() {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Show first frame as soon as video metadata is ready
+  useEffect(() => {
+    const video = heroVideoRef.current;
+    if (!video) return;
+    const onLoaded = () => { video.currentTime = 0; };
+    video.addEventListener('loadedmetadata', onLoaded);
+    return () => video.removeEventListener('loadedmetadata', onLoaded);
+  }, []);
+
+  // Activate scrub once "fixes all of it" enters the viewport
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) scrubActiveRef.current = true; },
+      { threshold: 0.1 }
+    );
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, []);
+
+  // Scroll-scrub: map scroll position to video currentTime
+  useEffect(() => {
+    const handleVideoScrub = () => {
+      if (!scrubActiveRef.current) return;
+      const video = heroVideoRef.current;
+      const trigger = triggerRef.current;
+      if (!video || !video.duration || !trigger) return;
+
+      // Scrub over the scroll distance equal to one full viewport height
+      // starting from where the trigger element enters the viewport
+      const triggerTop = trigger.getBoundingClientRect().top + window.scrollY;
+      const scrubStart = triggerTop - window.innerHeight * 0.9;
+      const scrubEnd = scrubStart + window.innerHeight * 1.5;
+      const progress = Math.min(1, Math.max(0,
+        (window.scrollY - scrubStart) / (scrubEnd - scrubStart)
+      ));
+      video.currentTime = progress * video.duration;
+    };
+
+    window.addEventListener('scroll', handleVideoScrub, { passive: true });
+    return () => window.removeEventListener('scroll', handleVideoScrub);
   }, []);
 
   useEffect(() => {
@@ -256,9 +305,12 @@ export default function Landing() {
               className="w-full md:w-2/5 max-w-[300px] flex-shrink-0"
               data-testid="image-hero"
             >
-              <img
-                src={appPreviewImage}
-                alt="Roster app preview showing team management features"
+              <video
+                ref={heroVideoRef}
+                src="/hero-demo.mp4"
+                muted
+                playsInline
+                preload="auto"
                 className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100"
               />
             </div>
@@ -276,7 +328,7 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
+              <p ref={triggerRef} className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
               <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
             </div>
           </div>
