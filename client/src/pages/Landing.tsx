@@ -274,7 +274,7 @@ export default function Landing() {
             </div>
             {/* Image — right, large */}
             <div
-              className="w-full md:w-3/5 flex-shrink-0"
+              className="w-full md:w-[90%] flex-shrink-0"
               data-testid="image-hero"
             >
               <img
