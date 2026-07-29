@@ -81,28 +81,43 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Scroll-scrub: advance the video as the trigger paragraph scrolls
-  // through the viewport. progress = 0 when it enters from the bottom,
-  // progress = 1 when it has fully scrolled past the top.
+  // Scroll-scrub: progress = 0 when trigger enters viewport from below,
+  // reaches 1 after scrolling 1.5× viewport height past that point.
   useEffect(() => {
-    const handleVideoScrub = () => {
+    // Read refs inside handlers so React Strict Mode remount doesn't capture stale nulls
+    const doScrub = () => {
       const video = heroVideoRef.current;
       const trigger = triggerRef.current;
       if (!video || !trigger) return;
-      if (!video.duration || video.readyState < 2) return;
-
+      if (!isFinite(video.duration) || video.duration <= 0) return;
       const rect = trigger.getBoundingClientRect();
-      // 0 → trigger just entering from bottom; 1 → trigger fully above viewport
+      const scrubRange = window.innerHeight * 1.5;
       const progress = Math.min(1, Math.max(0,
-        (window.innerHeight - rect.top) / (window.innerHeight + rect.height)
+        (window.innerHeight - rect.top) / scrubRange
       ));
       video.currentTime = progress * video.duration;
     };
 
-    window.addEventListener('scroll', handleVideoScrub, { passive: true });
-    // Also fire once on mount so the first frame is shown immediately
-    handleVideoScrub();
-    return () => window.removeEventListener('scroll', handleVideoScrub);
+    // Called when the video is ready — show the correct frame for the current
+    // scroll position immediately rather than waiting for the next scroll event.
+    const onVideoReady = () => doScrub();
+
+    const video = heroVideoRef.current;
+    if (video) {
+      video.addEventListener('loadedmetadata', onVideoReady);
+      video.addEventListener('loadeddata', onVideoReady);
+      // Force load regardless of browser preload heuristics
+      if (video.readyState === 0) video.load();
+      // If already loaded (HMR remount), scrub immediately
+      if (isFinite(video.duration) && video.duration > 0) doScrub();
+    }
+
+    window.addEventListener('scroll', doScrub, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', doScrub);
+      video?.removeEventListener('loadedmetadata', onVideoReady);
+      video?.removeEventListener('loadeddata', onVideoReady);
+    };
   }, []);
 
   useEffect(() => {
