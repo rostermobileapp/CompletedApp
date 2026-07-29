@@ -338,7 +338,7 @@ export default function Landing() {
         </div>
       </section>
       {/* Features phones photo */}
-      <section className="py-12 px-6 bg-white">
+      <section className="py-12 px-6 bg-white pt-[12px] pb-[12px]">
         <div className="max-w-6xl mx-auto">
           <img
             src="/features-phones.png"
