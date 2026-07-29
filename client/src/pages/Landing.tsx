@@ -67,7 +67,6 @@ export default function Landing() {
   // Scroll-scrub video refs
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const triggerRef = useRef<HTMLParagraphElement>(null);
-  const scrubActiveRef = useRef(false);
 
   useSeo({
     title: 'Roster — Hockey Team Management App',
@@ -82,47 +81,27 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Show first frame as soon as video metadata is ready
-  useEffect(() => {
-    const video = heroVideoRef.current;
-    if (!video) return;
-    const onLoaded = () => { video.currentTime = 0; };
-    video.addEventListener('loadedmetadata', onLoaded);
-    return () => video.removeEventListener('loadedmetadata', onLoaded);
-  }, []);
-
-  // Activate scrub once "fixes all of it" enters the viewport
-  useEffect(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) scrubActiveRef.current = true; },
-      { threshold: 0.1 }
-    );
-    observer.observe(trigger);
-    return () => observer.disconnect();
-  }, []);
-
-  // Scroll-scrub: map scroll position to video currentTime
+  // Scroll-scrub: advance the video as the trigger paragraph scrolls
+  // through the viewport. progress = 0 when it enters from the bottom,
+  // progress = 1 when it has fully scrolled past the top.
   useEffect(() => {
     const handleVideoScrub = () => {
-      if (!scrubActiveRef.current) return;
       const video = heroVideoRef.current;
       const trigger = triggerRef.current;
-      if (!video || !video.duration || !trigger) return;
+      if (!video || !trigger) return;
+      if (!video.duration || video.readyState < 2) return;
 
-      // Scrub over the scroll distance equal to one full viewport height
-      // starting from where the trigger element enters the viewport
-      const triggerTop = trigger.getBoundingClientRect().top + window.scrollY;
-      const scrubStart = triggerTop - window.innerHeight * 0.9;
-      const scrubEnd = scrubStart + window.innerHeight * 1.5;
+      const rect = trigger.getBoundingClientRect();
+      // 0 → trigger just entering from bottom; 1 → trigger fully above viewport
       const progress = Math.min(1, Math.max(0,
-        (window.scrollY - scrubStart) / (scrubEnd - scrubStart)
+        (window.innerHeight - rect.top) / (window.innerHeight + rect.height)
       ));
       video.currentTime = progress * video.duration;
     };
 
     window.addEventListener('scroll', handleVideoScrub, { passive: true });
+    // Also fire once on mount so the first frame is shown immediately
+    handleVideoScrub();
     return () => window.removeEventListener('scroll', handleVideoScrub);
   }, []);
 
@@ -311,7 +290,7 @@ export default function Landing() {
                 muted
                 playsInline
                 preload="auto"
-                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100"
+                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100 bg-white"
               />
             </div>
             <div
