@@ -252,11 +252,16 @@ export default function Landing() {
             <p className="text-xs text-gray-400">No credit card required · Free forever tier available</p>
           </div>
 
-          {/* Hero image + problem copy — grid overlap: both occupy the same cell */}
-          <div className="grid mt-10" style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }}>
-            {/* Image — right-justified, full size, not clipped */}
+          {/* Hero image + problem copy
+              Mobile/tablet : stacked — text above, image below at full width
+              Desktop (md+) : grid overlap — text floats over left side of image */}
+
+          {/* ── Text block (always rendered, stacks on mobile, overlays on md+) ── */}
+          <div className="mt-10 md:grid" style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }}>
+
+            {/* Image — hidden on mobile, right-justified overlay on md+ */}
             <div
-              className="col-start-1 row-start-1 flex justify-end items-center"
+              className="hidden md:flex md:col-start-1 md:row-start-1 justify-end items-center"
               data-testid="image-hero"
             >
               <img
@@ -265,9 +270,10 @@ export default function Landing() {
                 className="w-full md:w-[75%] h-auto"
               />
             </div>
-            {/* Text — overlays the left side, sits above the image */}
+
+            {/* Text */}
             <div
-              className="col-start-1 row-start-1 relative z-10 flex items-center py-10"
+              className="md:col-start-1 md:row-start-1 relative z-10 flex items-center md:py-10"
               data-testid="text-hero-body"
             >
               <div className="w-full md:w-[45%] text-left">
@@ -285,6 +291,16 @@ export default function Landing() {
                 <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
               </div>
             </div>
+
+            {/* Image — mobile only, full width below the text */}
+            <div className="md:hidden mt-8" data-testid="image-hero-mobile">
+              <img
+                src="/hero-demo.png"
+                alt="Roster app demo"
+                className="w-full h-auto"
+              />
+            </div>
+
           </div>
         </div>
       </section>
