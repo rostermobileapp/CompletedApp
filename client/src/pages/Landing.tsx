@@ -252,36 +252,38 @@ export default function Landing() {
             <p className="text-xs text-gray-400">No credit card required · Free forever tier available</p>
           </div>
 
-          {/* Hero image + problem copy */}
-          <div className="flex flex-col md:flex-row gap-12 items-center mt-10">
-            {/* Text — left */}
+          {/* Hero image + problem copy — grid overlap: both occupy the same cell */}
+          <div className="grid mt-10" style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }}>
+            {/* Image — right-justified, full size, not clipped */}
             <div
-              className="w-full md:w-2/5 flex-shrink-0 text-left"
-              data-testid="text-hero-body"
-            >
-              <p className="text-2xl font-semibold mb-4 text-gray-900">Every hockey team falls apart the same way.</p>
-              <p className="text-lg text-gray-600 mb-6">Nobody knows who's on the ice. Nobody knows when the game is. Half the team just doesn't show up.</p>
-              <div className="space-y-3 mb-6">
-                {["Endless group texts that go nowhere", "Half-baked spreadsheets nobody updates", "Email chains from 2018"].map((pain) => (
-                  <div key={pain} className="flex items-center gap-3">
-                    <span className="text-red-500 text-lg font-bold">✕</span>
-                    <span className="text-gray-500 text-lg line-through">{pain}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
-              <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
-            </div>
-            {/* Image — right, large */}
-            <div
-              className="w-full md:w-[90%] flex-shrink-0"
+              className="col-start-1 row-start-1 flex justify-end items-center"
               data-testid="image-hero"
             >
               <img
                 src="/hero-demo.png"
                 alt="Roster app demo"
-                className="w-full h-auto"
+                className="w-full md:w-[75%] h-auto"
               />
+            </div>
+            {/* Text — overlays the left side, sits above the image */}
+            <div
+              className="col-start-1 row-start-1 relative z-10 flex items-center py-10"
+              data-testid="text-hero-body"
+            >
+              <div className="w-full md:w-[45%] text-left">
+                <p className="text-2xl font-semibold mb-4 text-gray-900">Every hockey team falls apart the same way.</p>
+                <p className="text-lg text-gray-600 mb-6">Nobody knows who's on the ice. Nobody knows when the game is. Half the team just doesn't show up.</p>
+                <div className="space-y-3 mb-6">
+                  {["Endless group texts that go nowhere", "Half-baked spreadsheets nobody updates", "Email chains from 2018"].map((pain) => (
+                    <div key={pain} className="flex items-center gap-3">
+                      <span className="text-red-500 text-lg font-bold">✕</span>
+                      <span className="text-gray-500 text-lg line-through">{pain}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
+                <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
+              </div>
             </div>
           </div>
         </div>
