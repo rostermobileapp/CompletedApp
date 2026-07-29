@@ -5,7 +5,7 @@ import benchappLogo from "@assets/Benchapp_1779157432375.png";
 import teamsnapLogo from "@assets/TeamSnap_1779157432375.png";
 import sportsEngineLogo from "@assets/8W3CySTF_400x400_large_1779157432372.jpg";
 import crossbarLogo from "@assets/Crossbar_1779157432374.png";
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { SiAppstore, SiGoogleplay } from 'react-icons/si';
 import { useSeo } from '@/hooks/useSeo';
@@ -64,9 +64,6 @@ export default function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isIos = useIsIosDevice();
 
-  // Scroll-scrub video refs
-  const heroVideoRef = useRef<HTMLVideoElement>(null);
-  const triggerRef = useRef<HTMLParagraphElement>(null);
 
   useSeo({
     title: 'Roster — Hockey Team Management App',
@@ -81,26 +78,6 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Play the video when it scrolls into view; pause when it leaves.
-  // More reliable than frame-scrubbing for off-screen media in all browsers.
-  useEffect(() => {
-    const video = heroVideoRef.current;
-    if (!video) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          video.play().catch(() => {/* autoplay blocked */});
-        } else {
-          video.pause();
-        }
-      },
-      { threshold: 0.25 }
-    );
-
-    observer.observe(video);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     async function recordVisit() {
@@ -281,14 +258,10 @@ export default function Landing() {
               className="w-full md:w-2/5 max-w-[300px] flex-shrink-0"
               data-testid="image-hero"
             >
-              <video
-                ref={heroVideoRef}
-                src="/hero-demo-compressed.mp4"
-                muted
-                loop
-                playsInline
-                preload="auto"
-                className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100 bg-white"
+              <img
+                src="/hero-demo.png"
+                alt="Roster app demo"
+                className="w-full h-auto"
               />
             </div>
             <div
@@ -305,7 +278,7 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              <p ref={triggerRef} className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
+              <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
               <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
             </div>
           </div>
