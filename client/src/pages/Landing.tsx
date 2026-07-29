@@ -337,6 +337,16 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      {/* Features phones photo */}
+      <section className="py-12 px-6 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <img
+            src="/features-phones.png"
+            alt="Roster app features"
+            className="w-full h-auto"
+          />
+        </div>
+      </section>
       {/* Social Proof Stats Bar */}
       <section className="py-14 px-6 border-y border-gray-100 bg-blue-50/40">
         <div className="max-w-5xl mx-auto">
