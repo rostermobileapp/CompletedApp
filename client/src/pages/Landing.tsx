@@ -253,19 +253,10 @@ export default function Landing() {
           </div>
 
           {/* Hero image + problem copy */}
-          <div className="flex flex-col md:flex-row gap-10 items-center justify-center mt-10">
+          <div className="flex flex-col md:flex-row gap-12 items-center mt-10">
+            {/* Text — left */}
             <div
-              className="w-full md:w-2/5 max-w-[300px] flex-shrink-0"
-              data-testid="image-hero"
-            >
-              <img
-                src="/hero-demo.png"
-                alt="Roster app demo"
-                className="w-full h-auto"
-              />
-            </div>
-            <div
-              className="text-left md:w-3/5 max-w-xl"
+              className="w-full md:w-2/5 flex-shrink-0 text-left"
               data-testid="text-hero-body"
             >
               <p className="text-2xl font-semibold mb-4 text-gray-900">Every hockey team falls apart the same way.</p>
@@ -280,6 +271,17 @@ export default function Landing() {
               </div>
               <p className="text-3xl font-black text-[#3c82f4] mb-4 flex items-center gap-2"><img src={rosterLightLogo} alt="Roster" className="h-10 object-contain" /> fixes all of it.</p>
               <p className="text-lg text-gray-600">One app, built by a frustrated player, for players. Your schedule, your lineup, your team — organized. Finally.</p>
+            </div>
+            {/* Image — right, large */}
+            <div
+              className="w-full md:w-3/5 flex-shrink-0"
+              data-testid="image-hero"
+            >
+              <img
+                src="/hero-demo.png"
+                alt="Roster app demo"
+                className="w-full h-auto"
+              />
             </div>
           </div>
         </div>
