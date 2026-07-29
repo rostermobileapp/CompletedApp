@@ -81,43 +81,25 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Scroll-scrub: progress = 0 when trigger enters viewport from below,
-  // reaches 1 after scrolling 1.5× viewport height past that point.
+  // Play the video when it scrolls into view; pause when it leaves.
+  // More reliable than frame-scrubbing for off-screen media in all browsers.
   useEffect(() => {
-    // Read refs inside handlers so React Strict Mode remount doesn't capture stale nulls
-    const doScrub = () => {
-      const video = heroVideoRef.current;
-      const trigger = triggerRef.current;
-      if (!video || !trigger) return;
-      if (!isFinite(video.duration) || video.duration <= 0) return;
-      const rect = trigger.getBoundingClientRect();
-      const scrubRange = window.innerHeight * 1.5;
-      const progress = Math.min(1, Math.max(0,
-        (window.innerHeight - rect.top) / scrubRange
-      ));
-      video.currentTime = progress * video.duration;
-    };
-
-    // Called when the video is ready — show the correct frame for the current
-    // scroll position immediately rather than waiting for the next scroll event.
-    const onVideoReady = () => doScrub();
-
     const video = heroVideoRef.current;
-    if (video) {
-      video.addEventListener('loadedmetadata', onVideoReady);
-      video.addEventListener('loadeddata', onVideoReady);
-      // Force load regardless of browser preload heuristics
-      if (video.readyState === 0) video.load();
-      // If already loaded (HMR remount), scrub immediately
-      if (isFinite(video.duration) && video.duration > 0) doScrub();
-    }
+    if (!video) return;
 
-    window.addEventListener('scroll', doScrub, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', doScrub);
-      video?.removeEventListener('loadedmetadata', onVideoReady);
-      video?.removeEventListener('loadeddata', onVideoReady);
-    };
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => {/* autoplay blocked */});
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0.25 }
+    );
+
+    observer.observe(video);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -301,8 +283,9 @@ export default function Landing() {
             >
               <video
                 ref={heroVideoRef}
-                src="/hero-demo.mp4"
+                src="/hero-demo-compressed.mp4"
                 muted
+                loop
                 playsInline
                 preload="auto"
                 className="w-full h-auto rounded-3xl shadow-2xl shadow-blue-100 bg-white"
