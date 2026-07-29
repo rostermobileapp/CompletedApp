@@ -500,7 +500,6 @@ export default function Landing() {
                     ))}
                   </div>
                 </div>
-
                 {/* ── DESKTOP (≥ md): full 6-column table ── */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full border-collapse bg-white rounded-xl border border-gray-200 shadow-sm" data-testid="comparison-table">
@@ -526,7 +525,7 @@ export default function Landing() {
                     <tbody>
                       <tr className="border-b border-gray-100">
                         <td className="p-4 font-medium text-gray-900">Price</td>
-                        <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">See "Pricing" Page</td>
+                        <td className="text-center p-4 bg-[#3c82f4]/5 font-bold text-[#3c82f4]">$6.50 / Month</td>
                         <td className="text-center p-4 text-gray-700">$9 / Month</td>
                         <td className="text-center p-4 text-gray-700">$16 / Month</td>
                         <td className="text-center p-4 text-gray-700">$1,299 / Year</td>
