@@ -10,21 +10,33 @@ export function ScrollToTop() {
   const [location] = useLocation();
 
   useEffect(() => {
-    // Double-rAF: first frame lets React commit the new route's DOM,
-    // second frame fires after the browser has laid it out and painted —
-    // so we always win against any late content shifts.
-    let id1: number;
-    let id2: number;
+    // Attempt 1: immediate — catches most cases
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
-    id1 = requestAnimationFrame(() => {
-      id2 = requestAnimationFrame(() => {
+    // Attempt 2: after React commits new DOM (double-rAF)
+    let raf1: number, raf2: number;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
       });
     });
 
+    // Attempt 3: 200ms backstop — fires after Radix focus management,
+    // image layout shifts, and any other async content that follows mount.
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }, 200);
+
     return () => {
-      cancelAnimationFrame(id1);
-      cancelAnimationFrame(id2);
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(timer);
     };
   }, [location]);
 
