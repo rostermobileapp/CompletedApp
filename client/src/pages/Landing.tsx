@@ -289,7 +289,7 @@ export default function Landing() {
         </div>
       </section>
       {/* Video Demo Section */}
-      <section className="py-20 px-6 bg-gray-50" id="demo">
+      <section className="py-20 px-6 bg-gray-50 pt-[4px] pb-[20px]" id="demo">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-5xl font-bold mb-4 text-gray-900 flex items-center justify-center gap-2">
             See <img src={rosterLightLogo} alt="Roster" className="h-8 md:h-16 object-contain" /> in action.
