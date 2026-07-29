@@ -39,7 +39,7 @@ export default function VisitorMap() {
 
     const map = L.map(mapRef.current, {
       center: [49.0, -97.0],
-      zoom: 3,
+      zoom: 4,
       minZoom: 3,
       maxZoom: 12,
       maxBounds: northAmericaBounds,
@@ -102,7 +102,7 @@ export default function VisitorMap() {
         </div>
         <div
           className="rounded-2xl overflow-hidden border border-blue-100 shadow-sm"
-          style={{ height: 340 }}
+          style={{ height: 595 }}
         >
           <div ref={mapRef} style={{ height: "100%", width: "100%", background: "#f0f4ff" }} />
         </div>
