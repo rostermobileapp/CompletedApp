@@ -444,7 +444,7 @@ export default function Landing() {
                         <th className="text-center px-2 py-3 font-bold bg-[#3c82f4]/8 border-x border-[#3c82f4]/20 w-20">
                           <div className="flex flex-col items-center gap-0.5">
                             <img src={rosterLightLogo} alt="Roster" className="h-5 object-contain" />
-                            <span className="text-[9px] font-semibold text-[#3c82f4] leading-none">Best Value</span>
+                            <span className="text-[9px] font-semibold text-[#3c82f4] leading-none">$6.50 / mo</span>
                           </div>
                         </th>
                         <th className="text-center px-2 py-3 w-28">
