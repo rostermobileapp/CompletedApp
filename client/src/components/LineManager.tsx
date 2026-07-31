@@ -11,7 +11,8 @@ import {
   Flame, Snowflake, X, Save, TrendingUp, Minus,
 } from 'lucide-react';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
-import { PlayerActionSheet } from '@/components/PlayerActionSheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthHeaders, queryClient, apiRequest } from '@/lib/queryClient';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -684,14 +685,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                         } : undefined}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <ClickableAvatar
-                            userId={isPlaceholder ? undefined : playerId}
-                            profileImageUrl={profileImageUrl}
-                            firstName={memberFirstName}
-                            lastName={memberLastName}
-                            size="xs"
-                            className="!h-[45px] !w-[45px] shrink-0"
-                          />
+                          <Avatar className="!h-[45px] !w-[45px] shrink-0">
+                            <AvatarImage src={profileImageUrl ? (profileImageUrl.startsWith('http') ? profileImageUrl : `/api/storage/object/${profileImageUrl}`) : undefined} alt={memberFirstName || 'Player'} />
+                            <AvatarFallback>{((memberFirstName?.[0] || '') + (memberLastName?.[0] || '')).toUpperCase() || '?'}</AvatarFallback>
+                          </Avatar>
                           {isPlaceholder ? (
                             <div className="flex items-center gap-1 min-w-0 flex-1">
                               {nameContent}
@@ -1061,21 +1058,14 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
         </SheetContent>
       </Sheet>
 
-      {/* ── Player action sheet (roster view) ── */}
-      <PlayerActionSheet
-        open={!!actionSheetPlayer}
+      {/* ── Player profile preview (roster view) ── */}
+      <ProfilePhotoPreview
+        isOpen={!!actionSheetPlayer}
         onClose={() => setActionSheetPlayer(null)}
-        userId={actionSheetPlayer?.userId ?? null}
-        firstName={actionSheetPlayer?.firstName ?? ''}
-        lastName={actionSheetPlayer?.lastName ?? ''}
+        userId={actionSheetPlayer?.userId ?? ''}
+        firstName={actionSheetPlayer?.firstName}
+        lastName={actionSheetPlayer?.lastName}
         profileImageUrl={actionSheetPlayer?.profileImageUrl}
-        leagueId={leagueId}
-        seasonId={seasonId}
-        streakStatus={
-          actionSheetPlayer?.userId
-            ? (streaksData?.streaks?.[actionSheetPlayer.userId] as any)
-            : undefined
-        }
       />
     </>
   );
