@@ -1711,7 +1711,7 @@ export default function GameDetails() {
 
       {/* Line Combos read-only Sheet */}
       <Sheet open={showLineCombosModal} onOpenChange={setShowLineCombosModal}>
-        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="h-[92vh] overflow-y-auto rounded-t-2xl pb-safe">
           <SheetHeader className="mb-4">
             <SheetTitle className="flex items-center gap-2">
               <LayoutList className="w-5 h-5" />
