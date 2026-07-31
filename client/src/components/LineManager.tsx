@@ -17,7 +17,7 @@ import { getAuthHeaders, queryClient, apiRequest } from '@/lib/queryClient';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // ─────────────────────────────────────────────────────────────
-// Types (shared with the inline line editor)
+// Types
 // ─────────────────────────────────────────────────────────────
 
 type SlotState = {
@@ -58,6 +58,12 @@ const DEFENSE_POSITIONS = ['LD', 'RD'];
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
+
+/** Format: "J. Smith" — compact hockey-card style */
+function fmt(firstName: string, lastName: string): string {
+  if (firstName && lastName) return `${firstName.charAt(0)}. ${lastName}`;
+  return lastName || firstName || '—';
+}
 
 function makeEmptyLine(lineType: 'forward' | 'defense', lineNumber: number): LineEditor {
   const positions = lineType === 'forward' ? FORWARD_POSITIONS : DEFENSE_POSITIONS;
@@ -101,7 +107,7 @@ function dbLinesToEditorState(dbLines: any[]): {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Slot button sub-component
+// SlotButton — accepts drag-drop in addition to click
 // ─────────────────────────────────────────────────────────────
 
 function SlotButton({
@@ -109,21 +115,49 @@ function SlotButton({
   slot,
   canEdit,
   onClick,
+  onDrop,
 }: {
   position: string;
   slot: SlotState;
   canEdit: boolean;
   onClick?: () => void;
+  onDrop?: (playerId: string) => void;
 }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canEdit || !onDrop) return;
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+  const handleDragLeave = () => setIsDragOver(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const id = e.dataTransfer.getData('text/plain');
+    if (id && onDrop) onDrop(id);
+  };
+
+  // Derive display name from stored full name (stored as "First Last")
+  const parts = (slot.playerName ?? '').split(' ');
+  const displayName = parts.length >= 2
+    ? fmt(parts[0], parts.slice(1).join(' '))
+    : parts[0] || '—';
+
   return (
     <button
       onClick={canEdit ? onClick : undefined}
-      className={`flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-colors
-        ${slot.playerId
-          ? 'bg-background border-border'
-          : canEdit
-            ? 'border-dashed border-border bg-muted/30 hover:bg-muted/60'
-            : 'border-dashed border-border bg-muted/20'
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all
+        ${isDragOver
+          ? 'ring-2 ring-primary border-primary bg-primary/10 scale-[1.03]'
+          : slot.playerId
+            ? 'bg-background border-border'
+            : canEdit
+              ? 'border-dashed border-border bg-muted/30 hover:bg-muted/60'
+              : 'border-dashed border-border bg-muted/20'
         }
         ${canEdit ? 'cursor-pointer active:scale-95' : 'cursor-default'}
       `}
@@ -136,12 +170,12 @@ function SlotButton({
             userId={slot.playerId}
             profileImageUrl={slot.playerImage}
             firstName={slot.playerName?.split(' ')[0]}
-            lastName={slot.playerName?.split(' ')[1]}
+            lastName={slot.playerName?.split(' ').slice(1).join(' ')}
             size="xs"
             className="!h-8 !w-8 pointer-events-none"
           />
           <span className="text-[11px] font-medium text-center leading-tight truncate w-full">
-            {slot.playerName?.split(' ').pop() || '—'}
+            {displayName}
           </span>
         </>
       ) : (
@@ -157,7 +191,7 @@ function SlotButton({
 // Combo trend badge
 // ─────────────────────────────────────────────────────────────
 
-function ComboTrend({ combo, members }: { combo: ComboStat | undefined; members: any[] }) {
+function ComboTrend({ combo }: { combo: ComboStat | undefined }) {
   if (!combo) return null;
   const MIN_GAMES = 3;
   if (combo.gamesTogether < MIN_GAMES) {
@@ -236,7 +270,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
 
   // ── Queries ───────────────────────────────────────────────────
 
-  // Streak data (roster view)
   const { data: streaksData } = useQuery<{ streaks: Record<string, string> }>({
     queryKey: ['/api/teams', teamId, 'streaks', seasonId ?? null],
     queryFn: async () => {
@@ -250,7 +283,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     staleTime: 5 * 60 * 1000,
   });
 
-  // Template lines (lines view — gameId=null)
   const { data: existingLines = [], isLoading: linesLoading } = useQuery<any[]>({
     queryKey: ['/api/teams', teamId, 'line-combinations', 'template'],
     queryFn: async () => {
@@ -261,7 +293,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     staleTime: 60 * 1000,
   });
 
-  // Combo stats (lines view)
   const { data: comboStats } = useQuery<{ forward: ComboStat[]; defense: ComboStat[] }>({
     queryKey: ['/api/teams', teamId, 'line-combos', 'stats'],
     queryFn: async () => {
@@ -280,7 +311,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     setDefensePairs(dp);
   }, [existingLines, linesLoading]);
 
-  // ── Mutations (roster view) ───────────────────────────────────
+  // ── Mutations ─────────────────────────────────────────────────
 
   const addManualPlayerMutation = useMutation({
     mutationFn: async (data: {
@@ -329,7 +360,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     },
   });
 
-  // ── Handlers (roster view) ────────────────────────────────────
+  // ── Roster handlers ───────────────────────────────────────────
 
   const handleAddPlayer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,7 +391,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     importPlayersMutation.mutate(csvFile);
   };
 
-  // ── Lines handlers ────────────────────────────────────────────
+  // ── Lines save ────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (!teamId) return;
@@ -396,7 +427,8 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     }
   };
 
-  // Computed: which player IDs are already assigned
+  // ── Computed ──────────────────────────────────────────────────
+
   const assignedPlayerIds = useMemo(() => {
     const ids = new Set<string>();
     for (const line of [...forwardLines, ...defensePairs]) {
@@ -412,11 +444,19 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     [teamMembers, assignedPlayerIds],
   );
 
-  function handlePickPlayer(playerId: string | null) {
-    if (!pickerTarget) return;
-    const { lineType, lineIdx, position: pos } = pickerTarget;
-
-    // Deep-clone both arrays
+  // ── Core slot-assignment logic (used by picker AND drag-drop) ─
+  /**
+   * Assign `playerId` to the given target slot.
+   * - If the player was already on a slot, that source slot is vacated.
+   * - If the target slot had an occupant, they swap (occupy the source slot).
+   * - Pass `null` to clear the target slot.
+   */
+  function applyPlayerToSlot(
+    playerId: string | null,
+    lineType: 'forward' | 'defense',
+    lineIdx: number,
+    pos: string,
+  ) {
     const newForward: LineEditor[] = forwardLines.map((l) => ({
       ...l, slots: Object.fromEntries(Object.entries(l.slots).map(([p, s]) => [p, { ...s }])),
     }));
@@ -430,18 +470,16 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
       targetArr[lineIdx].slots[pos] = { playerId: null, playerName: null };
       setForwardLines(newForward);
       setDefensePairs(newDefense);
-      setPickerTarget(null);
       return;
     }
 
-    // Resolve display info
     const member = teamMembers.find((m: any) => (m.user?.id ?? m.userId) === playerId);
     const playerName = member
       ? `${member.user?.firstName || member.displayFirstName || ''} ${member.user?.lastName || member.displayLastName || ''}`.trim()
       : '';
     const playerImage = member?.user?.profileImageUrl ?? null;
 
-    // Find the current location of the selected player
+    // Find current location of the picked player
     type SlotLoc = { arr: LineEditor[]; li: number; pos: string };
     let sourceLoc: SlotLoc | null = null;
     outer: for (const arr of [newForward, newDefense]) {
@@ -455,30 +493,44 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
       }
     }
 
-    // Displaced player from target slot (if any)
     const displacedSlot = { ...targetArr[lineIdx].slots[pos] };
 
     if (sourceLoc) {
       if (displacedSlot.playerId) {
-        // Genuine swap: move displaced player to vacated source slot
+        // Swap: displaced player goes to vacated source slot
         sourceLoc.arr[sourceLoc.li].slots[sourceLoc.pos] = {
           playerId: displacedSlot.playerId,
           playerName: displacedSlot.playerName,
           playerImage: displacedSlot.playerImage ?? null,
         };
       } else {
-        // Clear the source slot
         sourceLoc.arr[sourceLoc.li].slots[sourceLoc.pos] = { playerId: null, playerName: null };
       }
     }
-    // If no sourceLoc the player was on bench; displaced (if any) goes to bench
+    // displaced player with no source → goes to bench (slot just cleared)
 
-    // Assign to target slot
     targetArr[lineIdx].slots[pos] = { playerId, playerName, playerImage };
 
     setForwardLines(newForward);
     setDefensePairs(newDefense);
+  }
+
+  // Called from picker sheet
+  function handlePickPlayer(playerId: string | null) {
+    if (!pickerTarget) return;
+    const { lineType, lineIdx, position: pos } = pickerTarget;
+    applyPlayerToSlot(playerId, lineType, lineIdx, pos);
     setPickerTarget(null);
+  }
+
+  // Called from drag-drop onto a slot
+  function handleDropToSlot(
+    playerId: string,
+    lineType: 'forward' | 'defense',
+    lineIdx: number,
+    pos: string,
+  ) {
+    applyPlayerToSlot(playerId, lineType, lineIdx, pos);
   }
 
   function addLine(lineType: 'forward' | 'defense') {
@@ -706,10 +758,11 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                                 slot={line.slots[pos]}
                                 canEdit={isTeamCaptain}
                                 onClick={() => setPickerTarget({ lineType: 'forward', lineIdx: idx, position: pos })}
+                                onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'forward', idx, pos) : undefined}
                               />
                             ))}
                           </div>
-                          <ComboTrend combo={findCombo(line)} members={teamMembers} />
+                          <ComboTrend combo={findCombo(line)} />
                         </div>
                       ))}
                     </div>
@@ -752,10 +805,11 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                                 slot={line.slots[pos]}
                                 canEdit={isTeamCaptain}
                                 onClick={() => setPickerTarget({ lineType: 'defense', lineIdx: idx, position: pos })}
+                                onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'defense', idx, pos) : undefined}
                               />
                             ))}
                           </div>
-                          <ComboTrend combo={findCombo(line)} members={teamMembers} />
+                          <ComboTrend combo={findCombo(line)} />
                         </div>
                       ))}
                     </div>
@@ -770,11 +824,16 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                     )}
                   </div>
 
-                  {/* Bench */}
+                  {/* Bench — draggable pills */}
                   <div>
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                       Bench ({benchPlayers.length})
                     </p>
+                    {isTeamCaptain && benchPlayers.length > 0 && (
+                      <p className="text-[11px] text-muted-foreground mb-1.5 italic">
+                        Drag a player onto a slot, or tap a slot to pick
+                      </p>
+                    )}
                     {benchPlayers.length === 0 ? (
                       <p className="text-xs text-muted-foreground">All players assigned!</p>
                     ) : (
@@ -786,7 +845,14 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                           return (
                             <div
                               key={memberId}
-                              className="flex items-center gap-1 bg-card border border-border rounded-full px-2 py-1 text-xs"
+                              draggable={isTeamCaptain}
+                              onDragStart={isTeamCaptain ? (e) => {
+                                e.dataTransfer.setData('text/plain', memberId);
+                                e.dataTransfer.effectAllowed = 'move';
+                              } : undefined}
+                              className={`flex items-center gap-1 bg-card border border-border rounded-full px-2 py-1 text-xs select-none
+                                ${isTeamCaptain ? 'cursor-grab active:cursor-grabbing' : ''}
+                              `}
                               data-testid={`bench-player-${memberId}`}
                             >
                               <ClickableAvatar
@@ -797,7 +863,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                                 size="xs"
                                 className="!h-5 !w-5 pointer-events-none"
                               />
-                              <span className="font-medium">{ln || fn}</span>
+                              <span className="font-medium">{fmt(fn, ln)}</span>
                             </div>
                           );
                         })}
@@ -811,7 +877,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
         </CardContent>
       </Card>
 
-      {/* ── Add Players Sheet (roster view) ── */}
+      {/* ── Add Players Sheet ── */}
       <Sheet open={showAddPlayers} onOpenChange={setShowAddPlayers}>
         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto rounded-t-2xl">
           <SheetHeader className="mb-4">
@@ -876,7 +942,8 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
         </SheetContent>
       </Sheet>
 
-      {/* ── Player picker sheet (lines view) ── */}
+      {/* ── Player picker sheet ─────────────────────────────────────
+           Bench players shown first, then on-ice players.        ── */}
       <Sheet open={!!pickerTarget} onOpenChange={(open) => { if (!open) setPickerTarget(null); }}>
         <SheetContent side="bottom" className="h-[65vh] rounded-t-2xl overflow-y-auto pb-safe">
           <SheetHeader className="mb-3">
@@ -890,13 +957,13 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
             </SheetTitle>
           </SheetHeader>
 
-          {/* Clear slot option */}
+          {/* Clear slot option — only when slot is occupied */}
           {pickerTarget && (() => {
             const lines = pickerTarget.lineType === 'forward' ? forwardLines : defensePairs;
             const currentSlot = lines[pickerTarget.lineIdx]?.slots[pickerTarget.position];
             return currentSlot?.playerId ? (
               <button
-                className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-border mb-2 hover:bg-muted/50 transition-colors"
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-border mb-3 hover:bg-muted/50 transition-colors"
                 onClick={() => handlePickPlayer(null)}
                 data-testid="picker-clear-slot"
               >
@@ -908,14 +975,15 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
             ) : null;
           })()}
 
-          <div className="space-y-0.5">
-            {teamMembers.map((m: any) => {
-              const memberId = m.user?.id ?? m.userId;
-              if (!memberId) return null;
-              const fn = m.user?.firstName ?? m.displayFirstName ?? '';
-              const ln = m.user?.lastName  ?? m.displayLastName  ?? '';
+          {/* Build bench / on-ice lists for this picker */}
+          {(() => {
+            const bench: any[] = [];
+            const onIce: Array<{ member: any; assignedAt: string }> = [];
 
-              // Find where this player currently sits
+            for (const m of teamMembers) {
+              const memberId = m.user?.id ?? m.userId;
+              if (!memberId) continue;
+
               let assignedAt = '';
               for (const [type, lines] of [['forward', forwardLines], ['defense', defensePairs]] as any) {
                 for (let i = 0; i < lines.length; i++) {
@@ -927,6 +995,17 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                 }
               }
 
+              if (assignedAt) {
+                onIce.push({ member: m, assignedAt });
+              } else {
+                bench.push(m);
+              }
+            }
+
+            const renderRow = (m: any, assignedAt: string) => {
+              const memberId = m.user?.id ?? m.userId;
+              const fn = m.user?.firstName ?? m.displayFirstName ?? '';
+              const ln = m.user?.lastName  ?? m.displayLastName  ?? '';
               return (
                 <button
                   key={memberId}
@@ -943,7 +1022,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                     className="pointer-events-none shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{fn} {ln}</p>
+                    <p className="text-sm font-medium">{fmt(fn, ln)}</p>
                     {assignedAt && <p className="text-xs text-muted-foreground">{assignedAt}</p>}
                   </div>
                   {assignedAt && (
@@ -951,8 +1030,33 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   )}
                 </button>
               );
-            })}
-          </div>
+            };
+
+            return (
+              <>
+                {bench.length > 0 && (
+                  <>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1 pb-1">
+                      Bench
+                    </p>
+                    <div className="space-y-0.5 mb-3">
+                      {bench.map((m) => renderRow(m, ''))}
+                    </div>
+                  </>
+                )}
+                {onIce.length > 0 && (
+                  <>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1 pb-1">
+                      On Ice — tap to move
+                    </p>
+                    <div className="space-y-0.5">
+                      {onIce.map(({ member, assignedAt }) => renderRow(member, assignedAt))}
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </SheetContent>
       </Sheet>
 
