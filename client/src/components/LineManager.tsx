@@ -616,7 +616,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   onClick={() => setView('roster')}
                   className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
                     view === 'roster'
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-blue-500 text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                   data-testid="toggle-roster-view"
@@ -627,7 +627,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   onClick={() => setView('lines')}
                   className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
                     view === 'lines'
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-blue-500 text-white shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                   data-testid="toggle-lines-view"
