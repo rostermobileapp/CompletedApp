@@ -421,8 +421,16 @@ export default function Teams() {
   }
 
   // Computed values (after early returns)
-  const isTeamCaptain = currentTeam?.captainId === (user as any)?.id;
-  const isTeamCreator = currentTeam?.creatorId === (user as any)?.id;
+  const userId = (user as any)?.id;
+  // isTeamCaptain covers: primary captain (teams.captainId) OR any secondary
+  // captain (team_memberships.isCaptain), matching the server-side auth model.
+  const currentUserMembership = teamMembers.find(
+    (m: any) => (m.user?.id ?? m.userId) === userId,
+  );
+  const isTeamCaptain =
+    currentTeam?.captainId === userId ||
+    !!(currentUserMembership as any)?.isCaptain;
+  const isTeamCreator = currentTeam?.creatorId === userId;
   const isCommissioner = hasRole('secondary_commissioner');
   const canUploadLogo = isTeamCaptain || isCommissioner;
 
@@ -838,22 +846,7 @@ export default function Teams() {
                   </div>
                 </div>
 
-                {/* Set Lines button — visible to captains/creators only */}
-                {(isTeamCaptain || isTeamCreator) && (
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={() => {
-                      navigate(`/set-lines/${team.id}`);
-                    }}
-                    data-testid="button-set-lines"
-                  >
-                    <Trophy className="w-4 h-4" />
-                    Set Game Lines
-                  </Button>
-                )}
-
-                {/* Line Combinations Manager */}
+                {/* Line Combinations Manager (Roster + inline line editor) */}
                 <LineManager 
                   teamId={team.id}
                   isTeamCaptain={isTeamCaptain || isTeamCreator}

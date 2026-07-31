@@ -7557,7 +7557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (invalidPlayers.length > 0) {
         return res.status(400).json({
           message: 'Some players are not members of this team',
-          invalidPlayerIds: [...new Set(invalidPlayers)],
+          invalidPlayerIds: Array.from(new Set(invalidPlayers)),
         });
       }
 
@@ -7970,6 +7970,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ──────────────────────────────────────────────────────────────────────
+  // PUT /api/teams/:teamId/line-combinations/template
+  // Atomically replaces ALL template lines (gameId = null) for a team.
+  // Body: { lines: [{ lineType, lineNumber, name, slots: [{position, playerId}] }] }
+  // Only team captains and creators may call this.
+  // ──────────────────────────────────────────────────────────────────────
+  app.put('/api/teams/:teamId/line-combinations/template', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+
+      // Auth: creator OR any team captain (captainId on teams table OR isCaptain in team_memberships)
+      const team = await storage.getTeam(teamId);
+      if (!team) return res.status(404).json({ message: 'Team not found' });
+      const isCreatorOrCaptain =
+        team.creatorId === userId || (await storage.isTeamCaptain(teamId, userId));
+      if (!isCreatorOrCaptain) {
+        return res.status(403).json({ message: 'Only team captains or creators can set lines' });
+      }
+
+      const { lines } = req.body;
+      if (!Array.isArray(lines)) {
+        return res.status(400).json({ message: 'lines must be an array' });
+      }
+
+      const VALID_LINE_TYPES_TPL = new Set(['forward', 'defense']);
+      const VALID_POSITIONS_TPL: Record<string, Set<string>> = {
+        forward: new Set(['LW', 'C', 'RW']),
+        defense: new Set(['LD', 'RD']),
+      };
+
+      // Validate line shape and collect all assigned player IDs
+      const allAssignedPlayerIdsTpl: string[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i] as any;
+        if (!VALID_LINE_TYPES_TPL.has(line.lineType)) {
+          return res.status(400).json({ message: `Line ${i}: invalid lineType "${line.lineType}"` });
+        }
+        if (typeof line.lineNumber !== 'number' || !Number.isInteger(line.lineNumber) || line.lineNumber < 1) {
+          return res.status(400).json({ message: `Line ${i}: lineNumber must be a positive integer` });
+        }
+        if (!Array.isArray(line.slots)) {
+          return res.status(400).json({ message: `Line ${i}: slots must be an array` });
+        }
+        for (const slot of line.slots as any[]) {
+          if (slot.playerId && !VALID_POSITIONS_TPL[line.lineType].has(slot.position)) {
+            return res.status(400).json({ message: `Line ${i}: invalid position "${slot.position}" for lineType "${line.lineType}"` });
+          }
+          if (slot.playerId) allAssignedPlayerIdsTpl.push(slot.playerId);
+        }
+      }
+
+      // Reject duplicate player assignments across all lines
+      const playerIdCountTpl = new Map<string, number>();
+      for (const id of allAssignedPlayerIdsTpl) {
+        playerIdCountTpl.set(id, (playerIdCountTpl.get(id) ?? 0) + 1);
+      }
+      const duplicateIdsTpl = Array.from(playerIdCountTpl.entries())
+        .filter(([, count]) => count > 1)
+        .map(([id]) => id);
+      if (duplicateIdsTpl.length > 0) {
+        return res.status(400).json({ message: 'Each player may only appear once across all lines', duplicatePlayerIds: duplicateIdsTpl });
+      }
+
+      // Validate all player IDs are team members before touching the DB
+      const teamMembersData = await storage.getTeamMembers(teamId);
+      const teamMemberIdSet = new Set(teamMembersData.map((m: any) => m.user?.id ?? m.userId));
+      const invalidPlayers = allAssignedPlayerIdsTpl.filter((id) => id && !teamMemberIdSet.has(id));
+      if (invalidPlayers.length > 0) {
+        return res.status(400).json({
+          message: 'Some players are not members of this team',
+          invalidPlayerIds: Array.from(new Set(invalidPlayers)),
+        });
+      }
+
+      // Atomic replace in a single transaction
+      const created = await db.transaction(async (tx) => {
+        // 1. Delete assignments for existing template lines
+        const existingLines = await tx
+          .select({ id: lineCombinationsTable.id })
+          .from(lineCombinationsTable)
+          .where(and(eq(lineCombinationsTable.teamId, teamId), isNull(lineCombinationsTable.gameId)));
+
+        for (const existing of existingLines) {
+          await tx
+            .delete(lineCombinationAssignmentsTable)
+            .where(eq(lineCombinationAssignmentsTable.lineCombinationId, existing.id));
+        }
+
+        // 2. Delete existing template line combinations
+        if (existingLines.length > 0) {
+          await tx
+            .delete(lineCombinationsTable)
+            .where(and(eq(lineCombinationsTable.teamId, teamId), isNull(lineCombinationsTable.gameId)));
+        }
+
+        // 3. Create new lines and assignments
+        const results = [];
+        for (const line of lines) {
+          const slots: { position: string; playerId: string }[] = (line.slots ?? []).filter(
+            (s: any) => s.playerId,
+          );
+          if (slots.length === 0) continue;
+
+          const [newLine] = await tx
+            .insert(lineCombinationsTable)
+            .values({
+              teamId,
+              gameId: null,
+              name: line.name ?? `${line.lineType === 'forward' ? 'Line' : 'Pair'} ${line.lineNumber}`,
+              lineType: line.lineType,
+              lineNumber: line.lineNumber,
+              isActive: true,
+            })
+            .returning();
+
+          const assignmentRows = [];
+          for (const slot of slots) {
+            const [a] = await tx
+              .insert(lineCombinationAssignmentsTable)
+              .values({
+                lineCombinationId: newLine.id,
+                position: slot.position as any,
+                playerId: slot.playerId,
+              })
+              .returning();
+            assignmentRows.push(a);
+          }
+          results.push({ ...newLine, assignments: assignmentRows });
+        }
+        return results;
+      });
+
+      return res.json({ lines: created });
+    } catch (err) {
+      console.error('[ReplaceTemplateLines] Error:', err);
+      return res.status(500).json({ message: 'Failed to save template lines' });
+    }
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
   // Combo Stats: GET /api/teams/:teamId/line-combos/stats
   // Returns forward and defense combo stats keyed by sorted player-ID set.
   // Requires the requester to be a team member.
@@ -7999,59 +8139,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Not a member of this team' });
       }
 
-      // SQL: for each game+lineType, gather the sorted player-ID set, then
-      // count games-together and goals-for (goals where any combo member is
-      // scorer or assist, for that game, for this team).
+      // SQL: for each current template combo (sorted player-ID set), find historical
+      // per-game saved line combinations that exactly match that player grouping, then
+      // count how many games they appeared together and sum their goals-for.
+      // This ensures combo stats reflect lines that were actually saved/played,
+      // not inferred from RSVP attendance.
       const result = await db.execute(sql`
-        WITH line_player_sets AS (
+        WITH template_lines AS (
+          -- Current template combos for this team (gameId IS NULL)
+          SELECT
+            lc.line_type,
+            array_agg(lca.player_id ORDER BY lca.player_id) AS player_ids
+          FROM line_combinations lc
+          JOIN line_combination_assignments lca ON lca.line_combination_id = lc.id
+          WHERE lc.team_id = ${teamId}
+            AND lc.game_id IS NULL
+          GROUP BY lc.id, lc.line_type
+        ),
+        historical_game_lines AS (
+          -- Historical per-game saved lines for this team (gameId IS NOT NULL)
           SELECT
             lc.game_id,
             lc.line_type,
-            lc.line_number,
-            lc.id AS line_id,
             array_agg(lca.player_id ORDER BY lca.player_id) AS player_ids
           FROM line_combinations lc
           JOIN line_combination_assignments lca ON lca.line_combination_id = lc.id
           WHERE lc.team_id = ${teamId}
             AND lc.game_id IS NOT NULL
-          GROUP BY lc.game_id, lc.line_type, lc.line_number, lc.id
+          GROUP BY lc.game_id, lc.line_type, lc.id
         ),
-        line_goal_counts AS (
+        matched_games AS (
+          -- Historical games where the exact same player set as the template was saved
           SELECT
-            lps.player_ids,
-            lps.line_type,
-            lps.game_id,
+            tl.player_ids,
+            tl.line_type,
+            hgl.game_id
+          FROM template_lines tl
+          JOIN historical_game_lines hgl
+            ON hgl.line_type = tl.line_type
+            AND hgl.player_ids = tl.player_ids
+        ),
+        game_goal_counts AS (
+          SELECT
+            mg.player_ids,
+            mg.line_type,
+            mg.game_id,
             COUNT(DISTINCT gg.id)::int AS goals_for
-          FROM line_player_sets lps
+          FROM matched_games mg
           LEFT JOIN game_goals gg ON
-            gg.game_id = lps.game_id
+            gg.game_id = mg.game_id
             AND gg.team_id = ${teamId}
             AND gg.is_submitted = true
             AND (
-              gg.scorer_id             = ANY(lps.player_ids)
-              OR gg.primary_assist_id  = ANY(lps.player_ids)
-              OR gg.secondary_assist_id= ANY(lps.player_ids)
+              gg.scorer_id              = ANY(mg.player_ids)
+              OR gg.primary_assist_id   = ANY(mg.player_ids)
+              OR gg.secondary_assist_id = ANY(mg.player_ids)
             )
-          GROUP BY lps.player_ids, lps.line_type, lps.game_id
+          GROUP BY mg.player_ids, mg.line_type, mg.game_id
         ),
         combo_agg AS (
           SELECT
             player_ids,
             line_type,
-            COUNT(*)::int             AS games_together,
-            COALESCE(SUM(goals_for),0)::int AS total_goals_for
-          FROM line_goal_counts
+            COUNT(*)::int                    AS games_together,
+            COALESCE(SUM(goals_for), 0)::int AS total_goals_for
+          FROM game_goal_counts
           GROUP BY player_ids, line_type
         )
         SELECT
           player_ids,
           line_type,
           games_together,
-          total_goals_for                                                                        AS goals_for,
-          ROUND(
-            (total_goals_for::numeric / NULLIF(games_together, 0)),
-            2
-          )                                                                                      AS goals_for_per_game
+          total_goals_for                                                          AS goals_for,
+          ROUND((total_goals_for::numeric / NULLIF(games_together, 0)), 2)       AS goals_for_per_game
         FROM combo_agg
         ORDER BY line_type, goals_for_per_game DESC NULLS LAST
       `);
