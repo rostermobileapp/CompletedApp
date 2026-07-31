@@ -118,12 +118,14 @@ function SlotButton({
   canEdit,
   onClick,
   onDrop,
+  onClear,
 }: {
   position: string;
   slot: SlotState;
   canEdit: boolean;
   onClick?: () => void;
   onDrop?: (playerId: string) => void;
+  onClear?: () => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -152,7 +154,7 @@ function SlotButton({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all
+      className={`relative flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all
         ${isDragOver
           ? 'ring-2 ring-primary border-primary bg-primary/10 scale-[1.03]'
           : slot.playerId
@@ -168,9 +170,20 @@ function SlotButton({
       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{position}</span>
       {slot.playerId ? (
         <>
+          {/* X clear button — div to avoid nested <button> */}
+          {canEdit && onClear && (
+            <div
+              onClick={(e) => { e.stopPropagation(); onClear(); }}
+              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); onClear(); }}
+              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-muted-foreground/20 hover:bg-destructive/80 flex items-center justify-center cursor-pointer z-10 transition-colors"
+              data-testid={`slot-clear-${position}`}
+            >
+              <X className="w-2.5 h-2.5 text-foreground" />
+            </div>
+          )}
           <Avatar className="!h-8 !w-8 pointer-events-none shrink-0">
             <AvatarImage src={slot.playerImage ? (slot.playerImage.startsWith('http') ? slot.playerImage : `/api/storage/object/${slot.playerImage}`) : undefined} alt={slot.playerName || ''} />
-            <AvatarFallback className="text-[10px]">{((slot.playerName?.split(' ')[0]?.[0] ?? '') + (slot.playerName?.split(' ').slice(1).join(' ')?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
+            <AvatarFallback className="bg-primary/20" />
           </Avatar>
           <span className="text-[11px] font-medium text-center leading-tight truncate w-full">
             {displayName}
@@ -759,6 +772,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                                 canEdit={isTeamCaptain}
                                 onClick={() => setPickerTarget({ lineType: 'forward', lineIdx: idx, position: pos })}
                                 onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'forward', idx, pos) : undefined}
+                                onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'forward', idx, pos) : undefined}
                               />
                             ))}
                           </div>
@@ -806,6 +820,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                                 canEdit={isTeamCaptain}
                                 onClick={() => setPickerTarget({ lineType: 'defense', lineIdx: idx, position: pos })}
                                 onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'defense', idx, pos) : undefined}
+                                onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'defense', idx, pos) : undefined}
                               />
                             ))}
                           </div>
