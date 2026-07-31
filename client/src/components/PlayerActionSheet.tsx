@@ -111,17 +111,15 @@ export function PlayerActionSheet({
               <User className="w-5 h-5 text-muted-foreground" />
               View Profile
             </Button>
-            {leagueId && (
-              <Button
-                variant="outline"
-                className="w-full h-12 text-base justify-start gap-3"
-                onClick={goToStatsTrends}
-                data-testid="action-stats-trends"
-              >
-                <BarChart2 className="w-5 h-5 text-muted-foreground" />
-                Player Stats &amp; Trends
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              className="w-full h-12 text-base justify-start gap-3"
+              onClick={goToStatsTrends}
+              data-testid="action-stats-trends"
+            >
+              <BarChart2 className="w-5 h-5 text-muted-foreground" />
+              Player Stats &amp; Trends
+            </Button>
           </div>
         ) : (
           <p className="text-center text-sm text-muted-foreground">
