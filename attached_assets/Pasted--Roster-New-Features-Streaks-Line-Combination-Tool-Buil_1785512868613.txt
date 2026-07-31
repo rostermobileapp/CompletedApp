@@ -1,0 +1,151 @@
+# Roster — New Features: Streaks & Line Combination Tool
+
+Build these as additive features only. Do not change any existing stat entry,
+game creation, scorekeeper, or roster management flows. Confirm the plan before
+writing code.
+
+
+================================================================================
+FEATURE 1: STREAKS (Hot/Cold Player Trends)
+================================================================================
+
+## What it does
+Show at-a-glance whether each player is trending hot or cold based on recent
+point production, for both my own team and opposing teams.
+
+## Calculation
+
+- "Points" = goals + assists.
+- No streak icon appears until the player has completed at least 4 games.
+  Before that, show nothing.
+
+recent_ppg = points in the player's most recent 4 games played / 4
+
+Baseline uses a 0.50 points-per-game assumption that fades out as real data
+accumulates. IMPORTANT: the baseline must be computed from games BEFORE the
+most recent 4, not from the full season, otherwise the recent games are being
+compared against themselves.
+
+  prior_games  = games played before the most recent 4
+  prior_points = points scored in those games
+  baseline_ppg = (prior_points + (4 * 0.50)) / (prior_games + 4)
+
+  At exactly 4 games played: prior_games = 0, so baseline_ppg = 0.50.
+  At 8 games: real data and the assumption are weighted 50/50.
+  At 24 games: the assumption carries only ~17% weight and keeps shrinking.
+
+ratio = recent_ppg / baseline_ppg
+
+- HOT     → ratio >= 1.25
+- COLD    → ratio <= 0.75
+- NEUTRAL → everything in between
+
+Only count games the player actually appeared in, not games the team played.
+
+Store the 0.50 assumed baseline as a single configurable constant
+(ASSUMED_BASELINE_PPG) so it can be tuned later without touching the logic.
+
+## UI — roster list
+
+- Add a small status icon immediately to the right of each player's name on the
+  team roster list (see attached screenshot, position marked with a red X).
+- HOT = upward flame/arrow icon in a warm color.
+  COLD = downward icon in a cool color.
+  NEUTRAL = no icon at all (keeps the list clean).
+- This appears on both my team's roster and on opponent rosters.
+
+## UI — tap behavior
+
+Tapping the icon (or the player row) opens a small action sheet with two options:
+  1. "View Profile" (existing behavior)
+  2. "Player Stats & Trends" (new — see below)
+
+## New screen: Player Stats & Trends
+
+- Back button in the top left, returns to the previous screen.
+- Header: player name, number, position, and current streak status.
+- Section 1 — Season Totals: games played, goals, assists, points, PIM, plus
+  points per game. Display as a compact stat grid.
+- Section 2 — Game-by-Game Breakdown: a table, most recent game first, with
+  columns for date, opponent, G, A, P, PIM.
+- Section 3 — Points Progression: a line chart showing cumulative season points
+  on the Y axis and game number on the X axis. Include a secondary faint line or
+  bars for points scored in each individual game.
+- This screen must work for opponent players too, using whatever stats are
+  visible for that league.
+
+## Data / backend notes
+
+- Add Supabase RLS policies so users can read per-game stat rows for players on
+  opposing teams within the same league. Do not expose stats across leagues the
+  user isn't part of.
+- Compute streak status in a database view or RPC rather than client-side, so the
+  roster list doesn't need to fetch every player's full game log.
+
+
+================================================================================
+FEATURE 2: LINE COMBINATION TOOL
+================================================================================
+
+## Part A — Setting lines
+
+- New screen accessible to team captains/admins only.
+- Default layout: 2 forward lines and 2 defensive pairs.
+    - Each forward line has 3 slots: LW, C, RW
+    - Each defensive pair has 2 slots: LD, RD
+- Below the forward lines, a "+" button adds another forward line.
+  Below the defensive pairs, a "+" button adds another pair.
+- Each added line can be removed.
+- Tapping an empty position slot opens a picker listing players on the team.
+  Selecting a player fills that slot.
+- Tapping a filled slot lets me swap or clear the player.
+- A player can only occupy one slot at a time — if I assign a player already
+  placed elsewhere, remove them from the previous slot automatically.
+- Show unassigned players in a "Bench" area below the lines.
+- Lines save per game, not just per team. When creating lines for a new game,
+  offer to prefill from the most recent game's lines.
+
+## Part B — Combo ratings
+
+Stats come from the existing scorekeeper function, which records goals with
+their scorer and assists. Ratings are built from those records, not from
+whole-game point totals.
+
+Attribution:
+- A goal is credited to a combo if at least one of the scorer or assist slots
+  on that goal belongs to a player in the combo, AND that combo was the set
+  line assignment for that game.
+- A single goal can credit both a forward line and a defensive pair if players
+  from both appear on the scoresheet for it. That is intended.
+
+Metrics per combo:
+- Games Together = number of games this exact set of players was assigned to
+  the same line
+- Goals For = count of distinct goals credited to the combo
+- Points = total scorer + assist credits earned by combo members on those goals
+- Goals For / Game = Goals For / Games Together     ← primary rating
+- Points / Game = Points / Games Together           ← secondary
+
+Rules:
+- A combo is identified by its set of player IDs, order-independent. The same
+  three forwards are the same combo regardless of which wing they played.
+- Require at least 3 games together before displaying a rating. Below that,
+  show "Not enough data" with the games-played count.
+- Always display Games Together next to any rating so small samples are visible.
+- Add a filter to include or exclude special-teams goals if the scorekeeper
+  records strength state.
+
+Display:
+- On the Set Lines screen, show the combo's Goals For / Game inline beneath each
+  fully assembled line, along with games played.
+- Add a "Top Combos" view listing best-rated forward lines and defensive pairs,
+  sorted by Goals For / Game, with a minimum-games filter applied.
+- Label the metric "Combo Trend" rather than "Rating" in the UI.
+
+## Data model
+
+- line_assignments table: game_id, team_id, line_number, line_type
+  (forward/defense), position, player_id
+- Derive combos and ratings from a view joining line_assignments to the
+  scorekeeper's goal records. Do not store combo ratings in a separate
+  denormalized table unless performance requires it.
