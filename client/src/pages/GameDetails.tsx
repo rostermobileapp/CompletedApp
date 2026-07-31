@@ -1717,11 +1717,6 @@ export default function GameDetails() {
               <LayoutList className="w-5 h-5" />
               Line Combinations
             </SheetTitle>
-            {!linesLoading && linesAreTemplate && templateLines.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Showing team template — no game-specific lines set yet.
-              </p>
-            )}
           </SheetHeader>
 
           {linesLoading ? (
