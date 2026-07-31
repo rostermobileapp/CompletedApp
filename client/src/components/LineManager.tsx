@@ -154,17 +154,7 @@ function SlotButton({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all
-        ${isDragOver
-          ? 'ring-2 ring-primary border-primary bg-primary/10 scale-[1.03]'
-          : slot.playerId
-            ? 'bg-background border-border'
-            : canEdit
-              ? 'border-dashed border-border bg-muted/30 hover:bg-muted/60'
-              : 'border-dashed border-border bg-muted/20'
-        }
-        ${canEdit ? 'cursor-pointer active:scale-95' : 'cursor-default'}
-      `}
+      className="relative flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all border-dashed border-border bg-muted/30 hover:bg-muted/60 cursor-pointer active:scale-95 pt-[2px] pb-[2px] pl-[4px] pr-[4px]"
       data-testid={`slot-${position}`}
     >
       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{position}</span>
@@ -650,7 +640,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
         <CardContent className="p-6 pl-[12px] pr-[12px] pt-[4px] pb-[12px]">
           {view === 'roster' ? (
             /* ── Roster view ── */
-            <>
+            (<>
               {sortedMembers.length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground">
                   <Users className="w-10 h-10 mx-auto mb-3 opacity-50" />
@@ -735,10 +725,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   {sortedMembers.length} {sortedMembers.length === 1 ? 'player' : 'players'}
                 </p>
               </div>
-            </>
+            </>)
           ) : (
             /* ── Lines view ── */
-            <div className="space-y-4">
+            (<div className="space-y-4">
               {linesLoading ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Loading lines…</p>
               ) : (
@@ -883,11 +873,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   </div>
                 </>
               )}
-            </div>
+            </div>)
           )}
         </CardContent>
       </Card>
-
       {/* ── Add Players Sheet ── */}
       <Sheet open={showAddPlayers} onOpenChange={setShowAddPlayers}>
         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto rounded-t-2xl">
@@ -952,7 +941,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
           </div>
         </SheetContent>
       </Sheet>
-
       {/* ── Player picker sheet ─────────────────────────────────────
            Bench players shown first, then on-ice players.        ── */}
       <Sheet open={!!pickerTarget} onOpenChange={(open) => { if (!open) setPickerTarget(null); }}>
@@ -1066,7 +1054,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
           })()}
         </SheetContent>
       </Sheet>
-
       {/* ── Player profile preview (roster view) ── */}
       <ProfilePhotoPreview
         isOpen={!!actionSheetPlayer}
