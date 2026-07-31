@@ -849,7 +849,7 @@ export default function Teams() {
                 {/* Line Combinations Manager (Roster + inline line editor) */}
                 <LineManager 
                   teamId={team.id}
-                  isTeamCaptain={isTeamCaptain || isTeamCreator}
+                  isTeamCaptain={isTeamCaptain || isTeamCreator || isCommissioner}
                   teamMembers={teamMembers}
                   leagueId={currentTeam?.leagueId ?? null}
                   seasonId={currentTeam?.seasonId ?? null}
