@@ -65,7 +65,7 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
   const [viewMode, setViewMode] = useState<'summary' | 'table'>('summary');
-  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
+  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
 
   // Use dashboard selection to determine league/team/tournament context
   const { selectedType, selectedId, selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
@@ -247,7 +247,7 @@ export default function Stats() {
   });
 
   // Get top players by category
-  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
+  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
     if (activeTab === 'goalies') {
       const goalieStats = filteredStats.filter((stat): stat is GoalieStats => stat.type === 'goalie');
       if (category === 'wins') {
@@ -285,6 +285,10 @@ export default function Stats() {
         case 'penaltyMinutes':
           return skaterStats
             .sort((a, b) => (b.penaltyMinutes || 0) - (a.penaltyMinutes || 0))
+            .slice(0, limit);
+        case 'beers':
+          return skaterStats
+            .sort((a, b) => (b.beers || 0) - (a.beers || 0))
             .slice(0, limit);
         default:
           return [];
@@ -334,6 +338,8 @@ export default function Stats() {
           return skaterStats.sort((a, b) => (b.assists || 0) - (a.assists || 0));
         case 'penaltyMinutes':
           return skaterStats.sort((a, b) => (b.penaltyMinutes || 0) - (a.penaltyMinutes || 0));
+        case 'beers':
+          return skaterStats.sort((a, b) => (b.beers || 0) - (a.beers || 0));
         default:
           return skaterStats;
       }
@@ -529,7 +535,7 @@ export default function Stats() {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h2 className="text-xl font-bold text-[#212121] dark:text-white capitalize" data-testid="text-table-title">
-                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy}
+                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy === 'beers' ? 'Beers Drank 🍺' : sortBy}
                 </h2>
               </div>
               {/* Stats Table */}
@@ -545,6 +551,7 @@ export default function Stats() {
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">A</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PTS</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PIM</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">🍺</th>
                         </>
                       ) : (
                         <>
@@ -589,6 +596,7 @@ export default function Stats() {
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.assists || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.points || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.penaltyMinutes || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.beers || 0}</td>
                             </>
                           ) : stat.type === 'goalie' ? (
                             <>
@@ -663,6 +671,20 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('penaltyMinutes')}
+                />
+              )}
+              {/* Beers Drank Section */}
+              {activeTab !== 'goalies' && (
+                <StatSection
+                  title="Beers Drank 🍺"
+                  players={getTopPlayers('beers', 1)}
+                  renderStat={(stat) => (stat.type === 'skater' ? stat.beers || 0 : 0)}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
+                  onClick={() => handleStatClick('beers')}
                 />
               )}
               {/* Wins Section (Goalies) */}

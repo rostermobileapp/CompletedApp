@@ -22,6 +22,7 @@ import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
+import beerCounterUrl from '@assets/beer-counter.png';
 import { getScrimmageCoverSrc } from '@/lib/scrimmageCoverOptions';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
@@ -143,6 +144,34 @@ export default function GameDetails() {
   const _scrimmageForHooks = (scrimmageData as any)?.scrimmage;
   const _canManageForHooks = !!(scrimmageData as any)?.canManagePlayers ||
     (_scrimmageForHooks?.creatorId === (user as any)?.id);
+
+  // Beer counter — visible 2 h before game time through 6 h after
+  const beerWindowOpen = React.useMemo(() => {
+    if (isScrimmage || !fullGameData?.game?.scheduledAt) return false;
+    const t = new Date(fullGameData.game.scheduledAt).getTime();
+    const now = Date.now();
+    return now >= t - 2 * 60 * 60 * 1000 && now <= t + 6 * 60 * 60 * 1000;
+  }, [fullGameData?.game?.scheduledAt, isScrimmage]);
+
+  const { data: beerData } = useQuery({
+    queryKey: [`/api/games/${gameId}/beers`],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/games/${gameId}/beers`);
+      return res.json();
+    },
+    enabled: !!gameId && !isScrimmage && beerWindowOpen,
+  });
+  const beerCount = (beerData as any)?.count ?? 0;
+
+  const beerMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/games/${gameId}/beers`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.setQueryData([`/api/games/${gameId}/beers`], data);
+    },
+  });
 
   // Fetch pending requests for creator / co-host management panel
   const { data: pendingRequests = [] } = useQuery<any[]>({
@@ -1084,18 +1113,34 @@ export default function GameDetails() {
               Game Details
             </h1>
           </div>
-          {canDeleteGame && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDeleteGame}
-              className="p-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-              disabled={deleteGameMutation.isPending}
-              data-testid="button-delete-game"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {beerWindowOpen && (
+              <button
+                onClick={() => beerMutation.mutate()}
+                disabled={beerMutation.isPending}
+                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl hover:bg-muted/60 active:scale-95 transition-all select-none"
+              >
+                <img src={beerCounterUrl} className="w-8 h-8" alt="Log a beer" />
+                {beerCount > 0 && (
+                  <span className="text-[10px] font-semibold leading-none text-muted-foreground whitespace-nowrap">
+                    {beerCount} Beers Drank
+                  </span>
+                )}
+              </button>
+            )}
+            {canDeleteGame && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDeleteGame}
+                className="p-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                disabled={deleteGameMutation.isPending}
+                data-testid="button-delete-game"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
       {/* Game Info */}

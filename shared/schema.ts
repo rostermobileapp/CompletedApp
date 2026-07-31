@@ -3545,6 +3545,7 @@ export type SkaterStats = {
   assists: number;
   penaltyMinutes: number;
   points: number;
+  beers?: number;
   isGoalie?: boolean;
   user: User;
 };
@@ -4147,3 +4148,17 @@ export const featureRequestReplies = pgTable("feature_request_replies", {
 ]);
 
 export type FeatureRequestReply = typeof featureRequestReplies.$inferSelect;
+
+// Beer counter — tracks how many beers a user logged during a specific game.
+// One row per (user, game); count increments on each tap.
+export const gameBeerCounts = pgTable("game_beer_counts", {
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  gameId: varchar("game_id").notNull(),
+  count: integer("count").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.gameId] }),
+  index("idx_game_beer_counts_game").on(table.gameId),
+]);
+
+export type GameBeerCount = typeof gameBeerCounts.$inferSelect;

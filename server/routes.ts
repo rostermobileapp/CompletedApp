@@ -552,6 +552,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('Error initializing user_registration_count table:', e);
   }
 
+  // Beer counter table — one row per (user, game); count increments on each tap
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS game_beer_counts (
+        user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        game_id varchar NOT NULL,
+        count integer NOT NULL DEFAULT 0,
+        updated_at timestamp DEFAULT NOW() NOT NULL,
+        PRIMARY KEY (user_id, game_id)
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_game_beer_counts_game ON game_beer_counts(game_id)
+    `);
+    console.log('[Init] game_beer_counts table ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure game_beer_counts table:', err);
+  }
+
   // Lightweight endpoint for the client-side ErrorBoundary to report rendering
   // crashes so we can debug what's failing in production / on user devices.
   // No auth required (the user may be unauthenticated at the time of the crash).
@@ -10744,6 +10763,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Beer Counter ──────────────────────────────────────────────────────────
+  // GET  /api/games/:gameId/beers  → current user's beer count for this game
+  // POST /api/games/:gameId/beers  → increment by 1, return new count
+  // ────────────────────────────────────────────────────────────────────────────
+
+  app.get('/api/games/:gameId/beers', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await db.execute(sql`
+        SELECT count FROM game_beer_counts
+        WHERE user_id = ${userId} AND game_id = ${gameId}
+      `);
+      const count = result.rows?.[0]?.count ?? 0;
+      return res.json({ count: Number(count) });
+    } catch (err) {
+      console.error('[Beers] GET error:', err);
+      return res.status(500).json({ message: 'Failed to fetch beer count' });
+    }
+  });
+
+  app.post('/api/games/:gameId/beers', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await db.execute(sql`
+        INSERT INTO game_beer_counts (user_id, game_id, count, updated_at)
+        VALUES (${userId}, ${gameId}, 1, NOW())
+        ON CONFLICT (user_id, game_id) DO UPDATE
+          SET count = game_beer_counts.count + 1, updated_at = NOW()
+        RETURNING count
+      `);
+      const count = result.rows?.[0]?.count ?? 1;
+      return res.json({ count: Number(count) });
+    } catch (err) {
+      console.error('[Beers] POST error:', err);
+      return res.status(500).json({ message: 'Failed to log beer' });
+    }
+  });
+
   // Scorekeeper Dashboard - Finalize game and update stats
   app.post('/api/games/:gameId/finalize', isAuthenticated, async (req: any, res) => {
     try {
@@ -17076,6 +17135,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Get regular player statistics with discriminated union type
         const playerStats = await storage.getPlayerStats(leagueId, seasonId, playerType as 'non-goalies' | undefined);
+
+        // Beer totals per user for this league/season
+        const beerSeasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+        const beerResult = await db.execute(sql`
+          SELECT gbc.user_id, COALESCE(SUM(gbc.count), 0)::int AS total_beers
+          FROM game_beer_counts gbc
+          JOIN games g ON g.id = gbc.game_id
+          WHERE g.league_id = ${leagueId}
+          ${beerSeasonFilter}
+          GROUP BY gbc.user_id
+        `);
+        const beerMap = new Map<string, number>();
+        (beerResult.rows ?? beerResult as any).forEach((row: any) => {
+          beerMap.set(row.user_id, Number(row.total_beers));
+        });
+
         const response = playerStats.map(stat => ({
           type: 'skater' as const,
           id: stat.id,
@@ -17087,6 +17162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assists: stat.assists,
           penaltyMinutes: stat.penaltyMinutes,
           points: stat.goals + stat.assists,
+          beers: beerMap.get(stat.userId) ?? 0,
           isGoalie: stat.isGoalie,
           user: stat.user
         }));
@@ -26123,6 +26199,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         else if (streakRatio <= 0.75) streakStatus = 'COLD';
       }
 
+      // Beer total for this user in this league/season
+      const beerSeasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+      const beerTrendResult = await db.execute(sql`
+        SELECT COALESCE(SUM(gbc.count), 0)::int AS total_beers
+        FROM game_beer_counts gbc
+        JOIN games g ON g.id = gbc.game_id
+        WHERE gbc.user_id = ${userId}
+          AND g.league_id = ${leagueId}
+          ${beerSeasonFilter}
+      `);
+      const totalBeers = Number(beerTrendResult.rows?.[0]?.total_beers ?? 0);
+
       return res.json({
         seasonTotals: seasonTotals
           ? {
@@ -26135,8 +26223,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 seasonTotals.gamesPlayed > 0
                   ? Number(((seasonTotals.goals + seasonTotals.assists) / seasonTotals.gamesPlayed).toFixed(2))
                   : 0,
+              beers: totalBeers,
             }
           : null,
+        beers: totalBeers,
         gameLog,
         streakStatus,
         streakRatio: Number(streakRatio.toFixed(3)),

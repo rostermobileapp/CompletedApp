@@ -23,6 +23,7 @@ interface SeasonTotals {
   points: number;
   penaltyMinutes: number;
   pointsPerGame: number;
+  beers?: number;
 }
 
 interface GameLogEntry {
@@ -41,6 +42,7 @@ interface GameLogEntry {
 
 interface StatsTrendsData {
   seasonTotals: SeasonTotals | null;
+  beers?: number;
   gameLog: GameLogEntry[];
   streakStatus: 'HOT' | 'COLD' | 'NEUTRAL';
   streakRatio: number;
@@ -200,21 +202,32 @@ export default function PlayerStatsTrends() {
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 {totals ? (
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'GP', value: totals.gamesPlayed },
-                      { label: 'G',  value: totals.goals },
-                      { label: 'A',  value: totals.assists },
-                      { label: 'PTS', value: totals.points },
-                      { label: 'PIM', value: totals.penaltyMinutes },
-                      { label: 'P/GP', value: totals.pointsPerGame },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="text-center bg-muted/40 rounded-lg py-3">
-                        <div className="text-xl font-bold">{value}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'GP', value: totals.gamesPlayed },
+                        { label: 'G',  value: totals.goals },
+                        { label: 'A',  value: totals.assists },
+                        { label: 'PTS', value: totals.points },
+                        { label: 'PIM', value: totals.penaltyMinutes },
+                        { label: 'P/GP', value: totals.pointsPerGame },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="text-center bg-muted/40 rounded-lg py-3">
+                          <div className="text-xl font-bold">{value}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Beer counter row */}
+                    <div className="mt-3 grid grid-cols-1">
+                      <div className="text-center bg-muted/40 rounded-lg py-3 flex items-center justify-center gap-2">
+                        <span className="text-xl font-bold">{totals.beers ?? (data as any)?.beers ?? 0}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">Beers Drank 🍺</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  </>
                 ) : (
                   <>
                     {/* Show zeroed-out grid as skeleton */}
@@ -226,6 +239,15 @@ export default function PlayerStatsTrends() {
                         </div>
                       ))}
                     </div>
+                    {/* Still show beer count even if no hockey stats */}
+                    {((data as any)?.beers ?? 0) > 0 && (
+                      <div className="grid grid-cols-1 mb-3">
+                        <div className="text-center bg-muted/40 rounded-lg py-3 flex items-center justify-center gap-2">
+                          <span className="text-xl font-bold">{(data as any)?.beers}</span>
+                          <span className="text-xs text-muted-foreground">Beers Drank 🍺</span>
+                        </div>
+                      </div>
+                    )}
                     <NoDataMessage />
                   </>
                 )}
