@@ -4,14 +4,14 @@ import { useLocation, useRoute } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trophy, Users, Target, TrendingUp, Apple, Flag, ArrowLeft, Lock, Flame, Snowflake } from 'lucide-react';
-import { ClickableAvatar } from '@/components/ClickableAvatar';
-import { PlayerActionSheet } from '@/components/PlayerActionSheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useAuth } from '@/hooks/useAuth';
 
-interface ActionSheetState {
+interface PreviewPlayerState {
   userId: string;
   firstName: string;
   lastName: string;
@@ -24,7 +24,7 @@ export default function TeamView() {
   const teamId = params?.id;
   const { canAccessPremiumFeatures } = usePermissions();
   const { user } = useAuth();
-  const [actionSheetPlayer, setActionSheetPlayer] = useState<ActionSheetState | null>(null);
+  const [previewPlayer, setPreviewPlayer] = useState<PreviewPlayerState | null>(null);
   
   // Check if user is on free tier
   const isFreeTier = !canAccessPremiumFeatures();
@@ -443,7 +443,7 @@ export default function TeamView() {
                       data-testid={`roster-member-${member.id}`}
                       onClick={() => {
                         if (!member.user?.id) return;
-                        setActionSheetPlayer({
+                        setPreviewPlayer({
                           userId: member.user.id,
                           firstName: member.user.firstName || '',
                           lastName: member.user.lastName || '',
@@ -452,13 +452,10 @@ export default function TeamView() {
                       }}
                     >
                       <div className="flex items-center gap-3">
-                        <ClickableAvatar
-                          userId={member.user?.id || ''}
-                          profileImageUrl={member.user?.profileImageUrl}
-                          firstName={member.user?.firstName}
-                          lastName={member.user?.lastName}
-                          size="sm"
-                        />
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={member.user?.profileImageUrl ? (member.user.profileImageUrl.startsWith('http') ? member.user.profileImageUrl : `/api/storage/object/${member.user.profileImageUrl}`) : undefined} alt={member.user?.firstName || 'User'} />
+                          <AvatarFallback>{((member.user?.firstName?.[0] || '') + (member.user?.lastName?.[0] || '')).toUpperCase() || 'U'}</AvatarFallback>
+                        </Avatar>
                         <div>
                           <div className="flex items-center gap-1.5" data-testid={`text-member-name-${member.id}`}>
                             <p className="font-medium">
@@ -493,21 +490,14 @@ export default function TeamView() {
         </Card>
       </div>
 
-      {/* Player action sheet */}
-      <PlayerActionSheet
-        open={!!actionSheetPlayer}
-        onClose={() => setActionSheetPlayer(null)}
-        userId={actionSheetPlayer?.userId ?? null}
-        firstName={actionSheetPlayer?.firstName ?? ''}
-        lastName={actionSheetPlayer?.lastName ?? ''}
-        profileImageUrl={actionSheetPlayer?.profileImageUrl}
-        leagueId={(team as any)?.leagueId ?? null}
-        seasonId={(team as any)?.seasonId ?? null}
-        streakStatus={
-          actionSheetPlayer?.userId
-            ? (streaksData?.streaks?.[actionSheetPlayer.userId] as any)
-            : undefined
-        }
+      {/* Player profile preview */}
+      <ProfilePhotoPreview
+        isOpen={!!previewPlayer}
+        onClose={() => setPreviewPlayer(null)}
+        userId={previewPlayer?.userId ?? ''}
+        firstName={previewPlayer?.firstName}
+        lastName={previewPlayer?.lastName}
+        profileImageUrl={previewPlayer?.profileImageUrl}
       />
     </div>
   );
