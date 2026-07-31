@@ -855,14 +855,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                               `}
                               data-testid={`bench-player-${memberId}`}
                             >
-                              <ClickableAvatar
-                                userId={memberId}
-                                profileImageUrl={m.user?.profileImageUrl}
-                                firstName={fn}
-                                lastName={ln}
-                                size="xs"
-                                className="!h-5 !w-5 pointer-events-none"
-                              />
+                              <Avatar className="h-5 w-5 shrink-0 pointer-events-none">
+                                <AvatarImage src={m.user?.profileImageUrl ? (m.user.profileImageUrl.startsWith('http') ? m.user.profileImageUrl : `/api/storage/object/${m.user.profileImageUrl}`) : undefined} alt={fn || 'Player'} />
+                                <AvatarFallback className="text-[8px]">{((fn?.[0] ?? '') + (ln?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
+                              </Avatar>
                               <span className="font-medium">{fmt(fn, ln)}</span>
                             </div>
                           );
