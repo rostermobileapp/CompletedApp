@@ -3,7 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign, CreditCard, ChevronRight } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign, CreditCard, ChevronRight, LayoutList } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SiVenmo, SiCashapp } from "react-icons/si";
 import { resolveVenmoLink, resolveCashAppLink } from "@/lib/paymentLinks";
 import { RSVPButtons } from "@/components/RSVPButtons";
@@ -51,6 +52,41 @@ export default function GameDetails() {
   const [firstStarUserId, setFirstStarUserId] = useState("");
   const [secondStarUserId, setSecondStarUserId] = useState("");
   const [thirdStarUserId, setThirdStarUserId] = useState("");
+
+  // Line Combos popup state — both IDs are set when the button is tapped so the
+  // query is lazy (only fires after the sheet opens)
+  const [showLineCombosModal, setShowLineCombosModal] = useState(false);
+  const [lineCombosTeamId, setLineCombosTeamId] = useState<string | null>(null);
+  const [lineCombosGameId, setLineCombosGameId] = useState<string | null>(null);
+
+  // Fetch game-specific lines first; if none exist, fall back to template lines.
+  // Query key includes both teamId and gameId so cache entries never cross games.
+  const {
+    data: lineCombosResult = { lines: [], isTemplate: true },
+    isLoading: linesLoading,
+  } = useQuery<{ lines: any[]; isTemplate: boolean }>({
+    queryKey: ['/api/teams', lineCombosTeamId, 'line-combinations', 'game', lineCombosGameId],
+    queryFn: async () => {
+      // Try game-specific lines first
+      const gameRes = await apiRequest(
+        'GET',
+        `/api/teams/${lineCombosTeamId}/line-combinations?gameId=${lineCombosGameId}`,
+      );
+      const gameLines: any[] = await gameRes.json();
+      if (gameLines.length > 0) return { lines: gameLines, isTemplate: false };
+      // Fall back to template lines
+      const tmplRes = await apiRequest(
+        'GET',
+        `/api/teams/${lineCombosTeamId}/line-combinations`,
+      );
+      const tmplLines: any[] = await tmplRes.json();
+      return { lines: tmplLines, isTemplate: true };
+    },
+    enabled: !!lineCombosTeamId && !!lineCombosGameId && showLineCombosModal,
+    staleTime: 60 * 1000,
+  });
+  const templateLines = lineCombosResult.lines;
+  const linesAreTemplate = lineCombosResult.isTemplate;
 
   // Consolidated query - fetches game, league, team members, score submissions, and user teams in ONE request
   interface FullGameData {
@@ -1194,6 +1230,24 @@ export default function GameDetails() {
                   Find Substitutes ({notAttendingCount})
                 </Button>
               )}
+
+              {/* Line Combos Button - visible to all team members for non-scrimmage games */}
+              {userTeam && !isScrimmage && game.id && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => {
+                    setLineCombosTeamId(userTeam.id);
+                    setLineCombosGameId(game.id);
+                    setShowLineCombosModal(true);
+                  }}
+                  data-testid="button-line-combos"
+                >
+                  <LayoutList className="w-4 h-4 mr-2" />
+                  Line Combos
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -1654,6 +1708,109 @@ export default function GameDetails() {
           notAttendingPlayers={captainRsvpSummary?.notAttending || []}
         />
       )}
+
+      {/* Line Combos read-only Sheet */}
+      <Sheet open={showLineCombosModal} onOpenChange={setShowLineCombosModal}>
+        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="mb-4">
+            <SheetTitle className="flex items-center gap-2">
+              <LayoutList className="w-5 h-5" />
+              Line Combinations
+            </SheetTitle>
+            {!linesLoading && linesAreTemplate && templateLines.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Showing team template — no game-specific lines set yet.
+              </p>
+            )}
+          </SheetHeader>
+
+          {linesLoading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+          ) : (() => {
+            const FWD_POS = ['LW', 'C', 'RW'];
+            const DEF_POS = ['LD', 'RD'];
+
+            function fmtLine(fn: string, ln: string): string {
+              if (fn && ln) return `${fn.charAt(0)}. ${ln}`;
+              return ln || fn || '—';
+            }
+
+            const fwdLines = templateLines
+              .filter((l: any) => l.lineType === 'forward')
+              .sort((a: any, b: any) => a.lineNumber - b.lineNumber);
+            const defPairs = templateLines
+              .filter((l: any) => l.lineType === 'defense')
+              .sort((a: any, b: any) => a.lineNumber - b.lineNumber);
+
+            const hasAnyPlayer =
+              fwdLines.some((l: any) => l.assignments?.length > 0) ||
+              defPairs.some((l: any) => l.assignments?.length > 0);
+
+            if (!hasAnyPlayer) {
+              return (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  No lines set yet — the captain can set them from the Roster card.
+                </div>
+              );
+            }
+
+            const renderLine = (line: any, positions: string[], label: string) => {
+              const byPos: Record<string, { firstName: string; lastName: string } | null> = {};
+              for (const pos of positions) byPos[pos] = null;
+              for (const a of line.assignments ?? []) {
+                if (a.position && byPos[a.position] !== undefined) {
+                  byPos[a.position] = {
+                    firstName: a.player?.firstName ?? '',
+                    lastName: a.player?.lastName ?? '',
+                  };
+                }
+              }
+              return (
+                <div key={`${line.lineType}-${line.lineNumber}`} className="space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {label} {line.lineNumber}
+                  </p>
+                  <div className="flex gap-2">
+                    {positions.map((pos) => {
+                      const p = byPos[pos];
+                      return (
+                        <div
+                          key={pos}
+                          className="flex-1 min-w-0 rounded-xl border border-border bg-muted/20 p-2 flex flex-col items-center gap-1"
+                        >
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                            {pos}
+                          </span>
+                          <span className="text-[11px] font-medium text-center leading-tight truncate w-full">
+                            {p ? fmtLine(p.firstName, p.lastName) : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <div className="space-y-6 pb-6">
+                {fwdLines.length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-sm font-semibold">Forwards</p>
+                    {fwdLines.map((l: any) => renderLine(l, FWD_POS, 'Line'))}
+                  </div>
+                )}
+                {defPairs.length > 0 && (
+                  <div className="space-y-4">
+                    <p className="text-sm font-semibold">Defense</p>
+                    {defPairs.map((l: any) => renderLine(l, DEF_POS, 'Pair'))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
