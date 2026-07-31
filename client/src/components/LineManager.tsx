@@ -54,6 +54,7 @@ type ComboStat = {
 
 const FORWARD_POSITIONS = ['LW', 'C', 'RW'];
 const DEFENSE_POSITIONS = ['LD', 'RD'];
+const EMPTY_LINES: any[] = []; // stable reference — avoids infinite useEffect loop
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -283,7 +284,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: existingLines = [], isLoading: linesLoading } = useQuery<any[]>({
+  const { data: existingLines = EMPTY_LINES, isLoading: linesLoading } = useQuery<any[]>({
     queryKey: ['/api/teams', teamId, 'line-combinations', 'template'],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/teams/${teamId}/line-combinations`);
