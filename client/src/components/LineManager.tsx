@@ -1072,6 +1072,8 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
         firstName={actionSheetPlayer?.firstName}
         lastName={actionSheetPlayer?.lastName}
         profileImageUrl={actionSheetPlayer?.profileImageUrl}
+        leagueId={leagueId}
+        seasonId={seasonId}
       />
     </>
   );

@@ -14,6 +14,10 @@ interface ProfilePhotoPreviewProps {
   profileImageUrl?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  /** Optional: pass to enable the Player Stats & Trends button */
+  leagueId?: string | null;
+  /** Optional: pass to scope stats to a specific season */
+  seasonId?: string | null;
 }
 
 export function ProfilePhotoPreview({
@@ -22,7 +26,9 @@ export function ProfilePhotoPreview({
   userId,
   profileImageUrl,
   firstName,
-  lastName
+  lastName,
+  leagueId,
+  seasonId,
 }: ProfilePhotoPreviewProps) {
   const [, navigate] = useLocation();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -37,9 +43,20 @@ export function ProfilePhotoPreview({
     }
   }, [isOpen]);
 
+  const fullName = `${firstName ?? ''} ${lastName ?? ''}`.trim() || 'Player';
+
   const handleViewProfile = () => {
     setPageTransitionDirection('up');
     navigate(`/user/${userId}`);
+    onClose();
+  };
+
+  const handleStatsTrends = () => {
+    setPageTransitionDirection('up');
+    const params = new URLSearchParams({ name: fullName });
+    if (leagueId) params.set('leagueId', leagueId);
+    if (seasonId) params.set('seasonId', seasonId);
+    navigate(`/player-stats/${userId}?${params}`);
     onClose();
   };
 
@@ -105,19 +122,29 @@ export function ProfilePhotoPreview({
         </Avatar>
 
         <div className="text-center text-white mb-2">
-          <p className="text-lg font-medium">
-            {firstName} {lastName}
-          </p>
+          <p className="text-lg font-medium">{fullName}</p>
         </div>
 
-        <Button
-          onClick={handleViewProfile}
-          variant="secondary"
-          className="px-6"
-          data-testid="button-view-profile"
-        >
-          View Profile
-        </Button>
+        {userId && (
+          <div className="flex flex-col gap-2 w-48">
+            <Button
+              onClick={handleViewProfile}
+              variant="secondary"
+              className="w-full"
+              data-testid="button-view-profile"
+            >
+              View Profile
+            </Button>
+            <Button
+              onClick={handleStatsTrends}
+              variant="secondary"
+              className="w-full"
+              data-testid="button-stats-trends"
+            >
+              Player Stats &amp; Trends
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

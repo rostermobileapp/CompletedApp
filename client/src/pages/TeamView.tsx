@@ -510,6 +510,8 @@ export default function TeamView() {
         firstName={previewPlayer?.firstName}
         lastName={previewPlayer?.lastName}
         profileImageUrl={previewPlayer?.profileImageUrl}
+        leagueId={(team as any)?.leagueId ?? null}
+        seasonId={(team as any)?.seasonId ?? null}
       />
     </div>
   );
