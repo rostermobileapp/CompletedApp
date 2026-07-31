@@ -428,9 +428,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
           lineNumber: line.lineNumber,
           name: `${line.lineType === 'forward' ? 'Line' : 'Pair'} ${line.lineNumber}`,
           slots: Object.entries(line.slots)
-            // Strip placeholder players — they have no real user row and can't be FK'd in the DB.
-            // Real players (UUID only, no "placeholder:" prefix) are saved normally.
-            .filter(([, slot]) => slot.playerId && !slot.playerId.startsWith('placeholder:'))
+            .filter(([, slot]) => slot.playerId)
             .map(([pos, slot]) => ({ position: pos, playerId: slot.playerId as string })),
         }))
         .filter((line) => line.slots.length > 0);

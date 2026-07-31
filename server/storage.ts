@@ -11379,10 +11379,12 @@ export class DatabaseStorage implements IStorage {
         lineCombination: lineCombinations,
         assignment: lineCombinationAssignments,
         user: users,
+        placeholder: placeholderPlayers,
       })
       .from(lineCombinations)
       .leftJoin(lineCombinationAssignments, eq(lineCombinations.id, lineCombinationAssignments.lineCombinationId))
       .leftJoin(users, eq(lineCombinationAssignments.playerId, users.id))
+      .leftJoin(placeholderPlayers, eq((lineCombinationAssignments as any).placeholderPlayerId, placeholderPlayers.id))
       .where(whereCondition)
       .orderBy(
         asc(lineCombinations.lineType),
@@ -11403,11 +11405,30 @@ export class DatabaseStorage implements IStorage {
         });
       }
       
-      if (row.assignment && row.user) {
-        lineCombinationsMap.get(lineId)!.assignments.push({
-          ...row.assignment,
-          player: row.user,
-        });
+      if (row.assignment) {
+        if (row.user) {
+          // Real user assignment
+          lineCombinationsMap.get(lineId)!.assignments.push({
+            ...row.assignment,
+            player: row.user,
+          });
+        } else if (row.placeholder) {
+          // Placeholder assignment — synthesise a player-shaped object so the
+          // client can hydrate the slot without special casing the shape.
+          const ph = row.placeholder;
+          lineCombinationsMap.get(lineId)!.assignments.push({
+            ...row.assignment,
+            // Expose placeholder ID in the prefixed format the client expects
+            playerId: `placeholder:${ph.id}` as any,
+            player: {
+              id: `placeholder:${ph.id}`,
+              firstName: ph.firstName,
+              lastName: ph.lastName,
+              profileImageUrl: null,
+              email: ph.email ?? null,
+            } as any,
+          });
+        }
       }
     }
     

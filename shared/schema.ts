@@ -1565,11 +1565,13 @@ export const lineCombinations = pgTable("line_combinations", {
 ]);
 
 // Line combination assignments table - stores player assignments to line positions
+// Exactly one of playerId (real user) or placeholderPlayerId (pending roster spot) is set per row.
 export const lineCombinationAssignments = pgTable("line_combination_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   lineCombinationId: varchar("line_combination_id").references(() => lineCombinations.id).notNull(),
   position: positionEnum("position").notNull(),
-  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  playerId: varchar("player_id").references(() => users.id, { onDelete: 'cascade' }),
+  placeholderPlayerId: varchar("placeholder_player_id").references(() => placeholderPlayers.id, { onDelete: 'cascade' }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

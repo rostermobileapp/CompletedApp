@@ -8033,15 +8033,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Each player may only appear once across all lines', duplicatePlayerIds: duplicateIdsTpl });
       }
 
-      // Validate all player IDs are team members before touching the DB
+      // Separate real-user IDs from placeholder IDs
+      const realPlayerIds = allAssignedPlayerIdsTpl.filter((id) => !id.startsWith('placeholder:'));
+      const placeholderRawIds = allAssignedPlayerIdsTpl
+        .filter((id) => id.startsWith('placeholder:'))
+        .map((id) => id.replace(/^placeholder:/, ''));
+
+      // Validate real player IDs are team members
       const teamMembersData = await storage.getTeamMembers(teamId);
       const teamMemberIdSet = new Set(teamMembersData.map((m: any) => m.user?.id ?? m.userId));
-      const invalidPlayers = allAssignedPlayerIdsTpl.filter((id) => id && !teamMemberIdSet.has(id));
+      const invalidPlayers = realPlayerIds.filter((id) => id && !teamMemberIdSet.has(id));
       if (invalidPlayers.length > 0) {
         return res.status(400).json({
           message: 'Some players are not members of this team',
           invalidPlayerIds: Array.from(new Set(invalidPlayers)),
         });
+      }
+
+      // Validate placeholder IDs belong to this team
+      if (placeholderRawIds.length > 0) {
+        const teamPlaceholders = await db
+          .select({ id: placeholderPlayers.id })
+          .from(placeholderPlayers)
+          .where(eq(placeholderPlayers.teamId, teamId));
+        const teamPlaceholderIdSet = new Set(teamPlaceholders.map((p) => p.id));
+        const invalidPlaceholders = placeholderRawIds.filter((id) => !teamPlaceholderIdSet.has(id));
+        if (invalidPlaceholders.length > 0) {
+          return res.status(400).json({
+            message: 'Some placeholder players are not on this team',
+            invalidPlaceholderIds: invalidPlaceholders,
+          });
+        }
       }
 
       // Atomic replace in a single transaction
@@ -8087,13 +8109,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const assignmentRows = [];
           for (const slot of slots) {
+            const isPlaceholderSlot = slot.playerId.startsWith('placeholder:');
+            const placeholderRawId = isPlaceholderSlot
+              ? slot.playerId.replace(/^placeholder:/, '')
+              : null;
             const [a] = await tx
               .insert(lineCombinationAssignmentsTable)
               .values({
                 lineCombinationId: newLine.id,
                 position: slot.position as any,
-                playerId: slot.playerId,
-              })
+                playerId: isPlaceholderSlot ? null : slot.playerId,
+                placeholderPlayerId: placeholderRawId ?? undefined,
+              } as any)
               .returning();
             assignmentRows.push(a);
           }
