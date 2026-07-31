@@ -843,6 +843,8 @@ export default function Teams() {
                   teamId={team.id}
                   isTeamCaptain={isTeamCaptain || isTeamCreator}
                   teamMembers={teamMembers}
+                  leagueId={currentTeam?.leagueId ?? null}
+                  seasonId={currentTeam?.seasonId ?? null}
                 />
                 
               </TabsContent>

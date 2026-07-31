@@ -1,27 +1,51 @@
 import { useState, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Users, UserPlus, Plus, Upload, Clock } from 'lucide-react';
-import { Link } from 'wouter';
+import { Users, UserPlus, Plus, Upload, Clock, Flame, Snowflake } from 'lucide-react';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
+import { PlayerActionSheet } from '@/components/PlayerActionSheet';
 import { useToast } from '@/hooks/use-toast';
-import { getAuthHeaders, queryClient } from '@/lib/queryClient';
+import { getAuthHeaders, queryClient, apiRequest } from '@/lib/queryClient';
+// Note: Link removed — player taps now open the action sheet instead of direct navigation
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface LineManagerProps {
   teamId: string;
   isTeamCaptain: boolean;
   teamMembers: any[];
+  leagueId?: string | null;
+  seasonId?: string | null;
 }
 
-export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerProps) {
+export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seasonId }: LineManagerProps) {
   const { toast } = useToast();
   const [showAddPlayers, setShowAddPlayers] = useState(false);
+  const [actionSheetPlayer, setActionSheetPlayer] = useState<{
+    userId: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string | null;
+  } | null>(null);
+
+  // Fetch streak status for all team members — only when a leagueId is available.
+  // When leagueId is absent (e.g. tournament context) the endpoint would 403, so skip it.
+  const { data: streaksData } = useQuery<{ streaks: Record<string, string> }>({
+    queryKey: ['/api/teams', teamId, 'streaks', seasonId ?? null],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (seasonId) params.set('seasonId', seasonId);
+      const qs = params.toString() ? `?${params}` : '';
+      const res = await apiRequest('GET', `/api/teams/${teamId}/streaks${qs}`);
+      return res.json();
+    },
+    enabled: !!teamId && !!leagueId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Manual player form state
   const [firstName, setFirstName] = useState('');
@@ -165,6 +189,8 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                 const profileImageUrl = member.user?.profileImageUrl;
                 const playerId = member.user?.id || member.userId;
 
+                const streak = !isPlaceholder && playerId ? streaksData?.streaks?.[playerId] : undefined;
+
                 const nameContent = (
                   <div className="flex items-center gap-2 min-w-0">
                     {memberJerseyNumber && (
@@ -178,14 +204,25 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                     {isCaptain && (
                       <span className="text-warning font-bold text-xs shrink-0">C</span>
                     )}
+                    {streak === 'HOT' && <Flame className="w-3 h-3 text-orange-500 shrink-0" />}
+                    {streak === 'COLD' && <Snowflake className="w-3 h-3 text-blue-400 shrink-0" />}
                   </div>
                 );
 
                 return (
                   <div
                     key={member.id || playerId}
-                    className="flex items-center pr-2 rounded-full hover:bg-muted/50 transition-colors bg-card hairline elev-rest overflow-hidden"
+                    className={`flex items-center pr-2 rounded-full hover:bg-muted/50 transition-colors bg-card hairline elev-rest overflow-hidden${!isPlaceholder && playerId ? ' cursor-pointer' : ''}`}
                     data-testid={`roster-player-${playerId}`}
+                    onClick={!isPlaceholder && playerId ? (e) => {
+                      e.preventDefault();
+                      setActionSheetPlayer({
+                        userId: playerId,
+                        firstName: memberFirstName,
+                        lastName: memberLastName,
+                        profileImageUrl,
+                      });
+                    } : undefined}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <ClickableAvatar
@@ -214,12 +251,9 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
                           </TooltipProvider>
                         </div>
                       ) : (
-                        <Link
-                          href={`/user/${playerId}`}
-                          className="flex items-center gap-2 min-w-0 cursor-pointer"
-                        >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           {nameContent}
-                        </Link>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -371,6 +405,23 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers }: LineManagerP
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Player action sheet */}
+      <PlayerActionSheet
+        open={!!actionSheetPlayer}
+        onClose={() => setActionSheetPlayer(null)}
+        userId={actionSheetPlayer?.userId ?? null}
+        firstName={actionSheetPlayer?.firstName ?? ''}
+        lastName={actionSheetPlayer?.lastName ?? ''}
+        profileImageUrl={actionSheetPlayer?.profileImageUrl}
+        leagueId={leagueId}
+        seasonId={seasonId}
+        streakStatus={
+          actionSheetPlayer?.userId
+            ? (streaksData?.streaks?.[actionSheetPlayer.userId] as any)
+            : undefined
+        }
+      />
     </>
   );
 }

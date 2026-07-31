@@ -1,13 +1,22 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useRoute } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trophy, Users, Target, TrendingUp, Apple, Flag, ArrowLeft, Lock } from 'lucide-react';
+import { Trophy, Users, Target, TrendingUp, Apple, Flag, ArrowLeft, Lock, Flame, Snowflake } from 'lucide-react';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
+import { PlayerActionSheet } from '@/components/PlayerActionSheet';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useAuth } from '@/hooks/useAuth';
+
+interface ActionSheetState {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string | null;
+}
 
 export default function TeamView() {
   const [, navigate] = useLocation();
@@ -15,6 +24,7 @@ export default function TeamView() {
   const teamId = params?.id;
   const { canAccessPremiumFeatures } = usePermissions();
   const { user } = useAuth();
+  const [actionSheetPlayer, setActionSheetPlayer] = useState<ActionSheetState | null>(null);
   
   // Check if user is on free tier
   const isFreeTier = !canAccessPremiumFeatures();
@@ -40,6 +50,20 @@ export default function TeamView() {
     queryKey: ['/api/teams', teamId, 'members'],
     enabled: !!teamId,
   }) as { data: any[] };
+
+  const { data: streaksData } = useQuery<{ streaks: Record<string, string> }>({
+    queryKey: ['/api/teams', teamId, 'streaks', (team as any)?.seasonId ?? null],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      const seasonId = (team as any)?.seasonId;
+      if (seasonId) params.set('seasonId', seasonId);
+      const qs = params.toString() ? `?${params}` : '';
+      const res = await apiRequest('GET', `/api/teams/${teamId}/streaks${qs}`);
+      return res.json();
+    },
+    enabled: !!teamId && !!user && !!(team as any)?.leagueId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: teamStats = [] } = useQuery({
     queryKey: ['/api/leagues', (team as any)?.leagueId, 'stats', 'team', teamId, 'members', teamMembers?.length],
@@ -409,12 +433,23 @@ export default function TeamView() {
                   const memberStats = (teamStats as any[]).find((stat: any) => 
                     String(stat.userId ?? stat.user?.id) === String(member.userId ?? member.user?.id)
                   );
+                  const memberId = member.user?.id || member.userId;
+                  const streak = memberId ? streaksData?.streaks?.[memberId] : undefined;
                   
                   return (
                     <div 
                       key={member.id} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-accent transition-colors"
+                      className="flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-accent transition-colors cursor-pointer"
                       data-testid={`roster-member-${member.id}`}
+                      onClick={() => {
+                        if (!member.user?.id) return;
+                        setActionSheetPlayer({
+                          userId: member.user.id,
+                          firstName: member.user.firstName || '',
+                          lastName: member.user.lastName || '',
+                          profileImageUrl: member.user.profileImageUrl,
+                        });
+                      }}
                     >
                       <div className="flex items-center gap-3">
                         <ClickableAvatar
@@ -425,9 +460,13 @@ export default function TeamView() {
                           size="sm"
                         />
                         <div>
-                          <p className="font-medium" data-testid={`text-member-name-${member.id}`}>
-                            {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'Player'}
-                          </p>
+                          <div className="flex items-center gap-1.5" data-testid={`text-member-name-${member.id}`}>
+                            <p className="font-medium">
+                              {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'Player'}
+                            </p>
+                            {streak === 'HOT' && <Flame className="w-3.5 h-3.5 text-orange-500 shrink-0" />}
+                            {streak === 'COLD' && <Snowflake className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
+                          </div>
                           {member.jerseyNumber && (
                             <p className="text-sm text-muted-foreground">
                               #{member.jerseyNumber} {member.position && `• ${member.position}`}
@@ -453,6 +492,23 @@ export default function TeamView() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Player action sheet */}
+      <PlayerActionSheet
+        open={!!actionSheetPlayer}
+        onClose={() => setActionSheetPlayer(null)}
+        userId={actionSheetPlayer?.userId ?? null}
+        firstName={actionSheetPlayer?.firstName ?? ''}
+        lastName={actionSheetPlayer?.lastName ?? ''}
+        profileImageUrl={actionSheetPlayer?.profileImageUrl}
+        leagueId={(team as any)?.leagueId ?? null}
+        seasonId={(team as any)?.seasonId ?? null}
+        streakStatus={
+          actionSheetPlayer?.userId
+            ? (streaksData?.streaks?.[actionSheetPlayer.userId] as any)
+            : undefined
+        }
+      />
     </div>
   );
 }

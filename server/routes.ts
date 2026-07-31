@@ -25442,6 +25442,294 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================
+  // STREAKS — Hot/Cold Player Trends
+  // ============================================================
+
+  // Constant for the Bayesian prior used in streak baseline computation.
+  // Stored as a named constant so it can be tuned in one place.
+  const ASSUMED_BASELINE_PPG = 0.50;
+
+  /**
+   * GET /api/teams/:id/streaks?seasonId=
+   * Returns { streaks: { [userId]: "HOT" | "COLD" | "NEUTRAL" } }
+   *
+   * Game participation is established from game_rsvps (status = 'attending') so that
+   * scoreless games are included in the recent/baseline PPG calculation.
+   * Only players with >= 4 attended games receive a streak entry.
+   * Requires the requester to be a member of the team's league.
+   */
+  app.get('/api/teams/:id/streaks', isAuthenticated, async (req: any, res) => {
+    try {
+      const teamId = req.params.id;
+      const requesterId = req.user?.id;
+      const { seasonId } = req.query as { seasonId?: string };
+
+      const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
+      if (!team) return res.status(404).json({ message: 'Team not found' });
+      if (!team.leagueId) return res.json({ streaks: {} });
+
+      // Verify requester is a league member (or commissioner)
+      const [membership] = await db
+        .select()
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.leagueId, team.leagueId), eq(leagueMemberships.userId, requesterId)));
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, team.leagueId));
+      const isCommissioner = league?.commissionerId === requesterId;
+      if (!membership && !isCommissioner) {
+        return res.status(403).json({ message: 'Not a member of this league' });
+      }
+
+      const leagueId = team.leagueId;
+      const priorBoost = 4 * ASSUMED_BASELINE_PPG; // = 2.0
+      const seasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+
+      // Game participation comes from game_rsvps (status = 'attending'), so scoreless games
+      // count against the baseline. Goal/assist points are left-joined in.
+      const result = await db.execute(sql`
+        WITH attended_games AS (
+          -- All completed league games where the player RSVPd as attending
+          SELECT gr.user_id, gr.game_id, g.scheduled_at
+          FROM game_rsvps gr
+          JOIN games g ON g.id = gr.game_id
+          WHERE g.league_id = ${leagueId}
+            AND g.is_completed = true
+            AND gr.status = 'attending'
+            ${seasonFilter}
+        ),
+        goal_pts AS (
+          -- Expand each goal into one row per credited player
+          SELECT gg.scorer_id AS user_id, gg.game_id, 1 AS pts
+          FROM game_goals gg
+          JOIN games g ON g.id = gg.game_id
+          WHERE g.league_id = ${leagueId} AND gg.is_submitted = true ${seasonFilter}
+          UNION ALL
+          SELECT gg.primary_assist_id, gg.game_id, 1
+          FROM game_goals gg
+          JOIN games g ON g.id = gg.game_id
+          WHERE g.league_id = ${leagueId} AND gg.is_submitted = true AND gg.primary_assist_id IS NOT NULL ${seasonFilter}
+          UNION ALL
+          SELECT gg.secondary_assist_id, gg.game_id, 1
+          FROM game_goals gg
+          JOIN games g ON g.id = gg.game_id
+          WHERE g.league_id = ${leagueId} AND gg.is_submitted = true AND gg.secondary_assist_id IS NOT NULL ${seasonFilter}
+        ),
+        game_pts_agg AS (
+          SELECT user_id, game_id, SUM(pts)::int AS pts
+          FROM goal_pts
+          GROUP BY user_id, game_id
+        ),
+        player_game_totals AS (
+          -- All attended games with points (0 when no scoring)
+          SELECT ag.user_id, ag.game_id, ag.scheduled_at,
+                 COALESCE(gpa.pts, 0) AS points
+          FROM attended_games ag
+          LEFT JOIN game_pts_agg gpa ON gpa.user_id = ag.user_id AND gpa.game_id = ag.game_id
+        ),
+        ranked AS (
+          SELECT user_id, game_id, points, scheduled_at,
+            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY scheduled_at DESC) AS rn,
+            COUNT(*) OVER (PARTITION BY user_id)::int AS total_games
+          FROM player_game_totals
+        ),
+        streak_data AS (
+          SELECT
+            user_id,
+            MAX(total_games) AS total_games,
+            (SUM(CASE WHEN rn <= 4 THEN points ELSE 0 END)::float / 4) AS recent_ppg,
+            COALESCE(SUM(CASE WHEN rn > 4 THEN points ELSE 0 END), 0)::float AS prior_points,
+            COALESCE(SUM(CASE WHEN rn > 4 THEN 1 ELSE 0 END), 0)::int AS prior_games
+          FROM ranked
+          GROUP BY user_id
+          HAVING MAX(total_games) >= 4
+        )
+        SELECT
+          user_id,
+          total_games,
+          recent_ppg,
+          prior_points,
+          prior_games,
+          (prior_points + ${priorBoost}::float) / (prior_games + 4) AS baseline_ppg,
+          CASE
+            WHEN (prior_points + ${priorBoost}::float) / (prior_games + 4) = 0 THEN 1.0
+            ELSE recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + 4))
+          END AS ratio,
+          CASE
+            WHEN (prior_points + ${priorBoost}::float) / (prior_games + 4) = 0 THEN 'NEUTRAL'
+            WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + 4)) >= 1.25 THEN 'HOT'
+            WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + 4)) <= 0.75 THEN 'COLD'
+            ELSE 'NEUTRAL'
+          END AS streak
+        FROM streak_data
+      `);
+
+      const rows = (result as any).rows ?? (result as any);
+      const streaks: Record<string, string> = {};
+      for (const row of rows) {
+        if (row.streak && row.streak !== 'NEUTRAL') {
+          streaks[row.user_id] = row.streak;
+        }
+      }
+
+      return res.json({ streaks });
+    } catch (err) {
+      console.error('[Streaks] Error computing streaks:', err);
+      return res.status(500).json({ message: 'Failed to compute streaks' });
+    }
+  });
+
+  /**
+   * GET /api/users/:userId/stats-trends?leagueId=&seasonId=
+   * Returns full player stats for the Stats & Trends screen:
+   *   { seasonTotals, gameLog, streakStatus, streakRatio }
+   *
+   * Game participation is established from game_rsvps (status = 'attending') so every
+   * attended game appears in the log, even those with zero points.
+   * Requires the requester to be a member of the specified league.
+   */
+  app.get('/api/users/:userId/stats-trends', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { leagueId, seasonId } = req.query as { leagueId?: string; seasonId?: string };
+      const requesterId = req.user?.id;
+
+      if (!leagueId) return res.status(400).json({ message: 'leagueId is required' });
+
+      // Verify requester belongs to this league
+      const [membership] = await db
+        .select()
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.userId, requesterId)));
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
+      const isCommissioner = league?.commissionerId === requesterId;
+      if (!membership && !isCommissioner) {
+        return res.status(403).json({ message: 'Not a member of this league' });
+      }
+
+      // --- Season totals ---
+      const seasonWhereConditions = [eq(playerStats.userId, userId), eq(playerStats.leagueId, leagueId)];
+      if (seasonId) seasonWhereConditions.push(eq(playerStats.seasonId, seasonId));
+      const [seasonTotals] = await db.select().from(playerStats).where(and(...seasonWhereConditions));
+
+      // --- Per-game log (all attended games, 0-point rows included) ---
+      const seasonSqlFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+
+      const gameLogResult = await db.execute(sql`
+        WITH attended_games AS (
+          -- Completed league games where this player RSVPd as attending
+          SELECT
+            g.id AS game_id,
+            g.scheduled_at,
+            g.home_team_id,
+            g.away_team_id,
+            g.opponent_name,
+            t_home.name AS home_team_name,
+            t_away.name AS away_team_name
+          FROM game_rsvps gr
+          JOIN games g ON g.id = gr.game_id
+          LEFT JOIN teams t_home ON t_home.id = g.home_team_id
+          LEFT JOIN teams t_away ON t_away.id = g.away_team_id
+          WHERE gr.user_id = ${userId}
+            AND g.league_id = ${leagueId}
+            AND g.is_completed = true
+            AND gr.status = 'attending'
+            ${seasonSqlFilter}
+        ),
+        goal_pts AS (
+          -- Points scored in each game for this player
+          SELECT
+            gg.game_id,
+            SUM(CASE WHEN gg.scorer_id = ${userId} THEN 1 ELSE 0 END)::int AS goals,
+            (SUM(CASE WHEN gg.primary_assist_id = ${userId} THEN 1 ELSE 0 END) +
+             SUM(CASE WHEN gg.secondary_assist_id = ${userId} THEN 1 ELSE 0 END))::int AS assists
+          FROM game_goals gg
+          WHERE gg.is_submitted = true
+            AND (gg.scorer_id = ${userId}
+                 OR gg.primary_assist_id = ${userId}
+                 OR gg.secondary_assist_id = ${userId})
+          GROUP BY gg.game_id
+        ),
+        pim_data AS (
+          SELECT gp.game_id, SUM(gp.minutes)::int AS pim
+          FROM game_penalties gp
+          WHERE gp.player_id = ${userId}
+          GROUP BY gp.game_id
+        )
+        SELECT
+          ag.game_id,
+          ag.scheduled_at,
+          ag.home_team_id,
+          ag.away_team_id,
+          ag.opponent_name,
+          ag.home_team_name,
+          ag.away_team_name,
+          COALESCE(gp.goals, 0)::int AS goals,
+          COALESCE(gp.assists, 0)::int AS assists,
+          (COALESCE(gp.goals, 0) + COALESCE(gp.assists, 0))::int AS points,
+          COALESCE(pp.pim, 0)::int AS penalty_minutes
+        FROM attended_games ag
+        LEFT JOIN goal_pts gp ON gp.game_id = ag.game_id
+        LEFT JOIN pim_data pp ON pp.game_id = ag.game_id
+        ORDER BY ag.scheduled_at DESC
+      `);
+
+      const gameLogRows = (gameLogResult as any).rows ?? (gameLogResult as any);
+      const gameLog = gameLogRows.map((row: any) => ({
+        gameId: row.game_id,
+        date: row.scheduled_at,
+        homeTeamId: row.home_team_id,
+        awayTeamId: row.away_team_id,
+        homeTeamName: row.home_team_name ?? null,
+        awayTeamName: row.away_team_name ?? null,
+        opponentName: row.opponent_name ?? null,
+        goals: Number(row.goals),
+        assists: Number(row.assists),
+        points: Number(row.points),
+        penaltyMinutes: Number(row.penalty_minutes),
+      }));
+
+      // --- Streak (identical algorithm to the team-level streak endpoint) ---
+      const PRIOR_BOOST = 4 * ASSUMED_BASELINE_PPG; // 2.0
+      let streakStatus = 'NEUTRAL';
+      let streakRatio = 1.0;
+
+      if (gameLog.length >= 4) {
+        // gameLog is newest-first; last-4 = most recent 4 attended games
+        const recent4Points = gameLog.slice(0, 4).reduce((s: number, g: any) => s + g.points, 0);
+        const recentPpg = recent4Points / 4;
+        const priorGames = gameLog.slice(4);
+        const priorPoints = priorGames.reduce((s: number, g: any) => s + g.points, 0);
+        const priorGameCount = priorGames.length;
+        const baselinePpg = (priorPoints + PRIOR_BOOST) / (priorGameCount + 4);
+        streakRatio = baselinePpg === 0 ? 1.0 : recentPpg / baselinePpg;
+        if (streakRatio >= 1.25) streakStatus = 'HOT';
+        else if (streakRatio <= 0.75) streakStatus = 'COLD';
+      }
+
+      return res.json({
+        seasonTotals: seasonTotals
+          ? {
+              gamesPlayed: seasonTotals.gamesPlayed,
+              goals: seasonTotals.goals,
+              assists: seasonTotals.assists,
+              penaltyMinutes: seasonTotals.penaltyMinutes,
+              points: seasonTotals.goals + seasonTotals.assists,
+              pointsPerGame:
+                seasonTotals.gamesPlayed > 0
+                  ? Number(((seasonTotals.goals + seasonTotals.assists) / seasonTotals.gamesPlayed).toFixed(2))
+                  : 0,
+            }
+          : null,
+        gameLog,
+        streakStatus,
+        streakRatio: Number(streakRatio.toFixed(3)),
+      });
+    } catch (err) {
+      console.error('[StatsTrends] Error:', err);
+      return res.status(500).json({ message: 'Failed to load player stats' });
+    }
+  });
+
   // IMPORTANT: Catch-all for unmatched API routes - must return JSON 404 instead of HTML
   // This prevents the static file handler from serving index.html for API routes
   app.all('/api/*', (req, res) => {

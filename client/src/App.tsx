@@ -78,6 +78,7 @@ import LeagueTournamentSearch from "@/pages/LeagueTournamentSearch";
 import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 import TeamView from "@/pages/TeamView";
+import PlayerStatsTrends from "@/pages/PlayerStatsTrends";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
@@ -281,6 +282,7 @@ function Router() {
               <Route path="/scrimmage/:id" component={GameDetails} />
               <Route path="/team-event/:id" component={TeamEventDetails} />
               <Route path="/team/:id" component={TeamView} />
+              <Route path="/player-stats/:userId" component={PlayerStatsTrends} />
               <Route path="/announcements" component={Announcements} />
               <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
               <Route path="/stats" component={Stats} />
