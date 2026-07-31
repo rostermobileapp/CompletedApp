@@ -1117,15 +1117,20 @@ export default function GameDetails() {
               <button
                 onClick={() => beerMutation.mutate()}
                 disabled={beerMutation.isPending}
-                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl hover:bg-muted/60 active:scale-95 transition-all select-none"
+                className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-muted/60 active:scale-95 transition-all select-none"
               >
-                <div className="relative">
-                  <img src={beverageJarUrl} className="w-8 h-8 object-contain" alt="Log a beer" />
-                  <span className="absolute -bottom-1 -right-2 text-[9px] font-bold leading-none bg-background rounded-full px-0.5">
+                <div className="relative flex items-center justify-center">
+                  <img
+                    src={beverageJarUrl}
+                    alt="Log a beer"
+                    className="h-10 w-auto invert dark:invert-0"
+                    style={{ aspectRatio: '9/16' }}
+                  />
+                  <span className="absolute -bottom-1.5 -right-3 text-[11px] font-extrabold leading-none bg-background border border-border rounded-full px-1 py-0.5">
                     +1
                   </span>
                 </div>
-                <span className="text-[10px] font-semibold leading-none text-muted-foreground whitespace-nowrap mt-1">
+                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   {beerCount} Beers Drank
                 </span>
               </button>
