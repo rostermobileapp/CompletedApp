@@ -89,6 +89,8 @@ import {
   updateTeamEventRequestSchema,
   teamEvents,
   teamEventRsvps,
+  lineCombinations as lineCombinationsTable,
+  lineCombinationAssignments as lineCombinationAssignmentsTable,
 } from "@shared/schema";
 import { z, ZodError } from "zod";
 import multer from "multer";
@@ -7516,6 +7518,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ──────────────────────────────────────────────────────────────────────
+  // PUT /api/teams/:teamId/line-combinations/game/:gameId
+  // Atomically replaces all line combinations for a single game.
+  // Body: { lines: [{ lineType, lineNumber, name, slots: [{position, playerId}] }] }
+  // Only team captains and creators may call this.
+  // ──────────────────────────────────────────────────────────────────────
+  app.put('/api/teams/:teamId/line-combinations/game/:gameId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId, gameId } = req.params;
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+
+      // Auth: captain or creator
+      const team = await storage.getTeam(teamId);
+      if (!team) return res.status(404).json({ message: 'Team not found' });
+      if (team.captainId !== userId && team.creatorId !== userId) {
+        return res.status(403).json({ message: 'Only team captains or creators can set game lines' });
+      }
+
+      // Validate game belongs to this team
+      const game = await storage.getGameById(gameId);
+      if (!game || (game.homeTeamId !== teamId && game.awayTeamId !== teamId)) {
+        return res.status(400).json({ message: 'Game does not involve this team' });
+      }
+
+      const { lines } = req.body;
+      if (!Array.isArray(lines)) {
+        return res.status(400).json({ message: 'lines must be an array' });
+      }
+
+      // Validate all player IDs are team members before touching DB
+      const teamMembersData = await storage.getTeamMembers(teamId);
+      const teamMemberIdSet = new Set(teamMembersData.map((m: any) => m.user?.id ?? m.userId));
+      const allSlots = lines.flatMap((l: any) => l.slots ?? []);
+      const invalidPlayers = allSlots
+        .map((s: any) => s.playerId)
+        .filter((id: string) => id && !teamMemberIdSet.has(id));
+      if (invalidPlayers.length > 0) {
+        return res.status(400).json({
+          message: 'Some players are not members of this team',
+          invalidPlayerIds: [...new Set(invalidPlayers)],
+        });
+      }
+
+      // Atomic replace in a single transaction
+      const created = await db.transaction(async (tx) => {
+        // 1. Delete existing assignments for all existing lines for this game
+        const existingLines = await tx
+          .select({ id: lineCombinationsTable.id })
+          .from(lineCombinationsTable)
+          .where(
+            and(
+              eq(lineCombinationsTable.teamId, teamId),
+              eq(lineCombinationsTable.gameId, gameId),
+            ),
+          );
+
+        for (const existing of existingLines) {
+          await tx
+            .delete(lineCombinationAssignmentsTable)
+            .where(eq(lineCombinationAssignmentsTable.lineCombinationId, existing.id));
+        }
+
+        // 2. Delete existing line combinations
+        if (existingLines.length > 0) {
+          await tx
+            .delete(lineCombinationsTable)
+            .where(
+              and(
+                eq(lineCombinationsTable.teamId, teamId),
+                eq(lineCombinationsTable.gameId, gameId),
+              ),
+            );
+        }
+
+        // 3. Create new lines and assignments
+        const results = [];
+        for (const line of lines) {
+          const slots: { position: string; playerId: string }[] = (line.slots ?? []).filter(
+            (s: any) => s.playerId,
+          );
+          if (slots.length === 0) continue;
+
+          const [newLine] = await tx
+            .insert(lineCombinationsTable)
+            .values({
+              teamId,
+              gameId,
+              name: line.name ?? `${line.lineType === 'forward' ? 'Line' : 'Pair'} ${line.lineNumber}`,
+              lineType: line.lineType,
+              lineNumber: line.lineNumber,
+              isActive: true,
+            })
+            .returning();
+
+          const assignmentRows = [];
+          for (const slot of slots) {
+            const [a] = await tx
+              .insert(lineCombinationAssignmentsTable)
+              .values({
+                lineCombinationId: newLine.id,
+                position: slot.position as any,
+                playerId: slot.playerId,
+              })
+              .returning();
+            assignmentRows.push(a);
+          }
+          results.push({ ...newLine, assignments: assignmentRows });
+        }
+        return results;
+      });
+
+      return res.json({ lines: created });
+    } catch (err) {
+      console.error('[ReplaceGameLines] Error:', err);
+      return res.status(500).json({ message: 'Failed to save game lines' });
+    }
+  });
+
   // Line combinations routes
   app.get("/api/teams/:teamId/line-combinations", isAuthenticated, async (req: any, res) => {
     try {
@@ -7546,10 +7666,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { teamId } = req.params;
       const userId = req.user.claims.sub;
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can create line combinations" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can create line combinations" });
       }
       
       const lineCombinationData = createLineCombinationRequestSchema.parse(req.body);
@@ -7613,10 +7733,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can update line combinations" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can update line combinations" });
       }
       
       const updates = updateLineCombinationRequestSchema.parse(req.body);
@@ -7650,10 +7770,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can delete line combinations" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can delete line combinations" });
       }
       
       await storage.deleteLineCombination(id);
@@ -7675,10 +7795,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can assign players to line combinations" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can assign players to line combinations" });
       }
       
       const assignmentData = createLineCombinationAssignmentRequestSchema.parse(req.body);
@@ -7711,8 +7831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       
       // Get the assignment to find the line combination
-      const assignments = await storage.getLineCombinationAssignments("");
-      const assignment = assignments.find(a => a.id === assignmentId);
+      const assignment = await storage.getLineCombinationAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ message: "Line assignment not found" });
       }
@@ -7722,10 +7841,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can update line assignments" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can update line assignments" });
       }
       
       const updatedAssignment = await storage.updateLineCombinationAssignment(assignmentId, playerId);
@@ -7751,8 +7870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the assignment to find the line combination
-      const assignments = await storage.getLineCombinationAssignments("");
-      const assignment = assignments.find(a => a.id === assignmentId);
+      const assignment = await storage.getLineCombinationAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ message: "Line assignment not found" });
       }
@@ -7762,10 +7880,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can update line assignments" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can update line assignments" });
       }
       
       const updatedAssignment = await storage.updateLineCombinationAssignmentPosition(assignmentId, position);
@@ -7792,10 +7910,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can update line assignments" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can update line assignments" });
       }
       
       // Validate all player IDs if provided
@@ -7837,10 +7955,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Line combination not found" });
       }
       
-      // Check if user is team captain
+      // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || team.captainId !== userId) {
-        return res.status(403).json({ message: "Only team captains can delete line assignments" });
+      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+        return res.status(403).json({ message: "Only team captains or creators can delete line assignments" });
       }
       
       await storage.deleteLineCombinationAssignment(assignmentId);
@@ -7848,6 +7966,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting line assignment:", error);
       res.status(500).json({ message: "Failed to delete line assignment" });
+    }
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Combo Stats: GET /api/teams/:teamId/line-combos/stats
+  // Returns forward and defense combo stats keyed by sorted player-ID set.
+  // Requires the requester to be a team member.
+  // ──────────────────────────────────────────────────────────────────────
+  app.get('/api/teams/:teamId/line-combos/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const { teamId } = req.params;
+      const requesterId = req.user?.id ?? req.user?.claims?.sub;
+
+      // Auth: must be a team member or captain
+      const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
+      if (!team) return res.status(404).json({ message: 'Team not found' });
+
+      const members = await storage.getTeamMembers(teamId);
+      const isMember = members.some((m: any) => (m.user?.id ?? m.userId) === requesterId);
+      const isCaptain = team.captainId === requesterId;
+      const isCreator = team.creatorId === requesterId;
+
+      // Also allow league commissioner when team is in a league
+      let isCommissioner = false;
+      if (team.leagueId) {
+        const [lg] = await db.select().from(leagues).where(eq(leagues.id, team.leagueId));
+        isCommissioner = lg?.commissionerId === requesterId;
+      }
+
+      if (!isMember && !isCaptain && !isCreator && !isCommissioner) {
+        return res.status(403).json({ message: 'Not a member of this team' });
+      }
+
+      // SQL: for each game+lineType, gather the sorted player-ID set, then
+      // count games-together and goals-for (goals where any combo member is
+      // scorer or assist, for that game, for this team).
+      const result = await db.execute(sql`
+        WITH line_player_sets AS (
+          SELECT
+            lc.game_id,
+            lc.line_type,
+            lc.line_number,
+            lc.id AS line_id,
+            array_agg(lca.player_id ORDER BY lca.player_id) AS player_ids
+          FROM line_combinations lc
+          JOIN line_combination_assignments lca ON lca.line_combination_id = lc.id
+          WHERE lc.team_id = ${teamId}
+            AND lc.game_id IS NOT NULL
+          GROUP BY lc.game_id, lc.line_type, lc.line_number, lc.id
+        ),
+        line_goal_counts AS (
+          SELECT
+            lps.player_ids,
+            lps.line_type,
+            lps.game_id,
+            COUNT(DISTINCT gg.id)::int AS goals_for
+          FROM line_player_sets lps
+          LEFT JOIN game_goals gg ON
+            gg.game_id = lps.game_id
+            AND gg.team_id = ${teamId}
+            AND gg.is_submitted = true
+            AND (
+              gg.scorer_id             = ANY(lps.player_ids)
+              OR gg.primary_assist_id  = ANY(lps.player_ids)
+              OR gg.secondary_assist_id= ANY(lps.player_ids)
+            )
+          GROUP BY lps.player_ids, lps.line_type, lps.game_id
+        ),
+        combo_agg AS (
+          SELECT
+            player_ids,
+            line_type,
+            COUNT(*)::int             AS games_together,
+            COALESCE(SUM(goals_for),0)::int AS total_goals_for
+          FROM line_goal_counts
+          GROUP BY player_ids, line_type
+        )
+        SELECT
+          player_ids,
+          line_type,
+          games_together,
+          total_goals_for                                                                        AS goals_for,
+          ROUND(
+            (total_goals_for::numeric / NULLIF(games_together, 0)),
+            2
+          )                                                                                      AS goals_for_per_game
+        FROM combo_agg
+        ORDER BY line_type, goals_for_per_game DESC NULLS LAST
+      `);
+
+      const rows = (result as any).rows ?? (result as any);
+      const forward: any[] = [];
+      const defense: any[] = [];
+      for (const row of rows) {
+        const entry = {
+          playerIds: row.player_ids,
+          lineType: row.line_type,
+          gamesTogether: Number(row.games_together),
+          goalsFor: Number(row.goals_for),
+          goalsForPerGame: Number(row.goals_for_per_game ?? 0),
+        };
+        if (row.line_type === 'forward') {
+          forward.push(entry);
+        } else {
+          defense.push(entry);
+        }
+      }
+
+      return res.json({ forward, defense });
+    } catch (err) {
+      console.error('[ComboStats] Error:', err);
+      return res.status(500).json({ message: 'Failed to compute combo stats' });
     }
   });
 

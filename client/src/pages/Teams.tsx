@@ -838,6 +838,21 @@ export default function Teams() {
                   </div>
                 </div>
 
+                {/* Set Lines button — visible to captains/creators only */}
+                {(isTeamCaptain || isTeamCreator) && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      navigate(`/set-lines/${team.id}`);
+                    }}
+                    data-testid="button-set-lines"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    Set Game Lines
+                  </Button>
+                )}
+
                 {/* Line Combinations Manager */}
                 <LineManager 
                   teamId={team.id}

@@ -79,6 +79,7 @@ import CustomBracketBuilderPage from "@/pages/CustomBracketBuilderPage";
 import MediaGalleryPage from "@/pages/MediaGallery";
 import TeamView from "@/pages/TeamView";
 import PlayerStatsTrends from "@/pages/PlayerStatsTrends";
+import SetLines from "@/pages/SetLines";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
@@ -283,6 +284,7 @@ function Router() {
               <Route path="/team-event/:id" component={TeamEventDetails} />
               <Route path="/team/:id" component={TeamView} />
               <Route path="/player-stats/:userId" component={PlayerStatsTrends} />
+              <Route path="/set-lines/:teamId" component={SetLines} />
               <Route path="/announcements" component={Announcements} />
               <Route path="/substitute-confirmations" component={SubstituteConfirmations} />
               <Route path="/stats" component={Stats} />
