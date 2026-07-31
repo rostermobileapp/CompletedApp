@@ -192,28 +192,52 @@ function SlotButton({
 // Combo trend badge
 // ─────────────────────────────────────────────────────────────
 
-function ComboTrend({ combo }: { combo: ComboStat | undefined }) {
-  if (!combo) return null;
-  const MIN_GAMES = 3;
-  if (combo.gamesTogether < MIN_GAMES) {
+/**
+ * Inline combo rating badge shown next to "Line N" / "Pair N" in the header row.
+ *
+ * Rules:
+ *  - combo === undefined → players have never played together → "New Line Combo"
+ *  - combo exists but < 3 games → show PPG with game count (low-confidence indicator)
+ *  - combo ≥ 3 games → show PPG with fire/snowflake/trending icon
+ *
+ * Pass `filledCount` so we only render something when ≥ 2 players are assigned.
+ */
+function ComboTrend({ combo, filledCount }: { combo: ComboStat | undefined; filledCount: number }) {
+  if (filledCount < 2) return null;
+
+  if (!combo) {
+    // Never played together
     return (
-      <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-        <Minus className="w-3 h-3" />
-        Not enough data ({combo.gamesTogether} game{combo.gamesTogether !== 1 ? 's' : ''})
-      </div>
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+        New Line Combo
+      </span>
     );
   }
+
   const gpg = combo.goalsForPerGame;
+  const MIN_GAMES = 3;
+
+  if (combo.gamesTogether < MIN_GAMES) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+        <Minus className="w-2.5 h-2.5" />
+        {gpg.toFixed(1)} PPG
+        <span className="opacity-60">({combo.gamesTogether}g)</span>
+      </span>
+    );
+  }
+
   const icon =
-    gpg >= 1.5 ? <Flame className="w-3 h-3 text-orange-500" /> :
-    gpg <= 0.5 ? <Snowflake className="w-3 h-3 text-blue-400" /> :
-    <TrendingUp className="w-3 h-3 text-green-500" />;
+    gpg >= 1.5 ? <Flame className="w-2.5 h-2.5 text-orange-500" /> :
+    gpg <= 0.5 ? <Snowflake className="w-2.5 h-2.5 text-blue-400" /> :
+    <TrendingUp className="w-2.5 h-2.5 text-green-500" />;
+
   return (
-    <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-muted px-1.5 py-0.5 rounded-full">
       {icon}
-      <span className="font-semibold">{gpg.toFixed(1)} GF/game</span>
-      <span className="text-muted-foreground">({combo.gamesTogether} games)</span>
-    </div>
+      <span>{gpg.toFixed(1)} PPG</span>
+      <span className="font-normal text-muted-foreground opacity-70">({combo.gamesTogether}g)</span>
+    </span>
   );
 }
 
@@ -404,7 +428,9 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
           lineNumber: line.lineNumber,
           name: `${line.lineType === 'forward' ? 'Line' : 'Pair'} ${line.lineNumber}`,
           slots: Object.entries(line.slots)
-            .filter(([, slot]) => slot.playerId)
+            // Strip placeholder players — they have no real user row and can't be FK'd in the DB.
+            // Real players (UUID only, no "placeholder:" prefix) are saved normally.
+            .filter(([, slot]) => slot.playerId && !slot.playerId.startsWith('placeholder:'))
             .map(([pos, slot]) => ({ position: pos, playerId: slot.playerId as string })),
         }))
         .filter((line) => line.slots.length > 0);
@@ -583,31 +609,33 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
               <Badge variant="secondary" className="shrink-0">Captain</Badge>
             )}
 
-            {/* Roster | Lines pill toggle */}
-            <div className="flex items-center bg-muted rounded-full p-0.5 text-xs ml-1">
-              <button
-                onClick={() => setView('roster')}
-                className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
-                  view === 'roster'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                data-testid="toggle-roster-view"
-              >
-                Roster
-              </button>
-              <button
-                onClick={() => setView('lines')}
-                className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
-                  view === 'lines'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                data-testid="toggle-lines-view"
-              >
-                Lines
-              </button>
-            </div>
+            {/* Roster | Lines pill toggle — Lines only visible to captains */}
+            {isTeamCaptain ? (
+              <div className="flex items-center bg-muted rounded-full p-0.5 text-xs ml-1">
+                <button
+                  onClick={() => setView('roster')}
+                  className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    view === 'roster'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  data-testid="toggle-roster-view"
+                >
+                  Roster
+                </button>
+                <button
+                  onClick={() => setView('lines')}
+                  className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    view === 'lines'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  data-testid="toggle-lines-view"
+                >
+                  Lines
+                </button>
+              </div>
+            ) : null}
 
             {/* Add-players button (roster view, captain only) */}
             {isTeamCaptain && view === 'roster' && (
@@ -739,36 +767,41 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                       Forward Lines
                     </p>
                     <div className="space-y-2">
-                      {forwardLines.map((line, idx) => (
-                        <div key={idx} className="bg-background rounded-xl border border-border p-2">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-semibold text-muted-foreground">Line {idx + 1}</span>
-                            {isTeamCaptain && forwardLines.length > 1 && (
-                              <button
-                                onClick={() => removeLine('forward', idx)}
-                                className="p-0.5 rounded hover:text-destructive text-muted-foreground transition-colors"
-                                data-testid={`remove-forward-line-${idx}`}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                      {forwardLines.map((line, idx) => {
+                        const filledCount = Object.values(line.slots).filter(s => s.playerId).length;
+                        return (
+                          <div key={idx} className="bg-background rounded-xl border border-border p-2">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-[11px] font-semibold text-muted-foreground shrink-0">Line {idx + 1}</span>
+                                <ComboTrend combo={findCombo(line)} filledCount={filledCount} />
+                              </div>
+                              {isTeamCaptain && forwardLines.length > 1 && (
+                                <button
+                                  onClick={() => removeLine('forward', idx)}
+                                  className="p-0.5 rounded hover:text-destructive text-muted-foreground transition-colors"
+                                  data-testid={`remove-forward-line-${idx}`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex gap-1">
+                              {FORWARD_POSITIONS.map((pos) => (
+                                <SlotButton
+                                  key={pos}
+                                  position={pos}
+                                  slot={line.slots[pos]}
+                                  canEdit={isTeamCaptain}
+                                  onClick={() => setPickerTarget({ lineType: 'forward', lineIdx: idx, position: pos })}
+                                  onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'forward', idx, pos) : undefined}
+                                  onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'forward', idx, pos) : undefined}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex gap-1">
-                            {FORWARD_POSITIONS.map((pos) => (
-                              <SlotButton
-                                key={pos}
-                                position={pos}
-                                slot={line.slots[pos]}
-                                canEdit={isTeamCaptain}
-                                onClick={() => setPickerTarget({ lineType: 'forward', lineIdx: idx, position: pos })}
-                                onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'forward', idx, pos) : undefined}
-                                onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'forward', idx, pos) : undefined}
-                              />
-                            ))}
-                          </div>
-                          <ComboTrend combo={findCombo(line)} />
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     {isTeamCaptain && forwardLines.length < 4 && (
                       <button
@@ -787,36 +820,41 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                       Defense Pairs
                     </p>
                     <div className="space-y-2">
-                      {defensePairs.map((line, idx) => (
-                        <div key={idx} className="bg-background rounded-xl border border-border p-2">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-semibold text-muted-foreground">Pair {idx + 1}</span>
-                            {isTeamCaptain && defensePairs.length > 1 && (
-                              <button
-                                onClick={() => removeLine('defense', idx)}
-                                className="p-0.5 rounded hover:text-destructive text-muted-foreground transition-colors"
-                                data-testid={`remove-defense-pair-${idx}`}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                      {defensePairs.map((line, idx) => {
+                        const filledCount = Object.values(line.slots).filter(s => s.playerId).length;
+                        return (
+                          <div key={idx} className="bg-background rounded-xl border border-border p-2">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-[11px] font-semibold text-muted-foreground shrink-0">Pair {idx + 1}</span>
+                                <ComboTrend combo={findCombo(line)} filledCount={filledCount} />
+                              </div>
+                              {isTeamCaptain && defensePairs.length > 1 && (
+                                <button
+                                  onClick={() => removeLine('defense', idx)}
+                                  className="p-0.5 rounded hover:text-destructive text-muted-foreground transition-colors"
+                                  data-testid={`remove-defense-pair-${idx}`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex gap-2 max-w-[200px]">
+                              {DEFENSE_POSITIONS.map((pos) => (
+                                <SlotButton
+                                  key={pos}
+                                  position={pos}
+                                  slot={line.slots[pos]}
+                                  canEdit={isTeamCaptain}
+                                  onClick={() => setPickerTarget({ lineType: 'defense', lineIdx: idx, position: pos })}
+                                  onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'defense', idx, pos) : undefined}
+                                  onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'defense', idx, pos) : undefined}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex gap-2 max-w-[200px]">
-                            {DEFENSE_POSITIONS.map((pos) => (
-                              <SlotButton
-                                key={pos}
-                                position={pos}
-                                slot={line.slots[pos]}
-                                canEdit={isTeamCaptain}
-                                onClick={() => setPickerTarget({ lineType: 'defense', lineIdx: idx, position: pos })}
-                                onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'defense', idx, pos) : undefined}
-                                onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'defense', idx, pos) : undefined}
-                              />
-                            ))}
-                          </div>
-                          <ComboTrend combo={findCombo(line)} />
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     {isTeamCaptain && defensePairs.length < 4 && (
                       <button
