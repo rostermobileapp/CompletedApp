@@ -450,6 +450,18 @@ export default function TeamView() {
                           profileImageUrl: member.user.profileImageUrl,
                         });
                       }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!member.user?.id) return;
+                        setPreviewPlayer({
+                          userId: member.user.id,
+                          firstName: member.user.firstName || '',
+                          lastName: member.user.lastName || '',
+                          profileImageUrl: member.user.profileImageUrl,
+                        });
+                      }}
+                      style={{ touchAction: 'manipulation' }}
                     >
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">

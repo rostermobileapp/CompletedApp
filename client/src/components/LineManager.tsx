@@ -683,6 +683,12 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                         onClick={!isPlaceholder && playerId ? () => {
                           setActionSheetPlayer({ userId: playerId, firstName: memberFirstName, lastName: memberLastName, profileImageUrl });
                         } : undefined}
+                        onTouchEnd={!isPlaceholder && playerId ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActionSheetPlayer({ userId: playerId, firstName: memberFirstName, lastName: memberLastName, profileImageUrl });
+                        } : undefined}
+                        style={{ touchAction: 'manipulation' }}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <Avatar className="!h-[45px] !w-[45px] shrink-0">
