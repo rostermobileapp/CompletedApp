@@ -22,7 +22,6 @@ import { useLocation, useRoute } from "wouter";
 import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
-import beerCounterUrl from '@assets/beer-counter.png';
 import { getScrimmageCoverSrc } from '@/lib/scrimmageCoverOptions';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
@@ -1120,12 +1119,15 @@ export default function GameDetails() {
                 disabled={beerMutation.isPending}
                 className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl hover:bg-muted/60 active:scale-95 transition-all select-none"
               >
-                <img src={beerCounterUrl} className="w-8 h-8" alt="Log a beer" />
-                {beerCount > 0 && (
-                  <span className="text-[10px] font-semibold leading-none text-muted-foreground whitespace-nowrap">
-                    {beerCount} Beers Drank
+                <div className="relative">
+                  <img src={beverageJarUrl} className="w-8 h-8 object-contain" alt="Log a beer" />
+                  <span className="absolute -bottom-1 -right-2 text-[9px] font-bold leading-none bg-background rounded-full px-0.5">
+                    +1
                   </span>
-                )}
+                </div>
+                <span className="text-[10px] font-semibold leading-none text-muted-foreground whitespace-nowrap mt-1">
+                  {beerCount} Beers Drank
+                </span>
               </button>
             )}
             {canDeleteGame && (
