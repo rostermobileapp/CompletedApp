@@ -168,14 +168,10 @@ function SlotButton({
       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{position}</span>
       {slot.playerId ? (
         <>
-          <ClickableAvatar
-            userId={slot.playerId}
-            profileImageUrl={slot.playerImage}
-            firstName={slot.playerName?.split(' ')[0]}
-            lastName={slot.playerName?.split(' ').slice(1).join(' ')}
-            size="xs"
-            className="!h-8 !w-8 pointer-events-none"
-          />
+          <Avatar className="!h-8 !w-8 pointer-events-none shrink-0">
+            <AvatarImage src={slot.playerImage ? (slot.playerImage.startsWith('http') ? slot.playerImage : `/api/storage/object/${slot.playerImage}`) : undefined} alt={slot.playerName || ''} />
+            <AvatarFallback className="text-[10px]">{((slot.playerName?.split(' ')[0]?.[0] ?? '') + (slot.playerName?.split(' ').slice(1).join(' ')?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
+          </Avatar>
           <span className="text-[11px] font-medium text-center leading-tight truncate w-full">
             {displayName}
           </span>
@@ -1017,14 +1013,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   onClick={() => handlePickPlayer(memberId)}
                   data-testid={`picker-player-${memberId}`}
                 >
-                  <ClickableAvatar
-                    userId={memberId}
-                    profileImageUrl={m.user?.profileImageUrl}
-                    firstName={fn}
-                    lastName={ln}
-                    size="sm"
-                    className="pointer-events-none shrink-0"
-                  />
+                  <Avatar className="h-10 w-10 pointer-events-none shrink-0">
+                    <AvatarImage src={m.user?.profileImageUrl ? (m.user.profileImageUrl.startsWith('http') ? m.user.profileImageUrl : `/api/storage/object/${m.user.profileImageUrl}`) : undefined} alt={fn || 'Player'} />
+                    <AvatarFallback>{((fn?.[0] ?? '') + (ln?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{fmt(fn, ln)}</p>
                     {assignedAt && <p className="text-xs text-muted-foreground">{assignedAt}</p>}
