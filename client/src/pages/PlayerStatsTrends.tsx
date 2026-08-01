@@ -107,12 +107,14 @@ export default function PlayerStatsTrends() {
   const { data, isLoading } = useQuery<StatsTrendsData>({
     queryKey: ['/api/users', userId, 'stats-trends', leagueId, seasonId],
     queryFn: async () => {
-      const p = new URLSearchParams({ leagueId });
+      const p = new URLSearchParams();
+      if (leagueId) p.set('leagueId', leagueId);
       if (seasonId) p.set('seasonId', seasonId);
-      const res = await apiRequest('GET', `/api/users/${userId}/stats-trends?${p}`);
+      const qs = p.toString();
+      const res = await apiRequest('GET', `/api/users/${userId}/stats-trends${qs ? `?${qs}` : ''}`);
       return res.json();
     },
-    enabled: !!userId && !!leagueId,
+    enabled: !!userId,
   });
 
   const fullName = profileData

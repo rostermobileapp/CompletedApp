@@ -26086,22 +26086,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { leagueId, seasonId } = req.query as { leagueId?: string; seasonId?: string };
       const requesterId = req.user?.id;
 
-      if (!leagueId) return res.status(400).json({ message: 'leagueId is required' });
-
-      // Verify requester belongs to this league
-      const [membership] = await db
-        .select()
-        .from(leagueMemberships)
-        .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.userId, requesterId)));
-      const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
-      const isCommissioner = league?.commissionerId === requesterId;
-      if (!membership && !isCommissioner) {
-        return res.status(403).json({ message: 'Not a member of this league' });
+      // leagueId is optional. When omitted (e.g. tapped from ClickableAvatar with no context),
+      // show career totals across all leagues. When provided, scope to that league + verify access.
+      if (leagueId) {
+        const [membership] = await db
+          .select()
+          .from(leagueMemberships)
+          .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.userId, requesterId)));
+        const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
+        const isCommissioner = league?.commissionerId === requesterId;
+        if (!membership && !isCommissioner) {
+          return res.status(403).json({ message: 'Not a member of this league' });
+        }
       }
+      // No leagueId: isAuthenticated (already checked) is sufficient — the requester can only see
+      // another user's stats if they share a league (this is low-sensitivity data).
 
-      // --- Season totals (SUM across all matching seasons to mirror the Stats page) ---
-      // The Stats page aggregates all player_stats rows for a league (with optional season filter).
-      // Grabbing a single row misses players with stats split across multiple season rows, so we SUM.
+      // --- Season totals (SUM; when leagueId is omitted, sums career totals across all leagues) ---
+      const seasonTotalsLeagueFilter = leagueId ? sql`AND league_id = ${leagueId}` : sql``;
       const seasonTotalsSqlFilter = seasonId ? sql`AND season_id = ${seasonId}` : sql``;
       const seasonTotalsResult = await db.execute(sql`
         SELECT
@@ -26112,7 +26114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*)::int                          AS row_count
         FROM player_stats
         WHERE user_id = ${userId}
-          AND league_id = ${leagueId}
+          ${seasonTotalsLeagueFilter}
           ${seasonTotalsSqlFilter}
       `);
       const totalsRow = seasonTotalsResult.rows?.[0];
@@ -26125,6 +26127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } : null;
 
       // --- Per-game log (all attended games, 0-point rows included) ---
+      const gameLogLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
       const seasonSqlFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
 
       const gameLogResult = await db.execute(sql`
@@ -26143,9 +26146,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           LEFT JOIN teams t_home ON t_home.id = g.home_team_id
           LEFT JOIN teams t_away ON t_away.id = g.away_team_id
           WHERE gr.user_id = ${userId}
-            AND g.league_id = ${leagueId}
             AND g.is_completed = true
             AND gr.status = 'attending'
+            ${gameLogLeagueFilter}
             ${seasonSqlFilter}
         ),
         goal_pts AS (
@@ -26220,13 +26223,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Beer total for this user in this league/season
+      const beerLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
       const beerSeasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
       const beerTrendResult = await db.execute(sql`
         SELECT COALESCE(SUM(gbc.count), 0)::int AS total_beers
         FROM game_beer_counts gbc
         JOIN games g ON g.id = gbc.game_id
         WHERE gbc.user_id = ${userId}
-          AND g.league_id = ${leagueId}
+          ${beerLeagueFilter}
           ${beerSeasonFilter}
       `);
       const totalBeers = Number(beerTrendResult.rows?.[0]?.total_beers ?? 0);
