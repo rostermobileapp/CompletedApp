@@ -401,6 +401,7 @@ export default function Stats() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-white dark:bg-black text-[#212121] dark:text-white pb-24" data-testid="stats-page" data-page-content>
       <FeatureLockOverlay isLocked={!canAccessPremiumFeatures() && !canEditStats()} className="min-h-screen flex flex-col">
         {/* Header */}
@@ -764,6 +765,7 @@ export default function Stats() {
       leagueId={leagueId}
       seasonId={selectedSeason || null}
     />
+    </>
   );
 }
 
