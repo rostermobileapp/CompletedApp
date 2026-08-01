@@ -119,6 +119,9 @@ function SlotButton({
   onClick,
   onDrop,
   onClear,
+  slotKey,
+  isDragTarget,
+  onTouchStartDrag,
 }: {
   position: string;
   slot: SlotState;
@@ -126,6 +129,9 @@ function SlotButton({
   onClick?: () => void;
   onDrop?: (playerId: string) => void;
   onClear?: () => void;
+  slotKey?: string;
+  isDragTarget?: boolean;
+  onTouchStartDrag?: (e: React.TouchEvent, playerId: string, displayName: string) => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -148,13 +154,20 @@ function SlotButton({
     ? fmt(parts[0], parts.slice(1).join(' '))
     : parts[0] || '—';
 
+  const highlighted = isDragOver || isDragTarget;
+
   return (
     <button
       onClick={canEdit ? onClick : undefined}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="relative flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all border-dashed border-border bg-muted/30 hover:bg-muted/60 cursor-pointer active:scale-95 pt-[2px] pb-[2px] pl-[4px] pr-[4px]"
+      data-slot-key={slotKey}
+      className={`relative flex flex-col items-center gap-1 flex-1 min-w-0 rounded-xl border p-2 transition-all border-dashed cursor-pointer active:scale-95 pt-[2px] pb-[2px] pl-[4px] pr-[4px] ${
+        highlighted
+          ? 'border-primary bg-primary/10 ring-2 ring-primary scale-105'
+          : 'border-border bg-muted/30 hover:bg-muted/60'
+      }`}
       data-testid={`slot-${position}`}
     >
       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{position}</span>
@@ -280,6 +293,87 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
 
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Touch drag-and-drop (mobile) ──────────────────────────────
+  const touchDragRef = useRef<{
+    playerId: string;
+    displayName: string;
+    ghostEl: HTMLDivElement;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+
+  function startTouchDrag(
+    e: React.TouchEvent,
+    playerId: string,
+    displayName: string,
+  ) {
+    if (!isTeamCaptain) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const sourceEl = e.currentTarget as HTMLElement;
+    const rect = sourceEl.getBoundingClientRect();
+
+    // Clone the source element as a visual ghost
+    const ghost = sourceEl.cloneNode(true) as HTMLDivElement;
+    ghost.style.cssText = `
+      position: fixed;
+      left: ${rect.left}px;
+      top: ${rect.top}px;
+      width: ${rect.width}px;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0.9;
+      transform: scale(1.08);
+      transform-origin: center center;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+      border-radius: 9999px;
+      transition: none;
+    `;
+    document.body.appendChild(ghost);
+
+    touchDragRef.current = {
+      playerId,
+      displayName,
+      ghostEl: ghost,
+      offsetX: touch.clientX - rect.left,
+      offsetY: touch.clientY - rect.top,
+    };
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!touchDragRef.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const { ghostEl, offsetX, offsetY } = touchDragRef.current;
+
+    ghostEl.style.left = `${touch.clientX - offsetX}px`;
+    ghostEl.style.top  = `${touch.clientY - offsetY}px`;
+
+    // Find slot under finger (ghost has pointer-events:none so it's transparent)
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const slotEl = el?.closest('[data-slot-key]') as HTMLElement | null;
+    setDragOverSlot(slotEl?.dataset.slotKey ?? null);
+  }
+
+  function endTouchDrag(e: React.TouchEvent) {
+    if (!touchDragRef.current) return;
+    const touch = e.changedTouches[0];
+    const { playerId, ghostEl } = touchDragRef.current;
+
+    ghostEl.remove();
+    touchDragRef.current = null;
+    setDragOverSlot(null);
+
+    // Find slot under finger
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const slotEl = el?.closest('[data-slot-key]') as HTMLElement | null;
+    if (slotEl?.dataset.slotKey) {
+      const [lineType, lineIdxStr, pos] = slotEl.dataset.slotKey.split('|');
+      handleDropToSlot(playerId, lineType as 'forward' | 'defense', parseInt(lineIdxStr), pos);
+    }
+  }
 
   // ── Lines view state ──────────────────────────────────────────
   const [forwardLines, setForwardLines] = useState<LineEditor[]>([
@@ -785,17 +879,22 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                               )}
                             </div>
                             <div className="flex gap-1">
-                              {FORWARD_POSITIONS.map((pos) => (
-                                <SlotButton
-                                  key={pos}
-                                  position={pos}
-                                  slot={line.slots[pos]}
-                                  canEdit={isTeamCaptain}
-                                  onClick={() => setPickerTarget({ lineType: 'forward', lineIdx: idx, position: pos })}
-                                  onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'forward', idx, pos) : undefined}
-                                  onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'forward', idx, pos) : undefined}
-                                />
-                              ))}
+                              {FORWARD_POSITIONS.map((pos) => {
+                                const sk = `forward|${idx}|${pos}`;
+                                return (
+                                  <SlotButton
+                                    key={pos}
+                                    position={pos}
+                                    slot={line.slots[pos]}
+                                    canEdit={isTeamCaptain}
+                                    onClick={() => setPickerTarget({ lineType: 'forward', lineIdx: idx, position: pos })}
+                                    onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'forward', idx, pos) : undefined}
+                                    onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'forward', idx, pos) : undefined}
+                                    slotKey={sk}
+                                    isDragTarget={dragOverSlot === sk}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -838,17 +937,22 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                               )}
                             </div>
                             <div className="flex gap-2 max-w-[200px]">
-                              {DEFENSE_POSITIONS.map((pos) => (
-                                <SlotButton
-                                  key={pos}
-                                  position={pos}
-                                  slot={line.slots[pos]}
-                                  canEdit={isTeamCaptain}
-                                  onClick={() => setPickerTarget({ lineType: 'defense', lineIdx: idx, position: pos })}
-                                  onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'defense', idx, pos) : undefined}
-                                  onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'defense', idx, pos) : undefined}
-                                />
-                              ))}
+                              {DEFENSE_POSITIONS.map((pos) => {
+                                const sk = `defense|${idx}|${pos}`;
+                                return (
+                                  <SlotButton
+                                    key={pos}
+                                    position={pos}
+                                    slot={line.slots[pos]}
+                                    canEdit={isTeamCaptain}
+                                    onClick={() => setPickerTarget({ lineType: 'defense', lineIdx: idx, position: pos })}
+                                    onDrop={isTeamCaptain ? (pid) => handleDropToSlot(pid, 'defense', idx, pos) : undefined}
+                                    onClear={isTeamCaptain ? () => applyPlayerToSlot(null, 'defense', idx, pos) : undefined}
+                                    slotKey={sk}
+                                    isDragTarget={dragOverSlot === sk}
+                                  />
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -883,6 +987,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                           const memberId = m.user?.id ?? m.userId;
                           const fn = m.user?.firstName ?? m.displayFirstName ?? '';
                           const ln = m.user?.lastName  ?? m.displayLastName  ?? '';
+                          const displayName = fmt(fn, ln);
                           return (
                             <div
                               key={memberId}
@@ -891,16 +996,20 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                                 e.dataTransfer.setData('text/plain', memberId);
                                 e.dataTransfer.effectAllowed = 'move';
                               } : undefined}
+                              onTouchStart={isTeamCaptain ? (e) => startTouchDrag(e, memberId, displayName) : undefined}
+                              onTouchMove={isTeamCaptain ? handleTouchMove : undefined}
+                              onTouchEnd={isTeamCaptain ? endTouchDrag : undefined}
                               className={`flex items-center gap-1 bg-card border border-border rounded-full px-2 py-1 text-xs select-none
                                 ${isTeamCaptain ? 'cursor-grab active:cursor-grabbing' : ''}
                               `}
+                              style={isTeamCaptain ? { touchAction: 'none' } : undefined}
                               data-testid={`bench-player-${memberId}`}
                             >
                               <Avatar className="h-5 w-5 shrink-0 pointer-events-none">
                                 <AvatarImage src={m.user?.profileImageUrl ? (m.user.profileImageUrl.startsWith('http') ? m.user.profileImageUrl : `/api/storage/object/${m.user.profileImageUrl}`) : undefined} alt={fn || 'Player'} />
                                 <AvatarFallback className="text-[8px]">{((fn?.[0] ?? '') + (ln?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
                               </Avatar>
-                              <span className="font-medium">{fmt(fn, ln)}</span>
+                              <span className="font-medium">{displayName}</span>
                             </div>
                           );
                         })}
