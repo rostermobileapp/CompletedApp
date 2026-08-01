@@ -179,30 +179,11 @@ export async function sendMessagePushNotification(
   messagePreview: string,
   conversationType?: string,
 ): Promise<boolean> {
-  // Censor direct-message previews for free-tier recipients so we don't leak
-  // sender identity or message content via push (the recipient can't read the
-  // thread in-app either). Group / team / captain chats keep the rich preview
-  // for everyone. The recipient's stored role is the source of truth here —
-  // pushes are sent server-side and don't see the in-app dropdown context.
-  if (conversationType === 'direct') {
-    try {
-      const recipient = await storage.getUser(recipientId);
-      if (recipient?.role === 'free_tier') {
-        return sendPushNotificationToUser({
-          userId: recipientId,
-          title: 'New Message Received',
-          message: 'New Message Received',
-          data: {
-            type: 'message',
-            conversationId,
-          },
-        });
-      }
-    } catch (err) {
-      console.error('[OneSignal] Failed to look up recipient role for DM censoring:', err);
-    }
-  }
-
+  // All recipients — including free-tier — always see the sender's name in
+  // the push notification. Free-tier DM access restrictions are enforced at
+  // the in-app read level, not at the push layer. Omitting the sender name
+  // from the push was counterproductive: recipients can always read messages
+  // sent TO them regardless of tier, so the censorship only hid useful context.
   const headline = `Message from ${senderName}`;
 
   return sendPushNotificationToUser({
