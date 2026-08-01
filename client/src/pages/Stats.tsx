@@ -817,16 +817,18 @@ function StatSection({
       <h2 className="text-[#00A9FF] text-sm font-semibold mb-3 uppercase tracking-wide" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
         {title}
       </h2>
-      <button
-        onClick={onClick}
-        className="w-full bg-[#f5f5f5] dark:bg-[#0a0a0a] hairline elev-rest rounded-lg p-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors group pt-[8px] pb-[8px]"
+      <div
+        className="w-full bg-[#f5f5f5] dark:bg-[#0a0a0a] hairline elev-rest rounded-lg flex items-center justify-between"
         data-testid={`button-${title.toLowerCase().replace(/\s+/g, '-')}`}
       >
-        <div className="flex items-center gap-4 flex-1">
+        {/* Left zone: avatar + name — opens action sheet when single player, otherwise goes to table */}
+        <div
+          className="flex items-center gap-4 flex-1 cursor-pointer px-4 pt-[8px] pb-[8px] hover:bg-gray-100 dark:hover:bg-gray-900 rounded-l-lg transition-colors active:bg-gray-200 dark:active:bg-gray-800"
+          onClick={() => (!isTied && onPlayerClick) ? onPlayerClick(players[0]) : onClick?.()}
+        >
           {/* Player Avatars */}
           <div className="flex -space-x-2">
             {isTied ? (
-              // Show multiple avatars for tied players
               (<>
                 {tiedPlayers.slice(0, 3).map((player, idx) => (
                   <Avatar key={idx} className="w-12 h-12 border-2 border-black" data-testid={`avatar-player-${idx}`}>
@@ -843,7 +845,6 @@ function StatSection({
                 )}
               </>)
             ) : (
-              // Show single avatar
               (<Avatar className="w-12 h-12" data-testid="avatar-player-single">
                 <AvatarImage src={getImageUrl(players[0].user?.profileImageUrl) || undefined} />
                 <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
@@ -854,48 +855,32 @@ function StatSection({
           </div>
 
           {/* Player Info */}
-          {!isTied && onPlayerClick ? (
-            <button
-              className="flex-1 text-left"
-              onClick={(e) => { e.stopPropagation(); onPlayerClick(players[0]); }}
-            >
-              <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
-                {formatPlayerName(players[0])}
-              </div>
-              {showPosition && (() => {
-                const membership = membershipMap.get(players[0].userId);
-                return (
-                  <div className="text-gray-400 text-sm" data-testid="text-player-team">
-                    {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
-                  </div>
-                );
-              })()}
-            </button>
-          ) : (
-            <div className="flex-1 text-left">
-              <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
-                {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
-              </div>
-              {showPosition && !isTied && (() => {
-                const membership = membershipMap.get(players[0].userId);
-                return (
-                  <div className="text-gray-400 text-sm" data-testid="text-player-team">
-                    {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
-                  </div>
-                );
-              })()}
+          <div className="flex-1 text-left">
+            <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
+              {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
             </div>
-          )}
+            {showPosition && !isTied && (() => {
+              const membership = membershipMap.get(players[0].userId);
+              return (
+                <div className="text-gray-400 text-sm" data-testid="text-player-team">
+                  {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
-        {/* Stat Value */}
-        <div className="flex items-center gap-3">
+        {/* Right zone: stat + chevron — always goes to table view */}
+        <button
+          className="flex items-center gap-3 px-4 pt-[8px] pb-[8px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-900 rounded-r-lg transition-colors group active:bg-gray-200 dark:active:bg-gray-800 h-full"
+          onClick={onClick}
+        >
           <span className="text-3xl font-bold text-[#212121] dark:text-white" data-testid="text-stat-value">
             {renderStat(players[0])}
           </span>
           <ChevronRight className="w-5 h-5 text-[#00A9FF] group-hover:translate-x-1 transition-transform" data-testid="icon-chevron" />
-        </div>
-      </button>
+        </button>
+      </div>
     </div>
   );
 }
