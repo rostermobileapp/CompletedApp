@@ -25955,7 +25955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/teams/:id/streaks', isAuthenticated, async (req: any, res) => {
     try {
       const teamId = req.params.id;
-      const requesterId = req.user?.id;
+      const requesterId = req.user?.claims?.sub;
       const { seasonId } = req.query as { seasonId?: string };
 
       const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
@@ -26084,7 +26084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const { leagueId, seasonId } = req.query as { leagueId?: string; seasonId?: string };
-      const requesterId = req.user?.id;
+      const requesterId = req.user?.claims?.sub;
 
       // leagueId is optional. When omitted (e.g. tapped from ClickableAvatar with no context),
       // show career totals across all leagues. When provided, scope to that league + verify access.
