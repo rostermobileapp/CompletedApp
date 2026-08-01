@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { PlayerActionSheet } from '@/components/PlayerActionSheet';
 
 export default function Stats() {
   const { user } = useAuth();
@@ -66,6 +67,12 @@ export default function Stats() {
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
   const [viewMode, setViewMode] = useState<'summary' | 'table'>('summary');
   const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
+  const [actionSheetPlayer, setActionSheetPlayer] = useState<{
+    userId: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl?: string | null;
+  } | null>(null);
 
   // Use dashboard selection to determine league/team/tournament context
   const { selectedType, selectedId, selectedTeamId, selectedLeagueId, selectedTournamentId } = useDashboardSelection();
@@ -568,7 +575,20 @@ export default function Stats() {
                     {getSortedStatsForTable().map((stat, index) => {
                       const membership = membershipMap.get(stat.userId);
                       return (
-                        <tr key={stat.userId} className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-900/50" data-testid={`row-player-${index}`}>
+                        <tr
+                          key={stat.userId}
+                          className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-900/50 cursor-pointer active:bg-gray-900/70"
+                          data-testid={`row-player-${index}`}
+                          onClick={() => {
+                            if (!stat.userId) return;
+                            setActionSheetPlayer({
+                              userId: stat.userId,
+                              firstName: stat.user?.firstName ?? '',
+                              lastName: stat.user?.lastName ?? '',
+                              profileImageUrl: stat.user?.profileImageUrl,
+                            });
+                          }}
+                        >
                           <td className="px-2 py-3 text-gray-600 dark:text-gray-400 text-sm w-8">{index + 1}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
@@ -734,6 +754,16 @@ export default function Stats() {
         </div>
       </FeatureLockOverlay>
     </div>
+    <PlayerActionSheet
+      open={!!actionSheetPlayer}
+      onClose={() => setActionSheetPlayer(null)}
+      userId={actionSheetPlayer?.userId ?? null}
+      firstName={actionSheetPlayer?.firstName ?? ''}
+      lastName={actionSheetPlayer?.lastName ?? ''}
+      profileImageUrl={actionSheetPlayer?.profileImageUrl}
+      leagueId={leagueId}
+      seasonId={selectedSeason || null}
+    />
   );
 }
 
