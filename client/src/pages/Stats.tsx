@@ -649,6 +649,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('points')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Goals Section */}
@@ -663,6 +664,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('goals')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Assists Section */}
@@ -678,6 +680,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('assists')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Penalty Minutes Section */}
@@ -692,6 +695,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('penaltyMinutes')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Beers Drank Section */}
@@ -706,6 +710,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('beers')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Wins Section (Goalies) */}
@@ -720,6 +725,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('wins')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Goals Against Average Section (Goalies) */}
@@ -734,6 +740,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('goalsAgainstAverage')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
               {/* Shutouts Section (Goalies) */}
@@ -748,6 +755,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('shutouts')}
+                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
                 />
               )}
             </div>)
@@ -781,6 +789,7 @@ interface StatSectionProps {
   membershipMap: Map<any, any>;
   teamMap: Map<any, any>;
   onClick?: () => void;
+  onPlayerClick?: (player: PlayerStatsUnion) => void;
 }
 
 function StatSection({ 
@@ -793,7 +802,8 @@ function StatSection({
   showMoreIndicator = false,
   membershipMap,
   teamMap,
-  onClick
+  onClick,
+  onPlayerClick,
 }: StatSectionProps) {
   if (players.length === 0) return null;
 
@@ -844,19 +854,38 @@ function StatSection({
           </div>
 
           {/* Player Info */}
-          <div className="flex-1 text-left">
-            <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
-              {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
+          {!isTied && onPlayerClick ? (
+            <button
+              className="flex-1 text-left"
+              onClick={(e) => { e.stopPropagation(); onPlayerClick(players[0]); }}
+            >
+              <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
+                {formatPlayerName(players[0])}
+              </div>
+              {showPosition && (() => {
+                const membership = membershipMap.get(players[0].userId);
+                return (
+                  <div className="text-gray-400 text-sm" data-testid="text-player-team">
+                    {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
+                  </div>
+                );
+              })()}
+            </button>
+          ) : (
+            <div className="flex-1 text-left">
+              <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
+                {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
+              </div>
+              {showPosition && !isTied && (() => {
+                const membership = membershipMap.get(players[0].userId);
+                return (
+                  <div className="text-gray-400 text-sm" data-testid="text-player-team">
+                    {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
+                  </div>
+                );
+              })()}
             </div>
-            {showPosition && !isTied && (() => {
-              const membership = membershipMap.get(players[0].userId);
-              return (
-                <div className="text-gray-400 text-sm" data-testid="text-player-team">
-                  {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
-                </div>
-              );
-            })()}
-          </div>
+          )}
         </div>
 
         {/* Stat Value */}
