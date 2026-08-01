@@ -26099,10 +26099,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Not a member of this league' });
       }
 
-      // --- Season totals ---
-      const seasonWhereConditions = [eq(playerStats.userId, userId), eq(playerStats.leagueId, leagueId)];
-      if (seasonId) seasonWhereConditions.push(eq(playerStats.seasonId, seasonId));
-      const [seasonTotals] = await db.select().from(playerStats).where(and(...seasonWhereConditions));
+      // --- Season totals (SUM across all matching seasons to mirror the Stats page) ---
+      // The Stats page aggregates all player_stats rows for a league (with optional season filter).
+      // Grabbing a single row misses players with stats split across multiple season rows, so we SUM.
+      const seasonTotalsSqlFilter = seasonId ? sql`AND season_id = ${seasonId}` : sql``;
+      const seasonTotalsResult = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(games_played), 0)::int  AS games_played,
+          COALESCE(SUM(goals), 0)::int          AS goals,
+          COALESCE(SUM(assists), 0)::int        AS assists,
+          COALESCE(SUM(penalty_minutes), 0)::int AS penalty_minutes,
+          COUNT(*)::int                          AS row_count
+        FROM player_stats
+        WHERE user_id = ${userId}
+          AND league_id = ${leagueId}
+          ${seasonTotalsSqlFilter}
+      `);
+      const totalsRow = seasonTotalsResult.rows?.[0];
+      const hasStats = Number(totalsRow?.row_count ?? 0) > 0;
+      const seasonTotals = hasStats ? {
+        gamesPlayed:    Number(totalsRow.games_played),
+        goals:          Number(totalsRow.goals),
+        assists:        Number(totalsRow.assists),
+        penaltyMinutes: Number(totalsRow.penalty_minutes),
+      } : null;
 
       // --- Per-game log (all attended games, 0-point rows included) ---
       const seasonSqlFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
@@ -26231,6 +26251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         streakStatus,
         streakRatio: Number(streakRatio.toFixed(3)),
       });
+
     } catch (err) {
       console.error('[StatsTrends] Error:', err);
       return res.status(500).json({ message: 'Failed to load player stats' });
