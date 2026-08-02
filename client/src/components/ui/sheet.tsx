@@ -22,7 +22,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/80",
+      "fixed inset-0 z-[110] bg-black/80",
       className
     )}
     {...props}
@@ -32,7 +32,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-[var(--elev-lift)]",
+  "fixed z-[110] gap-4 bg-background p-6 shadow-[var(--elev-lift)]",
   {
     variants: {
       side: {
@@ -111,7 +111,7 @@ const AnimatedSheetContent = React.forwardRef<
       {open && (
         <SheetPortal forceMount>
           <motion.div
-            className="fixed inset-0 z-50 bg-black/80"
+            className="fixed inset-0 z-[110] bg-black/80"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

@@ -15,6 +15,7 @@ import { getImageUrl } from '@/lib/queryClient';
 import {
   Sheet,
   SheetContent,
+  SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 
@@ -74,6 +75,7 @@ export function PlayerActionSheet({
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent side="bottom" className="rounded-t-2xl px-6 pb-20 pt-6">
+        <SheetTitle className="sr-only">{fullName}</SheetTitle>
         {/* Avatar + name */}
         <div className="flex flex-col items-center gap-3 mb-6">
           {profileImageUrl ? (
