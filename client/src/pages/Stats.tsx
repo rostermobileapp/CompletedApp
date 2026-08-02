@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
-import { PlayerActionSheet } from '@/components/PlayerActionSheet';
+import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 
 export default function Stats() {
   const { user } = useAuth();
@@ -763,16 +763,18 @@ export default function Stats() {
         </div>
       </FeatureLockOverlay>
     </div>
-    <PlayerActionSheet
-      open={!!actionSheetPlayer}
-      onClose={() => setActionSheetPlayer(null)}
-      userId={actionSheetPlayer?.userId ?? null}
-      firstName={actionSheetPlayer?.firstName ?? ''}
-      lastName={actionSheetPlayer?.lastName ?? ''}
-      profileImageUrl={actionSheetPlayer?.profileImageUrl}
-      leagueId={leagueId}
-      seasonId={selectedSeason || null}
-    />
+    {actionSheetPlayer && (
+      <ProfilePhotoPreview
+        isOpen={!!actionSheetPlayer}
+        onClose={() => setActionSheetPlayer(null)}
+        userId={actionSheetPlayer.userId}
+        firstName={actionSheetPlayer.firstName}
+        lastName={actionSheetPlayer.lastName}
+        profileImageUrl={actionSheetPlayer.profileImageUrl}
+        leagueId={leagueId}
+        seasonId={selectedSeason || null}
+      />
+    )}
     </>
   );
 }
