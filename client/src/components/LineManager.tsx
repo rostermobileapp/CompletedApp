@@ -697,9 +697,6 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
         <CardHeader className="flex flex-col space-y-1.5 p-6 pl-[12px] pr-[12px] pt-[8px] pb-[4px]">
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 shrink-0" />
-            {isTeamCaptain && (
-              <Badge variant="secondary" className="shrink-0">Captain</Badge>
-            )}
 
             {/* Roster | Lines pill toggle — Lines only visible to captains */}
             {isTeamCaptain ? (
