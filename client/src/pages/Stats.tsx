@@ -649,7 +649,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('points')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Goals Section */}
@@ -664,7 +664,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('goals')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Assists Section */}
@@ -680,7 +680,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('assists')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Penalty Minutes Section */}
@@ -695,7 +695,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('penaltyMinutes')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Beers Drank Section */}
@@ -710,7 +710,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('beers')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Wins Section (Goalies) */}
@@ -725,7 +725,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('wins')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Goals Against Average Section (Goalies) */}
@@ -740,7 +740,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('goalsAgainstAverage')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
               {/* Shutouts Section (Goalies) */}
@@ -755,7 +755,7 @@ export default function Stats() {
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('shutouts')}
-                  onPlayerClick={(p) => p.userId && setActionSheetPlayer({ userId: p.userId, firstName: p.user?.firstName ?? '', lastName: p.user?.lastName ?? '', profileImageUrl: p.user?.profileImageUrl })}
+
                 />
               )}
             </div>)
