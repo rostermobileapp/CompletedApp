@@ -815,7 +815,9 @@ function StatSection({
   const isTied = tiedPlayers.length > 1;
 
   return (
-    <div data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <div
+      data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      className="mt-[16px]">
       <h2 className="text-[#00A9FF] text-sm font-semibold mb-3 uppercase tracking-wide" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
         {title}
       </h2>
