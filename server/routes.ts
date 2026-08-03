@@ -99,7 +99,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail } from "./emails";
+import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail, sendNewDirectMessageEmail } from "./emails";
 import { startEventReminderJob } from "./eventReminderJob";
 import { startTournamentAccessJob } from "./tournamentAccessJob";
 import { startScrimmageInviteJob } from "./scrimmageInviteJob";
@@ -18084,7 +18084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const conversationType = conversationRecord?.type;
             const { sendMessagePushNotification } = await import('./oneSignalNotifications');
             for (const recipientId of recipientIds) {
-              await sendMessagePushNotification(
+              const pushed = await sendMessagePushNotification(
                 userId,
                 senderName,
                 recipientId,
@@ -18092,6 +18092,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 content,
                 conversationType,
               );
+              // If push was not delivered (no token yet), fall back to email
+              if (!pushed) {
+                try {
+                  const recipient = await storage.getUser(recipientId);
+                  if (recipient?.email) {
+                    await sendNewDirectMessageEmail(recipient.email, senderName, conversationId);
+                    console.log(`[Message Notification] Email fallback sent to ${recipient.email}`);
+                  }
+                } catch (emailErr) {
+                  console.error('[Message Notification] Email fallback failed:', emailErr);
+                }
+              }
             }
             console.log('[Message Notification Debug] Push notifications sent');
           } else {

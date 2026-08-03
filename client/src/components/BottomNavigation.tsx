@@ -68,8 +68,9 @@ export function BottomNavigation({ useSwipeNav = false }: BottomNavigationProps)
     return null;
   }, [selectedType, selectedId, userTeams]);
 
-  // Only count unread messages for the currently selected league
-  const currentLeagueUnread = currentLeagueId ? (leagueUnreadMessages[currentLeagueId] ?? 0) : 0;
+  // Count unread messages: current league + direct messages (no leagueId)
+  const currentLeagueUnread = (currentLeagueId ? (leagueUnreadMessages[currentLeagueId] ?? 0) : 0)
+    + (leagueUnreadMessages['__dm__'] ?? 0);
   
   const activeId: ScreenId | '' =
     useSwipeNav && swipeNav

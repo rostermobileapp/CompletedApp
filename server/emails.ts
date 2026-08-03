@@ -857,3 +857,78 @@ Visit: https://RosterHockey.com
     console.error(`❌ Failed to send team player invite email to ${recipientEmail}:`, error);
   }
 }
+
+export async function sendNewDirectMessageEmail(
+  recipientEmail: string,
+  senderName: string,
+  conversationId: string,
+): Promise<void> {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    const appUrl = `${APP_URL}/messages`;
+
+    const body = `
+          <tr>
+            <td style="padding:36px 40px 8px 40px;">
+              <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;">New Message</p>
+              <h1 style="margin:0 0 8px 0;font-size:26px;font-weight:800;color:#0a0a0a;line-height:1.2;">You have a message from ${senderName}</h1>
+              <p style="margin:0 0 28px 0;font-size:15px;color:#475569;line-height:1.5;">
+                <strong style="color:#0a0a0a;">${senderName}</strong> sent you a message on Roster Hockey. Open the app to read and reply.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${appUrl}" style="display:inline-block;background-color:#3b82f6;color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.01em;">Read Message</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New message from ${senderName}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:28px 40px 20px 40px;">
+              <img src="https://rosters.replit.app/roster-logo-email.png" alt="Roster Hockey" width="140" height="auto" style="display:block;max-width:140px;" />
+            </td>
+          </tr>
+          ${body}
+          <tr>
+            <td style="padding:20px 40px 28px 40px;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;line-height:1.6;">
+                You're receiving this because you have a message waiting in Roster Hockey.<br>
+                <a href="${appUrl}" style="color:#3b82f6;text-decoration:none;">Open Roster Hockey</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    await client.emails.send({
+      from: fromEmail,
+      to: recipientEmail,
+      subject: `New message from ${senderName} on Roster Hockey`,
+      html: htmlContent,
+      text: `${senderName} sent you a message on Roster Hockey.\n\nOpen the app to read and reply: ${appUrl}\n\n---\nRoster Hockey`,
+    });
+
+    console.log(`✅ Sent DM email notification to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send DM email notification to ${recipientEmail}:`, error);
+  }
+}

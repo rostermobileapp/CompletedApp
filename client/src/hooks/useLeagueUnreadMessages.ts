@@ -34,10 +34,10 @@ export function useLeagueUnreadMessages(): Record<string, number> {
       convUnreadMap[item.conversationId] = item.unreadCount;
     });
 
-    // Accumulate unread counts per league
+    // Accumulate unread counts per league; direct messages (no leagueId) go
+    // under the special '__dm__' key so callers can badge them separately.
     conversations.forEach((conv: any) => {
-      const leagueId = conv.leagueId;
-      if (!leagueId) return;
+      const leagueId = conv.leagueId || '__dm__';
       const count = convUnreadMap[conv.id] || 0;
       if (count > 0) {
         leagueMap[leagueId] = (leagueMap[leagueId] || 0) + count;

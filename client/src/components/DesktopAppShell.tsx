@@ -158,9 +158,9 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
     return null;
   }, [selectedType, selectedId, userTeams]);
 
-  const currentLeagueUnread = currentLeagueId
+  const currentLeagueUnread = (currentLeagueId
     ? leagueUnreadMessages[currentLeagueId] ?? 0
-    : 0;
+    : 0) + (leagueUnreadMessages['__dm__'] ?? 0);
 
   // Split teams into active vs. past based on the season's isActive flag.
   // Teams with no season association (standalone / legacy) are treated as
