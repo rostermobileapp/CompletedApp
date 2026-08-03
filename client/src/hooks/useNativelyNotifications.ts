@@ -331,11 +331,35 @@ export function useNativelyNotifications() {
 
     console.log('[OneSignal] Initializing Natively native SDK for displayId:', userDisplayId, 'firstName:', userFirstName);
 
-    // Get permission status
+    // Get permission status — and auto-request if not yet granted.
+    // On iOS/Android (Natively) this triggers the native OS permission dialog
+    // on first open without requiring any user interaction.
     notifications.getPermissionStatus((resp) => {
       console.log('[OneSignal] Natively permission status:', resp);
-      setPermissionState(resp.status ? 'granted' : 'default');
-      updateInAppTrigger(resp.status);
+      const hasPermission = resp.status;
+      setPermissionState(hasPermission ? 'granted' : 'default');
+      updateInAppTrigger(hasPermission);
+
+      if (!hasPermission) {
+        console.log('[OneSignal] Auto-requesting push permission...');
+        // fallbackToSettings: false — if already denied don't force-open Settings,
+        // just show the dialog on first open and silently resolve if denied.
+        notifications.requestPermission(false, (permResp) => {
+          console.log('[OneSignal] Auto-permission result:', permResp);
+          const granted = permResp.status;
+          setPermissionState(granted ? 'granted' : 'denied');
+          updateInAppTrigger(granted);
+          if (granted) {
+            notifications.getOneSignalId((idResp) => {
+              console.log('[OneSignal] Player ID after auto-permission grant:', idResp);
+              if (idResp.playerId) {
+                setPlayerId(idResp.playerId);
+                registerPlayerId(idResp.playerId);
+              }
+            });
+          }
+        });
+      }
     });
 
     // Set first_name tag for personalization (used in Liquid syntax: {{ first_name | default: "there" }})
