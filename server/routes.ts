@@ -3410,6 +3410,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Returns the userIds of all members who currently hold an active
+  // league-granted Player Pro seat in this league (current month).
+  // Commissioner only — used to render seat-holder badges in the member list.
+  app.get('/api/leagues/:leagueId/player-pro/seat-holders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { leagueId } = req.params;
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Only the league commissioner can view seat holders' });
+      }
+      const monthYM = currentMonth();
+      const userIds = await storage.getActiveLeagueProSeatUserIds(leagueId, monthYM);
+      res.json({ userIds });
+    } catch (error: any) {
+      console.error('[League Pro] Seat holders error:', error);
+      res.status(500).json({ message: 'Failed to load seat holders' });
+    }
+  });
+
   // Returns the current user's active per-league Player Pro seats, scoped to
   // the current month. The client SubscriptionContext uses this to grant
   // per-league premium feature access without elevating the global role.

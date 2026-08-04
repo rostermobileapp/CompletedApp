@@ -415,6 +415,8 @@ export interface IStorage {
   ): Promise<(LeagueProSeat & { grant: LeagueProGrant; leagueName: string })[]>;
   /** Whether `userId` has an active Player Pro seat in `leagueId` for `monthYM`. */
   userHasActiveLeagueProSeat(userId: string, leagueId: string, monthYM: string): Promise<boolean>;
+  /** All userIds that hold an active league-granted Player Pro seat in `leagueId` for `monthYM`. */
+  getActiveLeagueProSeatUserIds(leagueId: string, monthYM: string): Promise<string[]>;
 
   // Membership operations
   requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership>;
@@ -3998,6 +4000,22 @@ export class DatabaseStorage implements IStorage {
       )
       .limit(1);
     return Boolean(row);
+  }
+
+  async getActiveLeagueProSeatUserIds(leagueId: string, monthYM: string): Promise<string[]> {
+    const rows = await db
+      .select({ userId: leagueProSeats.userId })
+      .from(leagueProSeats)
+      .innerJoin(leagueProGrants, eq(leagueProSeats.grantId, leagueProGrants.id))
+      .where(
+        and(
+          eq(leagueProSeats.leagueId, leagueId),
+          eq(leagueProGrants.status, 'paid'),
+          lte(leagueProGrants.startMonth, monthYM),
+          gte(leagueProGrants.endMonth, monthYM),
+        )
+      );
+    return rows.map(r => r.userId);
   }
 
   async requestLeagueMembership(membership: InsertLeagueMembership): Promise<LeagueMembership> {

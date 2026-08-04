@@ -2277,6 +2277,20 @@ export default function LeagueManagement() {
     enabled: !!leagueId && !!user && !!league && league.commissionerId === user.id,
   });
 
+  // Active league-granted seat holders — used to show a crown badge in the member list.
+  const { data: leagueProSeatHolders } = useQuery<{ userIds: string[] }>({
+    queryKey: ['/api/leagues', leagueId, 'player-pro', 'seat-holders'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/player-pro/seat-holders`);
+      return response.json();
+    },
+    enabled: !!leagueId && !!user && !!league && league.commissionerId === user.id,
+  });
+  const leagueProSeatHolderSet = React.useMemo(
+    () => new Set(leagueProSeatHolders?.userIds ?? []),
+    [leagueProSeatHolders],
+  );
+
   // Live cost preview — sourced from the backend so the displayed totals are
   // *exactly* what Stripe will charge (the server reads the per-player price
   // from Stripe and applies the discount via the same helper checkout uses).
@@ -3975,6 +3989,16 @@ export default function LeagueManagement() {
                           {member.jerseyNumber && (
                             <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
                               #{member.jerseyNumber}
+                            </span>
+                          )}
+                          {leagueProSeatHolderSet.has(member.userId) && (
+                            <span
+                              className="inline-flex items-center gap-1 text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded"
+                              title="League Pro seat"
+                              data-testid={`league-pro-badge-${member.user.id}`}
+                            >
+                              <Crown className="w-3 h-3" />
+                              League Pro
                             </span>
                           )}
                         </div>
