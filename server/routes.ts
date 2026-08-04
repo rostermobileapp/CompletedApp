@@ -12145,6 +12145,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: teamName,
             leagueId: leagueId,
             captainId: null, // Will be assigned later when players join
+            // Anchor the new team to the import season so it appears in the
+            // commissioner's currently-selected season view, not just the
+            // first-created season (the fallback for null-season teams).
+            seasonId: resolvedSeasonId ?? undefined,
           });
           createdTeams.set(teamName, newTeam.id);
         } catch (error) {
