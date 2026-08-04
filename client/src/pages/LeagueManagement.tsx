@@ -817,6 +817,7 @@ export default function LeagueManagement() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
   const [proSeatCount, setProSeatCount] = useState<string>('20');
+  const proSeatCountTouched = useRef(false);
   const [proStartMonth, setProStartMonth] = useState<string>(_ymOffset(0));
   const [proEndMonth, setProEndMonth] = useState<string>(_ymOffset(5));
   const [showCreateSeason, setShowCreateSeason] = useState(false);
@@ -2246,6 +2247,26 @@ export default function LeagueManagement() {
   });
 
   // ─── League-Wide Player Pro: queries, mutations, redirect handler ─────
+  // Latest player import — used to seed the default seat count.
+  const { data: latestPlayerImport } = useQuery<{ successfulRecords: number } | null>({
+    queryKey: ['/api/leagues', leagueId, 'players', 'imports', 'latest'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/players/imports`);
+      const imports: Array<{ successfulRecords: number }> = await response.json();
+      return imports[0] ?? null;
+    },
+    enabled: !!leagueId && !!user && !!league && league.commissionerId === user.id,
+    staleTime: 60_000,
+  });
+
+  // Pre-fill seat count from the latest import once, unless the commissioner
+  // has already touched the field.
+  useEffect(() => {
+    if (!proSeatCountTouched.current && latestPlayerImport && latestPlayerImport.successfulRecords > 0) {
+      setProSeatCount(String(latestPlayerImport.successfulRecords));
+    }
+  }, [latestPlayerImport]);
+
   // Live grants list (refetched after a successful payment confirmation).
   const { data: leagueProGrants = [] } = useQuery<LeagueProGrantWithSeats[]>({
     queryKey: ['/api/leagues', leagueId, 'player-pro', 'grants'],
@@ -6022,7 +6043,7 @@ export default function LeagueManagement() {
                     Player Pro for League
                   </h3>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Pre-pay Player Pro for a fixed number of seats over a date range and save 25% versus everyone paying individually. Seats auto-assign to current league members in join order; new approvals receive any remaining seats automatically.
+                    Pre-pay Player Pro for a fixed number of seats over a date range and save 50% versus everyone paying individually. Seats auto-assign to current league members in join order; new approvals receive any remaining seats automatically.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
@@ -6032,10 +6053,18 @@ export default function LeagueManagement() {
                         type="number"
                         min={1}
                         value={proSeatCount}
-                        onChange={(e) => setProSeatCount(e.target.value.replace(/[^0-9]/g, ''))}
+                        onChange={(e) => {
+                          proSeatCountTouched.current = true;
+                          setProSeatCount(e.target.value.replace(/[^0-9]/g, ''));
+                        }}
                         className="w-full p-2 bg-card hairline elev-rest rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         data-testid="input-pro-seat-count"
                       />
+                      {latestPlayerImport && latestPlayerImport.successfulRecords > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Based on your last player import ({latestPlayerImport.successfulRecords} players)
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1">Start month</label>
@@ -6074,7 +6103,7 @@ export default function LeagueManagement() {
                         </span>
                       </div>
                       <div className="flex justify-between font-semibold">
-                        <span>League price (25% off)</span>
+                        <span>League price (50% off)</span>
                         <span data-testid="text-pro-discounted-total">
                           ${proPreview.discountedTotal.toFixed(2)}
                         </span>

@@ -17,7 +17,7 @@
  * access only — never global).
  */
 
-export const LEAGUE_PRO_DISCOUNT_PERCENT = 25;
+export const LEAGUE_PRO_DISCOUNT_PERCENT = 50;
 // Fallback when Stripe price lookup fails. Matches the live $6.50/mo Player Pro price.
 export const LEAGUE_PRO_DEFAULT_MONTHLY_CENTS = 650;
 
