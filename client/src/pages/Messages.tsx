@@ -707,6 +707,7 @@ export default function Messages() {
   // Emoji reaction picker state
   const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
   // Reaction reactor popover state — shows who reacted with a given emoji
   const [reactionPopover, setReactionPopover] = useState<{
     messageId: string;
@@ -1893,7 +1894,26 @@ export default function Messages() {
   };
 
   // ── Emoji reactions ──────────────────────────────────────────────────────
-  const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
+  // Quick-access bar (7 emojis) — last slot is the "+" button
+  const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏'];
+
+  // Full emoji list shown when the user taps "+"
+  const ALL_EMOJIS = [
+    '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃',
+    '😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙',
+    '😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔',
+    '🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥',
+    '😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤧',
+    '🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐',
+    '😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦',
+    '😧','😨','😰','😥','😢','😭','😱','😖','😣','😞',
+    '😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿',
+    '👍','👎','👊','✊','🤛','🤜','🤞','✌️','🤟','🤘',
+    '👌','🤏','👈','👉','👆','👇','☝️','✋','🤚','🖐',
+    '🖖','👋','🤙','💪','🦾','🙏','🫶','❤️','🧡','💛',
+    '💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','💯','🔥',
+    '⭐','🌟','✨','💥','🎉','🎊','🏆','🥇','👏','🙌',
+  ];
 
   /** Creates inline long-press event handlers bound to a specific message. */
   const makeLongPressHandlers = (messageId: string) => {
@@ -1931,6 +1951,7 @@ export default function Messages() {
   const handleReact = async (messageId: string, emoji: string) => {
     setPickerMessageId(null);
     setPickerAnchor(null);
+    setShowFullEmojiPicker(false);
     try {
       await apiRequest('POST', `/api/messages/${messageId}/reactions`, { emoji });
     } catch (err) {
@@ -1988,6 +2009,7 @@ export default function Messages() {
     const close = () => {
       setPickerMessageId(null);
       setPickerAnchor(null);
+      setShowFullEmojiPicker(false);
     };
     // No delay needed: the pointerdown that triggered the long-press has
     // already been dispatched before the picker mounts, so this listener only
@@ -3651,30 +3673,79 @@ export default function Messages() {
       {/* Emoji reaction picker — rendered in a portal so it's never clipped */}
       {pickerMessageId && pickerAnchor && createPortal(
         <div
-          style={{
-            position: 'fixed',
-            left: pickerAnchor.x,
-            top: pickerAnchor.y,
-            transform: 'translate(-50%, calc(-100% - 10px))',
-            zIndex: 9999,
-          }}
-          className="bg-[#2a2a2a] border border-white/15 rounded-full shadow-2xl flex items-center gap-0.5 px-2 py-1.5"
-          data-testid="emoji-reaction-picker"
-          // Stop the press from reaching the document pointerdown listener so
-          // tapping an emoji (or anywhere inside the picker) doesn't dismiss it.
+          // Stop all presses inside the picker from reaching the document
+          // pointerdown listener that would dismiss it.
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {REACTION_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); handleReact(pickerMessageId, emoji); }}
-              className="text-xl w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 active:scale-125 transition-transform"
-              data-testid={`emoji-btn-${emoji}`}
+          {/* Quick-access bar — centered horizontally in the viewport */}
+          {!showFullEmojiPicker && (
+            <div
+              style={{
+                position: 'fixed',
+                left: '50%',
+                top: pickerAnchor.y,
+                transform: 'translate(-50%, calc(-100% - 10px))',
+                zIndex: 9999,
+              }}
+              className="bg-[#2a2a2a] border border-white/15 rounded-full shadow-2xl flex items-center gap-0.5 px-2 py-1.5"
+              data-testid="emoji-reaction-picker"
             >
-              {emoji}
-            </button>
-          ))}
+              {REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); handleReact(pickerMessageId, emoji); }}
+                  className="text-xl w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 active:scale-125 transition-transform"
+                  data-testid={`emoji-btn-${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+              {/* + button — opens full emoji grid */}
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setShowFullEmojiPicker(true); }}
+                className="text-sm font-bold text-white/70 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                data-testid="emoji-btn-more"
+              >
+                +
+              </button>
+            </div>
+          )}
+
+          {/* Full emoji grid — shown when "+" is tapped */}
+          {showFullEmojiPicker && (
+            <div
+              style={{
+                position: 'fixed',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 9999,
+                width: 'min(340px, 92vw)',
+                maxHeight: '55vh',
+              }}
+              className="bg-[#1e1e1e] border border-white/15 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              data-testid="emoji-full-picker"
+            >
+              <div className="px-3 pt-3 pb-2 text-xs font-semibold text-white/50 uppercase tracking-wide border-b border-white/10">
+                React
+              </div>
+              <div className="overflow-y-auto p-2 grid grid-cols-8 gap-0.5">
+                {ALL_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); handleReact(pickerMessageId, emoji); }}
+                    className="text-xl w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 active:scale-110 transition-transform"
+                    data-testid={`emoji-full-btn-${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>,
         document.body,
       )}
