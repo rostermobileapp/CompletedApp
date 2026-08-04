@@ -1100,6 +1100,19 @@ export const chatPollVotes = pgTable("chat_poll_votes", {
   index("idx_chat_poll_votes_user").on(table.userId),
 ]);
 
+// Message reactions table
+export const messageReactions = pgTable("message_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").references(() => messages.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  emoji: varchar("emoji").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_message_user_emoji").on(table.messageId, table.userId, table.emoji),
+  index("idx_message_reactions_message").on(table.messageId),
+  index("idx_message_reactions_user").on(table.userId),
+]);
+
 // Announcements table
 export const announcements = pgTable("announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2930,6 +2943,11 @@ export const insertChatPollVoteSchema = createInsertSchema(chatPollVotes).omit({
   createdAt: true,
 });
 
+export const insertMessageReactionSchema = createInsertSchema(messageReactions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
   id: true,
   createdAt: true,
@@ -3501,6 +3519,8 @@ export type MessageAttachment = typeof messageAttachments.$inferSelect;
 export type InsertMessageAttachment = z.infer<typeof insertMessageAttachmentSchema>;
 export type MessageReadReceipt = typeof messageReadReceipts.$inferSelect;
 export type InsertMessageReadReceipt = z.infer<typeof insertMessageReadReceiptSchema>;
+export type MessageReaction = typeof messageReactions.$inferSelect;
+export type InsertMessageReaction = z.infer<typeof insertMessageReactionSchema>;
 export type TypingIndicator = typeof typingIndicators.$inferSelect;
 export type InsertTypingIndicator = z.infer<typeof insertTypingIndicatorSchema>;
 export type UserOnlineStatus = typeof userOnlineStatus.$inferSelect;

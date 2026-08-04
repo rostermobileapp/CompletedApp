@@ -211,6 +211,22 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               }
               break;
 
+            case 'reaction_update':
+              // Surgically update the specific message's reactions in the cache
+              if (data.messageId && data.conversationId) {
+                const cacheKey = ['/api/conversations', data.conversationId, 'messages'];
+                const existing = queryClient.getQueryData<any[]>(cacheKey);
+                if (existing) {
+                  queryClient.setQueryData(
+                    cacheKey,
+                    existing.map((m: any) =>
+                      m.id === data.messageId ? { ...m, reactions: data.reactions } : m,
+                    ),
+                  );
+                }
+              }
+              break;
+
             case 'notification_update':
               queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
               queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });

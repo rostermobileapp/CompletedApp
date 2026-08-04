@@ -17907,6 +17907,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { SupabaseStorageService } = await import('./supabaseStorage');
       const supabaseStorageService = new SupabaseStorageService();
       
+      // Batch-fetch reactions for all messages at once (avoids N+1)
+      const messageIds = messages.map((m: any) => m.id);
+      const reactionsMap = await messagingService.getReactionsForMessages(messageIds);
+
       // Get attachments and read receipts for each message
       const messagesWithDetails = await Promise.all(
         messages.map(async (message) => {
@@ -17932,7 +17936,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...message,
             sentAt: message.createdAt, // Map createdAt to sentAt for frontend compatibility
             attachments: attachmentsWithSignedUrls,
-            readReceipts
+            readReceipts,
+            reactions: reactionsMap[message.id] || [],
           };
         })
       );
@@ -18167,6 +18172,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error marking message as read:', error);
       res.status(500).json({ message: 'Failed to mark message as read' });
+    }
+  });
+
+  // Add a reaction to a message
+  app.post('/api/messages/:id/reactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: messageId } = req.params;
+      const { emoji } = req.body;
+
+      if (!emoji || typeof emoji !== 'string') {
+        return res.status(400).json({ message: 'emoji is required' });
+      }
+
+      const message = await messagingService.getMessage(messageId);
+      if (!message) return res.status(404).json({ message: 'Message not found' });
+
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) return res.status(403).json({ message: 'Access denied' });
+
+      await messagingService.addMessageReaction(messageId, userId, emoji);
+
+      // Return updated reactions + broadcast to participants
+      const reactionsMap = await messagingService.getReactionsForMessages([messageId]);
+      const reactions = reactionsMap[messageId] || [];
+
+      const participants = await messagingService.getConversationParticipants(message.conversationId);
+      broadcastToParticipants(participants, {
+        type: 'reaction_update',
+        messageId,
+        conversationId: message.conversationId,
+        reactions,
+      });
+
+      res.json({ reactions });
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+      res.status(500).json({ message: 'Failed to add reaction' });
+    }
+  });
+
+  // Remove a reaction from a message
+  app.delete('/api/messages/:id/reactions/:emoji', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: messageId, emoji } = req.params;
+
+      const message = await messagingService.getMessage(messageId);
+      if (!message) return res.status(404).json({ message: 'Message not found' });
+
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) return res.status(403).json({ message: 'Access denied' });
+
+      await messagingService.removeMessageReaction(messageId, userId, decodeURIComponent(emoji));
+
+      const reactionsMap = await messagingService.getReactionsForMessages([messageId]);
+      const reactions = reactionsMap[messageId] || [];
+
+      const participants = await messagingService.getConversationParticipants(message.conversationId);
+      broadcastToParticipants(participants, {
+        type: 'reaction_update',
+        messageId,
+        conversationId: message.conversationId,
+        reactions,
+      });
+
+      res.json({ reactions });
+    } catch (error) {
+      console.error('Error removing reaction:', error);
+      res.status(500).json({ message: 'Failed to remove reaction' });
     }
   });
 

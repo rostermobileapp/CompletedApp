@@ -4,6 +4,7 @@ import {
   messages,
   messageAttachments,
   messageReadReceipts,
+  messageReactions,
   typingIndicators,
   userOnlineStatus,
   users,
@@ -25,6 +26,7 @@ import {
   type InsertMessageAttachment,
   type MessageReadReceipt,
   type InsertMessageReadReceipt,
+  type MessageReaction,
   type TypingIndicator,
   type InsertTypingIndicator,
   type UserOnlineStatus,
@@ -1551,6 +1553,57 @@ export class MessagingService {
       ))
       .limit(1);
     return vote;
+  }
+
+  // ── Message reactions ──────────────────────────────────────────────────────
+
+  async addMessageReaction(messageId: string, userId: string, emoji: string): Promise<void> {
+    await db
+      .insert(messageReactions)
+      .values({ messageId, userId, emoji })
+      .onConflictDoNothing();
+  }
+
+  async removeMessageReaction(messageId: string, userId: string, emoji: string): Promise<void> {
+    await db
+      .delete(messageReactions)
+      .where(
+        and(
+          eq(messageReactions.messageId, messageId),
+          eq(messageReactions.userId, userId),
+          eq(messageReactions.emoji, emoji),
+        ),
+      );
+  }
+
+  /** Returns a map of messageId → grouped reactions [{emoji, count, userIds}] */
+  async getReactionsForMessages(
+    messageIds: string[],
+  ): Promise<Record<string, Array<{ emoji: string; count: number; userIds: string[] }>>> {
+    if (messageIds.length === 0) return {};
+
+    const rows = await db
+      .select()
+      .from(messageReactions)
+      .where(inArray(messageReactions.messageId, messageIds));
+
+    // Group: messageId → emoji → userIds[]
+    const grouped: Record<string, Record<string, string[]>> = {};
+    for (const row of rows) {
+      if (!grouped[row.messageId]) grouped[row.messageId] = {};
+      if (!grouped[row.messageId][row.emoji]) grouped[row.messageId][row.emoji] = [];
+      grouped[row.messageId][row.emoji].push(row.userId);
+    }
+
+    const result: Record<string, Array<{ emoji: string; count: number; userIds: string[] }>> = {};
+    for (const [msgId, emojiMap] of Object.entries(grouped)) {
+      result[msgId] = Object.entries(emojiMap).map(([emoji, userIds]) => ({
+        emoji,
+        count: userIds.length,
+        userIds,
+      }));
+    }
+    return result;
   }
 }
 

@@ -28,6 +28,12 @@ import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+interface MessageReactionGroup {
+  emoji: string;
+  count: number;
+  userIds: string[];
+}
+
 interface Message {
   id: string;
   conversationId: string;
@@ -39,6 +45,7 @@ interface Message {
   replyToId?: string;
   attachments: MessageAttachment[];
   readReceipts: ReadReceipt[];
+  reactions?: MessageReactionGroup[];
   sender?: {
     id: string;
     firstName?: string;
@@ -697,6 +704,9 @@ export default function Messages() {
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [groupTitle, setGroupTitle] = useState('');
+  // Emoji reaction picker state
+  const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
+  const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const pendingScrollConversation = useRef<string | null>(null);
@@ -1876,6 +1886,83 @@ export default function Messages() {
     }
   };
 
+  // ── Emoji reactions ──────────────────────────────────────────────────────
+  const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
+
+  /** Creates inline long-press event handlers bound to a specific message. */
+  const makeLongPressHandlers = (messageId: string) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const cancel = (el?: Element) => {
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    return {
+      onTouchStart: (e: React.TouchEvent) => {
+        const el = e.currentTarget as HTMLElement;
+        timer = setTimeout(() => {
+          const rect = el.getBoundingClientRect();
+          setPickerAnchor({ x: rect.left + rect.width / 2, y: rect.top });
+          setPickerMessageId(messageId);
+          timer = null;
+        }, 500);
+      },
+      onTouchEnd: () => cancel(),
+      onTouchMove: () => cancel(),
+      onMouseDown: (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        const el = e.currentTarget as HTMLElement;
+        timer = setTimeout(() => {
+          const rect = el.getBoundingClientRect();
+          setPickerAnchor({ x: rect.left + rect.width / 2, y: rect.top });
+          setPickerMessageId(messageId);
+          timer = null;
+        }, 500);
+      },
+      onMouseUp: () => cancel(),
+      onMouseLeave: () => cancel(),
+    };
+  };
+
+  const handleReact = async (messageId: string, emoji: string) => {
+    setPickerMessageId(null);
+    setPickerAnchor(null);
+    try {
+      await apiRequest('POST', `/api/messages/${messageId}/reactions`, { emoji });
+    } catch (err) {
+      console.error('Failed to add reaction:', err);
+    }
+  };
+
+  const handleReactionBadgeClick = async (messageId: string, emoji: string, userAlreadyReacted: boolean) => {
+    try {
+      if (userAlreadyReacted) {
+        await apiRequest('DELETE', `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);
+      } else {
+        await apiRequest('POST', `/api/messages/${messageId}/reactions`, { emoji });
+      }
+    } catch (err) {
+      console.error('Failed to toggle reaction:', err);
+    }
+  };
+
+  // Close picker when the user starts a NEW press outside it.
+  // Using 'pointerdown' (press-start) instead of 'click' or 'touchstart' means
+  // releasing the long-press that opened the picker (pointerup) never triggers
+  // this handler, so the picker stays open for the user to select an emoji.
+  useEffect(() => {
+    if (!pickerMessageId) return;
+    const close = () => {
+      setPickerMessageId(null);
+      setPickerAnchor(null);
+    };
+    // No delay needed: the pointerdown that triggered the long-press has
+    // already been dispatched before the picker mounts, so this listener only
+    // catches the NEXT press — which is an intentional outside tap.
+    document.addEventListener('pointerdown', close, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', close);
+    };
+  }, [pickerMessageId]);
+
   const getParticipantName = (conversation: Conversation) => {
     if (conversation.type === 'team_group' || conversation.type === 'custom_group') {
       return conversation.title || 'Group Chat';
@@ -2775,11 +2862,15 @@ export default function Messages() {
                     )}
                     
                     <div className={`${message.messageType === 'poll' ? 'w-3/4 lg:max-w-[20%]' : 'max-w-[70%]'} ${isCurrentUser ? 'order-1' : 'order-2'}`}>
-                      <div className={`rounded-lg ${
-                        message.messageType === 'poll'
-                          ? `text-foreground ${isCurrentUser ? 'ml-auto' : ''}`
-                          : `p-3 elev-rest ${isCurrentUser ? 'text-white ml-auto' : 'text-white'}`
-                      }`} style={message.messageType === 'poll' ? undefined : { backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}>
+                      <div
+                        className={`rounded-lg ${
+                          message.messageType === 'poll'
+                            ? `text-foreground ${isCurrentUser ? 'ml-auto' : ''}`
+                            : `p-3 elev-rest ${isCurrentUser ? 'text-white ml-auto' : 'text-white'}`
+                        }`}
+                        style={message.messageType === 'poll' ? undefined : { backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}
+                        {...(message.messageType !== 'poll' ? makeLongPressHandlers(message.id) : {})}
+                      >
                         {!isCurrentUser && (
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-xs" data-testid={`text-message-sender-${message.id}`}>
@@ -2910,6 +3001,29 @@ export default function Messages() {
                           </div>
                         )}
                       </div>
+                      {/* Reaction badges */}
+                      {message.reactions && message.reactions.length > 0 && (
+                        <div className={`flex flex-wrap gap-1 mt-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                          {message.reactions.map(({ emoji, count, userIds }: MessageReactionGroup) => {
+                            const userReacted = userIds.includes(currentUserId);
+                            return (
+                              <button
+                                key={emoji}
+                                onClick={() => handleReactionBadgeClick(message.id, emoji, userReacted)}
+                                className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs border transition-colors select-none ${
+                                  userReacted
+                                    ? 'bg-blue-500/30 border-blue-400/50 text-white'
+                                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                                }`}
+                                data-testid={`reaction-badge-${emoji}`}
+                              >
+                                <span>{emoji}</span>
+                                <span className="font-medium ml-0.5">{count}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -3498,6 +3612,37 @@ export default function Messages() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Emoji reaction picker — rendered in a portal so it's never clipped */}
+      {pickerMessageId && pickerAnchor && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: pickerAnchor.x,
+            top: pickerAnchor.y,
+            transform: 'translate(-50%, calc(-100% - 10px))',
+            zIndex: 9999,
+          }}
+          className="bg-[#2a2a2a] border border-white/15 rounded-full shadow-2xl flex items-center gap-0.5 px-2 py-1.5"
+          data-testid="emoji-reaction-picker"
+          // Stop the press from reaching the document pointerdown listener so
+          // tapping an emoji (or anywhere inside the picker) doesn't dismiss it.
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {REACTION_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); handleReact(pickerMessageId, emoji); }}
+              className="text-xl w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 active:scale-125 transition-transform"
+              data-testid={`emoji-btn-${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
     </>
   );
 }
