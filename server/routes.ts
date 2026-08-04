@@ -18083,6 +18083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const conversationRecord = await messagingService.getConversation(conversationId);
             const conversationType = conversationRecord?.type;
             const { sendMessagePushNotification } = await import('./oneSignalNotifications');
+            let anyPushDelivered = false;
             for (const recipientId of recipientIds) {
               const pushed = await sendMessagePushNotification(
                 userId,
@@ -18092,6 +18093,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 content,
                 conversationType,
               );
+              if (pushed) {
+                anyPushDelivered = true;
+              }
               // If push was not delivered (no token yet), fall back to email
               if (!pushed) {
                 try {
@@ -18103,6 +18107,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } catch (emailErr) {
                   console.error('[Message Notification] Email fallback failed:', emailErr);
                 }
+              }
+            }
+            // Mark message as delivered if at least one push reached a device
+            if (anyPushDelivered) {
+              try {
+                await messagingService.updateMessageStatus(message.id, 'delivered');
+                // Notify the sender via WebSocket so ticks update in real time
+                broadcastToUser(userId, {
+                  type: 'message_delivered',
+                  conversationId,
+                  messageId: message.id,
+                });
+              } catch (statusErr) {
+                console.error('[Message Notification] Failed to update delivered status:', statusErr);
               }
             }
             console.log('[Message Notification Debug] Push notifications sent');
@@ -19504,6 +19522,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Create read receipt
             await messagingService.markMessageAsRead(data.messageId, userId);
+            // Also update the message status to 'read'
+            await messagingService.updateMessageStatus(data.messageId, 'read');
             
             // Broadcast read receipt to message sender
             const readMessage = await messagingService.getMessage(data.messageId);
@@ -19512,6 +19532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (senderConnection && senderConnection.readyState === WebSocket.OPEN) {
                 senderConnection.send(JSON.stringify({
                   type: 'message_read',
+                  conversationId: readMessage.conversationId,
                   messageId: data.messageId,
                   readBy: userId,
                   readAt: new Date().toISOString()

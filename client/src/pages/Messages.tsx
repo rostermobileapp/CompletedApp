@@ -3,7 +3,7 @@
 // import { useSubscription } from '@/context/SubscriptionContext'; // REMOVED
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle, RefreshCw } from 'lucide-react';
+import { MessageCircle, Users, Edit, Send, ArrowLeft, MoreVertical, Phone, Video, Info, Paperclip, X, File, Image, Search, UserPlus, Trash2, Crown, Smile, LogOut, BarChart3, Plus, Minus, DollarSign, CheckCircle, RefreshCw, Check } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useLocation } from 'wouter';
@@ -35,6 +35,7 @@ interface Message {
   content: string;
   messageType: 'text' | 'image' | 'gif' | 'file' | 'poll';
   sentAt: string;
+  status?: 'sent' | 'delivered' | 'read';
   replyToId?: string;
   attachments: MessageAttachment[];
   readReceipts: ReadReceipt[];
@@ -105,6 +106,37 @@ interface Contact {
   position?: string;
   jerseyNumber?: number;
   skillLevel?: string;
+}
+
+// Delivery/read tick icons — WhatsApp/iMessage style
+// single gray ✓ = sent, double gray ✓✓ = delivered, double blue ✓✓ = read
+function MessageStatusTick({ message, currentUserId }: { message: Message; currentUserId: string }) {
+  // Determine effective status: read receipts from other participants override the status field
+  const hasReadReceipt = message.readReceipts.some(r => r.userId !== currentUserId);
+  const effectiveStatus = hasReadReceipt ? 'read' : (message.status ?? 'sent');
+
+  if (effectiveStatus === 'read') {
+    return (
+      <span className="inline-flex items-center" style={{ gap: '-2px' }} data-testid="msg-status-read" title="Read">
+        <Check className="w-3 h-3 text-blue-400" strokeWidth={3} />
+        <Check className="w-3 h-3 text-blue-400 -ml-1.5" strokeWidth={3} />
+      </span>
+    );
+  }
+  if (effectiveStatus === 'delivered') {
+    return (
+      <span className="inline-flex items-center" data-testid="msg-status-delivered" title="Delivered">
+        <Check className="w-3 h-3 text-white/50" strokeWidth={3} />
+        <Check className="w-3 h-3 text-white/50 -ml-1.5" strokeWidth={3} />
+      </span>
+    );
+  }
+  // sent (default)
+  return (
+    <span className="inline-flex items-center" data-testid="msg-status-sent" title="Sent">
+      <Check className="w-3 h-3 text-white/50" strokeWidth={3} />
+    </span>
+  );
 }
 
 // Poll Card Component
@@ -1463,11 +1495,51 @@ export default function Messages() {
       }
     });
 
+    // Update message status to 'delivered' when a push notification was confirmed delivered
+    const unsubDelivered = wsSubscribe('message_delivered', (data: { conversationId: string; messageId: string }) => {
+      queryClient.setQueryData(
+        ['/api/conversations', data.conversationId, 'messages'],
+        (old: Message[] | undefined) => {
+          if (!old) return old;
+          return old.map(msg =>
+            msg.id === data.messageId && (msg.status === 'sent' || !msg.status)
+              ? { ...msg, status: 'delivered' as const }
+              : msg
+          );
+        }
+      );
+    });
+
+    // Update message status to 'read' and add read receipt when recipient reads messages
+    const unsubMsgRead = wsSubscribe('message_read', (data: { conversationId: string; messageIds?: string[]; messageId?: string; readBy: string; readAt: string }) => {
+      const ids = data.messageIds ?? (data.messageId ? [data.messageId] : []);
+      if (!ids.length) return;
+      queryClient.setQueryData(
+        ['/api/conversations', data.conversationId, 'messages'],
+        (old: Message[] | undefined) => {
+          if (!old) return old;
+          return old.map(msg => {
+            if (!ids.includes(msg.id)) return msg;
+            const alreadyHasReceipt = msg.readReceipts.some(r => r.userId === data.readBy);
+            return {
+              ...msg,
+              status: 'read' as const,
+              readReceipts: alreadyHasReceipt
+                ? msg.readReceipts
+                : [...msg.readReceipts, { id: `${msg.id}-${data.readBy}`, messageId: msg.id, userId: data.readBy, readAt: data.readAt }],
+            };
+          });
+        }
+      );
+    });
+
     return () => {
       unsubTypingStart();
       unsubTypingStop();
       unsubOnline();
       unsubOffline();
+      unsubDelivered();
+      unsubMsgRead();
     };
   }, [currentUserId, wsSubscribe]);
   
@@ -2719,15 +2791,11 @@ export default function Messages() {
                           </div>
                         )}
                         {isCurrentUser && (
-                          <div className="flex items-center gap-2 mb-1 justify-end">
+                          <div className="flex items-center gap-1 mb-1 justify-end">
                             <span className="text-xs opacity-70" data-testid={`text-message-time-${message.id}`}>
                               {formatMessageTime(message.sentAt)}
                             </span>
-                            {message.readReceipts.length > 0 && (
-                              <span className="text-xs opacity-70" data-testid={`text-read-status-${message.id}`}>
-                                ✓ Read
-                              </span>
-                            )}
+                            <MessageStatusTick message={message} currentUserId={currentUserId} />
                           </div>
                         )}
                         {message.messageType !== 'gif' && message.messageType !== 'poll' && (

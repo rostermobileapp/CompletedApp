@@ -734,9 +734,29 @@ export class MessagingService {
     }));
 
     await db.insert(messageReadReceipts).values(readReceiptData).onConflictDoNothing();
+
+    // Upgrade those messages' status to 'read' (only those not already at 'read')
+    const unreadMessageIds = unreadMessages.map(m => m.id);
+    await db
+      .update(messages)
+      .set({ status: 'read', updatedAt: new Date() })
+      .where(
+        and(
+          inArray(messages.id, unreadMessageIds),
+          sql`${messages.status} IS DISTINCT FROM 'read'`
+        )
+      );
     
     // Return the marked messages with their sender IDs for WebSocket notifications
     return unreadMessages.map(m => ({ messageId: m.id, senderId: m.senderId }));
+  }
+
+  // Update the delivery/read status of a single message
+  async updateMessageStatus(messageId: string, status: 'sent' | 'delivered' | 'read'): Promise<void> {
+    await db
+      .update(messages)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(messages.id, messageId));
   }
 
   // Group conversation operations
