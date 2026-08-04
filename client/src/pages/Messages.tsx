@@ -1916,36 +1916,10 @@ export default function Messages() {
   ];
 
   /** Creates inline long-press event handlers bound to a specific message. */
-  const makeLongPressHandlers = (messageId: string) => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const cancel = (el?: Element) => {
-      if (timer) { clearTimeout(timer); timer = null; }
-    };
-    return {
-      onTouchStart: (e: React.TouchEvent) => {
-        const el = e.currentTarget as HTMLElement;
-        timer = setTimeout(() => {
-          const rect = el.getBoundingClientRect();
-          setPickerAnchor({ x: rect.left + rect.width / 2, y: rect.top });
-          setPickerMessageId(messageId);
-          timer = null;
-        }, 500);
-      },
-      onTouchEnd: () => cancel(),
-      onTouchMove: () => cancel(),
-      onMouseDown: (e: React.MouseEvent) => {
-        if (e.button !== 0) return;
-        const el = e.currentTarget as HTMLElement;
-        timer = setTimeout(() => {
-          const rect = el.getBoundingClientRect();
-          setPickerAnchor({ x: rect.left + rect.width / 2, y: rect.top });
-          setPickerMessageId(messageId);
-          timer = null;
-        }, 500);
-      },
-      onMouseUp: () => cancel(),
-      onMouseLeave: () => cancel(),
-    };
+  const openReactionPicker = (e: React.MouseEvent, messageId: string) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setPickerAnchor({ x: rect.left + rect.width / 2, y: rect.top });
+    setPickerMessageId(messageId);
   };
 
   const handleReact = async (messageId: string, emoji: string) => {
@@ -2926,7 +2900,7 @@ export default function Messages() {
                             : `p-3 elev-rest ${isCurrentUser ? 'text-white ml-auto' : 'text-white'}`
                         }`}
                         style={message.messageType === 'poll' ? undefined : { backgroundColor: isCurrentUser ? '#3c82f4' : '#212121' }}
-                        {...(message.messageType !== 'poll' ? makeLongPressHandlers(message.id) : {})}
+                        onClick={message.messageType !== 'poll' ? (e) => openReactionPicker(e, message.id) : undefined}
                       >
                         {!isCurrentUser && (
                           <div className="flex items-center gap-2 mb-1">
