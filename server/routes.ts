@@ -18213,6 +18213,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get reactions for a message with user details
+  app.get('/api/messages/:id/reactions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: messageId } = req.params;
+
+      const message = await messagingService.getMessage(messageId);
+      if (!message) return res.status(404).json({ message: 'Message not found' });
+
+      const isParticipant = await messagingService.isUserInConversation(userId, message.conversationId);
+      if (!isParticipant) return res.status(403).json({ message: 'Access denied' });
+
+      const reactions = await messagingService.getReactionsWithUsers(messageId);
+      res.json({ reactions });
+    } catch (error) {
+      console.error('Error fetching reactions:', error);
+      res.status(500).json({ message: 'Failed to fetch reactions' });
+    }
+  });
+
   // Remove a reaction from a message
   app.delete('/api/messages/:id/reactions/:emoji', isAuthenticated, async (req: any, res) => {
     try {

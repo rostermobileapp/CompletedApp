@@ -1605,6 +1605,44 @@ export class MessagingService {
     }
     return result;
   }
+
+  /**
+   * Returns reactions for a single message, each group enriched with user
+   * display details (firstName, lastName, profileImageUrl).
+   */
+  async getReactionsWithUsers(
+    messageId: string,
+  ): Promise<Array<{ emoji: string; count: number; users: Array<{ id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null }> }>> {
+    const rows = await db
+      .select({
+        emoji: messageReactions.emoji,
+        userId: messageReactions.userId,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+      })
+      .from(messageReactions)
+      .innerJoin(users, eq(messageReactions.userId, users.id))
+      .where(eq(messageReactions.messageId, messageId));
+
+    // Group by emoji
+    const grouped: Record<string, Array<{ id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null }>> = {};
+    for (const row of rows) {
+      if (!grouped[row.emoji]) grouped[row.emoji] = [];
+      grouped[row.emoji].push({
+        id: row.userId,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        profileImageUrl: row.profileImageUrl,
+      });
+    }
+
+    return Object.entries(grouped).map(([emoji, reactors]) => ({
+      emoji,
+      count: reactors.length,
+      users: reactors,
+    }));
+  }
 }
 
 export const messagingService = new MessagingService();

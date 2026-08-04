@@ -707,6 +707,12 @@ export default function Messages() {
   // Emoji reaction picker state
   const [pickerMessageId, setPickerMessageId] = useState<string | null>(null);
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
+  // Reaction reactor popover state — shows who reacted with a given emoji
+  const [reactionPopover, setReactionPopover] = useState<{
+    messageId: string;
+    emoji: string;
+    rect: DOMRect;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const pendingScrollConversation = useRef<string | null>(null);
@@ -1932,17 +1938,46 @@ export default function Messages() {
     }
   };
 
-  const handleReactionBadgeClick = async (messageId: string, emoji: string, userAlreadyReacted: boolean) => {
-    try {
-      if (userAlreadyReacted) {
+  const handleReactionBadgeClick = async (
+    messageId: string,
+    emoji: string,
+    userAlreadyReacted: boolean,
+    badgeEl: HTMLButtonElement,
+  ) => {
+    if (userAlreadyReacted) {
+      // Toggle off the user's own reaction (existing behaviour)
+      try {
         await apiRequest('DELETE', `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);
-      } else {
-        await apiRequest('POST', `/api/messages/${messageId}/reactions`, { emoji });
+      } catch (err) {
+        console.error('Failed to remove reaction:', err);
       }
-    } catch (err) {
-      console.error('Failed to toggle reaction:', err);
+    } else {
+      // Show who reacted — open the reactor popover
+      const rect = badgeEl.getBoundingClientRect();
+      setReactionPopover({ messageId, emoji, rect });
     }
   };
+
+  // Lazy-fetch reaction details (names + avatars) when the reactor popover is open
+  const { data: reactionDetailData } = useQuery<{
+    reactions: Array<{
+      emoji: string;
+      count: number;
+      users: Array<{ id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null }>;
+    }>;
+  }>({
+    queryKey: ['/api/messages', reactionPopover?.messageId, 'reactions'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/messages/${reactionPopover!.messageId}/reactions`);
+      return res.json();
+    },
+    enabled: !!reactionPopover,
+    staleTime: 10000,
+  });
+
+  const reactionPopoverUsers = reactionDetailData?.reactions?.find(
+    r => r.emoji === reactionPopover?.emoji,
+  )?.users ?? [];
 
   // Close picker when the user starts a NEW press outside it.
   // Using 'pointerdown' (press-start) instead of 'click' or 'touchstart' means
@@ -3009,7 +3044,7 @@ export default function Messages() {
                             return (
                               <button
                                 key={emoji}
-                                onClick={() => handleReactionBadgeClick(message.id, emoji, userReacted)}
+                                onClick={(e) => handleReactionBadgeClick(message.id, emoji, userReacted, e.currentTarget)}
                                 className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs border transition-colors select-none ${
                                   userReacted
                                     ? 'bg-blue-500/30 border-blue-400/50 text-white'
@@ -3641,6 +3676,68 @@ export default function Messages() {
             </button>
           ))}
         </div>,
+        document.body,
+      )}
+
+      {/* Reaction reactor popover — shows who reacted with a given emoji */}
+      {reactionPopover && createPortal(
+        <>
+          {/* Backdrop — tap anywhere outside the card to close */}
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => setReactionPopover(null)}
+            data-testid="reaction-popover-backdrop"
+          />
+          <div
+            style={{
+              position: 'fixed',
+              left: Math.min(
+                Math.max(reactionPopover.rect.left + reactionPopover.rect.width / 2, 120),
+                window.innerWidth - 120,
+              ),
+              top: reactionPopover.rect.top,
+              transform: 'translate(-50%, calc(-100% - 8px))',
+              zIndex: 9999,
+              maxWidth: 220,
+              minWidth: 140,
+            }}
+            className="bg-[#2a2a2a] border border-white/15 rounded-xl shadow-2xl p-3"
+            data-testid="reaction-popover"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-white/10">
+              <span className="text-base leading-none">{reactionPopover.emoji}</span>
+              <span className="text-xs text-white/50 font-medium">
+                {reactionPopoverUsers.length === 1 ? '1 reaction' : `${reactionPopoverUsers.length} reactions`}
+              </span>
+            </div>
+            {/* Reactor list */}
+            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+              {reactionPopoverUsers.length === 0 ? (
+                <p className="text-xs text-white/40 text-center py-1">Loading…</p>
+              ) : (
+                reactionPopoverUsers.map((reactor) => {
+                  const name = [reactor.firstName, reactor.lastName].filter(Boolean).join(' ') || 'Unknown';
+                  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                  const avatarUrl = reactor.profileImageUrl ? getImageUrl(reactor.profileImageUrl) : null;
+                  return (
+                    <div key={reactor.id} className="flex items-center gap-2" data-testid={`reactor-${reactor.id}`}>
+                      <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-white/10 flex items-center justify-center">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-semibold text-white/70">{initials}</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-white/80 truncate">{name}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>,
         document.body,
       )}
     </>
