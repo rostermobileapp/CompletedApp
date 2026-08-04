@@ -732,7 +732,6 @@ export default function LeagueManagement() {
   
   // Co-commissioner management state
   const [coCommissionerEmail, setCoCommissionerEmail] = useState('');
-  const [adminEmail, setAdminEmail] = useState('');
   const [statManagerEmail, setStatManagerEmail] = useState('');
 
   // Transfer commissioner state
@@ -1227,14 +1226,6 @@ export default function LeagueManagement() {
   const coCommissioners = React.useMemo(() => {
     if (!members || !Array.isArray(members)) return [];
     return members.filter((member: any) => member.leagueRole === 'secondary_commissioner');
-  }, [members]);
-
-  // Get current admins from members with admin special permission
-  const admins = React.useMemo(() => {
-    if (!members || !Array.isArray(members)) return [];
-    return members.filter((member: any) => 
-      member.leagueSpecialPermissions?.includes('admin')
-    );
   }, [members]);
 
   // Get current stat managers from members with stat_manager special permission
@@ -2171,75 +2162,6 @@ export default function LeagueManagement() {
     onError: () => {
       toast({
         title: 'Failed to Remove Co-Commissioner',
-        description: 'Please try again.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Add admin special permission mutation
-  const addAdminMutation = useMutation({
-    mutationFn: async (email: string) => {
-      // Find user by email from members list
-      const member = members?.find((m: any) => m.user.email === email);
-      if (!member) {
-        throw new Error('User not found in league members');
-      }
-      
-      const currentPermissions = member.leagueSpecialPermissions || [];
-      const newPermissions = currentPermissions.includes('admin') 
-        ? currentPermissions 
-        : [...currentPermissions, 'admin'];
-      
-      const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/users/${member.userId}/permissions`, {
-        leagueRole: member.leagueRole,
-        leagueSpecialPermissions: newPermissions
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Admin Added',
-        description: 'User has been granted admin privileges.',
-      });
-      setAdminEmail('');
-      refetchMembers();
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Failed to Add Admin',
-        description: error.message || 'Please check the email and try again.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Remove admin special permission mutation
-  const removeAdminMutation = useMutation({
-    mutationFn: async ({ userId, currentPermissions }: { userId: string; currentPermissions: string[] }) => {
-      const member = members?.find((m: any) => m.userId === userId);
-      if (!member) {
-        throw new Error('User not found');
-      }
-      
-      const newPermissions = currentPermissions.filter(p => p !== 'admin');
-      
-      const response = await apiRequest('PATCH', `/api/leagues/${leagueId}/users/${userId}/permissions`, {
-        leagueRole: member.leagueRole,
-        leagueSpecialPermissions: newPermissions
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Admin Removed',
-        description: 'Admin privileges have been revoked.',
-      });
-      refetchMembers();
-    },
-    onError: () => {
-      toast({
-        title: 'Failed to Remove Admin',
         description: 'Please try again.',
         variant: 'destructive',
       });
@@ -5843,74 +5765,6 @@ export default function LeagueManagement() {
                       data-testid="button-add-cocommissioner"
                     >
                       {addCoCommissionerMutation.isPending ? 'Adding...' : 'Add'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Admin Management */}
-                <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3">League Admins</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Grant admin privileges to users. Admins can manage league settings and permissions.
-                  </p>
-                  
-                  {/* Current admins list */}
-                  {admins.length > 0 && (
-                    <div className="mb-3 space-y-2">
-                      {admins.map((admin: any) => (
-                        <div key={admin.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-red-500" />
-                            <span className="text-sm">
-                              {admin.user.firstName && admin.user.lastName 
-                                ? `${admin.user.firstName} ${admin.user.lastName}` 
-                                : admin.user.email}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm('Remove admin privileges from this user?')) {
-                                removeAdminMutation.mutate({ 
-                                  userId: admin.userId, 
-                                  currentPermissions: admin.leagueSpecialPermissions || [] 
-                                });
-                              }
-                            }}
-                            disabled={removeAdminMutation.isPending}
-                            className="text-red-500 hover:text-red-600 text-sm"
-                            data-testid={`button-remove-admin-${admin.id}`}
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Add new admin */}
-                  <div className="flex gap-2">
-                    <MemberSearchInput
-                      members={members}
-                      value={adminEmail}
-                      onChange={setAdminEmail}
-                      placeholder="Search by name or enter email"
-                      data-testid="input-admin-email"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!adminEmail) {
-                          toast({ title: 'Please enter an email address', variant: 'destructive' });
-                          return;
-                        }
-                        addAdminMutation.mutate(adminEmail);
-                      }}
-                      disabled={addAdminMutation.isPending || !adminEmail}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary text-sm font-medium disabled:opacity-50"
-                      data-testid="button-add-admin"
-                    >
-                      {addAdminMutation.isPending ? 'Adding...' : 'Add'}
                     </button>
                   </div>
                 </div>
