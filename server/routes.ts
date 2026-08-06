@@ -6268,6 +6268,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // They live in placeholder_players, not league_memberships.
       if (memberId.startsWith('placeholder:')) {
         const placeholderId = memberId.slice('placeholder:'.length);
+
+        // Capture old team before updating so we can sync both old and new chats
+        const [existingPlaceholder] = await db
+          .select({ teamId: placeholderPlayers.teamId })
+          .from(placeholderPlayers)
+          .where(eq(placeholderPlayers.id, placeholderId));
+        const oldPlaceholderTeamId = existingPlaceholder?.teamId ?? null;
+
         const updated = await storage.updatePlaceholderPlayer(placeholderId, {
           firstName: updates.displayFirstName ?? undefined,
           lastName: updates.displayLastName ?? undefined,
@@ -6278,6 +6286,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isGoalie: updates.isGoalie !== undefined ? Boolean(updates.isGoalie) : undefined,
           isSkater: updates.isSkater !== undefined ? Boolean(updates.isSkater) : undefined,
         });
+
+        // If the placeholder's team changed, sync both old and new team chats
+        if ('assignedTeamId' in updates) {
+          const newPlaceholderTeamId = updates.assignedTeamId ?? null;
+          if (oldPlaceholderTeamId !== newPlaceholderTeamId) {
+            try {
+              if (oldPlaceholderTeamId) {
+                await messagingService.syncTeamChatParticipants(oldPlaceholderTeamId, leagueId);
+              }
+              if (newPlaceholderTeamId) {
+                await messagingService.syncTeamChatParticipants(newPlaceholderTeamId, leagueId);
+              }
+            } catch (chatSyncError) {
+              console.error('Error syncing team chat after placeholder team change:', chatSyncError);
+            }
+          }
+        }
+
         // Return a synthetic member-shaped response so the frontend is happy
         return res.json({ id: memberId, ...updates, updated });
       }
@@ -12426,13 +12452,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           failedRecords: parseResults.data.length - actualSuccessCount
         });
 
-        // Sync team chat participants for all teams that had players added or changed
-        for (const teamId of teamsToSyncAfterImport) {
-          try {
-            await messagingService.syncTeamChatParticipants(teamId, leagueId);
-          } catch (error) {
-            console.error(`Error syncing team chat for team ${teamId} after import:`, error);
+        // Sync team chat participants for every team in the league now that
+        // players have been assigned.  We fetch all league teams rather than
+        // only the ones touched during this batch so that pre-existing teams
+        // (and any newly-created ones) all get their group chats bootstrapped
+        // in one pass.
+        try {
+          const allLeagueTeams = await db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(eq(teams.leagueId, leagueId));
+
+          for (const team of allLeagueTeams) {
+            try {
+              await messagingService.syncTeamChatParticipants(team.id, leagueId);
+            } catch (error) {
+              console.error(`Error syncing team chat for team ${team.id} after import:`, error);
+            }
           }
+          console.log(`[ImportSync] Synced ${allLeagueTeams.length} team chat(s) for league ${leagueId} after player import`);
+        } catch (error) {
+          console.error(`Error fetching teams for chat sync after import in league ${leagueId}:`, error);
         }
 
         // Clean up uploaded file
