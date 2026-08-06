@@ -620,6 +620,7 @@ export default function LeagueManagement() {
   const [seasonToDelete, setSeasonToDelete] = useState<Season | null>(null);
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [showSendInvitesConfirm, setShowSendInvitesConfirm] = useState(false);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -2172,8 +2173,8 @@ export default function LeagueManagement() {
   // ─── Send welcome emails ───────────────────────────────────────────────
   const sendWelcomeEmailsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/send-welcome-emails`);
-      return response.json() as Promise<{ sent: number; failed: number }>;
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/send-welcome-emails`, {});
+      return response.json() as Promise<{ pushed: number; emailed: number; skipped: number; failed: number }>;
     },
     onSuccess: (data: { pushed: number; emailed: number; skipped: number; failed: number }) => {
       const parts: string[] = [];
@@ -3056,19 +3057,44 @@ export default function LeagueManagement() {
             })()}
           </div>
           {isCommissioner && (
-            <button
-              onClick={() => {
-                if (confirm('Send welcome emails to all league members with an email on file? Each person will be invited to create an account and download the app.')) {
-                  sendWelcomeEmailsMutation.mutate();
-                }
-              }}
-              disabled={sendWelcomeEmailsMutation.isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 font-medium text-[14px] text-[#ffffff] bg-[#3c83f6] rounded disabled:opacity-50"
-              data-testid="button-send-welcome-emails"
-            >
-              <Mail className="w-4 h-4" />
-              {sendWelcomeEmailsMutation.isPending ? 'Sending…' : 'Send Invites'}
-            </button>
+            <>
+              <button
+                onClick={() => setShowSendInvitesConfirm(true)}
+                disabled={sendWelcomeEmailsMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 font-medium text-[14px] text-[#ffffff] bg-[#3c83f6] rounded disabled:opacity-50"
+                data-testid="button-send-welcome-emails"
+              >
+                <Mail className="w-4 h-4" />
+                {sendWelcomeEmailsMutation.isPending ? 'Sending…' : 'Send Invites'}
+              </button>
+              {showSendInvitesConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6">
+                  <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Send Invites?</h3>
+                    <p className="text-sm text-gray-600 mb-6">
+                      New members will receive a push notification or welcome email. Anyone already invited will be skipped automatically.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowSendInvitesConfirm(false)}
+                        className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-700 font-semibold text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowSendInvitesConfirm(false);
+                          sendWelcomeEmailsMutation.mutate();
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-[#3c83f6] text-white font-semibold text-sm"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <button
             onClick={() => setShowEditLeague(true)}

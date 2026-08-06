@@ -12621,6 +12621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = req.params.leagueId;
       const userId = req.user.claims.sub;
+      console.log(`[WelcomeEmails] Request received — league: ${leagueId}, user: ${userId}`);
 
       const league = await storage.getLeague(leagueId);
       if (!league) return res.status(404).json({ message: 'League not found' });
