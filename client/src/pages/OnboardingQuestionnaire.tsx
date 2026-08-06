@@ -23,9 +23,6 @@ interface QuestionnaireState {
   goal: string;
   pains: string[];
   sport: string;
-  features: string[];
-  otherSports: string[];
-  otherSportCustom: string;
   referralCode: string;
   referralPartnerId: string;
   referralOtherText: string;
@@ -57,22 +54,6 @@ const SPORTS = [
   { value: 'other', label: "Another sport", emoji: '🏅' },
 ];
 
-const SPORTS_POLL = [
-  { value: 'soccer', label: "Soccer", emoji: '⚽' },
-  { value: 'basketball', label: "Basketball", emoji: '🏀' },
-  { value: 'baseball', label: "Baseball", emoji: '⚾' },
-  { value: 'other', label: "Another sport", emoji: '🏅' },
-  { value: 'none', label: "None", emoji: '🚫' },
-];
-
-const FEATURES = [
-  { value: 'scheduling', label: "Game scheduling & RSVPs", icon: Calendar },
-  { value: 'messaging', label: "Team messaging", icon: MessageSquare },
-  { value: 'roster', label: "Roster management", icon: Users },
-  { value: 'stats', label: "Stats & standings", icon: BarChart2 },
-  { value: 'payments', label: "Fee collection", icon: DollarSign },
-  { value: 'subs', label: "Sub request tool", icon: Zap },
-];
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
@@ -94,9 +75,6 @@ export default function OnboardingQuestionnaire() {
     goal: '',
     pains: [],
     sport: '',
-    features: [],
-    otherSports: [],
-    otherSportCustom: '',
     referralCode: '',
     referralPartnerId: '',
     referralOtherText: '',
@@ -143,13 +121,6 @@ export default function OnboardingQuestionnaire() {
     setState(prev => ({
       ...prev,
       pains: prev.pains.includes(val) ? prev.pains.filter(p => p !== val) : [...prev.pains, val],
-    }));
-  }
-
-  function toggleFeature(val: string) {
-    setState(prev => ({
-      ...prev,
-      features: prev.features.includes(val) ? prev.features.filter(f => f !== val) : [...prev.features, val],
     }));
   }
 
@@ -501,73 +472,8 @@ export default function OnboardingQuestionnaire() {
         {/* ── PREFERENCES ──────────────────────────────── */}
         {screen === 'preferences' && (
           <div className="pt-6">
-            <h2 className="text-2xl font-black text-gray-900 mb-2">What matters most to you?</h2>
-            <p className="text-gray-500 mb-6">Pick the features you care about most.</p>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {FEATURES.map(f => {
-                const selected = state.features.includes(f.value);
-                const Icon = f.icon;
-                return (
-                  <button
-                    key={f.value}
-                    onClick={() => toggleFeature(f.value)}
-                    className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all ${
-                      selected
-                        ? 'border-[#3c82f4] bg-blue-50 text-[#3c82f4]'
-                        : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
-                    }`}
-                  >
-                    <Icon className={`w-6 h-6 ${selected ? 'text-[#3c82f4]' : 'text-gray-400'}`} />
-                    <span className={`text-xs font-semibold text-center leading-tight ${selected ? 'text-[#3c82f4]' : 'text-gray-700'}`}>{f.label}</span>
-                    {selected && <Check className="w-4 h-4 text-[#3c82f4]" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mb-6">
-              <p className="text-sm font-semibold text-gray-700 mb-1">What other sports would you consider using Roster for?</p>
-              <p className="text-xs text-gray-400 mb-3">Select all that apply.</p>
-              <div className="grid grid-cols-3 gap-2">
-                {SPORTS_POLL.map(s => {
-                  const selected = state.otherSports.includes(s.value);
-                  return (
-                    <button
-                      key={s.value}
-                      onClick={() => {
-                        setState(prev => {
-                          if (prev.otherSports.includes(s.value)) {
-                            const next = prev.otherSports.filter(v => v !== s.value);
-                            return { ...prev, otherSports: next, otherSportCustom: s.value === 'other' ? '' : prev.otherSportCustom };
-                          }
-                          if (s.value === 'none') {
-                            return { ...prev, otherSports: ['none'], otherSportCustom: '' };
-                          }
-                          const next = [...prev.otherSports.filter(v => v !== 'none'), s.value];
-                          return { ...prev, otherSports: next };
-                        });
-                      }}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
-                        selected ? 'border-[#3c82f4] bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="text-xl">{s.emoji}</span>
-                      <span className={`text-xs font-semibold text-center leading-tight ${selected ? 'text-[#3c82f4]' : 'text-gray-700'}`}>{s.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {state.otherSports.includes('other') && (
-                <input
-                  type="text"
-                  value={state.otherSportCustom}
-                  onChange={e => setState(prev => ({ ...prev, otherSportCustom: e.target.value }))}
-                  placeholder="Which sport?"
-                  className="mt-3 w-full px-4 py-2.5 rounded-xl border-2 border-[#3c82f4] bg-blue-50 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-                  autoFocus
-                />
-              )}
-            </div>
+            <h2 className="text-2xl font-black text-gray-900 mb-2">How did you hear about us?</h2>
+            <p className="text-gray-500 mb-6">Select your hockey association or partner organization, if applicable.</p>
 
             {/* Who referred you dropdown */}
             <div className="mb-6">
@@ -603,19 +509,6 @@ export default function OnboardingQuestionnaire() {
             <button
               onClick={async () => {
                 const saves: Promise<void>[] = [];
-
-                if (state.otherSports.length > 0) {
-                  saves.push(
-                    fetch('/api/onboarding-sport-poll', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        sports: state.otherSports,
-                        otherSportText: state.otherSports.includes('other') ? state.otherSportCustom || null : null,
-                      }),
-                    }).then(() => {}).catch(() => {})
-                  );
-                }
 
                 // Persist referral selection to user profile (authenticated users only)
                 const hasRealPartner = state.referralPartnerId && state.referralPartnerId !== 'other';
@@ -708,7 +601,6 @@ export default function OnboardingQuestionnaire() {
           <DemoScreen
             goal={state.goal}
             sport={state.sport}
-            features={state.features}
             onContinue={() => goTo('paywall')}
           />
         )}
@@ -729,12 +621,10 @@ export default function OnboardingQuestionnaire() {
 function DemoScreen({
   goal,
   sport,
-  features,
   onContinue,
 }: {
   goal: string;
   sport: string;
-  features: string[];
   onContinue: () => void;
 }) {
   const [rsvps, setRsvps] = useState<Record<string, 'yes' | 'no' | null>>({});
