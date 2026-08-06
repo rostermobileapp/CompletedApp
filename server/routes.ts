@@ -12724,8 +12724,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[WelcomeEmails] League ${leagueId}: pushed ${pushed}, emailed ${emailed}, skipped ${skipped}, failed ${failed}`);
       res.json({ pushed, emailed, skipped, failed });
-    } catch (error) {
-      console.error('Error sending welcome emails:', error);
+    } catch (error: any) {
+      console.error('[WelcomeEmails] Outer error:', error?.message, error?.stack);
       res.status(500).json({ message: 'Failed to send welcome emails' });
     }
   });
