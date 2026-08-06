@@ -31,7 +31,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -12653,12 +12653,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
 
+      // Load the set of users who have already received an invite for this league
+      const alreadyInvitedRows = await db
+        .select({ userId: leagueInvitesSent.userId })
+        .from(leagueInvitesSent)
+        .where(eq(leagueInvitesSent.leagueId, leagueId));
+      const alreadyInvited = new Set(alreadyInvitedRows.map(r => r.userId));
+
       let pushed = 0;
       let emailed = 0;
+      let skipped = 0;
       let failed = 0;
       for (const member of memberships) {
         // Skip placeholder emails
         if (!member.email || member.email.includes('@placeholder.roster')) continue;
+
+        // Skip anyone who has already been invited
+        if (alreadyInvited.has(member.userId)) {
+          skipped++;
+          continue;
+        }
 
         let teamName: string | undefined;
         const teamId = userTeamMap.get(member.userId);
@@ -12683,25 +12697,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             data: { type: 'league_invite', leagueId },
           });
 
-          if (pushSent) {
-            pushed++;
-          } else {
+          const method = pushSent ? 'push' : 'email';
+
+          if (!pushSent) {
             // No push subscription — fall back to welcome email
             await sendWelcomeEmail(member.email, {
               playerName,
               leagueName: league.name,
               teamName,
             });
-            emailed++;
           }
+
+          // Record this invite so future sends skip this member
+          await db.insert(leagueInvitesSent).values({
+            leagueId,
+            userId: member.userId,
+            method,
+          }).onConflictDoNothing();
+
+          if (pushSent) pushed++; else emailed++;
         } catch (err) {
           console.error(`[WelcomeEmails] Failed for ${member.email}:`, err);
           failed++;
         }
       }
 
-      console.log(`[WelcomeEmails] League ${leagueId}: pushed ${pushed}, emailed ${emailed}, failed ${failed}`);
-      res.json({ pushed, emailed, failed });
+      console.log(`[WelcomeEmails] League ${leagueId}: pushed ${pushed}, emailed ${emailed}, skipped ${skipped}, failed ${failed}`);
+      res.json({ pushed, emailed, skipped, failed });
     } catch (error) {
       console.error('Error sending welcome emails:', error);
       res.status(500).json({ message: 'Failed to send welcome emails' });

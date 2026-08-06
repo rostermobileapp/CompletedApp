@@ -4182,3 +4182,18 @@ export const gameBeerCounts = pgTable("game_beer_counts", {
 ]);
 
 export type GameBeerCount = typeof gameBeerCounts.$inferSelect;
+
+// Tracks which users have already been sent an invite for a given league,
+// so pressing "Send Invites" a second time only reaches new members.
+export const leagueInvitesSent = pgTable("league_invites_sent", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leagueId: varchar("league_id").references(() => leagues.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  method: varchar("method", { length: 10 }).notNull(), // 'push' or 'email'
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_league_invite").on(table.leagueId, table.userId),
+  index("idx_league_invites_league").on(table.leagueId),
+]);
+
+export type LeagueInviteSent = typeof leagueInvitesSent.$inferSelect;
