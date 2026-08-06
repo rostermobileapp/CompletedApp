@@ -2189,8 +2189,9 @@ export default function LeagueManagement() {
         description: `${summary}${skippedNote}${failedNote}.`,
       });
     },
-    onError: () => {
-      toast({ title: 'Failed to send invites', variant: 'destructive' });
+    onError: (err: any) => {
+      const detail = err?.message ? ` (${err.message})` : '';
+      toast({ title: `Failed to send invites${detail}`, variant: 'destructive' });
     },
   });
 

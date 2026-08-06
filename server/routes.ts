@@ -12654,7 +12654,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
 
-      // Load the set of users who have already received an invite for this league
+      // Load the set of users who have already received an invite for this league.
+      // user_id stores either a real user UUID or an email address (for imported players
+      // who haven't created an account yet).
       const alreadyInvitedRows = await db
         .select({ userId: leagueInvitesSent.userId })
         .from(leagueInvitesSent)
@@ -12665,6 +12667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let emailed = 0;
       let skipped = 0;
       let failed = 0;
+
+      // ── Pass 1: existing registered members ────────────────────────────
       for (const member of memberships) {
         // Skip placeholder emails
         if (!member.email || member.email.includes('@placeholder.roster')) continue;
@@ -12719,6 +12723,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (pushSent) pushed++; else emailed++;
         } catch (err) {
           console.error(`[WelcomeEmails] Failed for ${member.email}:`, err);
+          failed++;
+        }
+      }
+
+      // ── Pass 2: imported players with emails who haven't signed up yet ─
+      // Build a set of emails already covered by registered members so we
+      // don't double-send.
+      const registeredEmails = new Set(memberships.map(m => m.email?.toLowerCase()).filter(Boolean));
+
+      const unregisteredImports = await db
+        .select({
+          id: importedPlayers.id,
+          firstName: importedPlayers.firstName,
+          lastName: importedPlayers.lastName,
+          email: importedPlayers.email,
+          teamId: importedPlayers.teamId,
+          mergedWithUserId: importedPlayers.mergedWithUserId,
+        })
+        .from(importedPlayers)
+        .where(
+          and(
+            eq(importedPlayers.leagueId, leagueId),
+            isNotNull(importedPlayers.email),
+            isNull(importedPlayers.mergedWithUserId),
+          )
+        );
+
+      for (const imp of unregisteredImports) {
+        const email = imp.email!;
+        if (!email || email.includes('@placeholder.roster')) continue;
+        if (registeredEmails.has(email.toLowerCase())) continue; // handled in pass 1
+        // Dedup key for imported players is their email address
+        if (alreadyInvited.has(email.toLowerCase())) {
+          skipped++;
+          continue;
+        }
+
+        let teamName: string | undefined;
+        if (imp.teamId) {
+          if (!teamCache.has(imp.teamId)) {
+            const team = await storage.getTeam(imp.teamId);
+            teamCache.set(imp.teamId, team?.name ?? '');
+          }
+          teamName = teamCache.get(imp.teamId) || undefined;
+        }
+
+        const playerName = `${imp.firstName ?? ''} ${imp.lastName ?? ''}`.trim() || email;
+
+        try {
+          await sendWelcomeEmail(email, {
+            playerName,
+            leagueName: league.name,
+            teamName,
+          });
+
+          // Track by email so repeat presses skip this person
+          await db.insert(leagueInvitesSent).values({
+            leagueId,
+            userId: email.toLowerCase(),
+            method: 'email',
+          }).onConflictDoNothing();
+
+          emailed++;
+        } catch (err) {
+          console.error(`[WelcomeEmails] Failed for imported player ${email}:`, err);
           failed++;
         }
       }
