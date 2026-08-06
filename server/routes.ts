@@ -12616,6 +12616,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync (or create) team group chats for every team in a league.
+  // Commissioners can call this to repair missing or stale team chats.
+  app.post('/api/leagues/:leagueId/sync-team-chats', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      const allTeams = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.leagueId, leagueId));
+
+      let synced = 0;
+      let failed = 0;
+      for (const team of allTeams) {
+        try {
+          await messagingService.syncTeamChatParticipants(team.id, leagueId);
+          synced++;
+        } catch (err) {
+          console.error(`[SyncTeamChats] Failed for team ${team.id}:`, err);
+          failed++;
+        }
+      }
+
+      console.log(`[SyncTeamChats] League ${leagueId}: synced ${synced}, failed ${failed}`);
+      res.json({ synced, failed });
+    } catch (error: any) {
+      console.error('[SyncTeamChats] Outer error:', error?.message);
+      res.status(500).json({ message: 'Failed to sync team chats' });
+    }
+  });
+
   // Send welcome emails to all league members with real emails on file
   app.post('/api/leagues/:leagueId/send-welcome-emails', isAuthenticated, async (req: any, res) => {
     try {
