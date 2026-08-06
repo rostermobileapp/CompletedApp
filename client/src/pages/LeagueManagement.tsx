@@ -59,7 +59,8 @@ import {
   Zap,
   Snowflake,
   RotateCcw,
-  BarChart2
+  BarChart2,
+  Mail
 } from 'lucide-react';
 import { insertTeamSchema, insertSeasonSchema, type LeagueProGrant, type League } from '@shared/schema';
 
@@ -2168,6 +2169,23 @@ export default function LeagueManagement() {
     },
   });
 
+  // ─── Send welcome emails ───────────────────────────────────────────────
+  const sendWelcomeEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/send-welcome-emails`);
+      return response.json() as Promise<{ sent: number; failed: number }>;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Invites sent',
+        description: `Welcome emails sent to ${data.sent} player${data.sent === 1 ? '' : 's'}${data.failed > 0 ? ` (${data.failed} failed)` : ''}.`,
+      });
+    },
+    onError: () => {
+      toast({ title: 'Failed to send invites', variant: 'destructive' });
+    },
+  });
+
   // ─── League-Wide Player Pro: queries, mutations, redirect handler ─────
   // Latest player import — used to seed the default seat count.
   const { data: latestPlayerImport } = useQuery<{ successfulRecords: number } | null>({
@@ -3030,6 +3048,21 @@ export default function LeagueManagement() {
               );
             })()}
           </div>
+          {isCommissioner && (
+            <button
+              onClick={() => {
+                if (confirm('Send welcome emails to all league members with an email on file? Each person will be invited to create an account and download the app.')) {
+                  sendWelcomeEmailsMutation.mutate();
+                }
+              }}
+              disabled={sendWelcomeEmailsMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 font-medium text-[14px] text-[#ffffff] bg-[#3c83f6] rounded disabled:opacity-50"
+              data-testid="button-send-welcome-emails"
+            >
+              <Mail className="w-4 h-4" />
+              {sendWelcomeEmailsMutation.isPending ? 'Sending…' : 'Send Invites'}
+            </button>
+          )}
           <button
             onClick={() => setShowEditLeague(true)}
             className="px-3 py-1.5 hover:text-primary/80 font-medium text-[16px] text-[#ffffff] bg-[#3c83f6]"

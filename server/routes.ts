@@ -12404,25 +12404,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 },
               } as any);
 
-              // Send welcome email when a player is newly added to the league (only if email provided)
-              // This notifies them that they've been added to a team/league
-              if (player.email) {
-                console.log(`[CSVImport] Sending welcome email to newly added player: ${player.email}`);
-                try {
-                  const teamName = player.teamId ? (await storage.getTeam(player.teamId))?.name : undefined;
-                  console.log(`[CSVImport] Team name: ${teamName || 'none'}, League: ${league.name}`);
-                  await sendWelcomeEmail(player.email, {
-                    playerName: `${player.firstName} ${player.lastName}`,
-                    leagueName: league.name,
-                    teamName: teamName,
-                  });
-                  console.log(`[CSVImport] Welcome email sent successfully to ${player.email}`);
-                } catch (emailError) {
-                  console.error(`[CSVImport] Failed to send welcome email to ${player.email}:`, emailError);
-                  // Don't fail the import if email fails
-                }
-              }
-
               // Track new player's team for chat syncing
               if (player.teamId) {
                 teamsToSyncAfterImport.add(player.teamId);
@@ -12632,6 +12613,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error adding player:', error);
       res.status(500).json({ message: 'Failed to add player' });
+    }
+  });
+
+  // Send welcome emails to all league members with real emails on file
+  app.post('/api/leagues/:leagueId/send-welcome-emails', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const userId = req.user.claims.sub;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      // Fetch all league members with their user records
+      const memberships = await db
+        .select({
+          userId: leagueMemberships.userId,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(leagueMemberships)
+        .innerJoin(users, eq(users.id, leagueMemberships.userId))
+        .where(eq(leagueMemberships.leagueId, leagueId));
+
+      // Gather team names in one pass for members who are on a team
+      const teamCache = new Map<string, string>();
+      const memberTeamRows = await db
+        .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId })
+        .from(teamMemberships)
+        .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
+        .where(eq(teams.leagueId, leagueId));
+
+      const userTeamMap = new Map<string, string>();
+      for (const tm of memberTeamRows) {
+        userTeamMap.set(tm.userId, tm.teamId);
+      }
+
+      let sent = 0;
+      let failed = 0;
+      for (const member of memberships) {
+        // Skip placeholder emails
+        if (!member.email || member.email.includes('@placeholder.roster')) continue;
+
+        let teamName: string | undefined;
+        const teamId = userTeamMap.get(member.userId);
+        if (teamId) {
+          if (!teamCache.has(teamId)) {
+            const team = await storage.getTeam(teamId);
+            teamCache.set(teamId, team?.name ?? '');
+          }
+          teamName = teamCache.get(teamId) || undefined;
+        }
+
+        try {
+          await sendWelcomeEmail(member.email, {
+            playerName: `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || member.email,
+            leagueName: league.name,
+            teamName,
+          });
+          sent++;
+        } catch (err) {
+          console.error(`[WelcomeEmails] Failed to send to ${member.email}:`, err);
+          failed++;
+        }
+      }
+
+      console.log(`[WelcomeEmails] League ${leagueId}: sent ${sent}, failed ${failed}`);
+      res.json({ sent, failed });
+    } catch (error) {
+      console.error('Error sending welcome emails:', error);
+      res.status(500).json({ message: 'Failed to send welcome emails' });
     }
   });
 
