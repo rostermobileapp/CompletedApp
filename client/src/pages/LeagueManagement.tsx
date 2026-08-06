@@ -2175,10 +2175,14 @@ export default function LeagueManagement() {
       const response = await apiRequest('POST', `/api/leagues/${leagueId}/send-welcome-emails`);
       return response.json() as Promise<{ sent: number; failed: number }>;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { pushed: number; emailed: number; failed: number }) => {
+      const parts: string[] = [];
+      if (data.pushed > 0) parts.push(`${data.pushed} push notification${data.pushed === 1 ? '' : 's'}`);
+      if (data.emailed > 0) parts.push(`${data.emailed} email${data.emailed === 1 ? '' : 's'}`);
+      const summary = parts.length ? parts.join(' + ') : 'No eligible members found';
       toast({
         title: 'Invites sent',
-        description: `Welcome emails sent to ${data.sent} player${data.sent === 1 ? '' : 's'}${data.failed > 0 ? ` (${data.failed} failed)` : ''}.`,
+        description: `${summary} sent${data.failed > 0 ? ` (${data.failed} failed)` : ''}.`,
       });
     },
     onError: () => {

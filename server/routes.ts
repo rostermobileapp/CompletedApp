@@ -12651,7 +12651,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userTeamMap.set(tm.userId, tm.teamId);
       }
 
-      let sent = 0;
+      const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+
+      let pushed = 0;
+      let emailed = 0;
       let failed = 0;
       for (const member of memberships) {
         // Skip placeholder emails
@@ -12667,21 +12670,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamName = teamCache.get(teamId) || undefined;
         }
 
+        const playerName = `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || member.email;
+        const teamSuffix = teamName ? ` — ${teamName}` : '';
+
         try {
-          await sendWelcomeEmail(member.email, {
-            playerName: `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || member.email,
-            leagueName: league.name,
-            teamName,
+          // Try push first — if the user has the app installed they'll have a
+          // OneSignal subscription on file. Skip the email if push succeeds.
+          const pushSent = await sendPushNotificationToUser({
+            userId: member.userId,
+            title: `You're in ${league.name}!`,
+            message: `You've been added to ${league.name}${teamSuffix}. Tap to view your roster.`,
+            data: { type: 'league_invite', leagueId },
           });
-          sent++;
+
+          if (pushSent) {
+            pushed++;
+          } else {
+            // No push subscription — fall back to welcome email
+            await sendWelcomeEmail(member.email, {
+              playerName,
+              leagueName: league.name,
+              teamName,
+            });
+            emailed++;
+          }
         } catch (err) {
-          console.error(`[WelcomeEmails] Failed to send to ${member.email}:`, err);
+          console.error(`[WelcomeEmails] Failed for ${member.email}:`, err);
           failed++;
         }
       }
 
-      console.log(`[WelcomeEmails] League ${leagueId}: sent ${sent}, failed ${failed}`);
-      res.json({ sent, failed });
+      console.log(`[WelcomeEmails] League ${leagueId}: pushed ${pushed}, emailed ${emailed}, failed ${failed}`);
+      res.json({ pushed, emailed, failed });
     } catch (error) {
       console.error('Error sending welcome emails:', error);
       res.status(500).json({ message: 'Failed to send welcome emails' });
