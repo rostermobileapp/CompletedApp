@@ -1593,6 +1593,7 @@ export default function CreateScrimmage() {
                           <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>
                             {member.user.firstName} {member.user.lastName}
                             {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
+                            {member.isPlaceholder && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 leading-tight text-muted-foreground">Placeholder</Badge>}
                           </span>
                         </div>
                       ))}
@@ -1662,6 +1663,7 @@ export default function CreateScrimmage() {
                           <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>
                             {member.user.firstName} {member.user.lastName}
                             {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
+                            {member.isPlaceholder && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 leading-tight text-muted-foreground">Placeholder</Badge>}
                           </span>
                         </div>
                       ))}

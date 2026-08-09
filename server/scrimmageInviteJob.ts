@@ -96,6 +96,15 @@ async function checkAndSendInvitations() {
         // created (synchronous path in POST /api/scrimmages); the job only handles
         // future occurrences.  When no group is attached the job falls back to
         // all currently-approved league members (original behaviour).
+        //
+        // Placeholder players (id prefix "placeholder:") never have accounts so
+        // they cannot receive push / in-app notifications, but their selection is
+        // preserved in inviteUserIds and must not be silently discarded.  We
+        // collect them separately so they are acknowledged in logs and kept in
+        // the invite record even though no notification is sent.
+        const allInviteUserIds: string[] = parentScrimmage.inviteUserIds || [];
+        const placeholderInviteIds = allInviteUserIds.filter(id => id.startsWith('placeholder:'));
+
         let approvedMembers;
         if (parentScrimmage.inviteGroupId) {
           const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
@@ -105,14 +114,19 @@ async function checkAndSendInvitations() {
           const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
           const recipientIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
 
-          // Union: add directly-selected individuals who are still approved league members
-          const directInvitees: string[] = parentScrimmage.inviteUserIds || [];
+          // Union: add directly-selected real users who are still approved league members.
+          // Placeholder IDs are handled separately via placeholderInviteIds above.
+          const directInvitees = allInviteUserIds.filter(uid => !uid.startsWith('placeholder:'));
           directInvitees.forEach(uid => { if (leagueMemberMap.has(uid)) recipientIds.add(uid); });
 
           approvedMembers = [...recipientIds].map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
-          console.log(`📋 Live invite group ${parentScrimmage.inviteGroupId} + ${directInvitees.length} direct invitees → ${approvedMembers.length} recipients`);
+          console.log(`📋 Live invite group ${parentScrimmage.inviteGroupId} + ${directInvitees.length} direct invitees + ${placeholderInviteIds.length} placeholders → ${approvedMembers.length} real recipients`);
         } else {
           approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
+        }
+
+        if (placeholderInviteIds.length > 0) {
+          console.log(`📋 ${placeholderInviteIds.length} placeholder invitee(s) on this scrimmage — no notifications sent (no account)`);
         }
         
         // Get the creator's name for the push notification

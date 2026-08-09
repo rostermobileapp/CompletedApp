@@ -6524,7 +6524,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const members = await storage.getLeagueMembers(leagueId);
-      res.json(members);
+
+      // Merge placeholder players so organizers can include them in the invite list.
+      // Placeholders have no user account, so we synthesise a user-shaped object with
+      // the id prefix "placeholder:{uuid}" to distinguish them on the client.
+      const placeholders = await storage.getLeaguePlaceholderPlayers(leagueId);
+      const placeholderMembers = placeholders.map(ph => ({
+        // League-membership fields that the client reads
+        id: `placeholder-membership:${ph.id}`,
+        leagueId,
+        userId: `placeholder:${ph.id}`,
+        status: 'approved' as const,
+        isGoalie: ph.isGoalie,
+        isSkater: ph.isSkater,
+        isPlaceholder: true,
+        // Synthetic user object matching the shape of a real member's .user
+        user: {
+          id: `placeholder:${ph.id}`,
+          firstName: ph.firstName,
+          lastName: ph.lastName,
+          profileImageUrl: null,
+          email: ph.email ?? null,
+          displayId: null,
+          role: null,
+        },
+      }));
+
+      res.json([...members, ...placeholderMembers]);
     } catch (error) {
       console.error("Error fetching league members for scrimmage:", error);
       res.status(500).json({ message: "Failed to fetch league members" });
@@ -15584,9 +15610,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create announcement first if there are selected members
+      // Create announcement first if there are selected members.
+      // Placeholder players (id prefix "placeholder:") have no users row — exclude
+      // them before writing announcement visibility records (FK to users.id).
+      // Only create the announcement when at least one real user is targeted;
+      // an announcement with no visibility rows is visible to the entire league.
       let announcementId = null;
-      if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+      const realSelectedMemberIds = (req.body.selectedMemberIds || []).filter(
+        (id: string) => !id.startsWith('placeholder:')
+      );
+      if (realSelectedMemberIds.length > 0) {
         try {
           
           const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)} at ${scrimmageData.location}. Click to RSVP!`;
@@ -15601,8 +15634,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           announcementId = announcement.id;
           
-          // Create visibility records for invited players
-          await storage.createAnnouncementVisibility(announcement.id, req.body.selectedMemberIds);
+          // Create visibility records for invited players (real users only)
+          await storage.createAnnouncementVisibility(announcement.id, realSelectedMemberIds);
           
         } catch (announcementError) {
           console.error('Error sending scrimmage invitations:', announcementError);
@@ -15831,6 +15864,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (e) { /* keep undefined */ }
           
           for (const memberId of req.body.selectedMemberIds) {
+            // Placeholder players have no account — skip notifications for them.
+            if (typeof memberId === 'string' && memberId.startsWith('placeholder:')) continue;
             try {
               // ALWAYS create in-app notification for Alerts
               await storage.createNotificationIfNotExists({
@@ -16008,6 +16043,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } catch (e) { /* keep undefined */ }
           
           for (const memberId of req.body.selectedMemberIds) {
+            // Placeholder players have no account — skip notifications for them.
+            if (typeof memberId === 'string' && memberId.startsWith('placeholder:')) continue;
             try {
               // ALWAYS create in-app notification for Alerts
               await storage.createNotificationIfNotExists({
