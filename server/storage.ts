@@ -9535,6 +9535,11 @@ export class DatabaseStorage implements IStorage {
     // Atomically stamp backupNotifiedAt on exactly one unnotified backup row.
     // Uses a correlated sub-select with FOR UPDATE SKIP LOCKED so concurrent cascades
     // cannot both claim the same row — only the first writer wins.
+    //
+    // NOTE: db.execute returns raw snake_case column names, not the camelCase
+    // shape that Drizzle ORM normally provides.  We extract just the `id` from
+    // the raw result and then re-fetch via Drizzle's typed .select() so callers
+    // receive a properly-mapped ScrimmageRequest (e.g. playerId, backupPosition).
     const now = new Date();
     const result = await db.execute(sql`
       UPDATE scrimmage_requests
@@ -9550,10 +9555,16 @@ export class DatabaseStorage implements IStorage {
         LIMIT  1
         FOR UPDATE SKIP LOCKED
       )
-      RETURNING *
+      RETURNING id
     `);
-    // db.execute returns a QueryResult with .rows — not a plain array
-    return (result.rows[0] as ScrimmageRequest | undefined);
+    const rawRow = result.rows[0] as { id: string } | undefined;
+    if (!rawRow) return undefined;
+    // Re-fetch via Drizzle to get properly camelCase-mapped ScrimmageRequest
+    const [updated] = await db
+      .select()
+      .from(scrimmageRequests)
+      .where(eq(scrimmageRequests.id, rawRow.id));
+    return updated;
   }
 
   /** @deprecated Use claimAndNotifyNextBackup for atomic vacancy notification */
