@@ -1132,23 +1132,10 @@ export class DatabaseStorage implements IStorage {
           console.error('[Storage] claimPlaceholdersForUser failed for new user:', claimErr);
         }
 
-        // Alert the founder (user U00001) in real time whenever a brand-new
-        // user signs up. Dynamically imported to avoid a circular import
-        // (oneSignalNotifications.ts imports `storage` from this file).
-        try {
-          const { sendNewSignupAlertPushNotification } = await import('./oneSignalNotifications');
-          sendNewSignupAlertPushNotification({
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            zipCode: (user as any).zipCode,
-          }).catch((notifyErr) => {
-            console.error('[Storage] sendNewSignupAlertPushNotification failed:', notifyErr);
-          });
-        } catch (notifyErr) {
-          console.error('[Storage] Failed to load oneSignalNotifications for new-signup alert:', notifyErr);
-        }
+        // NOTE: The founder new-signup alert is intentionally NOT sent here.
+        // It fires only after the user completes onboarding (PATCH /api/user/onboarding
+        // with onboardingCompleted=true), so the notification carries a real name
+        // and profile rather than a bare auth record.
       }
 
       return user;

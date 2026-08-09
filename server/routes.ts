@@ -1265,7 +1265,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.referralCode = referralCode;
       }
 
+      // Check whether this PATCH is the moment onboarding completes for the
+      // first time, so we can fire the founder new-signup alert after the user
+      // has a real name/profile rather than at raw account creation.
+      let wasAlreadyCompleted = false;
+      if (onboardingCompleted === true) {
+        const [existing] = await db
+          .select({ onboardingCompleted: users.onboardingCompleted })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+        wasAlreadyCompleted = existing?.onboardingCompleted === true;
+      }
+
       const user = await storage.updateUserOnboarding(userId, updateData);
+
+      // Fire the founder alert only on the first completion transition.
+      if (onboardingCompleted === true && !wasAlreadyCompleted) {
+        try {
+          const { sendNewSignupAlertPushNotification } = await import('./oneSignalNotifications');
+          sendNewSignupAlertPushNotification({
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            zipCode: (user as any).zipCode,
+          }).catch((err) => {
+            console.error('[Onboarding] sendNewSignupAlertPushNotification failed:', err);
+          });
+        } catch (err) {
+          console.error('[Onboarding] Failed to load oneSignalNotifications:', err);
+        }
+      }
+
       res.json(user);
     } catch (error) {
       console.error("Error updating onboarding:", error);
