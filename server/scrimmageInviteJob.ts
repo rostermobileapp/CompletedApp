@@ -1,6 +1,6 @@
 import { storage } from './storage';
 import { db } from './db';
-import { teams, teamMemberships } from '@shared/schema';
+import { teams, teamMemberships, scrimmages as scrimmagesTable } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes, format } from 'date-fns';
 import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
@@ -112,15 +112,26 @@ async function checkAndSendInvitations() {
 
           // Live group members (re-fetched at send-time)
           const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
+
+          // Real user recipients from the group
           const recipientIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
 
+          // Placeholder members from the group — synthesise their IDs and merge into
+          // placeholderInviteIds so they are acknowledged alongside direct selections.
+          const groupPlaceholderIds = groupMembers
+            .filter(gm => (gm as any).placeholderPlayerId)
+            .map(gm => `placeholder:${(gm as any).placeholderPlayerId}`);
+          groupPlaceholderIds.forEach(pid => {
+            if (!placeholderInviteIds.includes(pid)) placeholderInviteIds.push(pid);
+          });
+
           // Union: add directly-selected real users who are still approved league members.
-          // Placeholder IDs are handled separately via placeholderInviteIds above.
+          // Placeholder IDs are handled separately via placeholderInviteIds.
           const directInvitees = allInviteUserIds.filter(uid => !uid.startsWith('placeholder:'));
           directInvitees.forEach(uid => { if (leagueMemberMap.has(uid)) recipientIds.add(uid); });
 
           approvedMembers = [...recipientIds].map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
-          console.log(`📋 Live invite group ${parentScrimmage.inviteGroupId} + ${directInvitees.length} direct invitees + ${placeholderInviteIds.length} placeholders → ${approvedMembers.length} real recipients`);
+          console.log(`📋 Live invite group ${parentScrimmage.inviteGroupId} + ${directInvitees.length} direct invitees + ${placeholderInviteIds.length} placeholders (${groupPlaceholderIds.length} from group) → ${approvedMembers.length} real recipients`);
         } else {
           approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
         }
@@ -190,6 +201,16 @@ async function checkAndSendInvitations() {
           }
         }
 
+        // Persist placeholder invite IDs back to the occurrence's invite_user_ids so they
+        // appear as proper invite records on the occurrence view (they have no account so
+        // no notification is sent, but their selection must be visible to the organiser).
+        if (placeholderInviteIds.length > 0) {
+          const existingIds: string[] = scrimmage.inviteUserIds || [];
+          const merged = Array.from(new Set([...existingIds, ...placeholderInviteIds]));
+          await db.update(scrimmagesTable).set({ inviteUserIds: merged } as any).where(eq(scrimmagesTable.id, scrimmage.id));
+          console.log(`📋 Persisted ${placeholderInviteIds.length} placeholder ID(s) to occurrence invite_user_ids`);
+        }
+
         // Mark the invite as sent
         await storage.updateScrimmageInviteSent(scrimmage.id);
         
@@ -210,7 +231,28 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
   const createdOccurrences: any[] = [];
   const now = new Date();
   const horizonDate = addDays(now, horizonWeeks * 7);
-  
+
+  // If the parent scrimmage has a live invite group, pre-fetch its placeholder members
+  // and merge their synthetic IDs into the occurrence's inviteUserIds immediately so
+  // they are visible to organizers before the scheduled invite-send job fires.
+  let effectiveParent = parentScrimmage;
+  if (parentScrimmage.inviteGroupId) {
+    try {
+      const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
+      const groupPlaceholderIds = groupMembers
+        .filter((gm: any) => (gm as any).placeholderPlayerId)
+        .map((gm: any) => `placeholder:${(gm as any).placeholderPlayerId}`);
+      if (groupPlaceholderIds.length > 0) {
+        const baseIds: string[] = parentScrimmage.inviteUserIds || [];
+        const merged = Array.from(new Set([...baseIds, ...groupPlaceholderIds]));
+        effectiveParent = { ...parentScrimmage, inviteUserIds: merged };
+        console.log(`📋 Merged ${groupPlaceholderIds.length} group placeholder(s) into occurrence inviteUserIds for recurring scrimmage ${parentScrimmage.id}`);
+      }
+    } catch (e) {
+      console.error(`[RecurringOccurrence] Failed to pre-fetch group placeholders for group ${parentScrimmage.inviteGroupId}:`, e);
+    }
+  }
+
   // Get league timezone for proper date conversion
   const league = await storage.getLeague(parentScrimmage.leagueId);
   const timezone = league?.timezone || 'America/New_York';
@@ -239,13 +281,14 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
       );
       
       if (!existingOccurrence && isAfter(currentDate, now)) {
-        // Persist the occurrence to the database
+        // Persist the occurrence to the database — use effectiveParent so placeholder IDs
+        // from the live invite group are baked into the occurrence's inviteUserIds at creation.
         const newOccurrence = await storage.createRecurringScrimmageOccurrence(
-          parentScrimmage,
+          effectiveParent,
           currentDate
         );
         createdOccurrences.push(newOccurrence);
-        console.log(`📅 Created recurring occurrence for ${parentScrimmage.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`📅 Created recurring occurrence for ${effectiveParent.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
       }
       
       currentDate = addDays(currentDate, 7);
@@ -266,9 +309,9 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
       );
       
       if (!existingOccurrence && isAfter(currentDate, now)) {
-        // Persist the occurrence to the database
+        // Persist using effectiveParent for the same reason as the weekly branch above.
         const newOccurrence = await storage.createRecurringScrimmageOccurrence(
-          parentScrimmage,
+          effectiveParent,
           currentDate
         );
         createdOccurrences.push(newOccurrence);

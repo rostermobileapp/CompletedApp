@@ -623,9 +623,9 @@ export interface IStorage {
   getInviteGroup(groupId: string): Promise<InviteGroup | undefined>;
   updateInviteGroup(groupId: string, updates: Partial<InsertInviteGroup>): Promise<InviteGroup>;
   deleteInviteGroup(groupId: string): Promise<void>;
-  addMembersToInviteGroup(groupId: string, members: InsertInviteGroupMember[]): Promise<InviteGroupMember[]>;
+  addMembersToInviteGroup(groupId: string, members: Array<{ userId?: string | null; placeholderPlayerId?: string | null; email?: string | null }>): Promise<InviteGroupMember[]>;
   removeMemberFromInviteGroup(groupId: string, memberId: string): Promise<void>;
-  getInviteGroupMembers(groupId: string): Promise<(InviteGroupMember & { user?: User })[]>;
+  getInviteGroupMembers(groupId: string): Promise<(InviteGroupMember & { user?: User; placeholderPlayer?: PlaceholderPlayer })[]>;
   
   // Scrimmage invite operations
   createScrimmageInvites(scrimmageId: string, emails: string[]): Promise<ScrimmageInvite[]>;
@@ -9826,10 +9826,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(inviteGroups).where(eq(inviteGroups.id, groupId));
   }
 
-  async addMembersToInviteGroup(groupId: string, members: InsertInviteGroupMember[]): Promise<InviteGroupMember[]> {
+  async addMembersToInviteGroup(groupId: string, members: any[]): Promise<InviteGroupMember[]> {
     if (members.length === 0) return [];
     
-    const membersWithGroupId = members.map(m => ({ ...m, groupId }));
+    const membersWithGroupId = members.map(m => {
+      // Detect placeholder synthetic ID (format: "placeholder:{uuid}") — store the
+      // real UUID in placeholderPlayerId and clear userId so the FK to users is not violated.
+      if (m.userId && typeof m.userId === 'string' && m.userId.startsWith('placeholder:')) {
+        const placeholderPlayerId = m.userId.slice('placeholder:'.length);
+        return { groupId, userId: null, placeholderPlayerId, email: m.email ?? null };
+      }
+      return { ...m, groupId };
+    });
     return await db.insert(inviteGroupMembers).values(membersWithGroupId).returning();
   }
 
@@ -9842,17 +9850,19 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getInviteGroupMembers(groupId: string): Promise<(InviteGroupMember & { user?: User })[]> {
+  async getInviteGroupMembers(groupId: string): Promise<(InviteGroupMember & { user?: User; placeholderPlayer?: PlaceholderPlayer })[]> {
     const results = await db
       .select()
       .from(inviteGroupMembers)
       .leftJoin(users, eq(inviteGroupMembers.userId, users.id))
+      .leftJoin(placeholderPlayers, eq((inviteGroupMembers as any).placeholderPlayerId, placeholderPlayers.id))
       .where(eq(inviteGroupMembers.groupId, groupId))
       .orderBy(asc(inviteGroupMembers.createdAt));
 
     return results.map(r => ({
       ...r.invite_group_members,
-      user: r.users || undefined
+      user: r.users || undefined,
+      placeholderPlayer: r.placeholder_players || undefined,
     }));
   }
 

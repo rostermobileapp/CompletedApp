@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { queryClient, apiRequest, getImageUrl } from '@/lib/queryClient';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, UserPlus, Mail, X, Users } from 'lucide-react';
+import { ArrowLeft, UserPlus, Mail, X, Users, MapPin } from 'lucide-react';
 
 const inviteGroupSchema = z.object({
   name: z.string().min(1, 'Group name is required'),
@@ -33,23 +35,44 @@ export default function EditInviteGroup() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
-  
+
+  // Facility filter — 'all' means no facility filter applied
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('all');
+
   // Email invite states
   const [emailSearchTerm, setEmailSearchTerm] = useState('');
   const [manualEmail, setManualEmail] = useState('');
 
-  // Fetch user's leagues for member selection
+  // Fetch user's leagues (includes .facility on each league)
   const { data: userLeagues = [] } = useQuery({
     queryKey: ['/api/user/leagues'],
   });
 
-  // Use first league (same logic as CreateScrimmage)
-  const selectedLeague = (userLeagues as any[])?.[0];
+  // Derive unique facilities from the user's leagues
+  const facilities = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string }>();
+    for (const league of userLeagues as any[]) {
+      if (league.facilityId && league.facility?.name) {
+        seen.set(league.facilityId, { id: league.facilityId, name: league.facility.name });
+      }
+    }
+    return Array.from(seen.values());
+  }, [userLeagues]);
 
-  // Fetch league members
+  // Fetch candidate members — merges all leagues (optionally filtered by facility)
+  const candidateMembersParams = selectedFacilityId !== 'all'
+    ? `?facilityId=${encodeURIComponent(selectedFacilityId)}`
+    : '';
   const { data: members = [], isLoading: membersLoading } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
-    enabled: !!selectedLeague?.id,
+    queryKey: ['/api/invite-groups/candidate-members', selectedFacilityId],
+    queryFn: async () => {
+      const response = await fetch(`/api/invite-groups/candidate-members${candidateMembersParams}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch members');
+      return response.json();
+    },
+    enabled: (userLeagues as any[]).length > 0,
   });
 
   // Fetch existing group data if editing
@@ -91,7 +114,7 @@ export default function EditInviteGroup() {
     },
   });
 
-  // Populate form and selections when editing
+  // Populate form when editing
   useEffect(() => {
     if (existingGroup) {
       form.reset({
@@ -101,16 +124,19 @@ export default function EditInviteGroup() {
     }
   }, [existingGroup, form]);
 
+  // Populate selections when editing — handle both userId and placeholderPlayerId
   useEffect(() => {
-    if (existingMembers.length > 0) {
-      const userIds = existingMembers
-        .filter((m: any) => m.userId)
-        .map((m: any) => m.userId);
-      const emails = existingMembers
-        .filter((m: any) => m.email && !m.userId)
+    if ((existingMembers as any[]).length > 0) {
+      const ids = (existingMembers as any[])
+        .filter((m: any) => m.userId || m.placeholderPlayerId)
+        .map((m: any) =>
+          m.placeholderPlayerId ? `placeholder:${m.placeholderPlayerId}` : m.userId
+        );
+      const emails = (existingMembers as any[])
+        .filter((m: any) => m.email && !m.userId && !m.placeholderPlayerId)
         .map((m: any) => m.email);
-      
-      setSelectedMemberIds(userIds);
+
+      setSelectedMemberIds(ids);
       setSelectedEmails(emails);
     }
   }, [existingMembers]);
@@ -129,17 +155,18 @@ export default function EditInviteGroup() {
   };
 
   const selectAllMembers = () => {
-    setSelectedMemberIds(filteredMembers.map((m: any) => m.user.id));
+    const ids = filteredMembers.map((m: any) => m.user.id);
+    setSelectedMemberIds(prev => Array.from(new Set([...prev, ...ids])));
   };
 
   const deselectAllMembers = () => {
-    setSelectedMemberIds([]);
+    const idSet = new Set(filteredMembers.map((m: any) => m.user.id));
+    setSelectedMemberIds(prev => prev.filter(id => !idSet.has(id)));
   };
 
   const addEmailInvite = (email: string) => {
     const trimmedEmail = email.trim().toLowerCase();
-    
-    // Basic email validation
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       toast({
         title: 'Invalid email',
@@ -150,10 +177,7 @@ export default function EditInviteGroup() {
     }
 
     if (selectedEmails.includes(trimmedEmail)) {
-      toast({
-        title: 'Email already added',
-        variant: 'destructive',
-      });
+      toast({ title: 'Email already added', variant: 'destructive' });
       return;
     }
 
@@ -169,43 +193,39 @@ export default function EditInviteGroup() {
   const createOrUpdateMutation = useMutation({
     mutationFn: async (data: InviteGroupForm) => {
       if (isEditing) {
-        // Update group info
         await apiRequest('PATCH', `/api/invite-groups/${groupId}`, data);
-        
-        // Update members
-        const members = [
+
+        const memberPayload = [
           ...selectedMemberIds.map(userId => ({ userId, email: null })),
           ...selectedEmails.map(email => ({ userId: null, email })),
         ];
-        
-        await apiRequest('POST', `/api/invite-groups/${groupId}/members`, { members });
-        
+        await apiRequest('POST', `/api/invite-groups/${groupId}/members`, { members: memberPayload });
+
         return { id: groupId };
       } else {
-        // Create new group
+        // Create group — use the first league that has an approved membership
+        const firstLeague = (userLeagues as any[])?.[0];
         const response = await apiRequest('POST', '/api/invite-groups', {
           ...data,
-          leagueId: selectedLeague?.id || null,
+          leagueId: firstLeague?.id || null,
         });
         const group = await response.json();
-        
-        // Add members
+
         if (selectedMemberIds.length > 0 || selectedEmails.length > 0) {
-          const members = [
+          const memberPayload = [
             ...selectedMemberIds.map(userId => ({ userId, email: null })),
             ...selectedEmails.map(email => ({ userId: null, email })),
           ];
-          
-          await apiRequest('POST', `/api/invite-groups/${group.id}/members`, { members });
+          await apiRequest('POST', `/api/invite-groups/${group.id}/members`, { members: memberPayload });
         }
-        
+
         return group;
       }
     },
     onSuccess: () => {
       toast({
         title: isEditing ? 'Group updated' : 'Group created',
-        description: isEditing 
+        description: isEditing
           ? 'Your invite group has been updated successfully'
           : 'Your invite group has been created successfully',
       });
@@ -230,8 +250,38 @@ export default function EditInviteGroup() {
       });
       return;
     }
-    
     createOrUpdateMutation.mutate(data);
+  };
+
+  // Helper: find display info for a selected member ID
+  const getMemberDisplayInfo = (memberId: string) => {
+    // Check existing members first (when editing)
+    const existingMember = (existingMembers as any[])?.find((m: any) =>
+      m.userId === memberId ||
+      (m.placeholderPlayerId && `placeholder:${m.placeholderPlayerId}` === memberId)
+    );
+    // Fall back to the candidate members list
+    const candidateMember = (members as any[])?.find((m: any) => m.user?.id === memberId);
+
+    const isPlaceholder = memberId.startsWith('placeholder:');
+
+    if (existingMember) {
+      if (existingMember.placeholderPlayer) {
+        return {
+          firstName: existingMember.placeholderPlayer.firstName,
+          lastName: existingMember.placeholderPlayer.lastName,
+          profileImageUrl: null,
+          isPlaceholder: true,
+        };
+      }
+      if (existingMember.user) {
+        return { ...existingMember.user, isPlaceholder: false };
+      }
+    }
+    if (candidateMember?.user) {
+      return { ...candidateMember.user, isPlaceholder };
+    }
+    return null;
   };
 
   if (isEditing && groupLoading) {
@@ -270,7 +320,7 @@ export default function EditInviteGroup() {
             <UserPlus className="w-5 h-5" />
             Group Information
           </h3>
-          
+
           <div className="space-y-4">
             <div>
               <Label htmlFor="name">Group Name *</Label>
@@ -311,47 +361,45 @@ export default function EditInviteGroup() {
                 Currently in Group ({selectedMemberIds.length + selectedEmails.length})
               </h4>
               <div className="space-y-2">
-                {/* Selected League Members */}
-                {selectedMemberIds.map(userId => {
-                  // When editing, try to find in existingMembers first, then fall back to members
-                  const existingMember = (existingMembers as any[])?.find((m: any) => m.userId === userId);
-                  const member = existingMember || (members as any[])?.find((m: any) => m.user.id === userId);
-                  
-                  // Get user data from either source
-                  const user = existingMember?.user || member?.user;
-                  if (!user) return null;
-                  
+                {selectedMemberIds.map(memberId => {
+                  const info = getMemberDisplayInfo(memberId);
+                  if (!info) return null;
+
                   return (
                     <div
-                      key={userId}
+                      key={memberId}
                       className="flex items-center gap-3 p-2 bg-background rounded-lg"
-                      data-testid={`selected-member-${userId}`}
+                      data-testid={`selected-member-${memberId}`}
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.profileImageUrl || undefined} />
+                        <AvatarImage src={info.profileImageUrl || undefined} />
                         <AvatarFallback className="text-xs">
-                          {user.firstName?.[0]}{user.lastName?.[0]}
+                          {info.firstName?.[0]}{info.lastName?.[0]}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">
-                          {user.firstName} {user.lastName}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium flex items-center gap-1.5 flex-wrap">
+                          {info.firstName} {info.lastName}
+                          {info.isPlaceholder && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 leading-tight text-muted-foreground">
+                              Placeholder
+                            </Badge>
+                          )}
                         </p>
                       </div>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => toggleMemberSelection(userId)}
-                        data-testid={`button-remove-member-${userId}`}
+                        onClick={() => toggleMemberSelection(memberId)}
+                        data-testid={`button-remove-member-${memberId}`}
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   );
                 })}
-                
-                {/* Selected Email Invites */}
+
                 {selectedEmails.map(email => (
                   <div
                     key={email}
@@ -382,16 +430,57 @@ export default function EditInviteGroup() {
           {/* League Members Section */}
           <div className="mb-6">
             <Label>Select from League Members</Label>
-            
-            {!selectedLeague ? (
+
+            {(userLeagues as any[]).length === 0 ? (
               <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-border">
                 <p className="text-sm text-muted-foreground">
-                  You need to be an approved member of a league to select league members. 
+                  You need to be an approved member of a league to select league members.
                   You can still add people by email below.
                 </p>
               </div>
             ) : (
               <>
+                {/* Facility filter tabs — shown when user belongs to at least one facility */}
+                {facilities.length > 0 && (
+                  <div className="mt-3 mb-4">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      Filter by facility
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFacilityId('all')}
+                        className={cn(
+                          'px-3 py-1 text-sm rounded-full border transition-colors',
+                          selectedFacilityId === 'all'
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'border-border text-muted-foreground hover:border-primary/50'
+                        )}
+                        data-testid="facility-filter-all"
+                      >
+                        All
+                      </button>
+                      {facilities.map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setSelectedFacilityId(f.id)}
+                          className={cn(
+                            'px-3 py-1 text-sm rounded-full border transition-colors',
+                            selectedFacilityId === f.id
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'border-border text-muted-foreground hover:border-primary/50'
+                          )}
+                          data-testid={`facility-filter-${f.id}`}
+                        >
+                          {f.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Search */}
                 <div className="mt-2 mb-4">
                   <Input
@@ -468,9 +557,14 @@ export default function EditInviteGroup() {
                               {member.user.firstName?.[0]}{member.user.lastName?.[0]}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
-                            <p className="font-medium" data-testid={`text-member-name-${member.user.id}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium flex items-center gap-1.5 flex-wrap" data-testid={`text-member-name-${member.user.id}`}>
                               {member.user.firstName} {member.user.lastName}
+                              {member.isPlaceholder && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 leading-tight text-muted-foreground">
+                                  Placeholder
+                                </Badge>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -505,8 +599,7 @@ export default function EditInviteGroup() {
                   data-testid="input-search-email"
                 />
               </div>
-              
-              {/* Email Search Results */}
+
               {emailSearchTerm.length > 2 && (
                 <div className="mt-2 border border-border rounded-md max-h-32 overflow-y-auto">
                   {emailSearchLoading ? (
@@ -554,9 +647,7 @@ export default function EditInviteGroup() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      if (manualEmail.trim()) {
-                        addEmailInvite(manualEmail);
-                      }
+                      if (manualEmail.trim()) addEmailInvite(manualEmail);
                     }
                   }}
                   data-testid="input-manual-email"
@@ -592,7 +683,7 @@ export default function EditInviteGroup() {
                         type="button"
                         onClick={() => removeEmailInvite(email)}
                         className="hover:bg-primary/20 rounded-full p-0.5"
-                        data-testid={`button-remove-email-${email}`}
+                        data-testid={`button-remove-email-badge-${email}`}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -629,8 +720,8 @@ export default function EditInviteGroup() {
             disabled={createOrUpdateMutation.isPending}
             data-testid="button-save-group"
           >
-            {createOrUpdateMutation.isPending 
-              ? (isEditing ? 'Updating...' : 'Creating...') 
+            {createOrUpdateMutation.isPending
+              ? (isEditing ? 'Updating...' : 'Creating...')
               : (isEditing ? 'Update Group' : 'Create Group')}
           </Button>
         </div>

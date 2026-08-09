@@ -457,6 +457,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } catch (err) {
     console.error('[Init] Failed to ensure scrimmages.invite_user_ids column:', err);
   }
+  // Ensure invite_group_members.placeholder_player_id exists (placeholder support in invite groups)
+  try {
+    await db.execute(sql`ALTER TABLE invite_group_members ADD COLUMN IF NOT EXISTS placeholder_player_id varchar REFERENCES placeholder_players(id) ON DELETE CASCADE`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS unique_group_placeholder ON invite_group_members(group_id, placeholder_player_id) WHERE placeholder_player_id IS NOT NULL`);
+    console.log('[Init] invite_group_members.placeholder_player_id column ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure invite_group_members.placeholder_player_id:', err);
+  }
   // Ensure scrimmages.cover_photo exists (preset cover photo key for scrimmage creation)
   try {
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS cover_photo text`);
@@ -20529,6 +20537,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invite group routes
+
+  // Candidate members for invite group picker — supports ?facilityId=X or ?leagueId=X.
+  // Returns merged, deduplicated real members + placeholder players from all matching leagues.
+  // Must be declared before GET /api/invite-groups/:id to avoid route-param capture.
+  app.get('/api/invite-groups/candidate-members', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { facilityId, leagueId } = req.query as { facilityId?: string; leagueId?: string };
+
+      // All leagues the user belongs to (already includes .facility from getUserLeagues)
+      const userLeagues = await storage.getUserLeagues(userId);
+
+      let targetLeagues: typeof userLeagues;
+      if (facilityId) {
+        targetLeagues = userLeagues.filter((l: any) => l.facilityId === facilityId);
+      } else if (leagueId) {
+        targetLeagues = userLeagues.filter((l: any) => l.id === leagueId);
+      } else {
+        targetLeagues = userLeagues;
+      }
+
+      const seenUserIds = new Set<string>();
+      const seenPlaceholderIds = new Set<string>();
+      const allMembers: any[] = [];
+
+      for (const league of targetLeagues) {
+        // getUserLeagues already only returns leagues where the user is an approved member
+        // or the commissioner — no additional membership check is needed or correct here
+        // (commissioners may not have a league_memberships row with status='approved').
+        const members = await storage.getLeagueMembers((league as any).id);
+        for (const m of members) {
+          if (!seenUserIds.has(m.userId)) {
+            seenUserIds.add(m.userId);
+            allMembers.push({ ...m, facilityId: (league as any).facilityId || null });
+          }
+        }
+
+        const placeholders = await storage.getLeaguePlaceholderPlayers((league as any).id);
+        for (const ph of placeholders) {
+          if (!seenPlaceholderIds.has(ph.id)) {
+            seenPlaceholderIds.add(ph.id);
+            allMembers.push({
+              id: `placeholder-membership:${ph.id}`,
+              leagueId: (league as any).id,
+              facilityId: (league as any).facilityId || null,
+              userId: `placeholder:${ph.id}`,
+              status: 'approved',
+              isGoalie: ph.isGoalie,
+              isSkater: ph.isSkater,
+              isPlaceholder: true,
+              user: {
+                id: `placeholder:${ph.id}`,
+                firstName: ph.firstName,
+                lastName: ph.lastName,
+                profileImageUrl: null,
+                email: ph.email ?? null,
+                displayId: null,
+                role: null,
+              },
+            });
+          }
+        }
+      }
+
+      res.json(allMembers);
+    } catch (error) {
+      console.error('Error fetching invite group candidate members:', error);
+      res.status(500).json({ message: 'Failed to fetch candidate members' });
+    }
+  });
+
   // Get all invite groups for the current user
   app.get('/api/invite-groups', isAuthenticated, async (req: any, res) => {
     try {

@@ -1300,10 +1300,12 @@ export const inviteGroupMembers = pgTable("invite_group_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").references(() => inviteGroups.id).notNull(),
   userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }), // If member is a registered user
+  placeholderPlayerId: varchar("placeholder_player_id").references(() => placeholderPlayers.id, { onDelete: 'cascade' }), // If member is a placeholder (no account)
   email: varchar("email"), // If member is invited by email (not yet registered)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   unique("unique_group_user").on(table.groupId, table.userId),
+  unique("unique_group_placeholder").on(table.groupId, table.placeholderPlayerId),
   unique("unique_group_email").on(table.groupId, table.email),
 ]);
 
