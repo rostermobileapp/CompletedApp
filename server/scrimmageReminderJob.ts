@@ -7,6 +7,7 @@ import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+const BACKUP_TIMEOUT_INTERVAL_MS = 60 * 1000;     // Check backup timeouts every 1 minute
 
 export async function checkAndSendScrimmageReminders(): Promise<void> {
   try {
@@ -143,7 +144,14 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
     console.error('Error in scrimmage reminder job:', error);
   }
 
-  // ── Backup timeout check (15-minute window) ─────────────────────────────
+}
+
+/**
+ * Expire backups whose 15-minute response window has closed and cascade to the
+ * next player in the queue. Runs on its own 1-minute interval so no backup is
+ * left waiting longer than ~1 minute past their deadline.
+ */
+export async function checkAndExpireTimedOutBackups(): Promise<void> {
   try {
     const { notifyNextBackup } = await import('./scrimmageBackupUtils');
     const timedOutScrimmageIds = await storage.getScrimmagesWithTimedOutBackups(15);
@@ -162,6 +170,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
 }
 
 let reminderInterval: ReturnType<typeof setInterval> | null = null;
+let backupTimeoutInterval: ReturnType<typeof setInterval> | null = null;
 
 export function startScrimmageReminderJob(): void {
   if (reminderInterval) {
@@ -176,6 +185,12 @@ export function startScrimmageReminderJob(): void {
   
   // Then run periodically
   reminderInterval = setInterval(checkAndSendScrimmageReminders, REMINDER_CHECK_INTERVAL_MS);
+
+  // Backup timeout cascade: separate 1-minute interval so expired slots are
+  // cleared promptly rather than waiting up to 5 minutes.
+  console.log('⏱️  Starting backup timeout job (checking every 1 minute)');
+  checkAndExpireTimedOutBackups();
+  backupTimeoutInterval = setInterval(checkAndExpireTimedOutBackups, BACKUP_TIMEOUT_INTERVAL_MS);
 }
 
 export function stopScrimmageReminderJob(): void {
@@ -183,5 +198,10 @@ export function stopScrimmageReminderJob(): void {
     clearInterval(reminderInterval);
     reminderInterval = null;
     console.log('🔕 Stopped scrimmage reminder job');
+  }
+  if (backupTimeoutInterval) {
+    clearInterval(backupTimeoutInterval);
+    backupTimeoutInterval = null;
+    console.log('🔕 Stopped backup timeout job');
   }
 }
