@@ -310,7 +310,7 @@
     height: 0;
   }
 
-  /* Ensure all scrollable areas hide scrollbars */
+  /* Ensure all scrollable areas hide scrollbars and scroll smoothly on touch */
   .overflow-y-auto,
   .overflow-x-auto,
   .overflow-auto,
@@ -318,6 +318,16 @@
   [style*="overflow"] {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Native-feel vertical scroll for explicitly vertical-only scroll containers.
+     Scoped to overflow-y-auto only — overflow-auto and overflow-scroll can scroll
+     in both axes and must not have pan-y forced on them (breaks horizontal scroll).
+     - touch-action: pan-y  → browser handles vertical touch without waiting for JS
+     - overscroll-behavior-y: contain → prevents scroll chaining to the window     */
+  .overflow-y-auto {
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
   }
 
   .overflow-y-auto::-webkit-scrollbar,

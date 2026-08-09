@@ -132,7 +132,7 @@ function SwipeableScreenContainerInner({ screens }: SwipeableScreenContainerProp
         {screens.map((screen, index) => (
           <div
             key={SCREEN_ORDER[index]}
-            className="h-full overflow-y-auto overflow-x-hidden bg-background"
+            className="h-full overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y bg-background"
             style={{ 
               width: `${100 / screens.length}%`,
               flexShrink: 0,

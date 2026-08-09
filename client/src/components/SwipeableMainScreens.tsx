@@ -111,7 +111,7 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
         {screens.map((screen) => (
           <div
             key={screen.id}
-            className="relative h-full flex flex-col bg-background overflow-y-auto overflow-x-hidden"
+            className="relative h-full flex flex-col bg-background overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y"
             style={{ 
               width: `${100 / screens.length}%`,
               flexShrink: 0,
