@@ -666,6 +666,36 @@ export default function CreateScrimmage() {
           </h3>
           
           <div className="space-y-1">
+            {/* League selector — shown at the top when the user belongs to multiple leagues */}
+            {!isEditMode && (userLeagues as any[]).length > 1 && (
+              <div>
+                <Label htmlFor="scrimmage-league">League</Label>
+                <Select
+                  value={selectedLeagueId ?? ''}
+                  onValueChange={(value) => {
+                    setSelectedLeagueId(value);
+                    // Clear invite selections so stale members from the previous league
+                    // don't remain checked.
+                    setSelectedMemberIds([]);
+                    setSelectedInviteGroupId('');
+                    setLoadedInviteGroupId(null);
+                    setGroupLoadedUserIds(new Set());
+                  }}
+                >
+                  <SelectTrigger id="scrimmage-league" data-testid="select-scrimmage-league">
+                    <SelectValue placeholder="Select league…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(userLeagues as any[]).map((league: any) => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="title">Title</Label>
               <Input
@@ -1460,36 +1490,6 @@ export default function CreateScrimmage() {
               <Users className="w-5 h-5" />
               Invite Members
             </h3>
-
-          {/* League selector — only shown when the user belongs to more than one league */}
-          {(userLeagues as any[]).length > 1 && (
-            <div className="mb-3 p-3 bg-muted/30 rounded-lg hairline elev-rest">
-              <Label className="text-sm font-semibold mb-1.5 block">Browse roster from league</Label>
-              <Select
-                value={selectedLeagueId ?? ''}
-                onValueChange={(value) => {
-                  setSelectedLeagueId(value);
-                  // Clear selections and invite group when switching leagues so stale
-                  // members from the previous league don't remain checked.
-                  setSelectedMemberIds([]);
-                  setSelectedInviteGroupId('');
-                  setLoadedInviteGroupId(null);
-                  setGroupLoadedUserIds(new Set());
-                }}
-              >
-                <SelectTrigger data-testid="select-invite-league">
-                  <SelectValue placeholder="Select league…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(userLeagues as any[]).map((league: any) => (
-                    <SelectItem key={league.id} value={league.id}>
-                      {league.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           {/* Invite Group Selector - Always shown at top */}
           <div className="mb-1\.5 p-4 bg-muted/30 rounded-lg hairline elev-rest">
