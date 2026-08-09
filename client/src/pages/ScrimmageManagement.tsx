@@ -145,20 +145,33 @@ export default function ScrimmageManagement() {
   });
 
   const manageRequestMutation = useMutation({
-    mutationFn: async ({ requestId, status, teamAssignment }: { requestId: string; status: 'approved' | 'dismissed'; teamAssignment?: 'light' | 'dark' | null }) => {
+    mutationFn: async ({ requestId, status, teamAssignment }: { requestId: string; status: 'approved' | 'dismissed' | 'backup'; teamAssignment?: 'light' | 'dark' | null }) => {
       const response = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/status`, { status, teamAssignment: teamAssignment ?? null });
       return response.json();
     },
     onSuccess: (_, { status }) => {
       toast({
-        title: status === 'approved' ? 'Request Approved' : 'Request Declined',
-        description: status === 'approved' ? 'Player has been added to the scrimmage' : 'Request has been declined',
+        title: status === 'approved' ? 'Request Approved' : status === 'backup' ? 'Added to Backup List' : 'Request Declined',
+        description: status === 'approved' ? 'Player has been added to the scrimmage' : status === 'backup' ? 'Player has been notified they\'re on the backup list' : 'Request has been declined',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to process request', variant: 'destructive' });
+    },
+  });
+
+  const reorderBackupMutation = useMutation({
+    mutationFn: async (positions: { requestId: string; position: number }[]) => {
+      const response = await apiRequest('PUT', '/api/scrimmage-requests/backup-positions', { positions });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to reorder backup list', variant: 'destructive' });
     },
   });
 
@@ -255,6 +268,8 @@ export default function ScrimmageManagement() {
     reqs.filter(r => r.status === 'pending').sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
   const getApprovedRequests = (reqs: ScrimmageRequestWithPlayer[]) =>
     reqs.filter(r => r.status === 'approved').sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
+  const getBackupRequests = (reqs: ScrimmageRequestWithPlayer[]) =>
+    reqs.filter(r => r.status === 'backup').sort((a, b) => ((a as any).backupPosition ?? 999) - ((b as any).backupPosition ?? 999));
 
   // --- Calendar Logic ---
   const calendarDays = useMemo(() => {
@@ -591,9 +606,10 @@ export default function ScrimmageManagement() {
                 </div>
               ) : (
                 <Tabs defaultValue="pending" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="pending">Pending ({getPendingRequests(requests).length})</TabsTrigger>
                     <TabsTrigger value="approved">Approved ({getApprovedRequests(requests).length})</TabsTrigger>
+                    <TabsTrigger value="backup">Backup ({getBackupRequests(requests).length})</TabsTrigger>
                     <TabsTrigger value="cohosts"><Shield className="w-3 h-3 mr-1" />Co-Hosts ({coHosts.length})</TabsTrigger>
                   </TabsList>
 
@@ -637,10 +653,13 @@ export default function ScrimmageManagement() {
                                   ))}
                                 </div>
                                 <div className="flex gap-1">
-                                  <Button size="sm" variant="default" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved', teamAssignment: pendingTeamAssignment[request.id] ?? null })} disabled={manageRequestMutation.isPending}>
+                                  <Button size="sm" variant="default" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved', teamAssignment: pendingTeamAssignment[request.id] ?? null })} disabled={manageRequestMutation.isPending} title="Approve">
                                     <Check className="w-4 h-4" />
                                   </Button>
-                                  <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })} disabled={manageRequestMutation.isPending}>
+                                  <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })} disabled={manageRequestMutation.isPending} title="Add to backup list" className="text-amber-600 border-amber-500 hover:bg-amber-50">
+                                    <Clock className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })} disabled={manageRequestMutation.isPending} title="Decline">
                                     <X className="w-4 h-4" />
                                   </Button>
                                 </div>
@@ -649,6 +668,103 @@ export default function ScrimmageManagement() {
                           ))}
                         </div>
                       )}
+                    </ScrollArea>
+                  </TabsContent>
+
+                  <TabsContent value="backup" className="mt-4">
+                    <ScrollArea className="h-64">
+                      {(() => {
+                        const allBackups = getBackupRequests(requests);
+                        // Split into active queue (position set) and timed-out/dequeued (position null)
+                        const activeBackups = allBackups.filter(r => (r as any).backupPosition != null);
+                        const timedOutBackups = allBackups.filter(r => (r as any).backupPosition == null);
+
+                        if (allBackups.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm">No backup players</p>
+                              <p className="text-xs mt-1">Use the clock icon on pending requests to add backups</p>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="space-y-2">
+                            {activeBackups.length > 0 && (
+                              <>
+                                <p className="text-xs text-muted-foreground mb-2">When a spot opens, backups are notified in this order.</p>
+                                {activeBackups.map((request, activeIdx) => {
+                                  const br = request as any;
+                                  const isAwaiting = !!br.backupNotifiedAt;
+                                  return (
+                                    <div key={request.id} className={`p-3 rounded-lg border space-y-1 ${isAwaiting ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30' : 'bg-muted/50'}`}>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-sm font-bold text-muted-foreground w-5 text-center">
+                                          {br.backupPosition}
+                                        </span>
+                                        <Avatar className="h-8 w-8">
+                                          <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                          <AvatarFallback className="text-xs">{request.player.firstName?.[0]}{request.player.lastName?.[0]}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <p className="font-medium text-sm">{request.player.firstName} {request.player.lastName}</p>
+                                          {isAwaiting && <p className="text-xs text-amber-600 font-medium">⏳ Awaiting response…</p>}
+                                        </div>
+                                        <div className="flex gap-1">
+                                          {activeIdx > 0 && (
+                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Move up"
+                                              onClick={() => {
+                                                const swapWith = activeBackups[activeIdx - 1] as any;
+                                                reorderBackupMutation.mutate([
+                                                  { requestId: request.id, position: swapWith.backupPosition },
+                                                  { requestId: swapWith.id, position: br.backupPosition },
+                                                ]);
+                                              }}
+                                              disabled={reorderBackupMutation.isPending}
+                                            >▲</Button>
+                                          )}
+                                          {activeIdx < activeBackups.length - 1 && (
+                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Move down"
+                                              onClick={() => {
+                                                const swapWith = activeBackups[activeIdx + 1] as any;
+                                                reorderBackupMutation.mutate([
+                                                  { requestId: request.id, position: swapWith.backupPosition },
+                                                  { requestId: swapWith.id, position: br.backupPosition },
+                                                ]);
+                                              }}
+                                              disabled={reorderBackupMutation.isPending}
+                                            >▼</Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </>
+                            )}
+                            {timedOutBackups.length > 0 && (
+                              <>
+                                <p className="text-xs text-muted-foreground mt-3 mb-1">No longer active</p>
+                                {timedOutBackups.map((request) => (
+                                  <div key={request.id} className="p-3 rounded-lg border opacity-50 bg-muted/30">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-sm font-bold text-muted-foreground w-5 text-center">—</span>
+                                      <Avatar className="h-8 w-8">
+                                        <AvatarImage src={request.player.profileImageUrl || undefined} />
+                                        <AvatarFallback className="text-xs">{request.player.firstName?.[0]}{request.player.lastName?.[0]}</AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <p className="font-medium text-sm">{request.player.firstName} {request.player.lastName}</p>
+                                        <p className="text-xs text-muted-foreground">Timed out — no response</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </ScrollArea>
                   </TabsContent>
 

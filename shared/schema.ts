@@ -123,7 +123,8 @@ export const dutyScopeEnum = pgEnum("duty_scope", [
 export const scrimmageRequestStatusEnum = pgEnum("scrimmage_request_status", [
   "pending",
   "approved",
-  "dismissed"
+  "dismissed",
+  "backup"
 ]);
 
 // Recurrence type enum for recurring events
@@ -241,7 +242,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "scrimmage_cohost_added",
   "scrimmage_cohost_removed",
   "player_rsvp",
-  "photo_tag"
+  "photo_tag",
+  "scrimmage_backup"
 ]);
 
 // Users table (required for Replit Auth)
@@ -1261,6 +1263,9 @@ export const scrimmageRequests = pgTable("scrimmage_requests", {
   approvedAt: timestamp("approved_at"),
   dismissedAt: timestamp("dismissed_at"),
   teamAssignment: varchar("team_assignment"), // 'light' | 'dark' | null — assigned team colour
+  // Backup queue fields
+  backupPosition: integer("backup_position"), // rank in backup queue; null = not in active queue
+  backupNotifiedAt: timestamp("backup_notified_at"), // when this backup was sent the open-spot notification
 }, (table) => [
   unique("unique_scrimmage_player_request").on(table.scrimmageId, table.playerId),
 ]);

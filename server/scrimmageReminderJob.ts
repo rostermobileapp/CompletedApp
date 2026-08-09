@@ -142,6 +142,23 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
   } catch (error) {
     console.error('Error in scrimmage reminder job:', error);
   }
+
+  // ── Backup timeout check (15-minute window) ─────────────────────────────
+  try {
+    const { notifyNextBackup } = await import('./scrimmageBackupUtils');
+    const timedOutScrimmageIds = await storage.getScrimmagesWithTimedOutBackups(15);
+    for (const scrimmageId of timedOutScrimmageIds) {
+      try {
+        await storage.expireTimedOutBackups(scrimmageId, 15);
+        await notifyNextBackup(scrimmageId);
+        console.log(`[BackupQueue] Cascaded after timeout for scrimmage ${scrimmageId}`);
+      } catch (err) {
+        console.error(`[BackupQueue] Timeout cascade error for scrimmage ${scrimmageId}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('[BackupQueue] Error checking backup timeouts:', err);
+  }
 }
 
 let reminderInterval: ReturnType<typeof setInterval> | null = null;

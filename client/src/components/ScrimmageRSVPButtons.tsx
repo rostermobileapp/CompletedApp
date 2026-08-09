@@ -237,5 +237,24 @@ export function ScrimmageRSVPButtons({ scrimmageId, className, isCreator }: Scri
     );
   }
 
+  if (currentStatus === 'backup') {
+    const backupPos = (currentRequest as any)?.backupPosition;
+    const notified = !!(currentRequest as any)?.backupNotifiedAt;
+    return (
+      <div className={cn("flex gap-2", className)} data-testid="scrimmage-rsvp-buttons">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+          className={`flex items-center gap-1 border-2 ${notified ? 'border-amber-500 text-amber-700 bg-amber-50 animate-pulse' : 'border-yellow-500 text-yellow-700 bg-yellow-50'}`}
+          data-testid="button-backup"
+        >
+          <Users className="w-4 h-4" />
+          {notified ? 'Spot open!' : backupPos ? `Backup #${backupPos}` : 'Backup'}
+        </Button>
+      </div>
+    );
+  }
+
   return null;
 }

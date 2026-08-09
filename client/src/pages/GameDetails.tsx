@@ -139,6 +139,36 @@ export default function GameDetails() {
     enabled: !!gameId && isScrimmage,
   });
 
+  // Fetch the current user's scrimmage request (for backup status)
+  const { data: userScrimmageRequests } = useQuery<any[]>({
+    queryKey: ['/api/users/scrimmage-requests'],
+    enabled: isScrimmage,
+    staleTime: 30 * 1000,
+  });
+  const myBackupRequest = React.useMemo(() => {
+    if (!isScrimmage || !gameId || !userScrimmageRequests) return null;
+    const req = userScrimmageRequests.find((r: any) => r.scrimmageId === gameId && r.status === 'backup');
+    return req ?? null;
+  }, [isScrimmage, gameId, userScrimmageRequests]);
+
+  const backupResponseMutation = useMutation({
+    mutationFn: async ({ requestId, accept }: { requestId: string; accept: boolean }) => {
+      const res = await apiRequest('POST', `/api/scrimmage-requests/${requestId}/backup-response`, { accept });
+      return res.json();
+    },
+    onSuccess: (_data, { accept }) => {
+      toast({
+        title: accept ? 'You\'re in! 🎉' : 'Got it',
+        description: accept ? 'You\'ve been added to the roster.' : 'Spot declined — we\'ll move to the next backup.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to submit response', variant: 'destructive' });
+    },
+  });
+
   // Derived flags used to gate management hooks below
   const _scrimmageForHooks = (scrimmageData as any)?.scrimmage;
   const _canManageForHooks = !!(scrimmageData as any)?.canManagePlayers ||
@@ -608,6 +638,37 @@ export default function GameDetails() {
             )}
             </div>
           </div>
+
+          {/* Backup open-spot banner — shown to notified backups waiting for a response */}
+          {myBackupRequest?.backupNotifiedAt && (
+            <div className="rounded-xl border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/40 shadow-[var(--elev-rest)] p-4" data-testid="banner-backup-open-spot">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xl">🏒</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-amber-800 dark:text-amber-200">A spot just opened up!</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-0.5">Do you want to skate? You have 15 minutes to respond.</p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => backupResponseMutation.mutate({ requestId: myBackupRequest.id, accept: true })}
+                      disabled={backupResponseMutation.isPending}
+                      className="flex-1 py-2 rounded-lg bg-green-600 text-white font-semibold text-sm hover:bg-green-700 disabled:opacity-60 transition-colors"
+                    >
+                      {backupResponseMutation.isPending ? '…' : "✓ I'm in!"}
+                    </button>
+                    <button
+                      onClick={() => backupResponseMutation.mutate({ requestId: myBackupRequest.id, accept: false })}
+                      disabled={backupResponseMutation.isPending}
+                      className="flex-1 py-2 rounded-lg border border-amber-400 text-amber-800 dark:text-amber-200 font-semibold text-sm hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-60 transition-colors"
+                    >
+                      Can't make it
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Team colour banner — shown only to approved players with an assignment */}
           {(() => {

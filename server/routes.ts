@@ -168,6 +168,10 @@ async function broadcastScheduleUpdateToTeam(teamId: string) {
   }
 }
 
+// Import backup utility (exported for use in scrimmageReminderJob without importing all of routes.ts)
+import { notifyNextBackup } from './scrimmageBackupUtils';
+export { notifyNextBackup } from './scrimmageBackupUtils';
+
 // In-memory map of subscribed users per tournament (tournamentId -> Set<userId>)
 const tournamentSubscribers = new Map<string, Set<string>>();
 
@@ -16639,17 +16643,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate status input
-      if (!status || !['approved', 'dismissed'].includes(status)) {
-        return res.status(400).json({ message: 'Status must be "approved" or "dismissed"' });
+      if (!status || !['approved', 'dismissed', 'backup'].includes(status)) {
+        return res.status(400).json({ message: 'Status must be "approved", "dismissed", or "backup"' });
       }
 
       // Validate optional teamAssignment
       if (teamAssignment !== undefined && teamAssignment !== null && !['light', 'dark'].includes(teamAssignment)) {
         return res.status(400).json({ message: 'teamAssignment must be "light", "dark", or null' });
       }
-      // teamAssignment only makes sense when approving; reject for dismissed
-      if (status === 'dismissed' && teamAssignment != null) {
-        return res.status(400).json({ message: 'teamAssignment cannot be set when dismissing a request' });
+      // teamAssignment only makes sense when approving; reject for dismissed/backup
+      if (status !== 'approved' && teamAssignment != null) {
+        return res.status(400).json({ message: 'teamAssignment can only be set when approving a request' });
       }
 
       // Get the request first
@@ -16683,11 +16687,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Business invariant: Cannot approve requests for scrimmages that have passed
       const now = new Date();
-      if (scrimmage.dateTime <= now && status === 'approved') {
+      if (scrimmage.dateTime <= now && (status === 'approved' || status === 'backup')) {
         return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
       }
       
-      // Business invariant: Cannot approve if at capacity
+      // Business invariant: Cannot approve if at capacity (backup bypasses capacity check)
       if (status === 'approved') {
         const currentRequests = await storage.getScrimmageRequests(scrimmage.id);
         const approvedCount = currentRequests.filter(req => req.status === 'approved').length;
@@ -16695,6 +16699,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (approvedCount >= scrimmage.maxPlayers) {
           return res.status(409).json({ message: 'Cannot approve request - scrimmage is at full capacity' });
         }
+      }
+
+      // Handle backup approval separately — no capacity check, auto-assigned position
+      if (status === 'backup') {
+        const backupRequest = await storage.approveAsBackup(requestId);
+        // Notify the player they're in the backup queue
+        try {
+          const player = await storage.getUser(request.playerId);
+          if (player) {
+            const league = await storage.getLeague(scrimmage.leagueId);
+            const timezone = league?.timezone || 'America/New_York';
+            const { date: bDate, time: bTime } = formatDayAndTime(scrimmage.dateTime, timezone);
+            await storage.createNotification({
+              userId: player.id,
+              type: 'scrimmage_backup',
+              title: `You're on the backup list — ${scrimmage.title}`,
+              message: `You've been added to the backup list for "${scrimmage.title}" on ${bDate} at ${bTime}. You'll be notified if a spot opens up.`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Scrimmage',
+              scrimmageId: scrimmage.id,
+            });
+            broadcastNotificationUpdate(player.id);
+            const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+            sendPushNotificationToUser({
+              userId: player.id,
+              title: `You're on the backup list`,
+              message: `Added to backup for "${scrimmage.title}" on ${bDate} at ${bTime}. We'll alert you if a spot opens.`,
+            }).catch((err: unknown) => console.error('[BackupQueue] push failed:', err));
+          }
+        } catch (err) {
+          console.error('[BackupQueue] Failed to notify player of backup status:', err);
+        }
+        return res.json(backupRequest);
       }
 
       const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status, undefined, teamAssignment ?? null);
@@ -16718,12 +16755,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             broadcastNotificationUpdate(player.id);
             const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
-            await sendPushNotificationToUser(
-              player.id,
-              `Not selected for ${scrimmage.title}`,
-              `Unfortunately you were not selected for "${scrimmage.title}" on ${rejDate} at ${rejTime}.`,
-              `/scrimmage/${scrimmage.id}`
-            );
+            await sendPushNotificationToUser({
+              userId: player.id,
+              title: `Not selected for ${scrimmage.title}`,
+              message: `Unfortunately you were not selected for "${scrimmage.title}" on ${rejDate} at ${rejTime}.`,
+            });
           }
         } catch (err) {
           console.error('Failed to send scrimmage rejection notification:', err);
@@ -16879,6 +16915,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reorder backup queue — organiser sends an array of { requestId, position }
+  app.put('/api/scrimmage-requests/backup-positions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { positions } = req.body as { positions: { requestId: string; position: number }[] };
+      if (!Array.isArray(positions) || positions.length === 0) {
+        return res.status(400).json({ message: 'positions must be a non-empty array' });
+      }
+      // Validate ALL request IDs belong to the SAME scrimmage that the caller manages.
+      // Fetch them all in parallel, then cross-check scrimmageId uniformity before touching the DB.
+      const requestRecords = await Promise.all(
+        positions.map(p => storage.getScrimmageRequestById(p.requestId))
+      );
+      for (let i = 0; i < requestRecords.length; i++) {
+        if (!requestRecords[i]) {
+          return res.status(404).json({ message: `Request ${positions[i].requestId} not found` });
+        }
+      }
+      const scrimmageIds = new Set(requestRecords.map(r => r!.scrimmageId));
+      if (scrimmageIds.size !== 1) {
+        return res.status(400).json({ message: 'All request IDs must belong to the same scrimmage' });
+      }
+      const authorizedScrimmageId = Array.from(scrimmageIds)[0];
+      const { canManage, isCoHost, permissions } = await storage.canUserManageScrimmage(authorizedScrimmageId, userId);
+      if (!canManage || (isCoHost && permissions && !permissions.canApproveRequests)) {
+        return res.status(403).json({ message: 'Not authorized to manage this scrimmage' });
+      }
+      // Ensure every request is an active backup (status=backup AND backupPosition not null)
+      for (const rec of requestRecords) {
+        if (rec!.status !== 'backup') {
+          return res.status(409).json({ message: `Request ${rec!.id} is not in backup status` });
+        }
+        if (rec!.backupPosition == null) {
+          return res.status(409).json({ message: `Request ${rec!.id} is no longer active in the queue (timed out or dequeued)` });
+        }
+      }
+      // Validate all supplied positions are finite positive integers
+      for (const { requestId, position } of positions) {
+        if (!Number.isInteger(position) || position < 1) {
+          return res.status(400).json({ message: `Position for request ${requestId} must be a positive integer` });
+        }
+      }
+      await storage.reorderBackupQueue(positions);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('[BackupQueue] reorder error:', error);
+      res.status(500).json({ message: 'Failed to reorder backup queue' });
+    }
+  });
+
+  // Backup player responds to an open-spot notification (accept or decline)
+  app.post('/api/scrimmage-requests/:id/backup-response', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { accept } = req.body as { accept: boolean };
+      if (typeof accept !== 'boolean') {
+        return res.status(400).json({ message: '"accept" must be a boolean' });
+      }
+
+      const request = await storage.getScrimmageRequestById(requestId);
+      if (!request) return res.status(404).json({ message: 'Request not found' });
+      if (request.playerId !== userId) return res.status(403).json({ message: 'Unauthorized' });
+      if (request.status !== 'backup') return res.status(409).json({ message: 'This request is not in backup status' });
+      // Must have been notified AND still hold an active queue position (not expired/dequeued)
+      if (!request.backupNotifiedAt) return res.status(409).json({ message: 'You have not been notified of an open spot yet' });
+      if (request.backupPosition == null) return res.status(410).json({ message: 'Your response window has expired — the spot has moved to the next backup.' });
+      // Double-check the 15-minute window server-side
+      const notifiedMs = new Date(request.backupNotifiedAt).getTime();
+      if (Date.now() - notifiedMs > 15 * 60 * 1000) {
+        // Lazily expire this request in case the job hasn't run yet
+        await storage.expireTimedOutBackups(request.scrimmageId, 15);
+        notifyNextBackup(request.scrimmageId).catch(err => console.error('[BackupQueue] lazy expire cascade:', err));
+        return res.status(410).json({ message: 'Your response window has expired — the spot has moved to the next backup.' });
+      }
+
+      const scrimmage = await storage.getScrimmage(request.scrimmageId);
+      if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
+
+      // Guard: reject any acceptance or decline response after the scrimmage has started
+      if (new Date(scrimmage.dateTime) <= new Date()) {
+        return res.status(409).json({ message: 'This scrimmage has already started — the backup queue is now closed.' });
+      }
+
+      if (accept) {
+        // Atomically check capacity and promote — prevents concurrent accepts from both
+        // observing a single free slot and both transitioning to approved.
+        const result = await storage.acceptBackupAtomically(requestId, scrimmage.maxPlayers, scrimmage.id);
+        if (!result.ok) {
+          // Spot was taken by another concurrent request — dequeue this backup and cascade
+          await storage.resolveBackupResponse(requestId, false);
+          notifyNextBackup(scrimmage.id).catch(e => console.error('[BackupQueue] cascade after full:', e));
+          return res.status(409).json({ message: 'Sorry, that spot was just filled. We\'ll check the next backup.' });
+        }
+
+        // Notify organiser
+        try {
+          const player = await storage.getUser(userId);
+          const playerName = `${player?.firstName || ''} ${player?.lastName || ''}`.trim() || 'A backup player';
+          await storage.createNotification({
+            userId: scrimmage.creatorId,
+            type: 'scrimmage_approved',
+            title: 'Backup player accepted!',
+            message: `${playerName} accepted the open spot in "${scrimmage.title}".`,
+            actionUrl: `/scrimmage/${scrimmage.id}`,
+            actionText: 'View Roster',
+            scrimmageId: scrimmage.id,
+          });
+          broadcastNotificationUpdate(scrimmage.creatorId);
+        } catch (_) {}
+
+        return res.json(result.request);
+      } else {
+        // Decline — dismiss them and cascade to next backup
+        await storage.resolveBackupResponse(requestId, false);
+        notifyNextBackup(scrimmage.id).catch(e => console.error('[BackupQueue] cascade after decline:', e));
+        return res.json({ ok: true, message: 'Declined — next backup will be notified.' });
+      }
+    } catch (error) {
+      console.error('[BackupQueue] backup-response error:', error);
+      res.status(500).json({ message: 'Failed to process backup response' });
+    }
+  });
+
   // Delete scrimmage request
   app.delete('/api/scrimmage-requests/:id', isAuthenticated, async (req: any, res) => {
     try {
@@ -16921,6 +17081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const priorStatus = request.status;
       await storage.deleteScrimmageRequest(requestId);
 
       // Notify creator (and co-hosts) when a player withdraws themselves
@@ -16958,6 +17119,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: `You have been removed from ${scrimmageTitle}.`,
           });
         } catch (_) {}
+      }
+
+      // Any approved player removal (self-withdrawal OR manager removal) creates a vacancy.
+      // Always cascade to the backup queue so the spot is not left unfilled.
+      if (priorStatus === 'approved') {
+        notifyNextBackup(request.scrimmageId).catch(err =>
+          console.error('[BackupQueue] cascade after removal:', err)
+        );
       }
 
       res.json({ message: 'Request deleted successfully' });

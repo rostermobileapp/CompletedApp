@@ -606,6 +606,16 @@ export interface IStorage {
   deleteScrimmageRequest(requestId: string): Promise<void>;
   getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]>;
   getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]>;
+  getScrimmageRequestById(requestId: string): Promise<ScrimmageRequest | undefined>;
+  approveAsBackup(requestId: string): Promise<ScrimmageRequest>;
+  reorderBackupQueue(positions: { requestId: string; position: number }[]): Promise<void>;
+  claimAndNotifyNextBackup(scrimmageId: string): Promise<ScrimmageRequest | undefined>;
+  getNextUnnotifiedBackup(scrimmageId: string): Promise<ScrimmageRequest | undefined>;
+  markBackupNotified(requestId: string): Promise<ScrimmageRequest>;
+  resolveBackupResponse(requestId: string, accept: boolean): Promise<ScrimmageRequest>;
+  acceptBackupAtomically(requestId: string, maxPlayers: number, scrimmageId: string): Promise<{ ok: true; request: ScrimmageRequest } | { ok: false; reason: 'full' | 'not_found' }>;
+  expireTimedOutBackups(scrimmageId: string, minutesAgo: number): Promise<ScrimmageRequest[]>;
+  getScrimmagesWithTimedOutBackups(minutesAgo: number): Promise<string[]>;
 
   // Invite group operations
   createInviteGroup(groupData: InsertInviteGroup): Promise<InviteGroup>;
@@ -9456,6 +9466,225 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return updatedRequest;
+  }
+
+  /** Approve a pending request into the backup queue. Auto-assigns the next position. */
+  async approveAsBackup(requestId: string): Promise<ScrimmageRequest> {
+    // Serialize all enqueues for a given scrimmage by locking the scrimmage row first.
+    // This prevents two concurrent manager actions from both reading the same MAX(position)
+    // — even when the queue is empty (no backup rows to contend on).
+    return db.transaction(async (tx) => {
+      // Fetch the target request (no lock needed — just need the scrimmageId)
+      const [request] = await tx
+        .select()
+        .from(scrimmageRequests)
+        .where(eq(scrimmageRequests.id, requestId));
+      if (!request) throw new Error('Request not found');
+
+      // Lock the parent scrimmage row — serialises all concurrent enqueues for this scrimmage
+      await tx.execute(
+        sql`SELECT id FROM scrimmages WHERE id = ${request.scrimmageId} FOR UPDATE`
+      );
+
+      // Safe to compute MAX(position) now that we hold the scrimmage lock
+      const existing = await tx
+        .select({ pos: scrimmageRequests.backupPosition })
+        .from(scrimmageRequests)
+        .where(and(
+          eq(scrimmageRequests.scrimmageId, request.scrimmageId),
+          eq(scrimmageRequests.status, 'backup'),
+          sql`${scrimmageRequests.backupPosition} IS NOT NULL`
+        ));
+
+      const maxPos = existing.length > 0
+        ? Math.max(...existing.map(r => r.pos ?? 0))
+        : 0;
+
+      const [updated] = await tx
+        .update(scrimmageRequests)
+        .set({ status: 'backup', backupPosition: maxPos + 1 })
+        .where(and(
+          eq(scrimmageRequests.id, requestId),
+          eq(scrimmageRequests.status, 'pending')
+        ))
+        .returning();
+      return updated;
+    });
+  }
+
+  /** Reorder the backup queue for a scrimmage. positions is an array of { requestId, position } pairs. */
+  async reorderBackupQueue(positions: { requestId: string; position: number }[]): Promise<void> {
+    for (const { requestId, position } of positions) {
+      await db
+        .update(scrimmageRequests)
+        .set({ backupPosition: position })
+        .where(and(
+          eq(scrimmageRequests.id, requestId),
+          eq(scrimmageRequests.status, 'backup')
+        ));
+    }
+  }
+
+  /**
+   * Atomically claim the next unnotified backup for a scrimmage.
+   * Uses a single UPDATE ... WHERE ... RETURNING so concurrent vacancy cascades
+   * cannot both claim the same row — only the first to write wins.
+   * Returns the claimed-and-stamped row, or undefined if no eligible backup exists.
+   */
+  async claimAndNotifyNextBackup(scrimmageId: string): Promise<ScrimmageRequest | undefined> {
+    // Atomically stamp backupNotifiedAt on exactly one unnotified backup row.
+    // Uses a correlated sub-select with FOR UPDATE SKIP LOCKED so concurrent cascades
+    // cannot both claim the same row — only the first writer wins.
+    const now = new Date();
+    const result = await db.execute(sql`
+      UPDATE scrimmage_requests
+      SET    backup_notified_at = ${now.toISOString()}
+      WHERE  id = (
+        SELECT id
+        FROM   scrimmage_requests
+        WHERE  scrimmage_id       = ${scrimmageId}
+          AND  status             = 'backup'
+          AND  backup_position    IS NOT NULL
+          AND  backup_notified_at IS NULL
+        ORDER BY backup_position ASC
+        LIMIT  1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING *
+    `);
+    // db.execute returns a QueryResult with .rows — not a plain array
+    return (result.rows[0] as ScrimmageRequest | undefined);
+  }
+
+  /** @deprecated Use claimAndNotifyNextBackup for atomic vacancy notification */
+  async getNextUnnotifiedBackup(scrimmageId: string): Promise<ScrimmageRequest | undefined> {
+    const [backup] = await db
+      .select()
+      .from(scrimmageRequests)
+      .where(and(
+        eq(scrimmageRequests.scrimmageId, scrimmageId),
+        eq(scrimmageRequests.status, 'backup'),
+        sql`${scrimmageRequests.backupPosition} IS NOT NULL`,
+        sql`${scrimmageRequests.backupNotifiedAt} IS NULL`
+      ))
+      .orderBy(asc(scrimmageRequests.backupPosition))
+      .limit(1);
+    return backup;
+  }
+
+  /** @deprecated Use claimAndNotifyNextBackup; kept for reference only */
+  async markBackupNotified(requestId: string): Promise<ScrimmageRequest> {
+    const [updated] = await db
+      .update(scrimmageRequests)
+      .set({ backupNotifiedAt: new Date() })
+      .where(eq(scrimmageRequests.id, requestId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Transition a backup request to approved or dismissed (backup response).
+   * Clears backupPosition so the slot is freed.
+   */
+  async resolveBackupResponse(requestId: string, accept: boolean): Promise<ScrimmageRequest> {
+    const now = new Date();
+    const [updated] = await db
+      .update(scrimmageRequests)
+      .set({
+        status: accept ? 'approved' : 'dismissed',
+        backupPosition: null,
+        ...(accept ? { approvedAt: now } : { dismissedAt: now }),
+      })
+      .where(and(
+        eq(scrimmageRequests.id, requestId),
+        eq(scrimmageRequests.status, 'backup')
+      ))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Atomically check capacity and promote a backup to approved within a single
+   * serializable transaction — prevents two concurrent accepts from both seeing
+   * one free slot and both being promoted.
+   *
+   * Returns { ok: true, request } on success, or { ok: false, reason: 'full' | 'not_found' }.
+   */
+  async acceptBackupAtomically(
+    requestId: string,
+    maxPlayers: number,
+    scrimmageId: string,
+  ): Promise<{ ok: true; request: ScrimmageRequest } | { ok: false; reason: 'full' | 'not_found' }> {
+    return db.transaction(async (tx) => {
+      // Lock all scrimmage_requests rows for this scrimmage so concurrent transactions
+      // cannot read a stale approved count until we commit.
+      await tx.execute(
+        sql`SELECT id FROM scrimmage_requests WHERE scrimmage_id = ${scrimmageId} FOR UPDATE`
+      );
+
+      // Re-count approved players inside the lock
+      const [{ count }] = await tx
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(scrimmageRequests)
+        .where(and(
+          eq(scrimmageRequests.scrimmageId, scrimmageId),
+          eq(scrimmageRequests.status, 'approved'),
+        ));
+
+      if (count >= maxPlayers) {
+        return { ok: false as const, reason: 'full' as const };
+      }
+
+      const now = new Date();
+      const [updated] = await tx
+        .update(scrimmageRequests)
+        .set({ status: 'approved', backupPosition: null, approvedAt: now })
+        .where(and(
+          eq(scrimmageRequests.id, requestId),
+          eq(scrimmageRequests.status, 'backup'),
+        ))
+        .returning();
+
+      if (!updated) {
+        return { ok: false as const, reason: 'not_found' as const };
+      }
+      return { ok: true as const, request: updated };
+    });
+  }
+
+  /**
+   * Find backups whose notification window has expired (notified > minutesAgo ago, still backup).
+   * Also clears their backupPosition so they're dequeued.
+   */
+  async expireTimedOutBackups(scrimmageId: string, minutesAgo: number): Promise<ScrimmageRequest[]> {
+    const cutoff = new Date(Date.now() - minutesAgo * 60 * 1000);
+    const timedOut = await db
+      .update(scrimmageRequests)
+      .set({ backupPosition: null })
+      .where(and(
+        eq(scrimmageRequests.scrimmageId, scrimmageId),
+        eq(scrimmageRequests.status, 'backup'),
+        sql`${scrimmageRequests.backupPosition} IS NOT NULL`,
+        sql`${scrimmageRequests.backupNotifiedAt} IS NOT NULL`,
+        sql`${scrimmageRequests.backupNotifiedAt} < ${cutoff.toISOString()}`
+      ))
+      .returning();
+    return timedOut;
+  }
+
+  /** Find all scrimmages that have a backup notified more than minutesAgo minutes ago. */
+  async getScrimmagesWithTimedOutBackups(minutesAgo: number): Promise<string[]> {
+    const cutoff = new Date(Date.now() - minutesAgo * 60 * 1000);
+    const rows = await db
+      .selectDistinct({ scrimmageId: scrimmageRequests.scrimmageId })
+      .from(scrimmageRequests)
+      .where(and(
+        eq(scrimmageRequests.status, 'backup'),
+        sql`${scrimmageRequests.backupPosition} IS NOT NULL`,
+        sql`${scrimmageRequests.backupNotifiedAt} IS NOT NULL`,
+        sql`${scrimmageRequests.backupNotifiedAt} < ${cutoff.toISOString()}`
+      ));
+    return rows.map(r => r.scrimmageId);
   }
 
   async setTeamAssignment(requestId: string, teamAssignment: string | null): Promise<ScrimmageRequest> {

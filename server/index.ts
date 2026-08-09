@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { warmCityGeoCache } from "./storage";
 import { initReferralDb } from "./referralDbInit";
 import { initDraftDb } from "./draftDbInit";
+import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 
 const app = express();
 
@@ -87,6 +88,9 @@ app.use((req, res, next) => {
   // request after a cold restart requires no external geocoding API calls.
   // Awaited before listen() to guarantee cache readiness before traffic arrives.
   await warmCityGeoCache();
+
+  // Start background jobs (scrimmage reminders + backup queue timeout cascade)
+  startScrimmageReminderJob();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
