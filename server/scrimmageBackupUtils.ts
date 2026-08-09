@@ -9,16 +9,29 @@ import { formatDayAndTime } from "./dateUtils";
 import { broadcastNotificationUpdate } from "./notificationBroadcast";
 
 /**
+ * How many minutes before a scrimmage starts the backup cascade is frozen.
+ * Any approved-player removal or timeout expiry that would trigger a notification
+ * within this window is silently discarded — the backup would have no realistic
+ * time to travel and show up.
+ */
+export const BACKUP_CASCADE_CUTOFF_MINUTES = 60;
+
+/**
  * Find the next unnotified backup for a scrimmage and send them an open-spot
  * push + in-app notification. Safe to call when the queue is empty (no-op).
  */
 export async function notifyNextBackup(scrimmageId: string): Promise<void> {
   try {
-    // Guard: never notify after the scrimmage has started
+    // Guard: freeze the cascade once the scrimmage is within BACKUP_CASCADE_CUTOFF_MINUTES.
+    // A player notified right before the cutoff still has up to 15 min to respond,
+    // all before game time, so we only block new notifications past this point.
     const scrimmage = await storage.getScrimmage(scrimmageId);
     if (!scrimmage) return;
-    if (new Date(scrimmage.dateTime) <= new Date()) {
-      console.log(`[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} has already started`);
+    const cutoffMs = BACKUP_CASCADE_CUTOFF_MINUTES * 60 * 1000;
+    if (new Date(scrimmage.dateTime).getTime() <= Date.now() + cutoffMs) {
+      console.log(
+        `[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} starts within ${BACKUP_CASCADE_CUTOFF_MINUTES} min`
+      );
       return;
     }
 

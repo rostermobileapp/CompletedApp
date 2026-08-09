@@ -150,13 +150,28 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
  * Expire backups whose 15-minute response window has closed and cascade to the
  * next player in the queue. Runs on its own 1-minute interval so no backup is
  * left waiting longer than ~1 minute past their deadline.
+ *
+ * Scrimmages that start within BACKUP_CASCADE_CUTOFF_MINUTES are skipped:
+ * the cascade guard inside notifyNextBackup would reject the notification anyway,
+ * and we avoid the redundant DB work + log noise.
  */
 export async function checkAndExpireTimedOutBackups(): Promise<void> {
   try {
-    const { notifyNextBackup } = await import('./scrimmageBackupUtils');
+    const { notifyNextBackup, BACKUP_CASCADE_CUTOFF_MINUTES } = await import('./scrimmageBackupUtils');
     const timedOutScrimmageIds = await storage.getScrimmagesWithTimedOutBackups(15);
     for (const scrimmageId of timedOutScrimmageIds) {
       try {
+        // Skip scrimmages that are too close to start — no point cascading
+        const scrimmage = await storage.getScrimmage(scrimmageId);
+        if (!scrimmage) continue;
+        const cutoffMs = BACKUP_CASCADE_CUTOFF_MINUTES * 60 * 1000;
+        if (new Date(scrimmage.dateTime).getTime() <= Date.now() + cutoffMs) {
+          console.log(
+            `[BackupQueue] Skipping timeout cascade — scrimmage ${scrimmageId} starts within ${BACKUP_CASCADE_CUTOFF_MINUTES} min`
+          );
+          continue;
+        }
+
         await storage.expireTimedOutBackups(scrimmageId, 15);
         await notifyNextBackup(scrimmageId);
         console.log(`[BackupQueue] Cascaded after timeout for scrimmage ${scrimmageId}`);
