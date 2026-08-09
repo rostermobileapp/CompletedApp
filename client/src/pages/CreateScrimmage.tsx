@@ -177,9 +177,23 @@ export default function CreateScrimmage() {
     queryKey: ['/api/user/leagues'],
   });
 
-  // Fetch league members for the selected league
-  const selectedLeague = (userLeagues as any[])?.[0]; // Use first league for now
-  
+  // Which league's roster to browse in the invite picker.
+  // null = not yet initialised (leagues still loading).
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+
+  // Initialise to the first league once leagues have loaded, but don't override
+  // a user's explicit choice if they already switched.
+  useEffect(() => {
+    if (selectedLeagueId === null && (userLeagues as any[]).length > 0) {
+      setSelectedLeagueId((userLeagues as any[])[0].id);
+    }
+  }, [userLeagues, selectedLeagueId]);
+
+  // Derive the full league object reactively from the selected ID.
+  const selectedLeague = (userLeagues as any[]).find((l: any) => l.id === selectedLeagueId)
+    ?? (userLeagues as any[])[0]
+    ?? null;
+
   // Get the league's facility if it exists
   const leagueFacility = selectedLeague?.facility;
   const { data: leagueMembers = [], isLoading: membersLoading } = useQuery({
@@ -1446,6 +1460,36 @@ export default function CreateScrimmage() {
               <Users className="w-5 h-5" />
               Invite Members
             </h3>
+
+          {/* League selector — only shown when the user belongs to more than one league */}
+          {(userLeagues as any[]).length > 1 && (
+            <div className="mb-3 p-3 bg-muted/30 rounded-lg hairline elev-rest">
+              <Label className="text-sm font-semibold mb-1.5 block">Browse roster from league</Label>
+              <Select
+                value={selectedLeagueId ?? ''}
+                onValueChange={(value) => {
+                  setSelectedLeagueId(value);
+                  // Clear selections and invite group when switching leagues so stale
+                  // members from the previous league don't remain checked.
+                  setSelectedMemberIds([]);
+                  setSelectedInviteGroupId('');
+                  setLoadedInviteGroupId(null);
+                  setGroupLoadedUserIds(new Set());
+                }}
+              >
+                <SelectTrigger data-testid="select-invite-league">
+                  <SelectValue placeholder="Select league…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(userLeagues as any[]).map((league: any) => (
+                    <SelectItem key={league.id} value={league.id}>
+                      {league.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Invite Group Selector - Always shown at top */}
           <div className="mb-1\.5 p-4 bg-muted/30 rounded-lg hairline elev-rest">
