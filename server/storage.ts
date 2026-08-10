@@ -2066,7 +2066,23 @@ export class DatabaseStorage implements IStorage {
       ...commissionerLeagues.map(r => ({ ...r.league, facility: r.facility || undefined }))
     ];
     const uniqueLeagues = Array.from(new Map(allLeagueData.map(league => [league.id, league])).values());
-    
+
+    // Sort leagues so the most-populated ones come first.  This ensures that
+    // when a caller blindly picks index 0 (e.g. legacy code or a cold-start
+    // with no localStorage context) they get the user's main league rather
+    // than a small test/draft league.
+    if (uniqueLeagues.length > 1) {
+      const leagueIds = uniqueLeagues.map(l => l.id);
+      const counts = await db
+        .select({ leagueId: leagueMemberships.leagueId, count: sql<number>`count(*)::int` })
+        .from(leagueMemberships)
+        .where(and(inArray(leagueMemberships.leagueId, leagueIds), eq(leagueMemberships.status, 'approved')))
+        .groupBy(leagueMemberships.leagueId);
+      const countMap: Record<string, number> = {};
+      for (const row of counts) countMap[row.leagueId] = row.count;
+      uniqueLeagues.sort((a, b) => (countMap[b.id] ?? 0) - (countMap[a.id] ?? 0));
+    }
+
     // Fetch all seasons for these leagues so we can derive both the active
     // season name (for display) and a list of past seasons (for the home
     // dropdown's Past Seasons modal). A league with NO seasons at all is
