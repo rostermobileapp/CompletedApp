@@ -178,11 +178,20 @@ export default function CreateScrimmage() {
   });
 
   // Which league's roster to browse in the invite picker.
-  // null = not yet initialised (leagues still loading).
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  // Prefer: (1) URL ?leagueId param, (2) Dashboard's localStorage selection, (3) first league.
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(() => {
+    // Check URL search params first
+    const params = new URLSearchParams(window.location.search);
+    const urlLeagueId = params.get('leagueId');
+    if (urlLeagueId) return urlLeagueId;
+    // Fall back to what the Dashboard had selected
+    const dashType = localStorage.getItem('dashboardSelectedType');
+    const dashId = localStorage.getItem('dashboardSelectedId');
+    if (dashType === 'league' && dashId) return dashId;
+    return null;
+  });
 
-  // Initialise to the first league once leagues have loaded, but don't override
-  // a user's explicit choice if they already switched.
+  // If nothing was in URL/localStorage, fall back to first league once loaded.
   useEffect(() => {
     if (selectedLeagueId === null && (userLeagues as any[]).length > 0) {
       setSelectedLeagueId((userLeagues as any[])[0].id);

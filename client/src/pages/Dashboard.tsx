@@ -3805,7 +3805,8 @@ function DashboardMobile() {
               <Button
                 onClick={() => {
                   setShowAddEventDialog(false);
-                  navigate('/create-scrimmage');
+                  const leagueParam = selectedLeagueId ? `?leagueId=${selectedLeagueId}` : '';
+                  navigate(`/create-scrimmage${leagueParam}`);
                 }}
                 className="h-20 flex items-center justify-center text-lg font-semibold text-white hover:bg-blue-600 bg-blue-500 rounded-xl"
                 data-testid="button-select-scrimmage"

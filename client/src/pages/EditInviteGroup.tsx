@@ -66,9 +66,8 @@ export default function EditInviteGroup() {
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ['/api/invite-groups/candidate-members', selectedFacilityId],
     queryFn: async () => {
-      const response = await fetch(`/api/invite-groups/candidate-members${candidateMembersParams}`, {
-        credentials: 'include',
-      });
+      // Must use apiRequest (not raw fetch) — app uses JWT auth, not cookies
+      const response = await apiRequest('GET', `/api/invite-groups/candidate-members${candidateMembersParams}`);
       if (!response.ok) throw new Error('Failed to fetch members');
       return response.json();
     },
