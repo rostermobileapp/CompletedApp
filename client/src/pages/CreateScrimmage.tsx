@@ -1975,23 +1975,24 @@ export default function CreateScrimmage() {
 
           {/* Join Mode toggle — shown for all scrimmages, at the bottom before submit */}
           <div className="bg-card rounded-xl hairline elev-rest p-4 mt-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <Label className="text-sm font-semibold">
-                  {joinMode === 'first_come' ? 'First Come, First Served' : 'Approval Required'}
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {joinMode === 'first_come'
-                    ? 'Players are confirmed automatically as spots fill up — no manual approval needed.'
-                    : 'You review each request and manually approve or deny players.'}
-                </p>
-              </div>
+            <Label className="text-sm font-semibold block mb-3">Approval Method</Label>
+            <div className="flex items-center justify-center gap-4">
+              <span
+                className={`text-sm transition-all ${joinMode === 'first_come' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+              >
+                First to RSVP
+              </span>
               <Switch
-                checked={joinMode === 'first_come'}
-                onCheckedChange={(checked) => setJoinMode(checked ? 'first_come' : 'approval')}
+                checked={joinMode === 'approval'}
+                onCheckedChange={(checked) => setJoinMode(checked ? 'approval' : 'first_come')}
                 data-testid="switch-join-mode"
-                aria-label="First come first served"
+                aria-label="Approval method"
               />
+              <span
+                className={`text-sm transition-all ${joinMode === 'approval' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+              >
+                Manual Approval
+              </span>
             </div>
           </div>
 
