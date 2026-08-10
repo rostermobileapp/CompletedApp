@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check, ShieldHalf, PersonStanding } from 'lucide-react';
 import { SCRIMMAGE_COVER_OPTIONS } from '@/lib/scrimmageCoverOptions';
 import { RinkPickerField } from '@/components/RinkPickerField';
 import type { RinkSelection } from '@/components/RinkPickerField';
@@ -29,6 +29,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // Create form schema - includes UI fields that map to database fields
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
@@ -75,8 +76,8 @@ export default function CreateScrimmage() {
   const { user } = useAuth();
   const [goalieSearchTerm, setGoalieSearchTerm] = useState("");
   const [skaterSearchTerm, setSkaterSearchTerm] = useState("");
-  const [goaliesSectionOpen, setGoaliesSectionOpen] = useState(true);
-  const [skatersSectionOpen, setSkatersSectionOpen] = useState(true);
+  const [goaliePickerOpen, setGoaliePickerOpen] = useState(false);
+  const [skaterPickerOpen, setSkaterPickerOpen] = useState(false);
   const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
   // Tracks which selectedMemberIds originated from the invite group snapshot vs manual selection.
   // Only manually-selected users are persisted as inviteUserIds on the scrimmage so that
@@ -1587,145 +1588,237 @@ export default function CreateScrimmage() {
             </Button>
           </div>
 
-          {/* Goalies subsection */}
-          <div className="mb-1\.5">
-            <button
-              type="button"
-              className="w-full flex items-center gap-2 mb-1 text-left"
-              onClick={() => setGoaliesSectionOpen(o => !o)}
-              data-testid="toggle-goalies-section"
-            >
-              <Label className="text-sm font-semibold cursor-pointer">Goalies</Label>
-              <Badge variant="outline" className="text-xs">{filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length}/{filteredGoalies.length}</Badge>
-              <span className="ml-auto text-muted-foreground">
-                {goaliesSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </span>
-            </button>
-            {goaliesSectionOpen && (
-              <>
-                <div className="mb-1">
-                  <Input
-                    placeholder="Search goalies..."
-                    value={goalieSearchTerm}
-                    onChange={(e) => setGoalieSearchTerm(e.target.value)}
-                    data-testid="input-search-goalies"
-                  />
-                </div>
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    {filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredGoalies.length} selected
-                  </p>
-                  <div className="flex gap-1">
-                    <Button type="button" variant="outline" size="sm" onClick={selectAllGoalies} disabled={filteredGoalies.length === 0} data-testid="button-select-all-goalies">Select All</Button>
-                    <Button type="button" variant="outline" size="sm" onClick={deselectAllGoalies} disabled={!filteredGoalies.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-goalies">Deselect</Button>
+          {/* Goalies picker button */}
+          {(() => {
+            const selectedGoalieCount = filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length;
+            return (
+              <div className="mb-3">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 active:bg-muted transition-colors text-left"
+                  onClick={() => setGoaliePickerOpen(true)}
+                  data-testid="button-open-goalie-picker"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <ShieldHalf className="w-5 h-5" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">Select your Goalies</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {membersLoading
+                        ? 'Loading…'
+                        : selectedGoalieCount > 0
+                          ? `${selectedGoalieCount} goalie${selectedGoalieCount !== 1 ? 's' : ''} selected`
+                          : `${filteredGoalies.length} available`}
+                    </p>
                   </div>
-                </div>
-                <ScrollArea className="h-48">
-                  {membersLoading ? (
-                    <div className="space-y-1">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                          <div className="w-8 h-8 bg-muted rounded-full" />
-                          <div className="h-4 bg-muted rounded w-1/2" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : filteredGoalies.length === 0 ? (
-                    <div className="text-center py-1\.5 text-muted-foreground text-sm">
-                      {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {filteredGoalies.map((member: any) => (
-                        <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`goalie-item-${member.user.id}`}>
-                          <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-goalie-${member.user.id}`} />
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.user.profileImageUrl || undefined} />
-                            <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>
-                            {member.user.firstName} {member.user.lastName}
-                            {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
-                            {member.isPlaceholder && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 leading-tight text-muted-foreground">Placeholder</Badge>}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  {selectedGoalieCount > 0 && (
+                    <Badge className="shrink-0">{selectedGoalieCount}</Badge>
                   )}
-                </ScrollArea>
-              </>
-            )}
-          </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                </button>
 
-          {/* Skaters subsection */}
-          <div className="mb-1\.5">
-            <button
-              type="button"
-              className="w-full flex items-center gap-2 mb-1 text-left"
-              onClick={() => setSkatersSectionOpen(o => !o)}
-              data-testid="toggle-skaters-section"
-            >
-              <Label className="text-sm font-semibold cursor-pointer">Skaters</Label>
-              <Badge variant="outline" className="text-xs">{filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length}/{filteredSkaters.length}</Badge>
-              <span className="ml-auto text-muted-foreground">
-                {skatersSectionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </span>
-            </button>
-            {skatersSectionOpen && (
-              <>
-                <div className="mb-1">
-                  <Input
-                    placeholder="Search skaters..."
-                    value={skaterSearchTerm}
-                    onChange={(e) => setSkaterSearchTerm(e.target.value)}
-                    data-testid="input-search-skaters"
-                  />
-                </div>
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    {filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredSkaters.length} selected
-                  </p>
-                  <div className="flex gap-1">
-                    <Button type="button" variant="outline" size="sm" onClick={selectAllSkaters} disabled={filteredSkaters.length === 0} data-testid="button-select-all-skaters">Select All</Button>
-                    <Button type="button" variant="outline" size="sm" onClick={deselectAllSkaters} disabled={!filteredSkaters.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-skaters">Deselect</Button>
+                {/* Goalie picker dialog */}
+                <Dialog open={goaliePickerOpen} onOpenChange={(open) => { setGoaliePickerOpen(open); if (!open) setGoalieSearchTerm(""); }}>
+                  <DialogContent className="flex flex-col w-full max-w-lg p-0 gap-0 h-[85vh] max-h-[85vh]" data-testid="dialog-goalie-picker">
+                    <DialogHeader className="px-4 pt-4 pb-3 border-b border-border shrink-0">
+                      <DialogTitle className="flex items-center gap-2">
+                        <ShieldHalf className="w-5 h-5 text-primary" />
+                        Select Goalies
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    {/* Search + actions — fixed, never scrolls */}
+                    <div className="px-4 pt-3 pb-2 border-b border-border shrink-0 space-y-2">
+                      <Input
+                        placeholder="Search goalies…"
+                        value={goalieSearchTerm}
+                        onChange={(e) => setGoalieSearchTerm(e.target.value)}
+                        data-testid="input-search-goalies"
+                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          {filteredGoalies.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredGoalies.length} selected
+                        </p>
+                        <div className="flex gap-1">
+                          <Button type="button" variant="outline" size="sm" onClick={selectAllGoalies} disabled={filteredGoalies.length === 0} data-testid="button-select-all-goalies">Select All</Button>
+                          <Button type="button" variant="outline" size="sm" onClick={deselectAllGoalies} disabled={!filteredGoalies.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-goalies">Deselect</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Scrollable list — fills remaining space */}
+                    <div className="flex-1 overflow-y-auto px-4 py-2">
+                      {membersLoading ? (
+                        <div className="space-y-1 pt-1">
+                          {[...Array(5)].map((_, i) => (
+                            <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                              <div className="w-8 h-8 bg-muted rounded-full" />
+                              <div className="h-4 bg-muted rounded w-1/2" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : filteredGoalies.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
+                        </div>
+                      ) : (
+                        <div className="space-y-1 pb-2">
+                          {filteredGoalies.map((member: any) => (
+                            <div
+                              key={member.user.id}
+                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 active:bg-muted cursor-pointer"
+                              onClick={() => toggleMemberSelection(member.user.id)}
+                              data-testid={`goalie-item-${member.user.id}`}
+                            >
+                              <Checkbox
+                                checked={selectedMemberIds.includes(member.user.id)}
+                                onCheckedChange={() => toggleMemberSelection(member.user.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`checkbox-goalie-${member.user.id}`}
+                              />
+                              <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarImage src={member.user.profileImageUrl || undefined} />
+                                <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium text-sm" data-testid={`text-goalie-name-${member.user.id}`}>
+                                {member.user.firstName} {member.user.lastName}
+                                {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
+                                {member.isPlaceholder && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 leading-tight text-muted-foreground">Placeholder</Badge>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Done button — fixed at bottom */}
+                    <div className="px-4 py-3 border-t border-border shrink-0">
+                      <Button type="button" className="w-full" onClick={() => { setGoaliePickerOpen(false); setGoalieSearchTerm(""); }} data-testid="button-done-goalies">
+                        Done
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            );
+          })()}
+
+          {/* Skaters picker button */}
+          {(() => {
+            const selectedSkaterCount = filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length;
+            return (
+              <div className="mb-3">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 active:bg-muted transition-colors text-left"
+                  onClick={() => setSkaterPickerOpen(true)}
+                  data-testid="button-open-skater-picker"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <PersonStanding className="w-5 h-5" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">Select your Skaters</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {membersLoading
+                        ? 'Loading…'
+                        : selectedSkaterCount > 0
+                          ? `${selectedSkaterCount} skater${selectedSkaterCount !== 1 ? 's' : ''} selected`
+                          : `${filteredSkaters.length} available`}
+                    </p>
                   </div>
-                </div>
-                <ScrollArea className="h-48">
-                  {membersLoading ? (
-                    <div className="space-y-1">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                          <div className="w-8 h-8 bg-muted rounded-full" />
-                          <div className="h-4 bg-muted rounded w-1/2" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : filteredSkaters.length === 0 ? (
-                    <div className="text-center py-1\.5 text-muted-foreground text-sm">
-                      {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {filteredSkaters.map((member: any) => (
-                        <div key={member.user.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50" data-testid={`skater-item-${member.user.id}`}>
-                          <Checkbox checked={selectedMemberIds.includes(member.user.id)} onCheckedChange={() => toggleMemberSelection(member.user.id)} data-testid={`checkbox-skater-${member.user.id}`} />
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={member.user.profileImageUrl || undefined} />
-                            <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>
-                            {member.user.firstName} {member.user.lastName}
-                            {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
-                            {member.isPlaceholder && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 leading-tight text-muted-foreground">Placeholder</Badge>}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  {selectedSkaterCount > 0 && (
+                    <Badge className="shrink-0">{selectedSkaterCount}</Badge>
                   )}
-                </ScrollArea>
-              </>
-            )}
-          </div>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                </button>
+
+                {/* Skater picker dialog */}
+                <Dialog open={skaterPickerOpen} onOpenChange={(open) => { setSkaterPickerOpen(open); if (!open) setSkaterSearchTerm(""); }}>
+                  <DialogContent className="flex flex-col w-full max-w-lg p-0 gap-0 h-[85vh] max-h-[85vh]" data-testid="dialog-skater-picker">
+                    <DialogHeader className="px-4 pt-4 pb-3 border-b border-border shrink-0">
+                      <DialogTitle className="flex items-center gap-2">
+                        <PersonStanding className="w-5 h-5 text-primary" />
+                        Select Skaters
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    {/* Search + actions — fixed, never scrolls */}
+                    <div className="px-4 pt-3 pb-2 border-b border-border shrink-0 space-y-2">
+                      <Input
+                        placeholder="Search skaters…"
+                        value={skaterSearchTerm}
+                        onChange={(e) => setSkaterSearchTerm(e.target.value)}
+                        data-testid="input-search-skaters"
+                      />
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          {filteredSkaters.filter((m: any) => selectedMemberIds.includes(m.user.id)).length} of {filteredSkaters.length} selected
+                        </p>
+                        <div className="flex gap-1">
+                          <Button type="button" variant="outline" size="sm" onClick={selectAllSkaters} disabled={filteredSkaters.length === 0} data-testid="button-select-all-skaters">Select All</Button>
+                          <Button type="button" variant="outline" size="sm" onClick={deselectAllSkaters} disabled={!filteredSkaters.some((m: any) => selectedMemberIds.includes(m.user.id))} data-testid="button-deselect-skaters">Deselect</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Scrollable list — fills remaining space */}
+                    <div className="flex-1 overflow-y-auto px-4 py-2">
+                      {membersLoading ? (
+                        <div className="space-y-1 pt-1">
+                          {[...Array(5)].map((_, i) => (
+                            <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
+                              <div className="w-8 h-8 bg-muted rounded-full" />
+                              <div className="h-4 bg-muted rounded w-1/2" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : filteredSkaters.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
+                        </div>
+                      ) : (
+                        <div className="space-y-1 pb-2">
+                          {filteredSkaters.map((member: any) => (
+                            <div
+                              key={member.user.id}
+                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 active:bg-muted cursor-pointer"
+                              onClick={() => toggleMemberSelection(member.user.id)}
+                              data-testid={`skater-item-${member.user.id}`}
+                            >
+                              <Checkbox
+                                checked={selectedMemberIds.includes(member.user.id)}
+                                onCheckedChange={() => toggleMemberSelection(member.user.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`checkbox-skater-${member.user.id}`}
+                              />
+                              <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarImage src={member.user.profileImageUrl || undefined} />
+                                <AvatarFallback className="text-xs">{member.user.firstName?.[0]}{member.user.lastName?.[0]}</AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium text-sm" data-testid={`text-skater-name-${member.user.id}`}>
+                                {member.user.firstName} {member.user.lastName}
+                                {member.user.id === (user as any)?.id && <span className="text-muted-foreground text-xs ml-1">(Myself)</span>}
+                                {member.isPlaceholder && <Badge variant="outline" className="ml-1.5 text-[10px] px-1 py-0 leading-tight text-muted-foreground">Placeholder</Badge>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Done button — fixed at bottom */}
+                    <div className="px-4 py-3 border-t border-border shrink-0">
+                      <Button type="button" className="w-full" onClick={() => { setSkaterPickerOpen(false); setSkaterSearchTerm(""); }} data-testid="button-done-skaters">
+                        Done
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            );
+          })()}
 
           {/* Email Invites Section */}
           <div className="mt-1\.5 border-t border-border pt-1\.5">
