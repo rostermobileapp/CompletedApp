@@ -2371,15 +2371,19 @@ function DashboardMobile() {
   // Scrimmage check-in mutation (RSVP "In")
   const scrimmageCheckInMutation = useMutation({
     mutationFn: async (scrimmageId: string) => {
-      return await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
+      const res = await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      const autoApproved = data?.status === 'approved';
       toast({
-        title: "You're In!",
-        description: "Your join request has been submitted and is pending approval.",
+        title: autoApproved ? "You're Confirmed!" : "Request Submitted",
+        description: autoApproved
+          ? "You've been automatically added — spot confirmed!"
+          : "Your join request has been submitted and is pending approval.",
       });
     },
     onError: (error: any) => {
@@ -3155,13 +3159,18 @@ function DashboardMobile() {
                     return (
                       <div className="flex items-center gap-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold truncate" data-testid={`text-invite-title-${invite.id}`}>
                               {invite.title}
                             </h3>
                             <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">
                               {isOwnScrimmage ? 'My Scrimmage' : 'Invite'}
                             </span>
+                            {invite.joinMode === 'first_come' && (
+                              <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-first-come-${invite.id}`}>
+                                Open Spots
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
                             {format(new Date(invite.dateTime), 'MMM d • h:mm a')}

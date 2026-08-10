@@ -97,13 +97,20 @@ export function ScheduleCalendarMobile({
 
   const joinInviteMutation = useMutation({
     mutationFn: async (scrimmageId: string) => {
-      return await apiRequest('POST', `/api/scrimmages/${scrimmageId}/requests`, {});
+      const res = await apiRequest('POST', `/api/scrimmages/${scrimmageId}/requests`, {});
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
-      toast({ title: "You're In!", description: 'Your join request has been submitted and is pending approval.' });
+      const autoApproved = data?.status === 'approved';
+      toast({
+        title: autoApproved ? "You're Confirmed!" : "You're In!",
+        description: autoApproved
+          ? "You've been automatically added — spot confirmed!"
+          : 'Your join request has been submitted and is pending approval.',
+      });
     },
     onError: (error: any) => {
       toast({ title: 'Failed', description: error.message || 'Failed to send request.', variant: 'destructive' });

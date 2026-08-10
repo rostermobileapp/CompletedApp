@@ -62,6 +62,7 @@ import {
   insertScrimmageSchema,
   insertScrimmageRequestSchema,
   updateScrimmageRequestSchema,
+  type ScrimmageRequest,
   createSubstituteRequestSchema,
   getSubstituteRequestsQuerySchema,
   approveSubstituteRequestSchema,
@@ -471,6 +472,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[Init] scrimmages.cover_photo column ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure scrimmages.cover_photo column:', err);
+  }
+
+  // Ensure scrimmages.join_mode exists and is constrained to valid values.
+  // Migration is split into safe, fully-idempotent steps so it can run
+  // on any database state without causing startup failures on re-runs.
+  try {
+    // Step 1: Add the column nullable (IF NOT EXISTS is a no-op on repeat runs;
+    // we avoid NOT NULL here so existing rows with nulls don't cause an error).
+    await db.execute(sql`
+      ALTER TABLE scrimmages
+        ADD COLUMN IF NOT EXISTS join_mode text
+    `);
+
+    // Step 2: Back-fill any rows that have NULL or an invalid join_mode value.
+    // This is safe to run multiple times — it's a no-op when all rows are already valid.
+    await db.execute(sql`
+      UPDATE scrimmages
+         SET join_mode = 'approval'
+       WHERE join_mode IS NULL
+          OR join_mode NOT IN ('approval', 'first_come')
+    `);
+
+    // Step 3: Set NOT NULL and the column default now that all rows are valid.
+    await db.execute(sql`ALTER TABLE scrimmages ALTER COLUMN join_mode SET NOT NULL`);
+    await db.execute(sql`ALTER TABLE scrimmages ALTER COLUMN join_mode SET DEFAULT 'approval'`);
+
+    // Step 4: Add CHECK constraint only when it does not already exist.
+    // Checking pg_constraint avoids the "duplicate_object" race and also handles
+    // the edge case where a constraint with the same name already exists
+    // (regardless of whether its definition matches).
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint c
+          JOIN pg_class t ON c.conrelid = t.oid
+          WHERE t.relname = 'scrimmages'
+            AND c.conname  = 'scrimmages_join_mode_check'
+        ) THEN
+          ALTER TABLE scrimmages
+            ADD CONSTRAINT scrimmages_join_mode_check
+            CHECK (join_mode IN ('approval', 'first_come'));
+        END IF;
+      END; $$
+    `);
+
+    console.log('[Init] scrimmages.join_mode column and constraint ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure scrimmages.join_mode:', err);
+    throw err; // Fail fast — do not start with an unvalidated schema.
   }
   // Ensure scrimmage_requests.team_assignment exists (light/dark team colour assignment)
   try {
@@ -16507,25 +16557,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'Request already exists for this scrimmage' });
       }
       
-      // Check if scrimmage is already at capacity
+      // joinMode is typed as 'approval' | 'first_come' on the Scrimmage type via Drizzle.
+      const isFirstCome = scrimmage.joinMode === 'first_come';
+      const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
+
+      if (isFirstCome) {
+        // All players (including co-hosts) share the same locked capacity-check in
+        // first-come mode so no path can overbook the scrimmage.
+        const fcResult = await storage.createFirstComeScrimmageRequest(scrimmageId, userId);
+        if (fcResult === 'at_capacity') {
+          return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
+        }
+        if (fcResult === 'duplicate') {
+          return res.status(409).json({ message: 'Request already exists for this scrimmage' });
+        }
+        const request = fcResult;
+
+        // Respond immediately; send notifications outside the transaction to
+        // avoid holding locks during network I/O.
+        res.status(201).json(request);
+
+        // Mirror the same notification side-effects as a manual approval so the
+        // player receives an in-app notification, broadcast, and push.
+        try {
+          const [player, league] = await Promise.all([
+            storage.getUser(userId),
+            scrimmage.leagueId ? storage.getLeague(scrimmage.leagueId) : Promise.resolve(null),
+          ]);
+          if (player) {
+            const timezone = league?.timezone || 'America/New_York';
+            const { date: fcDate, time: fcTime } = formatDayAndTime(scrimmage.dateTime, timezone);
+
+            await storage.createNotification({
+              userId: player.id,
+              type: 'scrimmage_approved',
+              title: `You're in! ${scrimmage.title}`,
+              message: `You've automatically secured a spot in "${scrimmage.title}" on ${fcDate} at ${fcTime}!`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Details',
+              scrimmageId: scrimmage.id,
+            });
+            broadcastNotificationUpdate(player.id);
+
+            const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
+            let fcTeamLogoUrl: string | undefined;
+            try {
+              const logoRows = await db
+                .select({ logoUrl: teams.logoUrl })
+                .from(teamMemberships)
+                .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+                .where(and(
+                  eq(teamMemberships.userId, scrimmage.creatorId),
+                  eq(teams.leagueId, scrimmage.leagueId!),
+                  eq(teamMemberships.status, 'approved')
+                ))
+                .limit(1);
+              fcTeamLogoUrl = resolveTeamLogoUrl(logoRows[0]?.logoUrl);
+            } catch { /* keep undefined */ }
+
+            const { sendScrimmageApprovalPushNotification } = await import('./oneSignalNotifications');
+            const pushResult = await sendScrimmageApprovalPushNotification(
+              player.id,
+              scrimmage.title,
+              scrimmageDateTime,
+              scrimmage.id,
+              null, // no team assignment for first-come
+              fcTeamLogoUrl
+            );
+            console.log(`[Push] First-come auto-approval push to ${player.id}: ${pushResult ? 'sent' : 'skipped/failed'}`);
+          }
+        } catch (notifyErr) {
+          console.error('[FirstCome] Failed to send auto-approval notification:', notifyErr);
+        }
+        return;
+      }
+
+      // Standard (approval-required) path.
+      // Co-hosts are auto-approved; they use the same locked path as first-come to prevent
+      // a race where a concurrent manual-approval reads the same final available spot.
+      if (isCoHost) {
+        const coHostResult = await storage.createFirstComeScrimmageRequest(scrimmageId, userId);
+        if (coHostResult === 'at_capacity') {
+          return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
+        }
+        if (coHostResult === 'duplicate') {
+          return res.status(409).json({ message: 'Request already exists for this scrimmage' });
+        }
+        return res.status(201).json(coHostResult);
+      }
+
+      // Non-co-host, approval-mode: insert a pending request (no capacity concern yet).
       const currentRequests = await storage.getScrimmageRequests(scrimmageId);
       const acceptedCount = currentRequests.filter(req => req.status === 'approved').length;
-      
+
       if (acceptedCount >= scrimmage.maxPlayers) {
         return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
       }
 
-      // Validate request data
-      // Co-hosts are auto-approved when they RSVP; everyone else (including the creator) is pending
-      const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
-      const shouldAutoApprove = isCoHost;
-      
       let requestData;
       try {
         requestData = insertScrimmageRequestSchema.parse({
           scrimmageId,
           playerId: userId,
-          status: shouldAutoApprove ? 'approved' : 'pending',
+          status: 'pending',
         });
       } catch (validationError) {
         console.error('[Scrimmage Request] Validation error:', validationError);
@@ -16736,16 +16870,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
       }
       
-      // Business invariant: Cannot approve if at capacity (backup bypasses capacity check)
-      if (status === 'approved') {
-        const currentRequests = await storage.getScrimmageRequests(scrimmage.id);
-        const approvedCount = currentRequests.filter(req => req.status === 'approved').length;
-        
-        if (approvedCount >= scrimmage.maxPlayers) {
-          return res.status(409).json({ message: 'Cannot approve request - scrimmage is at full capacity' });
-        }
-      }
-
       // Handle backup approval separately — no capacity check, auto-assigned position
       if (status === 'backup') {
         const backupRequest = await storage.approveAsBackup(requestId);
@@ -16779,8 +16903,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(backupRequest);
       }
 
-      const updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status, undefined, teamAssignment ?? null);
-      
+      // For approvals: use the atomic capacity-checked path so concurrent organiser
+      // approvals and first-come auto-approvals cannot both exceed maxPlayers.
+      let updatedRequest: ScrimmageRequest;
+      if (status === 'approved') {
+        const approvalResult = await storage.atomicApproveRequest(requestId, scrimmage.id, teamAssignment ?? null);
+        if (approvalResult === 'at_capacity') {
+          return res.status(409).json({ message: 'Cannot approve request - scrimmage is at full capacity' });
+        }
+        if (approvalResult === 'not_pending') {
+          // A concurrent actor already processed this request inside the lock.
+          // Return 409 so the caller knows — do NOT send duplicate notifications.
+          return res.status(409).json({ message: 'Request has already been processed by a concurrent action' });
+        }
+        updatedRequest = approvalResult;
+      } else {
+        updatedRequest = await storage.updateScrimmageRequestStatus(requestId, status as 'approved' | 'dismissed', undefined, teamAssignment ?? null);
+      }
+
       // Send rejection push notification
       if (status === 'rejected') {
         try {

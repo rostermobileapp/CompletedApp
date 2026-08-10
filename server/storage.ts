@@ -599,6 +599,13 @@ export interface IStorage {
   
   // Scrimmage request operations
   createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest>;
+  /** Atomically checks capacity (under a scrimmages row-level lock) and inserts an approved request.
+   *  Returns the new request, 'at_capacity', or 'duplicate'. */
+  createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate'>;
+  /** Atomically approves an existing pending request, enforcing capacity under a lock.
+   *  Returns the updated request, 'at_capacity' when no spots remain, or 'not_pending'
+   *  when the request is no longer in 'pending' state (concurrent actor already processed it). */
+  atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending'>;
   getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]>;
   getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined>;
   updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date, teamAssignment?: string | null): Promise<ScrimmageRequest>;
@@ -9430,6 +9437,100 @@ export class DatabaseStorage implements IStorage {
     return newRequest;
   }
 
+  /**
+   * Atomically approves an existing pending request, enforcing capacity under a
+   * scrimmage-level row lock.  Used by both the manual-approval route and any
+   * other path that transitions a request to `approved`.
+   *
+   * Returns the updated ScrimmageRequest, or the string literal `'at_capacity'`
+   * when no spots remain (caller should respond with HTTP 409).
+   */
+  async atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending'> {
+    return await db.transaction(async (tx) => {
+      // Lock the scrimmage row to serialize all concurrent approval attempts.
+      const lockResult = await tx.execute(
+        sql`SELECT max_players FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
+      );
+      const scrimmageRow = lockResult.rows[0] as { max_players: number } | undefined;
+      if (!scrimmageRow) throw new Error(`Scrimmage ${scrimmageId} not found`);
+
+      // Re-count approved players under the lock.
+      const countResult = await tx.execute(
+        sql`SELECT COUNT(*) AS cnt FROM scrimmage_requests WHERE scrimmage_id = ${scrimmageId} AND status = 'approved'`
+      );
+      const approvedCount = parseInt((countResult.rows[0] as { cnt: string }).cnt, 10);
+
+      if (approvedCount >= scrimmageRow.max_players) {
+        return 'at_capacity' as const;
+      }
+
+      const updateData: Record<string, unknown> = { status: 'approved', approvedAt: new Date() };
+      if (teamAssignment !== undefined) updateData.teamAssignment = teamAssignment;
+
+      // Include status = 'pending' in WHERE so a concurrent approval of the same
+      // request (two organisers acting simultaneously) is detected atomically.
+      const [updated] = await tx
+        .update(scrimmageRequests)
+        .set(updateData as any)
+        .where(and(
+          eq(scrimmageRequests.id, requestId),
+          eq(scrimmageRequests.status, 'pending'),
+        ))
+        .returning();
+
+      // If no row was updated the request was no longer pending (already processed).
+      if (!updated) return 'not_pending' as const;
+
+      return updated;
+    });
+  }
+
+  /**
+   * First-come-first-served variant: acquires a row-level lock on the scrimmage,
+   * re-checks approved capacity inside the transaction, and inserts an auto-approved
+   * request only when a spot is still available.
+   *
+   * Returns the new ScrimmageRequest when successful, or null when the scrimmage
+   * is already at capacity (caller should respond with HTTP 409).
+   */
+  async createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate'> {
+    try {
+      return await db.transaction(async (tx) => {
+        // Lock the scrimmage row — this is the shared primitive that all approved-state
+        // transitions (first-come, co-host, manual approval, backup acceptance) must hold
+        // while counting and writing, so they never concurrently read the same final spot.
+        const lockResult = await tx.execute(
+          sql`SELECT max_players FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
+        );
+        const scrimmageRow = lockResult.rows[0] as { max_players: number } | undefined;
+        if (!scrimmageRow) return 'at_capacity' as const;
+
+        // Re-count approved players under the lock — prevents over-booking.
+        const countResult = await tx.execute(
+          sql`SELECT COUNT(*) AS cnt FROM scrimmage_requests WHERE scrimmage_id = ${scrimmageId} AND status = 'approved'`
+        );
+        const approvedCount = parseInt((countResult.rows[0] as { cnt: string }).cnt, 10);
+
+        if (approvedCount >= scrimmageRow.max_players) {
+          return 'at_capacity' as const;
+        }
+
+        const now = new Date();
+        const [newRequest] = await tx
+          .insert(scrimmageRequests)
+          .values({ scrimmageId, playerId, status: 'approved', approvedAt: now })
+          .returning();
+
+        return newRequest;
+      });
+    } catch (err: any) {
+      // Postgres unique_violation (23505): two concurrent requests from the same player
+      // both passed the pre-check before either acquired the lock.
+      if (err?.code === '23505') return 'duplicate' as const;
+      throw err;
+    }
+  }
+
   async getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]> {
     const results = await db
       .select()
@@ -9643,10 +9744,11 @@ export class DatabaseStorage implements IStorage {
     scrimmageId: string,
   ): Promise<{ ok: true; request: ScrimmageRequest } | { ok: false; reason: 'full' | 'not_found' }> {
     return db.transaction(async (tx) => {
-      // Lock all scrimmage_requests rows for this scrimmage so concurrent transactions
-      // cannot read a stale approved count until we commit.
+      // Lock the scrimmages row — the same primitive used by first-come joins,
+      // co-host auto-approvals, and manual approvals — so all approved-state
+      // transitions serialize on one row and can never race on the same vacancy.
       await tx.execute(
-        sql`SELECT id FROM scrimmage_requests WHERE scrimmage_id = ${scrimmageId} FOR UPDATE`
+        sql`SELECT id FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
       );
 
       // Re-count approved players inside the lock

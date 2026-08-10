@@ -1231,6 +1231,9 @@ export const scrimmages = pgTable("scrimmages", {
   venmoLinkOverride: text("venmo_link_override"),
   cashappLinkOverride: text("cashapp_link_override"),
   status: scrimmageStatusEnum("status").default("open").notNull(),
+  // Join mode: 'approval' = organiser manually approves each request (default);
+  // 'first_come' = requests are auto-approved on creation while capacity remains.
+  joinMode: text("join_mode").default("approval").notNull(),
   announcementId: varchar("announcement_id").references(() => announcements.id), // Link to auto-created announcement
   // Recurring event fields
   isRecurring: boolean("is_recurring").default(false).notNull(),
@@ -2959,6 +2962,10 @@ export const insertScrimmageSchema = createInsertSchema(scrimmages).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  // Narrow Drizzle's generated `string` to the two valid enum values.
+  // Optional here so callers that omit it get the DB-level default ('approval').
+  joinMode: z.enum(['approval', 'first_come']).optional(),
 });
 
 export const insertScrimmageRequestSchema = createInsertSchema(scrimmageRequests).omit({
@@ -3312,6 +3319,8 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   dateTime: z.string().optional(),
   venmoLinkOverride: venmoLinkOverrideField,
   cashappLinkOverride: cashappLinkOverrideField,
+  // Narrow Drizzle's generated `string` to the two valid enum values.
+  joinMode: z.enum(['approval', 'first_come']).optional(),
 });
 
 // Substitute request API validation schemas

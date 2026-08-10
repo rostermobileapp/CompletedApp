@@ -48,15 +48,19 @@ export function ScrimmageRSVPButtons({ scrimmageId, className, isCreator }: Scri
   // Join scrimmage mutation
   const joinMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
+      const res = await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", "scrimmage-requests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scrimmages", scrimmageId, "requests"] });
       if (!isCreator) fireFirstRsvpTrigger();
+      const autoApproved = data?.status === 'approved';
       toast({
-        title: "Request Sent",
-        description: "Your request to join this scrimmage has been sent to the creator.",
+        title: autoApproved ? "You're Confirmed!" : "Request Sent",
+        description: autoApproved
+          ? "You've been automatically added — spot confirmed!"
+          : "Your request to join this scrimmage has been sent to the creator.",
       });
     },
     onError: (error: any) => {

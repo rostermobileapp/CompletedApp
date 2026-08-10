@@ -78,6 +78,9 @@ export default function CreateScrimmage() {
   const [skaterSearchTerm, setSkaterSearchTerm] = useState("");
   const [goaliePickerOpen, setGoaliePickerOpen] = useState(false);
   const [skaterPickerOpen, setSkaterPickerOpen] = useState(false);
+  // 'approval' = organiser manually approves each request (default)
+  // 'first_come' = requests are auto-approved on creation while capacity remains
+  const [joinMode, setJoinMode] = useState<'approval' | 'first_come'>('approval');
   const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
   // Tracks which selectedMemberIds originated from the invite group snapshot vs manual selection.
   // Only manually-selected users are persisted as inviteUserIds on the scrimmage so that
@@ -303,6 +306,9 @@ export default function CreateScrimmage() {
       }
       if (existingScrimmage.venmoLinkOverride) setShowVenmoOverride(true);
       if (existingScrimmage.cashappLinkOverride) setShowCashAppOverride(true);
+      if (existingScrimmage.joinMode === 'first_come' || existingScrimmage.joinMode === 'approval') {
+        setJoinMode(existingScrimmage.joinMode);
+      }
       setFormInitialized(true);
     }
   }, [isEditMode, existingScrimmage, form, formInitialized]);
@@ -427,6 +433,8 @@ export default function CreateScrimmage() {
         color: selectedColor || null,
         // Cover photo
         coverPhoto: data.coverPhoto || null,
+        // Join mode: how players are admitted
+        joinMode,
       };
 
       if (isEditMode && scrimmageId) {
@@ -1964,6 +1972,28 @@ export default function CreateScrimmage() {
             </div>
           </div>
         )}
+
+          {/* Join Mode toggle — shown for all scrimmages, at the bottom before submit */}
+          <div className="bg-card rounded-xl hairline elev-rest p-4 mt-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <Label className="text-sm font-semibold">
+                  {joinMode === 'first_come' ? 'First Come, First Served' : 'Approval Required'}
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {joinMode === 'first_come'
+                    ? 'Players are confirmed automatically as spots fill up — no manual approval needed.'
+                    : 'You review each request and manually approve or deny players.'}
+                </p>
+              </div>
+              <Switch
+                checked={joinMode === 'first_come'}
+                onCheckedChange={(checked) => setJoinMode(checked ? 'first_come' : 'approval')}
+                data-testid="switch-join-mode"
+                aria-label="First come first served"
+              />
+            </div>
+          </div>
 
       </form>
       <FixedBottomButton>
