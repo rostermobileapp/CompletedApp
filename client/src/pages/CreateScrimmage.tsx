@@ -1978,7 +1978,7 @@ export default function CreateScrimmage() {
             <Label className="text-sm font-semibold block mb-3">Approval Method</Label>
             <div className="flex items-center justify-center gap-4">
               <span
-                className={`text-sm transition-all ${joinMode === 'first_come' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+                className={`text-sm transition-all ${joinMode === 'first_come' ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
               >
                 First to RSVP
               </span>
@@ -1989,7 +1989,7 @@ export default function CreateScrimmage() {
                 aria-label="Approval method"
               />
               <span
-                className={`text-sm transition-all ${joinMode === 'approval' ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+                className={`text-sm transition-all ${joinMode === 'approval' ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
               >
                 Manual Approval
               </span>
