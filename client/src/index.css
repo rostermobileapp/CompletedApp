@@ -295,11 +295,20 @@
   html {
     margin: 0;
     padding: 0;
+    /* Let the compositor handle page-level scroll without waiting for JS.
+       Critical for 120 Hz / ProMotion displays in WKWebView. */
+    touch-action: pan-y;
   }
 
   body {
     margin: 0;
     padding: 0;
+    /* Mirror touch-action so the scroll-hit-test reaches the compositor
+       layer, bypassing the main thread entirely during a pan gesture. */
+    touch-action: pan-y;
+    /* Hint to the browser that the body contents will be scrolled.
+       Promotes the layer stack to GPU compositing up-front. */
+    will-change: scroll-position;
   }
 
   html::-webkit-scrollbar,
@@ -323,11 +332,14 @@
   /* Native-feel vertical scroll for explicitly vertical-only scroll containers.
      Scoped to overflow-y-auto only — overflow-auto and overflow-scroll can scroll
      in both axes and must not have pan-y forced on them (breaks horizontal scroll).
-     - touch-action: pan-y  → browser handles vertical touch without waiting for JS
-     - overscroll-behavior-y: contain → prevents scroll chaining to the window     */
+     - touch-action: pan-y          → browser handles vertical touch without waiting for JS
+     - overscroll-behavior-y: contain → prevents scroll chaining to the window
+     - will-change: scroll-position  → compositor hint; promotes to GPU layer so the
+                                       scroll happens off the main thread at full frame rate */
   .overflow-y-auto {
     touch-action: pan-y;
     overscroll-behavior-y: contain;
+    will-change: scroll-position;
   }
 
   .overflow-y-auto::-webkit-scrollbar,
@@ -522,9 +534,16 @@
    in the cascade when needed. */
 .elev-rest {
   box-shadow: var(--elev-rest);
+  /* Promote to own GPU compositor layer so box-shadow doesn't trigger a
+     full repaint of the parent layer as the user scrolls past these cards.
+     backface-visibility: hidden is a complementary hint for WebKit. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 .elev-lift {
   box-shadow: var(--elev-lift);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 .elev-inset {
   box-shadow: var(--elev-inset);
