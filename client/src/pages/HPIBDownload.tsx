@@ -221,7 +221,7 @@ export default function HPIBDownload() {
           Run your team or league through Roster
         </p>
         <p style={{ color: "#3b82f6", fontWeight: 600, fontSize: "clamp(0.9rem, 3.5vw, 1.1rem)", lineHeight: 1.3, margin: 0 }}>
-          We'll send&nbsp;10% back to Hockey Players in Business
+          We'll send&nbsp;10% back to Hockey Players in Business to help grow the game we love.
         </p>
       </div>
 
