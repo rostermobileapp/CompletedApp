@@ -8,13 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   Users, UserPlus, Plus, Upload, Clock,
-  Flame, Snowflake, X, Save, TrendingUp, Minus,
+  Flame, Snowflake, X, Save, TrendingUp, Minus, UserRound,
 } from 'lucide-react';
 import { ClickableAvatar } from '@/components/ClickableAvatar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 import { useToast } from '@/hooks/use-toast';
-import { getAuthHeaders, queryClient, apiRequest } from '@/lib/queryClient';
+import { getAuthHeaders, queryClient, apiRequest, getImageUrl } from '@/lib/queryClient';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // ─────────────────────────────────────────────────────────────
@@ -185,8 +185,10 @@ function SlotButton({
             </div>
           )}
           <Avatar className="!h-8 !w-8 pointer-events-none shrink-0">
-            <AvatarImage src={slot.playerImage ? (slot.playerImage.startsWith('http') ? slot.playerImage : `/api/storage/object/${slot.playerImage}`) : undefined} alt={slot.playerName || ''} />
-            <AvatarFallback className="bg-primary/20" />
+            <AvatarImage src={getImageUrl(slot.playerImage) ?? undefined} alt={slot.playerName || ''} />
+            <AvatarFallback className="bg-primary/20">
+              <UserRound className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </AvatarFallback>
           </Avatar>
           <span className="text-[11px] font-medium text-center leading-tight truncate w-full">
             {displayName}
@@ -808,8 +810,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <Avatar className="!h-[45px] !w-[45px] shrink-0">
-                            <AvatarImage src={profileImageUrl ? (profileImageUrl.startsWith('http') ? profileImageUrl : `/api/storage/object/${profileImageUrl}`) : undefined} alt={memberFirstName || 'Player'} />
-                            <AvatarFallback>{((memberFirstName?.[0] || '') + (memberLastName?.[0] || '')).toUpperCase() || '?'}</AvatarFallback>
+                            <AvatarImage src={getImageUrl(profileImageUrl) ?? undefined} alt={memberFirstName || 'Player'} />
+                            <AvatarFallback>
+                              <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                            </AvatarFallback>
                           </Avatar>
                           {isPlaceholder ? (
                             <div className="flex items-center gap-1 min-w-0 flex-1">
@@ -1003,8 +1007,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                               data-testid={`bench-player-${memberId}`}
                             >
                               <Avatar className="h-5 w-5 shrink-0 pointer-events-none">
-                                <AvatarImage src={m.user?.profileImageUrl ? (m.user.profileImageUrl.startsWith('http') ? m.user.profileImageUrl : `/api/storage/object/${m.user.profileImageUrl}`) : undefined} alt={fn || 'Player'} />
-                                <AvatarFallback className="text-[8px]">{((fn?.[0] ?? '') + (ln?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
+                                <AvatarImage src={getImageUrl(m.user?.profileImageUrl) ?? undefined} alt={fn || 'Player'} />
+                                <AvatarFallback>
+                                  <UserRound className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                                </AvatarFallback>
                               </Avatar>
                               <span className="font-medium">{displayName}</span>
                             </div>
@@ -1155,8 +1161,10 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
                   data-testid={`picker-player-${memberId}`}
                 >
                   <Avatar className="h-10 w-10 pointer-events-none shrink-0">
-                    <AvatarImage src={m.user?.profileImageUrl ? (m.user.profileImageUrl.startsWith('http') ? m.user.profileImageUrl : `/api/storage/object/${m.user.profileImageUrl}`) : undefined} alt={fn || 'Player'} />
-                    <AvatarFallback>{((fn?.[0] ?? '') + (ln?.[0] ?? '')).toUpperCase() || '?'}</AvatarFallback>
+                    <AvatarImage src={getImageUrl(m.user?.profileImageUrl) ?? undefined} alt={fn || 'Player'} />
+                    <AvatarFallback>
+                      <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{fmt(fn, ln)}</p>
