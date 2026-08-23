@@ -368,7 +368,7 @@ export function ScheduleCalendarMobile({
               type="button"
               key={key}
               onClick={() => setSelectedDay(d)}
-              className={`relative min-w-0 aspect-square flex flex-col items-center justify-start py-1 px-0.5 transition-colors ${
+              className={`relative min-w-0 aspect-square overflow-hidden flex flex-col items-center justify-start py-1 px-0.5 transition-colors ${
                 inMonth ? 'bg-card' : 'bg-muted/30'
               } ${isSelected ? 'ring-2 ring-primary ring-inset' : ''}`}
               data-testid={`mobile-day-cell-${key}`}
@@ -387,11 +387,11 @@ export function ScheduleCalendarMobile({
                 {d.getDate()}
               </span>
               {dayEvents.length > 0 && (
-                <div className="mt-1.5 flex items-center justify-center gap-1 flex-wrap max-w-full px-0.5">
+                <div className="mt-1.5 flex w-full min-w-0 flex-nowrap items-center justify-center gap-1 overflow-hidden px-0.5">
                   {visibleDots.map((ev) => (
                     <span
                       key={ev.id}
-                      className="w-2.5 h-2.5 rounded-full inline-block"
+                      className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
                       style={{ backgroundColor: ev.color }}
                     />
                   ))}
