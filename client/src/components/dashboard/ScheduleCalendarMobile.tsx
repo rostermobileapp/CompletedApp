@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  addDays,
   addMonths,
   endOfMonth,
   endOfWeek,
@@ -298,8 +299,8 @@ export function ScheduleCalendarMobile({
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days: Date[] = [];
-  for (let d = gridStart; d <= gridEnd; d = new Date(d.getTime() + 86_400_000)) {
-    days.push(new Date(d));
+  for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
+    days.push(d);
   }
 
   const today = new Date();
@@ -384,9 +385,9 @@ export function ScheduleCalendarMobile({
                       : 'text-muted-foreground/60'
                 }`}
               >
-                {d.getDate()}
+                {inMonth ? d.getDate() : ''}
               </span>
-              {dayEvents.length > 0 && (
+              {inMonth && dayEvents.length > 0 && (
                 <div className="mt-1.5 flex w-full min-w-0 flex-nowrap items-center justify-center gap-1 overflow-hidden px-0.5">
                   {visibleDots.map((ev) => (
                     <span

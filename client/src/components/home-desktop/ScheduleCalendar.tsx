@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import {
+  addDays,
   addMonths,
   endOfMonth,
   endOfWeek,
@@ -294,8 +295,8 @@ export function ScheduleCalendar({
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days: Date[] = [];
-  for (let d = gridStart; d <= gridEnd; d = new Date(d.getTime() + 86_400_000)) {
-    days.push(new Date(d));
+  for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
+    days.push(d);
   }
 
   return (
@@ -467,11 +468,11 @@ function CalendarGrid({
                 <span
                   className={`${isToday ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[11px] font-medium' : 'text-foreground/70'} ${!inMonth ? 'opacity-50' : ''}`}
                 >
-                  {d.getDate()}
+                  {inMonth ? d.getDate() : ''}
                 </span>
               </div>
               <div className="flex flex-col gap-1 min-h-0">
-                {dayEvents.slice(0, 3).map((ev) => {
+                {(inMonth ? dayEvents : []).slice(0, 3).map((ev) => {
                   const c = EVENT_COLORS[ev.type];
                   // Prefer the user-chosen color; fall back to the type-based tint.
                   const bg = ev.color || c.bg;
@@ -501,7 +502,7 @@ function CalendarGrid({
                     </button>
                   );
                 })}
-                {dayEvents.length > 3 && (
+                {inMonth && dayEvents.length > 3 && (
                   <div className="text-[10px] text-[#888] px-1">
                     +{dayEvents.length - 3} more
                   </div>
