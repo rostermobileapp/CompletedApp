@@ -289,13 +289,12 @@ export default function ReferralProgram() {
           {submitStatus === 'success' ? (
             <div className="bg-green-50 border border-green-200 rounded-2xl p-10 text-center">
               <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-5" />
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Application submitted!</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Check your email</h3>
               <p className="text-gray-600 mb-5 max-w-sm mx-auto">
-                We'll review it and get back to you at <span className="font-semibold">{form.email}</span> within 3–5 business days.
+                We sent a confirmation link to <span className="font-semibold">{form.email}</span>. Click it to submit your application for review.
               </p>
               <p className="text-sm text-gray-400">
-                Already approved?{' '}
-                <Link href="/referral-program/portal/login" className="text-[#3c82f4] hover:underline">Sign in to your portal</Link>
+                The link expires in 24 hours. Once verified, our team will review your application within 3–5 business days.
               </p>
             </div>
           ) : (
@@ -337,7 +336,7 @@ export default function ReferralProgram() {
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3c82f4]/30 focus:border-[#3c82f4] transition-colors"
                 />
-                <p className="text-xs text-gray-400 mt-1">This will be your login email for the partner portal.</p>
+                <p className="text-xs text-gray-400 mt-1">We’ll send a confirmation link here before your application is reviewed. This will also be your login email if approved.</p>
               </div>
 
               {/* Org type */}

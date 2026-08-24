@@ -84,6 +84,7 @@ import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
 import FeaturesLanding from "@/pages/FeaturesLanding";
 import ReferralProgram from "@/pages/ReferralProgram";
+import ReferralApplicationVerification from "@/pages/ReferralApplicationVerification";
 import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
 import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
 import ReferralPortalSetPassword from "@/pages/ReferralPortalSetPassword";
@@ -222,6 +223,7 @@ function Router() {
           <Route path="/referral-program/portal/forgot-password" component={ReferralPortalForgotPassword} />
           <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
           <Route path="/referral-program/portal" component={ReferralPortal} />
+          <Route path="/referral-program/verify" component={ReferralApplicationVerification} />
           <Route path="/referral-program" component={ReferralProgram} />
           <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
           <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />
@@ -316,6 +318,7 @@ function Router() {
               <Route path="/referral-program/portal/forgot-password" component={ReferralPortalForgotPassword} />
               <Route path="/referral-program/portal/login" component={ReferralPortalLogin} />
               <Route path="/referral-program/portal" component={ReferralPortal} />
+              <Route path="/referral-program/verify" component={ReferralApplicationVerification} />
               <Route path="/referral-program" component={ReferralProgram} />
               <Route path="/admin/referrals/login" component={ReferralAdminLogin} />
               <Route path="/admin/referrals/partner/:id" component={ReferralAdminPartnerDetail} />

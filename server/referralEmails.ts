@@ -1,8 +1,12 @@
 import { getUncachableResendClient } from './resend';
 
 function getAppUrl(): string {
-  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  return process.env.APP_URL || 'https://rosters.replit.app';
+  if (process.env.NODE_ENV !== 'production' && process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  return process.env.FRONTEND_URL?.split(',')[0]?.trim()
+    || process.env.APP_URL
+    || 'https://www.roster-app.com';
 }
 
 function emailWrapper(content: string): string {
@@ -44,6 +48,48 @@ function templateToHtml(text: string): string {
   return `<div style="color:#374151;font-size:15px;line-height:24px;">${
     text.replace(/\n/g, '<br>')
   }</div>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Send the email ownership confirmation required before an application enters
+ * the admin review queue. Unlike the notification helpers below, failures are
+ * allowed to reach the caller so the application endpoint can report failure.
+ */
+export async function sendPartnerApplicationVerificationEmail(
+  toEmail: string,
+  data: { orgName: string; contactName: string; verificationLink: string },
+): Promise<void> {
+  const { client, fromEmail } = await getUncachableResendClient();
+  const contactName = escapeHtml(data.contactName);
+  const orgName = escapeHtml(data.orgName);
+  const verificationLink = escapeHtml(data.verificationLink);
+
+  const { error } = await client.emails.send({
+    from: fromEmail,
+    to: toEmail,
+    subject: 'Confirm your Roster Referral Program application',
+    html: emailWrapper(`
+      <h2 style="margin:0 0 16px 0;color:#111827;font-size:20px;">Confirm your email address</h2>
+      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:24px;">Hi ${contactName}, thanks for applying to the Roster Referral Program for <strong>${orgName}</strong>.</p>
+      <p style="margin:0 0 24px 0;color:#374151;font-size:15px;line-height:24px;">Please confirm that this email address belongs to you. Your application will be sent to our team for review after you confirm.</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="${verificationLink}" style="display:inline-block;background:#3b82f6;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:16px;">Confirm My Email</a>
+      </div>
+      <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;text-align:center;">This link expires in 24 hours and can only be used once.</p>
+      <p style="margin:16px 0 0 0;font-size:12px;color:#9ca3af;line-height:18px;word-break:break-all;">If the button doesn't work, copy and paste this link into your browser:<br>${verificationLink}</p>
+    `),
+  });
+  if (error) throw new Error(`Unable to send verification email: ${error.message}`);
+  console.log(`[ReferralEmail] Sent application verification email to ${toEmail}`);
 }
 
 export async function sendNewApplicationAdminEmail(

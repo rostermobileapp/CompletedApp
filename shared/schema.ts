@@ -4003,12 +4003,17 @@ export const referralPartners = pgTable("referral_partners", {
   payoutRate: decimal("payout_rate", { precision: 5, scale: 4 }).default("0.10").notNull(),
   adminNotes: text("admin_notes"),
   passwordHash: text("password_hash"),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  emailVerificationToken: varchar("email_verification_token", { length: 128 }),
+  emailVerificationExpiresAt: timestamp("email_verification_expires_at"),
+  emailVerificationSentAt: timestamp("email_verification_sent_at"),
   approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_referral_partners_status").on(table.status),
   index("idx_referral_partners_code").on(table.referralCode),
+  index("idx_referral_partners_email_verification_token").on(table.emailVerificationToken),
 ]);
 
 export const insertReferralPartnerSchema = createInsertSchema(referralPartners).omit({

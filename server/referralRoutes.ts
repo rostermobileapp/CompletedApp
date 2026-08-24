@@ -7,7 +7,7 @@
  */
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, count, sum, ne } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, count, sum, ne, isNull, isNotNull, gt } from "drizzle-orm";
 import {
   referralPartners,
   referralConversions,
@@ -24,6 +24,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import {
   sendNewApplicationAdminEmail,
+  sendPartnerApplicationVerificationEmail,
   sendPartnerApprovalEmail,
   sendPartnerRejectionEmail,
   sendPasswordResetEmail,
@@ -33,9 +34,16 @@ import {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getAppUrl(): string {
-  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  return process.env.APP_URL || "https://rosters.replit.app";
+  if (process.env.NODE_ENV !== "production" && process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  return process.env.FRONTEND_URL?.split(",")[0]?.trim()
+    || process.env.APP_URL
+    || "https://www.roster-app.com";
 }
+
+const APPLICATION_EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const APPLICATION_VERIFICATION_RESEND_COOLDOWN_MS = 10 * 60 * 1000;
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL!;
@@ -318,11 +326,59 @@ export function registerReferralRoutes(app: Express) {
 
         // Check if email already applied
         const [existing] = await db
-          .select({ id: referralPartners.id, status: referralPartners.status })
+          .select({
+            id: referralPartners.id,
+            status: referralPartners.status,
+            emailVerifiedAt: referralPartners.emailVerifiedAt,
+            emailVerificationSentAt: referralPartners.emailVerificationSentAt,
+          })
           .from(referralPartners)
           .where(eq(referralPartners.email, email))
           .limit(1);
         if (existing) {
+          if (existing.status === "pending" && !existing.emailVerifiedAt) {
+            const sentRecently = existing.emailVerificationSentAt
+              && Date.now() - existing.emailVerificationSentAt.getTime() < APPLICATION_VERIFICATION_RESEND_COOLDOWN_MS;
+            if (sentRecently) {
+              return res.status(429).json({
+                message: "A verification email was sent recently. Please check your inbox or try again in a few minutes.",
+              });
+            }
+
+            const verificationToken = randomBytes(48).toString("hex");
+            const verificationExpiresAt = new Date(Date.now() + APPLICATION_EMAIL_VERIFICATION_TTL_MS);
+            await db
+              .update(referralPartners)
+              .set({
+                emailVerificationToken: verificationToken,
+                emailVerificationExpiresAt: verificationExpiresAt,
+                emailVerificationSentAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(referralPartners.id, existing.id));
+
+            try {
+              const verificationLink = `${getAppUrl()}/referral-program/verify?token=${encodeURIComponent(verificationToken)}`;
+              await sendPartnerApplicationVerificationEmail(email, {
+                orgName,
+                contactName,
+                verificationLink,
+              });
+            } catch (emailErr) {
+              await db
+                .update(referralPartners)
+                .set({ emailVerificationSentAt: null, updatedAt: new Date() })
+                .where(eq(referralPartners.id, existing.id));
+              console.error("[Referral] resend verification email error:", emailErr);
+              return res.status(503).json({ message: "We couldn't send the verification email. Please try again." });
+            }
+
+            return res.status(200).json({
+              message: "We sent a new verification link. Check your email to submit your application for review.",
+              id: existing.id,
+            });
+          }
+
           const msg =
             existing.status === "pending"
               ? "An application with this email is already pending review"
@@ -342,6 +398,8 @@ export function registerReferralRoutes(app: Express) {
           );
         }
 
+        const verificationToken = randomBytes(48).toString("hex");
+        const verificationExpiresAt = new Date(Date.now() + APPLICATION_EMAIL_VERIFICATION_TTL_MS);
         const [partner] = await db
           .insert(referralPartners)
           .values({
@@ -352,23 +410,157 @@ export function registerReferralRoutes(app: Express) {
             hockeyAffiliation: hockeyAffiliation || null,
             proofDocumentPath,
             status: "pending",
+            emailVerificationToken: verificationToken,
+            emailVerificationExpiresAt: verificationExpiresAt,
+            emailVerificationSentAt: new Date(),
           })
           .returning();
 
-        // Notify admin
-        const adminEmail = await getDefaultSetting(
-          "admin_notification_email",
-          "roster.mobile.app@gmail.com"
-        );
-        await sendNewApplicationAdminEmail(adminEmail, { orgName, contactName, email, orgType });
+        try {
+          const verificationLink = `${getAppUrl()}/referral-program/verify?token=${encodeURIComponent(verificationToken)}`;
+          await sendPartnerApplicationVerificationEmail(email, {
+            orgName,
+            contactName,
+            verificationLink,
+          });
+        } catch (emailErr) {
+          await db
+            .update(referralPartners)
+            .set({ emailVerificationSentAt: null, updatedAt: new Date() })
+            .where(eq(referralPartners.id, partner.id));
+          console.error("[Referral] verification email error:", emailErr);
+          return res.status(503).json({ message: "We couldn't send the verification email. Please try again." });
+        }
 
-        res.status(201).json({ message: "Application submitted successfully", id: partner.id });
+        res.status(201).json({
+          message: "Check your email to verify your address and submit your application for review.",
+          id: partner.id,
+        });
       } catch (err) {
         console.error("[Referral] apply error:", err);
         res.status(500).json({ message: "Failed to submit application" });
       }
     }
   );
+
+  // ── Public: validate referral application verification link ──────────────
+  // This intentionally does not change state: mail-security scanners often
+  // follow links automatically, so the applicant must explicitly confirm via
+  // the POST endpoint below.
+  app.get("/api/referral/verify", async (req, res) => {
+    const token = (req.query.token as string || "").trim();
+    if (!token) return res.status(400).json({ message: "Verification token is required" });
+
+    try {
+      const [partner] = await db
+        .select({
+          id: referralPartners.id,
+          status: referralPartners.status,
+          emailVerifiedAt: referralPartners.emailVerifiedAt,
+          emailVerificationExpiresAt: referralPartners.emailVerificationExpiresAt,
+        })
+        .from(referralPartners)
+        .where(eq(referralPartners.emailVerificationToken, token))
+        .limit(1);
+
+      if (!partner) {
+        return res.status(404).json({ message: "This verification link is invalid or has already been used." });
+      }
+
+      if (partner.emailVerifiedAt) {
+        return res.json({
+          verified: true,
+          message: "Your email is already verified. Your application is with our team for review.",
+        });
+      }
+
+      if (
+        partner.status !== "pending" ||
+        !partner.emailVerificationExpiresAt ||
+        partner.emailVerificationExpiresAt.getTime() <= Date.now()
+      ) {
+        return res.status(410).json({ message: "This verification link has expired. Return to the application to request a new link." });
+      }
+
+      res.json({
+        valid: true,
+        message: "Confirm your email to submit this application for review.",
+      });
+    } catch (err) {
+      console.error("[Referral] verify validation error:", err);
+      res.status(500).json({ message: "Could not validate this verification link. Please try again." });
+    }
+  });
+
+  // ── Public: confirm referral application email ───────────────────────────
+  app.post("/api/referral/verify", async (req, res) => {
+    const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+    if (!token) return res.status(400).json({ message: "Verification token is required" });
+
+    try {
+      // The token and expiry are included in the update condition so only an
+      // intentional confirmation can consume a single-use link.
+      const [verifiedPartner] = await db
+        .update(referralPartners)
+        .set({
+          emailVerifiedAt: new Date(),
+          emailVerificationToken: null,
+          emailVerificationExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(referralPartners.emailVerificationToken, token),
+          isNull(referralPartners.emailVerifiedAt),
+          eq(referralPartners.status, "pending"),
+          gt(referralPartners.emailVerificationExpiresAt, new Date()),
+        ))
+        .returning({
+          id: referralPartners.id,
+          orgName: referralPartners.orgName,
+          contactName: referralPartners.contactName,
+          email: referralPartners.email,
+          orgType: referralPartners.orgType,
+        });
+
+      if (!verifiedPartner) {
+        const [existing] = await db
+          .select({
+            emailVerifiedAt: referralPartners.emailVerifiedAt,
+            emailVerificationExpiresAt: referralPartners.emailVerificationExpiresAt,
+          })
+          .from(referralPartners)
+          .where(eq(referralPartners.emailVerificationToken, token))
+          .limit(1);
+        if (existing?.emailVerifiedAt) {
+          return res.json({ verified: true, message: "Your email is already verified. Your application is with our team for review." });
+        }
+        if (existing?.emailVerificationExpiresAt && existing.emailVerificationExpiresAt.getTime() <= Date.now()) {
+          return res.status(410).json({ message: "This verification link has expired. Return to the application to request a new link." });
+        }
+        return res.status(404).json({ message: "This verification link is invalid or has already been used." });
+      }
+
+      // Only a verified application is announced to the referral admin.
+      const adminEmail = await getDefaultSetting(
+        "admin_notification_email",
+        "roster.mobile.app@gmail.com"
+      );
+      await sendNewApplicationAdminEmail(adminEmail, {
+        orgName: verifiedPartner.orgName,
+        contactName: verifiedPartner.contactName,
+        email: verifiedPartner.email,
+        orgType: verifiedPartner.orgType || undefined,
+      });
+
+      res.json({
+        verified: true,
+        message: "Email verified. Your application has been submitted for review.",
+      });
+    } catch (err) {
+      console.error("[Referral] verify confirmation error:", err);
+      res.status(500).json({ message: "Could not verify this application. Please try again." });
+    }
+  });
 
   // ── Partner portal: forgot password ──────────────────────────────────────
   app.post("/api/referral/portal/forgot-password", async (req, res) => {
@@ -656,7 +848,10 @@ export function registerReferralRoutes(app: Express) {
       const [pendingCount] = await db
         .select({ count: count() })
         .from(referralPartners)
-        .where(eq(referralPartners.status, "pending"));
+        .where(and(
+          eq(referralPartners.status, "pending"),
+          isNotNull(referralPartners.emailVerifiedAt),
+        ));
 
       const [totalConversions] = await db
         .select({ count: count() })
@@ -717,6 +912,10 @@ export function registerReferralRoutes(app: Express) {
       const recentPartners = await db
         .select({ id: referralPartners.id, orgName: referralPartners.orgName, status: referralPartners.status, createdAt: referralPartners.createdAt, approvedAt: referralPartners.approvedAt })
         .from(referralPartners)
+        .where(or(
+          ne(referralPartners.status, "pending"),
+          isNotNull(referralPartners.emailVerifiedAt),
+        ))
         .orderBy(desc(referralPartners.createdAt))
         .limit(10);
 
@@ -762,7 +961,12 @@ export function registerReferralRoutes(app: Express) {
   app.get("/api/admin/referrals/applications", requireAdminAuth, async (req, res) => {
     try {
       const { status, search } = req.query as Record<string, string>;
-      const conditions = [];
+      const conditions: any[] = [
+        or(
+          ne(referralPartners.status, "pending"),
+          isNotNull(referralPartners.emailVerifiedAt),
+        ),
+      ];
       if (status && status !== "all") {
         if (!isPartnerStatus(status)) {
           return res.status(400).json({ message: `Invalid status. Allowed: ${PARTNER_STATUSES.join(", ")}` });
@@ -820,6 +1024,9 @@ export function registerReferralRoutes(app: Express) {
       if (!partner) return res.status(404).json({ message: "Application not found" });
       if (partner.status === "approved") {
         return res.status(400).json({ message: "Already approved", referralCode: partner.referralCode });
+      }
+      if (!partner.emailVerifiedAt) {
+        return res.status(403).json({ message: "The applicant must verify their email before approval." });
       }
 
       const referralCode = await generateUniqueReferralCode(partner.orgName);

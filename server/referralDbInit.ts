@@ -40,6 +40,10 @@ export async function initReferralDb(): Promise<void> {
         referral_code VARCHAR(20) UNIQUE,
         payout_rate DECIMAL(5,4) NOT NULL DEFAULT 0.10,
         admin_notes TEXT,
+        email_verified_at TIMESTAMP,
+        email_verification_token VARCHAR(128),
+        email_verification_expires_at TIMESTAMP,
+        email_verification_sent_at TIMESTAMP,
         approved_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -48,6 +52,25 @@ export async function initReferralDb(): Promise<void> {
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_referral_partners_status ON referral_partners(status);
       CREATE INDEX IF NOT EXISTS idx_referral_partners_code ON referral_partners(referral_code);
+    `);
+    await db.execute(sql`
+      ALTER TABLE referral_partners
+        ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(128),
+        ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMP;
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_referral_partners_email_verification_token
+      ON referral_partners(email_verification_token);
+    `);
+    // Existing records predate email verification and should remain reviewable.
+    // New unverified applications always have a token, so they are not promoted.
+    await db.execute(sql`
+      UPDATE referral_partners
+      SET email_verified_at = COALESCE(created_at, NOW())
+      WHERE email_verified_at IS NULL
+        AND email_verification_token IS NULL;
     `);
 
     await db.execute(sql`
