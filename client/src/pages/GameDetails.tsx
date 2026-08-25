@@ -908,6 +908,22 @@ export default function GameDetails() {
                 </button>
               </div>
 
+              {isScrimmageCreator && (
+                <Button
+                  type="button"
+                  variant={scrimmage.timeTbd ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => {
+                    setPageTransitionDirection('up');
+                    navigate(`/edit-scrimmage/${gameId}`);
+                  }}
+                  data-testid="button-edit-scrimmage-time"
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  {scrimmage.timeTbd ? 'Set exact time' : 'Edit scrimmage'}
+                </Button>
+              )}
+
               {/* Pending requests */}
               {(() => {
                 const pending = (pendingRequests as any[]).filter((r: any) => r.status === 'pending');
