@@ -37,7 +37,7 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
   selectedEmails: z.array(z.string()).optional().default([]), // Email invites
   coHostIds: z.array(z.string()).optional().default([]), // Co-hosts who can help manage the scrimmage
   date: z.string().min(1, 'Date is required'),
-  time: z.string().min(1, 'Time is required'),
+  time: z.string().optional().default(''),
   venue: z.string().min(1, 'Venue is required'), // UI field that maps to location
   maxParticipants: z.number().min(2, 'Must have at least 2 participants'), // UI field that maps to maxPlayers
   costPerPlayer: z.string().optional(), // Optional cost field
@@ -151,6 +151,7 @@ export default function CreateScrimmage() {
       skillLevel: '',
       date: '',
       time: '',
+        timeTbd: true,
       selectedMemberIds: [],
       venue: '', // UI field that maps to location
       maxParticipants: 20, // UI field that maps to maxPlayers
@@ -265,7 +266,7 @@ export default function CreateScrimmage() {
       const dateTimeStr = existingScrimmage.dateTime || '';
       const [datePart, timePart] = dateTimeStr.split('T');
       const dateStr = datePart || '';
-      const timeStr = timePart ? timePart.slice(0, 5) : ''; // Get HH:mm
+       const timeStr = existingScrimmage.timeTbd ? '' : (timePart ? timePart.slice(0, 5) : ''); // Get HH:mm
       
       // Parse recurrence end date directly from string
       const recurrenceEndDateStr = existingScrimmage.recurrenceEndDate || '';
@@ -277,6 +278,7 @@ export default function CreateScrimmage() {
         skillLevel: existingScrimmage.skillLevel || '',
         date: dateStr,
         time: timeStr,
+         timeTbd: !!existingScrimmage.timeTbd,
         venue: existingScrimmage.location || '',
         maxParticipants: existingScrimmage.maxPlayers || 20,
         costPerPlayer: existingScrimmage.costPerPlayer || '',
@@ -409,7 +411,8 @@ export default function CreateScrimmage() {
         skillLevel: data.skillLevel,
         location: data.venue, // Map venue to location
         maxPlayers: data.maxParticipants, // Map maxParticipants to maxPlayers
-        dateTime: `${data.date}T${data.time}`, // Send as string without UTC conversion
+        dateTime: `${data.date}T${data.time || '00:00'}`, // Date-only anchor when the time is TBD
+        timeTbd: !!data.timeTbd || !data.time,
         costPerPlayer: data.costPerPlayer ? data.costPerPlayer : null, // Optional cost
         // Per-scrimmage payment link overrides (validated + normalized server-side)
         venmoLinkOverride: data.venmoLinkOverride ?? null,
@@ -428,7 +431,9 @@ export default function CreateScrimmage() {
         // Reminder settings
         reminderHoursBefore: data.enableReminders ? data.reminderHoursBefore : null,
         // Send invite immediately when scrimmage is created (only for new scrimmages)
-        sendInviteNow: !isEditMode && data.sendInviteNow,
+        // In edit mode this is an explicit choice to deliver already-saved
+        // invitations after setting an occurrence's time.
+        sendInviteNow: data.sendInviteNow && !(!!data.timeTbd || !data.time),
         // Calendar color
         color: selectedColor || null,
         // Cover photo
@@ -474,7 +479,9 @@ export default function CreateScrimmage() {
         title: isEditMode ? 'Scrimmage Updated' : 'Scrimmage Request Created',
         description: isEditMode 
           ? `"${scrimmage.title}" has been updated successfully.`
-          : `"${scrimmage.title}" has been created. Selected members will be notified.`,
+          : scrimmage.timeTbd
+            ? `"${scrimmage.title}" has been saved as Time TBD. Invitations will stay queued until a time is set.`
+            : `"${scrimmage.title}" has been created. Selected members will be notified.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId] });
@@ -907,6 +914,7 @@ export default function CreateScrimmage() {
                                         newHour24 = hour;
                                       }
                                       form.setValue('time', `${String(newHour24).padStart(2, '0')}:${minutes}`);
+                                       form.setValue('timeTbd', false);
                                     }}
                                     className={`w-full h-8 flex items-center justify-center text-sm font-medium hover:bg-primary/10 transition-colors ${
                                       isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground'
@@ -935,6 +943,7 @@ export default function CreateScrimmage() {
                                       const currentTimeVal = form.watch('time') || '12:00';
                                       const [hours] = currentTimeVal.split(':');
                                       form.setValue('time', `${hours}:${String(minute).padStart(2, '0')}`);
+                                       form.setValue('timeTbd', false);
                                     }}
                                     className={`w-full h-8 flex items-center justify-center text-sm font-medium hover:bg-primary/10 transition-colors ${
                                       isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground'
@@ -975,6 +984,7 @@ export default function CreateScrimmage() {
                                         newHour24 = currentHour12 + 12;
                                       }
                                       form.setValue('time', `${String(newHour24).padStart(2, '0')}:${minutes}`);
+                                       form.setValue('timeTbd', false);
                                     }}
                                     className={`w-12 h-8 flex items-center justify-center text-sm font-semibold hover:bg-primary/10 rounded transition-colors ${
                                       isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground border border-border'
@@ -1000,6 +1010,28 @@ export default function CreateScrimmage() {
                 </div>
                 {form.formState.errors.time && (
                   <p className="text-sm text-destructive mt-1">{form.formState.errors.time.message}</p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <Checkbox
+                    id="time-tbd"
+                    checked={!!form.watch('timeTbd')}
+                    onCheckedChange={(checked) => {
+                      form.setValue('timeTbd', !!checked);
+                      if (checked) {
+                        form.setValue('time', '');
+                        setShowTimePicker(false);
+                      }
+                    }}
+                    data-testid="checkbox-time-tbd"
+                  />
+                  <Label htmlFor="time-tbd" className="cursor-pointer text-sm font-normal">
+                    Time TBD — I’ll set this occurrence’s time later
+                  </Label>
+                </div>
+                {!!form.watch('timeTbd') && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    Invitations and reminders will stay queued until you select a time.
+                  </p>
                 )}
               </div>
             </div>
@@ -1125,22 +1157,35 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Send Invite Now Option */}
-            <div className="space-y-1 p-4 bg-green-500/10 rounded-lg border border-green-500/30 pt-[4px] pb-[4px]">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="sendInviteNow" className="text-base">Send Invite Now</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Immediately notify selected members when this scrimmage is created
-                  </p>
-                </div>
-                <Switch
-                  id="sendInviteNow"
-                  checked={form.watch('sendInviteNow')}
-                  onCheckedChange={(checked) => form.setValue('sendInviteNow', checked)}
-                  data-testid="switch-send-invite-now"
-                />
+            {(!isEditMode || existingScrimmage?.hasDeferredInvites) && (form.watch('timeTbd') ? (
+              <div className="space-y-1 p-4 bg-amber-500/10 rounded-lg border border-amber-500/30 pt-[4px] pb-[4px]">
+                <Label className="text-base">Invitations saved for later</Label>
+                <p className="text-sm text-muted-foreground">
+                  Your invitees will not be notified until this specific scrimmage has a time.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-1 p-4 bg-green-500/10 rounded-lg border border-green-500/30 pt-[4px] pb-[4px]">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="sendInviteNow" className="text-base">
+                      {isEditMode ? 'Send saved invitations now' : 'Send Invite Now'}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {isEditMode
+                        ? 'Deliver this occurrence’s pending invitations after you save.'
+                        : 'Immediately notify selected members when this scrimmage is created'}
+                    </p>
+                  </div>
+                  <Switch
+                    id="sendInviteNow"
+                    checked={form.watch('sendInviteNow')}
+                    onCheckedChange={(checked) => form.setValue('sendInviteNow', checked)}
+                    data-testid="switch-send-invite-now"
+                  />
+                </div>
+              </div>
+            ))}
 
             {/* Invitation Scheduling for Recurring Scrimmages */}
             {form.watch('isRecurring') && (

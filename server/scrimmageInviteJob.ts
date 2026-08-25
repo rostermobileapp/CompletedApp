@@ -52,7 +52,7 @@ async function checkAndSendInvitations() {
   for (const scrimmage of scrimmages) {
     try {
       // Check if this scrimmage has invitation scheduling configured
-      if (!scrimmage.inviteDaysBefore || scrimmage.inviteSentAt) {
+      if (!scrimmage.inviteDaysBefore || scrimmage.inviteSentAt || scrimmage.timeTbd) {
         continue;
       }
 

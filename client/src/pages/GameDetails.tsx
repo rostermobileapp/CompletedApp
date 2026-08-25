@@ -602,7 +602,9 @@ export default function GameDetails() {
                   {scrimmage.title}
                 </h2>
                 <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-date">
-                  {format(new Date(scrimmage.dateTime), 'EEEE, MMMM d • h:mm a')}
+                  {scrimmage.timeTbd
+                    ? `${format(new Date(scrimmage.dateTime), 'EEEE, MMMM d')} • Time TBD`
+                    : format(new Date(scrimmage.dateTime), 'EEEE, MMMM d • h:mm a')}
                 </p>
               </div>
             </div>

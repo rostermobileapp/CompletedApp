@@ -458,6 +458,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } catch (err) {
     console.error('[Init] Failed to ensure scrimmages.invite_user_ids column:', err);
   }
+  // Time TBD is stored per scrimmage occurrence. date_time remains a required
+  // date anchor for calendar placement and recurrence, but must not be treated
+  // as an event time while this flag is true.
+  try {
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS time_tbd boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS recurrence_times_independent boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_emails text[] NOT NULL DEFAULT '{}'::text[]`);
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS has_deferred_invites boolean NOT NULL DEFAULT false`);
+  } catch (err) {
+    console.error('[Init] Failed to ensure scrimmage Time TBD columns:', err);
+  }
   // Ensure invite_group_members.placeholder_player_id exists (placeholder support in invite groups)
   try {
     await db.execute(sql`ALTER TABLE invite_group_members ADD COLUMN IF NOT EXISTS placeholder_player_id varchar REFERENCES placeholder_players(id) ON DELETE CASCADE`);
@@ -15608,6 +15619,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cashappLinkOverride: cashappLinkOverrideField,
   });
 
+  /**
+   * Sends the invite payload already saved on one scrimmage occurrence.
+   * The atomic claim in storage makes this safe to call from either the edit
+   * flow or the later manual-send action without duplicating delivery.
+   */
+  const deliverPendingScrimmageInvites = async (scrimmageId: string) => {
+    const scrimmage = await storage.claimScrimmageInviteDelivery(scrimmageId);
+    if (!scrimmage) {
+      return { delivered: false, reason: 'already_sent_or_not_ready' };
+    }
+
+    const league = await storage.getLeague(scrimmage.leagueId);
+    if (!league) {
+      return { delivered: false, reason: 'league_not_found' };
+    }
+
+    const recipientIds = new Set(
+      (scrimmage.inviteUserIds || []).filter((id) => !id.startsWith('placeholder:')),
+    );
+    if (scrimmage.inviteGroupId) {
+      const groupMembers = await storage.getInviteGroupMembers(scrimmage.inviteGroupId);
+      for (const member of groupMembers) {
+        if (member.userId) recipientIds.add(member.userId);
+      }
+    }
+    recipientIds.delete(scrimmage.creatorId);
+    const recipients = [...recipientIds];
+
+    const creator = await storage.getUser(scrimmage.creatorId);
+    const organizerName = creator
+      ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
+      : 'Organizer';
+    const formattedDateTime = formatFullDateTime(scrimmage.dateTime, league.timezone);
+
+    if (recipients.length > 0) {
+      try {
+        const announcement = await storage.createAnnouncement({
+          content: `🏒 You're Invited! "${scrimmage.title}" on ${formattedDateTime} at ${scrimmage.location}. Click to RSVP!`,
+          leagueId: scrimmage.leagueId,
+          authorId: scrimmage.creatorId,
+          isPinned: false,
+        });
+        await storage.createAnnouncementVisibility(announcement.id, recipients);
+        await storage.updateScrimmage(scrimmage.id, { announcementId: announcement.id });
+      } catch (error) {
+        console.error(`Failed to create deferred invite announcement for ${scrimmage.id}:`, error);
+      }
+
+      for (const recipientId of recipients) {
+        try {
+          const notification = await storage.createNotificationIfNotExists({
+            userId: recipientId,
+            type: 'scrimmage_invite',
+            title: `You're Invited: ${scrimmage.title}`,
+            message: `Join us on ${formattedDateTime} at ${scrimmage.location}. Tap to RSVP!`,
+            actionUrl: `/scrimmage/${scrimmage.id}`,
+            actionText: 'View & RSVP',
+            scrimmageId: scrimmage.id,
+          });
+          if (notification) {
+            broadcastNotificationUpdate(recipientId);
+            const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+            await sendScrimmageInvitePushNotification(
+              recipientId,
+              organizerName,
+              scrimmage.title,
+              formattedDateTime,
+              scrimmage.location || 'TBD',
+              scrimmage.id,
+            );
+          }
+        } catch (error) {
+          console.error(`Failed to deliver deferred invite to ${recipientId}:`, error);
+        }
+      }
+    }
+
+    const emails = Array.from(new Set((scrimmage.inviteEmails || []).map((email) => email.toLowerCase().trim())));
+    if (emails.length > 0) {
+      try {
+        await storage.createScrimmageInvites(scrimmage.id, emails);
+        await sendBulkScrimmageInvites(emails, {
+          scrimmageId: scrimmage.id,
+          title: scrimmage.title,
+          dateTime: new Date(scrimmage.dateTime),
+          location: scrimmage.location,
+          creatorName: organizerName,
+          skillLevel: scrimmage.skillLevel || undefined,
+          costPerPlayer: scrimmage.costPerPlayer || undefined,
+          notes: scrimmage.notes || undefined,
+          maxPlayers: scrimmage.maxPlayers,
+        });
+      } catch (error) {
+        console.error(`Failed to deliver deferred email invites for ${scrimmage.id}:`, error);
+      }
+    }
+
+    return { delivered: true, recipientCount: recipients.length, emailCount: emails.length };
+  };
+
   // Create scrimmage (available to all users)
   app.post('/api/scrimmages', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
@@ -15644,10 +15755,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
       
-      // Ensure scrimmage is scheduled in the future
-      // Use parseLeagueLocalDateTime to convert string to Date for comparison
+      // Ensure the known date is still upcoming. A Time TBD occurrence uses
+      // midnight only as a date anchor, so validate against the end of that
+      // local date instead of incorrectly treating it as already started.
       const now = new Date();
-      const scrimmageDateTime = parseLeagueLocalDateTime(scrimmageData.dateTime, league.timezone);
+      const tbdDateAnchor = scrimmageData.dateTime.split('T')[0];
+      const futureValidationDate = scrimmageData.timeTbd
+        ? `${tbdDateAnchor}T23:59:59`
+        : scrimmageData.dateTime;
+      const scrimmageDateTime = parseLeagueLocalDateTime(futureValidationDate, league.timezone);
       if (scrimmageDateTime <= now) {
         return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
       }
@@ -15668,6 +15784,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const emailSchema = z.string().email();
+      const savedInviteEmails = Array.from(new Set(
+        ((req.body.selectedEmails as string[] | undefined) || [])
+          .map((email) => email.toLowerCase().trim())
+          .filter((email) => emailSchema.safeParse(email).success),
+      ));
+
       // Create announcement first if there are selected members.
       // Placeholder players (id prefix "placeholder:") have no users row — exclude
       // them before writing announcement visibility records (FK to users.id).
@@ -15677,7 +15800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const realSelectedMemberIds = (req.body.selectedMemberIds || []).filter(
         (id: string) => !id.startsWith('placeholder:')
       );
-      if (realSelectedMemberIds.length > 0) {
+    if (!scrimmageData.timeTbd && realSelectedMemberIds.length > 0) {
         try {
           
           const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)} at ${scrimmageData.location}. Click to RSVP!`;
@@ -15799,6 +15922,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           announcementId,
           dateTime: dates[0],
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
+          inviteEmails: savedInviteEmails,
+          hasDeferredInvites: !!scrimmageData.timeTbd,
+          recurrenceTimesIndependent: true,
         });
 
         // Creator must explicitly RSVP to join their own scrimmage
@@ -15815,16 +15941,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 canManagePayments: true,
                 addedBy: userId,
               });
-              // Notify co-host
-              await storage.createNotification({
-                userId: coHostId,
-                type: 'scrimmage_cohost_added',
-                title: `You're a co-host for ${scrimmageData.title}`,
-                message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
-                actionUrl: `/scrimmage/${parentScrimmage.id}`,
-                scrimmageId: parentScrimmage.id,
-              });
-              broadcastNotificationUpdate(coHostId);
+              if (!scrimmageData.timeTbd) {
+                await storage.createNotification({
+                  userId: coHostId,
+                  type: 'scrimmage_cohost_added',
+                  title: `You're a co-host for ${scrimmageData.title}`,
+                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
+                  actionUrl: `/scrimmage/${parentScrimmage.id}`,
+                  scrimmageId: parentScrimmage.id,
+                });
+                broadcastNotificationUpdate(coHostId);
+              }
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
@@ -15847,16 +15974,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   canManagePayments: true,
                   addedBy: userId,
                 });
-                await storage.createNotification({
-                  userId: existingUser.id,
-                  type: 'scrimmage_cohost_added',
-                  title: `You're a co-host for ${scrimmageData.title}`,
-                  message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
-                  actionUrl: `/scrimmage/${parentScrimmage.id}`,
-                  scrimmageId: parentScrimmage.id,
-                });
-                broadcastNotificationUpdate(existingUser.id);
-              } else {
+                if (!scrimmageData.timeTbd) {
+                  await storage.createNotification({
+                    userId: existingUser.id,
+                    type: 'scrimmage_cohost_added',
+                    title: `You're a co-host for ${scrimmageData.title}`,
+                    message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
+                    actionUrl: `/scrimmage/${parentScrimmage.id}`,
+                    scrimmageId: parentScrimmage.id,
+                  });
+                  broadcastNotificationUpdate(existingUser.id);
+                }
+              } else if (!scrimmageData.timeTbd) {
                 await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: scrimmageData.title });
               }
             } catch (emailCoHostError) {
@@ -15869,9 +15998,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (let i = 1; i < dates.length; i++) {
           const childScrimmage = await storage.createScrimmage({
             ...scrimmageData,
-            dateTime: dates[i],
+            // Future occurrences deliberately start as Time TBD. A time set on
+            // the first occurrence must never become the series-wide default.
+            dateTime: new Date(dates[i].getFullYear(), dates[i].getMonth(), dates[i].getDate()),
+            timeTbd: true,
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
+            inviteUserIds: (req.body.inviteUserIds as string[]) || [],
+            inviteEmails: savedInviteEmails,
+            hasDeferredInvites: true,
+            recurrenceTimesIndependent: true,
           });
 
           // Creator must explicitly RSVP to join each recurring child scrimmage
@@ -15897,7 +16033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         
         // ALWAYS send in-app notifications when members are invited
-        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        if (!scrimmageData.timeTbd && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -15958,7 +16094,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Save email invites if provided
-        if (req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
+        if (!scrimmageData.timeTbd && req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
           try {
             // Validate and normalize emails
             const emailSchema = z.string().email();
@@ -16009,6 +16145,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...scrimmageData,
           announcementId,
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
+          inviteEmails: savedInviteEmails,
+          hasDeferredInvites: !!scrimmageData.timeTbd,
         });
 
         // Creator must explicitly RSVP to join their own scrimmage
@@ -16025,16 +16163,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 canManagePayments: true,
                 addedBy: userId,
               });
-              // Notify co-host
-              await storage.createNotification({
-                userId: coHostId,
-                type: 'scrimmage_cohost_added',
-                title: `You're a co-host for ${scrimmageData.title}`,
-                message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
-                actionUrl: `/scrimmage/${scrimmage.id}`,
-                scrimmageId: scrimmage.id,
-              });
-              broadcastNotificationUpdate(coHostId);
+              if (!scrimmageData.timeTbd) {
+                await storage.createNotification({
+                  userId: coHostId,
+                  type: 'scrimmage_cohost_added',
+                  title: `You're a co-host for ${scrimmageData.title}`,
+                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
+                  actionUrl: `/scrimmage/${scrimmage.id}`,
+                  scrimmageId: scrimmage.id,
+                });
+                broadcastNotificationUpdate(coHostId);
+              }
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
@@ -16057,16 +16196,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   canManagePayments: true,
                   addedBy: userId,
                 });
-                await storage.createNotification({
-                  userId: existingUser.id,
-                  type: 'scrimmage_cohost_added',
-                  title: `You're a co-host for ${scrimmageData.title}`,
-                  message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
-                  actionUrl: `/scrimmage/${scrimmage.id}`,
-                  scrimmageId: scrimmage.id,
-                });
-                broadcastNotificationUpdate(existingUser.id);
-              } else {
+                if (!scrimmageData.timeTbd) {
+                  await storage.createNotification({
+                    userId: existingUser.id,
+                    type: 'scrimmage_cohost_added',
+                    title: `You're a co-host for ${scrimmageData.title}`,
+                    message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
+                    actionUrl: `/scrimmage/${scrimmage.id}`,
+                    scrimmageId: scrimmage.id,
+                  });
+                  broadcastNotificationUpdate(existingUser.id);
+                }
+              } else if (!scrimmageData.timeTbd) {
                 await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: scrimmageData.title });
               }
             } catch (emailCoHostError) {
@@ -16076,7 +16217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // ALWAYS send in-app notifications when members are invited
-        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        if (!scrimmageData.timeTbd && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -16137,7 +16278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Save email invites if provided
-        if (req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
+        if (!scrimmageData.timeTbd && req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
           try {
             // Validate and normalize emails
             const emailSchema = z.string().email();
@@ -16255,9 +16396,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only the creator can update this scrimmage' });
       }
       
-      // Business invariant: Cannot edit scrimmage that has already started or ended
+      // A Time TBD row uses date_time only as a calendar anchor, so it remains
+      // editable until a real time is set. Scheduled occurrences keep the
+      // existing no-edits-after-start rule.
       const now = new Date();
-      if (new Date(existingScrimmage.dateTime) <= now) {
+      if (!existingScrimmage.timeTbd && new Date(existingScrimmage.dateTime) <= now) {
         return res.status(409).json({ message: 'Cannot update scrimmage that has already started or ended' });
       }
       
@@ -16295,20 +16438,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const targetTimeTbd = updateData.timeTbd ?? existingScrimmage.timeTbd;
+
       // DateTime editing restrictions
       if (updateData.dateTime !== undefined) {
-        if (new Date(updateData.dateTime) <= now) {
+        const dateOnly = updateData.dateTime.split('T')[0];
+        const dateForValidation = targetTimeTbd
+          ? parseLeagueLocalDateTime(`${dateOnly}T23:59:59`, (await storage.getLeague(existingScrimmage.leagueId))?.timezone)
+          : new Date(updateData.dateTime);
+        if (dateForValidation <= now) {
           return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
         }
         
         // Don't allow changing date if it's less than 24 hours away
         const hoursUntilExisting = (new Date(existingScrimmage.dateTime).getTime() - now.getTime()) / (1000 * 60 * 60);
-        if (hoursUntilExisting < 24) {
+        if (!existingScrimmage.timeTbd && hoursUntilExisting < 24) {
           return res.status(409).json({ message: "Cannot change scrimmage date less than 24 hours before scheduled time" });
         }
       }
 
+      // Resolving Time TBD is a new delivery opportunity for this occurrence.
+      // It intentionally does not touch siblings in a recurring series.
+      const isResolvingTimeTbd = existingScrimmage.timeTbd && targetTimeTbd === false;
+      if (isResolvingTimeTbd) {
+        updateData.inviteSentAt = null;
+      }
+
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
+
+      if (updatedScrimmage.hasDeferredInvites && !updatedScrimmage.timeTbd && !updatedScrimmage.inviteSentAt && req.body.sendInviteNow === true) {
+        await deliverPendingScrimmageInvites(scrimmageId);
+      }
 
       // Handle co-host ID additions
       if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
@@ -16384,6 +16544,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // can be saved from the existing client.
   app.put('/api/scrimmages/:id', isAuthenticated, updateScrimmageHandler);
   app.patch('/api/scrimmages/:id', isAuthenticated, updateScrimmageHandler);
+
+  // Retry a deliberately-deferred delivery without changing the occurrence.
+  app.post('/api/scrimmages/:id/send-invites', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmage = await storage.getScrimmage(req.params.id);
+      if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
+      if (scrimmage.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: 'Only the creator can send invitations' });
+      }
+      if (scrimmage.timeTbd) {
+        return res.status(409).json({ message: 'Set a time before sending invitations' });
+      }
+      if (!scrimmage.hasDeferredInvites) {
+        return res.status(409).json({ message: 'This scrimmage has no deferred invitations to send' });
+      }
+
+      const result = await deliverPendingScrimmageInvites(scrimmage.id);
+      if (!result.delivered) {
+        return res.status(409).json({ message: 'Invitations have already been sent or are not ready' });
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error sending deferred scrimmage invitations:', error);
+      return res.status(500).json({ message: 'Failed to send invitations' });
+    }
+  });
 
   // Batch delete scrimmages (Creator only) - must be before :id route to avoid conflict
   app.delete('/api/scrimmages/batch', isAuthenticated, async (req: any, res) => {
@@ -16536,7 +16722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Business invariant: Cannot join scrimmage that has passed or is imminent
       const now = new Date();
-      if (scrimmage.dateTime <= now) {
+      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now) {
         return res.status(409).json({ message: 'Cannot join scrimmage that has already started or ended' });
       }
       
@@ -16866,7 +17052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Business invariant: Cannot approve requests for scrimmages that have passed
       const now = new Date();
-      if (scrimmage.dateTime <= now && (status === 'approved' || status === 'backup')) {
+      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now && (status === 'approved' || status === 'backup')) {
         return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
       }
       
@@ -17180,7 +17366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
 
       // Guard: reject any acceptance or decline response after the scrimmage has started
-      if (new Date(scrimmage.dateTime) <= new Date()) {
+      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= new Date()) {
         return res.status(409).json({ message: 'This scrimmage has already started — the backup queue is now closed.' });
       }
 
@@ -17259,7 +17445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const now = new Date();
         const hoursUntil = (new Date(scrimmage.dateTime).getTime() - now.getTime()) / (1000 * 60 * 60);
         
-        if (hoursUntil < 24) {
+        if (!scrimmage.timeTbd && hoursUntil < 24) {
           return res.status(409).json({ 
             message: 'Cannot withdraw from approved scrimmage less than 24 hours before scheduled time' 
           });
@@ -17351,7 +17537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Business rule: Cannot finalize if scrimmage has already started
       const now = new Date();
-      if (scrimmage.dateTime <= now) {
+      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now) {
         return res.status(409).json({ message: 'Cannot finalize a scrimmage that has already started' });
       }
       

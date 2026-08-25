@@ -26,6 +26,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
         and(
           sql`${scrimmages.dateTime} > ${nowStr}`,
           eq(scrimmages.status, 'open'),
+          eq(scrimmages.timeTbd, false),
           sql`${scrimmages.reminderHoursBefore} IS NOT NULL AND array_length(${scrimmages.reminderHoursBefore}, 1) > 0`
         )
       );
@@ -164,6 +165,7 @@ export async function checkAndExpireTimedOutBackups(): Promise<void> {
         // Skip scrimmages that are too close to start — no point cascading
         const scrimmage = await storage.getScrimmage(scrimmageId);
         if (!scrimmage) continue;
+        if (scrimmage.timeTbd) continue;
         const cutoffMs = BACKUP_CASCADE_CUTOFF_MINUTES * 60 * 1000;
         if (new Date(scrimmage.dateTime).getTime() <= Date.now() + cutoffMs) {
           console.log(

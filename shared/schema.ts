@@ -1219,6 +1219,10 @@ export const scrimmages = pgTable("scrimmages", {
   creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   title: varchar("title").notNull(),
   dateTime: timestamp("date_time", { mode: 'string' }).notNull(),
+  // Date is always retained for calendar placement. When true, dateTime's clock
+  // portion is only an internal date anchor and must never be presented or used
+  // to send invitations, reminders, or close RSVP actions.
+  timeTbd: boolean("time_tbd").default(false).notNull(),
   location: varchar("location").notNull(),
   maxPlayers: integer("max_players").notNull(),
   skillLevel: varchar("skill_level"), // Optional skill level requirement
@@ -1242,6 +1246,9 @@ export const scrimmages = pgTable("scrimmages", {
   recurrenceEndDate: timestamp("recurrence_end_date"), // When to stop creating recurring events
   recurrenceCount: integer("recurrence_count"), // Number of times to repeat (alternative to end date)
   parentScrimmageId: varchar("parent_scrimmage_id"), // Link to parent scrimmage if this is part of a recurring series
+  // New recurring schedules leave each later occurrence's time independent from
+  // the first occurrence, rather than copying one start time across the series.
+  recurrenceTimesIndependent: boolean("recurrence_times_independent").default(false).notNull(),
   // Reminder settings - hours before the scrimmage to send reminders (e.g., 24, 48, 168 for 1 day, 2 days, 1 week)
   reminderHoursBefore: integer("reminder_hours_before").array(), // Array of hours before to send reminders
   // Invitation scheduling for recurring scrimmages
@@ -1252,6 +1259,8 @@ export const scrimmages = pgTable("scrimmages", {
   coverPhoto: text("cover_photo"), // Optional preset cover photo id (e.g. "skates", "bench", "zamboni", "net", "outdoor")
   inviteGroupId: varchar("invite_group_id").references(() => inviteGroups.id, { onDelete: 'set null' }), // Live invite group for recurring scrimmages — re-fetched at each send time
   inviteUserIds: text("invite_user_ids").array().notNull().default(sql`'{}'::text[]`), // Directly-selected individual user IDs — merged with live group on recurring sends
+  inviteEmails: text("invite_emails").array().notNull().default(sql`'{}'::text[]`), // Saved email recipients; delivery waits until the occurrence has a time.
+  hasDeferredInvites: boolean("has_deferred_invites").default(false).notNull(), // Marks a Time TBD invite set, so only those rows expose later manual delivery.
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

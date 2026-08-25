@@ -405,7 +405,7 @@ export default function ScrimmageManagement() {
                 <CardDescription className="mt-2 space-y-1">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="w-4 h-4" />
-                    <span>{dateTime.date} at {dateTime.time}</span>
+                    <span>{dateTime.date} {scrimmage.timeTbd ? '• Time TBD' : `at ${dateTime.time}`}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="w-4 h-4" />

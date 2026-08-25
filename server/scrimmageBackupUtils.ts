@@ -27,6 +27,10 @@ export async function notifyNextBackup(scrimmageId: string): Promise<void> {
     // all before game time, so we only block new notifications past this point.
     const scrimmage = await storage.getScrimmage(scrimmageId);
     if (!scrimmage) return;
+    if (scrimmage.timeTbd) {
+      console.log(`[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} has no confirmed time`);
+      return;
+    }
     const cutoffMs = BACKUP_CASCADE_CUTOFF_MINUTES * 60 * 1000;
     if (new Date(scrimmage.dateTime).getTime() <= Date.now() + cutoffMs) {
       console.log(

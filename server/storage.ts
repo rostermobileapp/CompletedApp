@@ -650,6 +650,7 @@ export interface IStorage {
   // Scrimmage invitation scheduling operations
   getScrimmagesNeedingInvites(): Promise<Scrimmage[]>;
   updateScrimmageInviteSent(scrimmageId: string): Promise<Scrimmage>;
+  claimScrimmageInviteDelivery(scrimmageId: string): Promise<Scrimmage | null>;
   getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined>;
   createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: Date): Promise<Scrimmage>;
   getRecurringParentScrimmages(): Promise<Scrimmage[]>;
@@ -10088,6 +10089,7 @@ export class DatabaseStorage implements IStorage {
         and(
           isNotNull(scrimmages.inviteDaysBefore),
           isNull(scrimmages.inviteSentAt),
+          eq(scrimmages.timeTbd, false),
           eq(scrimmages.status, 'open'),
           gt(scrimmages.dateTime, now),
           eq(scrimmages.isRecurring, false)
@@ -10102,6 +10104,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scrimmages.id, scrimmageId))
       .returning();
     return updated;
+  }
+
+  async claimScrimmageInviteDelivery(scrimmageId: string): Promise<Scrimmage | null> {
+    const [claimed] = await db
+      .update(scrimmages)
+      .set({ inviteSentAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(scrimmages.id, scrimmageId),
+        isNull(scrimmages.inviteSentAt),
+        eq(scrimmages.timeTbd, false),
+        eq(scrimmages.status, 'open'),
+      ))
+      .returning();
+    return claimed || null;
   }
 
   async getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined> {
@@ -10126,12 +10142,19 @@ export class DatabaseStorage implements IStorage {
 
   async createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: Date): Promise<Scrimmage> {
     const { id, createdAt, updatedAt, parentScrimmageId: _, ...parentData } = parentScrimmage;
+    const occurrenceHasIndependentTime = parentScrimmage.recurrenceTimesIndependent;
+    const occurrenceDateTime = new Date(dateTime);
+    if (occurrenceHasIndependentTime) {
+      occurrenceDateTime.setHours(0, 0, 0, 0);
+    }
     
     const occurrenceData: InsertScrimmage = {
       ...parentData,
-      dateTime,
+      dateTime: occurrenceDateTime,
       parentScrimmageId: parentScrimmage.id,
       isRecurring: false,
+      timeTbd: occurrenceHasIndependentTime ? true : parentScrimmage.timeTbd,
+      hasDeferredInvites: occurrenceHasIndependentTime || parentScrimmage.hasDeferredInvites,
       inviteSentAt: null,
     };
     

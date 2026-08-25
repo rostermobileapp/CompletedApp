@@ -37,6 +37,7 @@ interface MobileCalendarEvent {
   teamAssignment?: string | null;
   scrimmageId?: string;
   isPending?: boolean;
+  timeTbd?: boolean;
 }
 
 interface ScheduleCalendarMobileProps {
@@ -156,7 +157,7 @@ export function ScheduleCalendarMobile({
           date: d,
           kind: 'invite',
           title: i.title || 'Scrimmage Invite',
-          subtitle: i.location || null,
+          subtitle: i.timeTbd ? `${i.location || 'Location TBD'} • Time TBD` : (i.location || null),
           color: i.color || KIND_FALLBACK_COLOR.invite,
           navigateTo: `/scrimmage/${i.id}`,
           scrimmageId: i.id,
@@ -175,11 +176,12 @@ export function ScheduleCalendarMobile({
           date: d,
           kind: 'scrimmage',
           title: s.title || 'Scrimmage',
-          subtitle: s.location || null,
+          subtitle: s.timeTbd ? `${s.location || 'Location TBD'} • Time TBD` : (s.location || null),
           color: r.status === 'pending' ? '#f59e0b' : (s.color || KIND_FALLBACK_COLOR.scrimmage),
           navigateTo: `/scrimmage/${s.id}`,
           teamAssignment: r.teamAssignment ?? null,
           isPending: r.status === 'pending',
+          timeTbd: !!s.timeTbd,
         });
       }
     }

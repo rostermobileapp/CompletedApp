@@ -177,13 +177,33 @@ export default function Calendar() {
     ...substituteGames,
     ...(Array.isArray(personalReminders) ? personalReminders.map((reminder: any) => ({ ...reminder, type: 'reminder' as const })) : []),
     ...(Array.isArray(calendarTeamEvents) ? calendarTeamEvents.map((event: any) => ({ ...event, type: 'team-event' as const })) : [])
-  ].sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+  ].sort((a: any, b: any) => {
+    // A TBD event belongs to its selected day, but it is not a midnight event.
+    // Put it after confirmed times on that day rather than letting its internal
+    // date anchor change the schedule order.
+    const at = (event: any) => {
+      const date = new Date(event.scheduledAt);
+      if (event.type === 'scrimmage' && event.timeTbd) {
+        date.setHours(23, 59, 59, 999);
+      }
+      return date.getTime();
+    };
+    return at(a) - at(b);
+  });
 
   // Find the index to scroll to (between last event and next event)
   const currentTime = new Date();
-  const nextEventIndex = allEvents.findIndex((event: any) => 
-    isAfter(new Date(event.scheduledAt), currentTime)
-  );
+  const nextEventIndex = allEvents.findIndex((event: any) => {
+    const eventDate = new Date(event.scheduledAt);
+    if (event.type === 'scrimmage' && event.timeTbd) {
+      // A date-only event remains current for its whole calendar day.
+      eventDate.setHours(0, 0, 0, 0);
+      const today = new Date(currentTime);
+      today.setHours(0, 0, 0, 0);
+      return eventDate >= today;
+    }
+    return isAfter(eventDate, currentTime);
+  });
   const scrollToIndex = nextEventIndex > 0 ? nextEventIndex - 1 : 0;
 
   // Auto-scroll to position between last and next event
@@ -267,7 +287,9 @@ export default function Calendar() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${event.id}`}>
-                          {format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
+                          {event.timeTbd
+                            ? `${format(new Date(event.scheduledAt), 'MMM d')} • Time TBD`
+                            : format(new Date(event.scheduledAt), 'MMM d • h:mm a')}
                         </p>
                         {event.location && (
                           <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${event.id}`}>
