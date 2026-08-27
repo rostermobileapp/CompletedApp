@@ -82,11 +82,12 @@ export default function CreateScrimmage() {
   // 'approval' = organiser manually approves each request (default)
   // 'first_come' = requests are auto-approved on creation while capacity remains
   const [joinMode, setJoinMode] = useState<'approval' | 'first_come' | 'first_pay'>('approval');
-  const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
+  const [loadedInviteGroupIds, setLoadedInviteGroupIds] = useState<string[]>([]);
   // Tracks which selectedMemberIds originated from the invite group snapshot vs manual selection.
   // Only manually-selected users are persisted as inviteUserIds on the scrimmage so that
   // the recurring invite job can treat the live group as the authoritative source.
   const [groupLoadedUserIds, setGroupLoadedUserIds] = useState<Set<string>>(new Set());
+  const [groupMembersById, setGroupMembersById] = useState<Record<string, { userIds: string[]; emails: string[] }>>({});
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
   const [selectedCoHostUsers, setSelectedCoHostUsers] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
@@ -263,6 +264,7 @@ export default function CreateScrimmage() {
   // Pre-populate form when editing an existing scrimmage
   useEffect(() => {
     if (isEditMode && existingScrimmage && !formInitialized) {
+      setSelectedLeagueId(existingScrimmage.leagueId);
       const { date: dateStr, time: storedTime } = splitScrimmageDateTime(existingScrimmage.dateTime);
       const timeStr = existingScrimmage.timeTbd ? '' : storedTime;
       
@@ -309,6 +311,10 @@ export default function CreateScrimmage() {
       if (existingScrimmage.joinMode === 'first_come' || existingScrimmage.joinMode === 'approval' || existingScrimmage.joinMode === 'first_pay') {
         setJoinMode(existingScrimmage.joinMode);
       }
+      setLoadedInviteGroupIds(Array.from(new Set([
+        ...(existingScrimmage.inviteGroupIds || []),
+        ...(existingScrimmage.inviteGroupId ? [existingScrimmage.inviteGroupId] : []),
+      ])));
       setFormInitialized(true);
     }
   }, [isEditMode, existingScrimmage, form, formInitialized]);
@@ -438,6 +444,9 @@ export default function CreateScrimmage() {
         coverPhoto: data.coverPhoto || null,
         // Join mode: how players are admitted
         joinMode,
+        inviteGroupIds: loadedInviteGroupIds,
+        // Keep the first selected group in the legacy field for older clients/jobs.
+        inviteGroupId: loadedInviteGroupIds[0] || null,
       };
 
       if (isEditMode && scrimmageId) {
@@ -455,7 +464,7 @@ export default function CreateScrimmage() {
         // When an invite group is linked, only store manually-selected IDs (not the group snapshot)
         // as inviteUserIds. The recurring job re-fetches live group membership at send-time and
         // unions it with these manual IDs — so only users added outside the group are persisted.
-        const manuallySelectedIds = loadedInviteGroupId
+        const manuallySelectedIds = loadedInviteGroupIds.length > 0
           ? filteredMemberIds.filter(id => !groupLoadedUserIds.has(id))
           : filteredMemberIds;
 
@@ -466,7 +475,6 @@ export default function CreateScrimmage() {
           selectedEmails: data.selectedEmails || [], // Include email invites
           coHostIds: selectedCoHostIds, // Include co-hosts who can help manage
           coHostEmails, // Email-invited co-hosts (may not have accounts yet)
-          inviteGroupId: loadedInviteGroupId || null, // Persist group for recurring live-membership sends
           inviteUserIds: manuallySelectedIds, // Only manually-selected (non-group) users persisted
         });
         return response.json();
@@ -662,7 +670,10 @@ export default function CreateScrimmage() {
 
   // Load invite group — also records the group ID so recurring scrimmages re-use it live
   const loadInviteGroup = async (groupId: string) => {
-    if (!groupId) return;
+    if (!groupId || loadedInviteGroupIds.includes(groupId)) {
+      setSelectedInviteGroupId('');
+      return;
+    }
     
     try {
       const response = await apiRequest('GET', `/api/invite-groups/${groupId}`);
@@ -675,6 +686,8 @@ export default function CreateScrimmage() {
         groupData.members.forEach((member: any) => {
           if (member.userId) {
             userIds.push(member.userId);
+          } else if (member.placeholderPlayerId) {
+            userIds.push(`placeholder:${member.placeholderPlayerId}`);
           } else if (member.email) {
             emails.push(member.email);
           }
@@ -688,8 +701,10 @@ export default function CreateScrimmage() {
         form.setValue('selectedMemberIds', mergedUserIds);
         form.setValue('selectedEmails', mergedEmails);
         form.trigger('selectedMemberIds');
-        setGroupLoadedUserIds(new Set(userIds)); // Track which IDs came from the group snapshot
-        setLoadedInviteGroupId(groupId);
+        setGroupLoadedUserIds((current) => new Set([...Array.from(current), ...userIds]));
+        setGroupMembersById((current) => ({ ...current, [groupId]: { userIds, emails } }));
+        setLoadedInviteGroupIds((current) => [...current, groupId]);
+        setSelectedInviteGroupId('');
         
         toast({
           title: 'Group Loaded',
@@ -703,6 +718,35 @@ export default function CreateScrimmage() {
         variant: 'destructive',
       });
     }
+  };
+
+  const unlinkInviteGroup = (groupId: string) => {
+    const remainingGroupIds = loadedInviteGroupIds.filter((id) => id !== groupId);
+    const remainingGroupMembers = remainingGroupIds
+      .map((id) => groupMembersById[id])
+      .filter(Boolean);
+    const remainingUserIds = new Set(remainingGroupMembers.flatMap((group) => group.userIds));
+    const remainingEmails = new Set(remainingGroupMembers.flatMap((group) => group.emails));
+    const removedGroup = groupMembersById[groupId];
+
+    const nextMemberIds = removedGroup
+      ? selectedMemberIds.filter((id) => !removedGroup.userIds.includes(id) || remainingUserIds.has(id))
+      : selectedMemberIds;
+    const nextEmails = removedGroup
+      ? selectedEmails.filter((email) => !removedGroup.emails.includes(email) || remainingEmails.has(email))
+      : selectedEmails;
+
+    setLoadedInviteGroupIds(remainingGroupIds);
+    setGroupLoadedUserIds(remainingUserIds);
+    setGroupMembersById((current) => {
+      const next = { ...current };
+      delete next[groupId];
+      return next;
+    });
+    setSelectedMemberIds(nextMemberIds);
+    setSelectedEmails(nextEmails);
+    form.setValue('selectedMemberIds', nextMemberIds);
+    form.setValue('selectedEmails', nextEmails);
   };
 
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
@@ -751,8 +795,9 @@ export default function CreateScrimmage() {
                     // don't remain checked.
                     setSelectedMemberIds([]);
                     setSelectedInviteGroupId('');
-                    setLoadedInviteGroupId(null);
+                    setLoadedInviteGroupIds([]);
                     setGroupLoadedUserIds(new Set());
+                    setGroupMembersById({});
                   }}
                 >
                   <SelectTrigger id="scrimmage-league" data-testid="select-scrimmage-league">
@@ -1632,7 +1677,7 @@ export default function CreateScrimmage() {
           {/* Invite Group Selector - Always shown at top */}
           <div className="mb-1\.5 p-4 bg-muted/30 rounded-lg hairline elev-rest">
             <Label htmlFor="invite-group" className="text-base font-semibold mb-1 block">
-              Quick Load from Saved Group
+              Add Saved Invite Groups
             </Label>
             {(inviteGroups as any[]).length > 0 ? (
               <div className="space-y-1">
@@ -1649,7 +1694,7 @@ export default function CreateScrimmage() {
                     </SelectTrigger>
                     <SelectContent>
                       {(inviteGroups as any[]).map((group: any) => (
-                        <SelectItem key={group.id} value={group.id}>
+                        <SelectItem key={group.id} value={group.id} disabled={loadedInviteGroupIds.includes(group.id)}>
                           {group.name}
                         </SelectItem>
                       ))}
@@ -1665,26 +1710,30 @@ export default function CreateScrimmage() {
                     Manage
                   </Button>
                 </div>
-                {loadedInviteGroupId && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="flex-1">
-                      Linked — future recurring invites will use live group membership
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      onClick={() => {
-                        setLoadedInviteGroupId(null);
-                        setSelectedInviteGroupId("");
-                        setGroupLoadedUserIds(new Set()); // Clear group snapshot tracking
-                      }}
-                      data-testid="button-unlink-group"
-                    >
-                      <X className="w-3 h-3 mr-1" />
-                      Unlink
-                    </Button>
+                {loadedInviteGroupIds.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Future recurring invites use live membership from every linked group.
+                    </p>
+                    <div className="flex flex-wrap gap-2" data-testid="selected-invite-groups">
+                      {loadedInviteGroupIds.map((groupId) => {
+                        const group = (inviteGroups as any[]).find((item: any) => item.id === groupId);
+                        return (
+                          <Badge key={groupId} variant="secondary" className="gap-1 py-1 pl-2 pr-1">
+                            <span>{group?.name || 'Saved group'}</span>
+                            <button
+                              type="button"
+                              className="rounded-full p-0.5 hover:bg-background/70"
+                              onClick={() => unlinkInviteGroup(groupId)}
+                              aria-label={`Remove ${group?.name || 'invite group'}`}
+                              data-testid={`button-unlink-group-${groupId}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

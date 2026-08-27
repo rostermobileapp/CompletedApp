@@ -10,6 +10,12 @@ const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 const BACKUP_TIMEOUT_INTERVAL_MS = 60 * 1000;     // Check backup timeouts every 1 minute
 const STALE_INVITE_TRACKING_HOURS = -24;
 
+const getInviteGroupIds = (scrimmage: { inviteGroupIds?: string[] | null; inviteGroupId?: string | null }) =>
+  Array.from(new Set([
+    ...(scrimmage.inviteGroupIds || []),
+    ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
+  ].filter(Boolean)));
+
 export async function checkAndSendScrimmageReminders(): Promise<void> {
   try {
     const now = new Date();
@@ -47,8 +53,11 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
       // RSVP row. Any request status represents a deliberate IN/OUT choice.
       if (hoursUntil <= 24 && hoursUntil > 23) {
         const recipientIds = new Set((scrimmage.inviteUserIds || []).filter(id => !id.startsWith('placeholder:')));
-        if (scrimmage.inviteGroupId) {
-          const groupMembers = await storage.getInviteGroupMembers(scrimmage.inviteGroupId);
+        const inviteGroupIds = getInviteGroupIds(scrimmage);
+        if (inviteGroupIds.length > 0) {
+          const groupMembers = (await Promise.all(
+            inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
+          )).flat();
           groupMembers.forEach(member => { if (member.userId) recipientIds.add(member.userId); });
         }
         recipientIds.delete(scrimmage.creatorId);

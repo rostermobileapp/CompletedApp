@@ -9939,6 +9939,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteInviteGroup(groupId: string): Promise<void> {
+    await db
+      .update(scrimmages)
+      .set({
+        inviteGroupIds: sql`array_remove(${scrimmages.inviteGroupIds}, ${groupId})`,
+      })
+      .where(sql`${groupId} = ANY(${scrimmages.inviteGroupIds})`);
     // First delete all members
     await db.delete(inviteGroupMembers).where(eq(inviteGroupMembers.groupId, groupId));
     // Then delete the group

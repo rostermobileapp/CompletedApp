@@ -1259,6 +1259,7 @@ export const scrimmages = pgTable("scrimmages", {
   color: text("color"), // Optional color for calendar display (e.g. "#ef4444" or "blue")
   coverPhoto: text("cover_photo"), // Optional preset cover photo id (e.g. "skates", "bench", "zamboni", "net", "outdoor")
   inviteGroupId: varchar("invite_group_id").references(() => inviteGroups.id, { onDelete: 'set null' }), // Live invite group for recurring scrimmages — re-fetched at each send time
+  inviteGroupIds: text("invite_group_ids").array().notNull().default(sql`'{}'::text[]`), // All live invite groups; inviteGroupId remains as a legacy single-group fallback
   inviteUserIds: text("invite_user_ids").array().notNull().default(sql`'{}'::text[]`), // Directly-selected individual user IDs — merged with live group on recurring sends
   inviteEmails: text("invite_emails").array().notNull().default(sql`'{}'::text[]`), // Saved email recipients; delivery waits until the occurrence has a time.
   hasDeferredInvites: boolean("has_deferred_invites").default(false).notNull(), // Marks a Time TBD invite set, so only those rows expose later manual delivery.

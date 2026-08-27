@@ -456,9 +456,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   // Ensure scrimmages.invite_user_ids exists (directly-selected invitees for recurring job merge)
   try {
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_group_ids text[] NOT NULL DEFAULT '{}'::text[]`);
+    await db.execute(sql`
+      UPDATE scrimmages
+      SET invite_group_ids = ARRAY[invite_group_id]
+      WHERE invite_group_id IS NOT NULL
+        AND NOT (invite_group_id = ANY(invite_group_ids))
+    `);
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_user_ids text[] NOT NULL DEFAULT '{}'::text[]`);
   } catch (err) {
-    console.error('[Init] Failed to ensure scrimmages.invite_user_ids column:', err);
+    console.error('[Init] Failed to ensure scrimmage invite-group/user columns:', err);
   }
   // Time TBD is stored per scrimmage occurrence. date_time remains a required
   // date anchor for calendar placement and recurrence, but must not be treated
@@ -15621,6 +15628,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cashappLinkOverride: cashappLinkOverrideField,
   });
 
+  const getInviteGroupIds = (scrimmage: { inviteGroupIds?: string[] | null; inviteGroupId?: string | null }) =>
+    Array.from(new Set([
+      ...(scrimmage.inviteGroupIds || []),
+      ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
+    ].filter(Boolean)));
+
   /**
    * Sends the invite payload already saved on one scrimmage occurrence.
    * The atomic claim in storage makes this safe to call from either the edit
@@ -15640,14 +15653,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const recipientIds = new Set(
       (scrimmage.inviteUserIds || []).filter((id) => !id.startsWith('placeholder:')),
     );
-    if (scrimmage.inviteGroupId) {
-      const groupMembers = await storage.getInviteGroupMembers(scrimmage.inviteGroupId);
+    const emailRecipients = new Set(
+      (scrimmage.inviteEmails || []).map((email) => email.toLowerCase().trim()),
+    );
+    const inviteGroupIds = getInviteGroupIds(scrimmage);
+    if (inviteGroupIds.length > 0) {
+      const groupMembers = (await Promise.all(
+        inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
+      )).flat();
       for (const member of groupMembers) {
         if (member.userId) recipientIds.add(member.userId);
+        if (member.email) emailRecipients.add(member.email.toLowerCase().trim());
       }
     }
     recipientIds.delete(scrimmage.creatorId);
-    const recipients = [...recipientIds];
+    const recipients = Array.from(recipientIds);
 
     const creator = await storage.getUser(scrimmage.creatorId);
     const organizerName = creator
@@ -15698,7 +15718,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
-    const emails = Array.from(new Set((scrimmage.inviteEmails || []).map((email) => email.toLowerCase().trim())));
+    const existingEmailInvites = await storage.getScrimmageInvites(scrimmage.id);
+    const existingInviteEmails = new Set(existingEmailInvites.map((invite) => invite.email.toLowerCase()));
+    const emails = Array.from(emailRecipients).filter(
+      (email) => email.includes('@') && !existingInviteEmails.has(email),
+    );
     if (emails.length > 0) {
       try {
         await storage.createScrimmageInvites(scrimmage.id, emails);
@@ -15778,16 +15802,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Must be an approved league member to create scrimmages" });
       }
 
-      // Validate inviteGroupId ownership — prevents cross-user group linkage
-      if (scrimmageData.inviteGroupId) {
-        const inviteGroup = await storage.getInviteGroup(scrimmageData.inviteGroupId);
+      const requestedInviteGroupIds = Array.from(new Set([
+        ...(scrimmageData.inviteGroupIds || []),
+        ...(scrimmageData.inviteGroupId ? [scrimmageData.inviteGroupId] : []),
+      ]));
+      for (const groupId of requestedInviteGroupIds) {
+        const inviteGroup = await storage.getInviteGroup(groupId);
         if (!inviteGroup) {
           return res.status(400).json({ message: 'Invite group not found' });
         }
         if (inviteGroup.creatorId !== userId) {
           return res.status(403).json({ message: 'You can only link invite groups that you created' });
         }
+        if (inviteGroup.leagueId && inviteGroup.leagueId !== scrimmageData.leagueId) {
+          return res.status(400).json({ message: 'Invite group does not belong to this league' });
+        }
       }
+      scrimmageData.inviteGroupIds = requestedInviteGroupIds;
+      scrimmageData.inviteGroupId = requestedInviteGroupIds[0] || null;
 
       const emailSchema = z.string().email();
       const savedInviteEmails = Array.from(new Set(
@@ -16458,6 +16490,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: 'Resolve existing pending requests before switching to First to Pay, First to Play',
           });
         }
+      }
+
+      const hasInviteGroupIdsUpdate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'inviteGroupIds');
+      const hasLegacyInviteGroupIdUpdate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'inviteGroupId');
+      if (hasInviteGroupIdsUpdate || hasLegacyInviteGroupIdUpdate) {
+        const legacyValueIsUnchanged =
+          !hasInviteGroupIdsUpdate &&
+          !!updateData.inviteGroupId &&
+          updateData.inviteGroupId === existingScrimmage.inviteGroupId;
+        const requestedInviteGroupIds = Array.from(new Set(
+          hasInviteGroupIdsUpdate
+            ? (updateData.inviteGroupIds || [])
+            : legacyValueIsUnchanged
+              ? getInviteGroupIds(existingScrimmage)
+              : updateData.inviteGroupId
+                ? [updateData.inviteGroupId]
+                : [],
+        ));
+        for (const groupId of requestedInviteGroupIds) {
+          const inviteGroup = await storage.getInviteGroup(groupId);
+          if (!inviteGroup) {
+            return res.status(400).json({ message: 'Invite group not found' });
+          }
+          if (inviteGroup.creatorId !== userId) {
+            return res.status(403).json({ message: 'You can only link invite groups that you created' });
+          }
+          if (inviteGroup.leagueId && inviteGroup.leagueId !== existingScrimmage.leagueId) {
+            return res.status(400).json({ message: 'Invite group does not belong to this league' });
+          }
+        }
+        updateData.inviteGroupIds = requestedInviteGroupIds;
+        updateData.inviteGroupId = requestedInviteGroupIds[0] || null;
       }
 
       const targetTimeTbd = updateData.timeTbd ?? existingScrimmage.timeTbd;

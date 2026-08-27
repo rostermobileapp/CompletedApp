@@ -5,8 +5,15 @@ import { eq, and } from 'drizzle-orm';
 import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes, format } from 'date-fns';
 import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
 import { formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
+import { sendBulkScrimmageInvites } from './emails';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+
+const getInviteGroupIds = (scrimmage: { inviteGroupIds?: string[] | null; inviteGroupId?: string | null }) =>
+  Array.from(new Set([
+    ...(scrimmage.inviteGroupIds || []),
+    ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
+  ].filter(Boolean)));
 
 export async function startScrimmageInviteJob() {
   console.log('🔔 Starting scrimmage invitation job (checking every 5 minutes)');
@@ -88,8 +95,8 @@ async function checkAndSendInvitations() {
 
         // Determine who to invite for this recurring occurrence.
         //
-        // Design: When a recurring scrimmage has an inviteGroupId, the group acts
-        // as the live invitation list — membership is fetched fresh at send-time
+        // Design: Linked invite groups act as the live invitation list —
+        // membership is fetched fresh at send-time
         // so additions/removals to the group are reflected in future occurrences
         // without recreating the scrimmage.  Individual members selected at
         // creation time receive their invite immediately when the scrimmage is
@@ -104,14 +111,28 @@ async function checkAndSendInvitations() {
         // the invite record even though no notification is sent.
         const allInviteUserIds: string[] = parentScrimmage.inviteUserIds || [];
         const placeholderInviteIds = allInviteUserIds.filter(id => id.startsWith('placeholder:'));
+        const inviteEmails = new Set<string>(
+          (scrimmage.inviteEmails || parentScrimmage.inviteEmails || [])
+            .map((email: string) => email.toLowerCase().trim())
+            .filter((email: string) => email.includes('@')),
+        );
 
         let approvedMembers;
-        if (parentScrimmage.inviteGroupId) {
+        const inviteGroupIds = getInviteGroupIds(parentScrimmage);
+        if (inviteGroupIds.length > 0) {
           const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
           const leagueMemberMap = new Map(leagueMembers.map(m => [m.userId, m]));
 
           // Live group members (re-fetched at send-time)
-          const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
+          const groupMembers = (await Promise.all(
+            inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
+          )).flat();
+          groupMembers.forEach((member) => {
+            if (member.email) {
+              const normalizedEmail = member.email.toLowerCase().trim();
+              if (normalizedEmail.includes('@')) inviteEmails.add(normalizedEmail);
+            }
+          });
 
           // Real user recipients from the group
           const recipientIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
@@ -130,8 +151,8 @@ async function checkAndSendInvitations() {
           const directInvitees = allInviteUserIds.filter(uid => !uid.startsWith('placeholder:'));
           directInvitees.forEach(uid => { if (leagueMemberMap.has(uid)) recipientIds.add(uid); });
 
-          approvedMembers = [...recipientIds].map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
-          console.log(`📋 Live invite group ${parentScrimmage.inviteGroupId} + ${directInvitees.length} direct invitees + ${placeholderInviteIds.length} placeholders (${groupPlaceholderIds.length} from group) → ${approvedMembers.length} real recipients`);
+          approvedMembers = Array.from(recipientIds).map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
+          console.log(`📋 ${inviteGroupIds.length} live invite group(s) + ${directInvitees.length} direct invitees + ${placeholderInviteIds.length} placeholders (${groupPlaceholderIds.length} from groups) → ${approvedMembers.length} real recipients`);
         } else {
           approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
         }
@@ -201,6 +222,26 @@ async function checkAndSendInvitations() {
           }
         }
 
+        // Claim and send each email address only once per occurrence, even when
+        // it appears in several linked groups or in the direct email list.
+        const existingEmailInvites = await storage.getScrimmageInvites(scrimmage.id);
+        const existingInviteEmails = new Set(existingEmailInvites.map((invite) => invite.email.toLowerCase()));
+        const newInviteEmails = Array.from(inviteEmails).filter((email) => !existingInviteEmails.has(email));
+        if (newInviteEmails.length > 0) {
+          await storage.createScrimmageInvites(scrimmage.id, newInviteEmails);
+          await sendBulkScrimmageInvites(newInviteEmails, {
+            scrimmageId: scrimmage.id,
+            title: scrimmage.title,
+            dateTime: new Date(scrimmage.dateTime),
+            location: scrimmage.location,
+            creatorName: organizerName,
+            skillLevel: scrimmage.skillLevel || undefined,
+            costPerPlayer: scrimmage.costPerPlayer || undefined,
+            notes: scrimmage.notes || undefined,
+            maxPlayers: scrimmage.maxPlayers,
+          });
+        }
+
         // Persist placeholder invite IDs back to the occurrence's invite_user_ids so they
         // appear as proper invite records on the occurrence view (they have no account so
         // no notification is sent, but their selection must be visible to the organiser).
@@ -236,9 +277,12 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
   // and merge their synthetic IDs into the occurrence's inviteUserIds immediately so
   // they are visible to organizers before the scheduled invite-send job fires.
   let effectiveParent = parentScrimmage;
-  if (parentScrimmage.inviteGroupId) {
+  const inviteGroupIds = getInviteGroupIds(parentScrimmage);
+  if (inviteGroupIds.length > 0) {
     try {
-      const groupMembers = await storage.getInviteGroupMembers(parentScrimmage.inviteGroupId);
+      const groupMembers = (await Promise.all(
+        inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
+      )).flat();
       const groupPlaceholderIds = groupMembers
         .filter((gm: any) => (gm as any).placeholderPlayerId)
         .map((gm: any) => `placeholder:${(gm as any).placeholderPlayerId}`);
@@ -249,7 +293,7 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
         console.log(`📋 Merged ${groupPlaceholderIds.length} group placeholder(s) into occurrence inviteUserIds for recurring scrimmage ${parentScrimmage.id}`);
       }
     } catch (e) {
-      console.error(`[RecurringOccurrence] Failed to pre-fetch group placeholders for group ${parentScrimmage.inviteGroupId}:`, e);
+      console.error(`[RecurringOccurrence] Failed to pre-fetch placeholders for invite groups ${inviteGroupIds.join(',')}:`, e);
     }
   }
 
