@@ -6,7 +6,7 @@ import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
 import { splitScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check, ShieldHalf, PersonStanding } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check, ShieldHalf, PersonStanding, AlertCircle } from 'lucide-react';
 import { SCRIMMAGE_COVER_OPTIONS } from '@/lib/scrimmageCoverOptions';
 import { RinkPickerField } from '@/components/RinkPickerField';
 import type { RinkSelection } from '@/components/RinkPickerField';
@@ -104,6 +104,7 @@ export default function CreateScrimmage() {
   const [emailSearchTerm, setEmailSearchTerm] = useState("");
   const [manualEmail, setManualEmail] = useState("");
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   // Invite group states
   const [selectedInviteGroupId, setSelectedInviteGroupId] = useState<string>("");
@@ -514,9 +515,35 @@ export default function CreateScrimmage() {
     },
   });
 
+  const onInvalid = (errors: Record<string, any>) => {
+    const fieldLabels: Record<string, string> = {
+      title: 'Title',
+      date: 'Date',
+      time: 'Time',
+      venue: 'Venue',
+      maxParticipants: 'Max Participants',
+      costPerPlayer: 'Cost Per Player',
+      selectedMemberIds: 'Players to invite',
+      venmoLinkOverride: 'Venmo payment destination',
+      cashappLinkOverride: 'Cash App payment destination',
+    };
+    const firstError = Object.keys(errors)[0];
+    setSubmitError(
+      firstError
+        ? `${fieldLabels[firstError] || 'Required information'}: ${errors[firstError]?.message || 'Please complete this field.'}`
+        : 'Please complete the required fields before creating the scrimmage.',
+    );
+  };
+
   const onSubmit = (data: CreateScrimmageForm) => {
+    setSubmitError(null);
+    if (!isEditMode && !selectedLeague?.id) {
+      setSubmitError('League: Please select a league before creating the scrimmage.');
+      return;
+    }
     if (joinMode === 'first_pay' && (!data.costPerPlayer || Number(data.costPerPlayer) <= 0)) {
       form.setError('costPerPlayer', { message: 'A cost per player is required for First to Pay, First to Play' });
+      setSubmitError('Cost Per Player: A positive amount is required for First to Pay, First to Play.');
       return;
     }
     if (
@@ -527,6 +554,7 @@ export default function CreateScrimmage() {
       !(user as any)?.cashappUsername
     ) {
       form.setError('venmoLinkOverride', { message: 'Add a Venmo or Cash App destination for player payments' });
+      setSubmitError('Payment destination: Add a Venmo or Cash App destination for player payments.');
       return;
     }
     // Additional validation for member selection when league is available (only for create mode)
@@ -535,6 +563,7 @@ export default function CreateScrimmage() {
         type: 'required',
         message: 'Please select at least one member or add an email invite'
       });
+      setSubmitError('Players to invite: Please select at least one member or add an email invite.');
       return;
     }
     
@@ -712,7 +741,7 @@ export default function CreateScrimmage() {
         </div>
       </div>
       {/* Form */}
-      <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit)} className="px-6 space-y-1\.5">
+      <form id="create-scrimmage-form" onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="px-6 space-y-1\.5">
         {/* Scrimmage Details */}
         <div className="rounded-xl hairline elev-rest p-6 pt-[4px] pb-[4px] pl-[4px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff]">
           <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
@@ -2076,6 +2105,16 @@ export default function CreateScrimmage() {
 
       </form>
       <FixedBottomButton>
+        {submitError && (
+          <div
+            role="alert"
+            className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            data-testid="alert-create-scrimmage-validation"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{submitError}</span>
+          </div>
+        )}
         <Button
           type="submit"
           form="create-scrimmage-form"
@@ -2083,9 +2122,7 @@ export default function CreateScrimmage() {
           className="w-full"
           disabled={
             createScrimmageRequest.isPending || 
-            scrimmageLoading ||
-            (!isEditMode && !selectedLeague?.id) || 
-            (!isEditMode && selectedMemberIds.length === 0 && selectedEmails.length === 0)
+            scrimmageLoading
           }
           data-testid="button-create-scrimmage"
         >
@@ -2095,7 +2132,7 @@ export default function CreateScrimmage() {
               ? 'Update Scrimmage'
               : !selectedLeague?.id 
                 ? 'Join a League First' 
-                : 'Create Scrimmage Request'
+                : 'Create Scrimmage'
           }
         </Button>
       </FixedBottomButton>
