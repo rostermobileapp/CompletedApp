@@ -225,7 +225,9 @@ export default function CreateScrimmage() {
       const url = selectedLeague?.id 
         ? `/api/invite-groups?leagueId=${selectedLeague.id}`
         : '/api/invite-groups';
-      const response = await fetch(url, { credentials: 'include' });
+      // Saved groups are protected by the app's JWT auth; credentials include
+      // alone does not attach the bearer token.
+      const response = await apiRequest('GET', url);
       if (!response.ok) throw new Error('Failed to fetch invite groups');
       return response.json();
     },
