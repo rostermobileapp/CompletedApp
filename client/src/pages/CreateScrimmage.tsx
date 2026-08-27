@@ -81,7 +81,7 @@ export default function CreateScrimmage() {
   const [skaterPickerOpen, setSkaterPickerOpen] = useState(false);
   // 'approval' = organiser manually approves each request (default)
   // 'first_come' = requests are auto-approved on creation while capacity remains
-  const [joinMode, setJoinMode] = useState<'approval' | 'first_come'>('approval');
+  const [joinMode, setJoinMode] = useState<'approval' | 'first_come' | 'first_pay'>('approval');
   const [loadedInviteGroupId, setLoadedInviteGroupId] = useState<string | null>(null);
   // Tracks which selectedMemberIds originated from the invite group snapshot vs manual selection.
   // Only manually-selected users are persisted as inviteUserIds on the scrimmage so that
@@ -305,7 +305,7 @@ export default function CreateScrimmage() {
       }
       if (existingScrimmage.venmoLinkOverride) setShowVenmoOverride(true);
       if (existingScrimmage.cashappLinkOverride) setShowCashAppOverride(true);
-      if (existingScrimmage.joinMode === 'first_come' || existingScrimmage.joinMode === 'approval') {
+      if (existingScrimmage.joinMode === 'first_come' || existingScrimmage.joinMode === 'approval' || existingScrimmage.joinMode === 'first_pay') {
         setJoinMode(existingScrimmage.joinMode);
       }
       setFormInitialized(true);
@@ -515,6 +515,20 @@ export default function CreateScrimmage() {
   });
 
   const onSubmit = (data: CreateScrimmageForm) => {
+    if (joinMode === 'first_pay' && (!data.costPerPlayer || Number(data.costPerPlayer) <= 0)) {
+      form.setError('costPerPlayer', { message: 'A cost per player is required for First to Pay, First to Play' });
+      return;
+    }
+    if (
+      joinMode === 'first_pay' &&
+      !data.venmoLinkOverride &&
+      !data.cashappLinkOverride &&
+      !(user as any)?.venmoUsername &&
+      !(user as any)?.cashappUsername
+    ) {
+      form.setError('venmoLinkOverride', { message: 'Add a Venmo or Cash App destination for player payments' });
+      return;
+    }
     // Additional validation for member selection when league is available (only for create mode)
     if (!isEditMode && selectedLeague && selectedMemberIds.length === 0 && selectedEmails.length === 0) {
       form.setError('selectedMemberIds', {
@@ -1269,7 +1283,7 @@ export default function CreateScrimmage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="enableReminders" className="text-base">Push Notifications</Label>
-                  <p className="text-sm text-muted-foreground">Send push notification reminders to approved players before the scrimmage</p>
+                  <p className="text-sm text-muted-foreground">Remind approved players and follow up once with invitees who have not responded</p>
                 </div>
                 <Switch
                   id="enableReminders"
@@ -1282,10 +1296,34 @@ export default function CreateScrimmage() {
               {form.watch('enableReminders') && (
                 <div className="pt-1">
                   <p className="text-sm text-muted-foreground">
-                    Reminders will be sent 2 days before (at 6PM) and 2 hours before the scrimmage.
+                    Approved-player reminders use your schedule. Unanswered invitees receive one additional push 24 hours before the scrimmage.
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Approval Method — intentionally adjacent to push settings */}
+            <div className="bg-card rounded-xl hairline elev-rest p-4 mt-3">
+              <Label className="text-sm font-semibold block mb-3">Approval Method</Label>
+              <RadioGroup
+                value={joinMode}
+                onValueChange={(value) => setJoinMode(value as 'approval' | 'first_come' | 'first_pay')}
+                className="space-y-2"
+                data-testid="radio-group-join-mode"
+              >
+                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                  <RadioGroupItem value="first_come" id="join-first-come" />
+                  <span><span className="block font-medium">First to RSVP</span><span className="text-xs text-muted-foreground">Players claim open spots immediately.</span></span>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                  <RadioGroupItem value="approval" id="join-approval" />
+                  <span><span className="block font-medium">Manual Approval</span><span className="text-xs text-muted-foreground">You approve each player before they join.</span></span>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                  <RadioGroupItem value="first_pay" id="join-first-pay" />
+                  <span><span className="block font-medium">First to Pay, First to Play</span><span className="text-xs text-muted-foreground">Payment must be recorded before a player receives a spot.</span></span>
+                </label>
+              </RadioGroup>
             </div>
           </div>
         </div>
@@ -1318,21 +1356,18 @@ export default function CreateScrimmage() {
 
             <div>
               <Label htmlFor="maxParticipants">Max Participants</Label>
-              <Select
-                value={form.watch('maxParticipants')?.toString()}
-                onValueChange={(value) => form.setValue('maxParticipants', parseInt(value))}
-              >
-                <SelectTrigger data-testid="select-max-participants">
-                  <SelectValue placeholder="Select max participants" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10 players</SelectItem>
-                  <SelectItem value="15">15 players</SelectItem>
-                  <SelectItem value="20">20 players</SelectItem>
-                  <SelectItem value="25">25 players</SelectItem>
-                  <SelectItem value="30">30 players</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                id="maxParticipants"
+                type="number"
+                min={2}
+                max={50}
+                step={1}
+                {...form.register('maxParticipants', { valueAsNumber: true })}
+                data-testid="input-max-participants"
+              />
+              {form.formState.errors.maxParticipants && (
+                <p className="text-sm text-destructive mt-1">{form.formState.errors.maxParticipants.message}</p>
+              )}
             </div>
 
             <div>
@@ -1344,8 +1379,13 @@ export default function CreateScrimmage() {
                 data-testid="input-cost-per-player"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                If there's a cost, you can create a payment request after approval
+                {joinMode === 'first_pay'
+                  ? 'Required: players receive a payment request before their spot is approved.'
+                  : "If there's a cost, you can create a payment request after approval"}
               </p>
+              {form.formState.errors.costPerPlayer && (
+                <p className="text-sm text-destructive mt-1">{form.formState.errors.costPerPlayer.message}</p>
+              )}
             </div>
 
             <div className="pt-1">
@@ -2033,29 +2073,6 @@ export default function CreateScrimmage() {
             </div>
           </div>
         )}
-
-          {/* Join Mode toggle — shown for all scrimmages, at the bottom before submit */}
-          <div className="bg-card rounded-xl hairline elev-rest p-4 mt-4">
-            <Label className="text-sm font-semibold block mb-3">Approval Method</Label>
-            <div className="flex items-center justify-center gap-4">
-              <span
-                className={`text-sm transition-all ${joinMode === 'first_come' ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
-              >
-                First to RSVP
-              </span>
-              <Switch
-                checked={joinMode === 'approval'}
-                onCheckedChange={(checked) => setJoinMode(checked ? 'approval' : 'first_come')}
-                data-testid="switch-join-mode"
-                aria-label="Approval method"
-              />
-              <span
-                className={`text-sm transition-all ${joinMode === 'approval' ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
-              >
-                Manual Approval
-              </span>
-            </div>
-          </div>
 
       </form>
       <FixedBottomButton>

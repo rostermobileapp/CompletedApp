@@ -3,11 +3,12 @@ import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users, userNotif
 import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { format } from "date-fns";
-import { sendScheduleReminderPushNotification } from "./oneSignalNotifications";
+import { sendScheduleReminderPushNotification, sendScrimmageInvitePushNotification } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 const BACKUP_TIMEOUT_INTERVAL_MS = 60 * 1000;     // Check backup timeouts every 1 minute
+const STALE_INVITE_TRACKING_HOURS = -24;
 
 export async function checkAndSendScrimmageReminders(): Promise<void> {
   try {
@@ -41,6 +42,54 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
       const timezone = league?.timezone || 'America/New_York';
       const scrimmageTime = parseLeagueLocalDateTime(scrimmage.dateTime, timezone);
       const hoursUntil = (scrimmageTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      // Send one push-only follow-up to registered invitees who still have no
+      // RSVP row. Any request status represents a deliberate IN/OUT choice.
+      if (hoursUntil <= 24 && hoursUntil > 23) {
+        const recipientIds = new Set((scrimmage.inviteUserIds || []).filter(id => !id.startsWith('placeholder:')));
+        if (scrimmage.inviteGroupId) {
+          const groupMembers = await storage.getInviteGroupMembers(scrimmage.inviteGroupId);
+          groupMembers.forEach(member => { if (member.userId) recipientIds.add(member.userId); });
+        }
+        recipientIds.delete(scrimmage.creatorId);
+
+        const [requests, staleAlreadySent, creator] = await Promise.all([
+          storage.getScrimmageRequests(scrimmage.id),
+          db.select().from(scrimmageRemindersSent).where(and(
+            eq(scrimmageRemindersSent.scrimmageId, scrimmage.id),
+            eq(scrimmageRemindersSent.hoursBefore, STALE_INVITE_TRACKING_HOURS),
+          )),
+          storage.getUser(scrimmage.creatorId),
+        ]);
+        requests.forEach(request => recipientIds.delete(request.playerId));
+        staleAlreadySent.forEach(sent => recipientIds.delete(sent.playerId));
+
+        const organizerName = creator
+          ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
+          : 'Organizer';
+        const formattedDateTime = format(scrimmageTime, 'EEE, MMM d · h:mm a');
+        for (const recipientId of Array.from(recipientIds)) {
+          try {
+            const sent = await sendScrimmageInvitePushNotification(
+              recipientId,
+              organizerName,
+              scrimmage.title,
+              formattedDateTime,
+              scrimmage.location,
+              scrimmage.id,
+            );
+            if (sent) {
+              await db.insert(scrimmageRemindersSent).values({
+                scrimmageId: scrimmage.id,
+                playerId: recipientId,
+                hoursBefore: STALE_INVITE_TRACKING_HOURS,
+              }).onConflictDoNothing();
+            }
+          } catch (error) {
+            console.error(`[StaleInvite] Failed for ${recipientId} on ${scrimmage.id}:`, error);
+          }
+        }
+      }
       
       // Find which reminders should be sent now
       for (const reminderHours of scrimmage.reminderHoursBefore) {

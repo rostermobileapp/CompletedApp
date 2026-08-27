@@ -78,6 +78,8 @@ import {
   createPaymentRequestSchema,
   updatePaymentRequestRecipientSchema,
   updatePaymentRequestSchema,
+  paymentRequests,
+  paymentRequestRecipients,
   venmoLinkOverrideField,
   cashappLinkOverrideField,
   createFacilityRequestSchema,
@@ -15748,6 +15750,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmageData.maxPlayers > 50) {
         return res.status(400).json({ message: "Maximum players cannot exceed 50" });
       }
+      if (scrimmageData.joinMode === 'first_pay' && Number(scrimmageData.costPerPlayer ?? 0) <= 0) {
+        return res.status(400).json({ message: 'First to Pay, First to Play requires a cost per player' });
+      }
+      if (
+        scrimmageData.joinMode === 'first_pay' &&
+        !scrimmageData.venmoLinkOverride &&
+        !scrimmageData.cashappLinkOverride &&
+        !user.venmoUsername &&
+        !user.cashappUsername
+      ) {
+        return res.status(400).json({ message: 'First to Pay, First to Play requires a Venmo or Cash App payment destination' });
+      }
       
       // Verify league exists and user is a member
       const league = await storage.getLeague(scrimmageData.leagueId);
@@ -16441,6 +16455,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      const effectiveJoinMode = updateData.joinMode ?? existingScrimmage.joinMode;
+      const effectiveCostPerPlayer = updateData.costPerPlayer ?? existingScrimmage.costPerPlayer;
+      if (effectiveJoinMode === 'first_pay' && Number(effectiveCostPerPlayer ?? 0) <= 0) {
+        return res.status(400).json({ message: 'First to Pay, First to Play requires a cost per player' });
+      }
+      if (effectiveJoinMode === 'first_pay') {
+        const creator = await storage.getUser(existingScrimmage.creatorId);
+        const effectiveVenmo = updateData.venmoLinkOverride ?? existingScrimmage.venmoLinkOverride;
+        const effectiveCashApp = updateData.cashappLinkOverride ?? existingScrimmage.cashappLinkOverride;
+        if (!effectiveVenmo && !effectiveCashApp && !creator?.venmoUsername && !creator?.cashappUsername) {
+          return res.status(400).json({ message: 'First to Pay, First to Play requires a Venmo or Cash App payment destination' });
+        }
+      }
+      if (existingScrimmage.joinMode !== 'first_pay' && effectiveJoinMode === 'first_pay') {
+        const existingRequests = await storage.getScrimmageRequests(existingScrimmage.id);
+        if (existingRequests.some(request => request.status === 'pending')) {
+          return res.status(409).json({
+            message: 'Resolve existing pending requests before switching to First to Pay, First to Play',
+          });
+        }
+      }
+
       const targetTimeTbd = updateData.timeTbd ?? existingScrimmage.timeTbd;
 
       // DateTime editing restrictions
@@ -16757,6 +16793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // joinMode is typed as 'approval' | 'first_come' on the Scrimmage type via Drizzle.
       const isFirstCome = scrimmage.joinMode === 'first_come';
+      const isFirstPay = scrimmage.joinMode === 'first_pay';
       const isCoHost = await storage.isUserScrimmageCoHost(scrimmageId, userId);
 
       if (isFirstCome) {
@@ -16830,10 +16867,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Standard (approval-required) path.
+      if (isFirstPay && Number(scrimmage.costPerPlayer ?? 0) <= 0) {
+        return res.status(409).json({ message: 'This scrimmage is missing its required payment amount' });
+      }
+
+      // Standard (approval-required and payment-gated) path.
       // Co-hosts are auto-approved; they use the same locked path as first-come to prevent
       // a race where a concurrent manual-approval reads the same final available spot.
-      if (isCoHost) {
+      if (isCoHost && !isFirstPay) {
         const coHostResult = await storage.createFirstComeScrimmageRequest(scrimmageId, userId);
         if (coHostResult === 'at_capacity') {
           return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
@@ -16848,7 +16889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentRequests = await storage.getScrimmageRequests(scrimmageId);
       const acceptedCount = currentRequests.filter(req => req.status === 'approved').length;
 
-      if (acceptedCount >= scrimmage.maxPlayers) {
+      if (!isFirstPay && acceptedCount >= scrimmage.maxPlayers) {
         return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
       }
 
@@ -16865,6 +16906,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const request = await storage.createScrimmageRequest(requestData);
+      if (isFirstPay) {
+        const paymentRequest = await storage.createPaymentRequest({
+          creatorId: scrimmage.creatorId,
+          title: `${scrimmage.title} — spot payment`,
+          description: 'Payment secures an available scrimmage spot in payment order.',
+          amountPerPerson: String(scrimmage.costPerPlayer),
+          deadline: scrimmage.timeTbd ? null : new Date(scrimmage.dateTime),
+          venmoLinkOverride: scrimmage.venmoLinkOverride,
+          cashappLinkOverride: scrimmage.cashappLinkOverride,
+          relatedScrimmageId: scrimmage.id,
+          relatedConversationId: null,
+        }, [userId]);
+        const creator = await storage.getUser(scrimmage.creatorId);
+        const creatorName = creator
+          ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
+          : 'Organizer';
+        const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+        await sendPaymentRequestPushNotification(
+          userId,
+          creatorName,
+          String(scrimmage.costPerPlayer),
+          scrimmage.title,
+          paymentRequest.id,
+        );
+      }
       res.status(201).json(request);
     } catch (error) {
       console.error('[Scrimmage Request] Error creating scrimmage request:', error);
@@ -16943,6 +17009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get only approved requests
       const allRequests = await storage.getScrimmageRequests(scrimmageId);
       const approvedPlayers = allRequests.filter(request => request.status === 'approved');
+      const openSpots = Math.max(0, scrimmage.maxPlayers - approvedPlayers.length);
 
       // Hydrate the creator so the scrimmage detail UI can render the
       // per-scrimmage payment links (override + profile-level fall back).
@@ -16967,6 +17034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         scrimmage,
         approvedPlayers,
+        openSpots,
         creator,
         canManagePlayers,
       });
@@ -17066,6 +17134,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now && (status === 'approved' || status === 'backup')) {
         return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
+      }
+
+      if (status === 'approved' && scrimmage.joinMode === 'first_pay') {
+        const [verifiedPayment] = await db
+          .select({ id: paymentRequestRecipients.id })
+          .from(paymentRequestRecipients)
+          .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
+          .where(and(
+            eq(paymentRequests.relatedScrimmageId, scrimmage.id),
+            eq(paymentRequests.creatorId, scrimmage.creatorId),
+            eq(paymentRequestRecipients.userId, request.playerId),
+            eq(paymentRequestRecipients.isPaid, true),
+            eq(paymentRequestRecipients.isConfirmed, true),
+          ))
+          .limit(1);
+        if (!verifiedPayment) {
+          return res.status(409).json({ message: 'Payment must be recorded and confirmed before this player can be approved' });
+        }
       }
       
       // Handle backup approval separately — no capacity check, auto-assigned position
@@ -21517,9 +21603,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only the payment request creator can confirm payments" });
       }
 
-      const updatedRecipient = await storage.confirmPaymentRequestRecipient(recipientId, isConfirmed);
+      if (isConfirmed && !recipient.isPaid) {
+        return res.status(409).json({ message: 'Record the payment as paid before confirming it' });
+      }
 
-      res.json(updatedRecipient);
+      const updatedRecipient = await storage.confirmPaymentRequestRecipient(recipientId, isConfirmed);
+      let scrimmageAdmission: 'approved' | 'at_capacity' | null = null;
+      if (isConfirmed && recipient.userId && recipient.paymentRequest.relatedScrimmageId) {
+        const linkedScrimmage = await storage.getScrimmage(recipient.paymentRequest.relatedScrimmageId);
+        if (
+          linkedScrimmage?.joinMode === 'first_pay' &&
+          recipient.paymentRequest.creatorId === linkedScrimmage.creatorId
+        ) {
+          const canStillAdmit =
+            linkedScrimmage.status === 'open' &&
+            (linkedScrimmage.timeTbd || new Date(linkedScrimmage.dateTime) > new Date());
+          if (!canStillAdmit) {
+            return res.json({ ...updatedRecipient, scrimmageAdmission: null });
+          }
+          const joinRequest = await storage.getScrimmageRequest(linkedScrimmage.id, recipient.userId);
+          if (joinRequest?.status === 'pending') {
+            const result = await storage.atomicApproveRequest(joinRequest.id, linkedScrimmage.id);
+            if (result === 'at_capacity') {
+              await storage.approveAsBackup(joinRequest.id);
+              scrimmageAdmission = 'at_capacity';
+            } else if (result !== 'not_pending') {
+              scrimmageAdmission = 'approved';
+              const league = await storage.getLeague(linkedScrimmage.leagueId);
+              const timezone = league?.timezone || 'America/New_York';
+              const { date: approvalDate, time: approvalTime } = formatDayAndTime(linkedScrimmage.dateTime, timezone);
+              await storage.createNotification({
+                userId: recipient.userId,
+                type: 'scrimmage_approved',
+                title: `You're in! ${linkedScrimmage.title}`,
+                message: `Your confirmed payment secured a spot in "${linkedScrimmage.title}" on ${approvalDate} at ${approvalTime}.`,
+                actionUrl: `/scrimmage/${linkedScrimmage.id}`,
+                actionText: 'View Details',
+                scrimmageId: linkedScrimmage.id,
+              });
+              broadcastNotificationUpdate(recipient.userId);
+              const { sendScrimmageApprovalPushNotification } = await import('./oneSignalNotifications');
+              await sendScrimmageApprovalPushNotification(
+                recipient.userId,
+                linkedScrimmage.title,
+                formatScrimmageDateTime(linkedScrimmage.dateTime, timezone),
+                linkedScrimmage.id,
+              );
+            }
+          }
+        }
+      }
+
+      res.json({ ...updatedRecipient, scrimmageAdmission });
     } catch (error) {
       console.error("Error confirming payment recipient:", error);
       res.status(500).json({ message: "Failed to confirm payment" });

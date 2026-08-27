@@ -527,7 +527,7 @@ export default function GameDetails() {
 
   // Early return with scrimmage-specific UI if viewing a scrimmage
   if (isScrimmage) {
-    const { scrimmage, approvedPlayers, creator: scrimmageCreator, canManagePlayers } = scrimmageData as any;
+    const { scrimmage, approvedPlayers, openSpots, creator: scrimmageCreator, canManagePlayers } = scrimmageData as any;
     const isScrimmageCreator = scrimmage.creatorId === (user as any)?.id;
     const scrimmageVenmoUrl = resolveVenmoLink(
       scrimmage.venmoLinkOverride,
@@ -621,6 +621,12 @@ export default function GameDetails() {
               )}
               {/* RSVP Buttons — inline to the right of the rink */}
               <ScrimmageRSVPButtons scrimmageId={gameId!} isCreator={isScrimmageCreator} className="ml-auto flex-shrink-0" />
+            </div>
+            <div
+              className={`mt-3 rounded-lg border px-3 py-2 text-sm font-medium ${openSpots > 0 ? 'border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200' : 'border-red-300 bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200'}`}
+              data-testid="text-scrimmage-open-spots"
+            >
+              {openSpots > 0 ? `${openSpots} open spot${openSpots === 1 ? '' : 's'} remaining` : 'This scrimmage is currently full'}
             </div>
 
             {scrimmage.notes && (
