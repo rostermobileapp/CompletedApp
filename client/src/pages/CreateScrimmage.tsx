@@ -485,6 +485,20 @@ export default function CreateScrimmage() {
             : `"${scrimmage.title}" has been created. Selected members will be notified.`,
         variant: scrimmage.inviteDeliveryFailed ? 'destructive' : 'default',
       });
+      // The details page reads the scrimmage from the approved-players
+      // response, not from the standalone `/api/scrimmages/:id` query. Update
+      // both cached shapes before navigating so the new time is visible
+      // immediately, even while the background refetch is still in flight.
+      queryClient.setQueryData(
+        [`/api/scrimmages/${scrimmageId}/approved-players`],
+        (current: any) => current
+          ? { ...current, scrimmage: { ...current.scrimmage, ...scrimmage } }
+          : current,
+      );
+      queryClient.setQueryData(
+        ['/api/scrimmages', scrimmageId],
+        scrimmage,
+      );
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
