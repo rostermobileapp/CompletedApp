@@ -30,15 +30,20 @@ export function FixedBottomButton({ children, className }: FixedBottomButtonProp
   }
 
   const isFreeTier = user?.role === 'free_tier';
-  const bottomOffset = isFreeTier ? 132 : 82;
+  // The mobile navigation is taller than its 60px minimum once labels,
+  // padding, and the device safe area are included. Keep fixed actions fully
+  // above it so the nav cannot cover or intercept the submit button.
+  const bottomOffset = isFreeTier ? 148 : 98;
 
   return (
     <div
       className={cn(
-        'fixed left-0 right-0 px-6 py-3 bg-background/95 backdrop-blur-sm border-t border-border z-40',
+        'fixed left-0 right-0 px-6 py-3 bg-background/95 backdrop-blur-sm border-t border-border z-[90]',
         className
       )}
-      style={{ bottom: `${bottomOffset}px` }}
+      style={{
+        bottom: `calc(${bottomOffset}px + var(--native-inset-bottom, env(safe-area-inset-bottom, 0px)))`,
+      }}
       data-testid="fixed-bottom-button-container"
     >
       {children}
