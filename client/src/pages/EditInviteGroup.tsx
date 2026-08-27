@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, UserPlus, Mail, X, Users, MapPin } from 'lucide-react';
@@ -520,7 +520,7 @@ export default function EditInviteGroup() {
                 </div>
 
                 {/* Member list */}
-                <ScrollArea className="h-64 border border-border rounded-lg">
+                <ScrollArea className="h-64 border border-border rounded-lg touch-pan-y">
                   {membersLoading ? (
                     <div className="space-y-3 p-2">
                       {[...Array(5)].map((_, i) => (
@@ -570,6 +570,12 @@ export default function EditInviteGroup() {
                       ))}
                     </div>
                   )}
+                  {filteredMembers.length > 4 && (
+                    <p className="border-t border-border bg-muted/30 px-3 py-1.5 text-center text-xs text-muted-foreground sm:hidden">
+                      Swipe to see more players
+                    </p>
+                  )}
+                  <ScrollBar orientation="vertical" />
                 </ScrollArea>
               </>
             )}
