@@ -218,21 +218,19 @@ export default function CreateScrimmage() {
     enabled: !!selectedLeague?.id,
   });
 
-  // Fetch invite groups for the current user
-  const { data: inviteGroups = [], isLoading: groupsLoading } = useQuery({
-    queryKey: ['/api/invite-groups', selectedLeague?.id],
-    queryFn: async () => {
-      const url = selectedLeague?.id 
-        ? `/api/invite-groups?leagueId=${selectedLeague.id}`
-        : '/api/invite-groups';
-      // Saved groups are protected by the app's JWT auth; credentials include
-      // alone does not attach the bearer token.
-      const response = await apiRequest('GET', url);
-      if (!response.ok) throw new Error('Failed to fetch invite groups');
-      return response.json();
-    },
+  // Use the same canonical saved-group query/cache as the Invite Groups page.
+  // A separate league-filtered key could retain an empty result even after
+  // groups were created and the canonical list was invalidated.
+  const { data: allInviteGroups = [], isLoading: groupsLoading } = useQuery({
+    queryKey: ['/api/invite-groups'],
     enabled: !!user,
   });
+  const inviteGroups = (allInviteGroups as any[]).filter(
+    (group: any) =>
+      !selectedLeague?.id ||
+      !group.leagueId ||
+      group.leagueId === selectedLeague.id,
+  );
 
   // Search users by email
   const { data: emailSearchResults = [], isLoading: emailSearchLoading } = useQuery({
