@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 import LocationLink from "@/components/LocationLink";
+import { parseScrimmageDateTime } from "@/lib/scrimmageDateTime";
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -139,7 +140,7 @@ export default function Calendar() {
       ...scrimmage,
       type: 'scrimmage' as const,
       userRole: 'creator' as const,
-      scheduledAt: scrimmage.dateTime, // Match games field name
+      scheduledAt: parseScrimmageDateTime(scrimmage.dateTime), // Match games field name without timezone conversion
     })),
     // User's approved scrimmage requests
     ...scrimmageRequests
@@ -148,7 +149,7 @@ export default function Calendar() {
         ...request.scrimmage,
         type: 'scrimmage' as const,
         userRole: 'participant' as const,
-        scheduledAt: request.scrimmage.dateTime, // Match games field name
+        scheduledAt: parseScrimmageDateTime(request.scrimmage.dateTime), // Match games field name without timezone conversion
         teamAssignment: request.teamAssignment ?? null,
       }))
   ].filter(scrimmage => {

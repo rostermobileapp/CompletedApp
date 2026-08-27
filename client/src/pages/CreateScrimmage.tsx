@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
+import { splitScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check, ShieldHalf, PersonStanding } from 'lucide-react';
@@ -261,12 +262,8 @@ export default function CreateScrimmage() {
   // Pre-populate form when editing an existing scrimmage
   useEffect(() => {
     if (isEditMode && existingScrimmage && !formInitialized) {
-      // Parse league-local datetime string directly without Date conversion
-      // dateTime is stored as "2025-01-15T18:00" (league-local time)
-      const dateTimeStr = existingScrimmage.dateTime || '';
-      const [datePart, timePart] = dateTimeStr.split('T');
-      const dateStr = datePart || '';
-       const timeStr = existingScrimmage.timeTbd ? '' : (timePart ? timePart.slice(0, 5) : ''); // Get HH:mm
+      const { date: dateStr, time: storedTime } = splitScrimmageDateTime(existingScrimmage.dateTime);
+      const timeStr = existingScrimmage.timeTbd ? '' : storedTime;
       
       // Parse recurrence end date directly from string
       const recurrenceEndDateStr = existingScrimmage.recurrenceEndDate || '';
@@ -476,12 +473,17 @@ export default function CreateScrimmage() {
     },
     onSuccess: (scrimmage) => {
       toast({
-        title: isEditMode ? 'Scrimmage Updated' : 'Scrimmage Request Created',
-        description: isEditMode 
+        title: scrimmage.inviteDeliveryFailed
+          ? 'Scrimmage Updated — Invitations Need Retry'
+          : isEditMode ? 'Scrimmage Updated' : 'Scrimmage Request Created',
+        description: scrimmage.inviteDeliveryFailed
+          ? `"${scrimmage.title}" has the new time, but its saved invitations could not be sent. You can retry from the scrimmage.`
+          : isEditMode
           ? `"${scrimmage.title}" has been updated successfully.`
           : scrimmage.timeTbd
             ? `"${scrimmage.title}" has been saved as Time TBD. Invitations will stay queued until a time is set.`
             : `"${scrimmage.title}" has been created. Selected members will be notified.`,
+        variant: scrimmage.inviteDeliveryFailed ? 'destructive' : 'default',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId] });

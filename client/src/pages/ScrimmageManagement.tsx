@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import LocationLink from "@/components/LocationLink";
+import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 
 const DEFAULT_SCRIMMAGE_COLOR = '#3b82f6';
 
@@ -38,13 +39,6 @@ type ScrimmageCoHostWithUser = ScrimmageCoHost & {
 
 function getScrimmageColor(scrimmage: ScrimmageWithCreatorAndCount): string {
   return scrimmage.color || DEFAULT_SCRIMMAGE_COLOR;
-}
-
-function parseScrimmageDate(dateTime: string | Date): Date {
-  if (typeof dateTime === 'string') {
-    return new Date(dateTime);
-  }
-  return dateTime;
 }
 
 export default function ScrimmageManagement() {
@@ -256,7 +250,7 @@ export default function ScrimmageManagement() {
 
   // --- Helpers ---
   const formatDateTime = (dateTime: string | Date) => {
-    const date = parseScrimmageDate(typeof dateTime === 'string' ? dateTime : dateTime.toISOString());
+    const date = parseScrimmageDateTime(dateTime);
     return {
       date: format(date, 'MMM d, yyyy'),
       time: format(date, 'h:mm a'),
@@ -285,7 +279,7 @@ export default function ScrimmageManagement() {
   const scrimmagesByDay = useMemo(() => {
     const map = new Map<string, ScrimmageWithCreatorAndCount[]>();
     for (const s of scrimmages) {
-      const d = parseScrimmageDate(s.dateTime);
+      const d = parseScrimmageDateTime(s.dateTime);
       const key = format(d, 'yyyy-MM-dd');
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);

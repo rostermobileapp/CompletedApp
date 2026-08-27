@@ -15,6 +15,7 @@ import {
 import { ChevronLeft, ChevronRight, Trophy, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { EVENT_COLORS } from '@/components/home-desktop/cardStyles';
 import { apiRequest } from '@/lib/queryClient';
+import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 
 type EventKind =
@@ -150,7 +151,7 @@ export function ScheduleCalendarMobile({
     if (Array.isArray(scrimmageInvites)) {
       for (const i of scrimmageInvites) {
         if (!i?.dateTime) continue;
-        const d = new Date(i.dateTime);
+        const d = parseScrimmageDateTime(i.dateTime);
         if (Number.isNaN(d.getTime())) continue;
         out.push({
           id: `invite-${i.id}`,
@@ -169,7 +170,7 @@ export function ScheduleCalendarMobile({
       for (const r of scrimmageRequests) {
         if ((r?.status !== 'approved' && r?.status !== 'pending') || !r.scrimmage?.dateTime) continue;
         const s = r.scrimmage;
-        const d = new Date(s.dateTime);
+        const d = parseScrimmageDateTime(s.dateTime);
         if (Number.isNaN(d.getTime())) continue;
         out.push({
           id: `scrimmage-${s.id}`,

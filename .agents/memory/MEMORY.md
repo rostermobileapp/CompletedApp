@@ -8,3 +8,4 @@
 - [Draft notification decoupling](draft-notification-decoupling.md) — notify actions must track delivery separately from roster/team assignment state, or auto-completion silently swallows notifications.
 - [storage.ts / oneSignalNotifications.ts cycle](storage-onesignal-circular-import.md) — oneSignalNotifications.ts imports storage; call it back from storage.ts via dynamic `await import()`, never a static import.
 - [Founder email constant](founder-email-constant.md) — founder's real login email is tobin@rosterhockey.com, not founder@rosterhockey.com; several founder-gate checks had the wrong hardcoded value.
+- [Scrimmage wall-clock timestamps](scrimmage-wall-clock-timestamps.md) — persist scrimmage times as league-local strings; passing Date objects shifts recurring times to UTC.

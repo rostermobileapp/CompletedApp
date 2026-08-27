@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+import { parseScrimmageDateTime } from "@/lib/scrimmageDateTime";
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign, CreditCard, ChevronRight, LayoutList } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -603,8 +604,8 @@ export default function GameDetails() {
                 </h2>
                 <p className="text-sm text-muted-foreground" data-testid="text-scrimmage-date">
                   {scrimmage.timeTbd
-                    ? `${format(new Date(scrimmage.dateTime), 'EEEE, MMMM d')} • Time TBD`
-                    : format(new Date(scrimmage.dateTime), 'EEEE, MMMM d • h:mm a')}
+                    ? `${format(parseScrimmageDateTime(scrimmage.dateTime), 'EEEE, MMMM d')} • Time TBD`
+                    : format(parseScrimmageDateTime(scrimmage.dateTime), 'EEEE, MMMM d • h:mm a')}
                 </p>
               </div>
             </div>

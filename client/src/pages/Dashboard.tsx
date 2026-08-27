@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
@@ -3222,7 +3223,7 @@ function DashboardMobile() {
                   const alreadyInInvites = Array.isArray(scrimmageInvites) &&
                     scrimmageInvites.some((i: any) => i.id === request.scrimmage.id);
                   if (alreadyInInvites) return false;
-                  const eventDate = new Date(request.scrimmage.dateTime);
+                  const eventDate = parseScrimmageDateTime(request.scrimmage.dateTime);
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);
                   yesterday.setHours(0, 0, 0, 0);
@@ -3251,7 +3252,9 @@ function DashboardMobile() {
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
-                            {format(new Date(scrimmage.dateTime), 'MMM d • h:mm a')}
+                            {scrimmage.timeTbd
+                              ? `${format(parseScrimmageDateTime(scrimmage.dateTime), 'MMM d')} • Time TBD`
+                              : format(parseScrimmageDateTime(scrimmage.dateTime), 'MMM d • h:mm a')}
                           </p>
                           {scrimmage.location && (
                             <p className="text-xs text-muted-foreground" data-testid={`text-scrimmage-location-${scrimmage.id}`}>

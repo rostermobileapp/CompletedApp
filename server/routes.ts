@@ -38,7 +38,7 @@ import { generateSingleElimination, generateDoubleElimination, generateRoundRobi
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 import { format, addDays, addWeeks, addMonths } from "date-fns";
-import { formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
+import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -15920,7 +15920,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const parentScrimmage = await storage.createScrimmage({
           ...scrimmageData,
           announcementId,
-          dateTime: dates[0],
+          // date_time is timestamp without time zone. Persist the league-local
+          // wall-clock string rather than a Date (which Drizzle serializes as
+          // UTC and would turn 9 PM Eastern into 1 AM).
+          dateTime: formatDateInTimezone(dates[0], "yyyy-MM-dd'T'HH:mm:ss", league.timezone),
           inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
           inviteEmails: savedInviteEmails,
           hasDeferredInvites: !!scrimmageData.timeTbd,
@@ -16000,7 +16003,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...scrimmageData,
             // Future occurrences deliberately start as Time TBD. A time set on
             // the first occurrence must never become the series-wide default.
-            dateTime: new Date(dates[i].getFullYear(), dates[i].getMonth(), dates[i].getDate()),
+            dateTime: `${formatDateInTimezone(dates[i], 'yyyy-MM-dd', league.timezone)}T00:00:00`,
             timeTbd: true,
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
@@ -16443,15 +16446,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // DateTime editing restrictions
       if (updateData.dateTime !== undefined) {
         const dateOnly = updateData.dateTime.split('T')[0];
+        const league = await storage.getLeague(existingScrimmage.leagueId);
         const dateForValidation = targetTimeTbd
-          ? parseLeagueLocalDateTime(`${dateOnly}T23:59:59`, (await storage.getLeague(existingScrimmage.leagueId))?.timezone)
-          : new Date(updateData.dateTime);
+          ? parseLeagueLocalDateTime(`${dateOnly}T23:59:59`, league?.timezone)
+          : parseLeagueLocalDateTime(updateData.dateTime, league?.timezone);
         if (dateForValidation <= now) {
           return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
         }
         
         // Don't allow changing date if it's less than 24 hours away
-        const hoursUntilExisting = (new Date(existingScrimmage.dateTime).getTime() - now.getTime()) / (1000 * 60 * 60);
+        const hoursUntilExisting = (
+          parseLeagueLocalDateTime(existingScrimmage.dateTime, league?.timezone).getTime() - now.getTime()
+        ) / (1000 * 60 * 60);
         if (!existingScrimmage.timeTbd && hoursUntilExisting < 24) {
           return res.status(409).json({ message: "Cannot change scrimmage date less than 24 hours before scheduled time" });
         }
@@ -16466,8 +16472,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
 
+      let inviteDeliveryFailed = false;
       if (updatedScrimmage.hasDeferredInvites && !updatedScrimmage.timeTbd && !updatedScrimmage.inviteSentAt && req.body.sendInviteNow === true) {
-        await deliverPendingScrimmageInvites(scrimmageId);
+        try {
+          await deliverPendingScrimmageInvites(scrimmageId);
+        } catch (inviteError) {
+          inviteDeliveryFailed = true;
+          console.error(`Scrimmage ${scrimmageId} updated, but deferred invitation delivery failed:`, inviteError);
+        }
       }
 
       // Handle co-host ID additions
@@ -16532,7 +16544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json(updatedScrimmage);
+      res.json({ ...updatedScrimmage, inviteDeliveryFailed });
     } catch (error) {
       console.error('Error updating scrimmage:', error);
       res.status(500).json({ message: 'Failed to update scrimmage' });
