@@ -546,17 +546,6 @@ export default function CreateScrimmage() {
       setSubmitError('Cost Per Player: A positive amount is required for First to Pay, First to Play.');
       return;
     }
-    if (
-      joinMode === 'first_pay' &&
-      !data.venmoLinkOverride &&
-      !data.cashappLinkOverride &&
-      !(user as any)?.venmoUsername &&
-      !(user as any)?.cashappUsername
-    ) {
-      form.setError('venmoLinkOverride', { message: 'Add a Venmo or Cash App destination for player payments' });
-      setSubmitError('Payment destination: Add a Venmo or Cash App destination for player payments.');
-      return;
-    }
     // Additional validation for member selection when league is available (only for create mode)
     if (!isEditMode && selectedLeague && selectedMemberIds.length === 0 && selectedEmails.length === 0) {
       form.setError('selectedMemberIds', {
@@ -1409,7 +1398,7 @@ export default function CreateScrimmage() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {joinMode === 'first_pay'
-                  ? 'Required: players receive a payment request before their spot is approved.'
+                  ? 'Players receive a payment request before their spot is approved. Cash payment is also accepted.'
                   : "If there's a cost, you can create a payment request after approval"}
               </p>
               {form.formState.errors.costPerPlayer && (
@@ -1420,8 +1409,9 @@ export default function CreateScrimmage() {
             <div className="pt-1">
               <p className="text-sm text-muted-foreground mb-1\.5 font-bold">
                 By default, players will pay you using the Venmo and Cash App handles
-                on your profile. Use these optional overrides to send payments for this
-                scrimmage somewhere else (for example, a team treasurer).
+                on your profile. These payment destinations are optional for cash
+                payments. Use the overrides to send payments for this scrimmage
+                somewhere else (for example, a team treasurer).
               </p>
 
               <div className="space-y-1\.5">

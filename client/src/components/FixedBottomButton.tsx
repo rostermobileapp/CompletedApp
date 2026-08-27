@@ -38,7 +38,10 @@ export function FixedBottomButton({ children, className }: FixedBottomButtonProp
   return (
     <div
       className={cn(
-        'fixed left-0 right-0 px-6 py-3 bg-background/95 backdrop-blur-sm border-t border-border z-[90]',
+        // Keep dialogs (z-50) above this page-level action bar. The action
+        // bar still sits above normal page content and remains clear of the
+        // mobile navigation via its bottom offset.
+        'fixed left-0 right-0 px-6 py-3 bg-background/95 backdrop-blur-sm border-t border-border z-[40]',
         className
       )}
       style={{

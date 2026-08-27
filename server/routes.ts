@@ -15753,15 +15753,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmageData.joinMode === 'first_pay' && Number(scrimmageData.costPerPlayer ?? 0) <= 0) {
         return res.status(400).json({ message: 'First to Pay, First to Play requires a cost per player' });
       }
-      if (
-        scrimmageData.joinMode === 'first_pay' &&
-        !scrimmageData.venmoLinkOverride &&
-        !scrimmageData.cashappLinkOverride &&
-        !user.venmoUsername &&
-        !user.cashappUsername
-      ) {
-        return res.status(400).json({ message: 'First to Pay, First to Play requires a Venmo or Cash App payment destination' });
-      }
       
       // Verify league exists and user is a member
       const league = await storage.getLeague(scrimmageData.leagueId);
@@ -16459,14 +16450,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const effectiveCostPerPlayer = updateData.costPerPlayer ?? existingScrimmage.costPerPlayer;
       if (effectiveJoinMode === 'first_pay' && Number(effectiveCostPerPlayer ?? 0) <= 0) {
         return res.status(400).json({ message: 'First to Pay, First to Play requires a cost per player' });
-      }
-      if (effectiveJoinMode === 'first_pay') {
-        const creator = await storage.getUser(existingScrimmage.creatorId);
-        const effectiveVenmo = updateData.venmoLinkOverride ?? existingScrimmage.venmoLinkOverride;
-        const effectiveCashApp = updateData.cashappLinkOverride ?? existingScrimmage.cashappLinkOverride;
-        if (!effectiveVenmo && !effectiveCashApp && !creator?.venmoUsername && !creator?.cashappUsername) {
-          return res.status(400).json({ message: 'First to Pay, First to Play requires a Venmo or Cash App payment destination' });
-        }
       }
       if (existingScrimmage.joinMode !== 'first_pay' && effectiveJoinMode === 'first_pay') {
         const existingRequests = await storage.getScrimmageRequests(existingScrimmage.id);
