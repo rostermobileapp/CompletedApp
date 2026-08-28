@@ -425,7 +425,7 @@ export default function Teams() {
   // isTeamCaptain covers: primary captain (teams.captainId) OR any secondary
   // captain (team_memberships.isCaptain), matching the server-side auth model.
   const currentUserMembership = teamMembers.find(
-    (m: any) => (m.user?.id ?? m.userId) === userId,
+    (m: any) => String(m.user?.id ?? m.userId) === String(userId),
   );
   const isTeamCaptain =
     currentTeam?.captainId === userId ||

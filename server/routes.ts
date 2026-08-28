@@ -396,6 +396,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Team line management supports both the legacy primary captain field and
+  // the multi-captain membership flag.
+  const canManageTeamLines = async (team: any, userId: string) =>
+    !!team &&
+    (team.creatorId === userId || (await storage.isTeamCaptain(team.id, userId)));
+
   // Draft tool: setup wizard, draft engine routes, live draft room
   setNotificationBroadcaster(broadcastNotificationUpdate);
   registerDraftRoutes(app, isAuthenticated);
@@ -7738,7 +7744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auth: captain or creator
       const team = await storage.getTeam(teamId);
       if (!team) return res.status(404).json({ message: 'Team not found' });
-      if (team.captainId !== userId && team.creatorId !== userId) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: 'Only team captains or creators can set game lines' });
       }
 
@@ -7853,7 +7859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamMembers = await storage.getTeamMembers(teamId);
       const isTeamMember = teamMembers.some(member => member.user.id === userId);
       const team = await storage.getTeam(teamId);
-      const isTeamCaptain = team?.captainId === userId;
+      const isTeamCaptain = team ? await storage.isTeamCaptain(teamId, userId) : false;
       
       if (!isTeamMember && !isTeamCaptain) {
         return res.status(403).json({ message: "Access denied. You must be a team member or captain." });
@@ -7874,7 +7880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can create line combinations" });
       }
       
@@ -7916,7 +7922,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamMembers = await storage.getTeamMembers(lineCombination.teamId);
       const isTeamMember = teamMembers.some(member => member.user.id === userId);
       const team = await storage.getTeam(lineCombination.teamId);
-      const isTeamCaptain = team?.captainId === userId;
+      const isTeamCaptain = team
+        ? await storage.isTeamCaptain(lineCombination.teamId, userId)
+        : false;
       
       if (!isTeamMember && !isTeamCaptain) {
         return res.status(403).json({ message: "Access denied. You must be a team member or captain." });
@@ -7941,7 +7949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can update line combinations" });
       }
       
@@ -7978,7 +7986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can delete line combinations" });
       }
       
@@ -8003,7 +8011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can assign players to line combinations" });
       }
       
@@ -8049,7 +8057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can update line assignments" });
       }
       
@@ -8088,7 +8096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can update line assignments" });
       }
       
@@ -8118,7 +8126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can update line assignments" });
       }
       
@@ -8163,7 +8171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is team captain or creator
       const team = await storage.getTeam(lineCombination.teamId);
-      if (!team || (team.captainId !== userId && team.creatorId !== userId)) {
+      if (!(await canManageTeamLines(team, userId))) {
         return res.status(403).json({ message: "Only team captains or creators can delete line assignments" });
       }
       
