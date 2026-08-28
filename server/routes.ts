@@ -517,30 +517,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       UPDATE scrimmages
          SET join_mode = 'approval'
        WHERE join_mode IS NULL
-          OR join_mode NOT IN ('approval', 'first_come')
+          OR join_mode NOT IN ('approval', 'first_come', 'first_pay')
     `);
 
     // Step 3: Set NOT NULL and the column default now that all rows are valid.
     await db.execute(sql`ALTER TABLE scrimmages ALTER COLUMN join_mode SET NOT NULL`);
     await db.execute(sql`ALTER TABLE scrimmages ALTER COLUMN join_mode SET DEFAULT 'approval'`);
 
-    // Step 4: Add CHECK constraint only when it does not already exist.
-    // Checking pg_constraint avoids the "duplicate_object" race and also handles
-    // the edge case where a constraint with the same name already exists
-    // (regardless of whether its definition matches).
+    // Step 4: Add the CHECK constraint, or replace the legacy two-value
+    // constraint that predates First to Pay, First to Play. Merely checking the
+    // constraint name is insufficient because older databases already have a
+    // constraint with that name which rejects the now-valid `first_pay` value.
     await db.execute(sql`
-      DO $$ BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint c
+      DO $$
+      DECLARE
+        join_mode_constraint text;
+      BEGIN
+        SELECT pg_get_constraintdef(c.oid)
+          INTO join_mode_constraint
+          FROM pg_constraint c
           JOIN pg_class t ON c.conrelid = t.oid
-          WHERE t.relname = 'scrimmages'
-            AND c.conname  = 'scrimmages_join_mode_check'
-        ) THEN
+         WHERE t.relname = 'scrimmages'
+           AND c.conname = 'scrimmages_join_mode_check';
+
+        IF join_mode_constraint IS NULL THEN
           ALTER TABLE scrimmages
             ADD CONSTRAINT scrimmages_join_mode_check
-            CHECK (join_mode IN ('approval', 'first_come'));
+            CHECK (join_mode IN ('approval', 'first_come', 'first_pay'));
+        ELSIF position('first_pay' in join_mode_constraint) = 0 THEN
+          ALTER TABLE scrimmages
+            DROP CONSTRAINT scrimmages_join_mode_check;
+          ALTER TABLE scrimmages
+            ADD CONSTRAINT scrimmages_join_mode_check
+            CHECK (join_mode IN ('approval', 'first_come', 'first_pay'));
         END IF;
-      END; $$
+      END
+      $$
     `);
 
     console.log('[Init] scrimmages.join_mode column and constraint ensured');
