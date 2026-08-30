@@ -3138,7 +3138,14 @@ function DashboardMobile() {
               return eventDateOnly >= yesterday;
             };
             const hasGames = Array.isArray(upcomingGames) && (upcomingGames as any[]).filter((g: any) => isYesterdayOrLater(g.scheduledAt)).length > 0;
-            const hasInvites = Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => isYesterdayOrLater(i.dateTime)).length > 0;
+            const hasInvites = Array.isArray(scrimmageInvites) && scrimmageInvites.filter((i: any) => {
+              const hasActiveRequest = Array.isArray(scrimmageRequests) &&
+                scrimmageRequests.some((request: any) =>
+                  (request.status === 'approved' || request.status === 'pending') &&
+                  request.scrimmage?.id === i.id
+                );
+              return !hasActiveRequest && isYesterdayOrLater(i.dateTime);
+            }).length > 0;
             const hasRequests = Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => (r.status === 'approved' || r.status === 'pending') && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
             const hasReminders = Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0;
             return hasGames || hasInvites || hasRequests || hasReminders || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
@@ -3146,6 +3153,12 @@ function DashboardMobile() {
             <div className="space-y-3">
               {/* First show scrimmage invites (yesterday and future - visible until day after) */}
               {Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
+                const hasActiveRequest = Array.isArray(scrimmageRequests) &&
+                  scrimmageRequests.some((request: any) =>
+                    (request.status === 'approved' || request.status === 'pending') &&
+                    request.scrimmage?.id === invite.id
+                  );
+                if (hasActiveRequest) return false;
                 const eventDate = new Date(invite.dateTime);
                 const yesterday = new Date();
                 yesterday.setDate(yesterday.getDate() - 1);
@@ -3224,12 +3237,6 @@ function DashboardMobile() {
               {Array.isArray(scrimmageRequests) && scrimmageRequests
                 .filter((request: any) => {
                   if ((request.status !== 'approved' && request.status !== 'pending') || !request.scrimmage) return false;
-                  // Only skip creator-owned scrimmages if they already appear in the invites list above.
-                  // If the scrimmage has aged off the invites feed (past dateTime) it won't be in
-                  // scrimmageInvites, so we must still show it here to avoid a gap between views.
-                  const alreadyInInvites = Array.isArray(scrimmageInvites) &&
-                    scrimmageInvites.some((i: any) => i.id === request.scrimmage.id);
-                  if (alreadyInInvites) return false;
                   const eventDate = parseScrimmageDateTime(request.scrimmage.dateTime);
                   const yesterday = new Date();
                   yesterday.setDate(yesterday.getDate() - 1);

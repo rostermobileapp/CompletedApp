@@ -147,10 +147,24 @@ export function ScheduleCalendarMobile({
 
   const events = useMemo<MobileCalendarEvent[]>(() => {
     const out: MobileCalendarEvent[] = [];
+    const activeRequestScrimmageIds = new Set(
+      Array.isArray(scrimmageRequests)
+        ? scrimmageRequests
+            .filter(
+              (request) =>
+                (request?.status === 'approved' || request?.status === 'pending') &&
+                request?.scrimmage?.id,
+            )
+            .map((request) => request.scrimmage.id)
+        : [],
+    );
 
     if (Array.isArray(scrimmageInvites)) {
       for (const i of scrimmageInvites) {
         if (!i?.dateTime) continue;
+        // The invite query can briefly remain cached after an RSVP is accepted.
+        // Prefer the request entry, which contains the finalized team assignment.
+        if (activeRequestScrimmageIds.has(i.id)) continue;
         const d = parseScrimmageDateTime(i.dateTime);
         if (Number.isNaN(d.getTime())) continue;
         out.push({
