@@ -15774,14 +15774,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (recipients.length > 0) {
       try {
-        const announcement = await storage.createAnnouncement({
-          content: `🏒 You're Invited! "${scrimmage.title}" on ${formattedDateTime} at ${scrimmage.location}. Click to RSVP!`,
-          leagueId: scrimmage.leagueId,
-          authorId: scrimmage.creatorId,
-          isPinned: false,
-        });
-        await storage.createAnnouncementVisibility(announcement.id, recipients);
-        await storage.updateScrimmage(scrimmage.id, { announcementId: announcement.id });
+        const content = `🏒 You're Invited! "${scrimmage.title}" on ${formattedDateTime} at ${scrimmage.location}. Click to RSVP!`;
+        let announcementId = scrimmage.announcementId;
+        if (announcementId) {
+          await storage.updateAnnouncement(announcementId, { content });
+        } else {
+          const announcement = await storage.createAnnouncement({
+            content,
+            leagueId: scrimmage.leagueId,
+            authorId: scrimmage.creatorId,
+            isPinned: false,
+          });
+          announcementId = announcement.id;
+          await storage.updateScrimmage(scrimmage.id, { announcementId });
+        }
+        await storage.createAnnouncementVisibility(announcementId, recipients);
       } catch (error) {
         console.error(`Failed to create deferred invite announcement for ${scrimmage.id}:`, error);
       }
@@ -15799,16 +15806,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           if (notification) {
             broadcastNotificationUpdate(recipientId);
-            const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
-            await sendScrimmageInvitePushNotification(
-              recipientId,
-              organizerName,
-              scrimmage.title,
-              formattedDateTime,
-              scrimmage.location || 'TBD',
-              scrimmage.id,
-            );
           }
+          // The player may already have received an in-app Time TBD invite.
+          // The claimed deferred delivery is still their one exact-time push.
+          const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+          await sendScrimmageInvitePushNotification(
+            recipientId,
+            organizerName,
+            scrimmage.title,
+            formattedDateTime,
+            scrimmage.location || 'TBD',
+            scrimmage.id,
+          );
         } catch (error) {
           console.error(`Failed to deliver deferred invite to ${recipientId}:`, error);
         }
@@ -15925,7 +15934,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .filter((email) => emailSchema.safeParse(email).success),
       ));
 
-      // Create announcement first if there are selected members.
+      // Create announcement first if there are selected members. Time TBD
+      // players need this visibility row immediately so the invite appears on
+      // their dashboard; only the exact-time push remains deferred.
       // Placeholder players (id prefix "placeholder:") have no users row — exclude
       // them before writing announcement visibility records (FK to users.id).
       // Only create the announcement when at least one real user is targeted;
@@ -15934,10 +15945,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const realSelectedMemberIds = (req.body.selectedMemberIds || []).filter(
         (id: string) => !id.startsWith('placeholder:')
       );
-    if (!scrimmageData.timeTbd && realSelectedMemberIds.length > 0) {
+      if (realSelectedMemberIds.length > 0) {
         try {
-          
-          const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)} at ${scrimmageData.location}. Click to RSVP!`;
+          const invitationWhen = scrimmageData.timeTbd
+            ? `${formatDateInTimezone(scrimmageData.dateTime, 'MMM d, yyyy', league.timezone)} (Time TBD)`
+            : formatFullDateTime(scrimmageData.dateTime, league.timezone);
+          const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${invitationWhen} at ${scrimmageData.location}. Click to RSVP!`;
           
           // Create announcement for the scrimmage invitation
           const announcement = await storage.createAnnouncement({
@@ -16169,8 +16182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         
-        // ALWAYS send in-app notifications when members are invited
-        if (!scrimmageData.timeTbd && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        // ALWAYS send in-app notifications when members are invited, including
+        // Time TBD events. Push delivery with the exact time remains deferred.
+        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -16203,7 +16217,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId: memberId,
                 type: 'scrimmage_invite',
                 title: `You're Invited: ${scrimmageData.title}`,
-                message: `Join us on ${inviteDate} at ${inviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
+                message: scrimmageData.timeTbd
+                  ? `Join us on ${inviteDate} (Time TBD) at ${scrimmageData.location}. Tap to RSVP!`
+                  : `Join us on ${inviteDate} at ${inviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
                 actionUrl: `/scrimmage/${parentScrimmage.id}`,
                 scrimmageId: parentScrimmage.id,
               });
@@ -16353,8 +16369,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // ALWAYS send in-app notifications when members are invited
-        if (!scrimmageData.timeTbd && req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        // ALWAYS send in-app notifications when members are invited, including
+        // Time TBD events. Push delivery with the exact time remains deferred.
+        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -16387,7 +16404,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 userId: memberId,
                 type: 'scrimmage_invite',
                 title: `You're Invited: ${scrimmageData.title}`,
-                message: `Join us on ${singleInviteDate} at ${singleInviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
+                message: scrimmageData.timeTbd
+                  ? `Join us on ${singleInviteDate} (Time TBD) at ${scrimmageData.location}. Tap to RSVP!`
+                  : `Join us on ${singleInviteDate} at ${singleInviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
                 actionUrl: `/scrimmage/${scrimmage.id}`,
                 scrimmageId: scrimmage.id,
               });

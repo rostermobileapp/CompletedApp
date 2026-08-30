@@ -9850,6 +9850,16 @@ export class DatabaseStorage implements IStorage {
 
   async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]> {
     const now = new Date();
+    const isUpcomingInvite = or(
+      and(
+        eq(scrimmages.timeTbd, false),
+        gte(scrimmages.dateTime, now),
+      ),
+      and(
+        eq(scrimmages.timeTbd, true),
+        sql`${scrimmages.dateTime}::date >= CURRENT_DATE`,
+      ),
+    );
 
     // 1) Scrimmages where user was directly invited via announcement visibility
     const invitedResults = await db
@@ -9861,7 +9871,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(announcementVisibility.userId, userId),
-          gte(scrimmages.dateTime, now),
+          isUpcomingInvite,
           not(
             sql`EXISTS (
               SELECT 1 FROM ${scrimmageRequests}
@@ -9873,7 +9883,29 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(asc(scrimmages.dateTime));
 
-    // 2) Scrimmages the user created themselves — they should always see their own
+    // 2) Directly-selected users are also stored on the scrimmage. Reading this
+    // list keeps older Time TBD invitations visible even if they were created
+    // before TBD announcement visibility was added.
+    const directlyInvitedResults = await db
+      .select({ scrimmage: scrimmages, creator: users })
+      .from(scrimmages)
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .where(
+        and(
+          sql`${userId} = ANY(COALESCE(${scrimmages.inviteUserIds}, ARRAY[]::text[]))`,
+          isUpcomingInvite,
+          not(
+            sql`EXISTS (
+              SELECT 1 FROM ${scrimmageRequests}
+              WHERE ${scrimmageRequests.scrimmageId} = ${scrimmages.id}
+              AND ${scrimmageRequests.playerId} = ${userId}
+            )`
+          )
+        )
+      )
+      .orderBy(asc(scrimmages.dateTime));
+
+    // 3) Scrimmages the user created themselves — they should always see their own
     const createdResults = await db
       .select({ scrimmage: scrimmages, creator: users })
       .from(scrimmages)
@@ -9881,7 +9913,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(scrimmages.creatorId, userId),
-          gte(scrimmages.dateTime, now),
+          isUpcomingInvite,
           sql`${scrimmages.status} != 'cancelled'`
         )
       )
@@ -9890,7 +9922,7 @@ export class DatabaseStorage implements IStorage {
     // Merge and deduplicate by scrimmage id
     const seen = new Set<string>();
     const merged: (Scrimmage & { creator: User })[] = [];
-    for (const r of [...invitedResults, ...createdResults]) {
+    for (const r of [...invitedResults, ...directlyInvitedResults, ...createdResults]) {
       if (!seen.has(r.scrimmage.id)) {
         seen.add(r.scrimmage.id);
         merged.push({ ...r.scrimmage, creator: r.creator });

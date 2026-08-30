@@ -490,7 +490,7 @@ export default function CreateScrimmage() {
           : isEditMode
           ? `"${scrimmage.title}" has been updated successfully.`
           : scrimmage.timeTbd
-            ? `"${scrimmage.title}" has been saved as Time TBD. Invitations will stay queued until a time is set.`
+            ? `"${scrimmage.title}" has been saved as Time TBD. Selected players can RSVP now and will receive the exact time when it is set.`
             : `"${scrimmage.title}" has been created. Selected members will be notified.`,
         variant: scrimmage.inviteDeliveryFailed ? 'destructive' : 'default',
       });
