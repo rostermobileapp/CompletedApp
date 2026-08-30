@@ -15661,6 +15661,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ].filter(Boolean)));
 
   /**
+   * Create the payment request for approved scrimmage players that do not
+   * already have one. This is shared by finalization and by edits that add a
+   * cost after the scrimmage was created.
+   */
+  const createScrimmagePaymentRequestForPlayers = async (
+    scrimmage: any,
+    recipientUserIds: string[],
+    creatorId: string = scrimmage.creatorId,
+  ) => {
+    const costPerPlayer = Number(scrimmage.costPerPlayer ?? 0);
+    const uniqueRecipientIds = Array.from(new Set(recipientUserIds.filter(Boolean)));
+    if (costPerPlayer <= 0 || uniqueRecipientIds.length === 0) return null;
+
+    const existingPaymentRequests = await storage.getPaymentRequestsByScrimmage(scrimmage.id);
+    const alreadyRequestedUserIds = new Set(
+      existingPaymentRequests.flatMap((request) =>
+        request.recipients
+          .map((recipient) => recipient.userId)
+          .filter((userId): userId is string => !!userId),
+      ),
+    );
+    const newRecipientIds = uniqueRecipientIds.filter((userId) => !alreadyRequestedUserIds.has(userId));
+    if (newRecipientIds.length === 0) return null;
+
+    const league = await storage.getLeague(scrimmage.leagueId);
+    const timezone = league?.timezone || 'America/New_York';
+    const paymentRequest = await storage.createPaymentRequest(
+      {
+        creatorId,
+        title: `Payment for ${scrimmage.title}`,
+        description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
+        amountPerPerson: String(scrimmage.costPerPlayer),
+        relatedScrimmageId: scrimmage.id,
+        deadline: null,
+        notes: null,
+        venmoLinkOverride: scrimmage.venmoLinkOverride,
+        cashappLinkOverride: scrimmage.cashappLinkOverride,
+        relatedConversationId: null,
+      },
+      newRecipientIds,
+    );
+
+    const creator = await storage.getUser(creatorId);
+    const creatorName = creator
+      ? `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || creator.email || 'Someone'
+      : 'Someone';
+    const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+    await Promise.all(
+      newRecipientIds.map((recipientId) =>
+        sendPaymentRequestPushNotification(
+          recipientId,
+          creatorName,
+          String(scrimmage.costPerPlayer),
+          paymentRequest.description || paymentRequest.title,
+          paymentRequest.id,
+        ).catch((error) => {
+          console.error(`[Scrimmage Payment] Failed to push payment notification to ${recipientId}:`, error);
+        }),
+      ),
+    );
+
+    return paymentRequest;
+  };
+
+  /**
    * Sends the invite payload already saved on one scrimmage occurrence.
    * The atomic claim in storage makes this safe to call from either the edit
    * flow or the later manual-send action without duplicating delivery.
@@ -16585,7 +16650,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.inviteSentAt = null;
       }
 
+      const wasFreeScrimmage = Number(existingScrimmage.costPerPlayer ?? 0) <= 0;
+      const willBePaidScrimmage = Number(updateData.costPerPlayer ?? existingScrimmage.costPerPlayer ?? 0) > 0;
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
+
+      // A scrimmage can be created for free and priced later. In that case,
+      // invoice the players who are already approved without waiting for a
+      // second finalize action.
+      if (wasFreeScrimmage && willBePaidScrimmage) {
+        try {
+          const approvedRequests = (await storage.getScrimmageRequests(scrimmageId))
+            .filter((request) => request.status === 'approved');
+          await createScrimmagePaymentRequestForPlayers(
+            updatedScrimmage,
+            approvedRequests.map((request) => request.playerId),
+            existingScrimmage.creatorId,
+          );
+        } catch (paymentError) {
+          console.error('Scrimmage updated, but payment request creation failed:', paymentError);
+          // Do not fail an otherwise successful scrimmage edit.
+        }
+      }
 
       let inviteDeliveryFailed = false;
       if (updatedScrimmage.hasDeferredInvites && !updatedScrimmage.timeTbd && !updatedScrimmage.inviteSentAt && req.body.sendInviteNow === true) {
@@ -17757,41 +17842,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the finalization if notification fails
       }
 
-      // Automatically create payment request if there's a cost
+      // Automatically create payment requests if there's a cost. The helper
+      // is idempotent so pricing a free scrimmage before finalization will not
+      // cause a second invoice here.
       console.log(`[finalize] scrimmage ${scrimmageId} costPerPlayer=${scrimmage.costPerPlayer} approvedCount=${approvedUserIds.length}`);
       if (scrimmage.costPerPlayer && parseFloat(scrimmage.costPerPlayer) > 0) {
         try {
-          const paymentRequest = await storage.createPaymentRequest(
-            {
-              creatorId: userId,
-              title: `Payment for ${scrimmage.title}`,
-              description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
-              amountPerPerson: scrimmage.costPerPlayer,
-              relatedScrimmageId: scrimmageId,
-              deadline: null,
-              notes: null,
-              relatedConversationId: null,
-            },
-            approvedUserIds
-          );
-
-          // Send the same push notification that "Remind Unpaid" sends
-          const creatorName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'Someone';
-          const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
-          await Promise.all(
-            approvedUserIds.map(recipientId =>
-              sendPaymentRequestPushNotification(
-                recipientId,
-                creatorName,
-                scrimmage.costPerPlayer!,
-                paymentRequest.description || paymentRequest.title,
-                paymentRequest.id,
-              ).catch(err => {
-                console.error(`[finalize] Failed to push payment notification to ${recipientId}:`, err);
-              })
-            )
-          );
-
+          await createScrimmagePaymentRequestForPlayers(scrimmage, approvedUserIds, userId);
         } catch (paymentError) {
           console.error('Error creating payment request:', paymentError);
           // Don't fail the finalization if payment request creation fails
