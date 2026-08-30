@@ -2,6 +2,18 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase, clearStaleSession } from "./supabase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const DEMO_ACTIVE_KEY = 'roster.demo.active';
+const DEMO_POV_KEY = 'roster.demo.povUserId';
+
+function isDemoControlUrl(url: string) {
+  return url.startsWith('/api/demo/') || url.includes('/api/demo/');
+}
+
+function getDemoPovHeader(): Record<string, string> {
+  if (typeof window === 'undefined' || localStorage.getItem(DEMO_ACTIVE_KEY) !== 'true') return {};
+  const povUserId = localStorage.getItem(DEMO_POV_KEY);
+  return povUserId ? { 'x-demo-pov-user-id': povUserId } : {};
+}
 
 /**
  * Converts relative image paths to absolute URLs pointing to the backend.
@@ -137,7 +149,7 @@ async function throwIfResNotOk(res: Response, url: string) {
   }
 }
 
-export async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthHeaders(requestUrl?: string): Promise<Record<string, string>> {
   const { data: { session }, error } = await supabase.auth.getSession();
   const headers: Record<string, string> = {};
   
@@ -155,8 +167,9 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   } else {
     console.log('[Auth] No session available - user not authenticated');
   }
-  
-  return headers;
+  // Raw authenticated fetches call this helper, so keep Demo identity handling
+  // centralized rather than requiring every feature to know about Demo mode.
+  return { ...headers, ...(requestUrl && isDemoControlUrl(requestUrl) ? {} : getDemoPovHeader()) };
 }
 
 export async function apiRequest(
@@ -165,7 +178,7 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const fullUrl = `${API_BASE_URL}${url}`;
-  const authHeaders = await getAuthHeaders();
+  const authHeaders = await getAuthHeaders(url);
   const headers = {
     ...authHeaders,
     ...(data ? { "Content-Type": "application/json" } : {}),
@@ -186,12 +199,14 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const fullUrl = `${API_BASE_URL}${queryKey.join("/")}`;
-    const authHeaders = await getAuthHeaders();
+  async ({ queryKey, signal }) => {
+    const requestPath = String(queryKey.join("/"));
+    const fullUrl = `${API_BASE_URL}${requestPath}`;
+    const authHeaders = await getAuthHeaders(requestPath);
     
     const res = await fetch(fullUrl, {
       headers: authHeaders,
+      signal,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

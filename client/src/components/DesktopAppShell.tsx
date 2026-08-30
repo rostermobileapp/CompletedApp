@@ -12,6 +12,7 @@ import { useDashboardSelection } from '@/hooks/useDashboardSelection';
 import { useLeagueUnreadMessages } from '@/hooks/useLeagueUnreadMessages';
 import { useSlideUpOverlay } from '@/components/SlideUpOverlay';
 import { DesktopMenuColumn } from '@/components/DesktopMenuColumn';
+import { DemoBanner } from '@/components/DemoBanner';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 import {
@@ -721,7 +722,7 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
           }
           onSelect={handlePastSeasonSelect}
         />
-
+        <DemoBanner />
         <main
           className="flex-1 w-full overflow-y-auto"
           data-testid="desktop-main-content"

@@ -6,6 +6,8 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
+import { DemoContextProvider } from "@/context/DemoContext";
+import { DemoBanner } from "@/components/DemoBanner";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { HPIBBanner } from "@/components/HPIBBanner";
@@ -95,6 +97,7 @@ import ReferralAdminLogin from "@/pages/ReferralAdminLogin";
 import ReferralAdminPartnerDetail from "@/pages/ReferralAdminPartnerDetail";
 import AdminMetrics from "@/pages/AdminMetrics";
 import HPIBDownload from "@/pages/HPIBDownload";
+import Demo from "@/pages/Demo";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -260,6 +263,7 @@ function Router() {
 
   const routesSwitch = (
     <Switch>
+      <Route path="/demo" component={Demo} />
       <Route path="/league-tournament-search" component={LeagueTournamentSearch} />
               <Route path="/league-search" component={LeagueSearch} />
               <Route path="/team-search" component={TeamSearch} />
@@ -348,6 +352,7 @@ function Router() {
           <div className="min-h-screen w-full bg-background">
             <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
               <SlideOutMenu />
+              <DemoBanner />
               <ActiveDraftsBanner />
               <SwipeableMainScreens>
                 <PageTransition>{routesSwitch}</PageTransition>
@@ -375,7 +380,9 @@ function App() {
               <MotionConfig reducedMotion="user">
                 <Toaster />
                 <ErrorBoundary>
-                  <Router />
+                  <DemoContextProvider>
+                    <Router />
+                  </DemoContextProvider>
                 </ErrorBoundary>
               </MotionConfig>
             </WebSocketProvider>

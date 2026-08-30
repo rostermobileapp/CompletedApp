@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
+import { containsForbiddenDemoBody, demoBodyUserIdsAreMapped, demoMutationAllowed, demoResourcesAreIsolated, hasDemoPaymentScrimmageFields, DEMO_OWNER_DISPLAY_ID, getDemoContext } from './demo';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -76,6 +77,42 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
         profile_image_url: dbUser.profileImageUrl || user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url,
       }
     } as any;
+
+    // Preserve the authenticated production identity even when a Demo POV is
+    // requested.  Demo controls are intentionally never impersonated.
+    req.realActor = { id: dbUser.id, displayId: dbUser.displayId };
+    const povHeader = req.header("x-demo-pov-user-id");
+    if (povHeader) {
+      if (req.path.startsWith("/api/demo")) {
+        return res.status(403).json({ message: "Demo control endpoints cannot impersonate" });
+      }
+      if (!req.path.startsWith("/api/") || dbUser.displayId !== DEMO_OWNER_DISPLAY_ID) {
+        return res.status(403).json({ message: "Demo access denied" });
+      }
+      const context = await getDemoContext(povHeader);
+      if (!context) return res.status(403).json({ message: "Invalid Demo POV user" });
+      const demoLeagueId = context.demoLeagueId!;
+      req.demoContext = {
+        environmentId: context.environmentId,
+        demoLeagueId,
+        povUserId: context.demoId,
+        realActorId: dbUser.id,
+      };
+      // Existing routes use this claim for all permission and membership
+      // checks, so only this effective identity is changed.
+      (req as any).user.claims.sub = context.demoId;
+      if (!await demoResourcesAreIsolated(req.demoContext, { ...(req.params ?? {}), ...(req.query ?? {}), ...(req.body ?? {}) }, req.path)) {
+        return res.status(403).json({ message: "Demo resources must belong to the active Demo snapshot." });
+      }
+      if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) &&
+          (!demoMutationAllowed(req.method, req.path) || containsForbiddenDemoBody(req.body) ||
+           !await demoBodyUserIdsAreMapped(context.environmentId, req.body))) {
+        return res.status(403).json({ message: "This action is not available in Demo." });
+      }
+      if (/^\/api\/scrimmages(?:\/|$)/.test(req.path) && hasDemoPaymentScrimmageFields(req.body)) {
+        return res.status(403).json({ message: "Paid and first-to-pay scrimmages are disabled in Demo." });
+      }
+    }
 
     return next();
   } catch (error) {

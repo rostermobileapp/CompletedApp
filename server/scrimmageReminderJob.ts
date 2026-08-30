@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { format } from "date-fns";
 import { sendScheduleReminderPushNotification, sendScrimmageInvitePushNotification } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
+import { isDemoLeague } from "./demo";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 const BACKUP_TIMEOUT_INTERVAL_MS = 60 * 1000;     // Check backup timeouts every 1 minute
@@ -39,6 +40,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
       );
     
     for (const scrimmage of upcomingScrimmages) {
+      if (await isDemoLeague(scrimmage.leagueId)) continue;
       if (!scrimmage.reminderHoursBefore || scrimmage.reminderHoursBefore.length === 0) {
         continue;
       }

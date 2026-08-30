@@ -24,6 +24,7 @@ import { format, subDays, setHours, setMinutes, subHours, addDays } from "date-f
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { sendScheduleReminderPushNotification, sendPersonalReminderPushNotification, sendRsvpReminderPushNotification, resolveTeamLogoUrl } from "./oneSignalNotifications";
 import { parseLeagueLocalDateTime } from "./dateUtils";
+import { isDemoLeague } from "./demo";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -296,6 +297,7 @@ async function checkAndSendRsvpReminders(now: Date): Promise<void> {
       );
     
     for (const game of upcomingGames) {
+      if (await isDemoLeague(game.leagueId)) continue;
       // Build event name and pre-fetch team logos for per-player icon
       let eventName = "Game";
       let homeTeamLogoUrl: string | undefined;
@@ -411,6 +413,8 @@ async function checkAndSendRsvpReminders(now: Date): Promise<void> {
       );
     
     for (const event of upcomingTeamEvents) {
+      const eventTeam = await storage.getTeam(event.teamId);
+      if (await isDemoLeague(eventTeam?.leagueId)) continue;
       // Get team members
       const teamMembers = await db
         .select({ userId: teamMemberships.userId })
@@ -609,6 +613,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
     
     // Process games
     for (const game of upcomingGames) {
+      if (await isDemoLeague(game.leagueId)) continue;
       // Get league timezone first for proper date conversion
       let timezone = "America/New_York"; // Default fallback
       try {
@@ -679,6 +684,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
     
     // Process scrimmages
     for (const scrimmage of upcomingScrimmages) {
+      if (await isDemoLeague(scrimmage.leagueId)) continue;
       // Get league timezone for proper date conversion
       let scrimmageTimezone = "America/New_York";
       try {

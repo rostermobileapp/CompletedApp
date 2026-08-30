@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated, supabase } from "./supabaseAuth";
+import { ensureDemoTables, registerDemoRoutes, isDemoLeague } from "./demo";
 import { 
   loadUserPermissions, 
   requireRole, 
@@ -395,6 +396,9 @@ async function applyAdditionalTeamPaymentFromSession(
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  // Demo tables are startup-safe for deployments that use runtime migrations.
+  await ensureDemoTables();
+  registerDemoRoutes(app, isAuthenticated);
 
   // Team line management supports both the legacy primary captain field and
   // the multi-captain membership flag.
@@ -10500,15 +10504,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          const { sendPlayerRsvpPushNotification } = await import('./oneSignalNotifications');
-          sendPlayerRsvpPushNotification(
-            team.captainId,
-            playerName,
-            status as 'attending' | 'not_attending',
-            gameTitle,
-            gameId,
-            teamId
-          ).catch(err => console.error('Failed to send RSVP push notification:', err));
+          if (!req.demoContext) {
+            const { sendPlayerRsvpPushNotification } = await import('./oneSignalNotifications');
+            sendPlayerRsvpPushNotification(
+              team.captainId,
+              playerName,
+              status as 'attending' | 'not_attending',
+              gameTitle,
+              gameId,
+              teamId
+            ).catch(err => console.error('Failed to send RSVP push notification:', err));
+          }
         }
       } catch (notifError) {
         console.error('Error sending RSVP notification:', notifError);
@@ -10516,7 +10522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Broadcast real-time schedule update to the player who RSVPed
-      broadcastScheduleUpdate(userId);
+      if (!req.demoContext) broadcastScheduleUpdate(userId);
 
       res.json(rsvp);
     } catch (error) {
@@ -15660,6 +15666,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * flow or the later manual-send action without duplicating delivery.
    */
   const deliverPendingScrimmageInvites = async (scrimmageId: string) => {
+    // This helper is also reachable from non-request paths; durable lookup is
+    // required rather than relying on a request context.
+    const existing = await storage.getScrimmage(scrimmageId);
+    if (existing && await isDemoLeague(existing.leagueId)) {
+      return { delivered: false, reason: 'demo_external_delivery_disabled' };
+    }
     const scrimmage = await storage.claimScrimmageInviteDelivery(scrimmageId);
     if (!scrimmage) {
       return { delivered: false, reason: 'already_sent_or_not_ready' };
@@ -18571,6 +18583,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { otherUserId, leagueId, teamId, tournamentId } = requestSchema.parse(req.body);
 
+      // Demo snapshots do not copy tournaments. Never allow a copied POV user
+      // to attach a direct conversation to a real production tournament.
+      if (req.demoContext && tournamentId) {
+        return res.status(403).json({ message: 'Tournament-scoped messaging is not available in Demo.' });
+      }
+
       // Prevent creating a conversation with a soft-deleted account
       const otherUser = await storage.getUser(otherUserId);
       if (!otherUser || otherUser.deletedAt) {
@@ -19084,7 +19102,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log('[Message Notification Debug] Recipient user IDs (after filtering sender):', recipientIds);
           
-          if (recipientIds.length > 0) {
+           // Demo users are deliberately non-deliverable. In-app message rows
+           // remain available, but no provider is ever called from Demo.
+           if (recipientIds.length > 0 && !req.demoContext) {
             console.log('[Message Notification Debug] Calling sendMessageNotification for', recipientIds.length, 'recipients');
             // Look up the conversation type so the push helper can censor
             // direct-message previews for free-tier recipients.

@@ -6,6 +6,7 @@ import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes, 
 import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
 import { formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
 import { sendBulkScrimmageInvites } from './emails';
+import { isDemoLeague } from './demo';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -39,6 +40,7 @@ async function generateMissingOccurrences() {
     const parentScrimmages = await storage.getRecurringParentScrimmages();
     
     for (const parent of parentScrimmages) {
+      if (await isDemoLeague(parent.leagueId)) continue;
       await generateAndPersistRecurringOccurrences(parent, 12);
     }
   } catch (error) {
@@ -58,6 +60,7 @@ async function checkAndSendInvitations() {
   
   for (const scrimmage of scrimmages) {
     try {
+      if (await isDemoLeague(scrimmage.leagueId)) continue;
       // Check if this scrimmage has invitation scheduling configured
       if (!scrimmage.inviteDaysBefore || scrimmage.inviteSentAt || scrimmage.timeTbd) {
         continue;

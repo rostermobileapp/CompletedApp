@@ -373,6 +373,33 @@ export const leagues = pgTable("leagues", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// A demo is a completely separate, disposable copy of a production league.
+// The mapping table deliberately has no foreign keys to copied records: a
+// re-sync deletes the copy first and then replaces its mappings atomically.
+export const demoEnvironments = pgTable("demo_environments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceLeagueId: varchar("source_league_id").references(() => leagues.id, { onDelete: "cascade" }).notNull().unique(),
+  demoLeagueId: varchar("demo_league_id").references(() => leagues.id, { onDelete: "set null" }),
+  syncedAt: timestamp("synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_demo_environments_demo_league").on(table.demoLeagueId),
+]);
+
+export const demoEntityMappings = pgTable("demo_entity_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  environmentId: varchar("environment_id").references(() => demoEnvironments.id, { onDelete: "cascade" }).notNull(),
+  entityType: varchar("entity_type", { length: 32 }).notNull(),
+  sourceId: varchar("source_id").notNull(),
+  demoId: varchar("demo_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("demo_entity_mapping_source_unique").on(table.environmentId, table.entityType, table.sourceId),
+  unique("demo_entity_mapping_demo_unique").on(table.environmentId, table.entityType, table.demoId),
+  index("idx_demo_entity_mappings_demo").on(table.entityType, table.demoId),
+]);
+
 // Seasons table 
 export const seasons = pgTable("seasons", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
