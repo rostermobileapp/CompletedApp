@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { ApiError, apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 
 const ACTIVE_KEY = 'roster.demo.active';
@@ -15,6 +15,7 @@ type DemoContextValue = {
   isAuthorized: boolean;
   isLoading: boolean;
   error: string | null;
+  statusErrorCode: number | null;
   enter: (povUserId?: string | null) => Promise<void>;
   exit: () => Promise<void>;
   setPovUser: (id: string) => Promise<void>;
@@ -80,6 +81,7 @@ export function DemoContextProvider({ children }: { children: ReactNode }) {
 
   const isAuthorized = !!statusQuery.data && !statusQuery.isError &&
     statusQuery.data.allowed !== false && statusQuery.data.authorized !== false;
+  const statusErrorCode = statusQuery.error instanceof ApiError ? statusQuery.error.status : null;
   useEffect(() => {
     // A forged local value must never keep a non-founder in demo mode.
     if (isActive && statusQuery.isError) {
@@ -196,8 +198,9 @@ export function DemoContextProvider({ children }: { children: ReactNode }) {
       : normalizeDemoUsers(statusQuery.data),
     isAuthorized, isLoading: statusQuery.isLoading || usersQuery.isLoading,
     error: actionError || (statusQuery.isError ? (statusQuery.error as Error)?.message || 'Demo access was denied.' : null),
+    statusErrorCode,
     enter, exit, setPovUser, sync, refresh,
-  }), [isActive, povUserId, statusQuery.data, usersQuery.data, isAuthorized, statusQuery.isLoading, usersQuery.isLoading, actionError, statusQuery.isError, statusQuery.error, enter, exit, setPovUser, sync, refresh]);
+  }), [isActive, povUserId, statusQuery.data, usersQuery.data, isAuthorized, statusQuery.isLoading, usersQuery.isLoading, actionError, statusQuery.isError, statusQuery.error, statusErrorCode, enter, exit, setPovUser, sync, refresh]);
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }
 

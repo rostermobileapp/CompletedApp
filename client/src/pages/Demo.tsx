@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 
 export default function Demo() {
   const [, navigate] = useLocation();
-  const { status, isLoading, error, enter, sync, isActive, isAuthorized } = useDemo();
+  const { status, isLoading, error, statusErrorCode, enter, sync, refresh, isActive, isAuthorized } = useDemo();
   const [busy, setBusy] = useState(false);
   const noSnapshot = status && (
     status.hasSnapshot === false ||
@@ -15,7 +15,17 @@ export default function Demo() {
   );
   useEffect(() => { if (isActive) navigate('/'); }, [isActive, navigate]);
   if (isLoading) return <div className="min-h-screen grid place-items-center" data-testid="demo-loading">Loading Demo mode…</div>;
-  if (!isAuthorized) return <main className="min-h-screen grid place-items-center p-6"><div className="max-w-md text-center space-y-4"><h1 className="text-2xl font-bold">Demo access denied</h1><p role="alert">{error || 'Only U00001 can use Demo mode.'}</p><Button onClick={() => navigate('/')}>Return to dashboard</Button></div></main>;
+  if (!isAuthorized) {
+    const accessDenied = statusErrorCode === 403;
+    return <main className="min-h-screen grid place-items-center p-6">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-2xl font-bold">{accessDenied ? 'Demo access denied' : 'Demo temporarily unavailable'}</h1>
+        <p role="alert">{error || (accessDenied ? 'Only U00001 can use Demo mode.' : 'Demo could not be loaded. Please try again.')}</p>
+        {!accessDenied && <Button onClick={() => void refresh()}>Try again</Button>}
+        <Button variant={accessDenied ? 'default' : 'outline'} onClick={() => navigate('/')}>Return to dashboard</Button>
+      </div>
+    </main>;
+  }
   const start = async () => {
     setBusy(true);
     try {
