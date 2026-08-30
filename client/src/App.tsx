@@ -7,7 +7,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
 import { DemoContextProvider } from "@/context/DemoContext";
-import { DemoBanner } from "@/components/DemoBanner";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { HPIBBanner } from "@/components/HPIBBanner";
@@ -352,7 +351,6 @@ function Router() {
           <div className="min-h-screen w-full bg-background">
             <div className="relative mx-auto w-full max-w-[1000px] min-h-screen">
               <SlideOutMenu />
-              <DemoBanner />
               <ActiveDraftsBanner />
               <SwipeableMainScreens>
                 <PageTransition>{routesSwitch}</PageTransition>

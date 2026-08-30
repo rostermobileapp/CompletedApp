@@ -32,6 +32,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import PastSeasonsModal from '@/components/PastSeasonsModal';
 import { useTheme } from '@/context/ThemeContext';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
+import { DemoBanner } from '@/components/DemoBanner';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { SlideOutMenu } from '@/components/SlideOutMenu';
 import { ScheduleCalendarMobile } from '@/components/dashboard/ScheduleCalendarMobile';
@@ -1188,6 +1189,7 @@ export default function Dashboard() {
   if (isDesktopWeb) {
     return (
       <>
+        <DemoBanner />
         <HomeDesktop onAddEvent={() => setShowAddEventDialog(true)} />
         <AddEventDialog
           open={showAddEventDialog}
@@ -1197,7 +1199,12 @@ export default function Dashboard() {
     );
   }
 
-  return <DashboardMobile />;
+  return (
+    <>
+      <DemoBanner />
+      <DashboardMobile />
+    </>
+  );
 }
 
 function DashboardMobile() {
