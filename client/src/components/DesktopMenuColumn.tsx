@@ -14,7 +14,6 @@ import {
   Lock,
   Search,
   MessageSquare,
-  BarChart2,
   FlaskConical,
 } from 'lucide-react';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
@@ -42,7 +41,6 @@ export function DesktopMenuColumn() {
     isCoCommissionerOfAnyLeague,
     isLoading,
   } = usePermissions();
-  const isFounder = user?.email === 'tobin@rosterhockey.com';
   const canUseDemo = (user as any)?.displayId === 'U00001';
 
   const isCommissioner = canManageLeague();
@@ -133,16 +131,6 @@ export function DesktopMenuColumn() {
       bgColor: 'bg-indigo-500/20',
       iconColor: 'text-indigo-500',
     },
-    ...(isFounder
-      ? [{
-          icon: BarChart2,
-          label: 'App Statistics',
-          path: '/admin/metrics',
-          locked: false,
-          bgColor: 'bg-violet-500/20',
-          iconColor: 'text-violet-500',
-        }]
-      : []),
     ...(canUseDemo
       ? [{
           icon: FlaskConical,

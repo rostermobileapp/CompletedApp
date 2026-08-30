@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock, Monitor, BarChart2, FlaskConical } from 'lucide-react';
+import { Menu, Calendar, Settings, Plus, Crown, Users, X, UserPlus, Trophy, Target, Lock, Monitor, FlaskConical } from 'lucide-react';
 import { Sheet, AnimatedSheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { PremiumFeatureAlert } from '@/components/PremiumFeatureAlert';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
@@ -32,7 +32,6 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
   const pendingPathRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
   const { user, canAccessPremiumFeatures, canManageLeague, hasStatManagerAccess, isCoCommissionerOfAnyLeague, isLoading } = usePermissions();
-  const isFounder = !!(user as any)?.feeExempt;
   const canUseDemo = (user as any)?.displayId === 'U00001';
 
   const isControlled = externalOpen !== undefined && externalOnOpenChange !== undefined;
@@ -140,17 +139,6 @@ export function SlideOutMenu({ open: externalOpen, onOpenChange: externalOnOpenC
     },
   ];
 
-  const founderItem = isFounder
-    ? [{
-        icon: BarChart2,
-        label: 'App Statistics',
-        path: '/admin/metrics',
-        locked: false,
-        requiredTier: '',
-        bgColor: 'bg-violet-500/20',
-        iconColor: 'text-violet-500',
-      }]
-    : [];
   const demoItem = canUseDemo
     ? [{
         icon: FlaskConical,
