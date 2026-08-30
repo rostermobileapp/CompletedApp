@@ -5,7 +5,8 @@ import {
   demoEntityMappings, demoEnvironments, gameRsvps, games, leagueMemberships,
   leagues, seasons, teamMemberships, teams, users, playerStats, gameGoalies,
   gameStars, gameGoals, teamEvents, teamEventRsvps, substituteRequests, substitutionApprovals,
-  conversations, scrimmages,
+  conversations, conversationParticipants, messages, messageReadReceipts, messageReactions,
+  chatPolls, chatPollVotes, scrimmages,
   announcements, announcementReactions, announcementReadStatus, announcementVisibility, announcementComments,
   scrimmageRequests, scrimmageCoHosts, inviteGroups, inviteGroupMembers,
 } from "@shared/schema";
@@ -193,6 +194,109 @@ export async function syncDemo() {
       const userId = userMap.get(m.userId), teamId = teamMap.get(m.teamId);
       if (userId && teamId) await tx.insert(teamMemberships).values({ ...m, id: crypto.randomUUID(), userId, teamId,
         approvedBy: m.approvedBy ? userMap.get(m.approvedBy) ?? commissionerId : commissionerId });
+    }
+    // Copy only conversations that are explicitly scoped to the source league
+    // and whose complete participant graph can be mapped into this snapshot.
+    // Tournament/global chats are intentionally excluded because their
+    // ownership cannot be proven from the league alone.
+    const sourceConversations = await tx.select().from(conversations)
+      .where(and(eq(conversations.leagueId, source.id), sql`${conversations.tournamentId} IS NULL`));
+    const sourceConversationIds = sourceConversations.map(row => row.id);
+    const sourceParticipants = sourceConversationIds.length
+      ? await tx.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, sourceConversationIds))
+      : [];
+    const participantsByConversation = new Map<string, typeof sourceParticipants>();
+    for (const participant of sourceParticipants) {
+      const rows = participantsByConversation.get(participant.conversationId) ?? [];
+      rows.push(participant);
+      participantsByConversation.set(participant.conversationId, rows);
+    }
+    const safeSourceConversations = sourceConversations.filter(conversation => {
+      const participants = participantsByConversation.get(conversation.id) ?? [];
+      return !!userMap.get(conversation.createdBy) &&
+        participants.length > 0 &&
+        participants.every(participant => userMap.has(participant.userId)) &&
+        (!conversation.teamId || teamMap.has(conversation.teamId));
+    });
+    const conversationMap = new Map<string, string>();
+    for (const conversation of safeSourceConversations) {
+      const id = crypto.randomUUID();
+      conversationMap.set(conversation.id, id);
+      await tx.insert(conversations).values({
+        ...conversation,
+        id,
+        leagueId: demoLeagueId,
+        tournamentId: null,
+        teamId: conversation.teamId ? teamMap.get(conversation.teamId)! : null,
+        createdBy: userMap.get(conversation.createdBy)!,
+      });
+      for (const participant of participantsByConversation.get(conversation.id)!) {
+        await tx.insert(conversationParticipants).values({
+          ...participant,
+          id: crypto.randomUUID(),
+          conversationId: id,
+          userId: userMap.get(participant.userId)!,
+        });
+      }
+    }
+    if (conversationMap.size) {
+      const copiedSourceConversationIds = Array.from(conversationMap.keys());
+      // Payment-request messages and attachment rows are deliberately omitted:
+      // both can contain source account or private object-storage references.
+      const sourceMessages = (await tx.select().from(messages)
+        .where(inArray(messages.conversationId, copiedSourceConversationIds)))
+        .filter(message => message.messageType !== "payment_request" && !message.paymentRequestId && userMap.has(message.senderId));
+      const messageMap = new Map<string, string>();
+      for (const message of sourceMessages) {
+        const id = crypto.randomUUID();
+        messageMap.set(message.id, id);
+        await tx.insert(messages).values({
+          ...message,
+          id,
+          conversationId: conversationMap.get(message.conversationId)!,
+          senderId: userMap.get(message.senderId)!,
+          replyToId: null,
+          paymentRequestId: null,
+        });
+      }
+      // Restore reply links only when the referenced message was also copied.
+      for (const message of sourceMessages) {
+        if (message.replyToId && messageMap.has(message.replyToId)) {
+          await tx.update(messages)
+            .set({ replyToId: messageMap.get(message.replyToId)! })
+            .where(eq(messages.id, messageMap.get(message.id)!));
+        }
+      }
+      if (messageMap.size) {
+        const copiedSourceMessageIds = Array.from(messageMap.keys());
+        for (const receipt of await tx.select().from(messageReadReceipts).where(inArray(messageReadReceipts.messageId, copiedSourceMessageIds))) {
+          const userId = userMap.get(receipt.userId);
+          if (userId) await tx.insert(messageReadReceipts).values({
+            ...receipt, id: crypto.randomUUID(), messageId: messageMap.get(receipt.messageId)!, userId,
+          });
+        }
+        for (const reaction of await tx.select().from(messageReactions).where(inArray(messageReactions.messageId, copiedSourceMessageIds))) {
+          const userId = userMap.get(reaction.userId);
+          if (userId) await tx.insert(messageReactions).values({
+            ...reaction, id: crypto.randomUUID(), messageId: messageMap.get(reaction.messageId)!, userId,
+          });
+        }
+        const sourcePolls = await tx.select().from(chatPolls).where(inArray(chatPolls.messageId, copiedSourceMessageIds));
+        const pollMap = new Map<string, string>();
+        for (const poll of sourcePolls) {
+          const id = crypto.randomUUID();
+          pollMap.set(poll.id, id);
+          await tx.insert(chatPolls).values({ ...poll, id, messageId: messageMap.get(poll.messageId)! });
+        }
+        if (pollMap.size) {
+          for (const vote of await tx.select().from(chatPollVotes).where(inArray(chatPollVotes.pollId, Array.from(pollMap.keys())))) {
+            const userId = userMap.get(vote.userId);
+            if (userId) await tx.insert(chatPollVotes).values({
+              ...vote, id: crypto.randomUUID(), pollId: pollMap.get(vote.pollId)!, userId,
+            });
+          }
+        }
+      }
     }
     const gameMap = new Map<string, string>();
     for (const game of await tx.select().from(games).where(eq(games.leagueId, source.id))) {
