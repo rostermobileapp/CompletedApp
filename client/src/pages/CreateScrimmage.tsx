@@ -1439,7 +1439,7 @@ export default function CreateScrimmage() {
                 className="space-y-2"
                 data-testid="radio-group-join-mode"
               >
-                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer pt-[4px] pb-[0px]">
                   <RadioGroupItem value="first_come" id="join-first-come" />
                   <span><span className="block font-medium">First to RSVP</span><span className="text-xs text-muted-foreground">Players claim open spots immediately.</span></span>
                 </label>
