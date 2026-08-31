@@ -29,6 +29,13 @@ const CLAIM_ID = `sched_claim_${RUN}`;
 const ANNOUNCEMENT_ID = `sched_announcement_${RUN}`;
 const MONTHLY_LEAGUE_ID = `sched_monthly_league_${RUN}`;
 const MONTHLY_PARENT_ID = `sched_monthly_parent_${RUN}`;
+const DRIFTED_MONTHLY_PARENT_ID = `sched_drifted_monthly_${RUN}`;
+const DRIFTED_MONTHLY_CHILD_IDS = [
+  `sched_drift_oct_${RUN}`,
+  `sched_drift_nov_${RUN}`,
+  `sched_drift_dec_${RUN}`,
+  `sched_drift_jan_${RUN}`,
+];
 
 before(async () => {
   await db.execute(sql`
@@ -114,6 +121,46 @@ before(async () => {
       'open', true, 'monthly', '2026-11-30 00:00:00', 12,
       ARRAY[${PLAYER_ID}], false, false, NOW(), NOW()
     )
+  `);
+
+  await db.execute(sql`
+    INSERT INTO scrimmages (
+      id, league_id, creator_id, title, date_time, location, max_players,
+      status, is_recurring, recurrence_type, recurrence_count,
+      recurrence_times_independent, invite_user_ids, time_tbd,
+      has_deferred_invites, parent_scrimmage_id, created_at, updated_at
+    )
+    VALUES
+      (
+        ${DRIFTED_MONTHLY_PARENT_ID}, ${MONTHLY_LEAGUE_ID}, ${CREATOR_ID},
+        'Legacy drifted monthly parent', '2026-09-04 00:00:00', 'Test Rink', 20,
+        'open', true, 'monthly', 5, true, ARRAY[${PLAYER_ID}], true, true,
+        NULL, NOW(), NOW()
+      ),
+      (
+        ${DRIFTED_MONTHLY_CHILD_IDS[0]}, ${MONTHLY_LEAGUE_ID}, ${CREATOR_ID},
+        'Legacy drifted monthly child', '2026-10-04 00:00:00', 'Test Rink', 20,
+        'open', false, 'monthly', 5, true, ARRAY[${PLAYER_ID}], true, true,
+        ${DRIFTED_MONTHLY_PARENT_ID}, NOW(), NOW()
+      ),
+      (
+        ${DRIFTED_MONTHLY_CHILD_IDS[1]}, ${MONTHLY_LEAGUE_ID}, ${CREATOR_ID},
+        'Legacy drifted monthly child', '2026-11-03 00:00:00', 'Test Rink', 20,
+        'open', false, 'monthly', 5, true, ARRAY[${PLAYER_ID}], true, true,
+        ${DRIFTED_MONTHLY_PARENT_ID}, NOW(), NOW()
+      ),
+      (
+        ${DRIFTED_MONTHLY_CHILD_IDS[2]}, ${MONTHLY_LEAGUE_ID}, ${CREATOR_ID},
+        'Legacy drifted monthly child', '2026-12-03 00:00:00', 'Test Rink', 20,
+        'open', false, 'monthly', 5, true, ARRAY[${PLAYER_ID}], true, true,
+        ${DRIFTED_MONTHLY_PARENT_ID}, NOW(), NOW()
+      ),
+      (
+        ${DRIFTED_MONTHLY_CHILD_IDS[3]}, ${MONTHLY_LEAGUE_ID}, ${CREATOR_ID},
+        'Legacy drifted monthly child', '2027-01-02 00:00:00', 'Test Rink', 20,
+        'open', false, 'monthly', 5, true, ARRAY[${PLAYER_ID}], true, true,
+        ${DRIFTED_MONTHLY_PARENT_ID}, NOW(), NOW()
+      )
   `);
 
   await db.execute(sql`
@@ -311,4 +358,31 @@ test('monthly occurrence job accepts a persisted end date and includes its final
       AND date_time::date = DATE '2026-11-30'
   `);
   assert.equal(Number((childCount.rows[0] as { count: number }).count), 1);
+});
+
+test('monthly occurrence job re-anchors children created by the legacy 30-day formula', async () => {
+  const parent = await storage.getScrimmage(DRIFTED_MONTHLY_PARENT_ID);
+  assert.ok(parent);
+
+  const created = await generateAndPersistRecurringOccurrences(parent, 20);
+  assert.deepEqual(created, []);
+
+  const children = await db.execute(sql`
+    SELECT id, date_time::date::text AS date_key
+    FROM scrimmages
+    WHERE parent_scrimmage_id = ${DRIFTED_MONTHLY_PARENT_ID}
+    ORDER BY date_time
+  `);
+  assert.deepEqual(
+    children.rows.map((row: any) => [row.id, row.date_key]),
+    [
+      [DRIFTED_MONTHLY_CHILD_IDS[0], '2026-10-04'],
+      [DRIFTED_MONTHLY_CHILD_IDS[1], '2026-11-04'],
+      [DRIFTED_MONTHLY_CHILD_IDS[2], '2026-12-04'],
+      [DRIFTED_MONTHLY_CHILD_IDS[3], '2027-01-04'],
+    ],
+  );
+
+  const secondRun = await generateAndPersistRecurringOccurrences(parent, 20);
+  assert.deepEqual(secondRun, []);
 });

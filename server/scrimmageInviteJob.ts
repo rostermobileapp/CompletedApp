@@ -506,16 +506,52 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
     let count = 1;
     const maxCount = parentScrimmage.recurrenceCount || Infinity;
     let currentDate = addCalendarMonthsInTimezone(startDate, monthOffset, timezone);
+    const series = await storage.getScrimmageSeries(parentScrimmage.id);
+    const childOccurrences = series.filter(
+      (scrimmage) => scrimmage.parentScrimmageId === parentScrimmage.id,
+    );
+    const startDateKey = getLeagueLocalDateKey(startDate, timezone);
+    const getLegacyFixedIntervalDateKey = (interval: number) => {
+      const [year, month, day] = startDateKey.split('-').map(Number);
+      const legacyDate = new Date(Date.UTC(year, month - 1, day + interval * 30));
+      return legacyDate.toISOString().slice(0, 10);
+    };
 
     while (
       isBefore(currentDate, horizonDate) &&
       isWithinRecurrenceEnd(currentDate) &&
       count < maxCount
     ) {
-      const existingOccurrence = await storage.getScrimmageByParentAndLocalDate(
+      const expectedDateKey = getLeagueLocalDateKey(currentDate, timezone);
+      let existingOccurrence = await storage.getScrimmageByParentAndLocalDate(
         parentScrimmage.id,
-        getLeagueLocalDateKey(currentDate, timezone),
+        expectedDateKey,
       );
+
+      // Older monthly series were generated as fixed 30-day intervals. Repair
+      // only a child that still lands on that exact legacy date; this avoids
+      // overwriting an occurrence that an organiser intentionally rescheduled.
+      if (!existingOccurrence) {
+        const legacyDateKey = getLegacyFixedIntervalDateKey(monthOffset);
+        const legacyOccurrence = childOccurrences.find(
+          (occurrence) =>
+            getStoredDateOnlyKey(occurrence.dateTime) === legacyDateKey,
+        );
+
+        if (legacyOccurrence && legacyDateKey !== expectedDateKey) {
+          existingOccurrence = await storage.updateScrimmage(
+            legacyOccurrence.id,
+            {
+              dateTime: `${expectedDateKey}T00:00:00`,
+            },
+          );
+          legacyOccurrence.dateTime = existingOccurrence.dateTime;
+          console.log(
+            `📅 Re-anchored legacy monthly occurrence ${legacyOccurrence.id} ` +
+            `from ${legacyDateKey} to ${expectedDateKey}`,
+          );
+        }
+      }
 
       if (!existingOccurrence && isAfter(currentDate, now)) {
         const newOccurrence = await storage.createRecurringScrimmageOccurrence(
