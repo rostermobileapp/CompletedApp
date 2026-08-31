@@ -16653,11 +16653,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
         }
         
-        // Don't allow changing date if it's less than 24 hours away
+        // An imminent scrimmage may still be moved out of the 24-hour window.
+        // Keep the lock only when both the existing time and the requested new
+        // time are less than 24 hours away.
         const hoursUntilExisting = (
           parseLeagueLocalDateTime(existingScrimmage.dateTime, league?.timezone).getTime() - now.getTime()
         ) / (1000 * 60 * 60);
-        if (!existingScrimmage.timeTbd && hoursUntilExisting < 24) {
+        const hoursUntilRequested = (dateForValidation.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (!existingScrimmage.timeTbd && hoursUntilExisting < 24 && hoursUntilRequested < 24) {
           return res.status(409).json({ message: "Cannot change scrimmage date less than 24 hours before scheduled time" });
         }
       }

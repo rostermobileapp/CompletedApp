@@ -267,6 +267,7 @@ export default function CreateScrimmage() {
       setSelectedLeagueId(existingScrimmage.leagueId);
       const { date: dateStr, time: storedTime } = splitScrimmageDateTime(existingScrimmage.dateTime);
       const timeStr = existingScrimmage.timeTbd ? '' : storedTime;
+      const savedInviteUserIds = Array.from(new Set<string>(existingScrimmage.inviteUserIds || []));
       
       // Parse recurrence end date directly from string
       const recurrenceEndDateStr = existingScrimmage.recurrenceEndDate || '';
@@ -296,10 +297,11 @@ export default function CreateScrimmage() {
         inviteTimeOfDay: existingScrimmage.inviteTimeOfDay || '09:00',
         enableReminders: !!existingScrimmage.reminderHoursBefore,
         reminderHoursBefore: existingScrimmage.reminderHoursBefore || [24],
-        selectedMemberIds: [],
+        selectedMemberIds: savedInviteUserIds,
         selectedEmails: [],
         coHostIds: [],
       });
+      setSelectedMemberIds(savedInviteUserIds);
       if (existingScrimmage.color) {
         setSelectedColor(existingScrimmage.color);
       }
