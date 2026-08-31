@@ -11,3 +11,4 @@
 - [Scrimmage wall-clock timestamps](scrimmage-wall-clock-timestamps.md) — persist scrimmage times as league-local strings; passing Date objects shifts recurring times to UTC.
 - [Demo client identity](demo-client-identity.md) — client-side user comparisons in Demo must use the copied POV ID, not the real Supabase session user ID.
 - [Scrimmage payment state locking](scrimmage-payment-state-locking.md) — invoice sends, paid admission, and roster finalization must share locks; generic invoices cannot accept scrimmage links.
+- [Payment tracking entitlement](payment-tracking-entitlement.md) — premium gates invoice creation, not viewing or confirming existing organizer-owned requests.

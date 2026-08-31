@@ -266,6 +266,7 @@ export default function GameDetails() {
       toast({ title: 'Roster Finalized!', description: 'Confirmation notifications sent to all players.' });
       queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', gameId, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to finalize scrimmage', variant: 'destructive' });
@@ -283,6 +284,7 @@ export default function GameDetails() {
         description: data.message,
       });
       queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/payment-requests`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
     },
     onError: (error: any) => {
       toast({ title: 'Unable to Send Payment Requests', description: error.message || 'Failed to send payment requests', variant: 'destructive' });

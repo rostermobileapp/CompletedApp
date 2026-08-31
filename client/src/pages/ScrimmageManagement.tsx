@@ -193,6 +193,7 @@ export default function ScrimmageManagement() {
       toast({ title: 'Roster Finalized!', description: `Confirmation notifications have been sent for "${scrimmage?.title || 'the scrimmage'}".` });
       queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to finalize scrimmage', variant: 'destructive' });
@@ -210,6 +211,7 @@ export default function ScrimmageManagement() {
         description: data.message,
       });
       queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${scrimmageId}/payment-requests`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
     },
     onError: (error: any) => {
       toast({ title: 'Unable to Send Payment Requests', description: error.message || 'Failed to send payment requests', variant: 'destructive' });

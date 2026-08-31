@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -21,14 +21,6 @@ export default function PaymentRequests() {
   const isFreeTier = !permissionsLoading && !canAccessPremiumFeatures();
 
   const [activeTab, setActiveTab] = useState<'created' | 'received'>('created');
-
-  // Once permissions have loaded, switch free-tier users to "Requests for Me".
-  // useEffect so we never read a transient pre-load permission value into permanent state.
-  useEffect(() => {
-    if (!permissionsLoading && !canAccessPremiumFeatures()) {
-      setActiveTab('received');
-    }
-  }, [permissionsLoading]);
 
   // Fetch unpaid count for badge
   const { data: unpaidCount } = useQuery({
@@ -73,7 +65,13 @@ export default function PaymentRequests() {
 
   const { data: allCreatedRequests = [], isLoading: createdLoading } = useQuery({
     queryKey: ['/api/payment-requests/created/by-me'],
-    enabled: !isFreeTier,
+    // Payment status can be changed by a recipient on another device. Always
+    // refresh when the organizer opens/returns to this screen, and poll while
+    // it is open so paid scrimmage invoices can be confirmed promptly.
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
   });
 
   const { data: allReceivedRequests = [], isLoading: receivedLoading } = useQuery({
@@ -171,26 +169,7 @@ export default function PaymentRequests() {
           </TabsList>
 
           <TabsContent value="created" className="space-y-3">
-            {isFreeTier ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Lock className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Premium Feature</h3>
-                <p className="text-muted-foreground max-w-sm mb-6">
-                  Creating payment requests is available with a Player Pro or Commissioner subscription.
-                </p>
-                <Button
-                  onClick={() => {
-                    setPageTransitionDirection('up');
-                    navigate('/subscription');
-                  }}
-                  data-testid="button-upgrade-payments"
-                >
-                  Upgrade to Create Requests
-                </Button>
-              </div>
-            ) : createdLoading ? (
+            {createdLoading ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">Loading...</p>
               </div>
@@ -198,13 +177,20 @@ export default function PaymentRequests() {
               <div className="text-center py-12">
                 <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">You haven't created any payment requests yet.</p>
-                <Button
-                  onClick={() => openOverlay('/create-payment-request', <CreatePaymentRequestPage />)}
-                  data-testid="button-create-first-request"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Request
-                </Button>
+                {isFreeTier ? (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="w-4 h-4" />
+                    Generic payment requests require Player Pro or Commissioner access.
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => openOverlay('/create-payment-request', <CreatePaymentRequestPage />)}
+                    data-testid="button-create-first-request"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Request
+                  </Button>
+                )}
               </div>
             ) : (
               createdRequestsArray.map((request: any) => (
