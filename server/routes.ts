@@ -16701,7 +16701,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let inviteDeliveryFailed = false;
-      if (updatedScrimmage.hasDeferredInvites && !updatedScrimmage.timeTbd && !updatedScrimmage.inviteSentAt && req.body.sendInviteNow === true) {
+      // Resolving Time TBD is itself the explicit send action: players need
+      // the push notification when the invite becomes actionable, even though
+      // edit mode defaults the optional "send now" toggle to off. The claim in
+      // deliverPendingScrimmageInvites keeps this one delivery idempotent.
+      if (
+        updatedScrimmage.hasDeferredInvites &&
+        !updatedScrimmage.timeTbd &&
+        !updatedScrimmage.inviteSentAt &&
+        (req.body.sendInviteNow === true || isResolvingTimeTbd)
+      ) {
         try {
           await deliverPendingScrimmageInvites(scrimmageId);
         } catch (inviteError) {
