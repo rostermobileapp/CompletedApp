@@ -4,6 +4,7 @@ import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, Check, DollarSign, ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,6 +29,7 @@ export default function PaymentRequestDetail() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [otherPaymentDetails, setOtherPaymentDetails] = useState('');
 
   const { data: paymentRequest, isLoading } = useQuery({
     queryKey: [`/api/payment-requests/${id}`],
@@ -44,6 +46,7 @@ export default function PaymentRequestDetail() {
     },
     onSuccess: () => {
       setSelectedPaymentMethod(null);
+      setOtherPaymentDetails('');
       toast({ title: 'Payment status updated' });
       queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
@@ -274,7 +277,12 @@ export default function PaymentRequestDetail() {
                     <button
                       type="button"
                       disabled={disabled}
-                      onClick={() => setSelectedPaymentMethod(option.value)}
+                       onClick={() => {
+                         setSelectedPaymentMethod(option.value);
+                         if (option.value !== 'other') {
+                           setOtherPaymentDetails('');
+                         }
+                       }}
                       className={`flex-1 inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
                         isSelected
                           ? 'border-primary bg-primary/10 ring-1 ring-primary'
@@ -294,7 +302,10 @@ export default function PaymentRequestDetail() {
                         href={option.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={() => setSelectedPaymentMethod(option.value)}
+                        onClick={() => {
+                          setSelectedPaymentMethod(option.value);
+                          setOtherPaymentDetails('');
+                        }}
                         aria-label={`Open ${option.label}`}
                         className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--hairline))] px-2 text-muted-foreground hover:text-foreground hover:bg-muted/60"
                         data-testid={`link-open-payment-${option.value}`}
@@ -306,6 +317,23 @@ export default function PaymentRequestDetail() {
                 );
               })}
             </div>
+            {selectedPaymentMethod === 'other' && (
+              <div className="mt-3">
+                <label htmlFor="other-payment-details" className="text-xs font-medium">
+                  What payment method did you use?
+                </label>
+                <Input
+                  id="other-payment-details"
+                  value={otherPaymentDetails}
+                  onChange={(event) => setOtherPaymentDetails(event.target.value)}
+                  placeholder="e.g. Zelle, check, or bank transfer"
+                  maxLength={100}
+                  required
+                  className="mt-1"
+                  data-testid="input-other-payment-details"
+                />
+              </div>
+            )}
             {myRecipient?.isPaid ? (
               <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <p className="text-xs text-emerald-600 dark:text-emerald-300">
@@ -333,7 +361,12 @@ export default function PaymentRequestDetail() {
               <Button
                 type="button"
                 className="w-full mt-3"
-                disabled={!selectedPaymentMethod || !myRecipient || updateRecipientMutation.isPending}
+                disabled={
+                  !selectedPaymentMethod ||
+                  !myRecipient ||
+                  updateRecipientMutation.isPending ||
+                  (selectedPaymentMethod === 'other' && !otherPaymentDetails.trim())
+                }
                 onClick={() => {
                   if (!selectedPaymentMethod || !myRecipient) return;
                   updateRecipientMutation.mutate({
