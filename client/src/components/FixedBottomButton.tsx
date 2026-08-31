@@ -30,10 +30,10 @@ export function FixedBottomButton({ children, className }: FixedBottomButtonProp
   }
 
   const isFreeTier = user?.role === 'free_tier';
-  // The mobile navigation is taller than its 60px minimum once labels,
-  // padding, and the device safe area are included. Keep fixed actions fully
-  // above it so the nav cannot cover or intercept the submit button.
-  const bottomOffset = isFreeTier ? 148 : 98;
+  // The mobile navigation's content is 75px tall. The free-tier promotional
+  // banner sits above the navigation, so free users retain its larger offset.
+  // Safe-area space is added separately in the bottom style below.
+  const bottomOffset = isFreeTier ? 148 : 75;
 
   return (
     <div
