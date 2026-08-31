@@ -19,7 +19,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import { isScrimmageTimeTbd, parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
+import {
+  compareScheduleEvents,
+  isScrimmageTimeTbd,
+  parseScrimmageDateTime,
+} from '@/lib/scrimmageDateTime';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
@@ -3180,8 +3184,138 @@ function DashboardMobile() {
             const hasRequests = Array.isArray(scrimmageRequests) && scrimmageRequests.filter((r: any) => (r.status === 'approved' || r.status === 'pending') && r.scrimmage && isYesterdayOrLater(r.scrimmage.dateTime)).length > 0;
             const hasReminders = Array.isArray(personalReminders) && personalReminders.filter((r: any) => !r.isCompleted && isYesterdayOrLater(r.scheduledAt)).length > 0;
             return hasGames || hasInvites || hasRequests || hasReminders || (Array.isArray(visibleTournaments) && visibleTournaments.length > 0);
-          })() ? (
-            <div className="space-y-3">
+          })() ? (() => {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+
+            const isVisibleListDate = (date: Date) => {
+              if (Number.isNaN(date.getTime())) return false;
+              const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+              return dateOnly >= yesterday;
+            };
+
+            const activeRequestScrimmageIds = new Set(
+              Array.isArray(scrimmageRequests)
+                ? scrimmageRequests
+                    .filter(
+                      (request: any) =>
+                        (request.status === 'approved' || request.status === 'pending') &&
+                        request.scrimmage?.id,
+                    )
+                    .map((request: any) => request.scrimmage.id)
+                : [],
+            );
+
+            const sortableListEvents: Array<{
+              id: string;
+              date: Date;
+              timeTbd?: boolean;
+            }> = [];
+
+            if (Array.isArray(scrimmageInvites)) {
+              for (const invite of scrimmageInvites) {
+                if (!invite?.dateTime || activeRequestScrimmageIds.has(invite.id)) continue;
+                const date = parseScrimmageDateTime(invite.dateTime);
+                if (!isVisibleListDate(date)) continue;
+                sortableListEvents.push({
+                  id: `invite-${invite.id}`,
+                  date,
+                  timeTbd: isScrimmageTimeTbd(invite.timeTbd, invite.dateTime),
+                });
+              }
+            }
+
+            if (Array.isArray(scrimmageRequests)) {
+              for (const request of scrimmageRequests
+                .filter((request: any) => {
+                  if (
+                    (request.status !== 'approved' && request.status !== 'pending') ||
+                    !request.scrimmage?.dateTime
+                  ) {
+                    return false;
+                  }
+                  return isVisibleListDate(parseScrimmageDateTime(request.scrimmage.dateTime));
+                })
+                .slice(0, 5)) {
+                const scrimmage = request.scrimmage;
+                sortableListEvents.push({
+                  id: `scrimmage-${scrimmage.id}`,
+                  date: parseScrimmageDateTime(scrimmage.dateTime),
+                  timeTbd: isScrimmageTimeTbd(scrimmage.timeTbd, scrimmage.dateTime),
+                });
+              }
+            }
+
+            if (Array.isArray(personalReminders)) {
+              for (const reminder of personalReminders
+                .filter(
+                  (reminder: any) =>
+                    !reminder.isCompleted &&
+                    isVisibleListDate(new Date(reminder.scheduledAt)),
+                )
+                .sort(
+                  (a: any, b: any) =>
+                    new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+                )
+                .slice(0, 5)) {
+                sortableListEvents.push({
+                  id: `reminder-${reminder.id}`,
+                  date: new Date(reminder.scheduledAt),
+                });
+              }
+            }
+
+            if (Array.isArray(teamEvents)) {
+              for (const event of teamEvents
+                .filter((event: any) => isVisibleListDate(new Date(event.scheduledAt)))
+                .sort(
+                  (a: any, b: any) =>
+                    new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
+                )
+                .slice(0, 5)) {
+                sortableListEvents.push({
+                  id: `team-event-${event.id}`,
+                  date: new Date(event.scheduledAt),
+                });
+              }
+            }
+
+            const currentUserTeamIds = Array.isArray(userTeams)
+              ? userTeams.map((team: any) => team.id)
+              : [];
+            if (Array.isArray(upcomingGames)) {
+              for (const game of (upcomingGames as any[])
+                .filter((game: any) => {
+                  if (game.isScrimmage || !isVisibleListDate(new Date(game.scheduledAt))) {
+                    return false;
+                  }
+                  const isOnTeam =
+                    currentUserTeamIds.includes(game.homeTeamId) ||
+                    currentUserTeamIds.includes(game.awayTeamId);
+                  return (
+                    isOnTeam ||
+                    game.isSubstitute === true ||
+                    game.isTournamentMatch === true
+                  );
+                })
+                .slice(0, 5)) {
+                sortableListEvents.push({
+                  id: `game-${game.id}`,
+                  date: new Date(game.scheduledAt),
+                });
+              }
+            }
+
+            sortableListEvents.sort(compareScheduleEvents);
+            const listOrder = new Map(
+              sortableListEvents.map((event, index) => [event.id, index]),
+            );
+            const getListOrder = (id: string) =>
+              listOrder.get(id) ?? sortableListEvents.length;
+
+            return (
+            <div className="flex flex-col gap-3">
               {/* First show scrimmage invites (yesterday and future - visible until day after) */}
               {Array.isArray(scrimmageInvites) && scrimmageInvites.filter((invite: any) => {
                 const hasActiveRequest = Array.isArray(scrimmageRequests) &&
@@ -3200,6 +3334,7 @@ function DashboardMobile() {
                 <div 
                   key={`invite-${invite.id}`}
                   className="rounded-xl border border-yellow-500/50 elev-rest relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer hover:border-yellow-500 transition-colors"
+                  style={{ order: getListOrder(`invite-${invite.id}`) }}
                   data-testid={`card-scrimmage-invite-${invite.id}`}
                   onClick={() => {
                     setPageTransitionDirection('up');
@@ -3287,6 +3422,7 @@ function DashboardMobile() {
                     <div 
                       key={`scrimmage-${scrimmage.id}`}
                       className={`rounded-xl elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${isPending ? 'border border-amber-500/50' : 'hairline'}`}
+                      style={{ order: getListOrder(`scrimmage-${scrimmage.id}`) }}
                       onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
                       data-testid={`card-scrimmage-${scrimmage.id}`}
                     >
@@ -3336,6 +3472,7 @@ function DashboardMobile() {
                       key={`reminder-${reminder.id}`}
                       className={`transition-all duration-300 ease-out ${isDismissing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
                       style={{ 
+                         order: getListOrder(`reminder-${reminder.id}`),
                         maxHeight: isDismissing ? '0px' : '200px', 
                         marginTop: isDismissing ? '0px' : undefined,
                         marginBottom: isDismissing ? '-12px' : undefined,
@@ -3402,6 +3539,7 @@ function DashboardMobile() {
                         ? 'border-orange-200 dark:border-orange-800' 
                         : 'border-blue-200 dark:border-blue-800'
                     }`}
+                     style={{ order: getListOrder(`team-event-${event.id}`) }}
                     onClick={() => navigate(`/team-event/${event.id}`)}
                     data-testid={`card-team-event-${event.id}`}
                   >
@@ -3474,6 +3612,7 @@ function DashboardMobile() {
                 <div 
                   key={`bracket-${tournament.id}`}
                   className="rounded-xl hairline p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
+                  style={{ order: sortableListEvents.length }}
                   onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
                   data-testid={`card-bracket-${tournament.id}`}
                 >
@@ -3542,6 +3681,7 @@ function DashboardMobile() {
                 <div 
                   key={game.id} 
                   className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                  style={{ order: getListOrder(`game-${game.id}`) }}
                   onClick={() => navigate(`/game/${game.id}`)}
                   data-testid={`card-game-${game.id}`}
                 >
@@ -3689,7 +3829,8 @@ function DashboardMobile() {
                 </div>
               ))}
             </div>
-          ) : (
+            );
+          })() : (
             <div className="bg-card rounded-xl hairline elev-rest p-8 text-center" data-testid="empty-upcoming-games">
               <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No upcoming games scheduled</p>

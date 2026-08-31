@@ -12,6 +12,31 @@ import {
 } from '../dateUtils.js';
 
 describe('desktop schedule scrimmage ordering', () => {
+  test('places 2027 recurring scrimmages after September 2026 games', () => {
+    const events = [
+      {
+        id: 'scrimmage-2027-03-03',
+        date: parseScrimmageDateTime('2027-03-03T00:00:00'),
+        timeTbd: true,
+      },
+      {
+        id: 'game-2026-09-06',
+        date: new Date(2026, 8, 6, 13, 0),
+        timeTbd: false,
+      },
+      {
+        id: 'scrimmage-2027-06-04',
+        date: parseScrimmageDateTime('2027-06-04T00:00:00'),
+        timeTbd: true,
+      },
+    ].sort(compareScheduleEvents);
+
+    assert.deepEqual(
+      events.map((event) => event.id),
+      ['game-2026-09-06', 'scrimmage-2027-03-03', 'scrimmage-2027-06-04'],
+    );
+  });
+
   test('interleaves Time TBD scrimmages with games by calendar day', () => {
     const events = [
       {
