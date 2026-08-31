@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/context/SubscriptionContext';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import { useDemo } from '@/context/DemoContext';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import type { UploadResult } from '@uppy/core';
 
 export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { isActive: isDemoActive, povUserId } = useDemo();
   const [location, navigate] = useLocation();
   const { hasRole } = usePermissions();
   const { toast } = useToast();
@@ -25,6 +27,10 @@ export default function Teams() {
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editedTeamName, setEditedTeamName] = useState('');
+  // Supabase always exposes the real signed-in account. In Demo mode the API
+  // operates as the copied POV player, so client-side captain controls must
+  // compare team records against that effective identity as well.
+  const userId = isDemoActive && povUserId ? povUserId : (user as any)?.id;
 
   // Get user's teams
   const { data: userTeams = [], isLoading: userTeamsLoading } = useQuery({
@@ -163,7 +169,7 @@ export default function Teams() {
   const { data: gameAttendanceCounts } = useQuery({
     queryKey: ['/api/games/attendance/captain-overview'],
     enabled: !!(user && (
-      (userTeams as any[])?.some((team: any) => team.captainId === (user as any)?.id) ||
+      (userTeams as any[])?.some((team: any) => team.captainId === userId) ||
       hasRole('secondary_commissioner')
     )),
   });
@@ -421,7 +427,6 @@ export default function Teams() {
   }
 
   // Computed values (after early returns)
-  const userId = (user as any)?.id;
   // isTeamCaptain covers: primary captain (teams.captainId) OR any secondary
   // captain (team_memberships.isCaptain), matching the server-side auth model.
   const currentUserMembership = teamMembers.find(
@@ -646,7 +651,7 @@ export default function Teams() {
                             <Trophy className="w-8 h-8 text-primary-foreground" />
                           )}
                         </div>
-                        {((team.captainId === (user as any)?.id) || 
+                        {((team.captainId === userId) ||
                           hasRole('secondary_commissioner')) && (
                           <ObjectUploader
                             maxNumberOfFiles={1}
@@ -704,7 +709,7 @@ export default function Teams() {
                               <CardTitle className="text-2xl" data-testid={`text-team-name-${team.id}`}>
                                 {team.name}
                               </CardTitle>
-                              {((team.captainId === (user as any)?.id) || 
+                              {((team.captainId === userId) ||
                                 hasRole('secondary_commissioner')) && (
                                 <button
                                   onClick={() => {
