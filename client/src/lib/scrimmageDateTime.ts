@@ -33,3 +33,19 @@ export function splitScrimmageDateTime(value: string | Date): { date: string; ti
     time: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`,
   };
 }
+
+/**
+ * Honor the persisted flag whenever the API supplies it. Older API deployments
+ * did not include timeTbd in invite payloads, so use the midnight date anchor
+ * as a compatibility fallback only when the flag is absent.
+ */
+export function isScrimmageTimeTbd(
+  timeTbd: unknown,
+  dateTime?: string | Date | null,
+): boolean {
+  if (timeTbd === true) return true;
+  if (timeTbd === false) return false;
+  if (!dateTime) return false;
+
+  return splitScrimmageDateTime(dateTime).time === '00:00';
+}

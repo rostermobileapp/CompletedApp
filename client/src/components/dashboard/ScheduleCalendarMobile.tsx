@@ -15,7 +15,7 @@ import {
 import { ChevronLeft, ChevronRight, Trophy, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { EVENT_COLORS } from '@/components/home-desktop/cardStyles';
 import { apiRequest } from '@/lib/queryClient';
-import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
+import { isScrimmageTimeTbd, parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 
 type EventKind =
@@ -176,7 +176,7 @@ export function ScheduleCalendarMobile({
           color: i.color || KIND_FALLBACK_COLOR.invite,
           navigateTo: `/scrimmage/${i.id}`,
           scrimmageId: i.id,
-          timeTbd: !!i.timeTbd,
+          timeTbd: isScrimmageTimeTbd(i.timeTbd, i.dateTime),
         });
       }
     }
@@ -197,7 +197,7 @@ export function ScheduleCalendarMobile({
           navigateTo: `/scrimmage/${s.id}`,
           teamAssignment: r.teamAssignment ?? null,
           isPending: r.status === 'pending',
-          timeTbd: !!s.timeTbd,
+          timeTbd: isScrimmageTimeTbd(s.timeTbd, s.dateTime),
         });
       }
     }

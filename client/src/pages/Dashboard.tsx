@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
-import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
+import { isScrimmageTimeTbd, parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
@@ -3208,6 +3208,7 @@ function DashboardMobile() {
                 >
                   {(() => {
                     const isOwnScrimmage = invite.creatorId === (userProfile as any)?.id;
+                    const timeTbd = isScrimmageTimeTbd(invite.timeTbd, invite.dateTime);
                     return (
                       <div className="flex items-center gap-4">
                         <div className="flex-1 min-w-0">
@@ -3225,7 +3226,7 @@ function DashboardMobile() {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
-                            {invite.timeTbd
+                            {timeTbd
                               ? `${format(parseScrimmageDateTime(invite.dateTime), 'MMM d')} • Time TBD`
                               : format(parseScrimmageDateTime(invite.dateTime), 'MMM d • h:mm a')}
                           </p>
@@ -3281,6 +3282,7 @@ function DashboardMobile() {
                 .map((request: any) => {
                   const scrimmage = request.scrimmage;
                   const isPending = request.status === 'pending';
+                  const timeTbd = isScrimmageTimeTbd(scrimmage.timeTbd, scrimmage.dateTime);
                   return (
                     <div 
                       key={`scrimmage-${scrimmage.id}`}
@@ -3299,7 +3301,7 @@ function DashboardMobile() {
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
-                            {scrimmage.timeTbd
+                            {timeTbd
                               ? `${format(parseScrimmageDateTime(scrimmage.dateTime), 'MMM d')} • Time TBD`
                               : format(parseScrimmageDateTime(scrimmage.dateTime), 'MMM d • h:mm a')}
                           </p>

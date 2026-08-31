@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { format } from 'date-fns';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest } from '@/lib/queryClient';
-import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
+import { isScrimmageTimeTbd, parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 
 interface Notification {
@@ -360,7 +360,10 @@ export function AlertsExpanded({
     const title = inv?.title || inv?.scrimmage?.title || 'Scrimmage invite';
     const dateValue =
       inv?.dateTime || inv?.scrimmage?.dateTime || inv?.scheduledAt || null;
-    const timeTbd = !!(inv?.timeTbd ?? inv?.scrimmage?.timeTbd);
+    const timeTbd = isScrimmageTimeTbd(
+      inv?.timeTbd ?? inv?.scrimmage?.timeTbd,
+      dateValue,
+    );
     const formattedDate = formatScrimmageInviteDateTime(dateValue, timeTbd);
     const date = formattedDate
       ? `${formattedDate}${timeTbd ? ' • Time TBD' : ''}`
