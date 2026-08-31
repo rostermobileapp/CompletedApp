@@ -1545,7 +1545,10 @@ export const paymentRequests = pgTable("payment_requests", {
   title: varchar("title").notNull(),
   description: text("description"),
   amountPerPerson: decimal("amount_per_person", { precision: 10, scale: 2 }).notNull(),
-  deadline: timestamp("deadline"),
+  // Payment deadlines are date-only values from the form. Keep them as
+  // league-local strings instead of mapping them through JavaScript Date,
+  // which can shift the day across time zones.
+  deadline: timestamp("deadline", { mode: 'string' }),
   notes: text("notes"),
   // Optional per-invoice payment link overrides. When set, recipients paying
   // this invoice should be sent to these URLs instead of the creator's

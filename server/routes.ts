@@ -22433,12 +22433,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientsArg = { recipientUserIds: finalUsers, placeholderPlayerIds: finalPlaceholders };
       }
 
-      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; deadline: Date | null; venmoLinkOverride: string | null; cashappLinkOverride: string | null }> = {};
+      const updates: Partial<{ title: string; description: string | null; amountPerPerson: string; deadline: string | null; venmoLinkOverride: string | null; cashappLinkOverride: string | null }> = {};
       if (validated.title !== undefined) updates.title = validated.title;
       if (validated.description !== undefined) updates.description = validated.description;
       if (validated.amountPerPerson !== undefined) updates.amountPerPerson = validated.amountPerPerson;
       if (validated.deadline !== undefined) {
-        updates.deadline = validated.deadline ? new Date(validated.deadline) : null;
+        updates.deadline = validated.deadline || null;
       }
       // Only emit override changes when the client actually included the field.
       // Zod's transform always materializes the key, so distinguish "client sent
