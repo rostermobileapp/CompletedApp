@@ -526,6 +526,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await ensureDemoTables();
   registerDemoRoutes(app, isAuthenticated);
 
+  // Generic payment requests always write these optional fields, even when
+  // they are null. Keep older deployed databases compatible with the current
+  // insert shape before registering the routes that depend on these columns.
+  try {
+    await db.execute(sql`
+      ALTER TABLE payment_requests
+        ADD COLUMN IF NOT EXISTS venmo_link_override text,
+        ADD COLUMN IF NOT EXISTS cashapp_link_override text
+    `);
+    console.log('[Init] payment request link-override columns ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure payment request link-override columns:', err);
+    throw err;
+  }
+
   // Team line management supports both the legacy primary captain field and
   // the multi-captain membership flag.
   const canManageTeamLines = async (team: any, userId: string) =>
