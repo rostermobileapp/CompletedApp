@@ -1607,6 +1607,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/notifications/dismiss-all', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dismissedCount = await storage.dismissAllNotifications(userId);
+      res.json({ dismissedCount });
+    } catch (error) {
+      console.error("Error dismissing all notifications:", error);
+      res.status(500).json({ message: "Failed to dismiss all notifications" });
+    }
+  });
+
   // Push Notification Preferences Routes
   app.get('/api/notification-preferences', isAuthenticated, async (req: any, res) => {
     try {

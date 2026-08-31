@@ -270,6 +270,7 @@ export interface IStorage {
   getUnreadNotifications(userId: string): Promise<UserNotification[]>;
   markNotificationAsRead(id: string, userId: string): Promise<UserNotification | undefined>;
   dismissNotification(id: string, userId: string): Promise<UserNotification | undefined>;
+  dismissAllNotifications(userId: string): Promise<number>;
   deleteNotification(id: string): Promise<void>;
   
   // Push notification preferences operations
@@ -1412,6 +1413,18 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return notification;
+  }
+
+  async dismissAllNotifications(userId: string): Promise<number> {
+    const dismissedNotifications = await db
+      .update(userNotifications)
+      .set({ isDismissed: true })
+      .where(and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.isDismissed, false)
+      ))
+      .returning({ id: userNotifications.id });
+    return dismissedNotifications.length;
   }
 
   async deleteNotification(id: string): Promise<void> {

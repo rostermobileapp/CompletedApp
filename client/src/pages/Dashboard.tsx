@@ -337,6 +337,25 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
     },
   });
 
+  const dismissAllNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('PATCH', '/api/notifications/dismiss-all');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
+      toast({ title: 'Notifications cleared' });
+    },
+    onError: () => {
+      toast({
+        title: 'Could not clear notifications',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Helper function to get notification icon based on type
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -804,18 +823,30 @@ function NeedsAttentionModal({ isOpen, onClose, leagueId, onNavigate }: {
                         Notifications ({notifications.length})
                       </h3>
                     </div>
-                    {unreadNotificationCount > 0 && (
+                    <div className="flex items-center gap-1">
+                      {unreadNotificationCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                          onClick={handleMarkAllRead}
+                          data-testid="button-mark-all-read"
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          Mark all read
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={handleMarkAllRead}
-                        data-testid="button-mark-all-read"
+                        onClick={() => dismissAllNotificationsMutation.mutate()}
+                        disabled={dismissAllNotificationsMutation.isPending}
+                        data-testid="button-clear-all-notifications"
                       >
-                        <Check className="w-3 h-3 mr-1" />
-                        Mark all read
+                        {dismissAllNotificationsMutation.isPending ? 'Clearing…' : 'Clear All'}
                       </Button>
-                    )}
+                    </div>
                   </div>
                   <div className="bg-[#e2e2e2] dark:bg-[#212121] rounded-lg p-4">
                     <div className="space-y-3">
