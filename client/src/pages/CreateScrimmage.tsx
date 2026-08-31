@@ -6,7 +6,7 @@ import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
 import { splitScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, Check, ShieldHalf, PersonStanding, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Crown, MapPin, Users, Mail, X, UserPlus, BookMarked, ChevronDown, ChevronUp, ChevronRight, Check, ShieldHalf, PersonStanding, AlertCircle } from 'lucide-react';
 import { SCRIMMAGE_COVER_OPTIONS } from '@/lib/scrimmageCoverOptions';
 import { RinkPickerField } from '@/components/RinkPickerField';
 import type { RinkSelection } from '@/components/RinkPickerField';
@@ -102,6 +102,8 @@ export default function CreateScrimmage() {
   const [playerLeagueFilter, setPlayerLeagueFilter] = useState('all');
   const rinkDefaultInitializedRef = useRef(false);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
+  const coverPhotoTrayRef = useRef<HTMLDivElement>(null);
+  const [canScrollCoverPhotos, setCanScrollCoverPhotos] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
   
   // Email invite states
@@ -417,6 +419,31 @@ export default function CreateScrimmage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showCoHostDropdown]);
+
+  useEffect(() => {
+    const tray = coverPhotoTrayRef.current;
+    if (!tray) return;
+
+    const updateScrollState = () => {
+      setCanScrollCoverPhotos(tray.scrollWidth - tray.clientWidth - tray.scrollLeft > 1);
+    };
+
+    updateScrollState();
+    tray.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+
+    let resizeObserver: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(updateScrollState);
+      resizeObserver.observe(tray);
+    }
+
+    return () => {
+      tray.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+      resizeObserver?.disconnect();
+    };
+  }, []);
 
   // Debounced co-host search
   useEffect(() => {
@@ -930,34 +957,48 @@ export default function CreateScrimmage() {
             <div>
               <Label>Cover Photo (Optional)</Label>
               <p className="text-xs text-muted-foreground mb-2">Choose a photo to display at the top of this scrimmage</p>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                {SCRIMMAGE_COVER_OPTIONS.map((option) => {
-                  const isSelected = form.watch('coverPhoto') === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => form.setValue('coverPhoto', isSelected ? null : option.id)}
-                      className="relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all"
-                      style={{
-                        width: 120,
-                        aspectRatio: '16/9',
-                        borderColor: isSelected ? 'hsl(var(--primary))' : 'transparent',
-                        boxShadow: isSelected ? '0 0 0 2px hsl(var(--primary))' : 'none',
-                      }}
-                      title={option.label}
-                    >
-                      <img src={option.src} alt={option.label} className="w-full h-full object-cover" />
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                          <div className="bg-primary rounded-full p-1">
-                            <Check className="w-3 h-3 text-primary-foreground" />
+              <div className="relative">
+                <div ref={coverPhotoTrayRef} className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {SCRIMMAGE_COVER_OPTIONS.map((option) => {
+                    const isSelected = form.watch('coverPhoto') === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => form.setValue('coverPhoto', isSelected ? null : option.id)}
+                        className="relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all"
+                        style={{
+                          width: 120,
+                          aspectRatio: '16/9',
+                          borderColor: isSelected ? 'hsl(var(--primary))' : 'transparent',
+                          boxShadow: isSelected ? '0 0 0 2px hsl(var(--primary))' : 'none',
+                        }}
+                        title={option.label}
+                      >
+                        <img src={option.src} alt={option.label} className="w-full h-full object-cover" />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                            <div className="bg-primary rounded-full p-1">
+                              <Check className="w-3 h-3 text-primary-foreground" />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {canScrollCoverPhotos && (
+                  <button
+                    type="button"
+                    aria-label="Show more cover photos"
+                    title="Show more cover photos"
+                    onClick={() => coverPhotoTrayRef.current?.scrollBy({ left: 136, behavior: 'smooth' })}
+                    className="absolute right-0 top-0 bottom-1 z-10 flex w-9 items-center justify-end bg-gradient-to-l from-background via-background/80 to-transparent pl-3"
+                    data-testid="button-cover-photo-scroll-right"
+                  >
+                    <ChevronRight className="h-5 w-5 rounded-full bg-background/90 text-foreground shadow-sm" />
+                  </button>
+                )}
               </div>
             </div>
 
