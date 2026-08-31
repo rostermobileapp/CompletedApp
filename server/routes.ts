@@ -7285,6 +7285,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const teams = await storage.getUserTeams(userId);
+      const teamsWithLinePermissions = await Promise.all(
+        teams.map(async (team) => ({
+          ...team,
+          canManageLines: await canManageTeamLines(team, userId),
+        })),
+      );
       
       // Prevent browser caching to ensure fresh data
       res.set({
@@ -7293,7 +7299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Expires': '0'
       });
       
-      res.json(teams);
+      res.json(teamsWithLinePermissions);
     } catch (error) {
       console.error("Error fetching user teams:", error);
       res.status(500).json({ message: "Failed to fetch teams" });

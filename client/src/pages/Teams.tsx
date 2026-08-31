@@ -21,7 +21,7 @@ export default function Teams() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { isActive: isDemoActive, povUserId } = useDemo();
   const [location, navigate] = useLocation();
-  const { hasRole } = usePermissions();
+  const { hasRole, user: databaseUser } = usePermissions();
   const { toast } = useToast();
   const { selectedTeamId, selectedLeagueId, selectedType, selectedTournamentId, setTeamSelection } = useDashboardSelection();
   const [isEditingTeamName, setIsEditingTeamName] = useState(false);
@@ -30,7 +30,9 @@ export default function Teams() {
   // Supabase always exposes the real signed-in account. In Demo mode the API
   // operates as the copied POV player, so client-side captain controls must
   // compare team records against that effective identity as well.
-  const userId = isDemoActive && povUserId ? povUserId : (user as any)?.id;
+  const userId = isDemoActive && povUserId
+    ? povUserId
+    : databaseUser?.id ?? (user as any)?.id;
 
   // Get user's teams
   const { data: userTeams = [], isLoading: userTeamsLoading } = useQuery({
@@ -437,6 +439,9 @@ export default function Teams() {
     !!(currentUserMembership as any)?.isCaptain;
   const isTeamCreator = currentTeam?.creatorId === userId;
   const isCommissioner = hasRole('secondary_commissioner');
+  const canManageLines = typeof currentTeam?.canManageLines === 'boolean'
+    ? currentTeam.canManageLines
+    : isTeamCaptain || isTeamCreator;
   const canUploadLogo = isTeamCaptain || isCommissioner;
 
   return (
@@ -854,7 +859,7 @@ export default function Teams() {
                 {/* Line Combinations Manager (Roster + inline line editor) */}
                 <LineManager 
                   teamId={team.id}
-                  isTeamCaptain={isTeamCaptain || isTeamCreator || isCommissioner}
+                  isTeamCaptain={canManageLines}
                   teamMembers={teamMembers}
                   leagueId={currentTeam?.leagueId ?? null}
                   seasonId={currentTeam?.seasonId ?? null}
