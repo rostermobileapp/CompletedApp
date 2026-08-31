@@ -3224,7 +3224,7 @@ export const createPaymentRequestSchema = createInsertSchema(paymentRequests).om
 
 export const updatePaymentRequestRecipientSchema = z.object({
   isPaid: z.boolean(),
-  paymentMethod: z.enum(['venmo', 'cashapp', 'cash', 'other']).optional(),
+  paymentMethod: z.enum(['venmo', 'cashapp', 'cash', 'other']).nullable().optional(),
 });
 
 export const updatePaymentRequestSchema = z.object({

@@ -701,7 +701,7 @@ export interface IStorage {
   getPaymentRequestsByRecipient(userId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
   getPaymentRequestsByScrimmage(scrimmageId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
   getPaymentRequestsByConversation(conversationId: string): Promise<(PaymentRequest & { creator: User; recipients: HydratedPaymentRequestRecipient[] })[]>;
-  updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient>;
+  updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' | null }): Promise<PaymentRequestRecipient>;
   confirmPaymentRequestRecipient(recipientId: string, isConfirmed: boolean): Promise<PaymentRequestRecipient>;
   deletePaymentRequest(id: string): Promise<void>;
   updatePaymentRequest(
@@ -12382,11 +12382,14 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' }): Promise<PaymentRequestRecipient> {
+  async updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' | null }): Promise<PaymentRequestRecipient> {
     const [recipient] = await db
       .update(paymentRequestRecipients)
       .set({
-        ...updates,
+        // An unpaid transition is a complete reset so a later confirmation
+        // cannot retain the previous payment method or paid timestamp.
+        isPaid: updates.isPaid,
+        paymentMethod: updates.isPaid ? (updates.paymentMethod ?? null) : null,
         paidAt: updates.isPaid ? new Date() : null,
         updatedAt: new Date(),
       })

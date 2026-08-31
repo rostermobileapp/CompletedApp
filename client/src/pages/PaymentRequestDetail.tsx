@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { type ComponentType, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -35,7 +35,7 @@ export default function PaymentRequestDetail() {
   });
 
   const updateRecipientMutation = useMutation({
-    mutationFn: async ({ recipientId, isPaid, paymentMethod }: { recipientId: string; isPaid: boolean; paymentMethod?: PaymentMethod }) => {
+    mutationFn: async ({ recipientId, isPaid, paymentMethod }: { recipientId: string; isPaid: boolean; paymentMethod?: PaymentMethod | null }) => {
       const response = await apiRequest('PATCH', `/api/payment-request-recipients/${recipientId}`, {
         isPaid,
         paymentMethod,
@@ -49,8 +49,12 @@ export default function PaymentRequestDetail() {
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
     },
-    onError: () => {
-      toast({ title: 'Failed to update payment status', variant: 'destructive' });
+    onError: (_error, variables) => {
+      toast({
+        title: variables?.isPaid === false ? 'Could not undo payment' : 'Failed to update payment status',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -125,7 +129,7 @@ export default function PaymentRequestDetail() {
     value: PaymentMethod;
     label: string;
     url: string | null;
-    icon: typeof DollarSign;
+    icon: ComponentType<{ className?: string }>;
   }> = [
     { value: 'venmo', label: 'Venmo', url: venmoUrl, icon: SiVenmo },
     { value: 'cashapp', label: 'Cash App', url: cashappUrl, icon: SiCashapp },
@@ -303,9 +307,28 @@ export default function PaymentRequestDetail() {
               })}
             </div>
             {myRecipient?.isPaid ? (
-              <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-300">
-                Payment marked as {myRecipient.paymentMethod || 'paid'}.
-              </p>
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <p className="text-xs text-emerald-600 dark:text-emerald-300">
+                  Payment marked as {myRecipient.paymentMethod || 'paid'}.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={updateRecipientMutation.isPending}
+                  onClick={() => {
+                    if (!myRecipient) return;
+                    updateRecipientMutation.mutate({
+                      recipientId: myRecipient.id,
+                      isPaid: false,
+                      paymentMethod: null,
+                    });
+                  }}
+                  data-testid="button-undo-payment"
+                >
+                  {updateRecipientMutation.isPending ? 'Undoing…' : 'Undo / change method'}
+                </Button>
+              </div>
             ) : (
               <Button
                 type="button"
@@ -458,7 +481,7 @@ export default function PaymentRequestDetail() {
                           updateRecipientMutation.mutate({
                             recipientId: recipient.id,
                             isPaid: true,
-                            paymentMethod: method,
+                              paymentMethod: method as PaymentMethod,
                           });
                         }}
                       >
