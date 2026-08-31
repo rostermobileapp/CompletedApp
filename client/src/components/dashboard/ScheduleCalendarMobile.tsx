@@ -172,10 +172,11 @@ export function ScheduleCalendarMobile({
           date: d,
           kind: 'invite',
           title: i.title || 'Scrimmage Invite',
-          subtitle: i.timeTbd ? `${i.location || 'Location TBD'} • Time TBD` : (i.location || null),
+          subtitle: i.location || null,
           color: i.color || KIND_FALLBACK_COLOR.invite,
           navigateTo: `/scrimmage/${i.id}`,
           scrimmageId: i.id,
+          timeTbd: !!i.timeTbd,
         });
       }
     }
@@ -191,7 +192,7 @@ export function ScheduleCalendarMobile({
           date: d,
           kind: 'scrimmage',
           title: s.title || 'Scrimmage',
-          subtitle: s.timeTbd ? `${s.location || 'Location TBD'} • Time TBD` : (s.location || null),
+          subtitle: s.location || null,
           color: r.status === 'pending' ? '#f59e0b' : (s.color || KIND_FALLBACK_COLOR.scrimmage),
           navigateTo: `/scrimmage/${s.id}`,
           teamAssignment: r.teamAssignment ?? null,
@@ -496,7 +497,7 @@ export function ScheduleCalendarMobile({
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {format(ev.date, 'h:mm a')}
+                        {ev.timeTbd ? 'Time TBD' : format(ev.date, 'h:mm a')}
                       </div>
                       {ev.subtitle && (
                         <div className="text-xs text-muted-foreground truncate">

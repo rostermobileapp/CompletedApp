@@ -3225,7 +3225,9 @@ function DashboardMobile() {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-invite-time-${invite.id}`}>
-                            {format(new Date(invite.dateTime), 'MMM d • h:mm a')}
+                            {invite.timeTbd
+                              ? `${format(parseScrimmageDateTime(invite.dateTime), 'MMM d')} • Time TBD`
+                              : format(parseScrimmageDateTime(invite.dateTime), 'MMM d • h:mm a')}
                           </p>
                           {invite.location && (
                             <p className="text-xs text-muted-foreground" data-testid={`text-invite-location-${invite.id}`}>

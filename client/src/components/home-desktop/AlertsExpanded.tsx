@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { format } from 'date-fns';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest } from '@/lib/queryClient';
+import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 
 interface Notification {
@@ -55,6 +56,20 @@ function formatGameDateTime(value?: string | Date | null): string | null {
     const d = typeof value === 'string' ? new Date(value) : value;
     if (Number.isNaN(d.getTime())) return null;
     return format(d, 'EEE MMM d • h:mm a');
+  } catch {
+    return null;
+  }
+}
+
+function formatScrimmageInviteDateTime(
+  value?: string | Date | null,
+  timeTbd?: boolean,
+): string | null {
+  if (!value) return null;
+  try {
+    const d = typeof value === 'string' ? parseScrimmageDateTime(value) : value;
+    if (Number.isNaN(d.getTime())) return null;
+    return format(d, timeTbd ? 'EEE MMM d' : 'EEE MMM d • h:mm a');
   } catch {
     return null;
   }
@@ -345,7 +360,11 @@ export function AlertsExpanded({
     const title = inv?.title || inv?.scrimmage?.title || 'Scrimmage invite';
     const dateValue =
       inv?.dateTime || inv?.scrimmage?.dateTime || inv?.scheduledAt || null;
-    const date = formatGameDateTime(dateValue);
+    const timeTbd = !!(inv?.timeTbd ?? inv?.scrimmage?.timeTbd);
+    const formattedDate = formatScrimmageInviteDateTime(dateValue, timeTbd);
+    const date = formattedDate
+      ? `${formattedDate}${timeTbd ? ' • Time TBD' : ''}`
+      : null;
     const venue = inv?.venue || inv?.location || inv?.scrimmage?.venue || null;
     const metaParts: string[] = [];
     if (date) metaParts.push(date);
