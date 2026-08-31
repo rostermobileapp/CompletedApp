@@ -12789,19 +12789,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePaymentRequestRecipient(recipientId: string, updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' | null }): Promise<PaymentRequestRecipient> {
-    const [recipient] = await db
-      .update(paymentRequestRecipients)
-      .set({
-        // An unpaid transition is a complete reset so a later confirmation
-        // cannot retain the previous payment method or paid timestamp.
-        isPaid: updates.isPaid,
-        paymentMethod: updates.isPaid ? (updates.paymentMethod ?? null) : null,
-        paidAt: updates.isPaid ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(paymentRequestRecipients.id, recipientId))
-      .returning();
-    return recipient;
+    return db.transaction(async (tx) => {
+      // Serialize player undo and organizer confirmation against the same row.
+      await tx
+        .select({ id: paymentRequestRecipients.id })
+        .from(paymentRequestRecipients)
+        .where(eq(paymentRequestRecipients.id, recipientId))
+        .for('update');
+      const [recipient] = await tx
+        .update(paymentRequestRecipients)
+        .set({
+          // An unpaid transition is a complete reset so a later confirmation
+          // cannot retain the previous payment method or paid timestamp.
+          isPaid: updates.isPaid,
+          paymentMethod: updates.isPaid ? (updates.paymentMethod ?? null) : null,
+          paidAt: updates.isPaid ? new Date() : null,
+          isConfirmed: updates.isPaid ? undefined : false,
+          confirmedAt: updates.isPaid ? undefined : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(paymentRequestRecipients.id, recipientId))
+        .returning();
+      return recipient;
+    });
   }
 
   async confirmPaymentRequestRecipient(recipientId: string, isConfirmed: boolean): Promise<PaymentRequestRecipient> {

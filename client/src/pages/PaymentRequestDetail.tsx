@@ -1,10 +1,9 @@
-import { type ComponentType, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { ArrowLeft, Check, DollarSign, ExternalLink, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,9 +17,8 @@ import {
   type PaymentStatus,
 } from '@/lib/paymentStatus';
 import { resolveVenmoLink, resolveCashAppLink } from '@/lib/paymentLinks';
+import { PaymentMethodPicker, type PaymentMethod } from '@/components/PaymentMethodPicker';
 import { SiVenmo, SiCashapp } from 'react-icons/si';
-
-type PaymentMethod = 'venmo' | 'cashapp' | 'cash' | 'other';
 
 export default function PaymentRequestDetail() {
   const { id } = useParams();
@@ -28,8 +26,6 @@ export default function PaymentRequestDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [otherPaymentDetails, setOtherPaymentDetails] = useState('');
 
   const { data: paymentRequest, isLoading } = useQuery({
     queryKey: [`/api/payment-requests/${id}`],
@@ -45,8 +41,6 @@ export default function PaymentRequestDetail() {
       return response.json();
     },
     onSuccess: () => {
-      setSelectedPaymentMethod(null);
-      setOtherPaymentDetails('');
       toast({ title: 'Payment status updated' });
       queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${id}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
@@ -128,17 +122,6 @@ export default function PaymentRequestDetail() {
   const creatorName = `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || 'the organizer';
   const venmoUrl = resolveVenmoLink(request.venmoLinkOverride, creator.venmoUsername);
   const cashappUrl = resolveCashAppLink(request.cashappLinkOverride, creator.cashappUsername);
-  const paymentOptions: Array<{
-    value: PaymentMethod;
-    label: string;
-    url: string | null;
-    icon: ComponentType<{ className?: string }>;
-  }> = [
-    { value: 'venmo', label: 'Venmo', url: venmoUrl, icon: SiVenmo },
-    { value: 'cashapp', label: 'Cash App', url: cashappUrl, icon: SiCashapp },
-    { value: 'cash', label: 'Cash', url: null, icon: DollarSign },
-    { value: 'other', label: 'Other', url: null, icon: DollarSign },
-  ];
 
   return (
     <div className="min-h-screen flex flex-col pb-24" data-testid="payment-request-detail-page">
@@ -258,129 +241,24 @@ export default function PaymentRequestDetail() {
             </div>
           ) : null
         ) : (
-          <div
-            className="mb-6 bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5"
-            data-testid="card-pay-creator"
-          >
-            <h2 className="text-base font-semibold mb-1">Pay {creatorName}</h2>
-            <p className="text-xs text-muted-foreground mb-3">
-              Send payment for this invoice using one of the options below.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {paymentOptions.map((option) => {
-                const isUnavailable = (option.value === 'venmo' || option.value === 'cashapp') && !option.url;
-                const disabled = isUnavailable || !myRecipient || myRecipient.isPaid || updateRecipientMutation.isPending;
-                const isSelected = selectedPaymentMethod === option.value;
-                const Icon = option.icon;
-                return (
-                  <div key={option.value} className="flex items-stretch gap-1">
-                    <button
-                      type="button"
-                      disabled={disabled}
-                       onClick={() => {
-                         setSelectedPaymentMethod(option.value);
-                         if (option.value !== 'other') {
-                           setOtherPaymentDetails('');
-                         }
-                       }}
-                      className={`flex-1 inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
-                        isSelected
-                          ? 'border-primary bg-primary/10 ring-1 ring-primary'
-                          : 'border-[hsl(var(--hairline))] bg-background/40 hover:bg-muted/60'
-                      } disabled:cursor-not-allowed disabled:opacity-40`}
-                      data-testid={`option-payment-method-${option.value}`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="font-medium">{option.label}</span>
-                      {isSelected && <Check className="ml-auto w-4 h-4 text-primary" />}
-                      {isUnavailable && (
-                        <span className="ml-auto text-[11px] text-muted-foreground">Unavailable</span>
-                      )}
-                    </button>
-                    {option.url && !myRecipient?.isPaid && (
-                      <a
-                        href={option.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => {
-                          setSelectedPaymentMethod(option.value);
-                          setOtherPaymentDetails('');
-                        }}
-                        aria-label={`Open ${option.label}`}
-                        className="inline-flex items-center justify-center rounded-lg border border-[hsl(var(--hairline))] px-2 text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                        data-testid={`link-open-payment-${option.value}`}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {selectedPaymentMethod === 'other' && (
-              <div className="mt-3">
-                <label htmlFor="other-payment-details" className="text-xs font-medium">
-                  What payment method did you use?
-                </label>
-                <Input
-                  id="other-payment-details"
-                  value={otherPaymentDetails}
-                  onChange={(event) => setOtherPaymentDetails(event.target.value)}
-                  placeholder="e.g. Zelle, check, or bank transfer"
-                  maxLength={100}
-                  required
-                  className="mt-1"
-                  data-testid="input-other-payment-details"
-                />
-              </div>
-            )}
-            {myRecipient?.isPaid ? (
-              <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <p className="text-xs text-emerald-600 dark:text-emerald-300">
-                  Payment marked as {myRecipient.paymentMethod || 'paid'}.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={updateRecipientMutation.isPending}
-                  onClick={() => {
-                    if (!myRecipient) return;
-                    updateRecipientMutation.mutate({
-                      recipientId: myRecipient.id,
-                      isPaid: false,
-                      paymentMethod: null,
-                    });
-                  }}
-                  data-testid="button-undo-payment"
-                >
-                  {updateRecipientMutation.isPending ? 'Undoing…' : 'Undo / change method'}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                className="w-full mt-3"
-                disabled={
-                  !selectedPaymentMethod ||
-                  !myRecipient ||
-                  updateRecipientMutation.isPending ||
-                  (selectedPaymentMethod === 'other' && !otherPaymentDetails.trim())
-                }
-                onClick={() => {
-                  if (!selectedPaymentMethod || !myRecipient) return;
-                  updateRecipientMutation.mutate({
-                    recipientId: myRecipient.id,
-                    isPaid: true,
-                    paymentMethod: selectedPaymentMethod,
-                  });
-                }}
-                data-testid="button-confirm-payment"
-              >
-                {updateRecipientMutation.isPending ? 'Confirming…' : 'Confirm'}
-              </Button>
-            )}
-          </div>
+          <PaymentMethodPicker
+            className="mb-6"
+            creatorName={creatorName}
+            venmoUrl={venmoUrl}
+            cashappUrl={cashappUrl}
+            isPaid={!!myRecipient?.isPaid}
+            isConfirmed={!!myRecipient?.isConfirmed}
+            paymentMethod={myRecipient?.paymentMethod}
+            isPending={updateRecipientMutation.isPending}
+            onUpdate={(isPaid, paymentMethod) => {
+              if (!myRecipient) return;
+              updateRecipientMutation.mutate({
+                recipientId: myRecipient.id,
+                isPaid,
+                paymentMethod,
+              });
+            }}
+          />
         )}
 
         {/* Recipients List */}

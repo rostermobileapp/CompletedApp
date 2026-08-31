@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { parseScrimmageDateTime } from "@/lib/scrimmageDateTime";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign, CreditCard, ChevronRight, LayoutList } from "lucide-react";
+import { Trophy, Check, X, ArrowLeft, MapPin, Clock, Target, Users, Trash2, Star, UserSearch, DollarSign, CreditCard, LayoutList } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SiVenmo, SiCashapp } from "react-icons/si";
 import { resolveVenmoLink, resolveCashAppLink } from "@/lib/paymentLinks";
@@ -27,6 +27,7 @@ import { getScrimmageCoverSrc } from '@/lib/scrimmageCoverOptions';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
+import { PaymentMethodPicker, type PaymentMethod } from "@/components/PaymentMethodPicker";
 
 interface ApprovedScrimmagePlayer extends ScrimmageRequest {
   player?: Pick<User, 'id' | 'firstName' | 'lastName'> | null;
@@ -174,6 +175,12 @@ export default function GameDetails() {
   const _scrimmageForHooks = (scrimmageData as any)?.scrimmage;
   const _canManageForHooks = !!(scrimmageData as any)?.canManagePlayers ||
     (_scrimmageForHooks?.creatorId === (user as any)?.id);
+  const _myScrimmageRequestForHooks = (userScrimmageRequests || []).find(
+    (request: any) => request.scrimmageId === gameId,
+  );
+  const _canPayForHooks =
+    _myScrimmageRequestForHooks?.status === 'approved' ||
+    _myScrimmageRequestForHooks?.status === 'pending';
 
   // Beer counter — visible 2 h before game time through 6 h after
   const beerWindowOpen = React.useMemo(() => {
@@ -209,16 +216,34 @@ export default function GameDetails() {
     enabled: !!gameId && isScrimmage && _canManageForHooks,
   });
 
-  // Payment requests received by this user — used to show "Payment Due" banner on scrimmage screen
-  const { data: receivedPaymentRequests = [] } = useQuery<any[]>({
-    queryKey: ['/api/payment-requests/received/by-me'],
-    enabled: !!gameId && isScrimmage,
-  });
-
-  // Payment requests for this scrimmage — manager-only view of per-player paid/unpaid status
+  // Managers see every recipient; players receive only their own filtered row.
   const { data: scrimmagePaymentRequests = [] } = useQuery<any[]>({
     queryKey: [`/api/scrimmages/${gameId}/payment-requests`],
-    enabled: !!gameId && isScrimmage && _canManageForHooks,
+    enabled: !!gameId && isScrimmage && (_canManageForHooks || _canPayForHooks),
+  });
+
+  const updateMyScrimmagePaymentMutation = useMutation({
+    mutationFn: async ({ isPaid, paymentMethod }: { isPaid: boolean; paymentMethod: PaymentMethod | null }) => {
+      const res = await apiRequest('PATCH', `/api/scrimmages/${gameId}/my-payment`, {
+        isPaid,
+        paymentMethod,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Payment status updated' });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/payment-requests`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
+    },
+    onError: (error: any, variables) => {
+      toast({
+        title: variables?.isPaid === false ? 'Could not undo payment' : 'Failed to update payment status',
+        description: error.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
   });
 
   // Approve or decline a pending scrimmage request
@@ -556,21 +581,29 @@ export default function GameDetails() {
       scrimmage.cashappLinkOverride,
       scrimmageCreator?.cashappUsername,
     );
-    const showScrimmagePayCard =
-      !!scrimmage.costPerPlayer && (scrimmageVenmoUrl || scrimmageCashAppUrl);
+    const myScrimmageRequest = (userScrimmageRequests || []).find(
+      (request: any) => request.scrimmageId === gameId,
+    );
+    const canPayScrimmage =
+      myScrimmageRequest?.status === 'approved' ||
+      myScrimmageRequest?.status === 'pending';
+    const isScrimmageManager = isScrimmageCreator || canManagePlayers;
+    const showCreatorPaymentCard =
+      isScrimmageManager &&
+      !!scrimmage.costPerPlayer &&
+      !!(scrimmageVenmoUrl || scrimmageCashAppUrl);
+    const showPlayerPaymentCard =
+      !isScrimmageManager &&
+      !!scrimmage.costPerPlayer &&
+      canPayScrimmage;
     const scrimmageCreatorName = scrimmageCreator
       ? `${scrimmageCreator.firstName ?? ''} ${scrimmageCreator.lastName ?? ''}`.trim() || 'the organizer'
       : 'the organizer';
     const isFinalized = scrimmage.status === 'roster_confirmed';
 
-    // Find an unpaid payment request for this scrimmage linked to the current user
-    const myUnpaidScrimmagePayment = (!isScrimmageCreator && !canManagePlayers)
-      ? (receivedPaymentRequests as any[]).find((pr: any) => {
-          if (pr.relatedScrimmageId !== gameId) return false;
-          const myRecipient = (pr.recipients || []).find((r: any) => r.userId === dbUserId);
-          return myRecipient && !myRecipient.paidAt;
-        })
-      : null;
+    const myScrimmagePaymentRecipient = (scrimmagePaymentRequests as any[])
+      .flatMap((paymentRequest: any) => paymentRequest.recipients || [])
+      .find((recipient: any) => recipient.userId === dbUserId);
 
     // Build a map from userId → paidAt for manager's per-player payment status view
     const playerPaymentStatus: Record<string, boolean> = {};
@@ -734,44 +767,19 @@ export default function GameDetails() {
             );
           })()}
 
-          {/* Payment Due banner — shown to non-creator approved players who have an unpaid invoice for this scrimmage */}
-          {myUnpaidScrimmagePayment && (
-            <button
-              onClick={() => {
-                setPageTransitionDirection('right');
-                navigate('/payment-requests');
-              }}
-              className="w-full rounded-xl border border-orange-400 bg-orange-50 dark:bg-orange-950/40 shadow-[var(--elev-rest)] p-4 flex items-center gap-3 text-left"
-              data-testid="card-payment-due"
-            >
-              <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
-                <CreditCard className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-orange-700 dark:text-orange-400 text-sm">Payment Due</p>
-                <p className="text-xs text-orange-600 dark:text-orange-500 truncate">
-                  ${Number(myUnpaidScrimmagePayment.amountPerPerson).toFixed(2)} owed to {scrimmageCreatorName} · Tap to view
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-orange-500 flex-shrink-0" />
-            </button>
-          )}
-
           {/* Pay-the-organizer card — shown when the scrimmage has a cost
               and at least one payment link can be resolved. The override
               wins; otherwise we fall back to the creator's profile handle. */}
-          {showScrimmagePayCard && (
+          {showCreatorPaymentCard && (
             <div
               className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6"
               data-testid="card-scrimmage-pay"
             >
               <h3 className="text-lg font-semibold mb-1">
-                {isScrimmageCreator ? 'How players will pay you' : `Pay ${scrimmageCreatorName}`}
+                {isScrimmageCreator ? 'How players will pay you' : 'How players will pay the organizer'}
               </h3>
               <p className="text-xs text-muted-foreground mb-3">
-                {isScrimmageCreator
-                  ? 'These are the links players see for this scrimmage. Edit the scrimmage to change them.'
-                  : `Send ${scrimmage.costPerPlayer ? `$${Number(scrimmage.costPerPlayer).toFixed(2)} ` : ''}using one of the options below.`}
+                These are the links players see for this scrimmage. Edit the scrimmage to change them.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 {scrimmageVenmoUrl && (
@@ -806,6 +814,21 @@ export default function GameDetails() {
                 )}
               </div>
             </div>
+          )}
+
+          {showPlayerPaymentCard && (
+            <PaymentMethodPicker
+              creatorName={scrimmageCreatorName}
+              venmoUrl={scrimmageVenmoUrl}
+              cashappUrl={scrimmageCashAppUrl}
+              isPaid={!!myScrimmagePaymentRecipient?.isPaid}
+              isConfirmed={!!myScrimmagePaymentRecipient?.isConfirmed}
+              paymentMethod={myScrimmagePaymentRecipient?.paymentMethod}
+              isPending={updateMyScrimmagePaymentMutation.isPending}
+              onUpdate={(isPaid, paymentMethod) => {
+                updateMyScrimmagePaymentMutation.mutate({ isPaid, paymentMethod });
+              }}
+            />
           )}
 
           {/* Approved Players */}
