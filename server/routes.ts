@@ -626,8 +626,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS recurrence_times_independent boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_emails text[] NOT NULL DEFAULT '{}'::text[]`);
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS has_deferred_invites boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS facility_id varchar REFERENCES facilities(id) ON DELETE SET NULL`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_scrimmages_facility_id ON scrimmages(facility_id)`);
+    await db.execute(sql`
+      UPDATE scrimmages AS s
+      SET facility_id = f.id
+      FROM facilities AS f
+      WHERE s.facility_id IS NULL
+        AND (
+          lower(trim(s.location)) = lower(trim(f.name))
+          OR lower(trim(s.location)) = lower(trim(COALESCE(f.address, '')))
+        )
+    `);
   } catch (err) {
-    console.error('[Init] Failed to ensure scrimmage Time TBD columns:', err);
+    console.error('[Init] Failed to ensure scrimmage scheduling/venue columns:', err);
   }
   // Ensure invite_group_members.placeholder_player_id exists (placeholder support in invite groups)
   try {
@@ -6806,6 +6818,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching league members for scrimmage:", error);
       res.status(500).json({ message: "Failed to fetch league members" });
+    }
+  });
+
+  const getVenueScrimmagePoolForUser = async (userId: string, facilityId: string) => {
+    const userLeagues = await storage.getUserLeagues(userId);
+    const venueUserLeagues = userLeagues.filter((league: any) => league.facilityId === facilityId);
+    const members = await storage.getVenueScrimmageMembers(
+      facilityId,
+      venueUserLeagues.map((league: any) => league.id),
+    );
+    const facilityMembership = await storage.getUserFacilityMembership(userId, facilityId);
+    const hasVenueRelationship =
+      venueUserLeagues.length > 0 ||
+      facilityMembership?.status === 'active' ||
+      members.some((member: any) => member.userId === userId);
+    return { members, venueUserLeagues, hasVenueRelationship };
+  };
+
+  const validateVenueInviteTargets = async (
+    userId: string,
+    facilityId: string,
+    inviteeIds: string[],
+  ) => {
+    if (inviteeIds.length === 0) return { valid: true, invalidIds: [] as string[] };
+    const { members, hasVenueRelationship } = await getVenueScrimmagePoolForUser(userId, facilityId);
+    if (!hasVenueRelationship) {
+      return { valid: false, invalidIds: inviteeIds };
+    }
+    const allowedIds = new Set(members.map((member: any) => member.userId));
+    const invalidIds = inviteeIds.filter((id) => !allowedIds.has(id));
+    return { valid: invalidIds.length === 0, invalidIds };
+  };
+
+  const normalizeStringIds = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return Array.from(new Set(
+      value.filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ));
+  };
+
+  const validateVenueInviteGroups = async (
+    userId: string,
+    facilityId: string,
+    groupIds: string[],
+  ) => {
+    const groupMembers = (await Promise.all(
+      groupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
+    )).flat();
+    if (groupMembers.some((member) => member.email && !member.userId && !(member as any).placeholderPlayerId)) {
+      return false;
+    }
+    const memberIds = groupMembers.flatMap((member) => {
+      if (member.userId) return [member.userId];
+      const placeholderId = (member as any).placeholderPlayerId;
+      return placeholderId ? [`placeholder:${placeholderId}`] : [];
+    });
+    return (await validateVenueInviteTargets(userId, facilityId, memberIds)).valid;
+  };
+
+  // Venue-wide player pool for scrimmage creation. Access is limited to users
+  // who have a durable relationship with the rink (facility membership,
+  // venue-linked league/team/event/game/scrimmage, or commissioner role).
+  app.get("/api/facilities/:id/members-for-scrimmage", isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const facilityId = req.params.id;
+      const userId = req.user.claims.sub;
+      const facility = await storage.getFacility(facilityId);
+      if (!facility) {
+        return res.status(404).json({ message: "Rink not found" });
+      }
+
+      const { members, hasVenueRelationship } = await getVenueScrimmagePoolForUser(userId, facilityId);
+
+      if (!hasVenueRelationship) {
+        return res.status(403).json({
+          message: "Join this rink or one of its leagues before browsing its players",
+        });
+      }
+
+      const directlyLinkedLeagues = await db
+        .select({ id: leagues.id, name: leagues.name })
+        .from(leagues)
+        .where(eq(leagues.facilityId, facilityId));
+      const venueLeagues = Array.from(new Map(
+        [
+          ...directlyLinkedLeagues,
+          ...members.flatMap((member: any) => member.leagues || []),
+        ].map((league: { id: string; name: string }) => [league.id, league]),
+      ).values()).sort((a, b) => a.name.localeCompare(b.name));
+
+      res.json({
+        facility: {
+          id: facility.id,
+          name: facility.name,
+          address: facility.address,
+          city: facility.city,
+          state: facility.state,
+        },
+        leagues: venueLeagues,
+        members,
+      });
+    } catch (error) {
+      console.error("Error fetching rink members for scrimmage:", error);
+      res.status(500).json({ message: "Failed to fetch rink players" });
     }
   });
 
@@ -15821,6 +15937,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
     ].filter(Boolean)));
 
+  const canUserAccessScrimmage = async (scrimmage: any, userId: string) => {
+    if (scrimmage.creatorId === userId) return true;
+    const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
+    if (membership?.status === 'approved') return true;
+    if (scrimmage.inviteUserIds?.includes(userId)) return true;
+
+    const [request, coHost, emailInvites, hasAnnouncementVisibility] = await Promise.all([
+      storage.getScrimmageRequest(scrimmage.id, userId),
+      storage.getScrimmageCoHost(scrimmage.id, userId),
+      storage.getScrimmageInvites(scrimmage.id),
+      scrimmage.announcementId
+        ? storage.isAnnouncementVisibleToUser(scrimmage.announcementId, userId)
+        : Promise.resolve(false),
+    ]);
+    if (
+      request ||
+      coHost ||
+      hasAnnouncementVisibility ||
+      emailInvites.some((invite: any) => invite.userId === userId)
+    ) {
+      return true;
+    }
+
+    if (scrimmage.facilityId) {
+      const { members } = await getVenueScrimmagePoolForUser(userId, scrimmage.facilityId);
+      return members.some((member: any) => member.userId === userId);
+    }
+    return false;
+  };
+
   /**
    * Create the payment request for approved scrimmage players that do not
    * already have one. This is shared by finalization and by edits that add a
@@ -15950,6 +16096,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const recipientIds = new Set(
       (scrimmage.inviteUserIds || []).filter((id) => !id.startsWith('placeholder:')),
     );
+    const allowedVenueIds = scrimmage.facilityId
+      ? new Set(
+          (await getVenueScrimmagePoolForUser(scrimmage.creatorId, scrimmage.facilityId))
+            .members.map((member: any) => member.userId),
+        )
+      : null;
     const emailRecipients = new Set(
       (scrimmage.inviteEmails || []).map((email) => email.toLowerCase().trim()),
     );
@@ -15959,8 +16111,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
       )).flat();
       for (const member of groupMembers) {
-        if (member.userId) recipientIds.add(member.userId);
-        if (member.email) emailRecipients.add(member.email.toLowerCase().trim());
+        if (member.userId && (!allowedVenueIds || allowedVenueIds.has(member.userId))) {
+          recipientIds.add(member.userId);
+        }
+        if (!allowedVenueIds && member.email) emailRecipients.add(member.email.toLowerCase().trim());
+      }
+    }
+    if (allowedVenueIds) {
+      for (const recipientId of Array.from(recipientIds)) {
+        if (!allowedVenueIds.has(recipientId)) recipientIds.delete(recipientId);
       }
     }
     recipientIds.delete(scrimmage.creatorId);
@@ -16108,6 +16267,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Must be an approved league member to create scrimmages" });
       }
 
+      // Persist the explicit rink relationship and use its canonical display
+      // name as the scrimmage location. Older clients may omit facilityId and
+      // continue using the free-text location contract.
+      if (scrimmageData.facilityId) {
+        const facility = await storage.getFacility(scrimmageData.facilityId);
+        if (!facility) {
+          return res.status(400).json({ message: "Selected rink was not found" });
+        }
+        const venueAccess = await getVenueScrimmagePoolForUser(userId, scrimmageData.facilityId);
+        if (!venueAccess.hasVenueRelationship) {
+          return res.status(403).json({
+            message: "Join this rink or one of its leagues before creating a scrimmage there",
+          });
+        }
+        scrimmageData.location = facility.name;
+      }
+
+      const requestedSelectedMemberIds = normalizeStringIds(req.body.selectedMemberIds);
+      const requestedInviteUserIds = normalizeStringIds(req.body.inviteUserIds);
+      if (scrimmageData.facilityId) {
+        const inviteTargetValidation = await validateVenueInviteTargets(
+          userId,
+          scrimmageData.facilityId,
+          Array.from(new Set([...requestedSelectedMemberIds, ...requestedInviteUserIds])),
+        );
+        if (!inviteTargetValidation.valid) {
+          return res.status(403).json({
+            message: "Every selected player must be connected to the selected rink",
+          });
+        }
+      }
+
       const requestedInviteGroupIds = Array.from(new Set([
         ...(scrimmageData.inviteGroupIds || []),
         ...(scrimmageData.inviteGroupId ? [scrimmageData.inviteGroupId] : []),
@@ -16123,6 +16314,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (inviteGroup.leagueId && inviteGroup.leagueId !== scrimmageData.leagueId) {
           return res.status(400).json({ message: 'Invite group does not belong to this league' });
         }
+      }
+      if (
+        scrimmageData.facilityId &&
+        !(await validateVenueInviteGroups(userId, scrimmageData.facilityId, requestedInviteGroupIds))
+      ) {
+        return res.status(403).json({
+          message: "Invite groups may only contain players connected to this rink; add outside email guests separately",
+        });
       }
       scrimmageData.inviteGroupIds = requestedInviteGroupIds;
       scrimmageData.inviteGroupId = requestedInviteGroupIds[0] || null;
@@ -16142,7 +16341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Only create the announcement when at least one real user is targeted;
       // an announcement with no visibility rows is visible to the entire league.
       let announcementId = null;
-      const realSelectedMemberIds = (req.body.selectedMemberIds || []).filter(
+      const realSelectedMemberIds = requestedSelectedMemberIds.filter(
         (id: string) => !id.startsWith('placeholder:')
       );
       if (realSelectedMemberIds.length > 0) {
@@ -16271,7 +16470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // wall-clock string rather than a Date (which Drizzle serializes as
           // UTC and would turn 9 PM Eastern into 1 AM).
           dateTime: formatDateInTimezone(dates[0], "yyyy-MM-dd'T'HH:mm:ss", league.timezone),
-          inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
+          inviteUserIds: requestedInviteUserIds, // Only manual (non-group) selections
           inviteEmails: savedInviteEmails,
           hasDeferredInvites: !!scrimmageData.timeTbd,
           recurrenceTimesIndependent: true,
@@ -16354,7 +16553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             timeTbd: true,
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
-            inviteUserIds: (req.body.inviteUserIds as string[]) || [],
+            inviteUserIds: requestedInviteUserIds,
             inviteEmails: savedInviteEmails,
             hasDeferredInvites: true,
             recurrenceTimesIndependent: true,
@@ -16384,7 +16583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // ALWAYS send in-app notifications when members are invited, including
         // Time TBD events. Push delivery with the exact time remains deferred.
-        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        if (requestedSelectedMemberIds.length > 0) {
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -16408,7 +16607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             inviteTeamLogoUrl = resolveTeamLogoUrl(inviteTeamRows[0]?.logoUrl);
           } catch (e) { /* keep undefined */ }
           
-          for (const memberId of req.body.selectedMemberIds) {
+          for (const memberId of requestedSelectedMemberIds) {
             // Placeholder players have no account — skip notifications for them.
             if (typeof memberId === 'string' && memberId.startsWith('placeholder:')) continue;
             try {
@@ -16456,7 +16655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter((email: string) => emailSchema.safeParse(email).success);
             
             // Deduplicate emails
-            const uniqueEmails = Array.from(new Set(validEmails));
+            const uniqueEmails: string[] = Array.from(new Set<string>(validEmails));
             
             if (uniqueEmails.length > 0) {
               await storage.createScrimmageInvites(parentScrimmage.id, uniqueEmails);
@@ -16497,7 +16696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const scrimmage = await storage.createScrimmage({
           ...scrimmageData,
           announcementId,
-          inviteUserIds: (req.body.inviteUserIds as string[]) || [], // Only manual (non-group) selections
+          inviteUserIds: requestedInviteUserIds, // Only manual (non-group) selections
           inviteEmails: savedInviteEmails,
           hasDeferredInvites: !!scrimmageData.timeTbd,
         });
@@ -16571,7 +16770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // ALWAYS send in-app notifications when members are invited, including
         // Time TBD events. Push delivery with the exact time remains deferred.
-        if (req.body.selectedMemberIds && req.body.selectedMemberIds.length > 0) {
+        if (requestedSelectedMemberIds.length > 0) {
           const creator = await storage.getUser(userId);
           const organizerName = creator 
             ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
@@ -16595,7 +16794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             singleInviteTeamLogoUrl = resolveTeamLogoUrl(singleInviteTeamRows[0]?.logoUrl);
           } catch (e) { /* keep undefined */ }
           
-          for (const memberId of req.body.selectedMemberIds) {
+          for (const memberId of requestedSelectedMemberIds) {
             // Placeholder players have no account — skip notifications for them.
             if (typeof memberId === 'string' && memberId.startsWith('placeholder:')) continue;
             try {
@@ -16643,7 +16842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter((email: string) => emailSchema.safeParse(email).success);
             
             // Deduplicate emails
-            const uniqueEmails = Array.from(new Set(validEmails));
+            const uniqueEmails: string[] = Array.from(new Set<string>(validEmails));
             
             if (uniqueEmails.length > 0) {
               await storage.createScrimmageInvites(scrimmage.id, uniqueEmails);
@@ -16723,10 +16922,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
       
-      // Verify user is a member of the league
-      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(403).json({ message: "Must be a league member to view scrimmage details" });
+      if (!(await canUserAccessScrimmage(scrimmage, userId))) {
+        return res.status(403).json({ message: "Not authorized to view this scrimmage" });
       }
 
       res.json(scrimmage);
@@ -16772,6 +16969,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (validationError) {
         console.error('Validation error updating scrimmage:', validationError);
         return res.status(400).json({ message: "Invalid update data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
+      }
+
+      if (updateData.facilityId) {
+        const facility = await storage.getFacility(updateData.facilityId);
+        if (!facility) {
+          return res.status(400).json({ message: "Selected rink was not found" });
+        }
+        updateData.location = facility.name;
+      }
+
+      const hasInviteUserIdsUpdate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'inviteUserIds');
+      const requestedInviteUserIds = normalizeStringIds(req.body.inviteUserIds);
+      if (hasInviteUserIdsUpdate) {
+        updateData.inviteUserIds = requestedInviteUserIds;
+      }
+      const effectiveFacilityId = updateData.facilityId === undefined
+        ? existingScrimmage.facilityId
+        : updateData.facilityId;
+      const facilityChanged =
+        updateData.facilityId !== undefined &&
+        updateData.facilityId !== existingScrimmage.facilityId;
+      if (effectiveFacilityId && facilityChanged) {
+        const venueAccess = await getVenueScrimmagePoolForUser(userId, effectiveFacilityId);
+        if (!venueAccess.hasVenueRelationship) {
+          return res.status(403).json({
+            message: "Join this rink or one of its leagues before moving the scrimmage there",
+          });
+        }
+      }
+      const existingInviteUserIds = normalizeStringIds(existingScrimmage.inviteUserIds);
+      const inviteIdsChanged =
+        hasInviteUserIdsUpdate &&
+        (
+          requestedInviteUserIds.length !== existingInviteUserIds.length ||
+          requestedInviteUserIds.some((id) => !existingInviteUserIds.includes(id))
+        );
+      if (effectiveFacilityId && (facilityChanged || inviteIdsChanged)) {
+        const inviteTargetValidation = await validateVenueInviteTargets(
+          userId,
+          effectiveFacilityId,
+          hasInviteUserIdsUpdate ? requestedInviteUserIds : existingInviteUserIds,
+        );
+        if (!inviteTargetValidation.valid) {
+          return res.status(403).json({
+            message: "Every selected player must be connected to the selected rink",
+          });
+        }
       }
       
       // Business invariants validation
@@ -16835,6 +17079,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (inviteGroup.leagueId && inviteGroup.leagueId !== existingScrimmage.leagueId) {
             return res.status(400).json({ message: 'Invite group does not belong to this league' });
           }
+        }
+        const existingGroupIds = getInviteGroupIds(existingScrimmage);
+        const groupsChanged =
+          requestedInviteGroupIds.length !== existingGroupIds.length ||
+          requestedInviteGroupIds.some((id) => !existingGroupIds.includes(id));
+        if (
+          effectiveFacilityId &&
+          (facilityChanged || groupsChanged) &&
+          !(await validateVenueInviteGroups(userId, effectiveFacilityId, requestedInviteGroupIds))
+        ) {
+          return res.status(403).json({
+            message: "Invite groups may only contain players connected to this rink; add outside email guests separately",
+          });
         }
         updateData.inviteGroupIds = requestedInviteGroupIds;
         updateData.inviteGroupId = requestedInviteGroupIds[0] || null;
@@ -17177,10 +17434,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
       }
       
-      // Verify user is a member of the league
-      const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(403).json({ message: "Must be an approved league member to join scrimmages" });
+      if (!(await canUserAccessScrimmage(scrimmage, userId))) {
+        return res.status(403).json({ message: "You must be connected to this rink or directly invited to join" });
       }
 
       // Check if user already has a request for this scrimmage
@@ -17458,29 +17713,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
 
-      // Access check: league-linked scrimmages require league membership;
-      // standalone scrimmages (no leagueId) allow creator, co-hosts, or anyone with an invite/request.
-      if (scrimmage.leagueId) {
-        const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
-        if (!membership || membership.status !== 'approved') {
-          return res.status(403).json({ message: "Must be a league member to view scrimmage details" });
-        }
-      } else {
-        const isCreator = scrimmage.creatorId === userId;
-        if (!isCreator) {
-          const [allRequests, allInvites, coHost] = await Promise.all([
-            storage.getScrimmageRequests(scrimmageId),
-            storage.getScrimmageInvites(scrimmageId),
-            storage.getScrimmageCoHost(scrimmageId, userId),
-          ]);
-          const hasAccess =
-            allRequests.some((r: any) => r.playerId === userId) ||
-            allInvites.some((i: any) => i.inviteeId === userId) ||
-            !!coHost;
-          if (!hasAccess) {
-            return res.status(403).json({ message: "Not authorized to view this scrimmage" });
-          }
-        }
+      if (!(await canUserAccessScrimmage(scrimmage, userId))) {
+        return res.status(403).json({ message: "Not authorized to view this scrimmage" });
       }
 
       // Get only approved requests
@@ -21931,7 +22165,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const members = await db
           .select({ userId: facilityMemberships.userId })
           .from(facilityMemberships)
-          .where(eq(facilityMemberships.facilityId, facilityId));
+          .where(and(
+            eq(facilityMemberships.facilityId, facilityId),
+            eq(facilityMemberships.status, 'active'),
+          ));
         rinkMemberIds = new Set(members.map(m => m.userId));
       }
 

@@ -1243,6 +1243,9 @@ export const announcementComments = pgTable("announcement_comments", {
 export const scrimmages = pgTable("scrimmages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leagueId: varchar("league_id").references(() => leagues.id).notNull(),
+  // Explicit rink context for venue-wide player discovery. leagueId remains the
+  // required authorization/timezone/notification context.
+  facilityId: varchar("facility_id").references(() => facilities.id),
   creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   title: varchar("title").notNull(),
   dateTime: timestamp("date_time", { mode: 'string' }).notNull(),
@@ -2353,6 +2356,10 @@ export const scrimmagesRelations = relations(scrimmages, ({ one, many }) => ({
   league: one(leagues, {
     fields: [scrimmages.leagueId],
     references: [leagues.id],
+  }),
+  facility: one(facilities, {
+    fields: [scrimmages.facilityId],
+    references: [facilities.id],
   }),
   creator: one(users, {
     fields: [scrimmages.creatorId],

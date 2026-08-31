@@ -98,6 +98,9 @@ export default function CreateScrimmage() {
   const [coHostSearchLoading, setCoHostSearchLoading] = useState(false);
   const coHostDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedRinkFacilityId, setSelectedRinkFacilityId] = useState<string | null>(null);
+  const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(null);
+  const [playerLeagueFilter, setPlayerLeagueFilter] = useState('all');
+  const rinkDefaultInitializedRef = useRef(false);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
   const [formInitialized, setFormInitialized] = useState(false);
   
@@ -211,12 +214,29 @@ export default function CreateScrimmage() {
     ?? (userLeagues as any[])[0]
     ?? null;
 
-  // Get the league's facility if it exists
+  // The league remains the required authorization, timezone, and notification
+  // context. The rink independently controls the player pool.
   const leagueFacility = selectedLeague?.facility;
-  const { data: leagueMembers = [], isLoading: membersLoading } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague?.id}/members-for-scrimmage`],
-    enabled: !!selectedLeague?.id,
+  const {
+    data: venuePlayerPool,
+    isLoading: membersLoading,
+    error: venueMembersError,
+  } = useQuery<any>({
+    queryKey: ['/api/facilities', selectedRinkFacilityId, 'members-for-scrimmage'],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        `/api/facilities/${selectedRinkFacilityId}/members-for-scrimmage`,
+      );
+      return response.json();
+    },
+    enabled: !!selectedRinkFacilityId,
   });
+  const venueLeagues = (venuePlayerPool?.leagues || []) as Array<{ id: string; name: string }>;
+  const venueMembers = (venuePlayerPool?.members || []) as any[];
+  const poolMembers = playerLeagueFilter === 'all'
+    ? venueMembers
+    : venueMembers.filter((member: any) => (member.leagueIds || []).includes(playerLeagueFilter));
 
   // Use the same canonical saved-group query/cache as the Invite Groups page.
   // A separate league-filtered key could retain an empty result even after
@@ -244,27 +264,44 @@ export default function CreateScrimmage() {
   });
 
   // Separate goalie / skater lists with independent search
-  const filteredGoalies = (leagueMembers as any[]).filter((member: any) =>
+  const filteredGoalies = poolMembers.filter((member: any) =>
     member.isGoalie === true &&
     `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(goalieSearchTerm.toLowerCase())
   );
-  const filteredSkaters = (leagueMembers as any[]).filter((member: any) =>
+  const filteredSkaters = poolMembers.filter((member: any) =>
     member.isSkater === true &&
     `${member.user.firstName} ${member.user.lastName}`.toLowerCase().includes(skaterSearchTerm.toLowerCase())
   );
 
 
-  // Set default venue to league facility when it loads (only for create mode)
+  // Start at the selected league's rink when one exists, while keeping rink
+  // selection independent from the scrimmage's league metadata.
   useEffect(() => {
-    if (!isEditMode && leagueFacility && !form.watch('venue')) {
+    if (!isEditMode && leagueFacility && !selectedRinkFacilityId && !rinkDefaultInitializedRef.current) {
+      rinkDefaultInitializedRef.current = true;
+      setSelectedRink({
+        facilityId: leagueFacility.id,
+        name: leagueFacility.name,
+        address: leagueFacility.address || '',
+      });
+      setSelectedRinkFacilityId(leagueFacility.id);
       form.setValue('venue', leagueFacility.name);
     }
-  }, [leagueFacility, form, isEditMode]);
+  }, [leagueFacility, form, isEditMode, selectedRinkFacilityId]);
 
   // Pre-populate form when editing an existing scrimmage
   useEffect(() => {
     if (isEditMode && existingScrimmage && !formInitialized) {
       setSelectedLeagueId(existingScrimmage.leagueId);
+      if (existingScrimmage.facilityId) {
+        const rink = {
+          facilityId: existingScrimmage.facilityId,
+          name: existingScrimmage.location || 'Selected rink',
+          address: '',
+        };
+        setSelectedRink(rink);
+        setSelectedRinkFacilityId(existingScrimmage.facilityId);
+      }
       const { date: dateStr, time: storedTime } = splitScrimmageDateTime(existingScrimmage.dateTime);
       const timeStr = existingScrimmage.timeTbd ? '' : storedTime;
       const savedInviteUserIds = Array.from(new Set<string>(existingScrimmage.inviteUserIds || []));
@@ -452,6 +489,8 @@ export default function CreateScrimmage() {
         coverPhoto: data.coverPhoto || null,
         // Join mode: how players are admitted
         joinMode,
+        // Explicit venue relationship used for rink-wide player discovery.
+        facilityId: selectedRinkFacilityId,
         inviteGroupIds: loadedInviteGroupIds,
         // Keep the first selected group in the legacy field for older clients/jobs.
         inviteGroupId: loadedInviteGroupIds[0] || null,
@@ -798,36 +837,76 @@ export default function CreateScrimmage() {
           </h3>
           
           <div className="space-y-1">
-            {/* League selector — shown at the top when the user belongs to multiple leagues */}
-            {!isEditMode && (userLeagues as any[]).length > 1 && (
-              <div>
-                <Label htmlFor="scrimmage-league">League</Label>
-                <Select
-                  value={selectedLeagueId ?? ''}
-                  onValueChange={(value) => {
-                    setSelectedLeagueId(value);
-                    // Clear invite selections so stale members from the previous league
-                    // don't remain checked.
-                    setSelectedMemberIds([]);
-                    setSelectedInviteGroupId('');
-                    setLoadedInviteGroupIds([]);
-                    setGroupLoadedUserIds(new Set());
-                    setGroupMembersById({});
-                  }}
-                >
-                  <SelectTrigger id="scrimmage-league" data-testid="select-scrimmage-league">
-                    <SelectValue placeholder="Select league…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(userLeagues as any[]).map((league: any) => (
-                      <SelectItem key={league.id} value={league.id}>
-                        {league.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Venue context controls the player pool. */}
+            <div className="space-y-1.5">
+              <Label>Venue / Rink</Label>
+              <RinkPickerField
+                key={selectedRink?.facilityId || 'no-rink-selected'}
+                initialSelection={selectedRink || undefined}
+                onSelect={(rink) => {
+                  rinkDefaultInitializedRef.current = true;
+                  setSelectedRink(rink);
+                  setSelectedRinkFacilityId(rink?.facilityId || null);
+                  setPlayerLeagueFilter('all');
+                  form.setValue('venue', rink?.name || '', { shouldValidate: true });
+
+                  // A different rink represents a different invite pool.
+                  setSelectedMemberIds([]);
+                  form.setValue('selectedMemberIds', []);
+                  setSelectedInviteGroupId('');
+                  setLoadedInviteGroupIds([]);
+                  setGroupLoadedUserIds(new Set());
+                  setGroupMembersById({});
+
+                  if (rink) {
+                    const matchingLeague = (userLeagues as any[]).find(
+                      (league: any) => league.facilityId === rink.facilityId,
+                    );
+                    if (matchingLeague) setSelectedLeagueId(matchingLeague.id);
+                  }
+                }}
+              />
+              {isEditMode && form.watch('venue') && !selectedRinkFacilityId && (
+                <p className="text-xs text-muted-foreground">
+                  Current saved venue: {form.watch('venue')}. Search above to link this scrimmage to a rink.
+                </p>
+              )}
+              {form.formState.errors.venue && (
+                <p className="text-sm text-destructive">{form.formState.errors.venue.message}</p>
+              )}
+            </div>
+
+            {/* Required legacy context stays explicit and independent of the pool filter. */}
+            <div>
+              <Label htmlFor="scrimmage-league">Scrimmage League</Label>
+              <Select
+                value={selectedLeagueId ?? ''}
+                disabled={isEditMode || (userLeagues as any[]).length <= 1}
+                onValueChange={(value) => {
+                  setSelectedLeagueId(value);
+                  setSelectedMemberIds([]);
+                  form.setValue('selectedMemberIds', []);
+                  setSelectedInviteGroupId('');
+                  setLoadedInviteGroupIds([]);
+                  setGroupLoadedUserIds(new Set());
+                  setGroupMembersById({});
+                }}
+              >
+                <SelectTrigger id="scrimmage-league" data-testid="select-scrimmage-league">
+                  <SelectValue placeholder="Select league…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(userLeagues as any[]).map((league: any) => (
+                    <SelectItem key={league.id} value={league.id}>
+                      {league.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Used for permissions, timezone, and notifications. It does not limit the rink player pool.
+              </p>
+            </div>
 
             <div>
               <Label htmlFor="title">Title</Label>
@@ -1406,32 +1485,14 @@ export default function CreateScrimmage() {
           </div>
         </div>
 
-        {/* Rink Information */}
+        {/* Capacity and payment information */}
         <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-[#ffffff] pt-[4px] pb-[4px] pl-[4px] pr-[4px] mt-[8px] mb-[8px]">
           <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
-            Rink Information
+            Capacity & Payments
           </h3>
           
           <div className="space-y-1">
-            <div>
-              <Label htmlFor="venue">Rink</Label>
-              <RinkPickerField
-                onSelect={(rink) => {
-                  form.setValue('venue', rink ? rink.name : '');
-                  setSelectedRinkFacilityId(rink ? rink.facilityId : null);
-                }}
-                initialSelection={
-                  leagueFacility
-                    ? { facilityId: leagueFacility.id, name: leagueFacility.name, address: leagueFacility.address || '' }
-                    : undefined
-                }
-              />
-              {form.formState.errors.venue && (
-                <p className="text-sm text-destructive mt-1">{form.formState.errors.venue.message}</p>
-              )}
-            </div>
-
             <div>
               <Label htmlFor="maxParticipants">Max Participants</Label>
               <Input
@@ -1689,6 +1750,51 @@ export default function CreateScrimmage() {
               Invite Members
             </h3>
 
+          {/* The rink defines the candidate pool; this filter never changes the
+              scrimmage's required league association. */}
+          <div className="mb-1.5 rounded-lg hairline elev-rest bg-muted/30 p-4">
+            <Label htmlFor="rink-player-league-filter" className="text-base font-semibold mb-1 block">
+              Players at this Rink
+            </Label>
+            {!selectedRinkFacilityId ? (
+              <p className="text-sm text-muted-foreground">
+                Select a venue/rink above to browse connected players.
+              </p>
+            ) : venueMembersError ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p className="font-medium">This rink's player list is unavailable.</p>
+                <p className="mt-1 text-muted-foreground">
+                  {(venueMembersError as Error)?.message || 'Join the rink or one of its leagues to browse players.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                <Select value={playerLeagueFilter} onValueChange={setPlayerLeagueFilter}>
+                  <SelectTrigger id="rink-player-league-filter" data-testid="select-rink-player-league-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      All players at {selectedRink?.name || 'this rink'}
+                    </SelectItem>
+                    {venueLeagues.map((league) => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {membersLoading
+                    ? 'Loading rink connections…'
+                    : playerLeagueFilter === 'all'
+                      ? `${venueMembers.length} connected player${venueMembers.length === 1 ? '' : 's'}, including players without a league here.`
+                      : `${poolMembers.length} player${poolMembers.length === 1 ? '' : 's'} in this league at the rink.`}
+                </p>
+              </>
+            )}
+          </div>
+
           {/* Invite Group Selector - Always shown at top */}
           <div className="mb-1\.5 p-4 bg-muted/30 rounded-lg hairline elev-rest">
             <Label htmlFor="invite-group" className="text-base font-semibold mb-1 block">
@@ -1852,7 +1958,7 @@ export default function CreateScrimmage() {
                         </div>
                       ) : filteredGoalies.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground text-sm">
-                          {goalieSearchTerm ? 'No goalies found' : 'No goalies in this league'}
+                          {goalieSearchTerm ? 'No goalies found' : 'No goalies in this rink filter'}
                         </div>
                       ) : (
                         <div className="space-y-1 pb-2">
@@ -1968,7 +2074,7 @@ export default function CreateScrimmage() {
                         </div>
                       ) : filteredSkaters.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground text-sm">
-                          {skaterSearchTerm ? 'No skaters found' : 'No skaters in this league'}
+                          {skaterSearchTerm ? 'No skaters found' : 'No skaters in this rink filter'}
                         </div>
                       ) : (
                         <div className="space-y-1 pb-2">
@@ -2019,7 +2125,7 @@ export default function CreateScrimmage() {
               Invite by Email
             </Label>
             <p className="text-sm text-muted-foreground mb-1">
-              Invite users who aren't in the league yet
+              Invite users who are not connected to this rink yet
             </p>
 
             {/* Email Search */}

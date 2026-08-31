@@ -11,11 +11,11 @@ export default function LeagueTournamentSearch() {
     <div className="min-h-screen flex flex-col pb-24" data-testid="league-tournament-search-page">
       {/* Header */}
       <div className="p-6 pt-12">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Find Leagues & Tournaments</h1>
+        <div className="flex items-start justify-between gap-2 mb-6">
+          <h1 className="text-2xl font-bold leading-tight" data-testid="text-page-title">Find Leagues & Tournaments</h1>
           <button 
             onClick={() => navigate('/')}
-            className="text-primary text-sm"
+            className="text-primary text-sm shrink-0 pt-1"
             data-testid="button-skip"
           >
             Skip
@@ -23,9 +23,10 @@ export default function LeagueTournamentSearch() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="leagues" data-testid="tab-leagues">Leagues</TabsTrigger>
-            <TabsTrigger value="tournaments" data-testid="tab-tournaments">Tournaments</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="leagues" className="px-2 text-xs sm:text-sm" data-testid="tab-leagues">Leagues</TabsTrigger>
+            <TabsTrigger value="tournaments" className="px-2 text-xs sm:text-sm" data-testid="tab-tournaments">Tournaments</TabsTrigger>
+            <TabsTrigger value="rinks" className="px-2 text-xs sm:text-sm" data-testid="tab-rinks">Rinks</TabsTrigger>
           </TabsList>
           
           <TabsContent value="leagues" className="mt-0">
@@ -56,6 +57,22 @@ export default function LeagueTournamentSearch() {
                 data-testid="button-go-to-tournament-search"
               >
                 Search for Tournaments
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="rinks" className="mt-0">
+            <div className="space-y-4">
+              <p className="text-muted-foreground text-sm">
+                Find and join local rinks to connect with players for scrimmages
+              </p>
+              <Button
+                onClick={() => navigate('/facilities')}
+                className="w-full"
+                size="lg"
+                data-testid="button-go-to-rink-search"
+              >
+                Search for Rinks
               </Button>
             </div>
           </TabsContent>

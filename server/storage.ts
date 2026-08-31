@@ -594,6 +594,7 @@ export interface IStorage {
   getScrimmage(scrimmageId: string): Promise<Scrimmage | undefined>;
   getLeagueScrimmages(leagueId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
   getUserScrimmages(userId: string): Promise<(Scrimmage & { creator: User; requestCount: number })[]>;
+  getVenueScrimmageMembers(facilityId: string, placeholderLeagueIds?: string[]): Promise<any[]>;
   updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage>;
   deleteScrimmage(scrimmageId: string): Promise<void>;
   getScrimmageSeries(parentId: string): Promise<Scrimmage[]>;
@@ -9420,6 +9421,267 @@ export class DatabaseStorage implements IStorage {
       creator: r.creator,
       requestCount: r.requestCount
     }));
+  }
+
+  /**
+   * Builds the invite pool for a rink from durable app relationships. A user
+   * may qualify through an active facility membership, a venue-linked league
+   * or team, a facility calendar event, a game at the rink, or a scrimmage at
+   * the rink. Results are deduplicated by user and retain every venue league
+   * relationship so the client can filter without dropping non-league users
+   * from the all-at-rink view.
+   */
+  async getVenueScrimmageMembers(facilityId: string, placeholderLeagueIds: string[] = []): Promise<any[]> {
+    const facility = await this.getFacility(facilityId);
+    if (!facility) return [];
+
+    type AggregatedMember = {
+      id: string;
+      userId: string;
+      status: 'approved';
+      isGoalie: boolean;
+      isSkater: boolean;
+      isPlaceholder?: boolean;
+      user: User | {
+        id: string;
+        firstName: string;
+        lastName: string;
+        profileImageUrl: null;
+      };
+      leagueIds: string[];
+      leagues: Array<{ id: string; name: string }>;
+      sourceTypes: string[];
+      _hasPositionData: boolean;
+    };
+
+    const members = new Map<string, AggregatedMember>();
+    const addUser = (
+      user: User,
+      sourceType: string,
+      options: {
+        leagueId?: string | null;
+        leagueName?: string | null;
+        isGoalie?: boolean;
+        isSkater?: boolean;
+        hasPositionData?: boolean;
+      } = {},
+    ) => {
+      if (user.deletedAt) return;
+      let member = members.get(user.id);
+      if (!member) {
+        member = {
+          id: `venue-member:${user.id}`,
+          userId: user.id,
+          status: 'approved',
+          isGoalie: false,
+          isSkater: false,
+          user,
+          leagueIds: [],
+          leagues: [],
+          sourceTypes: [],
+          _hasPositionData: false,
+        };
+        members.set(user.id, member);
+      }
+      if (!member.sourceTypes.includes(sourceType)) member.sourceTypes.push(sourceType);
+      if (options.leagueId && !member.leagueIds.includes(options.leagueId)) {
+        member.leagueIds.push(options.leagueId);
+        member.leagues.push({
+          id: options.leagueId,
+          name: options.leagueName || 'League',
+        });
+      }
+      if (options.hasPositionData) {
+        member._hasPositionData = true;
+        member.isGoalie = member.isGoalie || options.isGoalie === true;
+        member.isSkater = member.isSkater || options.isSkater === true;
+      }
+    };
+
+    const [
+      leagueRows,
+      facilityRows,
+      teamRows,
+      eventRows,
+      gameRows,
+      scrimmageRows,
+      scrimmageCreatorRows,
+    ] = await Promise.all([
+      db
+        .select({ membership: leagueMemberships, user: users, leagueId: leagues.id, leagueName: leagues.name })
+        .from(leagueMemberships)
+        .innerJoin(users, eq(leagueMemberships.userId, users.id))
+        .innerJoin(leagues, eq(leagueMemberships.leagueId, leagues.id))
+        .where(and(
+          eq(leagues.facilityId, facilityId),
+          eq(leagueMemberships.status, 'approved'),
+          isNull(users.deletedAt),
+        )),
+      db
+        .select({ membership: facilityMemberships, user: users })
+        .from(facilityMemberships)
+        .innerJoin(users, eq(facilityMemberships.userId, users.id))
+        .where(and(
+          eq(facilityMemberships.facilityId, facilityId),
+          eq(facilityMemberships.status, 'active'),
+          isNull(users.deletedAt),
+        )),
+      db
+        .select({
+          membership: teamMemberships,
+          user: users,
+          leagueId: leagues.id,
+          leagueName: leagues.name,
+        })
+        .from(teamMemberships)
+        .innerJoin(users, eq(teamMemberships.userId, users.id))
+        .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+        .leftJoin(leagues, eq(teams.leagueId, leagues.id))
+        .where(and(
+          eq(teamMemberships.status, 'approved'),
+          isNull(users.deletedAt),
+          or(eq(teams.facilityId, facilityId), eq(leagues.facilityId, facilityId)),
+        )),
+      db
+        .select({ user: users, leagueId: calendarEvents.leagueId, leagueName: leagues.name })
+        .from(eventParticipants)
+        .innerJoin(users, eq(eventParticipants.userId, users.id))
+        .innerJoin(calendarEvents, eq(eventParticipants.eventId, calendarEvents.id))
+        .leftJoin(leagues, eq(calendarEvents.leagueId, leagues.id))
+        .where(and(
+          eq(calendarEvents.facilityId, facilityId),
+          isNull(users.deletedAt),
+        )),
+      db
+        .select({ user: users, leagueId: games.leagueId, leagueName: leagues.name })
+        .from(gameRsvps)
+        .innerJoin(users, eq(gameRsvps.userId, users.id))
+        .innerJoin(games, eq(gameRsvps.gameId, games.id))
+        .leftJoin(leagues, eq(games.leagueId, leagues.id))
+        .leftJoin(calendarEvents, eq(calendarEvents.gameId, games.id))
+        .where(and(
+          isNull(users.deletedAt),
+          or(
+            eq(leagues.facilityId, facilityId),
+            eq(calendarEvents.facilityId, facilityId),
+            ilike(games.venue, facility.name),
+            facility.address ? ilike(games.venue, facility.address) : sql`false`,
+          ),
+        )),
+      db
+        .select({ user: users, leagueId: scrimmages.leagueId, leagueName: leagues.name })
+        .from(scrimmageRequests)
+        .innerJoin(users, eq(scrimmageRequests.playerId, users.id))
+        .innerJoin(scrimmages, eq(scrimmageRequests.scrimmageId, scrimmages.id))
+        .leftJoin(leagues, eq(scrimmages.leagueId, leagues.id))
+        .leftJoin(calendarEvents, eq(calendarEvents.scrimmageId, scrimmages.id))
+        .where(and(
+          or(
+            eq(scrimmages.facilityId, facilityId),
+            eq(calendarEvents.facilityId, facilityId),
+          ),
+          ne(scrimmageRequests.status, 'dismissed'),
+          isNull(users.deletedAt),
+        )),
+      db
+        .select({ user: users, leagueId: scrimmages.leagueId, leagueName: leagues.name })
+        .from(scrimmages)
+        .innerJoin(users, eq(scrimmages.creatorId, users.id))
+        .leftJoin(leagues, eq(scrimmages.leagueId, leagues.id))
+        .leftJoin(calendarEvents, eq(calendarEvents.scrimmageId, scrimmages.id))
+        .where(and(
+          or(
+            eq(scrimmages.facilityId, facilityId),
+            eq(calendarEvents.facilityId, facilityId),
+          ),
+          isNull(users.deletedAt),
+        )),
+    ]);
+
+    for (const row of leagueRows) {
+      addUser(row.user, 'league', {
+        leagueId: row.leagueId,
+        leagueName: row.leagueName,
+        isGoalie: row.membership.isGoalie,
+        isSkater: row.membership.isSkater,
+        hasPositionData: true,
+      });
+    }
+    for (const row of facilityRows) addUser(row.user, 'facility_membership');
+    for (const row of teamRows) {
+      const isGoalie = /goalie|goaltender|goalkeeper/i.test(row.membership.position || '');
+      addUser(row.user, 'team', {
+        leagueId: row.leagueId,
+        leagueName: row.leagueName,
+        isGoalie,
+        isSkater: !isGoalie,
+        hasPositionData: !!row.membership.position,
+      });
+    }
+    for (const row of eventRows) {
+      addUser(row.user, 'facility_event', { leagueId: row.leagueId, leagueName: row.leagueName });
+    }
+    for (const row of gameRows) {
+      addUser(row.user, 'game', { leagueId: row.leagueId, leagueName: row.leagueName });
+    }
+    for (const row of scrimmageRows) {
+      addUser(row.user, 'scrimmage', { leagueId: row.leagueId, leagueName: row.leagueName });
+    }
+    for (const row of scrimmageCreatorRows) {
+      addUser(row.user, 'scrimmage_creator', { leagueId: row.leagueId, leagueName: row.leagueName });
+    }
+
+    if (placeholderLeagueIds.length > 0) {
+      const venueLeagueRows = await db
+        .select({ id: leagues.id, name: leagues.name })
+        .from(leagues)
+        .where(and(
+          eq(leagues.facilityId, facilityId),
+          inArray(leagues.id, placeholderLeagueIds),
+        ));
+      for (const league of venueLeagueRows) {
+        const placeholders = await this.getLeaguePlaceholderPlayers(league.id);
+        for (const placeholder of placeholders) {
+          const userId = `placeholder:${placeholder.id}`;
+          if (members.has(userId)) continue;
+          members.set(userId, {
+            id: `placeholder-membership:${placeholder.id}`,
+            userId,
+            status: 'approved',
+            isGoalie: placeholder.isGoalie,
+            isSkater: placeholder.isSkater,
+            isPlaceholder: true,
+            user: {
+              id: userId,
+              firstName: placeholder.firstName,
+              lastName: placeholder.lastName,
+              profileImageUrl: null,
+            },
+            leagueIds: [league.id],
+            leagues: [{ id: league.id, name: league.name }],
+            sourceTypes: ['league_placeholder'],
+            _hasPositionData: true,
+          });
+        }
+      }
+    }
+
+    return Array.from(members.values())
+      .map(({ _hasPositionData, sourceTypes: _sourceTypes, ...member }) => ({
+        ...member,
+        isSkater: _hasPositionData ? member.isSkater : true,
+        user: {
+          id: member.user.id,
+          firstName: member.user.firstName,
+          lastName: member.user.lastName,
+          profileImageUrl: member.user.profileImageUrl,
+        },
+      }))
+      .sort((a, b) => {
+        const aName = `${a.user.firstName || ''} ${a.user.lastName || ''}`.trim();
+        const bName = `${b.user.firstName || ''} ${b.user.lastName || ''}`.trim();
+        return aName.localeCompare(bName);
+      });
   }
 
   async updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage> {

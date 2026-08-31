@@ -16,6 +16,19 @@ const getInviteGroupIds = (scrimmage: { inviteGroupIds?: string[] | null; invite
     ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
   ].filter(Boolean)));
 
+const getVenueAllowedInviteIds = async (scrimmage: any): Promise<Set<string> | null> => {
+  if (!scrimmage.facilityId) return null;
+  const creatorLeagues = await storage.getUserLeagues(scrimmage.creatorId);
+  const placeholderLeagueIds = creatorLeagues
+    .filter((league: any) => league.facilityId === scrimmage.facilityId)
+    .map((league: any) => league.id);
+  const venueMembers = await storage.getVenueScrimmageMembers(
+    scrimmage.facilityId,
+    placeholderLeagueIds,
+  );
+  return new Set(venueMembers.map((member: any) => member.userId));
+};
+
 export async function startScrimmageInviteJob() {
   console.log('🔔 Starting scrimmage invitation job (checking every 5 minutes)');
   
@@ -112,8 +125,11 @@ async function checkAndSendInvitations() {
         // preserved in inviteUserIds and must not be silently discarded.  We
         // collect them separately so they are acknowledged in logs and kept in
         // the invite record even though no notification is sent.
+        const allowedVenueIds = await getVenueAllowedInviteIds(parentScrimmage);
         const allInviteUserIds: string[] = parentScrimmage.inviteUserIds || [];
-        const placeholderInviteIds = allInviteUserIds.filter(id => id.startsWith('placeholder:'));
+        const placeholderInviteIds = allInviteUserIds.filter(
+          id => id.startsWith('placeholder:') && (!allowedVenueIds || allowedVenueIds.has(id)),
+        );
         const inviteEmails = new Set<string>(
           (scrimmage.inviteEmails || parentScrimmage.inviteEmails || [])
             .map((email: string) => email.toLowerCase().trim())
@@ -124,27 +140,38 @@ async function checkAndSendInvitations() {
         const inviteGroupIds = getInviteGroupIds(parentScrimmage);
         if (inviteGroupIds.length > 0) {
           const leagueMembers = await storage.getLeagueMembers(scrimmage.leagueId);
-          const leagueMemberMap = new Map(leagueMembers.map(m => [m.userId, m]));
+          const eligibleMemberMap = allowedVenueIds
+            ? new Map(
+                (await storage.getVenueScrimmageMembers(parentScrimmage.facilityId!))
+                  .filter((member: any) => !member.userId.startsWith('placeholder:'))
+                  .map((member: any) => [member.userId, { userId: member.userId }]),
+              )
+            : new Map(leagueMembers.map(m => [m.userId, m]));
 
           // Live group members (re-fetched at send-time)
           const groupMembers = (await Promise.all(
             inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
           )).flat();
           groupMembers.forEach((member) => {
-            if (member.email) {
+            if (!allowedVenueIds && member.email) {
               const normalizedEmail = member.email.toLowerCase().trim();
               if (normalizedEmail.includes('@')) inviteEmails.add(normalizedEmail);
             }
           });
 
           // Real user recipients from the group
-          const recipientIds = new Set(groupMembers.filter(gm => gm.userId).map(gm => gm.userId!));
+          const recipientIds = new Set(
+            groupMembers
+              .filter(gm => gm.userId && (!allowedVenueIds || allowedVenueIds.has(gm.userId)))
+              .map(gm => gm.userId!),
+          );
 
           // Placeholder members from the group — synthesise their IDs and merge into
           // placeholderInviteIds so they are acknowledged alongside direct selections.
           const groupPlaceholderIds = groupMembers
             .filter(gm => (gm as any).placeholderPlayerId)
-            .map(gm => `placeholder:${(gm as any).placeholderPlayerId}`);
+            .map(gm => `placeholder:${(gm as any).placeholderPlayerId}`)
+            .filter(id => !allowedVenueIds || allowedVenueIds.has(id));
           groupPlaceholderIds.forEach(pid => {
             if (!placeholderInviteIds.includes(pid)) placeholderInviteIds.push(pid);
           });
@@ -152,12 +179,21 @@ async function checkAndSendInvitations() {
           // Union: add directly-selected real users who are still approved league members.
           // Placeholder IDs are handled separately via placeholderInviteIds.
           const directInvitees = allInviteUserIds.filter(uid => !uid.startsWith('placeholder:'));
-          directInvitees.forEach(uid => { if (leagueMemberMap.has(uid)) recipientIds.add(uid); });
+          directInvitees.forEach(uid => {
+            if (eligibleMemberMap.has(uid) && (!allowedVenueIds || allowedVenueIds.has(uid))) recipientIds.add(uid);
+          });
 
-          approvedMembers = Array.from(recipientIds).map(uid => leagueMemberMap.get(uid)!).filter(Boolean);
+          approvedMembers = Array.from(recipientIds).map(uid => eligibleMemberMap.get(uid)!).filter(Boolean);
           console.log(`📋 ${inviteGroupIds.length} live invite group(s) + ${directInvitees.length} direct invitees + ${placeholderInviteIds.length} placeholders (${groupPlaceholderIds.length} from groups) → ${approvedMembers.length} real recipients`);
         } else {
-          approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
+          if (allowedVenueIds) {
+            const venueMembers = await storage.getVenueScrimmageMembers(parentScrimmage.facilityId!);
+            approvedMembers = venueMembers
+              .filter((member: any) => !member.userId.startsWith('placeholder:'))
+              .map((member: any) => ({ userId: member.userId }));
+          } else {
+            approvedMembers = await storage.getLeagueMembers(scrimmage.leagueId);
+          }
         }
 
         if (placeholderInviteIds.length > 0) {
@@ -286,9 +322,11 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
       const groupMembers = (await Promise.all(
         inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
       )).flat();
+      const allowedVenueIds = await getVenueAllowedInviteIds(parentScrimmage);
       const groupPlaceholderIds = groupMembers
         .filter((gm: any) => (gm as any).placeholderPlayerId)
-        .map((gm: any) => `placeholder:${(gm as any).placeholderPlayerId}`);
+        .map((gm: any) => `placeholder:${(gm as any).placeholderPlayerId}`)
+        .filter((id: string) => !allowedVenueIds || allowedVenueIds.has(id));
       if (groupPlaceholderIds.length > 0) {
         const baseIds: string[] = parentScrimmage.inviteUserIds || [];
         const merged = Array.from(new Set([...baseIds, ...groupPlaceholderIds]));
