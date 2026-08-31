@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { supabase } from '@/lib/supabase';
 
 type WebSocketEventHandler = (data: any) => void;
 
@@ -15,6 +16,31 @@ const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 
 const RECONNECT_DELAYS = [1000, 2000, 5000, 10000, 30000];
 const FALLBACK_POLL_INTERVAL = 120000;
+
+function invalidateRealtimeQueries() {
+  queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmage-requests'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0];
+      if (typeof key !== 'string') return false;
+      return (
+        (key.startsWith('/api/games/') && (key.includes('/rsvp') || key.endsWith('/full'))) ||
+        key.startsWith('/api/team-events/') ||
+        key === '/api/scrimmages' ||
+        key.startsWith('/api/scrimmages/') ||
+        key.startsWith('/api/payment-requests/')
+      );
+    },
+  });
+}
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -104,6 +130,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
           queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
           queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmage-requests'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+          invalidateRealtimeQueries();
         }
       }, FALLBACK_POLL_INTERVAL);
     };
@@ -115,10 +148,19 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const connect = () => {
+    const connect = async () => {
       if (connectionTokenRef.current !== currentToken) return;
       if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (connectionTokenRef.current !== currentToken) return;
+      if (!session?.access_token) {
+        startFallbackPolling();
+        const delay = RECONNECT_DELAYS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)];
+        reconnectAttemptRef.current++;
+        reconnectTimeoutRef.current = setTimeout(connect, delay);
+        return;
+      }
       const websocket = new WebSocket(wsUrl);
 
       websocket.onopen = () => {
@@ -129,18 +171,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
         wsRef.current = websocket;
         reconnectAttemptRef.current = 0;
-        stopFallbackPolling();
 
         websocket.send(JSON.stringify({
           type: 'authenticate',
-          userId: userId
+          accessToken: session.access_token,
         }));
-
-        // Fire all registered connect listeners so subscribers can re-register
-        // server-side subscriptions (e.g. draft_subscribe) after a reconnect.
-        connectListenersRef.current.forEach(fn => {
-          try { fn(); } catch (e) { /* ignore */ }
-        });
       };
 
       websocket.onmessage = (event) => {
@@ -150,6 +185,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const data = JSON.parse(event.data);
 
           switch (data.type) {
+            case 'authenticated':
+              stopFallbackPolling();
+              // Reconcile changes that may have happened while disconnected,
+              // then re-register server-side subscriptions.
+              invalidateRealtimeQueries();
+              connectListenersRef.current.forEach(fn => {
+                try { fn(); } catch (e) { /* ignore */ }
+              });
+              break;
+
+            case 'authentication_error':
+              websocket.close();
+              break;
+
             case 'schedule_update':
               queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
               queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
@@ -231,6 +280,50 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
               queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
               queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
+              break;
+
+            case 'rsvp_update':
+              if (data.gameId) {
+                queryClient.invalidateQueries({
+                  predicate: (query) => {
+                    const key = query.queryKey[0];
+                    return typeof key === 'string' && key.startsWith(`/api/games/${data.gameId}/rsvp`);
+                  },
+                });
+                queryClient.invalidateQueries({ queryKey: [`/api/games/${data.gameId}/full`] });
+              }
+              if (data.teamEventId) {
+                queryClient.invalidateQueries({ queryKey: [`/api/team-events/${data.teamEventId}`] });
+              }
+              queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
+              break;
+
+            case 'scrimmage_update':
+              queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmage-requests'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+              if (data.scrimmageId) {
+                queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', data.scrimmageId, 'requests'] });
+                queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${data.scrimmageId}/approved-players`] });
+                queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${data.scrimmageId}/payment-requests`] });
+                queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${data.scrimmageId}`] });
+              }
+              queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+              break;
+
+            case 'payment_update':
+              queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/created/by-me'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/received/by-me'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
+              if (data.paymentRequestId) {
+                queryClient.invalidateQueries({ queryKey: [`/api/payment-requests/${data.paymentRequestId}`] });
+              }
+              if (data.scrimmageId) {
+                queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${data.scrimmageId}/payment-requests`] });
+              }
               break;
           }
 

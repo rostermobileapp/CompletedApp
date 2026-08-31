@@ -17,6 +17,19 @@ const supabase = createClient(
 // Export supabase client for use in other modules
 export { supabase };
 
+export async function getAuthenticatedDatabaseUser(accessToken: string) {
+  if (!accessToken || accessToken.length < 10) return null;
+  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  if (error || !user) return null;
+  return storage.upsertUser({
+    id: user.id,
+    email: user.email || '',
+    firstName: user.user_metadata?.first_name || user.email?.split('@')[0] || '',
+    lastName: user.user_metadata?.last_name || '',
+    profileImageUrl: user.user_metadata?.profile_image_url || user.user_metadata?.avatar_url || null,
+  });
+}
+
 export async function setupAuth(app: Express) {
   // No special setup needed for Supabase auth
   // Authentication will be handled via JWT verification middleware

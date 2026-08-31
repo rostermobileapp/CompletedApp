@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
-import { setupAuth, isAuthenticated, supabase } from "./supabaseAuth";
+import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser } from "./supabaseAuth";
 import { ensureDemoTables, registerDemoRoutes, isDemoLeague } from "./demo";
 import { 
   loadUserPermissions, 
@@ -126,16 +126,21 @@ import {
 
 // Module-level map to store active WebSocket connections by user ID
 // This allows broadcasting from anywhere in routes.ts
-const activeConnections = new Map<string, WebSocket>();
+const activeConnections = new Map<string, Set<WebSocket>>();
 
 // Helper function to broadcast a message to a specific user via WebSocket
 export function broadcastToUser(userId: string, message: any) {
-  const connection = activeConnections.get(userId);
-  if (connection && connection.readyState === WebSocket.OPEN) {
-    connection.send(JSON.stringify(message));
-    return true;
+  const connections = activeConnections.get(userId);
+  if (!connections) return false;
+  const payload = JSON.stringify(message);
+  let delivered = false;
+  for (const connection of Array.from(connections)) {
+    if (connection.readyState === WebSocket.OPEN) {
+      connection.send(payload);
+      delivered = true;
+    }
   }
-  return false;
+  return delivered;
 }
 
 // Helper function to broadcast notification count update to a user
@@ -154,6 +159,125 @@ export function broadcastScheduleUpdate(userId: string) {
     type: 'schedule_update',
     timestamp: new Date().toISOString()
   });
+}
+
+function broadcastRealtimeEvent(userIds: Iterable<string | null | undefined>, message: Record<string, unknown>) {
+  const payload = {
+    ...message,
+    timestamp: new Date().toISOString(),
+  };
+  for (const userId of Array.from(new Set(Array.from(userIds).filter((id): id is string => !!id)))) {
+    broadcastToUser(userId, payload);
+  }
+}
+
+async function broadcastGameRsvpUpdate(
+  game: { id?: string; leagueId?: string | null },
+  gameId: string,
+  teamId: string,
+  respondingUserId: string,
+) {
+  try {
+    const [directMembers, assignedMembers, team, league, tournamentMembers, substitutes] = await Promise.all([
+      db.select({ userId: teamMemberships.userId })
+        .from(teamMemberships)
+        .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.status, 'approved'))),
+      db.select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.assignedTeamId, teamId), eq(leagueMemberships.status, 'approved'))),
+      storage.getTeam(teamId).catch(() => null),
+      game.leagueId ? storage.getLeague(game.leagueId).catch(() => null) : Promise.resolve(null),
+      db.select({ userId: tournamentParticipants.userId })
+        .from(tournamentParticipants)
+        .where(eq(tournamentParticipants.tournamentTeamId, teamId)),
+      db.select({ userId: substituteRequests.substitutePlayerId })
+        .from(substituteRequests)
+        .where(and(
+          eq(substituteRequests.gameId, gameId),
+          eq(substituteRequests.requestingTeamId, teamId),
+          eq(substituteRequests.status, 'approved'),
+        )),
+    ]);
+
+    broadcastRealtimeEvent([
+      respondingUserId,
+      team?.captainId,
+      league?.commissionerId,
+      ...directMembers.map((member) => member.userId),
+      ...assignedMembers.map((member) => member.userId),
+      ...tournamentMembers.map((member) => member.userId),
+      ...substitutes.map((substitute) => substitute.userId),
+    ], {
+      type: 'rsvp_update',
+      gameId,
+      teamId,
+    });
+  } catch (error) {
+    console.error('[Realtime] Failed to broadcast game RSVP update:', error);
+  }
+}
+
+async function broadcastTeamEventRsvpUpdate(teamId: string, teamEventId: string) {
+  try {
+    // Match getTeamMembership authorization: direct approved membership or an
+    // approved league membership assigned to this team.
+    const [directMembers, assignedMembers] = await Promise.all([
+      db.select({ userId: teamMemberships.userId })
+        .from(teamMemberships)
+        .where(and(eq(teamMemberships.teamId, teamId), eq(teamMemberships.status, 'approved'))),
+      db.select({ userId: leagueMemberships.userId })
+        .from(leagueMemberships)
+        .where(and(eq(leagueMemberships.assignedTeamId, teamId), eq(leagueMemberships.status, 'approved'))),
+    ]);
+    broadcastRealtimeEvent([
+      ...directMembers.map((member) => member.userId),
+      ...assignedMembers.map((member) => member.userId),
+    ], {
+      type: 'rsvp_update',
+      teamEventId,
+      teamId,
+    });
+  } catch (error) {
+    console.error('[Realtime] Failed to broadcast team-event RSVP update:', error);
+  }
+}
+
+async function broadcastScrimmageUpdate(scrimmageId: string, additionalUserIds: string[] = []) {
+  try {
+    const [scrimmage, requests, coHosts] = await Promise.all([
+      storage.getScrimmage(scrimmageId),
+      storage.getScrimmageRequests(scrimmageId).catch(() => []),
+      storage.getScrimmageCoHosts(scrimmageId).catch(() => []),
+    ]);
+    if (!scrimmage) return;
+    broadcastRealtimeEvent([
+      scrimmage.creatorId,
+      ...(scrimmage.inviteUserIds || []).filter((id: string) => !id.startsWith('placeholder:')),
+      ...requests.map((request) => request.playerId),
+      ...coHosts.map((coHost) => coHost.userId),
+      ...additionalUserIds,
+    ], {
+      type: 'scrimmage_update',
+      scrimmageId,
+    });
+  } catch (error) {
+    console.error('[Realtime] Failed to broadcast scrimmage update:', error);
+  }
+}
+
+function broadcastPaymentUpdate(
+  paymentRequest: { id: string; creatorId: string; relatedScrimmageId?: string | null },
+  recipientUserIds: Array<string | null | undefined>,
+) {
+  broadcastRealtimeEvent([paymentRequest.creatorId, ...recipientUserIds], {
+    type: 'payment_update',
+    paymentRequestId: paymentRequest.id,
+    scrimmageId: paymentRequest.relatedScrimmageId || undefined,
+  });
+}
+
+function broadcastPaymentListUpdate(userIds: Array<string | null | undefined>) {
+  broadcastRealtimeEvent(userIds, { type: 'payment_update' });
 }
 
 // Broadcast schedule update to all approved members of a team
@@ -10531,6 +10655,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Broadcast real-time schedule update to the player who RSVPed
       if (!req.demoContext) broadcastScheduleUpdate(userId);
+      if (!req.demoContext) {
+        void broadcastGameRsvpUpdate(game, gameId, teamId, userId);
+      }
 
       res.json(rsvp);
     } catch (error) {
@@ -15748,6 +15875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!paymentRequest) {
       return { paymentRequest: null, requestedUserIds, blockedReason };
     }
+    broadcastPaymentUpdate(paymentRequest, requestedUserIds);
 
     const creator = await storage.getUser(creatorId);
     const creatorName = creator
@@ -17057,6 +17185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Respond immediately; send notifications outside the transaction to
         // avoid holding locks during network I/O.
+        void broadcastScrimmageUpdate(scrimmageId, [userId]);
         res.status(201).json(request);
 
         // Mirror the same notification side-effects as a manual approval so the
@@ -17132,6 +17261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (coHostResult === 'not_open') {
           return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
         }
+        void broadcastScrimmageUpdate(scrimmageId, [userId]);
         return res.status(201).json(coHostResult);
       }
 
@@ -17227,6 +17357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (firstPayJoin.paymentRequest) {
+          broadcastPaymentUpdate(firstPayJoin.paymentRequest, [userId]);
           try {
             const creator = await storage.getUser(scrimmage.creatorId);
             const creatorName = creator
@@ -17244,10 +17375,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('[FirstPay] Payment request created, but push notification failed:', paymentNotificationError);
           }
         }
+        void broadcastScrimmageUpdate(scrimmageId, [userId]);
         return res.status(201).json(firstPayJoin.request);
       }
 
       const request = await storage.createScrimmageRequest(requestData);
+      void broadcastScrimmageUpdate(scrimmageId, [userId]);
       res.status(201).json(request);
     } catch (error) {
       console.error('[Scrimmage Request] Error creating scrimmage request:', error);
@@ -17280,6 +17413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const request = await storage.createScrimmageRequest(requestData);
+      void broadcastScrimmageUpdate(scrimmageId, [userId]);
       res.status(201).json(request);
     } catch (error) {
       console.error('[Scrimmage Decline] Error declining invite:', error);
@@ -17474,6 +17608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle backup approval separately — no capacity check, auto-assigned position
       if (status === 'backup') {
         const backupRequest = await storage.approveAsBackup(requestId);
+        void broadcastScrimmageUpdate(scrimmage.id, [request.playerId]);
         // Notify the player they're in the backup queue
         try {
           const player = await storage.getUser(request.playerId);
@@ -17626,6 +17761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      void broadcastScrimmageUpdate(scrimmage.id, [request.playerId]);
       res.json(updatedRequest);
     } catch (error) {
       console.error('Error updating request status:', error);
@@ -17660,6 +17796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedRequest = await storage.setTeamAssignment(requestId, teamAssignment ?? null);
+      void broadcastScrimmageUpdate(request.scrimmageId, [request.playerId]);
 
       // Notify the player that their team assignment changed
       try {
@@ -17747,6 +17884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       await storage.reorderBackupQueue(positions);
+      void broadcastScrimmageUpdate(authorizedScrimmageId);
       res.json({ ok: true });
     } catch (error) {
       console.error('[BackupQueue] reorder error:', error);
@@ -17796,6 +17934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Spot was taken by another concurrent request — dequeue this backup and cascade
           await storage.resolveBackupResponse(requestId, false);
           notifyNextBackup(scrimmage.id).catch(e => console.error('[BackupQueue] cascade after full:', e));
+          void broadcastScrimmageUpdate(scrimmage.id, [userId]);
           return res.status(409).json({ message: 'Sorry, that spot was just filled. We\'ll check the next backup.' });
         }
 
@@ -17815,11 +17954,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           broadcastNotificationUpdate(scrimmage.creatorId);
         } catch (_) {}
 
+        void broadcastScrimmageUpdate(scrimmage.id, [userId]);
         return res.json(result.request);
       } else {
         // Decline — dismiss them and cascade to next backup
         await storage.resolveBackupResponse(requestId, false);
         notifyNextBackup(scrimmage.id).catch(e => console.error('[BackupQueue] cascade after decline:', e));
+        void broadcastScrimmageUpdate(scrimmage.id, [userId]);
         return res.json({ ok: true, message: 'Declined — next backup will be notified.' });
       }
     } catch (error) {
@@ -17918,6 +18059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
+      void broadcastScrimmageUpdate(request.scrimmageId, [request.playerId]);
       res.json({ message: 'Request deleted successfully' });
     } catch (error) {
       console.error('Error deleting request:', error);
@@ -18164,6 +18306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (finalizationInvoice) {
+        broadcastPaymentUpdate(finalizationInvoice.paymentRequest, finalizationInvoice.requestedUserIds);
         try {
           const creator = await storage.getUser(lockedScrimmage.creatorId);
           const creatorName = creator
@@ -18188,6 +18331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      void broadcastScrimmageUpdate(lockedScrimmage.id, approvedRequests.map((request) => request.playerId));
       res.json(updatedScrimmage);
     } catch (error) {
       console.error('Error finalizing scrimmage:', error);
@@ -20915,10 +21059,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         switch (data.type) {
           case 'authenticate':
-            // Authenticate user and store connection
-            userId = data.userId;
+            // Verify the Supabase access token and use the mapped database user
+            // identity. Never trust a client-supplied user ID.
+            if (userId) break;
+            const authenticatedUser = await getAuthenticatedDatabaseUser(
+              typeof data.accessToken === 'string' ? data.accessToken : '',
+            );
+            userId = authenticatedUser?.id ?? null;
             if (userId) {
-              activeConnections.set(userId, ws);
+              const userConnections = activeConnections.get(userId) ?? new Set<WebSocket>();
+              userConnections.add(ws);
+              activeConnections.set(userId, userConnections);
               
               // Update user online status (wrapped in try-catch to prevent server crash)
               try {
@@ -20931,6 +21082,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               broadcastOnlineStatus(userId, true);
               
               ws.send(JSON.stringify({ type: 'authenticated', userId }));
+            } else {
+              ws.send(JSON.stringify({ type: 'authentication_error' }));
+              ws.close(1008, 'Authentication required');
             }
             break;
 
@@ -21036,16 +21190,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Broadcast read receipt to message sender
             const readMessage = await messagingService.getMessage(data.messageId);
             if (readMessage) {
-              const senderConnection = activeConnections.get(readMessage.senderId);
-              if (senderConnection && senderConnection.readyState === WebSocket.OPEN) {
-                senderConnection.send(JSON.stringify({
-                  type: 'message_read',
-                  conversationId: readMessage.conversationId,
-                  messageId: data.messageId,
-                  readBy: userId,
-                  readAt: new Date().toISOString()
-                }));
-              }
+              broadcastToUser(readMessage.senderId, {
+                type: 'message_read',
+                conversationId: readMessage.conversationId,
+                messageId: data.messageId,
+                readBy: userId,
+                readAt: new Date().toISOString()
+              });
             }
             break;
 
@@ -21113,7 +21264,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     ws.on('close', async () => {
       if (userId) {
-        // Remove connection
+        const userConnections = activeConnections.get(userId);
+        userConnections?.delete(ws);
+        const isLastConnection = !userConnections || userConnections.size === 0;
+        if (!isLastConnection) return;
         activeConnections.delete(userId);
         unsubscribeUserFromAllDrafts(userId);
         unsubscribeUserFromAllTournaments(userId);
@@ -21149,9 +21303,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lastSeen: new Date().toISOString()
     };
 
-    for (const [contactId, connection] of Array.from(activeConnections)) {
-      if (contactId !== userId && connection.readyState === WebSocket.OPEN) {
-        connection.send(JSON.stringify(statusMessage));
+    for (const [contactId, connections] of Array.from(activeConnections)) {
+      if (contactId !== userId) {
+        for (const connection of Array.from(connections)) {
+          if (connection.readyState === WebSocket.OPEN) {
+            connection.send(JSON.stringify(statusMessage));
+          }
+        }
       }
     }
   }
@@ -21159,10 +21317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Helper function to broadcast to conversation participants
   function broadcastToParticipants(participants: Array<{userId: string}>, message: any) {
     participants.forEach(participant => {
-      const connection = activeConnections.get(participant.userId);
-      if (connection && connection.readyState === WebSocket.OPEN) {
-        connection.send(JSON.stringify(message));
-      }
+      broadcastToUser(participant.userId, message);
     });
   }
 
@@ -21190,16 +21345,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Send notification to each sender
         Array.from(messagesBySender.entries()).forEach(([senderId, messageIds]) => {
-          const senderConnection = activeConnections.get(senderId);
-          if (senderConnection && senderConnection.readyState === WebSocket.OPEN) {
-            senderConnection.send(JSON.stringify({
-              type: 'message_read',
-              conversationId,
-              messageIds,
-              readBy: userId,
-              readAt
-            }));
-          }
+          broadcastToUser(senderId, {
+            type: 'message_read',
+            conversationId,
+            messageIds,
+            readBy: userId,
+            readAt
+          });
         });
       }
       
@@ -21839,6 +21991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         venmoLinkOverride: validatedData.venmoLinkOverride ?? null,
         cashappLinkOverride: validatedData.cashappLinkOverride ?? null,
       }, validatedData.recipientUserIds, validatedData.placeholderPlayerIds);
+      broadcastPaymentUpdate(paymentRequest, validatedData.recipientUserIds);
 
       // Send push notifications to recipients (async, don't wait)
       (async () => {
@@ -22045,6 +22198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isPaid: validatedData.isPaid,
         paymentMethod: validatedData.paymentMethod,
       });
+      broadcastPaymentUpdate(recipient.paymentRequest, [recipient.userId]);
 
       res.json(updatedRecipient);
     } catch (error) {
@@ -22101,6 +22255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             linkedScrimmage.status === 'open' &&
             (linkedScrimmage.timeTbd || new Date(linkedScrimmage.dateTime) > new Date());
           if (!canStillAdmit) {
+            broadcastPaymentUpdate(recipient.paymentRequest, [recipient.userId]);
+            void broadcastScrimmageUpdate(linkedScrimmage.id, [recipient.userId]);
             return res.json({ ...updatedRecipient, scrimmageAdmission: null });
           }
           const joinRequest = await storage.getScrimmageRequest(linkedScrimmage.id, recipient.userId);
@@ -22138,6 +22294,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      broadcastPaymentUpdate(recipient.paymentRequest, [recipient.userId]);
+      if (recipient.paymentRequest.relatedScrimmageId) {
+        void broadcastScrimmageUpdate(recipient.paymentRequest.relatedScrimmageId, recipient.userId ? [recipient.userId] : []);
+      }
       res.json({ ...updatedRecipient, scrimmageAdmission });
     } catch (error) {
       console.error("Error confirming payment recipient:", error);
@@ -22162,6 +22322,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.deletePaymentRequest(id);
+      // The request no longer exists, so former recipients receive only a
+      // generic list refresh event rather than an identifier they cannot open.
+      broadcastPaymentListUpdate([
+        paymentRequest.creatorId,
+        ...paymentRequest.recipients.map((recipient) => recipient.userId),
+      ]);
       res.json({ success: true, message: "Payment request deleted successfully" });
     } catch (error) {
       console.error("Error deleting payment request:", error);
@@ -22271,6 +22437,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updatePaymentRequest(id, updates, recipientsArg);
       const refreshed = await storage.getPaymentRequest(id);
+      if (refreshed) {
+        const currentRecipientIds = refreshed.recipients
+          .map((recipient) => recipient.userId)
+          .filter((recipientId): recipientId is string => !!recipientId);
+        const currentRecipientSet = new Set(currentRecipientIds);
+        const removedRecipientIds = existing.recipients
+          .map((recipient) => recipient.userId)
+          .filter((recipientId): recipientId is string => !!recipientId && !currentRecipientSet.has(recipientId));
+        broadcastPaymentUpdate(refreshed, currentRecipientIds);
+        broadcastPaymentListUpdate(removedRecipientIds);
+      }
       res.json(refreshed);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -23170,6 +23347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (event.creatorId && event.creatorId !== userId) {
         broadcastScheduleUpdate(event.creatorId);
       }
+      void broadcastTeamEventRsvpUpdate(event.teamId, id);
       
       res.json(rsvp);
     } catch (error) {

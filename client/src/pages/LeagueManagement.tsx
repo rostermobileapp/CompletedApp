@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { usePermissions } from '@/context/SubscriptionContext';
+import { useWebSocket } from '@/context/WebSocketContext';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import {
@@ -970,62 +971,16 @@ export default function LeagueManagement() {
     enabled: !!leagueId,
   });
 
-  // WebSocket connection for real-time pending member updates
-  const wsRef = useRef<WebSocket | null>(null);
-  
+  // Reuse the shared authenticated/reconnecting WebSocket connection.
+  const { subscribe } = useWebSocket();
   useEffect(() => {
     if (!user?.id || !leagueId) return;
-    
-    // Construct WebSocket URL
-    let wsUrl;
-    try {
-      const origin = window.location.origin;
-      wsUrl = origin.replace('https:', 'wss:').replace('http:', 'ws:') + '/ws';
-    } catch (error) {
-      console.warn('Failed to get origin, using fallback:', error);
-      wsUrl = 'ws://localhost:5000/ws';
-    }
-    
-    const websocket = new WebSocket(wsUrl);
-    
-    websocket.onopen = () => {
-      wsRef.current = websocket;
-      // Authenticate with the server
-      websocket.send(JSON.stringify({
-        type: 'authenticate',
-        userId: user.id
-      }));
-    };
-    
-    websocket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        // Handle pending member added event
-        if (data.type === 'pending_member_added' && data.leagueId === leagueId) {
-          // Refetch pending members to show the new request immediately
-          refetchPending();
-        }
-        
-        // Handle real-time notification updates
-        if (data.type === 'notification_update') {
-          queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
-        }
-      } catch (error) {
-        console.error('WebSocket message parse error:', error);
+    return subscribe('pending_member_added', (data) => {
+      if (data.leagueId === leagueId) {
+        void refetchPending();
       }
-    };
-    
-    websocket.onclose = () => {
-      wsRef.current = null;
-    };
-    
-    return () => {
-      websocket.close();
-    };
-  }, [user?.id, leagueId, refetchPending]);
+    });
+  }, [user?.id, leagueId, refetchPending, subscribe]);
 
   // Reset the post-season-creation Player Pro prompt when the active league changes.
   useEffect(() => {
