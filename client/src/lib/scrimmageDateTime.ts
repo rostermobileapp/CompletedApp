@@ -49,3 +49,31 @@ export function isScrimmageTimeTbd(
 
   return splitScrimmageDateTime(dateTime).time === '00:00';
 }
+
+export interface SortableScheduleEvent {
+  id: string;
+  date: Date;
+  timeTbd?: boolean;
+}
+
+/**
+ * Sort Time TBD events at the end of their selected local day rather than
+ * treating their midnight storage anchor as an exact event time.
+ */
+export function getScheduleEventSortTime(
+  event: Pick<SortableScheduleEvent, 'date' | 'timeTbd'>,
+): number {
+  if (!event.timeTbd) return event.date.getTime();
+
+  const endOfSelectedDay = new Date(event.date);
+  endOfSelectedDay.setHours(23, 59, 59, 999);
+  return endOfSelectedDay.getTime();
+}
+
+export function compareScheduleEvents(
+  a: SortableScheduleEvent,
+  b: SortableScheduleEvent,
+): number {
+  const timeDifference = getScheduleEventSortTime(a) - getScheduleEventSortTime(b);
+  return timeDifference || a.id.localeCompare(b.id);
+}

@@ -16,23 +16,123 @@ const DEFAULT_TIMEZONE = 'America/New_York';
  * // Date representing 2025-01-15T23:00:00Z (11 PM UTC)
  * parseLeagueLocalDateTime("2025-01-15T18:00", "America/New_York")
  */
-export function parseLeagueLocalDateTime(localDateTimeString: string, leagueTimezone: string | null | undefined): Date {
-  if (!localDateTimeString) {
+export function parseLeagueLocalDateTime(
+  localDateTime: Date | string,
+  leagueTimezone: string | null | undefined,
+): Date {
+  if (!localDateTime) {
     return new Date();
+  }
+
+  if (localDateTime instanceof Date) {
+    return localDateTime;
   }
   
   const tz = leagueTimezone || DEFAULT_TIMEZONE;
   
   // If already has timezone designator (Z, +, or -), parse directly
-  if (localDateTimeString.endsWith('Z') || 
-      localDateTimeString.includes('+') || 
-      (localDateTimeString.length > 10 && localDateTimeString.includes('-', 10))) {
-    return new Date(localDateTimeString);
+  if (localDateTime.endsWith('Z') ||
+      localDateTime.includes('+') ||
+      (localDateTime.length > 10 && localDateTime.includes('-', 10))) {
+    return new Date(localDateTime);
   }
   
   // Convert from league local time to UTC using the league timezone
   // This creates a proper UTC instant from a league-local time string
-  return fromZonedTime(localDateTimeString, tz);
+  return fromZonedTime(localDateTime, tz);
+}
+
+export function getLeagueLocalDateKey(
+  dateTime: Date | string,
+  leagueTimezone: string | null | undefined,
+): string {
+  const tz = leagueTimezone || DEFAULT_TIMEZONE;
+  const date = typeof dateTime === 'string'
+    ? parseLeagueLocalDateTime(dateTime, tz)
+    : dateTime;
+  return formatInTimeZone(date, tz, 'yyyy-MM-dd');
+}
+
+/**
+ * Date-only recurrence boundaries are stored in a timestamp-without-time-zone
+ * column. Drizzle returns those values as Date objects whose UTC components
+ * represent the persisted wall-clock date, so do not shift them through the
+ * league timezone when recovering the selected date key.
+ */
+export function getStoredDateOnlyKey(dateTime: Date | string): string {
+  if (dateTime instanceof Date) {
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return `${dateTime.getUTCFullYear()}-${pad(dateTime.getUTCMonth() + 1)}-${pad(dateTime.getUTCDate())}`;
+  }
+
+  const match = dateTime.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+
+  const parsed = new Date(dateTime);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+}
+
+/**
+ * Advance from the original league-local wall-clock value by whole calendar
+ * months. The original day remains the anchor: a 31st occurrence clamps to
+ * February's final day, then returns to the 31st in March.
+ */
+export function addCalendarMonthsInTimezone(
+  dateTime: Date | string,
+  monthOffset: number,
+  leagueTimezone: string | null | undefined,
+): Date {
+  const tz = leagueTimezone || DEFAULT_TIMEZONE;
+  const date = typeof dateTime === 'string'
+    ? parseLeagueLocalDateTime(dateTime, tz)
+    : dateTime;
+  const localParts = formatInTimeZone(date, tz, 'yyyy-MM-dd-HH-mm-ss-SSS')
+    .split('-')
+    .map(Number);
+  const [year, month, day, hour, minute, second, millisecond] = localParts;
+  const targetMonthIndex = month - 1 + Math.trunc(monthOffset);
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+  const finalDayOfTargetMonth = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0),
+  ).getUTCDate();
+  const targetDay = Math.min(day, finalDayOfTargetMonth);
+  const pad = (part: number, width = 2) => String(part).padStart(width, '0');
+  const targetLocalDateTime =
+    `${targetYear}-${pad(targetMonth + 1)}-${pad(targetDay)}` +
+    `T${pad(hour)}:${pad(minute)}:${pad(second)}.${pad(millisecond, 3)}`;
+
+  return fromZonedTime(targetLocalDateTime, tz);
+}
+
+export function generateMonthlyRecurrenceDates(
+  startDateTime: Date | string,
+  maxOccurrences: number,
+  recurrenceEndDate: Date | string | null | undefined,
+  leagueTimezone: string | null | undefined,
+): Date[] {
+  const dates: Date[] = [];
+  const recurrenceEndDateKey = recurrenceEndDate
+    ? getStoredDateOnlyKey(recurrenceEndDate)
+    : null;
+
+  for (let monthOffset = 0; dates.length < maxOccurrences; monthOffset++) {
+    const occurrence = addCalendarMonthsInTimezone(
+      startDateTime,
+      monthOffset,
+      leagueTimezone,
+    );
+    if (
+      recurrenceEndDateKey &&
+      getLeagueLocalDateKey(occurrence, leagueTimezone) > recurrenceEndDateKey
+    ) {
+      break;
+    }
+    dates.push(occurrence);
+  }
+
+  return dates;
 }
 
 /**

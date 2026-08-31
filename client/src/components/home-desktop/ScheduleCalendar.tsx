@@ -25,6 +25,11 @@ import {
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { apiRequest } from '@/lib/queryClient';
 import {
+  compareScheduleEvents,
+  isScrimmageTimeTbd,
+  parseScrimmageDateTime,
+} from '@/lib/scrimmageDateTime';
+import {
   cardClass,
   cardStyle,
   sectionTitleClass,
@@ -63,6 +68,8 @@ interface ScheduleEvent {
   color?: string | null;
   // True when the current user is a player in this game (used for blue highlight)
   isUserGame?: boolean;
+  // Date-only scrimmages sort after timed events on their selected day.
+  timeTbd?: boolean;
 }
 
 export function ScheduleCalendar({
@@ -155,7 +162,9 @@ export function ScheduleCalendar({
     if (isLeagueScope && Array.isArray(leagueGames)) {
       for (const g of leagueGames) {
         if (!g?.scheduledAt) continue;
-        const d = new Date(g.scheduledAt);
+        const d = g.isScrimmage
+          ? parseScrimmageDateTime(g.scheduledAt)
+          : new Date(g.scheduledAt);
         if (Number.isNaN(d.getTime())) continue;
         out.push({
           id: `game-${g.id}`,
@@ -166,6 +175,9 @@ export function ScheduleCalendar({
           location: g.venue || g.location || null,
           color: g.color ?? null,
           isUserGame: isUserInGame(g),
+          timeTbd: g.isScrimmage
+            ? isScrimmageTimeTbd(g.timeTbd, g.scheduledAt)
+            : false,
         });
       }
 
@@ -200,7 +212,7 @@ export function ScheduleCalendar({
         }
       }
 
-      out.sort((a, b) => a.date.getTime() - b.date.getTime());
+      out.sort(compareScheduleEvents);
       return out;
     }
 
@@ -208,7 +220,9 @@ export function ScheduleCalendar({
     if (Array.isArray(rawGames)) {
       for (const g of rawGames) {
         if (!g?.scheduledAt) continue;
-        const d = new Date(g.scheduledAt);
+        const d = g.isScrimmage
+          ? parseScrimmageDateTime(g.scheduledAt)
+          : new Date(g.scheduledAt);
         if (Number.isNaN(d.getTime())) continue;
         if (!inSeason(g)) continue;
         if (selectedTournamentId) {
@@ -231,6 +245,9 @@ export function ScheduleCalendar({
           location: g.venue || g.location || null,
           color: g.color ?? null,
           isUserGame: isUserInGame(g),
+          timeTbd: g.isScrimmage
+            ? isScrimmageTimeTbd(g.timeTbd, g.scheduledAt)
+            : false,
         });
       }
     }
@@ -260,7 +277,7 @@ export function ScheduleCalendar({
       }
     }
 
-    out.sort((a, b) => a.date.getTime() - b.date.getTime());
+    out.sort(compareScheduleEvents);
     return out;
   }, [
     rawGames,
@@ -492,12 +509,14 @@ function CalendarGrid({
                           ? 'inset 0 0 0 2px #3b82f6'
                           : undefined,
                       }}
-                      title={`${ev.title} — ${format(ev.date, 'h:mm a')}`}
+                      title={`${ev.title} — ${ev.timeTbd ? 'Time TBD' : format(ev.date, 'h:mm a')}`}
                       data-testid={`event-pill-${ev.id}`}
                     >
                       <span className="truncate font-medium">{ev.title}</span>
                       <span className="truncate text-[9.5px] opacity-90">
-                        {format(ev.date, 'h:mm a').toLowerCase()}
+                        {ev.timeTbd
+                          ? 'time tbd'
+                          : format(ev.date, 'h:mm a').toLowerCase()}
                       </span>
                     </button>
                   );
@@ -564,7 +583,9 @@ function ListView({
               <div className="mt-0.5 flex items-center gap-3 text-[12px] text-[#666]">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {format(e.date, 'EEE MMM d • h:mm a')}
+                  {e.timeTbd
+                    ? `${format(e.date, 'EEE MMM d')} • Time TBD`
+                    : format(e.date, 'EEE MMM d • h:mm a')}
                 </span>
                 {e.location && (
                   <span className="inline-flex items-center gap-1 truncate">

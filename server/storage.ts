@@ -659,7 +659,7 @@ export interface IStorage {
   renewScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<boolean>;
   completeScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<Scrimmage | null>;
   releaseScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<void>;
-  getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined>;
+  getScrimmageByParentAndLocalDate(parentId: string, dateKey: string): Promise<Scrimmage | undefined>;
   createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: string): Promise<Scrimmage>;
   getRecurringParentScrimmages(): Promise<Scrimmage[]>;
   
@@ -5268,6 +5268,7 @@ export class DatabaseStorage implements IStorage {
       // Mark as scrimmage for frontend identification
       isScrimmage: true,
       scrimmageTitle: scrimmage.title,
+      timeTbd: scrimmage.timeTbd,
       resultType: null
     }));
 
@@ -10681,20 +10682,15 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
-  async getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
+  async getScrimmageByParentAndLocalDate(parentId: string, dateKey: string): Promise<Scrimmage | undefined> {
     const [result] = await db
       .select()
       .from(scrimmages)
       .where(
         and(
           eq(scrimmages.parentScrimmageId, parentId),
-          gte(scrimmages.dateTime, startOfDay.toISOString()),
-          lte(scrimmages.dateTime, endOfDay.toISOString())
+          gte(scrimmages.dateTime, `${dateKey}T00:00:00`),
+          lte(scrimmages.dateTime, `${dateKey}T23:59:59.999`)
         )
       )
       .limit(1);

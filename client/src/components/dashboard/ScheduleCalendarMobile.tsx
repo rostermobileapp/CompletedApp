@@ -15,7 +15,11 @@ import {
 import { ChevronLeft, ChevronRight, Trophy, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { EVENT_COLORS } from '@/components/home-desktop/cardStyles';
 import { apiRequest } from '@/lib/queryClient';
-import { isScrimmageTimeTbd, parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
+import {
+  compareScheduleEvents,
+  isScrimmageTimeTbd,
+  parseScrimmageDateTime,
+} from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 
 type EventKind =
@@ -261,7 +265,9 @@ export function ScheduleCalendarMobile({
     if (Array.isArray(upcomingGames)) {
       for (const g of upcomingGames) {
         if (!g?.scheduledAt) continue;
-        const d = new Date(g.scheduledAt);
+        const d = g.isScrimmage
+          ? parseScrimmageDateTime(g.scheduledAt)
+          : new Date(g.scheduledAt);
         if (Number.isNaN(d.getTime())) continue;
         let title = 'Game';
         if (g.isScrimmage) {
@@ -285,11 +291,14 @@ export function ScheduleCalendarMobile({
           subtitle: g.venue || g.location || null,
           color: g.color || KIND_FALLBACK_COLOR.game,
           navigateTo: `/game/${g.id}`,
+          timeTbd: g.isScrimmage
+            ? isScrimmageTimeTbd(g.timeTbd, g.scheduledAt)
+            : false,
         });
       }
     }
 
-    out.sort((a, b) => a.date.getTime() - b.date.getTime());
+    out.sort(compareScheduleEvents);
     return out;
   }, [
     scrimmageInvites,

@@ -38,8 +38,8 @@ import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } fr
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
-import { format, addDays, addWeeks, addMonths } from "date-fns";
-import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
+import { format, addDays, addWeeks } from "date-fns";
+import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from "./dateUtils";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -7876,6 +7876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isPending: req.status === 'pending',
             scrimmageTitle: req.scrimmage.title,
             scrimmageCreator: req.scrimmage.creator,
+            timeTbd: req.scrimmage.timeTbd,
             isSubstitute: false,
             homeTeam: null,
             awayTeam: null,
@@ -16481,18 +16482,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dates: Date[] = [];
         const startDate = parseLeagueLocalDateTime(scrimmageData.dateTime, league.timezone);
         const maxOccurrences = scrimmageData.recurrenceCount || 52; // Default max to prevent infinite loops
-        const endDate = scrimmageData.recurrenceEndDate ? parseLeagueLocalDateTime(scrimmageData.recurrenceEndDate, league.timezone) : null;
+        const recurrenceEndDateKey = scrimmageData.recurrenceEndDate
+          ? getStoredDateOnlyKey(scrimmageData.recurrenceEndDate)
+          : null;
+        const isAfterRecurrenceEnd = (date: Date) =>
+          !!recurrenceEndDateKey &&
+          getLeagueLocalDateKey(date, league.timezone) > recurrenceEndDateKey;
         
         if (scrimmageData.recurrenceType === 'daily') {
           // Daily recurrence: simple iteration
           let currentDate = new Date(startDate);
           while (dates.length < maxOccurrences) {
-            // Compare dates only (ignore time) for end date check
-            if (endDate) {
-              const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-              const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-              if (currentDateOnly > endDateOnly) break;
-            }
+            if (isAfterRecurrenceEnd(currentDate)) break;
             dates.push(new Date(currentDate));
             currentDate = addDays(currentDate, 1);
           }
@@ -16517,52 +16518,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // Only include dates that are >= start date
                 if (occurrenceDate >= startDate) {
-                  // Compare dates only (ignore time) for end date check
-                  if (endDate) {
-                    const occurrenceDateOnly = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth(), occurrenceDate.getDate());
-                    const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-                    if (occurrenceDateOnly > endDateOnly) break;
-                  }
+                  if (isAfterRecurrenceEnd(occurrenceDate)) break;
                   dates.push(new Date(occurrenceDate));
                   if (dates.length >= maxOccurrences) break;
                 }
               }
               weekOffset++;
               // Check if we should continue to next week
-              if (endDate) {
+              if (recurrenceEndDateKey) {
                 const nextWeekStart = addWeeks(startDate, weekOffset);
-                const nextWeekStartOnly = new Date(nextWeekStart.getFullYear(), nextWeekStart.getMonth(), nextWeekStart.getDate());
-                const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-                if (nextWeekStartOnly > endDateOnly) break;
+                if (isAfterRecurrenceEnd(nextWeekStart)) break;
               }
             }
           } else {
             // No specific days, just repeat weekly
             let currentDate = new Date(startDate);
             while (dates.length < maxOccurrences) {
-              // Compare dates only (ignore time) for end date check
-              if (endDate) {
-                const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-                const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-                if (currentDateOnly > endDateOnly) break;
-              }
+              if (isAfterRecurrenceEnd(currentDate)) break;
               dates.push(new Date(currentDate));
               currentDate = addWeeks(currentDate, 1);
             }
           }
         } else if (scrimmageData.recurrenceType === 'monthly') {
-          // Monthly recurrence
-          let currentDate = new Date(startDate);
-          while (dates.length < maxOccurrences) {
-            // Compare dates only (ignore time) for end date check
-            if (endDate) {
-              const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-              const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-              if (currentDateOnly > endDateOnly) break;
-            }
-            dates.push(new Date(currentDate));
-            currentDate = addMonths(currentDate, 1);
-          }
+          dates.push(...generateMonthlyRecurrenceDates(
+            startDate,
+            maxOccurrences,
+            scrimmageData.recurrenceEndDate,
+            league.timezone,
+          ));
         }
         
         

@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { addDays, isBefore, isAfter, format } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
-import { formatDateInTimezone, formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
+import { addCalendarMonthsInTimezone, formatDateInTimezone, formatScrimmageDateTime, formatDayAndTime, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from './dateUtils';
 import { sendBulkScrimmageInvites } from './emails';
 import { isDemoLeague } from './demo';
 
@@ -428,14 +428,12 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
   const timezone = league?.timezone || 'America/New_York';
   const startDate = parseLeagueLocalDateTime(parentScrimmage.dateTime, timezone);
   
-  // Determine recurrence end date
-  let endDate = horizonDate;
-  if (parentScrimmage.recurrenceEndDate) {
-    endDate = parseLeagueLocalDateTime(parentScrimmage.recurrenceEndDate, timezone);
-    if (isAfter(endDate, horizonDate)) {
-      endDate = horizonDate;
-    }
-  }
+  const recurrenceEndDateKey = parentScrimmage.recurrenceEndDate
+    ? getStoredDateOnlyKey(parentScrimmage.recurrenceEndDate)
+    : null;
+  const isWithinRecurrenceEnd = (date: Date) =>
+    !recurrenceEndDateKey ||
+    getLeagueLocalDateKey(date, timezone) <= recurrenceEndDateKey;
 
   // For weekly recurrence
   if (parentScrimmage.recurrenceType === 'weekly') {
@@ -443,11 +441,15 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
     let count = 1;
     const maxCount = parentScrimmage.recurrenceCount || Infinity;
     
-    while (isBefore(currentDate, endDate) && count < maxCount) {
+    while (
+      isBefore(currentDate, horizonDate) &&
+      isWithinRecurrenceEnd(currentDate) &&
+      count < maxCount
+    ) {
       // Check if this occurrence already exists
-      const existingOccurrence = await storage.getScrimmageByParentAndDate(
+      const existingOccurrence = await storage.getScrimmageByParentAndLocalDate(
         parentScrimmage.id,
-        currentDate
+        getLeagueLocalDateKey(currentDate, timezone),
       );
       
       if (!existingOccurrence && isAfter(currentDate, now)) {
@@ -472,10 +474,14 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
     let count = 1;
     const maxCount = parentScrimmage.recurrenceCount || Infinity;
     
-    while (isBefore(currentDate, endDate) && count < maxCount) {
-      const existingOccurrence = await storage.getScrimmageByParentAndDate(
+    while (
+      isBefore(currentDate, horizonDate) &&
+      isWithinRecurrenceEnd(currentDate) &&
+      count < maxCount
+    ) {
+      const existingOccurrence = await storage.getScrimmageByParentAndLocalDate(
         parentScrimmage.id,
-        currentDate
+        getLeagueLocalDateKey(currentDate, timezone),
       );
       
       if (!existingOccurrence && isAfter(currentDate, now)) {
@@ -490,6 +496,39 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
       
       currentDate = addDays(currentDate, 1);
       count++;
+    }
+  }
+
+  // Monthly occurrences are always calculated from the original local date.
+  // This avoids permanently drifting from the 29th/30th/31st after February.
+  if (parentScrimmage.recurrenceType === 'monthly') {
+    let monthOffset = 1;
+    let count = 1;
+    const maxCount = parentScrimmage.recurrenceCount || Infinity;
+    let currentDate = addCalendarMonthsInTimezone(startDate, monthOffset, timezone);
+
+    while (
+      isBefore(currentDate, horizonDate) &&
+      isWithinRecurrenceEnd(currentDate) &&
+      count < maxCount
+    ) {
+      const existingOccurrence = await storage.getScrimmageByParentAndLocalDate(
+        parentScrimmage.id,
+        getLeagueLocalDateKey(currentDate, timezone),
+      );
+
+      if (!existingOccurrence && isAfter(currentDate, now)) {
+        const newOccurrence = await storage.createRecurringScrimmageOccurrence(
+          effectiveParent,
+          formatDateInTimezone(currentDate, "yyyy-MM-dd'T'HH:mm:ss", timezone),
+        );
+        createdOccurrences.push(newOccurrence);
+        console.log(`📅 Created recurring occurrence for ${parentScrimmage.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
+      }
+
+      monthOffset++;
+      count++;
+      currentDate = addCalendarMonthsInTimezone(startDate, monthOffset, timezone);
     }
   }
 

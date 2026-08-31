@@ -11,7 +11,10 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { storage } from '../storage.js';
-import { getScrimmageInviteSendAt } from '../scrimmageInviteJob.js';
+import {
+  generateAndPersistRecurringOccurrences,
+  getScrimmageInviteSendAt,
+} from '../scrimmageInviteJob.js';
 
 const RUN = randomUUID().replaceAll('-', '').slice(0, 10);
 const CREATOR_ID = `sched_creator_${RUN}`;
@@ -24,6 +27,8 @@ const DELIVERED_ID = `sched_delivered_${RUN}`;
 const PARENT_ID = `sched_parent_${RUN}`;
 const CLAIM_ID = `sched_claim_${RUN}`;
 const ANNOUNCEMENT_ID = `sched_announcement_${RUN}`;
+const MONTHLY_LEAGUE_ID = `sched_monthly_league_${RUN}`;
+const MONTHLY_PARENT_ID = `sched_monthly_parent_${RUN}`;
 
 before(async () => {
   await db.execute(sql`
@@ -34,6 +39,19 @@ before(async () => {
       (${CREATOR_ID}, 'free_tier', false, NOW(), NOW(), NOW(), false),
       (${PLAYER_ID}, 'free_tier', false, NOW(), NOW(), NOW(), false),
       (${COHOST_ID}, 'free_tier', false, NOW(), NOW(), NOW(), false)
+  `);
+
+  await db.execute(sql`
+    INSERT INTO leagues (
+      id, name, unique_league_id, sport, commissioner_id, timezone,
+      is_active, playoff_started, sub_approval_workflow, created_at, updated_at
+    )
+    VALUES (
+      ${MONTHLY_LEAGUE_ID}, 'Monthly Recurrence Test',
+      ${`M${RUN.slice(0, 5)}`.toUpperCase()}, 'hockey', ${CREATOR_ID},
+      'America/Los_Angeles', true, false, 'captain_and_commissioner',
+      NOW(), NOW()
+    )
   `);
 
   await db.execute(sql`
@@ -84,6 +102,21 @@ before(async () => {
   `);
 
   await db.execute(sql`
+    INSERT INTO scrimmages (
+      id, league_id, creator_id, title, date_time, location, max_players,
+      status, is_recurring, recurrence_type, recurrence_end_date,
+      recurrence_count, invite_user_ids, time_tbd, has_deferred_invites,
+      created_at, updated_at
+    )
+    VALUES (
+      ${MONTHLY_PARENT_ID}, ${MONTHLY_LEAGUE_ID}, ${CREATOR_ID},
+      'Monthly end-date parent', '2026-10-31 20:00:00', 'Test Rink', 20,
+      'open', true, 'monthly', '2026-11-30 00:00:00', 12,
+      ARRAY[${PLAYER_ID}], false, false, NOW(), NOW()
+    )
+  `);
+
+  await db.execute(sql`
     INSERT INTO scrimmage_co_hosts (
       scrimmage_id, user_id, added_by, can_approve_requests,
       can_send_reminders, can_manage_payments, added_at
@@ -96,8 +129,10 @@ after(async () => {
   await db.execute(sql`DELETE FROM user_notifications WHERE scrimmage_id IN (${TBD_ID}, ${QUEUED_ID}, ${DELIVERED_ID}, ${PARENT_ID}, ${CLAIM_ID})`);
   await db.execute(sql`DELETE FROM scrimmage_co_hosts WHERE scrimmage_id = ${TBD_ID}`);
   await db.execute(sql`DELETE FROM scrimmages WHERE league_id = ${LEAGUE_ID}`);
+  await db.execute(sql`DELETE FROM scrimmages WHERE league_id = ${MONTHLY_LEAGUE_ID}`);
   await db.execute(sql`DELETE FROM announcements WHERE id = ${ANNOUNCEMENT_ID}`);
   await db.execute(sql`DELETE FROM leagues WHERE id = ${LEAGUE_ID}`);
+  await db.execute(sql`DELETE FROM leagues WHERE id = ${MONTHLY_LEAGUE_ID}`);
   await db.execute(sql`DELETE FROM users WHERE id IN (${PLAYER_ID}, ${COHOST_ID}, ${CREATOR_ID})`);
 });
 
@@ -252,4 +287,28 @@ test('scheduled send time also preserves the configured hour across fall DST', (
   );
 
   assert.equal(sendAt.toISOString(), '2026-11-01T14:00:00.000Z');
+});
+
+test('monthly occurrence job accepts a persisted end date and includes its final local day', async () => {
+  const parent = await storage.getScrimmage(MONTHLY_PARENT_ID);
+  assert.ok(parent);
+  assert.ok(parent.recurrenceEndDate instanceof Date);
+
+  const created = await generateAndPersistRecurringOccurrences(parent, 20);
+
+  assert.deepEqual(
+    created.map((occurrence) => occurrence.dateTime),
+    ['2026-11-30 20:00:00'],
+  );
+
+  const secondRun = await generateAndPersistRecurringOccurrences(parent, 20);
+  assert.deepEqual(secondRun, []);
+
+  const childCount = await db.execute(sql`
+    SELECT COUNT(*)::int AS count
+    FROM scrimmages
+    WHERE parent_scrimmage_id = ${MONTHLY_PARENT_ID}
+      AND date_time::date = DATE '2026-11-30'
+  `);
+  assert.equal(Number((childCount.rows[0] as { count: number }).count), 1);
 });
