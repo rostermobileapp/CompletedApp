@@ -1,6 +1,7 @@
 import {
   users,
   leagues,
+  demoEnvironments,
   seasons,
   teams,
   leagueMemberships,
@@ -219,7 +220,7 @@ import {
   type LeagueProSeat,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists } from "drizzle-orm";
 
 // Recipient row hydrated with either the real user or the placeholder player.
 // Exactly one of `user` / `placeholderPlayer` is populated for any given row.
@@ -2021,7 +2022,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeagues(sport?: string, search?: string): Promise<League[]> {
-    let conditions: any[] = [];
+    const conditions: any[] = [
+      notExists(
+        db
+          .select({ id: demoEnvironments.id })
+          .from(demoEnvironments)
+          .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+      ),
+    ];
     
     if (sport && sport !== "all") {
       conditions.push(eq(leagues.sport, sport as any));
@@ -2069,7 +2077,13 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.userId, userId),
-          eq(leagueMemberships.status, "approved")
+          eq(leagueMemberships.status, "approved"),
+          notExists(
+            db
+              .select({ id: demoEnvironments.id })
+              .from(demoEnvironments)
+              .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+          ),
         )
       );
     
@@ -2081,7 +2095,15 @@ export class DatabaseStorage implements IStorage {
       })
       .from(leagues)
       .leftJoin(facilities, eq(leagues.facilityId, facilities.id))
-      .where(eq(leagues.commissionerId, userId));
+      .where(and(
+        eq(leagues.commissionerId, userId),
+        notExists(
+          db
+            .select({ id: demoEnvironments.id })
+            .from(demoEnvironments)
+            .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+        ),
+      ));
     
     // Combine and deduplicate
     const allLeagueData = [
@@ -2188,7 +2210,15 @@ export class DatabaseStorage implements IStorage {
     const primaryCommissionerLeagues = await db
       .select()
       .from(leagues)
-      .where(eq(leagues.commissionerId, commissionerId));
+      .where(and(
+        eq(leagues.commissionerId, commissionerId),
+        notExists(
+          db
+            .select({ id: demoEnvironments.id })
+            .from(demoEnvironments)
+            .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+        ),
+      ));
     
     // Get leagues where user is a co-commissioner (secondary_commissioner)
     const coCommissionerLeaguesRaw = await db
@@ -2199,7 +2229,13 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.userId, commissionerId),
           eq(leagueMemberships.leagueRole, 'secondary_commissioner'),
-          eq(leagueMemberships.status, 'approved')
+            eq(leagueMemberships.status, 'approved'),
+            notExists(
+              db
+                .select({ id: demoEnvironments.id })
+                .from(demoEnvironments)
+                .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+            ),
         )
       );
     
@@ -2217,7 +2253,15 @@ export class DatabaseStorage implements IStorage {
     const primaryCommissionerLeagues = await db
       .select()
       .from(leagues)
-      .where(eq(leagues.commissionerId, userId));
+      .where(and(
+        eq(leagues.commissionerId, userId),
+        notExists(
+          db
+            .select({ id: demoEnvironments.id })
+            .from(demoEnvironments)
+            .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+        ),
+      ));
     
     // Get leagues where user is a co-commissioner (secondary_commissioner)
     const coCommissionerLeaguesRaw = await db
@@ -2228,7 +2272,13 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.userId, userId),
           eq(leagueMemberships.leagueRole, 'secondary_commissioner'),
-          eq(leagueMemberships.status, 'approved')
+          eq(leagueMemberships.status, 'approved'),
+          notExists(
+            db
+              .select({ id: demoEnvironments.id })
+              .from(demoEnvironments)
+              .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+          ),
         )
       );
     
@@ -9521,6 +9571,12 @@ export class DatabaseStorage implements IStorage {
     };
 
     const members = new Map<string, AggregatedMember>();
+    const nonDemoLeagueCondition = () => notExists(
+      db
+        .select({ id: demoEnvironments.id })
+        .from(demoEnvironments)
+        .where(eq(demoEnvironments.demoLeagueId, leagues.id)),
+    );
     const addUser = (
       user: User,
       sourceType: string,
@@ -9584,6 +9640,7 @@ export class DatabaseStorage implements IStorage {
           eq(leagues.facilityId, facilityId),
           eq(leagueMemberships.status, 'approved'),
           isNull(users.deletedAt),
+           nonDemoLeagueCondition(),
         )),
       db
         .select({ membership: facilityMemberships, user: users })
@@ -9609,6 +9666,7 @@ export class DatabaseStorage implements IStorage {
           eq(teamMemberships.status, 'approved'),
           isNull(users.deletedAt),
           or(eq(teams.facilityId, facilityId), eq(leagues.facilityId, facilityId)),
+           nonDemoLeagueCondition(),
         )),
       db
         .select({ user: users, leagueId: calendarEvents.leagueId, leagueName: leagues.name })
@@ -9619,6 +9677,7 @@ export class DatabaseStorage implements IStorage {
         .where(and(
           eq(calendarEvents.facilityId, facilityId),
           isNull(users.deletedAt),
+           nonDemoLeagueCondition(),
         )),
       db
         .select({ user: users, leagueId: games.leagueId, leagueName: leagues.name })
@@ -9635,6 +9694,7 @@ export class DatabaseStorage implements IStorage {
             ilike(games.venue, facility.name),
             facility.address ? ilike(games.venue, facility.address) : sql`false`,
           ),
+           nonDemoLeagueCondition(),
         )),
       db
         .select({ user: users, leagueId: scrimmages.leagueId, leagueName: leagues.name })
@@ -9650,6 +9710,7 @@ export class DatabaseStorage implements IStorage {
           ),
           ne(scrimmageRequests.status, 'dismissed'),
           isNull(users.deletedAt),
+           nonDemoLeagueCondition(),
         )),
       db
         .select({ user: users, leagueId: scrimmages.leagueId, leagueName: leagues.name })
@@ -9663,6 +9724,7 @@ export class DatabaseStorage implements IStorage {
             eq(calendarEvents.facilityId, facilityId),
           ),
           isNull(users.deletedAt),
+           nonDemoLeagueCondition(),
         )),
     ]);
 
@@ -9706,6 +9768,7 @@ export class DatabaseStorage implements IStorage {
         .where(and(
           eq(leagues.facilityId, facilityId),
           inArray(leagues.id, placeholderLeagueIds),
+          nonDemoLeagueCondition(),
         ));
       for (const league of venueLeagueRows) {
         const placeholders = await this.getLeaguePlaceholderPlayers(league.id);
