@@ -268,6 +268,11 @@ export default function CreateScrimmage() {
       const { date: dateStr, time: storedTime } = splitScrimmageDateTime(existingScrimmage.dateTime);
       const timeStr = existingScrimmage.timeTbd ? '' : storedTime;
       const savedInviteUserIds = Array.from(new Set<string>(existingScrimmage.inviteUserIds || []));
+      const savedInviteEmails = Array.from(new Set<string>(
+        (existingScrimmage.inviteEmails || [])
+          .map((email: string) => email.toLowerCase().trim())
+          .filter(Boolean),
+      ));
       
       // Parse recurrence end date directly from string
       const recurrenceEndDateStr = existingScrimmage.recurrenceEndDate || '';
@@ -298,10 +303,11 @@ export default function CreateScrimmage() {
         enableReminders: !!existingScrimmage.reminderHoursBefore,
         reminderHoursBefore: existingScrimmage.reminderHoursBefore || [24],
         selectedMemberIds: savedInviteUserIds,
-        selectedEmails: [],
+        selectedEmails: savedInviteEmails,
         coHostIds: [],
       });
       setSelectedMemberIds(savedInviteUserIds);
+      setSelectedEmails(savedInviteEmails);
       if (existingScrimmage.color) {
         setSelectedColor(existingScrimmage.color);
       }
@@ -451,25 +457,32 @@ export default function CreateScrimmage() {
         inviteGroupId: loadedInviteGroupIds[0] || null,
       };
 
+      // Persist the invite list on every save. Keep direct invitations separate
+      // from members loaded from a linked group so recurring occurrences can
+      // continue resolving each group's live membership at delivery time.
+      const userId = (user as any)?.id;
+      const filteredMemberIds = userId
+        ? data.selectedMemberIds.filter(id => id !== userId)
+        : data.selectedMemberIds;
+      const manuallySelectedIds = loadedInviteGroupIds.length > 0
+        ? filteredMemberIds.filter(id => !groupLoadedUserIds.has(id))
+        : filteredMemberIds;
+      const savedInviteEmails = Array.from(new Set(
+        (data.selectedEmails || [])
+          .map(email => email.toLowerCase().trim())
+          .filter(Boolean),
+      ));
+
       if (isEditMode && scrimmageId) {
         // Update existing scrimmage
-        const response = await apiRequest('PATCH', `/api/scrimmages/${scrimmageId}`, scrimmageData);
+        const response = await apiRequest('PATCH', `/api/scrimmages/${scrimmageId}`, {
+          ...scrimmageData,
+          inviteUserIds: manuallySelectedIds,
+          inviteEmails: savedInviteEmails,
+        });
         return response.json();
       } else {
         // Create new scrimmage
-        // Filter out the creator from selectedMemberIds (they don't need to invite themselves)
-        const userId = (user as any)?.id;
-        const filteredMemberIds = userId 
-          ? data.selectedMemberIds.filter(id => id !== userId)
-          : data.selectedMemberIds;
-
-        // When an invite group is linked, only store manually-selected IDs (not the group snapshot)
-        // as inviteUserIds. The recurring job re-fetches live group membership at send-time and
-        // unions it with these manual IDs — so only users added outside the group are persisted.
-        const manuallySelectedIds = loadedInviteGroupIds.length > 0
-          ? filteredMemberIds.filter(id => !groupLoadedUserIds.has(id))
-          : filteredMemberIds;
-
         const response = await apiRequest('POST', '/api/scrimmages', {
           ...scrimmageData,
           leagueId: selectedLeague.id, // Required by server for new scrimmages
@@ -568,8 +581,8 @@ export default function CreateScrimmage() {
     
     const formData = { 
       ...data, 
-      selectedMemberIds: selectedLeague ? selectedMemberIds : [],
-      selectedEmails: selectedLeague ? selectedEmails : [],
+      selectedMemberIds: isEditMode || selectedLeague ? selectedMemberIds : [],
+      selectedEmails: isEditMode || selectedLeague ? selectedEmails : [],
       coHostIds: selectedCoHostIds,
       coHostEmails,
     };
