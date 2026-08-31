@@ -233,13 +233,15 @@ Visit: https://RosterHockey.com
 
 export async function sendBulkScrimmageInvites(
   emails: string[],
-  scrimmageData: ScrimmageInviteData
+  scrimmageData: ScrimmageInviteData,
+  beforeEach?: () => Promise<void>,
 ): Promise<{ sent: string[]; failed: string[] }> {
   const sent: string[] = [];
   const failed: string[] = [];
 
   for (const email of emails) {
     try {
+      if (beforeEach) await beforeEach();
       await sendScrimmageInviteEmail(email, scrimmageData);
       sent.push(email);
     } catch (error) {

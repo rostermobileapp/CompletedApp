@@ -13,3 +13,4 @@
 - [Scrimmage payment state locking](scrimmage-payment-state-locking.md) — invoice sends, paid admission, and roster finalization must share locks; generic invoices cannot accept scrimmage links.
 - [Payment tracking entitlement](payment-tracking-entitlement.md) — premium gates invoice creation, not viewing or confirming existing organizer-owned requests.
 - [Placeholder user identity](placeholder-user-identity.md) — placeholder user accounts are identified by their @placeholder.roster email; users has no is_placeholder column.
+- [Scrimmage invite delivery leases](scrimmage-invite-delivery-leases.md) — mark sent only after full delivery; use owner-token heartbeats and revalidate before every side effect.

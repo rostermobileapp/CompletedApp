@@ -184,6 +184,9 @@ export default function CreateScrimmage() {
       coverPhoto: null,
     },
   });
+  const hasScheduledInvitationRule =
+    !!existingScrimmage?.inviteDaysBefore ||
+    (form.watch('isRecurring') && form.watch('enableInviteScheduling'));
 
   // Fetch user's leagues to get league members
   const { data: userLeagues = [], isLoading: leaguesLoading } = useQuery({
@@ -574,8 +577,12 @@ export default function CreateScrimmage() {
           : isEditMode
           ? `"${scrimmage.title}" has been updated successfully.`
           : scrimmage.timeTbd
-            ? `"${scrimmage.title}" has been saved as Time TBD. Selected players can RSVP now and will receive the exact time when it is set.`
-            : `"${scrimmage.title}" has been created. Selected members will be notified.`,
+            ? `"${scrimmage.title}" has been saved as Time TBD. Selected players will not see an invitation until an exact time is set.`
+            : scrimmage.inviteDaysBefore && !scrimmage.inviteSentAt
+              ? `"${scrimmage.title}" has been created. Each occurrence will be invited at its scheduled delivery time.`
+              : scrimmage.inviteSentAt
+                ? `"${scrimmage.title}" has been created. Selected members were notified.`
+                : `"${scrimmage.title}" has been created with invitations saved for later.`,
         variant: scrimmage.inviteDeliveryFailed ? 'destructive' : 'default',
       });
       // The details page reads the scrimmage from the approved-players
@@ -1360,7 +1367,14 @@ export default function CreateScrimmage() {
               <div className="space-y-1 p-4 bg-amber-500/10 rounded-lg border border-amber-500/30 pt-[4px] pb-[4px]">
                 <Label className="text-base">Invitations saved for later</Label>
                 <p className="text-sm text-muted-foreground">
-                  Your invitees will not be notified until this specific scrimmage has a time.
+                  This scrimmage will not appear to invitees until this occurrence has an exact time and is delivered.
+                </p>
+              </div>
+            ) : hasScheduledInvitationRule ? (
+              <div className="space-y-1 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30 pt-[4px] pb-[4px]">
+                <Label className="text-base">Invitations follow the schedule</Label>
+                <p className="text-sm text-muted-foreground">
+                  This occurrence will stay hidden from invitees until its scheduled invitation time.
                 </p>
               </div>
             ) : (

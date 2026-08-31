@@ -219,6 +219,7 @@ import {
   type InsertLeagueProGrant,
   type LeagueProSeat,
 } from "@shared/schema";
+import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists } from "drizzle-orm";
 
@@ -655,8 +656,11 @@ export interface IStorage {
   getScrimmagesNeedingInvites(): Promise<Scrimmage[]>;
   updateScrimmageInviteSent(scrimmageId: string): Promise<Scrimmage>;
   claimScrimmageInviteDelivery(scrimmageId: string): Promise<Scrimmage | null>;
+  renewScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<boolean>;
+  completeScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<Scrimmage | null>;
+  releaseScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<void>;
   getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined>;
-  createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: Date): Promise<Scrimmage>;
+  createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: string): Promise<Scrimmage>;
   getRecurringParentScrimmages(): Promise<Scrimmage[]>;
   
   // User search operations
@@ -1377,7 +1381,18 @@ export class DatabaseStorage implements IStorage {
       .from(userNotifications)
       .where(and(
         eq(userNotifications.userId, userId),
-        eq(userNotifications.isDismissed, false)
+        eq(userNotifications.isDismissed, false),
+        sql`(
+          ${userNotifications.type} != 'scrimmage_invite'
+          OR ${userNotifications.scrimmageId} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${scrimmages} visible_scrimmage
+            WHERE visible_scrimmage.id = ${userNotifications.scrimmageId}
+              AND visible_scrimmage.time_tbd = false
+              AND visible_scrimmage.invite_sent_at IS NOT NULL
+          )
+        )`
       ))
       .orderBy(desc(userNotifications.createdAt));
   }
@@ -1389,7 +1404,18 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(userNotifications.userId, userId),
         eq(userNotifications.isRead, false),
-        eq(userNotifications.isDismissed, false)
+        eq(userNotifications.isDismissed, false),
+        sql`(
+          ${userNotifications.type} != 'scrimmage_invite'
+          OR ${userNotifications.scrimmageId} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${scrimmages} visible_scrimmage
+            WHERE visible_scrimmage.id = ${userNotifications.scrimmageId}
+              AND visible_scrimmage.time_tbd = false
+              AND visible_scrimmage.invite_sent_at IS NOT NULL
+          )
+        )`
       ))
       .orderBy(desc(userNotifications.createdAt));
   }
@@ -10257,12 +10283,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]> {
-    const now = new Date();
-    const isUpcomingInvite = or(
-      and(
-        eq(scrimmages.timeTbd, false),
-        gte(scrimmages.dateTime, now),
-      ),
+    const now = new Date().toISOString();
+    const isUpcomingDeliveredInvite = and(
+      eq(scrimmages.timeTbd, false),
+      isNotNull(scrimmages.inviteSentAt),
+      gte(scrimmages.dateTime, now),
+    );
+    const isUpcomingCreatedScrimmage = or(
+      and(eq(scrimmages.timeTbd, false), gte(scrimmages.dateTime, now)),
       and(
         eq(scrimmages.timeTbd, true),
         sql`${scrimmages.dateTime}::date >= CURRENT_DATE`,
@@ -10279,7 +10307,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(announcementVisibility.userId, userId),
-          isUpcomingInvite,
+          isUpcomingDeliveredInvite,
           not(
             sql`EXISTS (
               SELECT 1 FROM ${scrimmageRequests}
@@ -10291,9 +10319,9 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(asc(scrimmages.dateTime));
 
-    // 2) Directly-selected users are also stored on the scrimmage. Reading this
-    // list keeps older Time TBD invitations visible even if they were created
-    // before TBD announcement visibility was added.
+    // 2) Directly-selected users are stored before delivery so organizers can
+    // manage the queue. Only expose them to players after this occurrence has
+    // actually been delivered.
     const directlyInvitedResults = await db
       .select({ scrimmage: scrimmages, creator: users })
       .from(scrimmages)
@@ -10301,7 +10329,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           sql`${userId} = ANY(COALESCE(${scrimmages.inviteUserIds}, ARRAY[]::text[]))`,
-          isUpcomingInvite,
+          isUpcomingDeliveredInvite,
           not(
             sql`EXISTS (
               SELECT 1 FROM ${scrimmageRequests}
@@ -10321,8 +10349,24 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(scrimmages.creatorId, userId),
-          isUpcomingInvite,
+          isUpcomingCreatedScrimmage,
           sql`${scrimmages.status} != 'cancelled'`
+        )
+      )
+      .orderBy(asc(scrimmages.dateTime));
+
+    // 4) Co-hosts share organizer visibility, including queued and Time TBD
+    // occurrences that ordinary invitees must not see yet.
+    const coHostedResults = await db
+      .select({ scrimmage: scrimmages, creator: users })
+      .from(scrimmageCoHosts)
+      .innerJoin(scrimmages, eq(scrimmageCoHosts.scrimmageId, scrimmages.id))
+      .innerJoin(users, eq(scrimmages.creatorId, users.id))
+      .where(
+        and(
+          eq(scrimmageCoHosts.userId, userId),
+          isUpcomingCreatedScrimmage,
+          sql`${scrimmages.status} != 'cancelled'`,
         )
       )
       .orderBy(asc(scrimmages.dateTime));
@@ -10330,7 +10374,7 @@ export class DatabaseStorage implements IStorage {
     // Merge and deduplicate by scrimmage id
     const seen = new Set<string>();
     const merged: (Scrimmage & { creator: User })[] = [];
-    for (const r of [...invitedResults, ...directlyInvitedResults, ...createdResults]) {
+    for (const r of [...invitedResults, ...directlyInvitedResults, ...createdResults, ...coHostedResults]) {
       if (!seen.has(r.scrimmage.id)) {
         seen.add(r.scrimmage.id);
         merged.push({ ...r.scrimmage, creator: r.creator });
@@ -10527,7 +10571,7 @@ export class DatabaseStorage implements IStorage {
 
   // Scrimmage invitation scheduling operations
   async getScrimmagesNeedingInvites(): Promise<Scrimmage[]> {
-    const now = new Date();
+    const now = new Date().toISOString();
     return await db
       .select()
       .from(scrimmages)
@@ -10537,8 +10581,7 @@ export class DatabaseStorage implements IStorage {
           isNull(scrimmages.inviteSentAt),
           eq(scrimmages.timeTbd, false),
           eq(scrimmages.status, 'open'),
-          gt(scrimmages.dateTime, now),
-          eq(scrimmages.isRecurring, false)
+          gt(scrimmages.dateTime, now)
         )
       );
   }
@@ -10546,24 +10589,96 @@ export class DatabaseStorage implements IStorage {
   async updateScrimmageInviteSent(scrimmageId: string): Promise<Scrimmage> {
     const [updated] = await db
       .update(scrimmages)
-      .set({ inviteSentAt: new Date(), updatedAt: new Date() })
+      .set({
+        inviteSentAt: new Date(),
+        inviteDeliveryClaimedAt: null,
+        inviteDeliveryClaimId: null,
+        hasDeferredInvites: false,
+        updatedAt: new Date(),
+      })
       .where(eq(scrimmages.id, scrimmageId))
       .returning();
     return updated;
   }
 
   async claimScrimmageInviteDelivery(scrimmageId: string): Promise<Scrimmage | null> {
-    const [claimed] = await db
+    return await db.transaction(async (tx) => {
+      const leaseExpiredBefore = new Date(Date.now() - 10 * 60 * 1000);
+      const claimId = randomUUID();
+      const [claimed] = await tx
+        .update(scrimmages)
+        .set({
+          inviteDeliveryClaimedAt: new Date(),
+          inviteDeliveryClaimId: claimId,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(scrimmages.id, scrimmageId),
+          isNull(scrimmages.inviteSentAt),
+          eq(scrimmages.timeTbd, false),
+          eq(scrimmages.status, 'open'),
+          sql`(
+            ${scrimmages.inviteDeliveryClaimedAt} IS NULL
+            OR ${scrimmages.inviteDeliveryClaimedAt} < ${leaseExpiredBefore}
+          )`,
+        ))
+        .returning();
+
+      if (!claimed) return null;
+
+      return claimed;
+    });
+  }
+
+  async renewScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<boolean> {
+    const [renewed] = await db
       .update(scrimmages)
-      .set({ inviteSentAt: new Date(), updatedAt: new Date() })
+      .set({ inviteDeliveryClaimedAt: new Date(), updatedAt: new Date() })
       .where(and(
         eq(scrimmages.id, scrimmageId),
+        eq(scrimmages.inviteDeliveryClaimId, claimId),
         isNull(scrimmages.inviteSentAt),
         eq(scrimmages.timeTbd, false),
         eq(scrimmages.status, 'open'),
       ))
+      .returning({ id: scrimmages.id });
+    return !!renewed;
+  }
+
+  async completeScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<Scrimmage | null> {
+    const [completed] = await db
+      .update(scrimmages)
+      .set({
+        inviteSentAt: new Date(),
+        inviteDeliveryClaimedAt: null,
+        inviteDeliveryClaimId: null,
+        hasDeferredInvites: false,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(scrimmages.id, scrimmageId),
+        isNull(scrimmages.inviteSentAt),
+        eq(scrimmages.inviteDeliveryClaimId, claimId),
+        eq(scrimmages.timeTbd, false),
+        eq(scrimmages.status, 'open'),
+      ))
       .returning();
-    return claimed || null;
+    return completed || null;
+  }
+
+  async releaseScrimmageInviteDelivery(scrimmageId: string, claimId: string): Promise<void> {
+    await db
+      .update(scrimmages)
+      .set({
+        inviteDeliveryClaimedAt: null,
+        inviteDeliveryClaimId: null,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(scrimmages.id, scrimmageId),
+        isNull(scrimmages.inviteSentAt),
+        eq(scrimmages.inviteDeliveryClaimId, claimId),
+      ));
   }
 
   async getScrimmageByParentAndDate(parentId: string, date: Date): Promise<Scrimmage | undefined> {
@@ -10578,30 +10693,33 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(scrimmages.parentScrimmageId, parentId),
-          gte(scrimmages.dateTime, startOfDay),
-          lte(scrimmages.dateTime, endOfDay)
+          gte(scrimmages.dateTime, startOfDay.toISOString()),
+          lte(scrimmages.dateTime, endOfDay.toISOString())
         )
       )
       .limit(1);
     return result;
   }
 
-  async createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: Date): Promise<Scrimmage> {
+  async createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: string): Promise<Scrimmage> {
     const { id, createdAt, updatedAt, parentScrimmageId: _, ...parentData } = parentScrimmage;
     const occurrenceHasIndependentTime = parentScrimmage.recurrenceTimesIndependent;
-    const occurrenceDateTime = new Date(dateTime);
-    if (occurrenceHasIndependentTime) {
-      occurrenceDateTime.setHours(0, 0, 0, 0);
-    }
+    const occurrenceDateTime = occurrenceHasIndependentTime
+      ? `${dateTime.slice(0, 10)}T00:00:00`
+      : dateTime;
     
     const occurrenceData: InsertScrimmage = {
       ...parentData,
       dateTime: occurrenceDateTime,
       parentScrimmageId: parentScrimmage.id,
       isRecurring: false,
+      announcementId: null,
       timeTbd: occurrenceHasIndependentTime ? true : parentScrimmage.timeTbd,
       hasDeferredInvites: occurrenceHasIndependentTime || parentScrimmage.hasDeferredInvites,
       inviteSentAt: null,
+      inviteDeliveryClaimedAt: null,
+      inviteDeliveryClaimId: null,
+      joinMode: parentScrimmage.joinMode as InsertScrimmage['joinMode'],
     };
     
     const [newOccurrence] = await db.insert(scrimmages).values(occurrenceData).returning();

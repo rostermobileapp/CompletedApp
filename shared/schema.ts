@@ -1286,6 +1286,8 @@ export const scrimmages = pgTable("scrimmages", {
   inviteDaysBefore: integer("invite_days_before"), // Number of days before each occurrence to send invites (e.g., 5 for Sunday invite for Friday scrimmage)
   inviteTimeOfDay: varchar("invite_time_of_day"), // Time to send invites in HH:MM format (e.g., "09:00" for 9am)
   inviteSentAt: timestamp("invite_sent_at"), // When the invite was sent for this occurrence (null if not sent yet)
+  inviteDeliveryClaimedAt: timestamp("invite_delivery_claimed_at"), // Retryable worker lease; inviteSentAt is set only after delivery completes
+  inviteDeliveryClaimId: varchar("invite_delivery_claim_id"), // Stable worker ownership token while the lease heartbeat advances
   color: text("color"), // Optional color for calendar display (e.g. "#ef4444" or "blue")
   coverPhoto: text("cover_photo"), // Optional preset cover photo id (e.g. "skates", "bench", "zamboni", "net", "outdoor")
   inviteGroupId: varchar("invite_group_id").references(() => inviteGroups.id, { onDelete: 'set null' }), // Live invite group for recurring scrimmages — re-fetched at each send time
@@ -3335,6 +3337,10 @@ export const createScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   leagueId: true,     // Server-controlled
   creatorId: true,    // Server-controlled
   announcementId: true, // Server-controlled
+  inviteSentAt: true, // Server-controlled delivery completion marker
+  inviteDeliveryClaimedAt: true, // Server-controlled worker lease
+  inviteDeliveryClaimId: true, // Server-controlled worker ownership token
+  hasDeferredInvites: true, // Derived from delivery state
   createdAt: true,
   updatedAt: true,
   venmoLinkOverride: true,   // Re-added below with normalization.
@@ -3358,6 +3364,10 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   leagueId: true,     // Server-controlled
   creatorId: true,    // Server-controlled
   announcementId: true, // Server-controlled
+  inviteSentAt: true, // Server-controlled delivery completion marker
+  inviteDeliveryClaimedAt: true, // Server-controlled worker lease
+  inviteDeliveryClaimId: true, // Server-controlled worker ownership token
+  hasDeferredInvites: true, // Derived from delivery state
   createdAt: true,
   updatedAt: true,
   venmoLinkOverride: true,   // Re-added below with normalization.

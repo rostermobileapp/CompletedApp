@@ -15939,13 +15939,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const canUserAccessScrimmage = async (scrimmage: any, userId: string) => {
     if (scrimmage.creatorId === userId) return true;
+    const invitationDelivered = !scrimmage.timeTbd && !!scrimmage.inviteSentAt;
+    if (!invitationDelivered) {
+      return !!(await storage.getScrimmageCoHost(scrimmage.id, userId));
+    }
+
     const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
     if (membership?.status === 'approved') return true;
     if (scrimmage.inviteUserIds?.includes(userId)) return true;
 
-    const [request, coHost, emailInvites, hasAnnouncementVisibility] = await Promise.all([
+    const [request, emailInvites, hasAnnouncementVisibility] = await Promise.all([
       storage.getScrimmageRequest(scrimmage.id, userId),
-      storage.getScrimmageCoHost(scrimmage.id, userId),
       storage.getScrimmageInvites(scrimmage.id),
       scrimmage.announcementId
         ? storage.isAnnouncementVisibleToUser(scrimmage.announcementId, userId)
@@ -15953,7 +15957,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ]);
     if (
       request ||
-      coHost ||
       hasAnnouncementVisibility ||
       emailInvites.some((invite: any) => invite.userId === userId)
     ) {
@@ -16155,127 +16158,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!scrimmage) {
       return { delivered: false, reason: 'already_sent_or_not_ready' };
     }
-
-    const league = await storage.getLeague(scrimmage.leagueId);
-    if (!league) {
-      return { delivered: false, reason: 'league_not_found' };
+    const claimToken = scrimmage.inviteDeliveryClaimId;
+    if (!claimToken) {
+      throw new Error(`Invite delivery claim for ${scrimmage.id} did not return a lease token`);
     }
-
-    const recipientIds = new Set(
-      (scrimmage.inviteUserIds || []).filter((id) => !id.startsWith('placeholder:')),
-    );
-    const allowedVenueIds = scrimmage.facilityId
-      ? new Set(
-          (await getVenueScrimmagePoolForUser(scrimmage.creatorId, scrimmage.facilityId))
-            .members.map((member: any) => member.userId),
-        )
-      : null;
-    const emailRecipients = new Set(
-      (scrimmage.inviteEmails || []).map((email) => email.toLowerCase().trim()),
-    );
-    const inviteGroupIds = getInviteGroupIds(scrimmage);
-    if (inviteGroupIds.length > 0) {
-      const groupMembers = (await Promise.all(
-        inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
-      )).flat();
-      for (const member of groupMembers) {
-        if (member.userId && (!allowedVenueIds || allowedVenueIds.has(member.userId))) {
-          recipientIds.add(member.userId);
-        }
-        if (!allowedVenueIds && member.email) emailRecipients.add(member.email.toLowerCase().trim());
-      }
-    }
-    if (allowedVenueIds) {
-      for (const recipientId of Array.from(recipientIds)) {
-        if (!allowedVenueIds.has(recipientId)) recipientIds.delete(recipientId);
-      }
-    }
-    recipientIds.delete(scrimmage.creatorId);
-    const recipients = Array.from(recipientIds);
-
-    const creator = await storage.getUser(scrimmage.creatorId);
-    const organizerName = creator
-      ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
-      : 'Organizer';
-    const formattedDateTime = formatFullDateTime(scrimmage.dateTime, league.timezone);
-
-    if (recipients.length > 0) {
+    let leaseLost = false;
+    let heartbeatRunning = false;
+    const heartbeat = setInterval(async () => {
+      if (heartbeatRunning || leaseLost) return;
+      heartbeatRunning = true;
       try {
-        const content = `🏒 You're Invited! "${scrimmage.title}" on ${formattedDateTime} at ${scrimmage.location}. Click to RSVP!`;
-        let announcementId = scrimmage.announcementId;
-        if (announcementId) {
-          await storage.updateAnnouncement(announcementId, { content });
-        } else {
-          const announcement = await storage.createAnnouncement({
-            content,
-            leagueId: scrimmage.leagueId,
-            authorId: scrimmage.creatorId,
-            isPinned: false,
-          });
-          announcementId = announcement.id;
-          await storage.updateScrimmage(scrimmage.id, { announcementId });
-        }
-        await storage.createAnnouncementVisibility(announcementId, recipients);
+        leaseLost = !(await storage.renewScrimmageInviteDelivery(scrimmage.id, claimToken));
       } catch (error) {
-        console.error(`Failed to create deferred invite announcement for ${scrimmage.id}:`, error);
+        console.error(`Failed to renew invite delivery lease for ${scrimmage.id}:`, error);
+      } finally {
+        heartbeatRunning = false;
       }
+    }, 60_000);
+    heartbeat.unref();
+    const ensureLeaseOwnership = async () => {
+      if (leaseLost || !(await storage.renewScrimmageInviteDelivery(scrimmage.id, claimToken))) {
+        leaseLost = true;
+        throw new Error(`Invite delivery lease was lost for ${scrimmage.id}`);
+      }
+    };
 
-      for (const recipientId of recipients) {
-        try {
-          const notification = await storage.createNotificationIfNotExists({
-            userId: recipientId,
-            type: 'scrimmage_invite',
-            title: `You're Invited: ${scrimmage.title}`,
-            message: `Join us on ${formattedDateTime} at ${scrimmage.location}. Tap to RSVP!`,
-            actionUrl: `/scrimmage/${scrimmage.id}`,
-            actionText: 'View & RSVP',
-            scrimmageId: scrimmage.id,
-          });
-          if (notification) {
-            broadcastNotificationUpdate(recipientId);
+    try {
+      const league = await storage.getLeague(scrimmage.leagueId);
+      if (!league) {
+        await storage.releaseScrimmageInviteDelivery(scrimmage.id, claimToken);
+        return { delivered: false, reason: 'league_not_found' };
+      }
+      let deliveryFailed = false;
+
+      const recipientIds = new Set(
+        (scrimmage.inviteUserIds || []).filter((id) => !id.startsWith('placeholder:')),
+      );
+      const allowedVenueIds = scrimmage.facilityId
+        ? new Set(
+            (await getVenueScrimmagePoolForUser(scrimmage.creatorId, scrimmage.facilityId))
+              .members.map((member: any) => member.userId),
+          )
+        : null;
+      const emailRecipients = new Set(
+        (scrimmage.inviteEmails || []).map((email) => email.toLowerCase().trim()),
+      );
+      const inviteGroupIds = getInviteGroupIds(scrimmage);
+      if (inviteGroupIds.length > 0) {
+        const groupMembers = (await Promise.all(
+          inviteGroupIds.map((groupId) => storage.getInviteGroupMembers(groupId)),
+        )).flat();
+        for (const member of groupMembers) {
+          if (member.userId && (!allowedVenueIds || allowedVenueIds.has(member.userId))) {
+            recipientIds.add(member.userId);
           }
-          // The player may already have received an in-app Time TBD invite.
-          // The claimed deferred delivery is still their one exact-time push.
-          const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
-          await sendScrimmageInvitePushNotification(
-            recipientId,
-            organizerName,
-            scrimmage.title,
-            formattedDateTime,
-            scrimmage.location || 'TBD',
-            scrimmage.id,
-          );
-        } catch (error) {
-          console.error(`Failed to deliver deferred invite to ${recipientId}:`, error);
+          if (!allowedVenueIds && member.email) emailRecipients.add(member.email.toLowerCase().trim());
         }
       }
-    }
-
-    const existingEmailInvites = await storage.getScrimmageInvites(scrimmage.id);
-    const existingInviteEmails = new Set(existingEmailInvites.map((invite) => invite.email.toLowerCase()));
-    const emails = Array.from(emailRecipients).filter(
-      (email) => email.includes('@') && !existingInviteEmails.has(email),
-    );
-    if (emails.length > 0) {
-      try {
-        await storage.createScrimmageInvites(scrimmage.id, emails);
-        await sendBulkScrimmageInvites(emails, {
-          scrimmageId: scrimmage.id,
-          title: scrimmage.title,
-          dateTime: new Date(scrimmage.dateTime),
-          location: scrimmage.location,
-          creatorName: organizerName,
-          skillLevel: scrimmage.skillLevel || undefined,
-          costPerPlayer: scrimmage.costPerPlayer || undefined,
-          notes: scrimmage.notes || undefined,
-          maxPlayers: scrimmage.maxPlayers,
-        });
-      } catch (error) {
-        console.error(`Failed to deliver deferred email invites for ${scrimmage.id}:`, error);
+      if (allowedVenueIds) {
+        for (const recipientId of Array.from(recipientIds)) {
+          if (!allowedVenueIds.has(recipientId)) recipientIds.delete(recipientId);
+        }
       }
-    }
+      recipientIds.delete(scrimmage.creatorId);
+      const recipients = Array.from(recipientIds);
 
-    return { delivered: true, recipientCount: recipients.length, emailCount: emails.length };
+      const creator = await storage.getUser(scrimmage.creatorId);
+      const organizerName = creator
+        ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
+        : 'Organizer';
+      const formattedDateTime = formatFullDateTime(scrimmage.dateTime, league.timezone);
+
+      if (recipients.length > 0) {
+        try {
+          await ensureLeaseOwnership();
+          const content = `🏒 You're Invited! "${scrimmage.title}" on ${formattedDateTime} at ${scrimmage.location}. Click to RSVP!`;
+          let announcementId = scrimmage.announcementId;
+          if (announcementId) {
+            await storage.updateAnnouncement(announcementId, { content });
+          } else {
+            const announcement = await storage.createAnnouncement({
+              content,
+              leagueId: scrimmage.leagueId,
+              authorId: scrimmage.creatorId,
+              isPinned: false,
+            });
+            announcementId = announcement.id;
+            await storage.updateScrimmage(scrimmage.id, { announcementId });
+          }
+          await storage.createAnnouncementVisibility(announcementId, recipients);
+        } catch (error) {
+          deliveryFailed = true;
+          console.error(`Failed to create deferred invite announcement for ${scrimmage.id}:`, error);
+        }
+
+        for (const recipientId of recipients) {
+          try {
+            await ensureLeaseOwnership();
+            const notification = await storage.createNotificationIfNotExists({
+              userId: recipientId,
+              type: 'scrimmage_invite',
+              title: `You're Invited: ${scrimmage.title}`,
+              message: `Join us on ${formattedDateTime} at ${scrimmage.location}. Tap to RSVP!`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View & RSVP',
+              scrimmageId: scrimmage.id,
+            });
+            if (notification) {
+              broadcastNotificationUpdate(recipientId);
+              await ensureLeaseOwnership();
+              const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
+              await sendScrimmageInvitePushNotification(
+                recipientId,
+                organizerName,
+                scrimmage.title,
+                formattedDateTime,
+                scrimmage.location || 'TBD',
+                scrimmage.id,
+              );
+            }
+          } catch (error) {
+            deliveryFailed = true;
+            console.error(`Failed to deliver deferred invite to ${recipientId}:`, error);
+          }
+        }
+      }
+
+      const existingEmailInvites = await storage.getScrimmageInvites(scrimmage.id);
+      const existingInviteEmails = new Set(existingEmailInvites.map((invite) => invite.email.toLowerCase()));
+      const emails = Array.from(emailRecipients).filter(
+        (email) => email.includes('@') && !existingInviteEmails.has(email),
+      );
+      if (emails.length > 0) {
+        try {
+          await ensureLeaseOwnership();
+          const emailResults = await sendBulkScrimmageInvites(emails, {
+            scrimmageId: scrimmage.id,
+            title: scrimmage.title,
+            dateTime: new Date(scrimmage.dateTime),
+            location: scrimmage.location,
+            creatorName: organizerName,
+            skillLevel: scrimmage.skillLevel || undefined,
+            costPerPlayer: scrimmage.costPerPlayer || undefined,
+            notes: scrimmage.notes || undefined,
+            maxPlayers: scrimmage.maxPlayers,
+          }, ensureLeaseOwnership);
+          if (emailResults.sent.length > 0) {
+            await storage.createScrimmageInvites(scrimmage.id, emailResults.sent);
+          }
+          if (emailResults.failed.length > 0) {
+            deliveryFailed = true;
+          }
+        } catch (error) {
+          deliveryFailed = true;
+          console.error(`Failed to deliver deferred email invites for ${scrimmage.id}:`, error);
+        }
+      }
+
+      if (deliveryFailed) {
+        await storage.releaseScrimmageInviteDelivery(scrimmage.id, claimToken);
+        return { delivered: false, reason: 'delivery_failed' };
+      }
+      await ensureLeaseOwnership();
+
+      const completed = await storage.completeScrimmageInviteDelivery(scrimmage.id, claimToken);
+      if (!completed) {
+        return { delivered: false, reason: 'delivery_completion_failed' };
+      }
+      return { delivered: true, recipientCount: recipients.length, emailCount: emails.length };
+    } catch (error) {
+      await storage.releaseScrimmageInviteDelivery(scrimmage.id, claimToken);
+      throw error;
+    } finally {
+      clearInterval(heartbeat);
+    }
   };
 
   // Create scrimmage (available to all users)
@@ -16401,42 +16457,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .filter((email) => emailSchema.safeParse(email).success),
       ));
 
-      // Create announcement first if there are selected members. Time TBD
-      // players need this visibility row immediately so the invite appears on
-      // their dashboard; only the exact-time push remains deferred.
-      // Placeholder players (id prefix "placeholder:") have no users row — exclude
-      // them before writing announcement visibility records (FK to users.id).
-      // Only create the announcement when at least one real user is targeted;
-      // an announcement with no visibility rows is visible to the entire league.
-      let announcementId = null;
-      const realSelectedMemberIds = requestedSelectedMemberIds.filter(
-        (id: string) => !id.startsWith('placeholder:')
-      );
-      if (realSelectedMemberIds.length > 0) {
-        try {
-          const invitationWhen = scrimmageData.timeTbd
-            ? `${formatDateInTimezone(scrimmageData.dateTime, 'MMM d, yyyy', league.timezone)} (Time TBD)`
-            : formatFullDateTime(scrimmageData.dateTime, league.timezone);
-          const invitationContent = `🏒 You're Invited! "${scrimmageData.title}" on ${invitationWhen} at ${scrimmageData.location}. Click to RSVP!`;
-          
-          // Create announcement for the scrimmage invitation
-          const announcement = await storage.createAnnouncement({
-            content: invitationContent,
-            leagueId: scrimmageData.leagueId,
-            authorId: userId,
-            isPinned: false,
-          });
-          
-          announcementId = announcement.id;
-          
-          // Create visibility records for invited players (real users only)
-          await storage.createAnnouncementVisibility(announcement.id, realSelectedMemberIds);
-          
-        } catch (announcementError) {
-          console.error('Error sending scrimmage invitations:', announcementError);
-          // Continue with scrimmage creation even if announcement fails
-        }
-      }
+      const hasInviteRecipients =
+        requestedSelectedMemberIds.length > 0 ||
+        requestedInviteGroupIds.length > 0 ||
+        savedInviteEmails.length > 0;
+      // A recurring schedule owns delivery timing. The send-now toggle cannot
+      // bypass it, and a TBD occurrence can never be delivered.
+      const usesScheduledInvitationDelivery =
+        scrimmageData.isRecurring && scrimmageData.inviteDaysBefore != null;
+      const shouldDeliverImmediately =
+        !scrimmageData.timeTbd &&
+        req.body.sendInviteNow === true &&
+        !usesScheduledInvitationDelivery;
+      // Recipient configuration remains queued until the shared delivery path
+      // completes and stamps inviteSentAt.
+      const hasDeferredInvites = hasInviteRecipients;
+      const announcementId = null;
       
       // Handle recurring events
       if (scrimmageData.isRecurring && scrimmageData.recurrenceType !== 'none') {
@@ -16533,6 +16569,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create parent scrimmage (first occurrence)
         const parentScrimmage = await storage.createScrimmage({
           ...scrimmageData,
+          recurrenceEndDate: scrimmageData.recurrenceEndDate
+            ? new Date(scrimmageData.recurrenceEndDate)
+            : null,
           announcementId,
           // date_time is timestamp without time zone. Persist the league-local
           // wall-clock string rather than a Date (which Drizzle serializes as
@@ -16540,7 +16579,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dateTime: formatDateInTimezone(dates[0], "yyyy-MM-dd'T'HH:mm:ss", league.timezone),
           inviteUserIds: requestedInviteUserIds, // Only manual (non-group) selections
           inviteEmails: savedInviteEmails,
-          hasDeferredInvites: !!scrimmageData.timeTbd,
+          hasDeferredInvites,
+          inviteSentAt: null,
+          inviteDeliveryClaimedAt: null,
+          inviteDeliveryClaimId: null,
           recurrenceTimesIndependent: true,
         });
 
@@ -16615,6 +16657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (let i = 1; i < dates.length; i++) {
           const childScrimmage = await storage.createScrimmage({
             ...scrimmageData,
+            recurrenceEndDate: scrimmageData.recurrenceEndDate
+              ? new Date(scrimmageData.recurrenceEndDate)
+              : null,
             // Future occurrences deliberately start as Time TBD. A time set on
             // the first occurrence must never become the series-wide default.
             dateTime: `${formatDateInTimezone(dates[i], 'yyyy-MM-dd', league.timezone)}T00:00:00`,
@@ -16624,6 +16669,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             inviteUserIds: requestedInviteUserIds,
             inviteEmails: savedInviteEmails,
             hasDeferredInvites: true,
+            inviteSentAt: null,
+            inviteDeliveryClaimedAt: null,
+            inviteDeliveryClaimId: null,
             recurrenceTimesIndependent: true,
           });
 
@@ -16647,126 +16695,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-        
-        
-        // ALWAYS send in-app notifications when members are invited, including
-        // Time TBD events. Push delivery with the exact time remains deferred.
-        if (requestedSelectedMemberIds.length > 0) {
-          const creator = await storage.getUser(userId);
-          const organizerName = creator 
-            ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
-            : 'Organizer';
-          const scrimmageDateTime = formatScrimmageDateTime(scrimmageData.dateTime, league.timezone);
-          const { date: inviteDate, time: inviteTime } = formatShortDayAndTime(scrimmageData.dateTime, league.timezone);
-          
-          // Resolve creator's team logo once for all recipients in this batch
-          let inviteTeamLogoUrl: string | undefined;
-          try {
-            const inviteTeamRows = await db
-              .select({ logoUrl: teams.logoUrl })
-              .from(teamMemberships)
-              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-              .where(and(
-                eq(teamMemberships.userId, userId),
-                eq(teams.leagueId, league.id),
-                eq(teamMemberships.status, 'approved')
-              ))
-              .limit(1);
-            inviteTeamLogoUrl = resolveTeamLogoUrl(inviteTeamRows[0]?.logoUrl);
-          } catch (e) { /* keep undefined */ }
-          
-          for (const memberId of requestedSelectedMemberIds) {
-            // Placeholder players have no account — skip notifications for them.
-            if (typeof memberId === 'string' && memberId.startsWith('placeholder:')) continue;
-            try {
-              // ALWAYS create in-app notification for Alerts
-              await storage.createNotificationIfNotExists({
-                userId: memberId,
-                type: 'scrimmage_invite',
-                title: `You're Invited: ${scrimmageData.title}`,
-                message: scrimmageData.timeTbd
-                  ? `Join us on ${inviteDate} (Time TBD) at ${scrimmageData.location}. Tap to RSVP!`
-                  : `Join us on ${inviteDate} at ${inviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
-                actionUrl: `/scrimmage/${parentScrimmage.id}`,
-                scrimmageId: parentScrimmage.id,
-              });
-
-              
-              // Only send push notification if sendInviteNow is enabled
-              if (req.body.sendInviteNow) {
-                const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
-                const pushResult = await sendScrimmageInvitePushNotification(
-                  memberId,
-                  organizerName,
-                  scrimmageData.title,
-                  scrimmageDateTime,
-                  scrimmageData.location || 'TBD',
-                  parentScrimmage.id,
-                  inviteTeamLogoUrl
-                );
-                console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
-              }
-            } catch (notifError) {
-              console.error(`Failed to create notification for user ${memberId}:`, notifError);
-            }
-          }
-
+        let inviteDeliveryFailed = false;
+        if (shouldDeliverImmediately && hasInviteRecipients) {
+          const delivery = await deliverPendingScrimmageInvites(parentScrimmage.id);
+          inviteDeliveryFailed = !delivery.delivered;
         }
-        
-        // Save email invites if provided
-        if (!scrimmageData.timeTbd && req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
-          try {
-            // Validate and normalize emails
-            const emailSchema = z.string().email();
-            const validEmails = req.body.selectedEmails
-              .map((email: string) => email.toLowerCase().trim())
-              .filter((email: string) => emailSchema.safeParse(email).success);
-            
-            // Deduplicate emails
-            const uniqueEmails: string[] = Array.from(new Set<string>(validEmails));
-            
-            if (uniqueEmails.length > 0) {
-              await storage.createScrimmageInvites(parentScrimmage.id, uniqueEmails);
-              
-              // Send email notifications
-              try {
-                const creator = await storage.getUser(userId);
-                const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'A league member';
-                
-                const emailData = {
-                  scrimmageId: parentScrimmage.id,
-                  title: parentScrimmage.title,
-                  dateTime: new Date(parentScrimmage.dateTime),
-                  location: parentScrimmage.location,
-                  creatorName,
-                  skillLevel: parentScrimmage.skillLevel || undefined,
-                  costPerPlayer: parentScrimmage.costPerPlayer || undefined,
-                  notes: parentScrimmage.notes || undefined,
-                  maxPlayers: parentScrimmage.maxPlayers,
-                };
-                
-                const emailResults = await sendBulkScrimmageInvites(uniqueEmails, emailData);
-
-              } catch (emailSendError) {
-                console.error('Error sending email notifications:', emailSendError);
-                // Continue even if email notifications fail
-              }
-            }
-          } catch (emailError) {
-            console.error('Error creating email invites:', emailError);
-            // Continue even if email invites fail
-          }
-        }
-        
-        res.status(201).json(parentScrimmage);
+        const responseScrimmage = await storage.getScrimmage(parentScrimmage.id);
+        res.status(201).json({ ...(responseScrimmage || parentScrimmage), inviteDeliveryFailed });
       } else {
         // Create single scrimmage (non-recurring)
         const scrimmage = await storage.createScrimmage({
           ...scrimmageData,
+          recurrenceEndDate: scrimmageData.recurrenceEndDate
+            ? new Date(scrimmageData.recurrenceEndDate)
+            : null,
           announcementId,
           inviteUserIds: requestedInviteUserIds, // Only manual (non-group) selections
           inviteEmails: savedInviteEmails,
-          hasDeferredInvites: !!scrimmageData.timeTbd,
+          hasDeferredInvites,
+          inviteSentAt: null,
+          inviteDeliveryClaimedAt: null,
+          inviteDeliveryClaimId: null,
         });
 
         // Creator must explicitly RSVP to join their own scrimmage
@@ -16835,117 +16784,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-        
-        // ALWAYS send in-app notifications when members are invited, including
-        // Time TBD events. Push delivery with the exact time remains deferred.
-        if (requestedSelectedMemberIds.length > 0) {
-          const creator = await storage.getUser(userId);
-          const organizerName = creator 
-            ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
-            : 'Organizer';
-          const scrimmageDateTime = formatScrimmageDateTime(scrimmageData.dateTime, league.timezone);
-          const { date: singleInviteDate, time: singleInviteTime } = formatShortDayAndTime(scrimmageData.dateTime, league.timezone);
-          
-          // Resolve creator's team logo once for all recipients in this batch
-          let singleInviteTeamLogoUrl: string | undefined;
-          try {
-            const singleInviteTeamRows = await db
-              .select({ logoUrl: teams.logoUrl })
-              .from(teamMemberships)
-              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-              .where(and(
-                eq(teamMemberships.userId, userId),
-                eq(teams.leagueId, league.id),
-                eq(teamMemberships.status, 'approved')
-              ))
-              .limit(1);
-            singleInviteTeamLogoUrl = resolveTeamLogoUrl(singleInviteTeamRows[0]?.logoUrl);
-          } catch (e) { /* keep undefined */ }
-          
-          for (const memberId of requestedSelectedMemberIds) {
-            // Placeholder players have no account — skip notifications for them.
-            if (typeof memberId === 'string' && memberId.startsWith('placeholder:')) continue;
-            try {
-              // ALWAYS create in-app notification for Alerts
-              await storage.createNotificationIfNotExists({
-                userId: memberId,
-                type: 'scrimmage_invite',
-                title: `You're Invited: ${scrimmageData.title}`,
-                message: scrimmageData.timeTbd
-                  ? `Join us on ${singleInviteDate} (Time TBD) at ${scrimmageData.location}. Tap to RSVP!`
-                  : `Join us on ${singleInviteDate} at ${singleInviteTime} at ${scrimmageData.location}. Tap to RSVP!`,
-                actionUrl: `/scrimmage/${scrimmage.id}`,
-                scrimmageId: scrimmage.id,
-              });
-
-              
-              // Only send push notification if sendInviteNow is enabled
-              if (req.body.sendInviteNow) {
-                const { sendScrimmageInvitePushNotification } = await import('./oneSignalNotifications');
-                const pushResult = await sendScrimmageInvitePushNotification(
-                  memberId,
-                  organizerName,
-                  scrimmageData.title,
-                  scrimmageDateTime,
-                  scrimmageData.location || 'TBD',
-                  scrimmage.id,
-                  singleInviteTeamLogoUrl
-                );
-                console.log(`[Push] Scrimmage invite push to ${memberId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
-              }
-            } catch (notifError) {
-              console.error(`Failed to create notification for user ${memberId}:`, notifError);
-            }
-          }
-
+        let inviteDeliveryFailed = false;
+        if (shouldDeliverImmediately && hasInviteRecipients) {
+          const delivery = await deliverPendingScrimmageInvites(scrimmage.id);
+          inviteDeliveryFailed = !delivery.delivered;
         }
-        
-        // Save email invites if provided
-        if (!scrimmageData.timeTbd && req.body.selectedEmails && Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
-          try {
-            // Validate and normalize emails
-            const emailSchema = z.string().email();
-            const validEmails = req.body.selectedEmails
-              .map((email: string) => email.toLowerCase().trim())
-              .filter((email: string) => emailSchema.safeParse(email).success);
-            
-            // Deduplicate emails
-            const uniqueEmails: string[] = Array.from(new Set<string>(validEmails));
-            
-            if (uniqueEmails.length > 0) {
-              await storage.createScrimmageInvites(scrimmage.id, uniqueEmails);
-              
-              // Send email notifications
-              try {
-                const creator = await storage.getUser(userId);
-                const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : 'A league member';
-                
-                const emailData = {
-                  scrimmageId: scrimmage.id,
-                  title: scrimmage.title,
-                  dateTime: new Date(scrimmage.dateTime),
-                  location: scrimmage.location,
-                  creatorName,
-                  skillLevel: scrimmage.skillLevel || undefined,
-                  costPerPlayer: scrimmage.costPerPlayer || undefined,
-                  notes: scrimmage.notes || undefined,
-                  maxPlayers: scrimmage.maxPlayers,
-                };
-                
-                const emailResults = await sendBulkScrimmageInvites(uniqueEmails, emailData);
-
-              } catch (emailSendError) {
-                console.error('Error sending email notifications:', emailSendError);
-                // Continue even if email notifications fail
-              }
-            }
-          } catch (emailError) {
-            console.error('Error creating email invites:', emailError);
-            // Continue even if email invites fail
-          }
-        }
-        
-        res.status(201).json(scrimmage);
+        const responseScrimmage = await storage.getScrimmage(scrimmage.id);
+        res.status(201).json({ ...(responseScrimmage || scrimmage), inviteDeliveryFailed });
       }
     } catch (error) {
       console.error('Error creating scrimmage:', error);
@@ -16972,7 +16817,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const scrimmages = await storage.getLeagueScrimmages(leagueId);
-      res.json(scrimmages);
+      const visibleScrimmages = await Promise.all(scrimmages.map(async (scrimmage) => {
+        if (!scrimmage.timeTbd && scrimmage.inviteSentAt) return scrimmage;
+        if (scrimmage.creatorId === userId) return scrimmage;
+        return (await storage.getScrimmageCoHost(scrimmage.id, userId)) ? scrimmage : null;
+      }));
+      res.json(visibleScrimmages.filter(Boolean));
     } catch (error) {
       console.error('Error fetching league scrimmages:', error);
       res.status(500).json({ message: 'Failed to fetch league scrimmages' });
@@ -17031,9 +16881,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate input data with proper Zod schema
-      let updateData;
+      let updateData: any;
       try {
         updateData = updateScrimmageRequestSchema.parse(req.body);
+        delete updateData.inviteSentAt;
+        delete updateData.inviteDeliveryClaimedAt;
+        delete updateData.inviteDeliveryClaimId;
+        delete updateData.hasDeferredInvites;
       } catch (validationError) {
         console.error('Validation error updating scrimmage:', validationError);
         return res.status(400).json({ message: "Invalid update data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
@@ -17127,9 +16981,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           !hasInviteGroupIdsUpdate &&
           !!updateData.inviteGroupId &&
           updateData.inviteGroupId === existingScrimmage.inviteGroupId;
-        const requestedInviteGroupIds = Array.from(new Set(
+        const requestedInviteGroupIds: string[] = Array.from(new Set<string>(
           hasInviteGroupIdsUpdate
-            ? (updateData.inviteGroupIds || [])
+            ? (updateData.inviteGroupIds || []) as string[]
             : legacyValueIsUnchanged
               ? getInviteGroupIds(existingScrimmage)
               : updateData.inviteGroupId
@@ -17220,14 +17074,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let inviteDeliveryFailed = false;
-      // Resolving Time TBD is itself the explicit send action: players need
-      // the push notification when the invite becomes actionable, even though
-      // edit mode defaults the optional "send now" toggle to off. The claim in
-      // deliverPendingScrimmageInvites keeps this one delivery idempotent.
+      // A configured recurring schedule remains authoritative after a TBD
+      // occurrence receives an exact time. The scheduler will deliver it at
+      // the occurrence's own due time (or its next run if already overdue).
+      const usesScheduledInvitationDelivery = updatedScrimmage.inviteDaysBefore != null;
       if (
         updatedScrimmage.hasDeferredInvites &&
         !updatedScrimmage.timeTbd &&
         !updatedScrimmage.inviteSentAt &&
+        !usesScheduledInvitationDelivery &&
         (req.body.sendInviteNow === true || isResolvingTimeTbd)
       ) {
         try {
@@ -17326,6 +17181,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!scrimmage.hasDeferredInvites) {
         return res.status(409).json({ message: 'This scrimmage has no deferred invitations to send' });
+      }
+      if (scrimmage.inviteDaysBefore != null) {
+        return res.status(409).json({
+          message: 'This occurrence uses scheduled invitations and will send automatically at its configured time',
+        });
       }
 
       const result = await deliverPendingScrimmageInvites(scrimmage.id);

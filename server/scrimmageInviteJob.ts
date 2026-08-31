@@ -2,13 +2,33 @@ import { storage } from './storage';
 import { db } from './db';
 import { teams, teamMemberships, scrimmages as scrimmagesTable } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { addDays, subDays, isBefore, isAfter, startOfDay, setHours, setMinutes, format } from 'date-fns';
+import { addDays, isBefore, isAfter, format } from 'date-fns';
+import { fromZonedTime } from 'date-fns-tz';
 import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
-import { formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
+import { formatDateInTimezone, formatScrimmageDateTime, formatDayAndTime, parseLeagueLocalDateTime } from './dateUtils';
 import { sendBulkScrimmageInvites } from './emails';
 import { isDemoLeague } from './demo';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+
+export function getScrimmageInviteSendAt(
+  dateTime: Date | string,
+  inviteDaysBefore: number,
+  inviteTimeOfDay: string | null | undefined,
+  timezone: string,
+): Date {
+  const eventDateKey = typeof dateTime === 'string'
+    ? dateTime.slice(0, 10)
+    : formatDateInTimezone(dateTime, 'yyyy-MM-dd', timezone);
+  const [year, month, day] = eventDateKey.split('-').map(Number);
+  const sendDate = new Date(Date.UTC(year, month - 1, day));
+  sendDate.setUTCDate(sendDate.getUTCDate() - Math.max(0, Math.trunc(inviteDaysBefore)));
+  const sendDateKey = sendDate.toISOString().slice(0, 10);
+  const sendTime = /^\d{2}:\d{2}$/.test(inviteTimeOfDay || '')
+    ? inviteTimeOfDay!
+    : '09:00';
+  return fromZonedTime(`${sendDateKey}T${sendTime}:00`, timezone);
+}
 
 const getInviteGroupIds = (scrimmage: { inviteGroupIds?: string[] | null; inviteGroupId?: string | null }) =>
   Array.from(new Set([
@@ -71,42 +91,69 @@ async function checkAndSendInvitations() {
   // and haven't had their invitations sent yet
   const scrimmages = await storage.getScrimmagesNeedingInvites();
   
-  for (const scrimmage of scrimmages) {
+  for (const candidateScrimmage of scrimmages) {
     try {
-      if (await isDemoLeague(scrimmage.leagueId)) continue;
+      if (await isDemoLeague(candidateScrimmage.leagueId)) continue;
       // Check if this scrimmage has invitation scheduling configured
-      if (!scrimmage.inviteDaysBefore || scrimmage.inviteSentAt || scrimmage.timeTbd) {
+      if (
+        !candidateScrimmage.inviteDaysBefore ||
+        candidateScrimmage.inviteSentAt ||
+        candidateScrimmage.timeTbd
+      ) {
         continue;
       }
 
-      // Calculate when the invite should be sent
-      // Get league timezone for proper date conversion
-      const league = await storage.getLeague(scrimmage.leagueId);
+      // Calculate this occurrence's send instant in league-local wall-clock
+      // time. Calendar-day subtraction avoids DST shifting the configured hour.
+      const league = await storage.getLeague(candidateScrimmage.leagueId);
       const timezone = league?.timezone || 'America/New_York';
-      const scrimmageDate = parseLeagueLocalDateTime(scrimmage.dateTime, timezone);
-      const inviteSendDate = subDays(scrimmageDate, scrimmage.inviteDaysBefore);
-      
-      // If inviteTimeOfDay is specified, use that time
-      let inviteSendDateTime = startOfDay(inviteSendDate);
-      if (scrimmage.inviteTimeOfDay) {
-        const [hours, minutes] = scrimmage.inviteTimeOfDay.split(':').map(Number);
-        inviteSendDateTime = setMinutes(setHours(inviteSendDate, hours), minutes);
-      } else {
-        // Default to 9 AM
-        inviteSendDateTime = setHours(inviteSendDate, 9);
-      }
+      const inviteSendDateTime = getScrimmageInviteSendAt(
+        candidateScrimmage.dateTime,
+        candidateScrimmage.inviteDaysBefore,
+        candidateScrimmage.inviteTimeOfDay,
+        timezone,
+      );
 
       // Check if it's time to send the invite
-      if (isAfter(now, inviteSendDateTime)) {
-        console.log(`📬 Sending invitations for scrimmage: ${scrimmage.title} (${scrimmage.id})`);
+      if (!isBefore(now, inviteSendDateTime)) {
+        // Claim before creating any player-visible or external side effects.
+        // Only one overlapping worker can claim this occurrence.
+        const scrimmage = await storage.claimScrimmageInviteDelivery(candidateScrimmage.id);
+        if (!scrimmage) continue;
+        const claimToken = scrimmage.inviteDeliveryClaimId;
+        if (!claimToken) {
+          throw new Error(`Invite delivery claim for ${scrimmage.id} did not return a lease token`);
+        }
+        let leaseLost = false;
+        let heartbeatRunning = false;
+        const heartbeat = setInterval(async () => {
+          if (heartbeatRunning || leaseLost) return;
+          heartbeatRunning = true;
+          try {
+            leaseLost = !(await storage.renewScrimmageInviteDelivery(scrimmage.id, claimToken));
+          } catch (error) {
+            console.error(`Failed to renew invite delivery lease for ${scrimmage.id}:`, error);
+          } finally {
+            heartbeatRunning = false;
+          }
+        }, 60_000);
+        heartbeat.unref();
+        const ensureLeaseOwnership = async () => {
+          if (leaseLost || !(await storage.renewScrimmageInviteDelivery(scrimmage.id, claimToken))) {
+            leaseLost = true;
+            throw new Error(`Invite delivery lease was lost for ${scrimmage.id}`);
+          }
+        };
+
+        try {
+          console.log(`📬 Sending invitations for scrimmage: ${scrimmage.title} (${scrimmage.id})`);
         
         // Get the parent scrimmage to find the invited members
         const parentId = scrimmage.parentScrimmageId || scrimmage.id;
         const parentScrimmage = await storage.getScrimmage(parentId);
         
         if (!parentScrimmage) {
-          console.error(`Parent scrimmage not found: ${parentId}`);
-          continue;
+          throw new Error(`Parent scrimmage not found: ${parentId}`);
         }
 
         // Determine who to invite for this recurring occurrence.
@@ -212,6 +259,28 @@ async function checkAndSendInvitations() {
         
         const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
         const { date: formattedDate, time: formattedTime } = formatDayAndTime(scrimmage.dateTime, timezone);
+
+        const visibleRecipientIds = approvedMembers
+          .map((member: any) => member.userId)
+          .filter((recipientId: string) => recipientId && recipientId !== scrimmage.creatorId);
+        if (visibleRecipientIds.length > 0) {
+          await ensureLeaseOwnership();
+          const content = `🏒 You're Invited! "${scrimmage.title}" on ${scrimmageDateTime} at ${scrimmage.location}. Click to RSVP!`;
+          let announcementId = scrimmage.announcementId;
+          if (announcementId) {
+            await storage.updateAnnouncement(announcementId, { content });
+          } else {
+            const announcement = await storage.createAnnouncement({
+              content,
+              leagueId: scrimmage.leagueId,
+              authorId: scrimmage.creatorId,
+              isPinned: false,
+            });
+            announcementId = announcement.id;
+            await storage.updateScrimmage(scrimmage.id, { announcementId });
+          }
+          await storage.createAnnouncementVisibility(announcementId, visibleRecipientIds);
+        }
         
         // Resolve creator's team logo once — used as the notification icon for all invites
         let jobInviteTeamLogoUrl: string | undefined;
@@ -235,7 +304,8 @@ async function checkAndSendInvitations() {
         let sentCount = 0;
         for (const member of approvedMembers) {
           if (member.userId === scrimmage.creatorId) continue; // Skip the creator
-          
+
+          await ensureLeaseOwnership();
           const notification = await storage.createNotificationIfNotExists({
             userId: member.userId,
             type: 'scrimmage_invite',
@@ -249,7 +319,8 @@ async function checkAndSendInvitations() {
           if (notification) {
             sentCount++;
             // Send push notification to device
-            sendScrimmageInvitePushNotification(
+            await ensureLeaseOwnership();
+            await sendScrimmageInvitePushNotification(
               member.userId,
               organizerName,
               scrimmage.title,
@@ -257,7 +328,7 @@ async function checkAndSendInvitations() {
               scrimmage.location || 'TBD',
               scrimmage.id,
               jobInviteTeamLogoUrl
-            ).catch(console.error);
+            );
           }
         }
 
@@ -267,8 +338,8 @@ async function checkAndSendInvitations() {
         const existingInviteEmails = new Set(existingEmailInvites.map((invite) => invite.email.toLowerCase()));
         const newInviteEmails = Array.from(inviteEmails).filter((email) => !existingInviteEmails.has(email));
         if (newInviteEmails.length > 0) {
-          await storage.createScrimmageInvites(scrimmage.id, newInviteEmails);
-          await sendBulkScrimmageInvites(newInviteEmails, {
+          await ensureLeaseOwnership();
+          const emailResults = await sendBulkScrimmageInvites(newInviteEmails, {
             scrimmageId: scrimmage.id,
             title: scrimmage.title,
             dateTime: new Date(scrimmage.dateTime),
@@ -278,7 +349,13 @@ async function checkAndSendInvitations() {
             costPerPlayer: scrimmage.costPerPlayer || undefined,
             notes: scrimmage.notes || undefined,
             maxPlayers: scrimmage.maxPlayers,
-          });
+          }, ensureLeaseOwnership);
+          if (emailResults.sent.length > 0) {
+            await storage.createScrimmageInvites(scrimmage.id, emailResults.sent);
+          }
+          if (emailResults.failed.length > 0) {
+            throw new Error(`Failed to send ${emailResults.failed.length} email invite(s) for ${scrimmage.id}`);
+          }
         }
 
         // Persist placeholder invite IDs back to the occurrence's invite_user_ids so they
@@ -291,13 +368,21 @@ async function checkAndSendInvitations() {
           console.log(`📋 Persisted ${placeholderInviteIds.length} placeholder ID(s) to occurrence invite_user_ids`);
         }
 
-        // Mark the invite as sent
-        await storage.updateScrimmageInviteSent(scrimmage.id);
-        
-        console.log(`✅ Sent ${sentCount} invitations for scrimmage ${scrimmage.id}`);
+          await ensureLeaseOwnership();
+          const completed = await storage.completeScrimmageInviteDelivery(scrimmage.id, claimToken);
+          if (!completed) {
+            throw new Error(`Could not complete invite delivery claim for ${scrimmage.id}`);
+          }
+          console.log(`✅ Sent ${sentCount} invitations for scrimmage ${scrimmage.id}`);
+        } catch (deliveryError) {
+          await storage.releaseScrimmageInviteDelivery(scrimmage.id, claimToken);
+          throw deliveryError;
+        } finally {
+          clearInterval(heartbeat);
+        }
       }
     } catch (error) {
-      console.error(`Error sending invitations for scrimmage ${scrimmage.id}:`, error);
+      console.error(`Error sending invitations for scrimmage ${candidateScrimmage.id}:`, error);
     }
   }
 }
@@ -370,7 +455,7 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
         // from the live invite group are baked into the occurrence's inviteUserIds at creation.
         const newOccurrence = await storage.createRecurringScrimmageOccurrence(
           effectiveParent,
-          currentDate
+          formatDateInTimezone(currentDate, "yyyy-MM-dd'T'HH:mm:ss", timezone),
         );
         createdOccurrences.push(newOccurrence);
         console.log(`📅 Created recurring occurrence for ${effectiveParent.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
@@ -397,7 +482,7 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
         // Persist using effectiveParent for the same reason as the weekly branch above.
         const newOccurrence = await storage.createRecurringScrimmageOccurrence(
           effectiveParent,
-          currentDate
+          formatDateInTimezone(currentDate, "yyyy-MM-dd'T'HH:mm:ss", timezone),
         );
         createdOccurrences.push(newOccurrence);
         console.log(`📅 Created recurring occurrence for ${parentScrimmage.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
