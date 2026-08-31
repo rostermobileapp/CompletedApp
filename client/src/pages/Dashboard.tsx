@@ -3473,7 +3473,7 @@ function DashboardMobile() {
               ))}
               
               {/* Then show regular games (yesterday and future - visible until day after) */}
-              {(upcomingGames as any[])
+              {(Array.isArray(upcomingGames) ? upcomingGames : [])
                 .filter((game: any) => {
                   // Games remain visible until the day AFTER they are scheduled
                   // Compare local dates only (not timestamps) to handle timezone differences correctly
