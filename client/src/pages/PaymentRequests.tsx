@@ -117,7 +117,7 @@ export default function PaymentRequests() {
   }, [allReceivedRequests]);
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="payment-requests-page">
+    <div className="h-full min-h-0 flex flex-col overflow-y-auto overscroll-y-contain pb-28" data-testid="payment-requests-page">
       {/* Header */}
       <div className="p-6 pt-12">
         <div className="flex items-center justify-between mb-6">
