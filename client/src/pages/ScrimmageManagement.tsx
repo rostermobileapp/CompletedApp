@@ -199,6 +199,23 @@ export default function ScrimmageManagement() {
     },
   });
 
+  const sendPaymentRequestsMutation = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      const response = await apiRequest('POST', `/api/scrimmages/${scrimmageId}/send-payment-requests`, {});
+      return response.json();
+    },
+    onSuccess: (data: { createdCount: number; message: string }, scrimmageId) => {
+      toast({
+        title: data.createdCount > 0 ? 'Payment Requests Sent' : 'Players Already Invoiced',
+        description: data.message,
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${scrimmageId}/payment-requests`] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Unable to Send Payment Requests', description: error.message || 'Failed to send payment requests', variant: 'destructive' });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (scrimmageId: string) => {
       const response = await apiRequest('DELETE', `/api/scrimmages/${scrimmageId}`, {});
@@ -486,8 +503,22 @@ export default function ScrimmageManagement() {
               </Button>
             </div>
 
-            {/* Finalize Button */}
+            {/* Payment and finalization actions */}
             <div className="border-t border-border pt-3">
+              {scrimmage.status !== 'roster_confirmed' && !!scrimmage.costPerPlayer && Number(scrimmage.costPerPlayer) > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => sendPaymentRequestsMutation.mutate(scrimmage.id)}
+                  disabled={sendPaymentRequestsMutation.isPending && sendPaymentRequestsMutation.variables === scrimmage.id}
+                  className="w-full mb-2"
+                  size="sm"
+                >
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  {(sendPaymentRequestsMutation.isPending && sendPaymentRequestsMutation.variables === scrimmage.id)
+                    ? 'Sending...'
+                    : 'Send Payment Requests'}
+                </Button>
+              )}
               <Button
                 onClick={() => finalizeMutation.mutate(scrimmage.id)}
                 disabled={(finalizeMutation.isPending && finalizeMutation.variables === scrimmage.id) || scrimmage.status === 'roster_confirmed'}
@@ -499,12 +530,12 @@ export default function ScrimmageManagement() {
                 ) : scrimmage.status === 'roster_confirmed' ? (
                   <><Check className="w-4 h-4 mr-2" />Roster Finalized</>
                 ) : (
-                  <><Check className="w-4 h-4 mr-2" />Finalize & Invoice</>
+                  <><Check className="w-4 h-4 mr-2" />Finalize Roster</>
                 )}
               </Button>
               <p className="text-xs text-muted-foreground mt-1 text-center">
                 {scrimmage.costPerPlayer
-                  ? 'Confirm roster, send notifications & create payment requests'
+                  ? 'Send payment requests first, then finalize the approved roster'
                   : 'Confirm roster and send notifications to approved players'}
               </p>
             </div>

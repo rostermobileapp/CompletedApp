@@ -10,3 +10,4 @@
 - [Founder email constant](founder-email-constant.md) — founder's real login email is tobin@rosterhockey.com, not founder@rosterhockey.com; several founder-gate checks had the wrong hardcoded value.
 - [Scrimmage wall-clock timestamps](scrimmage-wall-clock-timestamps.md) — persist scrimmage times as league-local strings; passing Date objects shifts recurring times to UTC.
 - [Demo client identity](demo-client-identity.md) — client-side user comparisons in Demo must use the copied POV ID, not the real Supabase session user ID.
+- [Scrimmage payment state locking](scrimmage-payment-state-locking.md) — invoice sends, paid admission, and roster finalization must share locks; generic invoices cannot accept scrimmage links.

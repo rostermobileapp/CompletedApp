@@ -272,6 +272,23 @@ export default function GameDetails() {
     },
   });
 
+  const sendScrimmagePaymentRequestsM = useMutation({
+    mutationFn: async (scrimmageId: string) => {
+      const res = await apiRequest('POST', `/api/scrimmages/${scrimmageId}/send-payment-requests`, {});
+      return res.json();
+    },
+    onSuccess: (data: { createdCount: number; message: string }) => {
+      toast({
+        title: data.createdCount > 0 ? 'Payment Requests Sent' : 'Players Already Invoiced',
+        description: data.message,
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/payment-requests`] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Unable to Send Payment Requests', description: error.message || 'Failed to send payment requests', variant: 'destructive' });
+    },
+  });
+
   // Compute captain team ID early for the RSVP summary query
   // Check membership isCaptain flag for multi-captain support, with fallback to legacy captainId
   const isEarlyCaptainOfHome = userTeamMemberships.find(m => m.teamId === game?.homeTeam?.id)?.isCaptain || 
@@ -981,7 +998,19 @@ export default function GameDetails() {
                 );
               })()}
 
-              {/* Finalize & Invoice — or Finalized success state */}
+              {!isFinalized && !!scrimmage.costPerPlayer && Number(scrimmage.costPerPlayer) > 0 && (
+                <button
+                  onClick={() => sendScrimmagePaymentRequestsM.mutate(scrimmage.id)}
+                  disabled={sendScrimmagePaymentRequestsM.isPending}
+                  className="w-full py-3 rounded-lg border border-primary text-primary font-semibold flex items-center justify-center gap-2 hover:bg-primary/10 disabled:opacity-60"
+                  data-testid="button-send-scrimmage-payment-requests"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {sendScrimmagePaymentRequestsM.isPending ? 'Sending…' : 'Send Payment Requests'}
+                </button>
+              )}
+
+              {/* Finalize roster — or finalized success state */}
               {isFinalized ? (
                 <div className="rounded-lg bg-green-50 dark:bg-green-950/40 border border-green-400 p-4 space-y-2">
                   <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-semibold">
@@ -989,7 +1018,7 @@ export default function GameDetails() {
                     Roster Finalized
                   </div>
                   <p className="text-xs text-green-600 dark:text-green-500">
-                    Payment requests have been sent to all players.
+                    Confirmation notifications have been sent to approved players.
                   </p>
                   <button
                     onClick={() => {
@@ -1010,10 +1039,10 @@ export default function GameDetails() {
                     className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-60"
                   >
                     <Check className="w-4 h-4" />
-                    {finalizeScrimmageM.isPending ? 'Finalizing…' : 'Finalize & Invoice'}
+                    {finalizeScrimmageM.isPending ? 'Finalizing…' : 'Finalize Roster'}
                   </button>
                   <p className="text-xs text-muted-foreground text-center -mt-2">
-                    Confirm roster, send notifications & create payment requests
+                    Confirm the approved roster and send notifications
                   </p>
                 </>
               )}

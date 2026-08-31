@@ -601,11 +601,11 @@ export interface IStorage {
   createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest>;
   /** Atomically checks capacity (under a scrimmages row-level lock) and inserts an approved request.
    *  Returns the new request, 'at_capacity', or 'duplicate'. */
-  createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate'>;
+  createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate' | 'not_open'>;
   /** Atomically approves an existing pending request, enforcing capacity under a lock.
    *  Returns the updated request, 'at_capacity' when no spots remain, or 'not_pending'
    *  when the request is no longer in 'pending' state (concurrent actor already processed it). */
-  atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending'>;
+  atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending' | 'not_open'>;
   getScrimmageRequests(scrimmageId: string): Promise<(ScrimmageRequest & { player: User })[]>;
   getScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | undefined>;
   updateScrimmageRequestStatus(requestId: string, status: 'approved' | 'dismissed', timestamp?: Date, teamAssignment?: string | null): Promise<ScrimmageRequest>;
@@ -9446,14 +9446,15 @@ export class DatabaseStorage implements IStorage {
    * Returns the updated ScrimmageRequest, or the string literal `'at_capacity'`
    * when no spots remain (caller should respond with HTTP 409).
    */
-  async atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending'> {
+  async atomicApproveRequest(requestId: string, scrimmageId: string, teamAssignment?: string | null): Promise<ScrimmageRequest | 'at_capacity' | 'not_pending' | 'not_open'> {
     return await db.transaction(async (tx) => {
       // Lock the scrimmage row to serialize all concurrent approval attempts.
       const lockResult = await tx.execute(
-        sql`SELECT max_players FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
+        sql`SELECT max_players, status FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
       );
-      const scrimmageRow = lockResult.rows[0] as { max_players: number } | undefined;
+      const scrimmageRow = lockResult.rows[0] as { max_players: number; status: string } | undefined;
       if (!scrimmageRow) throw new Error(`Scrimmage ${scrimmageId} not found`);
+      if (scrimmageRow.status !== 'open') return 'not_open' as const;
 
       // Re-count approved players under the lock.
       const countResult = await tx.execute(
@@ -9494,17 +9495,18 @@ export class DatabaseStorage implements IStorage {
    * Returns the new ScrimmageRequest when successful, or null when the scrimmage
    * is already at capacity (caller should respond with HTTP 409).
    */
-  async createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate'> {
+  async createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate' | 'not_open'> {
     try {
       return await db.transaction(async (tx) => {
         // Lock the scrimmage row — this is the shared primitive that all approved-state
         // transitions (first-come, co-host, manual approval, backup acceptance) must hold
         // while counting and writing, so they never concurrently read the same final spot.
         const lockResult = await tx.execute(
-          sql`SELECT max_players FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
+          sql`SELECT max_players, status FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
         );
-        const scrimmageRow = lockResult.rows[0] as { max_players: number } | undefined;
+        const scrimmageRow = lockResult.rows[0] as { max_players: number; status: string } | undefined;
         if (!scrimmageRow) return 'at_capacity' as const;
+        if (scrimmageRow.status !== 'open') return 'not_open' as const;
 
         // Re-count approved players under the lock — prevents over-booking.
         const countResult = await tx.execute(

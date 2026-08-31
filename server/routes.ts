@@ -81,6 +81,8 @@ import {
   updatePaymentRequestSchema,
   paymentRequests,
   paymentRequestRecipients,
+  scrimmages,
+  scrimmageRequests,
   venmoLinkOverrideField,
   cashappLinkOverrideField,
   createFacilityRequestSchema,
@@ -15678,36 +15680,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ) => {
     const costPerPlayer = Number(scrimmage.costPerPlayer ?? 0);
     const uniqueRecipientIds = Array.from(new Set(recipientUserIds.filter(Boolean)));
-    if (costPerPlayer <= 0 || uniqueRecipientIds.length === 0) return null;
-
-    const existingPaymentRequests = await storage.getPaymentRequestsByScrimmage(scrimmage.id);
-    const alreadyRequestedUserIds = new Set(
-      existingPaymentRequests.flatMap((request) =>
-        request.recipients
-          .map((recipient) => recipient.userId)
-          .filter((userId): userId is string => !!userId),
-      ),
-    );
-    const newRecipientIds = uniqueRecipientIds.filter((userId) => !alreadyRequestedUserIds.has(userId));
-    if (newRecipientIds.length === 0) return null;
+    if (costPerPlayer <= 0 || uniqueRecipientIds.length === 0) {
+      return { paymentRequest: null, requestedUserIds: [] as string[], blockedReason: null };
+    }
 
     const league = await storage.getLeague(scrimmage.leagueId);
     const timezone = league?.timezone || 'America/New_York';
-    const paymentRequest = await storage.createPaymentRequest(
-      {
-        creatorId,
-        title: `Payment for ${scrimmage.title}`,
-        description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
-        amountPerPerson: String(scrimmage.costPerPlayer),
-        relatedScrimmageId: scrimmage.id,
-        deadline: null,
-        notes: null,
-        venmoLinkOverride: scrimmage.venmoLinkOverride,
-        cashappLinkOverride: scrimmage.cashappLinkOverride,
-        relatedConversationId: null,
-      },
-      newRecipientIds,
-    );
+    const { paymentRequest, requestedUserIds, blockedReason } = await db.transaction(async (tx) => {
+      // Serialize every invoice path for this scrimmage, including first-pay
+      // joins and finalization fallback. The transaction-scoped advisory lock
+      // works across server processes and is released automatically.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmage.id}`}))`);
+      const [currentScrimmage] = await tx
+        .select({ status: scrimmages.status })
+        .from(scrimmages)
+        .where(eq(scrimmages.id, scrimmage.id))
+        .limit(1);
+      if (currentScrimmage?.status !== 'open') {
+        return {
+          paymentRequest: null,
+          requestedUserIds: [] as string[],
+          blockedReason: 'not_open' as const,
+        };
+      }
+
+      const existingRecipients = await tx
+        .select({ userId: paymentRequestRecipients.userId })
+        .from(paymentRequestRecipients)
+        .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
+        .where(and(
+          eq(paymentRequests.relatedScrimmageId, scrimmage.id),
+          isNotNull(paymentRequestRecipients.userId),
+        ));
+      const alreadyRequestedUserIds = new Set(
+        existingRecipients
+          .map((recipient) => recipient.userId)
+          .filter((userId): userId is string => !!userId),
+      );
+      const newRecipientIds = uniqueRecipientIds.filter((userId) => !alreadyRequestedUserIds.has(userId));
+      if (newRecipientIds.length === 0) {
+        return { paymentRequest: null, requestedUserIds: [] as string[], blockedReason: null };
+      }
+
+      const [createdPaymentRequest] = await tx
+        .insert(paymentRequests)
+        .values({
+          creatorId,
+          title: `Payment for ${scrimmage.title}`,
+          description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
+          amountPerPerson: String(scrimmage.costPerPlayer),
+          relatedScrimmageId: scrimmage.id,
+          deadline: null,
+          notes: null,
+          venmoLinkOverride: scrimmage.venmoLinkOverride,
+          cashappLinkOverride: scrimmage.cashappLinkOverride,
+          relatedConversationId: null,
+        })
+        .returning();
+      await tx.insert(paymentRequestRecipients).values(
+        newRecipientIds.map((userId) => ({
+          paymentRequestId: createdPaymentRequest.id,
+          userId,
+        })),
+      );
+      return { paymentRequest: createdPaymentRequest, requestedUserIds: newRecipientIds, blockedReason: null };
+    });
+    if (!paymentRequest) {
+      return { paymentRequest: null, requestedUserIds, blockedReason };
+    }
 
     const creator = await storage.getUser(creatorId);
     const creatorName = creator
@@ -15715,7 +15755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       : 'Someone';
     const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
     await Promise.all(
-      newRecipientIds.map((recipientId) =>
+      requestedUserIds.map((recipientId) =>
         sendPaymentRequestPushNotification(
           recipientId,
           creatorName,
@@ -15728,7 +15768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ),
     );
 
-    return paymentRequest;
+    return { paymentRequest, requestedUserIds, blockedReason };
   };
 
   /**
@@ -16979,6 +17019,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmage.status === 'cancelled') {
         return res.status(409).json({ message: 'Cannot join cancelled scrimmage' });
       }
+      if (scrimmage.status !== 'open') {
+        return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
+      }
       
       // Verify user is a member of the league
       const membership = await storage.getUserLeagueMembership(userId, scrimmage.leagueId);
@@ -17006,6 +17049,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (fcResult === 'duplicate') {
           return res.status(409).json({ message: 'Request already exists for this scrimmage' });
+        }
+        if (fcResult === 'not_open') {
+          return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
         }
         const request = fcResult;
 
@@ -17083,6 +17129,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (coHostResult === 'duplicate') {
           return res.status(409).json({ message: 'Request already exists for this scrimmage' });
         }
+        if (coHostResult === 'not_open') {
+          return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
+        }
         return res.status(201).json(coHostResult);
       }
 
@@ -17106,32 +17155,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
       }
 
-      const request = await storage.createScrimmageRequest(requestData);
       if (isFirstPay) {
-        const paymentRequest = await storage.createPaymentRequest({
-          creatorId: scrimmage.creatorId,
-          title: `${scrimmage.title} — spot payment`,
-          description: 'Payment secures an available scrimmage spot in payment order.',
-          amountPerPerson: String(scrimmage.costPerPlayer),
-          deadline: scrimmage.timeTbd ? null : new Date(scrimmage.dateTime),
-          venmoLinkOverride: scrimmage.venmoLinkOverride,
-          cashappLinkOverride: scrimmage.cashappLinkOverride,
-          relatedScrimmageId: scrimmage.id,
-          relatedConversationId: null,
-        }, [userId]);
-        const creator = await storage.getUser(scrimmage.creatorId);
-        const creatorName = creator
-          ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
-          : 'Organizer';
-        const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
-        await sendPaymentRequestPushNotification(
-          userId,
-          creatorName,
-          String(scrimmage.costPerPlayer),
-          scrimmage.title,
-          paymentRequest.id,
-        );
+        const league = await storage.getLeague(scrimmage.leagueId);
+        const timezone = league?.timezone || 'America/New_York';
+        const firstPayJoin = await db.transaction(async (tx) => {
+          // The pending request and its invoice are one state transition. This
+          // shares both locks with finalization so neither half can be created
+          // after the roster has been finalized.
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmageId}`}))`);
+          const [currentScrimmage] = await tx
+            .select()
+            .from(scrimmages)
+            .where(eq(scrimmages.id, scrimmageId))
+            .limit(1)
+            .for('update');
+          if (!currentScrimmage || currentScrimmage.status !== 'open') {
+            return { kind: 'not_open' as const };
+          }
+
+          const [request] = await tx
+            .insert(scrimmageRequests)
+            .values(requestData)
+            .onConflictDoNothing({
+              target: [scrimmageRequests.scrimmageId, scrimmageRequests.playerId],
+            })
+            .returning();
+          if (!request) {
+            return { kind: 'duplicate' as const };
+          }
+
+          const existingRecipient = await tx
+            .select({ id: paymentRequestRecipients.id })
+            .from(paymentRequestRecipients)
+            .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
+            .where(and(
+              eq(paymentRequests.relatedScrimmageId, scrimmageId),
+              eq(paymentRequestRecipients.userId, userId),
+            ))
+            .limit(1);
+          if (existingRecipient.length > 0) {
+            return { kind: 'created' as const, request, paymentRequest: null };
+          }
+
+          const [paymentRequest] = await tx
+            .insert(paymentRequests)
+            .values({
+              creatorId: currentScrimmage.creatorId,
+              title: `Payment for ${currentScrimmage.title}`,
+              description: `Payment for scrimmage on ${formatFullDateTime(currentScrimmage.dateTime, timezone)} at ${currentScrimmage.location}`,
+              amountPerPerson: String(currentScrimmage.costPerPlayer),
+              relatedScrimmageId: currentScrimmage.id,
+              deadline: null,
+              notes: null,
+              venmoLinkOverride: currentScrimmage.venmoLinkOverride,
+              cashappLinkOverride: currentScrimmage.cashappLinkOverride,
+              relatedConversationId: null,
+            })
+            .returning();
+          await tx.insert(paymentRequestRecipients).values({
+            paymentRequestId: paymentRequest.id,
+            userId,
+          });
+          return { kind: 'created' as const, request, paymentRequest };
+        });
+
+        if (firstPayJoin.kind === 'not_open') {
+          return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
+        }
+        if (firstPayJoin.kind === 'duplicate') {
+          return res.status(409).json({ message: 'Request already exists for this scrimmage' });
+        }
+
+        if (firstPayJoin.paymentRequest) {
+          try {
+            const creator = await storage.getUser(scrimmage.creatorId);
+            const creatorName = creator
+              ? `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || creator.email || 'Someone'
+              : 'Someone';
+            const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+            await sendPaymentRequestPushNotification(
+              userId,
+              creatorName,
+              String(scrimmage.costPerPlayer),
+              firstPayJoin.paymentRequest.description || firstPayJoin.paymentRequest.title,
+              firstPayJoin.paymentRequest.id,
+            );
+          } catch (paymentNotificationError) {
+            console.error('[FirstPay] Payment request created, but push notification failed:', paymentNotificationError);
+          }
+        }
+        return res.status(201).json(firstPayJoin.request);
       }
+
+      const request = await storage.createScrimmageRequest(requestData);
       res.status(201).json(request);
     } catch (error) {
       console.error('[Scrimmage Request] Error creating scrimmage request:', error);
@@ -17400,6 +17516,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // A concurrent actor already processed this request inside the lock.
           // Return 409 so the caller knows — do NOT send duplicate notifications.
           return res.status(409).json({ message: 'Request has already been processed by a concurrent action' });
+        }
+        if (approvalResult === 'not_open') {
+          return res.status(409).json({ message: 'Cannot approve players after the scrimmage roster is finalized' });
         }
         updatedRequest = approvalResult;
       } else {
@@ -17806,6 +17925,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send payment requests before roster finalization. Pending players are
+  // included so payment-gated scrimmages do not require approval before the
+  // player has an invoice to pay.
+  app.post('/api/scrimmages/:id/send-payment-requests', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+
+      const { canManage, isCoHost, permissions } = await storage.canUserManageScrimmage(scrimmageId, userId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only the creator or co-hosts can send payment requests' });
+      }
+      if (isCoHost && permissions && !permissions.canManagePayments) {
+        return res.status(403).json({ message: 'You do not have permission to manage payments for this scrimmage' });
+      }
+
+      if (Number(scrimmage.costPerPlayer ?? 0) <= 0) {
+        return res.status(409).json({ message: 'This scrimmage does not have a cost per player' });
+      }
+      if (scrimmage.status === 'cancelled') {
+        return res.status(409).json({ message: 'Cannot send payment requests for a cancelled scrimmage' });
+      }
+      if (scrimmage.status === 'roster_confirmed') {
+        return res.status(409).json({ message: 'Payment requests must be sent before the roster is finalized' });
+      }
+      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= new Date()) {
+        return res.status(409).json({ message: 'Cannot send payment requests for a scrimmage that has already started' });
+      }
+
+      const requests = await storage.getScrimmageRequests(scrimmageId);
+      const eligibleUserIds = requests
+        .filter((request) => request.status === 'pending' || request.status === 'approved')
+        .map((request) => request.playerId);
+
+      if (eligibleUserIds.length === 0) {
+        return res.status(409).json({ message: 'There are no pending or approved players to invoice yet' });
+      }
+
+      const result = await createScrimmagePaymentRequestForPlayers(
+        scrimmage,
+        eligibleUserIds,
+        scrimmage.creatorId,
+      );
+      if (result.blockedReason === 'not_open') {
+        return res.status(409).json({ message: 'Payment requests must be sent before the roster is finalized' });
+      }
+
+      res.json({
+        createdCount: result.requestedUserIds.length,
+        eligibleCount: new Set(eligibleUserIds).size,
+        alreadyRequestedCount: new Set(eligibleUserIds).size - result.requestedUserIds.length,
+        message: result.requestedUserIds.length > 0
+          ? `Payment requests sent to ${result.requestedUserIds.length} player${result.requestedUserIds.length === 1 ? '' : 's'}`
+          : 'All eligible players already have payment requests',
+      });
+    } catch (error) {
+      console.error('Error sending scrimmage payment requests:', error);
+      res.status(500).json({ message: 'Failed to send payment requests' });
+    }
+  });
+
   // Finalize scrimmage roster and send confirmation notifications (Creator or Co-Host)
   app.put('/api/scrimmages/:id/finalize', isAuthenticated, async (req: any, res) => {
     try {
@@ -17828,36 +18012,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!canManage) {
         return res.status(403).json({ message: 'Only the creator or co-hosts can finalize the scrimmage' });
       }
-      
-      // Check if already finalized
-      if (scrimmage.status === 'roster_confirmed') {
-        return res.status(409).json({ message: 'Scrimmage roster is already finalized' });
-      }
-      
-      // Business rule: Cannot finalize if scrimmage has already started
-      const now = new Date();
-      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now) {
-        return res.status(409).json({ message: 'Cannot finalize a scrimmage that has already started' });
-      }
-      
-      // Get approved players
-      const requests = await storage.getScrimmageRequests(scrimmageId);
-      const approvedRequests = requests.filter(req => req.status === 'approved');
-      
-      if (approvedRequests.length === 0) {
-        return res.status(400).json({ message: 'Cannot finalize scrimmage with no approved players' });
-      }
-      
-      // Update scrimmage status to finalized
-      const updatedScrimmage = await storage.updateScrimmage(scrimmageId, { status: 'roster_confirmed' });
-      
-      // Send in-app notifications to approved players (shows in Alerts, not News)
-      const approvedUserIds = approvedRequests.map(req => req.playerId);
-      
-      // Get league timezone for proper date formatting
+
       const league = await storage.getLeague(scrimmage.leagueId);
       const timezone = league?.timezone || 'America/New_York';
       
+      // Serialize finalization with every invoice path. Whichever action gets
+      // the lock first completes first; a later invoice send sees the finalized
+      // status and cannot bill players who were left pending.
+      const finalizeResult = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmageId}`}))`);
+        const [currentScrimmage] = await tx
+          .select()
+          .from(scrimmages)
+          .where(eq(scrimmages.id, scrimmageId))
+          .limit(1)
+          .for('update');
+        if (!currentScrimmage) {
+          return { kind: 'not_found' as const };
+        }
+        if (currentScrimmage.status === 'roster_confirmed') {
+          return { kind: 'already_finalized' as const };
+        }
+        if (currentScrimmage.status === 'cancelled') {
+          return { kind: 'cancelled' as const };
+        }
+        if (!currentScrimmage.timeTbd && new Date(currentScrimmage.dateTime) <= new Date()) {
+          return { kind: 'started' as const };
+        }
+
+        const approvedRequests = await tx
+          .select()
+          .from(scrimmageRequests)
+          .where(and(
+            eq(scrimmageRequests.scrimmageId, scrimmageId),
+            eq(scrimmageRequests.status, 'approved'),
+          ));
+        if (approvedRequests.length === 0) {
+          return { kind: 'no_players' as const };
+        }
+
+        let finalizationInvoice: {
+          paymentRequest: typeof paymentRequests.$inferSelect;
+          requestedUserIds: string[];
+        } | null = null;
+        if (Number(currentScrimmage.costPerPlayer ?? 0) > 0) {
+          try {
+            // A savepoint preserves the old non-blocking behavior: if invoice
+            // creation fails, roster finalization can still commit.
+            finalizationInvoice = await tx.transaction(async (invoiceTx) => {
+              const existingRecipients = await invoiceTx
+                .select({ userId: paymentRequestRecipients.userId })
+                .from(paymentRequestRecipients)
+                .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
+                .where(and(
+                  eq(paymentRequests.relatedScrimmageId, scrimmageId),
+                  isNotNull(paymentRequestRecipients.userId),
+                ));
+              const alreadyRequestedUserIds = new Set(
+                existingRecipients
+                  .map((recipient) => recipient.userId)
+                  .filter((recipientId): recipientId is string => !!recipientId),
+              );
+              const requestedUserIds = Array.from(new Set(approvedRequests.map((request) => request.playerId)))
+                .filter((recipientId) => !alreadyRequestedUserIds.has(recipientId));
+              if (requestedUserIds.length === 0) return null;
+
+              const [paymentRequest] = await invoiceTx
+                .insert(paymentRequests)
+                .values({
+                  creatorId: currentScrimmage.creatorId,
+                  title: `Payment for ${currentScrimmage.title}`,
+                  description: `Payment for scrimmage on ${formatFullDateTime(currentScrimmage.dateTime, timezone)} at ${currentScrimmage.location}`,
+                  amountPerPerson: String(currentScrimmage.costPerPlayer),
+                  relatedScrimmageId: currentScrimmage.id,
+                  deadline: null,
+                  notes: null,
+                  venmoLinkOverride: currentScrimmage.venmoLinkOverride,
+                  cashappLinkOverride: currentScrimmage.cashappLinkOverride,
+                  relatedConversationId: null,
+                })
+                .returning();
+              await invoiceTx.insert(paymentRequestRecipients).values(
+                requestedUserIds.map((recipientId) => ({
+                  paymentRequestId: paymentRequest.id,
+                  userId: recipientId,
+                })),
+              );
+              return { paymentRequest, requestedUserIds };
+            });
+          } catch (paymentError) {
+            console.error('Payment request creation failed during finalization:', paymentError);
+          }
+        }
+
+        const [updatedScrimmage] = await tx
+          .update(scrimmages)
+          .set({ status: 'roster_confirmed', updatedAt: new Date() })
+          .where(eq(scrimmages.id, scrimmageId))
+          .returning();
+        return {
+          kind: 'finalized' as const,
+          scrimmage: currentScrimmage,
+          approvedRequests,
+          finalizationInvoice,
+          updatedScrimmage,
+        };
+      });
+      if (finalizeResult.kind === 'not_found') {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      if (finalizeResult.kind === 'already_finalized') {
+        return res.status(409).json({ message: 'Scrimmage roster is already finalized' });
+      }
+      if (finalizeResult.kind === 'cancelled') {
+        return res.status(409).json({ message: 'Cannot finalize a cancelled scrimmage' });
+      }
+      if (finalizeResult.kind === 'started') {
+        return res.status(409).json({ message: 'Cannot finalize a scrimmage that has already started' });
+      }
+      if (finalizeResult.kind === 'no_players') {
+        return res.status(400).json({ message: 'Cannot finalize scrimmage with no approved players' });
+      }
+
+      const {
+        scrimmage: lockedScrimmage,
+        approvedRequests,
+        finalizationInvoice,
+        updatedScrimmage,
+      } = finalizeResult;
+      
+      // Send in-app notifications to approved players (shows in Alerts, not News)
       try {
         for (const approvedReq of approvedRequests) {
           const playerId = approvedReq.playerId;
@@ -17866,11 +18150,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createNotification({
             userId: playerId,
             type: 'scrimmage_approved',
-            title: `Scrimmage Confirmed: ${scrimmage.title}`,
-            message: `Your spot in "${scrimmage.title}" has been confirmed for ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}.${confirmTeamSuffix} See you on the ice!`,
-            actionUrl: `/scrimmage/${scrimmage.id}`,
+            title: `Scrimmage Confirmed: ${lockedScrimmage.title}`,
+            message: `Your spot in "${lockedScrimmage.title}" has been confirmed for ${formatFullDateTime(lockedScrimmage.dateTime, timezone)} at ${lockedScrimmage.location}.${confirmTeamSuffix} See you on the ice!`,
+            actionUrl: `/scrimmage/${lockedScrimmage.id}`,
             actionText: 'View Details',
-            scrimmageId: scrimmage.id,
+            scrimmageId: lockedScrimmage.id,
           });
           broadcastNotificationUpdate(playerId);
         }
@@ -17879,19 +18163,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Don't fail the finalization if notification fails
       }
 
-      // Automatically create payment requests if there's a cost. The helper
-      // is idempotent so pricing a free scrimmage before finalization will not
-      // cause a second invoice here.
-      console.log(`[finalize] scrimmage ${scrimmageId} costPerPlayer=${scrimmage.costPerPlayer} approvedCount=${approvedUserIds.length}`);
-      if (scrimmage.costPerPlayer && parseFloat(scrimmage.costPerPlayer) > 0) {
+      if (finalizationInvoice) {
         try {
-          await createScrimmagePaymentRequestForPlayers(scrimmage, approvedUserIds, userId);
-        } catch (paymentError) {
-          console.error('Error creating payment request:', paymentError);
-          // Don't fail the finalization if payment request creation fails
+          const creator = await storage.getUser(lockedScrimmage.creatorId);
+          const creatorName = creator
+            ? `${creator.firstName ?? ''} ${creator.lastName ?? ''}`.trim() || creator.email || 'Someone'
+            : 'Someone';
+          const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
+          await Promise.all(
+            finalizationInvoice.requestedUserIds.map((recipientId) =>
+              sendPaymentRequestPushNotification(
+                recipientId,
+                creatorName,
+                String(lockedScrimmage.costPerPlayer),
+                finalizationInvoice.paymentRequest.description || finalizationInvoice.paymentRequest.title,
+                finalizationInvoice.paymentRequest.id,
+              ).catch((error) => {
+                console.error(`[Scrimmage Payment] Failed to push payment notification to ${recipientId}:`, error);
+              }),
+            ),
+          );
+        } catch (paymentNotificationError) {
+          console.error('Roster finalized, but payment notifications failed:', paymentNotificationError);
         }
       }
-      
+
       res.json(updatedScrimmage);
     } catch (error) {
       console.error('Error finalizing scrimmage:', error);
@@ -21493,6 +21789,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate request body using Zod schema
       const validatedData = createPaymentRequestSchema.parse(req.body);
       const { leagueId } = validatedData;
+      if (validatedData.relatedScrimmageId) {
+        return res.status(400).json({
+          message: 'Use the scrimmage payment action to send payment requests for a scrimmage',
+        });
+      }
 
       // 1) The creator must be an approved member of the target league.
       const creatorMembership = await storage.getUserLeagueMembership(userId, leagueId);
@@ -21808,6 +22109,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (result === 'at_capacity') {
               await storage.approveAsBackup(joinRequest.id);
               scrimmageAdmission = 'at_capacity';
+            } else if (result === 'not_open') {
+              scrimmageAdmission = null;
             } else if (result !== 'not_pending') {
               scrimmageAdmission = 'approved';
               const league = await storage.getLeague(linkedScrimmage.leagueId);
