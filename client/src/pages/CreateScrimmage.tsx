@@ -1447,7 +1447,7 @@ export default function CreateScrimmage() {
                   <RadioGroupItem value="approval" id="join-approval" />
                   <span><span className="block font-medium">Manual Approval</span><span className="text-xs text-muted-foreground">You approve each player before they join.</span></span>
                 </label>
-                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer pt-[4px] pb-[0px]">
                   <RadioGroupItem value="first_pay" id="join-first-pay" />
                   <span><span className="block font-medium">First to Pay, First to Play</span><span className="text-xs text-muted-foreground">Payment must be recorded before a player receives a spot.</span></span>
                 </label>
