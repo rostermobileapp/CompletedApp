@@ -1431,7 +1431,7 @@ export default function CreateScrimmage() {
             </div>
 
             {/* Approval Method — intentionally adjacent to push settings */}
-            <div className="bg-card rounded-xl hairline elev-rest p-4 mt-3">
+            <div className="bg-card rounded-xl hairline elev-rest p-4 mt-3 pt-[4px] pb-[4px]">
               <Label className="text-sm font-semibold block mb-3">Approval Method</Label>
               <RadioGroup
                 value={joinMode}
