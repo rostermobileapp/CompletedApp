@@ -234,9 +234,12 @@ export default function CreateScrimmage() {
   });
   const venueLeagues = (venuePlayerPool?.leagues || []) as Array<{ id: string; name: string }>;
   const venueMembers = (venuePlayerPool?.members || []) as any[];
+  const registeredVenueMembers = venueMembers.filter(
+    (member: any) => !member.isPlaceholder && !member.user?.isPlaceholder,
+  );
   const poolMembers = playerLeagueFilter === 'all'
-    ? venueMembers
-    : venueMembers.filter((member: any) => (member.leagueIds || []).includes(playerLeagueFilter));
+    ? registeredVenueMembers
+    : registeredVenueMembers.filter((member: any) => (member.leagueIds || []).includes(playerLeagueFilter));
 
   // Use the same canonical saved-group query/cache as the Invite Groups page.
   // A separate league-filtered key could retain an empty result even after
@@ -874,38 +877,6 @@ export default function CreateScrimmage() {
               {form.formState.errors.venue && (
                 <p className="text-sm text-destructive">{form.formState.errors.venue.message}</p>
               )}
-            </div>
-
-            {/* Required legacy context stays explicit and independent of the pool filter. */}
-            <div>
-              <Label htmlFor="scrimmage-league">Scrimmage League</Label>
-              <Select
-                value={selectedLeagueId ?? ''}
-                disabled={isEditMode || (userLeagues as any[]).length <= 1}
-                onValueChange={(value) => {
-                  setSelectedLeagueId(value);
-                  setSelectedMemberIds([]);
-                  form.setValue('selectedMemberIds', []);
-                  setSelectedInviteGroupId('');
-                  setLoadedInviteGroupIds([]);
-                  setGroupLoadedUserIds(new Set());
-                  setGroupMembersById({});
-                }}
-              >
-                <SelectTrigger id="scrimmage-league" data-testid="select-scrimmage-league">
-                  <SelectValue placeholder="Select league…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(userLeagues as any[]).map((league: any) => (
-                    <SelectItem key={league.id} value={league.id}>
-                      {league.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Used for permissions, timezone, and notifications. It does not limit the rink player pool.
-              </p>
             </div>
 
             <div>

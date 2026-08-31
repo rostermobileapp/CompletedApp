@@ -35,6 +35,7 @@ import {
   inviteGroupMembers,
   scrimmageInvites,
   scrimmageRemindersSent,
+  leagueInvitesSent,
   playerImports,
   importedPlayers,
   playerMergeRequests,
@@ -2255,6 +2256,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLeague(id: string): Promise<void> {
+    let deletionStage = "loading league dependencies";
+
+    try {
+      await db.transaction(async (tx) => {
+        // Use one transaction so an unexpected dependency cannot leave a
+        // partially-deleted league behind.
+        const db = tx;
+
     // Cascade deletion of all related data in the correct order to respect foreign key constraints
     
     // Get all teams in this league first (needed for some queries)
@@ -2269,6 +2278,8 @@ export class DatabaseStorage implements IStorage {
     const leagueSeasons = await db.select({ id: seasons.id }).from(seasons).where(eq(seasons.leagueId, id));
     const seasonIds = leagueSeasons.map(s => s.id);
     
+    deletionStage = "deleting league conversations and announcements";
+
     // 1. Delete chat poll votes and chat polls (depends on messages → conversations)
     const leagueConversationsForPolls = await db.select({ id: conversations.id }).from(conversations).where(eq(conversations.leagueId, id));
     if (leagueConversationsForPolls.length > 0) {
@@ -2341,6 +2352,8 @@ export class DatabaseStorage implements IStorage {
     // 11. Delete conversations
     await db.delete(conversations).where(eq(conversations.leagueId, id));
     
+    deletionStage = "deleting league games, drafts, scrimmages, and imports";
+
     // 12. Delete game-related data if there are games
     if (gameIds.length > 0) {
       // Delete substitution approvals (depends on substituteRequests)
@@ -2384,10 +2397,27 @@ export class DatabaseStorage implements IStorage {
     }
     await db.delete(drafts).where(eq(drafts.leagueId, id));
     
-    // 16. Delete scrimmage requests and scrimmages
+    // 16. Delete scrimmage children and scrimmages
     const leagueScrimmages = await db.select({ id: scrimmages.id }).from(scrimmages).where(eq(scrimmages.leagueId, id));
     if (leagueScrimmages.length > 0) {
       const scrimmageIds = leagueScrimmages.map(s => s.id);
+      const linkedCalendarEvents = await db
+        .select({ id: calendarEvents.id })
+        .from(calendarEvents)
+        .where(inArray(calendarEvents.scrimmageId, scrimmageIds));
+      if (linkedCalendarEvents.length > 0) {
+        const calendarEventIds = linkedCalendarEvents.map(event => event.id);
+        await db.delete(eventParticipants).where(inArray(eventParticipants.eventId, calendarEventIds));
+        await db.delete(calendarEvents).where(inArray(calendarEvents.id, calendarEventIds));
+      }
+      // Preserve invoice history while removing its link to a deleted scrimmage.
+      await db
+        .update(paymentRequests)
+        .set({ relatedScrimmageId: null })
+        .where(inArray(paymentRequests.relatedScrimmageId, scrimmageIds));
+      await db.delete(scrimmageCoHosts).where(inArray(scrimmageCoHosts.scrimmageId, scrimmageIds));
+      await db.delete(scrimmageInvites).where(inArray(scrimmageInvites.scrimmageId, scrimmageIds));
+      await db.delete(scrimmageRemindersSent).where(inArray(scrimmageRemindersSent.scrimmageId, scrimmageIds));
       await db.delete(scrimmageRequests).where(inArray(scrimmageRequests.scrimmageId, scrimmageIds));
     }
     await db.delete(scrimmages).where(eq(scrimmages.leagueId, id));
@@ -2423,6 +2453,8 @@ export class DatabaseStorage implements IStorage {
       await db.delete(games).where(inArray(games.id, gameIds));
     }
     
+    deletionStage = "deleting league teams, seasons, and placeholders";
+
     // 20. Delete team memberships (depends on teams)
     if (teamIds.length > 0) {
       await db.delete(teamMemberships).where(inArray(teamMemberships.teamId, teamIds));
@@ -2455,17 +2487,39 @@ export class DatabaseStorage implements IStorage {
         );
     }
     
-    // 22. Delete teams
+    // 22. Delete placeholders before their teams or seasons. Older imports can
+    // be scoped only through team_id or season_id with a null league_id.
+    if (teamIds.length > 0 && seasonIds.length > 0) {
+      await db.delete(placeholderPlayers).where(or(
+        eq(placeholderPlayers.leagueId, id),
+        inArray(placeholderPlayers.teamId, teamIds),
+        inArray(placeholderPlayers.seasonId, seasonIds),
+      ));
+    } else if (teamIds.length > 0) {
+      await db.delete(placeholderPlayers).where(or(
+        eq(placeholderPlayers.leagueId, id),
+        inArray(placeholderPlayers.teamId, teamIds),
+      ));
+    } else if (seasonIds.length > 0) {
+      await db.delete(placeholderPlayers).where(or(
+        eq(placeholderPlayers.leagueId, id),
+        inArray(placeholderPlayers.seasonId, seasonIds),
+      ));
+    } else {
+      await db.delete(placeholderPlayers).where(eq(placeholderPlayers.leagueId, id));
+    }
+
+    // 23. Delete teams
     if (teamIds.length > 0) {
       await db.delete(teams).where(inArray(teams.id, teamIds));
     }
     
-    // 23. Delete seasons
+    // 24. Delete seasons
     if (seasonIds.length > 0) {
       await db.delete(seasons).where(inArray(seasons.id, seasonIds));
     }
     
-    // 24. Soft-delete placeholder users who belong exclusively to this league.
+    // 25. Soft-delete placeholder users who belong exclusively to this league.
     // Find all placeholder members of this league first (memberships still exist at this point).
     const placeholderMembers = await db
       .select({ userId: leagueMemberships.userId })
@@ -2474,7 +2528,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(leagueMemberships.leagueId, id),
-          eq(users.isPlaceholder, true)
+          ilike(users.email, '%@placeholder.roster')
         )
       );
 
@@ -2518,14 +2572,26 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // 25. Delete placeholder players for this league
-    await db.delete(placeholderPlayers).where(eq(placeholderPlayers.leagueId, id));
+    deletionStage = "deleting league memberships and the league record";
 
-    // 26. Delete league memberships
+    // 26. Explicitly clear sent-invite history. Current schemas cascade this
+    // relation, while this keeps cleanup compatible with older deployments.
+    await db.delete(leagueInvitesSent).where(eq(leagueInvitesSent.leagueId, id));
+
+    // 27. Delete league memberships
     await db.delete(leagueMemberships).where(eq(leagueMemberships.leagueId, id));
     
-    // 27. Finally, delete the league itself
+    // 28. Finally, delete the league itself
     await db.delete(leagues).where(eq(leagues.id, id));
+      });
+    } catch (error: any) {
+      const detail = error?.message || String(error);
+      const wrappedError: any = new Error(`League deletion failed while ${deletionStage}: ${detail}`);
+      wrappedError.constraint = error?.constraint;
+      wrappedError.detail = error?.detail;
+      wrappedError.cause = error;
+      throw wrappedError;
+    }
   }
 
   // Season operations
@@ -9466,7 +9532,9 @@ export class DatabaseStorage implements IStorage {
         hasPositionData?: boolean;
       } = {},
     ) => {
-      if (user.deletedAt) return;
+      // Legacy placeholder-backed accounts use a synthetic email domain. They
+      // are not registered rink players and must not enter the venue directory.
+      if (user.deletedAt || user.email?.toLowerCase().endsWith('@placeholder.roster')) return;
       let member = members.get(user.id);
       if (!member) {
         member = {
