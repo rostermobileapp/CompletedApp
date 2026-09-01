@@ -3360,7 +3360,7 @@ function DashboardMobile() {
                             </span>
                              {invite.openSpots !== undefined && (
                               <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-first-come-${invite.id}`}>
-                                {invite.openSpots > 0 ? `${invite.openSpots} Open Spots` : 'FULL'}
+                                {invite.openSpots > 0 ? `${invite.openSpots} Open` : 'FULL'}
                               </span>
                             )}
                           </div>
@@ -3441,7 +3441,7 @@ function DashboardMobile() {
                             </span>
                             {scrimmage.openSpots !== undefined && (
                               <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-request-open-spots-${scrimmage.id}`}>
-                                {scrimmage.openSpots > 0 ? `${scrimmage.openSpots} Open Spots` : 'FULL'}
+                                {scrimmage.openSpots > 0 ? `${scrimmage.openSpots} Open` : 'FULL'}
                               </span>
                             )}
                           </div>

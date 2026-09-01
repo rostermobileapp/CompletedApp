@@ -10306,14 +10306,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User; openSpots?: number })[]> {
-    const now = new Date().toISOString();
+    // Scrimmage date_time is stored as a league-local wall-clock timestamp.
+    // Use the calendar date rather than comparing it with the server's UTC
+    // instant, so same-day invites remain visible to invitees until the day
+    // after the event.
+    const visibleScrimmageDate = sql`${scrimmages.dateTime}::date >= CURRENT_DATE - INTERVAL '1 day'`;
     const isUpcomingDeliveredInvite = and(
       eq(scrimmages.timeTbd, false),
       isNotNull(scrimmages.inviteSentAt),
-      gte(scrimmages.dateTime, now),
+      visibleScrimmageDate,
     );
     const isUpcomingCreatedScrimmage = or(
-      and(eq(scrimmages.timeTbd, false), gte(scrimmages.dateTime, now)),
+      and(eq(scrimmages.timeTbd, false), visibleScrimmageDate),
       and(
         eq(scrimmages.timeTbd, true),
         sql`${scrimmages.dateTime}::date >= CURRENT_DATE`,

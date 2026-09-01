@@ -509,7 +509,7 @@ export function ScheduleCalendarMobile({
                         )}
                         {(ev.kind === 'invite' || ev.kind === 'scrimmage') && ev.openSpots !== undefined && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-600/15 text-emerald-700 dark:text-emerald-300">
-                            {ev.openSpots > 0 ? `${ev.openSpots} Open Spots` : 'FULL'}
+                            {ev.openSpots > 0 ? `${ev.openSpots} Open` : 'FULL'}
                           </span>
                         )}
                       </div>

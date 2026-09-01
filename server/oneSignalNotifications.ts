@@ -484,6 +484,30 @@ export async function sendScrimmageInvitePushNotification(
   });
 }
 
+export async function sendScrimmageOpenSpotPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  dateTime: string,
+  scrimmageId: string,
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏒 Spot opened: ${scrimmageTitle}`,
+    message: `A spot is now open on ${dateTime}. Tap to RSVP.`,
+    data: {
+      type: 'scrimmage_open_spot',
+      scrimmageId,
+    },
+  });
+}
+
 export async function sendScrimmageApprovalPushNotification(
   recipientId: string,
   scrimmageTitle: string,

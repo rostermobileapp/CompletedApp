@@ -21,6 +21,7 @@ const CREATOR_ID = `sched_creator_${RUN}`;
 const PLAYER_ID = `sched_player_${RUN}`;
 const COHOST_ID = `sched_cohost_${RUN}`;
 const LEAGUE_ID = `sched_league_${RUN}`;
+const TODAY_ID = `sched_today_${RUN}`;
 const TBD_ID = `sched_tbd_${RUN}`;
 const QUEUED_ID = `sched_queued_${RUN}`;
 const DELIVERED_ID = `sched_delivered_${RUN}`;
@@ -81,6 +82,11 @@ before(async () => {
       has_deferred_invites, created_at, updated_at
     )
     VALUES
+      (
+        ${TODAY_ID}, ${LEAGUE_ID}, ${CREATOR_ID}, 'Same-day delivered', NOW() - INTERVAL '1 hour',
+        'Test Rink', 20, 'open', false, 'none', ARRAY[${PLAYER_ID}], false,
+        NULL, NULL, NOW(), false, NOW(), NOW()
+      ),
       (
         ${TBD_ID}, ${LEAGUE_ID}, ${CREATOR_ID}, 'TBD queued', NOW() + INTERVAL '10 days',
         'Test Rink', 20, 'open', false, 'none', ARRAY[${PLAYER_ID}], true,
@@ -192,6 +198,7 @@ describe('scrimmage invite visibility', () => {
     assert.equal(ids.has(QUEUED_ID), false);
     assert.equal(ids.has(PARENT_ID), false);
     assert.equal(ids.has(DELIVERED_ID), true);
+    assert.equal(ids.has(TODAY_ID), true);
   });
 
   test('organizers still see their queued and TBD occurrences', async () => {

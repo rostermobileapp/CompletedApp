@@ -738,7 +738,7 @@ export default function GameDetails() {
               className={`mt-3 rounded-lg border px-3 py-2 text-sm font-medium ${openSpots > 0 ? 'border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200' : 'border-red-300 bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200'}`}
               data-testid="text-scrimmage-open-spots"
             >
-              {openSpots > 0 ? `${openSpots} open spot${openSpots === 1 ? '' : 's'} remaining` : 'This scrimmage is currently full'}
+              {openSpots > 0 ? `${openSpots} Open` : 'This scrimmage is currently full'}
             </div>
 
             {scrimmage.notes && (

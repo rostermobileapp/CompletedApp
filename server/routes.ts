@@ -15984,6 +15984,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return Array.from(recipientIds);
   };
 
+  const getScrimmageOpenSpotRecipientIds = async (
+    scrimmage: { id: string; creatorId: string; inviteSentAt?: Date | null; inviteUserIds?: string[] | null },
+  ) => {
+    const [requests, deliveredInviteeIds] = await Promise.all([
+      storage.getScrimmageRequests(scrimmage.id),
+      getScrimmageChangeRecipientIds(scrimmage),
+    ]);
+    const statusByPlayerId = new Map(requests.map((request) => [request.playerId, request.status]));
+
+    // Players who explicitly declined should not be re-alerted. Backup players
+    // are handled by notifyNextBackup so they do not receive two vacancy pushes.
+    return deliveredInviteeIds.filter((playerId) => {
+      const status = statusByPlayerId.get(playerId);
+      return status !== 'approved' && status !== 'dismissed' && status !== 'backup';
+    });
+  };
+
+  const notifyScrimmageOpenSpotInvitees = async (scrimmage: any) => {
+    const recipientIds = await getScrimmageOpenSpotRecipientIds(scrimmage);
+    if (recipientIds.length === 0) return;
+
+    const league = await storage.getLeague(scrimmage.leagueId);
+    const timezone = league?.timezone || 'America/New_York';
+    const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
+    const title = `Spot opened: ${scrimmage.title}`;
+    const message = `A spot is now open for "${scrimmage.title}" on ${scrimmageDateTime}. Tap to RSVP.`;
+    const { sendScrimmageOpenSpotPushNotification } = await import('./oneSignalNotifications');
+
+    await Promise.allSettled(recipientIds.flatMap((recipientId) => [
+      storage.createNotification({
+        userId: recipientId,
+        type: 'scrimmage_backup',
+        title,
+        message,
+        actionUrl: `/scrimmage/${scrimmage.id}`,
+        actionText: 'View & RSVP',
+        scrimmageId: scrimmage.id,
+      }).then(() => broadcastNotificationUpdate(recipientId)),
+      sendScrimmageOpenSpotPushNotification(
+        recipientId,
+        scrimmage.title,
+        scrimmageDateTime,
+        scrimmage.id,
+      ),
+    ]));
+  };
+
   const canUserAccessScrimmage = async (scrimmage: any, userId: string) => {
     if (scrimmage.creatorId === userId) return true;
     const invitationDelivered = !scrimmage.timeTbd && !!scrimmage.inviteSentAt;
@@ -17096,16 +17143,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
         }
         
-        // An imminent scrimmage may still be moved out of the 24-hour window.
-        // Keep the lock only when both the existing time and the requested new
-        // time are less than 24 hours away.
-        const hoursUntilExisting = (
-          parseLeagueLocalDateTime(existingScrimmage.dateTime, league?.timezone).getTime() - now.getTime()
-        ) / (1000 * 60 * 60);
-        const hoursUntilRequested = (dateForValidation.getTime() - now.getTime()) / (1000 * 60 * 60);
-        if (!existingScrimmage.timeTbd && hoursUntilExisting < 24 && hoursUntilRequested < 24) {
-          return res.status(409).json({ message: "Cannot change scrimmage date less than 24 hours before scheduled time" });
-        }
       }
 
       // Resolving Time TBD is a new delivery opportunity for this occurrence.
@@ -18365,6 +18402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const priorStatus = request.status;
+      const wasFullBeforeRemoval = priorStatus === 'approved'
+        && (await storage.getScrimmageRequests(scrimmage.id))
+          .filter((scrimmageRequest) => scrimmageRequest.status === 'approved')
+          .length >= scrimmage.maxPlayers;
       await storage.deleteScrimmageRequest(requestId);
 
       // Notify creator (and co-hosts) when a player withdraws themselves
@@ -18407,6 +18448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Any approved player removal (self-withdrawal OR manager removal) creates a vacancy.
       // Always cascade to the backup queue so the spot is not left unfilled.
       if (priorStatus === 'approved') {
+        if (wasFullBeforeRemoval) {
+          notifyScrimmageOpenSpotInvitees(scrimmage).catch(err =>
+            console.error('[Scrimmage] open-spot invite notifications failed:', err)
+          );
+        }
         notifyNextBackup(request.scrimmageId).catch(err =>
           console.error('[BackupQueue] cascade after removal:', err)
         );
