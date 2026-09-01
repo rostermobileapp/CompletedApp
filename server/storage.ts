@@ -10283,7 +10283,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User })[]> {
+  async getScrimmageInvitesForUser(userId: string): Promise<(Scrimmage & { creator: User; openSpots?: number })[]> {
     const now = new Date().toISOString();
     const isUpcomingDeliveredInvite = and(
       eq(scrimmages.timeTbd, false),
@@ -10374,11 +10374,44 @@ export class DatabaseStorage implements IStorage {
 
     // Merge and deduplicate by scrimmage id
     const seen = new Set<string>();
-    const merged: (Scrimmage & { creator: User })[] = [];
+    const merged: (Scrimmage & { creator: User; openSpots?: number })[] = [];
+    const scrimmageIds = Array.from(new Set([
+      ...invitedResults.map((r) => r.scrimmage.id),
+      ...directlyInvitedResults.map((r) => r.scrimmage.id),
+      ...createdResults.map((r) => r.scrimmage.id),
+      ...coHostedResults.map((r) => r.scrimmage.id),
+    ]));
+    const approvedCounts = scrimmageIds.length > 0
+      ? await db
+          .select({
+            scrimmageId: scrimmageRequests.scrimmageId,
+            approvedCount: sql<number>`count(*)`,
+          })
+          .from(scrimmageRequests)
+          .where(and(
+            inArray(scrimmageRequests.scrimmageId, scrimmageIds),
+            eq(scrimmageRequests.status, 'approved'),
+          ))
+          .groupBy(scrimmageRequests.scrimmageId)
+      : [];
+    const approvedCountByScrimmageId = new Map(
+      approvedCounts.map((row) => [row.scrimmageId, Number(row.approvedCount)]),
+    );
     for (const r of [...invitedResults, ...directlyInvitedResults, ...createdResults, ...coHostedResults]) {
       if (!seen.has(r.scrimmage.id)) {
         seen.add(r.scrimmage.id);
-        merged.push({ ...r.scrimmage, creator: r.creator });
+        merged.push({
+          ...r.scrimmage,
+          creator: r.creator,
+          ...(r.scrimmage.creatorId === userId
+            ? {
+                openSpots: Math.max(
+                  0,
+                  r.scrimmage.maxPlayers - (approvedCountByScrimmageId.get(r.scrimmage.id) ?? 0),
+                ),
+              }
+            : {}),
+        });
       }
     }
     return merged.sort((a, b) => new Date(a.dateTime as string).getTime() - new Date(b.dateTime as string).getTime());

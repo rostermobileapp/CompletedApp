@@ -3354,9 +3354,9 @@ function DashboardMobile() {
                             <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">
                               {isOwnScrimmage ? 'My Scrimmage' : 'Invite'}
                             </span>
-                            {invite.joinMode === 'first_come' && (
+                            {isOwnScrimmage && invite.joinMode === 'first_come' && (
                               <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-first-come-${invite.id}`}>
-                                Open Spots
+                                {invite.openSpots ?? 0} Open Spots
                               </span>
                             )}
                           </div>
