@@ -87,10 +87,6 @@ export async function notifyNextBackup(scrimmageId: string): Promise<void> {
     const scrimmage = await storage.getScrimmage(scrimmageId);
     if (!scrimmage) return;
     if (await isDemoLeague(scrimmage.leagueId)) return;
-    if (scrimmage.joinMode === "first_come") {
-      console.log(`[BackupQueue] Skipping notification — scrimmage ${scrimmageId} uses First to RSVP`);
-      return;
-    }
     if (scrimmage.timeTbd) {
       console.log(`[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} has no confirmed time`);
       return;

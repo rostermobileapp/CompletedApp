@@ -17647,7 +17647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isFirstCome) {
         // All players (including co-hosts) share the same locked capacity-check in
         // first-come mode so no path can overbook the scrimmage.
-        const fcResult = await storage.createFirstComeScrimmageRequest(scrimmageId, userId);
+        const fcResult = await storage.createFirstComeScrimmageRequest(scrimmageId, userId, true);
         if (fcResult === 'at_capacity') {
           return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
         }
@@ -17675,6 +17675,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // network I/O.
         await broadcastScrimmageUpdate(scrimmageId, [userId]);
         res.status(201).json(request);
+
+        if (request.status === 'backup') {
+          try {
+            const { date: backupDate, time: backupTime } = formatDayAndTime(
+              scrimmage.dateTime,
+              scrimmageTimezone,
+            );
+            await storage.createNotification({
+              userId,
+              type: 'scrimmage_backup',
+              title: `You're on the backup list — ${scrimmage.title}`,
+              message: `The roster is full. You've been added to the backup list for "${scrimmage.title}" on ${backupDate} at ${backupTime}.`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Scrimmage',
+              scrimmageId: scrimmage.id,
+            });
+            broadcastNotificationUpdate(userId);
+            const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+            await sendPushNotificationToUser({
+              userId,
+              title: `You're on the backup list`,
+              message: `The roster is full for "${scrimmage.title}". You've been added as backup #${request.backupPosition}.`,
+            });
+          } catch (notifyErr) {
+            console.error('[FirstCome] Failed to send backup notification:', notifyErr);
+          }
+          return;
+        }
 
         // Mirror the same notification side-effects as a manual approval so the
         // player receives an in-app notification, broadcast, and push.
@@ -18132,12 +18160,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You do not have permission to approve requests for this scrimmage' });
       }
 
-      if (status === 'backup' && scrimmage.joinMode === 'first_come') {
-        return res.status(409).json({
-          message: 'The backup queue is not available for First to RSVP scrimmages',
-        });
-      }
-      
       // Business invariant: Cannot approve requests for scrimmages that have passed.
       if (!scrimmage.timeTbd && (status === 'approved' || status === 'backup')) {
         if (hasLeagueLocalDateTimeStarted(scrimmage.dateTime, getScrimmageTimezone(scrimmage))) {
@@ -18340,11 +18362,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!scrimmage) {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
-      if (scrimmage.joinMode === 'first_come') {
-        return res.status(409).json({
-          message: 'The backup queue is not available for First to RSVP scrimmages',
-        });
-      }
       if (scrimmage.status === 'cancelled') {
         return res.status(409).json({ message: 'Cannot add players to a cancelled scrimmage' });
       }
@@ -18528,12 +18545,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!canManage || (isCoHost && permissions && !permissions.canApproveRequests)) {
         return res.status(403).json({ message: 'Not authorized to manage this scrimmage' });
       }
-      const managedScrimmage = await storage.getScrimmage(authorizedScrimmageId);
-      if (managedScrimmage?.joinMode === 'first_come') {
-        return res.status(409).json({
-          message: 'The backup queue is not available for First to RSVP scrimmages',
-        });
-      }
       // Ensure every request is an active backup (status=backup AND backupPosition not null)
       for (const rec of requestRecords) {
         if (rec!.status !== 'backup') {
@@ -18586,12 +18597,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const scrimmage = await storage.getScrimmage(request.scrimmageId);
       if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
-      if (scrimmage.joinMode === 'first_come') {
-        return res.status(409).json({
-          message: 'The backup queue is not available for First to RSVP scrimmages',
-        });
-      }
-
       // Guard: reject any acceptance or decline response after the scrimmage has started.
       if (!scrimmage.timeTbd) {
         if (hasLeagueLocalDateTimeStarted(scrimmage.dateTime, getScrimmageTimezone(scrimmage))) {

@@ -607,7 +607,7 @@ export interface IStorage {
   createScrimmageRequest(requestData: InsertScrimmageRequest): Promise<ScrimmageRequest>;
   /** Atomically checks capacity (under a scrimmages row-level lock) and inserts an approved request.
    *  Returns the new request, 'at_capacity', or 'duplicate'. */
-  createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate' | 'not_open'>;
+  createFirstComeScrimmageRequest(scrimmageId: string, playerId: string, queueWhenFull?: boolean): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate' | 'not_open'>;
   /** Atomically approves an existing pending request, enforcing capacity under a lock.
    *  Returns the updated request, 'at_capacity' when no spots remain, or 'not_pending'
    *  when the request is no longer in 'pending' state (concurrent actor already processed it). */
@@ -9940,7 +9940,7 @@ export class DatabaseStorage implements IStorage {
    * Returns the new ScrimmageRequest when successful, or null when the scrimmage
    * is already at capacity (caller should respond with HTTP 409).
    */
-  async createFirstComeScrimmageRequest(scrimmageId: string, playerId: string): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate' | 'not_open'> {
+  async createFirstComeScrimmageRequest(scrimmageId: string, playerId: string, queueWhenFull = false): Promise<ScrimmageRequest | 'at_capacity' | 'duplicate' | 'not_open'> {
     try {
       return await db.transaction(async (tx) => {
         // Lock the scrimmage row — this is the shared primitive that all approved-state
@@ -9951,7 +9951,9 @@ export class DatabaseStorage implements IStorage {
         );
         const scrimmageRow = lockResult.rows[0] as { max_players: number; status: string } | undefined;
         if (!scrimmageRow) return 'at_capacity' as const;
-        if (scrimmageRow.status !== 'open') return 'not_open' as const;
+        if (scrimmageRow.status !== 'open' && !(queueWhenFull && scrimmageRow.status === 'roster_confirmed')) {
+          return 'not_open' as const;
+        }
 
         // Re-count approved players under the lock — prevents over-booking.
         const countResult = await tx.execute(
@@ -9960,7 +9962,25 @@ export class DatabaseStorage implements IStorage {
         const approvedCount = parseInt((countResult.rows[0] as { cnt: string }).cnt, 10);
 
         if (approvedCount >= scrimmageRow.max_players) {
-          return 'at_capacity' as const;
+          if (!queueWhenFull) return 'at_capacity' as const;
+
+          const positionResult = await tx.execute(sql`
+            SELECT COALESCE(MAX(backup_position), 0)::int AS max_position
+            FROM scrimmage_requests
+            WHERE scrimmage_id = ${scrimmageId}
+              AND status = 'backup'
+          `);
+          const nextPosition = Number((positionResult.rows[0] as any)?.max_position ?? 0) + 1;
+          const [backupRequest] = await tx
+            .insert(scrimmageRequests)
+            .values({
+              scrimmageId,
+              playerId,
+              status: 'backup',
+              backupPosition: nextPosition,
+            })
+            .returning();
+          return backupRequest;
         }
 
         const now = new Date();
@@ -10048,15 +10068,12 @@ export class DatabaseStorage implements IStorage {
 
       // Lock the parent scrimmage row — serialises all concurrent enqueues for this scrimmage
       const scrimmageResult = await tx.execute(
-        sql`SELECT id, join_mode FROM scrimmages WHERE id = ${request.scrimmageId} FOR UPDATE`
+        sql`SELECT id FROM scrimmages WHERE id = ${request.scrimmageId} FOR UPDATE`
       );
       const scrimmageRow = scrimmageResult.rows[0] as
-        | { id: string; join_mode: string }
+        | { id: string }
         | undefined;
       if (!scrimmageRow) throw new Error('Scrimmage not found');
-      if (scrimmageRow.join_mode === 'first_come') {
-        throw new Error('Backup queue is not available for First to RSVP scrimmages');
-      }
 
       // Safe to compute MAX(position) now that we hold the scrimmage lock
       const existing = await tx
@@ -10112,8 +10129,7 @@ export class DatabaseStorage implements IStorage {
         | undefined;
       if (
         !scrimmageRow ||
-        scrimmageRow.status === 'cancelled' ||
-        scrimmageRow.join_mode === 'first_come'
+        scrimmageRow.status === 'cancelled'
       ) return undefined;
 
       const [{ count: approvedCount }] = await tx

@@ -31,14 +31,14 @@ describe('scrimmage finalization lifecycle', () => {
     );
   });
 
-  test('keeps First to RSVP and cancelled scrimmages closed', () => {
+  test('keeps finalized First to RSVP open for backup RSVPs and cancelled scrimmages closed', () => {
     assert.equal(
       canAcceptFreshScrimmageRequest('roster_confirmed', 'first_come', 11, 12),
-      false,
+      true,
     );
     assert.equal(
       canAcceptFreshScrimmageRequest('roster_confirmed', 'first_come', 12, 12),
-      false,
+      true,
     );
     assert.equal(
       canAcceptFreshScrimmageRequest('cancelled', 'approval', 0, 12),

@@ -257,7 +257,7 @@ describe('promoteNextBackupAtomically — ordered automatic promotion', () => {
     }
   });
 
-  test('does not promote backups for First to RSVP scrimmages', async () => {
+  test('promotes backups for First to RSVP scrimmages', async () => {
     await db.execute(sql`
       UPDATE scrimmages SET join_mode = 'first_come' WHERE id = ${SCRIM}
     `);
@@ -273,8 +273,8 @@ describe('promoteNextBackupAtomically — ordered automatic promotion', () => {
 
       const promoted = await storage.promoteNextBackupAtomically(SCRIM);
 
-      assert.equal(promoted, undefined);
-      assert.equal((await storage.getScrimmageRequestById(requestId))?.status, 'backup');
+      assert.equal(promoted?.id, requestId);
+      assert.equal((await storage.getScrimmageRequestById(requestId))?.status, 'approved');
     } finally {
       await db.execute(sql`
         UPDATE scrimmages SET join_mode = 'approval' WHERE id = ${SCRIM}

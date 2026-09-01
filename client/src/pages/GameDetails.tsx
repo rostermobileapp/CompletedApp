@@ -1011,8 +1011,7 @@ export default function GameDetails() {
           </div>
 
           {/* Backup queue — visible to every invitee who can view the scrimmage */}
-          {scrimmage.joinMode !== 'first_come' && (
-            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[8px] pt-[8px] pb-[8px] pl-[8px]" data-testid="scrimmage-backup-queue">
+          <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[8px] pt-[8px] pb-[8px] pl-[8px]" data-testid="scrimmage-backup-queue">
               <div className="flex items-center gap-2 mb-3">
                 <img
                   src={queueIconUrl}
@@ -1051,8 +1050,7 @@ export default function GameDetails() {
                   No players are waiting in the backup queue.
                 </p>
               )}
-            </div>
-          )}
+          </div>
 
           {/* Creator / co-host management panel */}
           {(isScrimmageCreator || canManagePlayers) && (
@@ -1130,17 +1128,15 @@ export default function GameDetails() {
                               >
                                 <X className="w-4 h-4" />
                               </button>
-                              {scrimmage.joinMode !== 'first_come' && (
-                                <button
-                                  onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })}
-                                  disabled={manageRequestMutation.isPending}
-                                  className="w-8 h-8 rounded-full border border-amber-500 text-amber-600 flex items-center justify-center hover:bg-amber-500/10 disabled:opacity-50"
-                                  title="Add to backup list"
-                                  aria-label="Add to backup list"
-                                >
-                                  <img src={queueIconUrl} alt="" className="w-4 h-4 object-contain mix-blend-multiply" aria-hidden="true" />
-                                </button>
-                              )}
+                              <button
+                                onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })}
+                                disabled={manageRequestMutation.isPending}
+                                className="w-8 h-8 rounded-full border border-amber-500 text-amber-600 flex items-center justify-center hover:bg-amber-500/10 disabled:opacity-50"
+                                title="Add to backup list"
+                                aria-label="Add to backup list"
+                              >
+                                <img src={queueIconUrl} alt="" className="w-4 h-4 object-contain mix-blend-multiply" aria-hidden="true" />
+                              </button>
                             </div>
                           </div>
                         ))}
