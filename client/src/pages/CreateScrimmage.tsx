@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, getAuthHeaders, getImageUrl } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { splitScrimmageDateTime } from '@/lib/scrimmageDateTime';
 import { useToast } from '@/hooks/use-toast';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -96,7 +96,6 @@ export default function CreateScrimmage() {
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const [coHostSearchResults, setCoHostSearchResults] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
   const [coHostSearchLoading, setCoHostSearchLoading] = useState(false);
-  const coHostDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedRinkFacilityId, setSelectedRinkFacilityId] = useState<string | null>(null);
   const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(null);
   const [playerLeagueFilter, setPlayerLeagueFilter] = useState('all');
@@ -449,34 +448,43 @@ export default function CreateScrimmage() {
     };
   }, []);
 
-  // Debounced co-host search
+  // Co-hosts must come from the selected rink's canonical player pool. This
+  // also lets the picker show eligible people immediately, before typing.
   useEffect(() => {
-    if (coHostDebounceRef.current) clearTimeout(coHostDebounceRef.current);
-    if (!coHostSearchTerm || coHostSearchTerm.trim().length < 2) {
-      setCoHostSearchResults([]);
-      setCoHostSearchLoading(false);
-      return;
-    }
-    setCoHostSearchLoading(true);
-    coHostDebounceRef.current = setTimeout(async () => {
-      try {
-        const facilityId = selectedRinkFacilityId || leagueFacility?.id;
-        const params = new URLSearchParams({ q: coHostSearchTerm.trim() });
-        if (facilityId) params.set('facilityId', facilityId);
-        const headers = await getAuthHeaders();
-        const res = await fetch(`/api/users/search-all?${params}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setCoHostSearchResults(data);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setCoHostSearchLoading(false);
-      }
-    }, 350);
-    return () => { if (coHostDebounceRef.current) clearTimeout(coHostDebounceRef.current); };
-  }, [coHostSearchTerm, selectedRinkFacilityId, leagueFacility?.id]);
+    setCoHostSearchLoading(membersLoading);
+
+    const search = coHostSearchTerm.trim().toLowerCase();
+    const rinkUsers = ((venuePlayerPool?.members || []) as any[])
+      .filter((member: any) =>
+        !member.isPlaceholder &&
+        !member.user?.isPlaceholder &&
+        member.user?.id &&
+        member.user.id !== user?.id
+      )
+      .map((member: any) => ({
+        id: member.user.id,
+        firstName: member.user.firstName ?? null,
+        lastName: member.user.lastName ?? null,
+        email: member.user.email ?? null,
+        profileImageUrl: member.user.profileImageUrl ?? null,
+        isAtRink: true,
+      }))
+      .filter((candidate) => {
+        if (!search) return true;
+        const searchable = [
+          candidate.firstName,
+          candidate.lastName,
+          `${candidate.firstName || ''} ${candidate.lastName || ''}`,
+          candidate.email,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return searchable.includes(search);
+      });
+
+    setCoHostSearchResults(rinkUsers);
+  }, [coHostSearchTerm, membersLoading, user?.id, venuePlayerPool?.members]);
 
   const createScrimmageRequest = useMutation({
     mutationFn: async (data: CreateScrimmageForm) => {
@@ -1698,10 +1706,10 @@ export default function CreateScrimmage() {
               data-testid="input-cohost-search"
             />
 
-            {showCoHostDropdown && coHostSearchTerm.trim().length >= 2 && (
+            {showCoHostDropdown && (
               <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-auto">
                 {coHostSearchLoading ? (
-                  <div className="p-3 text-center text-muted-foreground text-sm">Searching…</div>
+                  <div className="p-3 text-center text-muted-foreground text-sm">Loading rink users…</div>
                 ) : (() => {
                   const available = coHostSearchResults.filter(
                     u => !selectedCoHostIds.includes(u.id)
@@ -1759,7 +1767,9 @@ export default function CreateScrimmage() {
                         </button>
                       )}
                       {available.length === 0 && (!isValidEmail || emailHasAccount || emailAlreadySelected) && (
-                        <div className="p-3 text-center text-muted-foreground text-sm">No users found</div>
+                        <div className="p-3 text-center text-muted-foreground text-sm">
+                          {coHostSearchTerm.trim() ? 'No matching rink users found' : 'No other users are connected to this rink'}
+                        </div>
                       )}
                     </>
                   );
