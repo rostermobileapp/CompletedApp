@@ -37,7 +37,7 @@ import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAUL
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
-import { eq, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, ne, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 import { format, addDays, addWeeks } from "date-fns";
 import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from "./dateUtils";
 import {
@@ -16078,6 +16078,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { paymentRequest, requestedUserIds, blockedReason };
   };
 
+  /**
+   * Older join requests can predate join-time invoice creation. Reconcile any
+   * current/future paid scrimmages before serving the player's Payments list so
+   * the scrimmage card and "Requests for Me" share the same persisted invoice.
+   */
+  const ensureJoinedScrimmagePaymentRequests = async (userId: string) => {
+    const joinedScrimmages = await db
+      .select({ scrimmage: scrimmages })
+      .from(scrimmageRequests)
+      .innerJoin(scrimmages, eq(scrimmageRequests.scrimmageId, scrimmages.id))
+      .where(and(
+        eq(scrimmageRequests.playerId, userId),
+        inArray(scrimmageRequests.status, ['pending', 'approved']),
+        eq(scrimmages.status, 'open'),
+        sql`${scrimmages.costPerPlayer} > 0`,
+        sql`${scrimmages.dateTime}::date >= CURRENT_DATE`,
+        ne(scrimmages.creatorId, userId),
+      ));
+
+    for (const { scrimmage } of joinedScrimmages) {
+      await createScrimmagePaymentRequestForPlayers(
+        scrimmage,
+        [userId],
+        scrimmage.creatorId,
+        false,
+      );
+    }
+  };
+
   const updateLinkedScrimmagePaymentRecipient = async (
     recipientId: string,
     actorUserId: string,
@@ -22251,6 +22280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/payment-requests/received/by-me', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      await ensureJoinedScrimmagePaymentRequests(userId);
       const paymentRequests = await storage.getPaymentRequestsByRecipient(userId);
       // Non-creators only see their own recipient row in each request
       const filtered = paymentRequests.map((pr: any) => ({
@@ -22268,6 +22298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/payment-requests/unpaid-count', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      await ensureJoinedScrimmagePaymentRequests(userId);
       const count = await storage.getUnpaidPaymentRequestCount(userId);
       res.json({ count });
     } catch (error) {

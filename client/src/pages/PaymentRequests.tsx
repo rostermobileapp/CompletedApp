@@ -76,6 +76,10 @@ export default function PaymentRequests() {
 
   const { data: allReceivedRequests = [], isLoading: receivedLoading } = useQuery({
     queryKey: ['/api/payment-requests/received/by-me'],
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
   });
 
   const filterCreatedRequests = (requests: any[]) => {
