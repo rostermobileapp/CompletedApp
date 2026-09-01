@@ -83,6 +83,7 @@ import {
   paymentRequestRecipients,
   scrimmages,
   scrimmageRequests,
+  userNotifications,
   venmoLinkOverrideField,
   cashappLinkOverrideField,
   createFacilityRequestSchema,
@@ -15938,6 +15939,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
     ].filter(Boolean)));
 
+  const getScrimmageChangeRecipientIds = async (
+    scrimmage: { id: string; creatorId: string; inviteSentAt?: Date | null; inviteUserIds?: string[] | null },
+  ) => {
+    const [requests, emailInvites, deliveredInviteNotifications] = await Promise.all([
+      storage.getScrimmageRequests(scrimmage.id),
+      storage.getScrimmageInvites(scrimmage.id),
+      db
+        .select({ userId: userNotifications.userId })
+        .from(userNotifications)
+        .where(and(
+          eq(userNotifications.scrimmageId, scrimmage.id),
+          eq(userNotifications.type, 'scrimmage_invite'),
+        )),
+    ]);
+
+    const recipientIds = new Set<string>();
+    for (const request of requests) {
+      if (request.status === 'approved') recipientIds.add(request.playerId);
+    }
+    for (const invite of emailInvites) {
+      if (invite.userId) recipientIds.add(invite.userId);
+    }
+    for (const notification of deliveredInviteNotifications) {
+      recipientIds.add(notification.userId);
+    }
+    if (scrimmage.inviteSentAt) {
+      for (const inviteeId of scrimmage.inviteUserIds || []) {
+        if (!inviteeId.startsWith('placeholder:')) recipientIds.add(inviteeId);
+      }
+    }
+    recipientIds.delete(scrimmage.creatorId);
+    return Array.from(recipientIds);
+  };
+
   const canUserAccessScrimmage = async (scrimmage: any, userId: string) => {
     if (scrimmage.creatorId === userId) return true;
     const invitationDelivered = !scrimmage.timeTbd && !!scrimmage.inviteSentAt;
@@ -17073,6 +17108,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const willBePaidScrimmage = Number(updateData.costPerPlayer ?? existingScrimmage.costPerPlayer ?? 0) > 0;
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
 
+      const previousCost = Number(existingScrimmage.costPerPlayer ?? 0);
+      const updatedCost = Number(updatedScrimmage.costPerPlayer ?? 0);
+      const costChanged = previousCost !== updatedCost;
+      const dateTimeChanged =
+        existingScrimmage.dateTime !== updatedScrimmage.dateTime ||
+        existingScrimmage.timeTbd !== updatedScrimmage.timeTbd;
+
+      if (costChanged || dateTimeChanged) {
+        try {
+          const league = await storage.getLeague(existingScrimmage.leagueId);
+          const timezone = league?.timezone || 'America/New_York';
+          const formatCost = (amount: number) => amount > 0 ? `$${amount.toFixed(2)}` : 'Free';
+          const formatScheduledTime = (scrimmage: typeof existingScrimmage) =>
+            scrimmage.timeTbd
+              ? `${getStoredDateOnlyKey(scrimmage.dateTime)} (time TBD)`
+              : formatFullDateTime(scrimmage.dateTime, timezone);
+          const changeMessages: string[] = [];
+          const changeTypes: Array<'cost' | 'date_time'> = [];
+
+          if (costChanged) {
+            changeMessages.push(`Cost changed from ${formatCost(previousCost)} to ${formatCost(updatedCost)}.`);
+            changeTypes.push('cost');
+          }
+          if (dateTimeChanged) {
+            changeMessages.push(
+              `Date/time changed from ${formatScheduledTime(existingScrimmage)} to ${formatScheduledTime(updatedScrimmage)}.`,
+            );
+            changeTypes.push('date_time');
+          }
+
+          const targetUserIds = await getScrimmageChangeRecipientIds(updatedScrimmage);
+          if (targetUserIds.length > 0) {
+            const message = changeMessages.join(' ');
+            const { sendScrimmageUpdatePushNotification } = await import('./oneSignalNotifications');
+            await Promise.allSettled(
+              targetUserIds.map(async (recipientId) => {
+                await Promise.allSettled([
+                  storage.createNotification({
+                    userId: recipientId,
+                    type: 'scrimmage_updated',
+                    title: `Scrimmage Updated: ${updatedScrimmage.title}`,
+                    message,
+                    actionUrl: `/scrimmage/${updatedScrimmage.id}`,
+                    actionText: 'View Scrimmage',
+                    scrimmageId: updatedScrimmage.id,
+                  }),
+                  sendScrimmageUpdatePushNotification(
+                    recipientId,
+                    updatedScrimmage.title,
+                    message,
+                    updatedScrimmage.id,
+                    changeTypes,
+                  ),
+                ]);
+                broadcastNotificationUpdate(recipientId);
+              }),
+            );
+          }
+        } catch (notificationError) {
+          console.error(`Scrimmage ${scrimmageId} updated, but change notifications failed:`, notificationError);
+          // Do not fail an otherwise successful edit.
+        }
+      }
+
       // A scrimmage can be created for free and priced later. In that case,
       // invoice the players who are already approved without waiting for a
       // second finalize action.
@@ -17235,19 +17334,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!scrimmage) { skipped++; continue; }
           if (scrimmage.creatorId !== userId) { skipped++; continue; }
 
-          // Get approved players before deleting (for cancellation notifications)
-          const scrimmageRequests = await storage.getScrimmageRequests(scrimmageId);
-          const approvedRequests = scrimmageRequests.filter(r => r.status === 'approved');
+          // Resolve delivered invitees and approved players before deletion
+          // removes the source rows used to identify them.
+          const targetUserIds = await getScrimmageChangeRecipientIds(scrimmage);
 
           await storage.deleteScrimmage(scrimmageId);
           deleted++;
 
-          // Send cancellation notification to approved players: bell + push
-          if (approvedRequests.length > 0) {
+          // Send cancellation notification to invitees and approved players.
+          if (targetUserIds.length > 0) {
             try {
-              const targetUserIds = approvedRequests
-                .map(r => r.playerId)
-                .filter(pid => pid !== userId);
               const notifTitle = '❌ Scrimmage Cancelled';
               const notifMessage = `"${scrimmage.title}" at ${scrimmage.location} has been cancelled by the organizer.`;
               const { sendScrimmageCancellationPushNotification } = await import('./oneSignalNotifications');
@@ -17302,11 +17398,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only the creator can delete this series' });
       }
 
-      // Collect all approved players across all occurrences (deduplicated by userId)
-      const allApprovedPlayerIds = new Set<string>();
+      // Collect delivered invitees and approved players across all occurrences.
+      const allAffectedPlayerIds = new Set<string>();
       for (const scrimmage of seriesScrimmages) {
-        const scrimmageRequests = await storage.getScrimmageRequests(scrimmage.id);
-        scrimmageRequests.filter(r => r.status === 'approved').forEach(r => allApprovedPlayerIds.add(r.playerId));
+        const recipientIds = await getScrimmageChangeRecipientIds(scrimmage);
+        recipientIds.forEach((recipientId) => allAffectedPlayerIds.add(recipientId));
       }
 
       // Delete all scrimmages in the series
@@ -17315,9 +17411,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send a single series-cancellation notification to all affected players: bell + push
-      if (allApprovedPlayerIds.size > 0) {
+      if (allAffectedPlayerIds.size > 0) {
         try {
-          const targetUserIds = Array.from(allApprovedPlayerIds).filter(pid => pid !== userId);
+          const targetUserIds = Array.from(allAffectedPlayerIds);
           const notifTitle = '❌ Recurring Series Cancelled';
           const notifMessage = `The entire "${representative.title}" recurring scrimmage series has been cancelled by the organizer.`;
           const { sendScrimmageCancellationPushNotification } = await import('./oneSignalNotifications');
@@ -18025,14 +18121,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You do not have permission to manage player assignments for this scrimmage' });
       }
 
-      const updatedRequest = await storage.setTeamAssignment(requestId, teamAssignment ?? null);
+      const normalizedTeamAssignment = teamAssignment ?? null;
+      if ((request.teamAssignment ?? null) === normalizedTeamAssignment) {
+        return res.json(request);
+      }
+
+      const updatedRequest = await storage.setTeamAssignment(requestId, normalizedTeamAssignment);
       void broadcastScrimmageUpdate(request.scrimmageId, [request.playerId]);
 
       // Notify the player that their team assignment changed
       try {
         const scrimmage = await storage.getScrimmage(request.scrimmageId);
         if (scrimmage) {
-          const assignedTeamLabel = teamAssignment === 'light' ? 'Team Light' : teamAssignment === 'dark' ? 'Team Dark' : 'Unassigned';
+          const assignedTeamLabel = normalizedTeamAssignment === 'light' ? 'Team Light' : normalizedTeamAssignment === 'dark' ? 'Team Dark' : 'Unassigned';
           await storage.createNotification({
             userId: request.playerId,
             type: 'scrimmage_approved',
@@ -18058,7 +18159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assignmentLogoUrl = resolveTeamLogoUrl(assignmentTeamRows[0]?.logoUrl);
           } catch (e) { /* keep undefined */ }
           const { sendTeamAssignmentPushNotification } = await import('./oneSignalNotifications');
-          await sendTeamAssignmentPushNotification(request.playerId, scrimmage.title, scrimmage.id, teamAssignment ?? null, assignmentLogoUrl);
+          await sendTeamAssignmentPushNotification(request.playerId, scrimmage.title, scrimmage.id, normalizedTeamAssignment, assignmentLogoUrl);
         }
       } catch (notifyError) {
         console.error('[TeamAssignment] Failed to send reassignment notification:', notifyError);
@@ -18782,19 +18883,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only the creator can cancel the scrimmage' });
       }
       
-      // Gather all players to notify before deleting:
-      // 1) approved join-requests, 2) checked-in invitees — excluding the creator
-      const [requests, invites] = await Promise.all([
-        storage.getScrimmageRequests(scrimmageId),
-        storage.getScrimmageInvites(scrimmageId),
-      ]);
-      const approvedPlayerIds = requests
-        .filter(r => r.status === 'approved' && r.playerId !== userId)
-        .map(r => r.playerId);
-      const checkedInInviteeIds = invites
-        .filter(i => i.inviteeId !== userId)
-        .map(i => i.inviteeId);
-      const targetUserIds = [...new Set([...approvedPlayerIds, ...checkedInInviteeIds])];
+      // Gather delivered invitees and approved players before deleting the
+      // source rows used to identify them.
+      const targetUserIds = await getScrimmageChangeRecipientIds(scrimmage);
 
       // Delete the scrimmage (cascades requests + invites)
       await storage.deleteScrimmage(scrimmageId);

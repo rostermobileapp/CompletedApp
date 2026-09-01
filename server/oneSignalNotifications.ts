@@ -516,6 +516,32 @@ export async function sendScrimmageApprovalPushNotification(
   });
 }
 
+export async function sendScrimmageUpdatePushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  message: string,
+  scrimmageId: string,
+  changeTypes: Array<'cost' | 'date_time'>
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏒 Scrimmage Updated: ${scrimmageTitle}`,
+    message,
+    data: {
+      type: 'scrimmage_updated',
+      scrimmageId,
+      changeTypes: changeTypes.join(','),
+    },
+  });
+}
+
 export async function sendTeamAssignmentPushNotification(
   recipientId: string,
   scrimmageTitle: string,
