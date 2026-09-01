@@ -104,10 +104,9 @@ async function checkAndSendInvitations() {
         continue;
       }
 
-      // Calculate this occurrence's send instant in league-local wall-clock
+      // Calculate this occurrence's send instant in its creator-timezone wall-clock
       // time. Calendar-day subtraction avoids DST shifting the configured hour.
-      const league = await storage.getLeague(candidateScrimmage.leagueId);
-      const timezone = league?.timezone || 'America/New_York';
+      const timezone = candidateScrimmage.timezone || 'America/New_York';
       const inviteSendDateTime = getScrimmageInviteSendAt(
         candidateScrimmage.dateTime,
         candidateScrimmage.inviteDaysBefore,
@@ -254,9 +253,7 @@ async function checkAndSendInvitations() {
           ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
           : 'Organizer';
         
-        // Get league timezone for proper date formatting
-        const league = await storage.getLeague(scrimmage.leagueId);
-        const timezone = league?.timezone || 'America/New_York';
+        const timezone = scrimmage.timezone || 'America/New_York';
         
         const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
         const { date: formattedDate, time: formattedTime } = formatDayAndTime(scrimmage.dateTime, timezone);
@@ -343,7 +340,7 @@ async function checkAndSendInvitations() {
           const emailResults = await sendBulkScrimmageInvites(newInviteEmails, {
             scrimmageId: scrimmage.id,
             title: scrimmage.title,
-            dateTime: new Date(scrimmage.dateTime),
+            dateTime: parseLeagueLocalDateTime(scrimmage.dateTime, timezone),
             location: scrimmage.location,
             creatorName: organizerName,
             skillLevel: scrimmage.skillLevel || undefined,
@@ -431,9 +428,7 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
     }
   }
 
-  // Get league timezone for proper date conversion
-  const league = await storage.getLeague(parentScrimmage.leagueId);
-  const timezone = league?.timezone || 'America/New_York';
+  const timezone = parentScrimmage.timezone || 'America/New_York';
   const startDate = parseLeagueLocalDateTime(parentScrimmage.dateTime, timezone);
   
   const recurrenceEndDateKey = parentScrimmage.recurrenceEndDate

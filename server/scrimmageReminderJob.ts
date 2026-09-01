@@ -4,7 +4,7 @@ import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { format } from "date-fns";
 import { sendScheduleReminderPushNotification, sendScrimmageInvitePushNotification } from "./oneSignalNotifications";
-import { parseLeagueLocalDateTime } from "./dateUtils";
+import { formatDateInTimezone, parseLeagueLocalDateTime } from "./dateUtils";
 import { isDemoLeague } from "./demo";
 
 const REMINDER_CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
@@ -45,9 +45,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
         continue;
       }
       
-      // Get league timezone for proper date conversion
-      const league = await storage.getLeague(scrimmage.leagueId);
-      const timezone = league?.timezone || 'America/New_York';
+      const timezone = scrimmage.timezone || 'America/New_York';
       const scrimmageTime = parseLeagueLocalDateTime(scrimmage.dateTime, timezone);
       const hoursUntil = (scrimmageTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -78,7 +76,11 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
         const organizerName = creator
           ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
           : 'Organizer';
-        const formattedDateTime = format(scrimmageTime, 'EEE, MMM d · h:mm a');
+        const formattedDateTime = formatDateInTimezone(
+          scrimmage.dateTime,
+          'EEE, MMM d · h:mm a',
+          timezone,
+        );
         for (const recipientId of Array.from(recipientIds)) {
           try {
             const sent = await sendScrimmageInvitePushNotification(
@@ -171,7 +173,7 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
               userId: player.id,
               type: 'scrimmage_reminder',
               title: `Reminder: ${scrimmage.title}`,
-              message: `Starting in ${timeLabel} at ${scrimmage.location} on ${format(scrimmageTime, 'EEEE, MMMM d')} at ${format(scrimmageTime, 'h:mm a')}`,
+              message: `Starting in ${timeLabel} at ${scrimmage.location} on ${formatDateInTimezone(scrimmage.dateTime, 'EEEE, MMMM d', timezone)} at ${formatDateInTimezone(scrimmage.dateTime, 'h:mm a', timezone)}`,
               actionUrl: `/scrimmage/${scrimmage.id}`,
               actionText: 'View Details',
               scrimmageId: scrimmage.id,
@@ -227,7 +229,10 @@ export async function checkAndExpireTimedOutBackups(): Promise<void> {
         if (!scrimmage) continue;
         if (scrimmage.timeTbd) continue;
         const cutoffMs = BACKUP_CASCADE_CUTOFF_MINUTES * 60 * 1000;
-        if (new Date(scrimmage.dateTime).getTime() <= Date.now() + cutoffMs) {
+        if (
+          parseLeagueLocalDateTime(scrimmage.dateTime, scrimmage.timezone).getTime() <=
+          Date.now() + cutoffMs
+        ) {
           console.log(
             `[BackupQueue] Skipping timeout cascade — scrimmage ${scrimmageId} starts within ${BACKUP_CASCADE_CUTOFF_MINUTES} min`
           );

@@ -10310,7 +10310,10 @@ export class DatabaseStorage implements IStorage {
     // Use the calendar date rather than comparing it with the server's UTC
     // instant, so same-day invites remain visible to invitees until the day
     // after the event.
-    const visibleScrimmageDate = sql`${scrimmages.dateTime}::date >= CURRENT_DATE - INTERVAL '1 day'`;
+    const scrimmageLocalToday =
+      sql`(CURRENT_TIMESTAMP AT TIME ZONE ${scrimmages.timezone})::date`;
+    const visibleScrimmageDate =
+      sql`${scrimmages.dateTime}::date >= ${scrimmageLocalToday} - 1`;
     const isUpcomingDeliveredInvite = and(
       eq(scrimmages.timeTbd, false),
       isNotNull(scrimmages.inviteSentAt),
@@ -10320,7 +10323,7 @@ export class DatabaseStorage implements IStorage {
       and(eq(scrimmages.timeTbd, false), visibleScrimmageDate),
       and(
         eq(scrimmages.timeTbd, true),
-        sql`${scrimmages.dateTime}::date >= CURRENT_DATE`,
+        sql`${scrimmages.dateTime}::date >= ${scrimmageLocalToday}`,
       ),
     );
 

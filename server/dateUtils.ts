@@ -42,6 +42,14 @@ export function parseLeagueLocalDateTime(
   return fromZonedTime(localDateTime, tz);
 }
 
+export function hasLeagueLocalDateTimeStarted(
+  localDateTime: Date | string,
+  leagueTimezone: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return parseLeagueLocalDateTime(localDateTime, leagueTimezone).getTime() <= now.getTime();
+}
+
 export function getLeagueLocalDateKey(
   dateTime: Date | string,
   leagueTimezone: string | null | undefined,

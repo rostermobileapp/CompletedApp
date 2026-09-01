@@ -599,6 +599,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
         location: scrimmages.location,
         leagueId: scrimmages.leagueId,
         creatorId: scrimmages.creatorId,
+        timezone: scrimmages.timezone,
       })
       .from(scrimmages)
       .where(
@@ -627,7 +628,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
         // Keep default timezone
       }
       
-      // Parse the league-local datetime string with proper timezone context
+      // Parse the creator-local scrimmage wall-clock with its persisted timezone.
       const eventTime = parseLeagueLocalDateTime(game.scheduledAt, timezone);
       
       // Build event title and pre-fetch both team logos for per-player icon selection
@@ -685,16 +686,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
     // Process scrimmages
     for (const scrimmage of upcomingScrimmages) {
       if (await isDemoLeague(scrimmage.leagueId)) continue;
-      // Get league timezone for proper date conversion
-      let scrimmageTimezone = "America/New_York";
-      try {
-        const scrimmageLeague = await storage.getLeague(scrimmage.leagueId);
-        if (scrimmageLeague?.timezone) {
-          scrimmageTimezone = scrimmageLeague.timezone;
-        }
-      } catch (e) {
-        // Keep default timezone
-      }
+      const scrimmageTimezone = scrimmage.timezone || "America/New_York";
       
       // Parse the league-local datetime string with proper timezone context
       const eventTime = parseLeagueLocalDateTime(scrimmage.dateTime, scrimmageTimezone);

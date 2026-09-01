@@ -4,7 +4,7 @@
  */
 
 import { storage } from "./storage";
-import { formatDayAndTime } from "./dateUtils";
+import { formatDayAndTime, parseLeagueLocalDateTime } from "./dateUtils";
 
 import { broadcastNotificationUpdate } from "./notificationBroadcast";
 import { isDemoLeague } from "./demo";
@@ -33,8 +33,9 @@ export async function notifyNextBackup(scrimmageId: string): Promise<void> {
       console.log(`[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} has no confirmed time`);
       return;
     }
+    const timezone = scrimmage.timezone || "America/New_York";
     const cutoffMs = BACKUP_CASCADE_CUTOFF_MINUTES * 60 * 1000;
-    if (new Date(scrimmage.dateTime).getTime() <= Date.now() + cutoffMs) {
+    if (parseLeagueLocalDateTime(scrimmage.dateTime, timezone).getTime() <= Date.now() + cutoffMs) {
       console.log(
         `[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} starts within ${BACKUP_CASCADE_CUTOFF_MINUTES} min`
       );
@@ -50,8 +51,6 @@ export async function notifyNextBackup(scrimmageId: string): Promise<void> {
     const player = await storage.getUser(next.playerId);
     if (!player) return;
 
-    const league = await storage.getLeague(scrimmage.leagueId);
-    const timezone = league?.timezone || "America/New_York";
     const { date, time } = formatDayAndTime(scrimmage.dateTime, timezone);
 
     await storage.createNotification({

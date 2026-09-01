@@ -39,7 +39,7 @@ import { generateSingleElimination, generateDoubleElimination, generateRoundRobi
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, ne, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 import { format, addDays, addWeeks } from "date-fns";
-import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from "./dateUtils";
+import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, hasLeagueLocalDateTimeStarted, parseLeagueLocalDateTime } from "./dateUtils";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -639,6 +639,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS invite_emails text[] NOT NULL DEFAULT '{}'::text[]`);
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS has_deferred_invites boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS facility_id varchar REFERENCES facilities(id) ON DELETE SET NULL`);
+    await db.execute(sql`ALTER TABLE scrimmages ADD COLUMN IF NOT EXISTS timezone varchar`);
+    await db.execute(sql`
+      UPDATE scrimmages AS s
+      SET timezone = COALESCE(
+        (SELECT NULLIF(u.timezone, '') FROM users AS u WHERE u.id = s.creator_id),
+        (SELECT NULLIF(l.timezone, '') FROM leagues AS l WHERE l.id = s.league_id),
+        'America/New_York'
+      )
+      WHERE s.timezone IS NULL OR s.timezone = ''
+    `);
+    await db.execute(sql`UPDATE scrimmages SET timezone = 'America/New_York' WHERE timezone IS NULL OR timezone = ''`);
+    await db.execute(sql`ALTER TABLE scrimmages ALTER COLUMN timezone SET DEFAULT 'America/New_York'`);
+    await db.execute(sql`ALTER TABLE scrimmages ALTER COLUMN timezone SET NOT NULL`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_scrimmages_facility_id ON scrimmages(facility_id)`);
     await db.execute(sql`
       UPDATE scrimmages AS s
@@ -15950,6 +15963,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ...(scrimmage.inviteGroupId ? [scrimmage.inviteGroupId] : []),
     ].filter(Boolean)));
 
+  const getScrimmageTimezone = (
+    scrimmage: { timezone?: string | null },
+    fallback?: string | null,
+  ) => scrimmage.timezone || fallback || 'America/New_York';
+
   const getScrimmageChangeRecipientIds = async (
     scrimmage: { id: string; creatorId: string; inviteSentAt?: Date | null; inviteUserIds?: string[] | null },
   ) => {
@@ -16005,8 +16023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const recipientIds = await getScrimmageOpenSpotRecipientIds(scrimmage);
     if (recipientIds.length === 0) return;
 
-    const league = await storage.getLeague(scrimmage.leagueId);
-    const timezone = league?.timezone || 'America/New_York';
+    const timezone = getScrimmageTimezone(scrimmage);
     const scrimmageDateTime = formatScrimmageDateTime(scrimmage.dateTime, timezone);
     const title = `Spot opened: ${scrimmage.title}`;
     const message = `A spot is now open for "${scrimmage.title}" on ${scrimmageDateTime}. Tap to RSVP.`;
@@ -16081,8 +16098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return { paymentRequest: null, requestedUserIds: [] as string[], blockedReason: null };
     }
 
-    const league = await storage.getLeague(scrimmage.leagueId);
-    const timezone = league?.timezone || 'America/New_York';
+    const timezone = getScrimmageTimezone(scrimmage);
     const { paymentRequest, requestedUserIds, blockedReason } = await db.transaction(async (tx) => {
       // Serialize every invoice path for this scrimmage, including first-pay
       // joins and finalization fallback. The transaction-scoped advisory lock
@@ -16350,7 +16366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const organizerName = creator
         ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Organizer'
         : 'Organizer';
-      const formattedDateTime = formatFullDateTime(scrimmage.dateTime, league.timezone);
+      const formattedDateTime = formatFullDateTime(scrimmage.dateTime, getScrimmageTimezone(scrimmage, league.timezone));
 
       if (recipients.length > 0) {
         try {
@@ -16418,7 +16434,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const emailResults = await sendBulkScrimmageInvites(emails, {
             scrimmageId: scrimmage.id,
             title: scrimmage.title,
-            dateTime: new Date(scrimmage.dateTime),
+            dateTime: parseLeagueLocalDateTime(
+              scrimmage.dateTime,
+              getScrimmageTimezone(scrimmage),
+            ),
             location: scrimmage.location,
             creatorName: organizerName,
             skillLevel: scrimmage.skillLevel || undefined,
@@ -16501,6 +16520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
+      const scrimmageTimezone = user.timezone || league.timezone || 'America/New_York';
       
       // Ensure the known date is still upcoming. A Time TBD occurrence uses
       // midnight only as a date anchor, so validate against the end of that
@@ -16510,7 +16530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const futureValidationDate = scrimmageData.timeTbd
         ? `${tbdDateAnchor}T23:59:59`
         : scrimmageData.dateTime;
-      const scrimmageDateTime = parseLeagueLocalDateTime(futureValidationDate, league.timezone);
+      const scrimmageDateTime = parseLeagueLocalDateTime(futureValidationDate, scrimmageTimezone);
       if (scrimmageDateTime <= now) {
         return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
       }
@@ -16608,14 +16628,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Generate all recurring dates
         // Use parseLeagueLocalDateTime to convert string to Date for date arithmetic
         const dates: Date[] = [];
-        const startDate = parseLeagueLocalDateTime(scrimmageData.dateTime, league.timezone);
+        const startDate = parseLeagueLocalDateTime(scrimmageData.dateTime, scrimmageTimezone);
         const maxOccurrences = scrimmageData.recurrenceCount || 52; // Default max to prevent infinite loops
         const recurrenceEndDateKey = scrimmageData.recurrenceEndDate
           ? getStoredDateOnlyKey(scrimmageData.recurrenceEndDate)
           : null;
         const isAfterRecurrenceEnd = (date: Date) =>
           !!recurrenceEndDateKey &&
-          getLeagueLocalDateKey(date, league.timezone) > recurrenceEndDateKey;
+          getLeagueLocalDateKey(date, scrimmageTimezone) > recurrenceEndDateKey;
         
         if (scrimmageData.recurrenceType === 'daily') {
           // Daily recurrence: simple iteration
@@ -16672,7 +16692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             startDate,
             maxOccurrences,
             scrimmageData.recurrenceEndDate,
-            league.timezone,
+            scrimmageTimezone,
           ));
         }
         
@@ -16680,6 +16700,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create parent scrimmage (first occurrence)
         const parentScrimmage = await storage.createScrimmage({
           ...scrimmageData,
+          timezone: scrimmageTimezone,
           recurrenceEndDate: scrimmageData.recurrenceEndDate
             ? new Date(scrimmageData.recurrenceEndDate)
             : null,
@@ -16687,7 +16708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // date_time is timestamp without time zone. Persist the league-local
           // wall-clock string rather than a Date (which Drizzle serializes as
           // UTC and would turn 9 PM Eastern into 1 AM).
-          dateTime: formatDateInTimezone(dates[0], "yyyy-MM-dd'T'HH:mm:ss", league.timezone),
+          dateTime: formatDateInTimezone(dates[0], "yyyy-MM-dd'T'HH:mm:ss", scrimmageTimezone),
           inviteUserIds: requestedInviteUserIds, // Only manual (non-group) selections
           inviteEmails: savedInviteEmails,
           hasDeferredInvites,
@@ -16716,7 +16737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   userId: coHostId,
                   type: 'scrimmage_cohost_added',
                   title: `You're a co-host for ${scrimmageData.title}`,
-                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
+                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, scrimmageTimezone)}. You can now help manage players and payments.`,
                   actionUrl: `/scrimmage/${parentScrimmage.id}`,
                   scrimmageId: parentScrimmage.id,
                 });
@@ -16768,12 +16789,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (let i = 1; i < dates.length; i++) {
           const childScrimmage = await storage.createScrimmage({
             ...scrimmageData,
+            timezone: scrimmageTimezone,
             recurrenceEndDate: scrimmageData.recurrenceEndDate
               ? new Date(scrimmageData.recurrenceEndDate)
               : null,
             // Future occurrences deliberately start as Time TBD. A time set on
             // the first occurrence must never become the series-wide default.
-            dateTime: `${formatDateInTimezone(dates[i], 'yyyy-MM-dd', league.timezone)}T00:00:00`,
+            dateTime: `${formatDateInTimezone(dates[i], 'yyyy-MM-dd', scrimmageTimezone)}T00:00:00`,
             timeTbd: true,
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
@@ -16817,6 +16839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create single scrimmage (non-recurring)
         const scrimmage = await storage.createScrimmage({
           ...scrimmageData,
+          timezone: scrimmageTimezone,
           recurrenceEndDate: scrimmageData.recurrenceEndDate
             ? new Date(scrimmageData.recurrenceEndDate)
             : null,
@@ -16848,7 +16871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   userId: coHostId,
                   type: 'scrimmage_cohost_added',
                   title: `You're a co-host for ${scrimmageData.title}`,
-                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, league.timezone)}. You can now help manage players and payments.`,
+                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, scrimmageTimezone)}. You can now help manage players and payments.`,
                   actionUrl: `/scrimmage/${scrimmage.id}`,
                   scrimmageId: scrimmage.id,
                 });
@@ -16982,7 +17005,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // editable until a real time is set. Scheduled occurrences keep the
       // existing no-edits-after-start rule.
       const now = new Date();
-      if (!existingScrimmage.timeTbd && new Date(existingScrimmage.dateTime) <= now) {
+      if (
+        !existingScrimmage.timeTbd &&
+        hasLeagueLocalDateTimeStarted(
+          existingScrimmage.dateTime,
+          getScrimmageTimezone(existingScrimmage),
+          now,
+        )
+      ) {
         return res.status(409).json({ message: 'Cannot update scrimmage that has already started or ended' });
       }
       
@@ -16999,6 +17029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete updateData.inviteDeliveryClaimedAt;
         delete updateData.inviteDeliveryClaimId;
         delete updateData.hasDeferredInvites;
+        delete updateData.timezone;
       } catch (validationError) {
         console.error('Validation error updating scrimmage:', validationError);
         return res.status(400).json({ message: "Invalid update data", errors: validationError instanceof Error ? validationError.message : 'Validation failed' });
@@ -17135,10 +17166,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // DateTime editing restrictions
       if (updateData.dateTime !== undefined) {
         const dateOnly = updateData.dateTime.split('T')[0];
-        const league = await storage.getLeague(existingScrimmage.leagueId);
+        const scrimmageTimezone = getScrimmageTimezone(existingScrimmage);
         const dateForValidation = targetTimeTbd
-          ? parseLeagueLocalDateTime(`${dateOnly}T23:59:59`, league?.timezone)
-          : parseLeagueLocalDateTime(updateData.dateTime, league?.timezone);
+          ? parseLeagueLocalDateTime(`${dateOnly}T23:59:59`, scrimmageTimezone)
+          : parseLeagueLocalDateTime(updateData.dateTime, scrimmageTimezone);
         if (dateForValidation <= now) {
           return res.status(400).json({ message: "Scrimmage must be scheduled for a future date" });
         }
@@ -17168,8 +17199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (costChanged || dateTimeChanged) {
         try {
-          const league = await storage.getLeague(existingScrimmage.leagueId);
-          const timezone = league?.timezone || 'America/New_York';
+          const timezone = getScrimmageTimezone(existingScrimmage);
           const formatCost = (amount: number) => amount > 0 ? `$${amount.toFixed(2)}` : 'Free';
           const formatScheduledTime = (scrimmage: typeof existingScrimmage) =>
             scrimmage.timeTbd
@@ -17263,7 +17293,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle co-host ID additions
       if (req.body.coHostIds && Array.isArray(req.body.coHostIds) && req.body.coHostIds.length > 0) {
-        const league = existingScrimmage.leagueId ? await storage.getLeague(existingScrimmage.leagueId) : null;
         for (const coHostId of req.body.coHostIds as string[]) {
           try {
             await storage.addScrimmageCoHost({
@@ -17278,7 +17307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               userId: coHostId,
               type: 'scrimmage_cohost_added',
               title: `You're a co-host for ${updatedScrimmage.title}`,
-              message: `You have been added as a co-host for "${updatedScrimmage.title}"${league ? ` on ${formatFullDateTime(updatedScrimmage.dateTime, league.timezone)}` : ''}. You can now help manage players and payments.`,
+              message: `You have been added as a co-host for "${updatedScrimmage.title}" on ${formatFullDateTime(updatedScrimmage.dateTime, getScrimmageTimezone(updatedScrimmage))}. You can now help manage players and payments.`,
               actionUrl: `/scrimmage/${scrimmageId}`,
               scrimmageId,
             });
@@ -17520,10 +17549,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!scrimmage) {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
-      
-      // Business invariant: Cannot join scrimmage that has passed or is imminent
-      const now = new Date();
-      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now) {
+
+      const scrimmageTimezone = getScrimmageTimezone(scrimmage);
+
+      // The stored timestamp is league-local wall-clock time, not UTC.
+      if (
+        !scrimmage.timeTbd &&
+        hasLeagueLocalDateTimeStarted(scrimmage.dateTime, scrimmageTimezone)
+      ) {
         return res.status(409).json({ message: 'Cannot join scrimmage that has already started or ended' });
       }
       
@@ -17585,12 +17618,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Mirror the same notification side-effects as a manual approval so the
         // player receives an in-app notification, broadcast, and push.
         try {
-          const [player, league] = await Promise.all([
-            storage.getUser(userId),
-            scrimmage.leagueId ? storage.getLeague(scrimmage.leagueId) : Promise.resolve(null),
-          ]);
+          const player = await storage.getUser(userId);
           if (player) {
-            const timezone = league?.timezone || 'America/New_York';
+            const timezone = getScrimmageTimezone(scrimmage);
             const { date: fcDate, time: fcTime } = formatDayAndTime(scrimmage.dateTime, timezone);
 
             await storage.createNotification({
@@ -17686,8 +17716,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (isFirstPay) {
-        const league = await storage.getLeague(scrimmage.leagueId);
-        const timezone = league?.timezone || 'America/New_York';
         const firstPayJoin = await db.transaction(async (tx) => {
           // The pending request and its invoice are one state transition. This
           // shares both locks with finalization so neither half can be created
@@ -17732,7 +17760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .values({
               creatorId: currentScrimmage.creatorId,
               title: `Payment for ${currentScrimmage.title}`,
-              description: `Payment for scrimmage on ${formatFullDateTime(currentScrimmage.dateTime, timezone)} at ${currentScrimmage.location}`,
+              description: `Payment for scrimmage on ${formatFullDateTime(currentScrimmage.dateTime, scrimmageTimezone)} at ${currentScrimmage.location}`,
               amountPerPerson: String(currentScrimmage.costPerPlayer),
               relatedScrimmageId: currentScrimmage.id,
               deadline: null,
@@ -17966,10 +17994,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You do not have permission to approve requests for this scrimmage' });
       }
       
-      // Business invariant: Cannot approve requests for scrimmages that have passed
-      const now = new Date();
-      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= now && (status === 'approved' || status === 'backup')) {
-        return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
+      // Business invariant: Cannot approve requests for scrimmages that have passed.
+      if (!scrimmage.timeTbd && (status === 'approved' || status === 'backup')) {
+        if (hasLeagueLocalDateTimeStarted(scrimmage.dateTime, getScrimmageTimezone(scrimmage))) {
+          return res.status(409).json({ message: 'Cannot approve requests for scrimmages that have already started' });
+        }
       }
 
       if (status === 'approved' && scrimmage.joinMode === 'first_pay') {
@@ -17998,8 +18027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const player = await storage.getUser(request.playerId);
           if (player) {
-            const league = await storage.getLeague(scrimmage.leagueId);
-            const timezone = league?.timezone || 'America/New_York';
+            const timezone = getScrimmageTimezone(scrimmage);
             const { date: bDate, time: bTime } = formatDayAndTime(scrimmage.dateTime, timezone);
             await storage.createNotification({
               userId: player.id,
@@ -18050,8 +18078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const player = await storage.getUser(request.playerId);
           if (player) {
-            const league = await storage.getLeague(scrimmage.leagueId);
-            const timezone = league?.timezone || 'America/New_York';
+            const timezone = getScrimmageTimezone(scrimmage);
             const { date: rejDate, time: rejTime } = formatDayAndTime(scrimmage.dateTime, timezone);
             await storage.createNotification({
               userId: player.id,
@@ -18089,9 +18116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const approvedCount = allRequests.filter(r => r.status === 'approved').length;
           
           if (player) {
-            // Get league timezone for proper date formatting
-            const league = await storage.getLeague(scrimmage.leagueId);
-            const timezone = league?.timezone || 'America/New_York';
+            const timezone = getScrimmageTimezone(scrimmage);
             const { date: approvalDate, time: approvalTime } = formatDayAndTime(scrimmage.dateTime, timezone);
             
             // Build team assignment suffix for messages
@@ -18311,9 +18336,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scrimmage = await storage.getScrimmage(request.scrimmageId);
       if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
 
-      // Guard: reject any acceptance or decline response after the scrimmage has started
-      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= new Date()) {
-        return res.status(409).json({ message: 'This scrimmage has already started — the backup queue is now closed.' });
+      // Guard: reject any acceptance or decline response after the scrimmage has started.
+      if (!scrimmage.timeTbd) {
+        if (hasLeagueLocalDateTimeStarted(scrimmage.dateTime, getScrimmageTimezone(scrimmage))) {
+          return res.status(409).json({ message: 'This scrimmage has already started — the backup queue is now closed.' });
+        }
       }
 
       if (accept) {
@@ -18392,7 +18419,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Business invariant: 24-hour lockout applies only to self-withdrawals, not manager removals
       if (request.status === 'approved' && request.playerId === userId && !isManager) {
         const now = new Date();
-        const hoursUntil = (new Date(scrimmage.dateTime).getTime() - now.getTime()) / (1000 * 60 * 60);
+        const hoursUntil = (
+          parseLeagueLocalDateTime(scrimmage.dateTime, getScrimmageTimezone(scrimmage)).getTime() - now.getTime()
+        ) / (1000 * 60 * 60);
         
         if (!scrimmage.timeTbd && hoursUntil < 24) {
           return res.status(409).json({ 
@@ -18495,8 +18524,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmage.status === 'roster_confirmed') {
         return res.status(409).json({ message: 'Payment requests must be sent before the roster is finalized' });
       }
-      if (!scrimmage.timeTbd && new Date(scrimmage.dateTime) <= new Date()) {
-        return res.status(409).json({ message: 'Cannot send payment requests for a scrimmage that has already started' });
+      if (!scrimmage.timeTbd) {
+        if (hasLeagueLocalDateTimeStarted(scrimmage.dateTime, getScrimmageTimezone(scrimmage))) {
+          return res.status(409).json({ message: 'Cannot send payment requests for a scrimmage that has already started' });
+        }
       }
 
       const requests = await storage.getScrimmageRequests(scrimmageId);
@@ -18554,8 +18585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Only the creator or co-hosts can finalize the scrimmage' });
       }
 
-      const league = await storage.getLeague(scrimmage.leagueId);
-      const timezone = league?.timezone || 'America/New_York';
+      const timezone = getScrimmageTimezone(scrimmage);
       
       // Serialize finalization with every invoice path. Whichever action gets
       // the lock first completes first; a later invoice send sees the finalized
@@ -18577,7 +18607,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (currentScrimmage.status === 'cancelled') {
           return { kind: 'cancelled' as const };
         }
-        if (!currentScrimmage.timeTbd && new Date(currentScrimmage.dateTime) <= new Date()) {
+        if (
+          !currentScrimmage.timeTbd &&
+          hasLeagueLocalDateTimeStarted(currentScrimmage.dateTime, timezone)
+        ) {
           return { kind: 'started' as const };
         }
 
@@ -18821,9 +18854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         addedBy: userId,
       });
       
-      // Get league timezone for proper date formatting
-      const league = await storage.getLeague(scrimmage.leagueId);
-      const timezone = league?.timezone || 'America/New_York';
+      const timezone = getScrimmageTimezone(scrimmage);
       
       // Notify the new co-host
       const dateTimeStr = formatFullDateTime(scrimmage.dateTime, timezone);
@@ -22780,7 +22811,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             joinRequest.status === 'pending';
           const canStillAdmit =
             linkedScrimmage?.status === 'open' &&
-            (linkedScrimmage.timeTbd || new Date(linkedScrimmage.dateTime) > new Date());
+            (
+              linkedScrimmage.timeTbd ||
+              !hasLeagueLocalDateTimeStarted(
+                linkedScrimmage.dateTime,
+                getScrimmageTimezone(linkedScrimmage),
+              )
+            );
 
           if (shouldHandleFirstPay && canStillAdmit) {
             const countResult = await tx.execute(sql`
@@ -22858,8 +22895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { updatedRecipient, scrimmageAdmission, linkedScrimmage } = confirmation;
       if (scrimmageAdmission === 'approved' && recipient.userId && linkedScrimmage) {
-        const league = await storage.getLeague(linkedScrimmage.leagueId);
-        const timezone = league?.timezone || 'America/New_York';
+        const timezone = getScrimmageTimezone(linkedScrimmage);
         const { date: approvalDate, time: approvalTime } = formatDayAndTime(linkedScrimmage.dateTime, timezone);
         try {
           await storage.createNotification({

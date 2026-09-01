@@ -1249,6 +1249,9 @@ export const scrimmages = pgTable("scrimmages", {
   creatorId: varchar("creator_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
   title: varchar("title").notNull(),
   dateTime: timestamp("date_time", { mode: 'string' }).notNull(),
+  // Immutable timezone captured from the creator when this scrimmage is made.
+  // dateTime is a wall-clock value interpreted in this timezone.
+  timezone: varchar("timezone").default("America/New_York").notNull(),
   // Date is always retained for calendar placement. When true, dateTime's clock
   // portion is only an internal date anchor and must never be presented or used
   // to send invitations, reminders, or close RSVP actions.
@@ -3336,6 +3339,7 @@ export const createScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   id: true,
   leagueId: true,     // Server-controlled
   creatorId: true,    // Server-controlled
+  timezone: true,     // Captured from the creator by the server
   announcementId: true, // Server-controlled
   inviteSentAt: true, // Server-controlled delivery completion marker
   inviteDeliveryClaimedAt: true, // Server-controlled worker lease
@@ -3363,6 +3367,7 @@ export const updateScrimmageRequestSchema = createInsertSchema(scrimmages).omit(
   id: true,
   leagueId: true,     // Server-controlled
   creatorId: true,    // Server-controlled
+  timezone: true,     // Immutable after creation
   announcementId: true, // Server-controlled
   inviteSentAt: true, // Server-controlled delivery completion marker
   inviteDeliveryClaimedAt: true, // Server-controlled worker lease

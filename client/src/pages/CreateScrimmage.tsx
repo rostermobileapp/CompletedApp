@@ -219,8 +219,9 @@ export default function CreateScrimmage() {
     ?? (userLeagues as any[])[0]
     ?? null;
 
-  // The league remains the required authorization, timezone, and notification
-  // context. The rink independently controls the player pool.
+  // The league remains the required authorization and notification context.
+  // The creator's profile timezone controls the scrimmage wall-clock time,
+  // while the rink independently controls the player pool.
   const leagueFacility = selectedLeague?.facility;
   const {
     data: venuePlayerPool,
@@ -485,8 +486,8 @@ export default function CreateScrimmage() {
       }
       
       // Map form fields to database schema
-      // Send datetime strings directly without timezone conversion
-      // The datetime is in the league's timezone and should be stored as-is
+      // Send the wall-clock value directly. The server captures the creator's
+      // profile timezone on the scrimmage and interprets this value in it.
       const scrimmageData = {
         title: data.title,
         notes: data.notes,

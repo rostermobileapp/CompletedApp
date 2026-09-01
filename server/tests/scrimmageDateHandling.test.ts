@@ -9,6 +9,7 @@ import {
   addCalendarMonthsInTimezone,
   formatDateInTimezone,
   generateMonthlyRecurrenceDates,
+  hasLeagueLocalDateTimeStarted,
 } from '../dateUtils.js';
 
 describe('desktop schedule scrimmage ordering', () => {
@@ -141,6 +142,23 @@ describe('calendar-month scrimmage recurrence', () => {
         ),
       ),
       ['2026-10-31T20:00:00', '2026-11-30T20:00:00'],
+    );
+  });
+});
+
+describe('league-local scrimmage start guards', () => {
+  test('keeps an Eastern scrimmage joinable until its local wall-clock start time', () => {
+    const scheduledAt = '2026-09-01T16:30:00';
+    const beforeStart = new Date('2026-09-01T20:00:00.000Z');
+    const atStart = new Date('2026-09-01T20:30:00.000Z');
+
+    assert.equal(
+      hasLeagueLocalDateTimeStarted(scheduledAt, 'America/New_York', beforeStart),
+      false,
+    );
+    assert.equal(
+      hasLeagueLocalDateTimeStarted(scheduledAt, 'America/New_York', atStart),
+      true,
     );
   });
 });
