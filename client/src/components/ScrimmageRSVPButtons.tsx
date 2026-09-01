@@ -61,11 +61,14 @@ export function ScrimmageRSVPButtons({ scrimmageId, className, isCreator }: Scri
       queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
       if (!isCreator) fireFirstRsvpTrigger();
       const autoApproved = data?.status === 'approved';
+      const addedToBackup = data?.status === 'backup';
       toast({
-        title: autoApproved ? "You're Confirmed!" : "Request Sent",
+        title: autoApproved ? "You're Confirmed!" : addedToBackup ? "Added to Backup List" : "Request Sent",
         description: autoApproved
           ? "You've been automatically added — spot confirmed!"
-          : "Your request to join this scrimmage has been sent to the creator.",
+          : addedToBackup
+            ? `The roster is full, so you're now backup ${(data?.backupPosition ?? '')}.`
+            : "Your request to join this scrimmage has been sent to the creator.",
       });
     },
     onError: (error: any) => {

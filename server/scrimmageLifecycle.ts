@@ -13,9 +13,11 @@ export function canAcceptFreshScrimmageRequest(
 ): boolean {
   if (status === 'open') return true;
 
+  // Finalized Manual Approval and Pay to Play scrimmages remain open to new
+  // RSVPs. If the approved roster is full, the caller places the request on
+  // the backup queue instead of rejecting the RSVP.
   return (
     status === 'roster_confirmed'
     && resetsPendingRequestsOnFinalize(joinMode)
-    && approvedCount < maxPlayers
   );
 }

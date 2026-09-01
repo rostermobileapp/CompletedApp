@@ -63,7 +63,9 @@ export default function ScrimmageManagement() {
   const [selectedScrimmage, setSelectedScrimmage] = useState<string | null>(null);
   const [viewRosterScrimmage, setViewRosterScrimmage] = useState<string | null>(null);
   const [coHostDialogOpen, setCoHostDialogOpen] = useState<string | null>(null);
+  const [backupDialogOpen, setBackupDialogOpen] = useState<string | null>(null);
   const [selectedCoHostUserId, setSelectedCoHostUserId] = useState<string>('');
+  const [selectedBackupPlayerId, setSelectedBackupPlayerId] = useState<string>('');
   const [coHostPermissions, setCoHostPermissions] = useState({
     canApproveRequests: true,
     canSendReminders: true,
@@ -96,10 +98,11 @@ export default function ScrimmageManagement() {
     enabled: !!selectedScrimmage,
   }) as { data: ScrimmageCoHostWithUser[], isLoading: boolean };
 
-  const selectedScrimmageData = scrimmages.find(s => s.id === coHostDialogOpen);
+  const membersDialogScrimmageId = coHostDialogOpen ?? backupDialogOpen;
+  const selectedScrimmageData = scrimmages.find(s => s.id === membersDialogScrimmageId);
   const { data: leagueMembers = [] } = useQuery({
     queryKey: ['/api/leagues', selectedScrimmageData?.leagueId, 'members'],
-    enabled: !!selectedScrimmageData?.leagueId,
+    enabled: !!membersDialogScrimmageId && !!selectedScrimmageData?.leagueId,
   }) as { data: { user: User; status: string }[] };
 
   // --- Mutations ---
@@ -153,6 +156,23 @@ export default function ScrimmageManagement() {
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to process request', variant: 'destructive' });
+    },
+  });
+
+  const addBackupPlayerMutation = useMutation({
+    mutationFn: async ({ scrimmageId, playerId }: { scrimmageId: string; playerId: string }) => {
+      const response = await apiRequest('POST', `/api/scrimmages/${scrimmageId}/backup-players`, { playerId });
+      return response.json();
+    },
+    onSuccess: (_, { scrimmageId }) => {
+      toast({ title: 'Player Added to Backup', description: 'The player has been added to the end of the backup queue and notified.' });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
+      setBackupDialogOpen(null);
+      setSelectedBackupPlayerId('');
+    },
+    onError: (error: any) => {
+      toast({ title: 'Unable to Add Player', description: error.message || 'Failed to add player to backup queue', variant: 'destructive' });
     },
   });
 
@@ -704,6 +724,80 @@ export default function ScrimmageManagement() {
 
                   {scrimmage.joinMode !== 'first_come' && (
                     <TabsContent value="backup" className="mt-4">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                          <p className="text-sm font-medium">Backup queue</p>
+                          <p className="text-xs text-muted-foreground">Players are promoted in this order when a spot opens.</p>
+                        </div>
+                        {scrimmage.leagueId && (
+                          <Dialog
+                            open={backupDialogOpen === scrimmage.id}
+                            onOpenChange={(open) => {
+                              setBackupDialogOpen(open ? scrimmage.id : null);
+                              if (!open) setSelectedBackupPlayerId('');
+                            }}
+                          >
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="flex-shrink-0">
+                                <UserPlus className="w-4 h-4 mr-1.5" />
+                                Add Player
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Add Player to Backup</DialogTitle>
+                                <DialogDescription>
+                                  Choose an approved league member to add to the end of this scrimmage&apos;s backup queue.
+                                </DialogDescription>
+                              </DialogHeader>
+                              {(() => {
+                                const existingPlayerIds = new Set(requests.map(request => request.playerId));
+                                const backupCandidates = leagueMembers
+                                  .filter(member => member.status === 'approved' && !(member as any).isPlaceholderPlayer)
+                                  .filter(member => !existingPlayerIds.has(member.user.id))
+                                  .sort((a, b) => {
+                                    const aName = `${a.user.firstName ?? ''} ${a.user.lastName ?? ''}`.trim();
+                                    const bName = `${b.user.firstName ?? ''} ${b.user.lastName ?? ''}`.trim();
+                                    return aName.localeCompare(bName);
+                                  });
+                                return backupCandidates.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground py-4">
+                                    All approved league members already have a request or are on this roster.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`backup-player-${scrimmage.id}`}>Player</Label>
+                                      <Select value={selectedBackupPlayerId} onValueChange={setSelectedBackupPlayerId}>
+                                        <SelectTrigger id={`backup-player-${scrimmage.id}`}>
+                                          <SelectValue placeholder="Select a player" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {backupCandidates.map(member => (
+                                            <SelectItem key={member.user.id} value={member.user.id}>
+                                              {`${member.user.firstName ?? ''} ${member.user.lastName ?? ''}`.trim() || member.user.email}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <Button
+                                      className="w-full"
+                                      disabled={!selectedBackupPlayerId || addBackupPlayerMutation.isPending}
+                                      onClick={() => addBackupPlayerMutation.mutate({
+                                        scrimmageId: scrimmage.id,
+                                        playerId: selectedBackupPlayerId,
+                                      })}
+                                    >
+                                      {addBackupPlayerMutation.isPending ? 'Adding...' : 'Add to Backup Queue'}
+                                    </Button>
+                                  </div>
+                                );
+                              })()}
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
                       <ScrollArea className="h-64">
                         {(() => {
                         const allBackups = getBackupRequests(requests);

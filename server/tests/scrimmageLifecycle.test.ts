@@ -12,7 +12,7 @@ describe('scrimmage finalization lifecycle', () => {
     assert.equal(resetsPendingRequestsOnFinalize('first_come'), false);
   });
 
-  test('accepts fresh applications when a finalized manual roster has a vacancy', () => {
+  test('accepts fresh applications for finalized manual/pay rosters, including full rosters', () => {
     assert.equal(
       canAcceptFreshScrimmageRequest('roster_confirmed', 'approval', 11, 12),
       true,
@@ -21,19 +21,23 @@ describe('scrimmage finalization lifecycle', () => {
       canAcceptFreshScrimmageRequest('roster_confirmed', 'first_pay', 11, 12),
       true,
     );
-  });
-
-  test('keeps finalized full rosters and first-come scrimmages closed', () => {
     assert.equal(
       canAcceptFreshScrimmageRequest('roster_confirmed', 'approval', 12, 12),
-      false,
-    );
-    assert.equal(
-      canAcceptFreshScrimmageRequest('roster_confirmed', 'first_pay', 10, 12),
       true,
     );
     assert.equal(
+      canAcceptFreshScrimmageRequest('roster_confirmed', 'first_pay', 12, 12),
+      true,
+    );
+  });
+
+  test('keeps First to RSVP and cancelled scrimmages closed', () => {
+    assert.equal(
       canAcceptFreshScrimmageRequest('roster_confirmed', 'first_come', 11, 12),
+      false,
+    );
+    assert.equal(
+      canAcceptFreshScrimmageRequest('roster_confirmed', 'first_come', 12, 12),
       false,
     );
     assert.equal(

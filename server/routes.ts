@@ -17761,7 +17761,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const acceptedCount = currentRequests.filter(req => req.status === 'approved').length;
 
       if (!isFirstPay && acceptedCount >= scrimmage.maxPlayers) {
-        return res.status(409).json({ message: 'Scrimmage is already at full capacity' });
+        let backupRequestData;
+        try {
+          backupRequestData = insertScrimmageRequestSchema.parse({
+            scrimmageId,
+            playerId: userId,
+            status: 'pending',
+          });
+        } catch (validationError) {
+          console.error('[Scrimmage Request] Backup validation error:', validationError);
+          return res.status(400).json({
+            message: 'Invalid request data',
+            errors: validationError instanceof Error ? validationError.message : 'Validation failed',
+          });
+        }
+
+        const pendingRequest = await storage.createScrimmageRequest(backupRequestData);
+        const backupRequest = await storage.approveAsBackup(pendingRequest.id);
+        // Re-check under the normal promotion lock in case an approved player
+        // withdrew between the capacity read and this backup enqueue.
+        await promoteNextBackup(scrimmageId);
+        const finalRequest =
+          (await storage.getScrimmageRequestById(backupRequest.id)) ?? backupRequest;
+        await createScrimmagePaymentRequestForPlayers(
+          scrimmage,
+          [userId],
+          scrimmage.creatorId,
+          false,
+        );
+        await broadcastScrimmageUpdate(scrimmageId, [userId]);
+
+        if (finalRequest.status === 'backup') try {
+          const player = await storage.getUser(userId);
+          if (player) {
+            const { date: backupDate, time: backupTime } = formatDayAndTime(
+              scrimmage.dateTime,
+              scrimmageTimezone,
+            );
+            await storage.createNotification({
+              userId: player.id,
+              type: 'scrimmage_backup',
+              title: `You're on the backup list — ${scrimmage.title}`,
+              message: `The approved roster is full. You've been added to the backup list for "${scrimmage.title}" on ${backupDate} at ${backupTime}.`,
+              actionUrl: `/scrimmage/${scrimmage.id}`,
+              actionText: 'View Scrimmage',
+              scrimmageId: scrimmage.id,
+            });
+            broadcastNotificationUpdate(player.id);
+            const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+            await sendPushNotificationToUser({
+              userId: player.id,
+              title: `You're on the backup list`,
+              message: `The approved roster is full for "${scrimmage.title}". You've been added as backup #${finalRequest.backupPosition}.`,
+            });
+          }
+        } catch (notificationError) {
+          console.error('[BackupQueue] Failed to notify RSVP backup player:', notificationError);
+        }
+
+        return res.status(201).json(finalRequest);
       }
 
       let requestData;
@@ -18258,6 +18316,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating request status:', error);
       res.status(500).json({ message: 'Failed to update request status' });
+    }
+  });
+
+  // Add a league member directly to the organizer-managed backup queue.
+  // This is intentionally separate from player RSVP: organizers may add a
+  // player who has not submitted a request yet once the roster is full.
+  app.post('/api/scrimmages/:id/backup-players', isAuthenticated, async (req: any, res) => {
+    try {
+      const scrimmageId = req.params.id;
+      const userId = req.user.claims.sub;
+      const playerId = typeof req.body?.playerId === 'string' ? req.body.playerId : '';
+
+      if (!playerId) {
+        return res.status(400).json({ message: 'playerId is required' });
+      }
+
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      if (!scrimmage) {
+        return res.status(404).json({ message: 'Scrimmage not found' });
+      }
+      if (scrimmage.joinMode === 'first_come') {
+        return res.status(409).json({
+          message: 'The backup queue is not available for First to RSVP scrimmages',
+        });
+      }
+      if (scrimmage.status === 'cancelled') {
+        return res.status(409).json({ message: 'Cannot add players to a cancelled scrimmage' });
+      }
+      if (!scrimmage.timeTbd && hasLeagueLocalDateTimeStarted(
+        scrimmage.dateTime,
+        getScrimmageTimezone(scrimmage),
+      )) {
+        return res.status(409).json({ message: 'Cannot add players after the scrimmage has started' });
+      }
+
+      const { canManage, isCoHost, permissions } =
+        await storage.canUserManageScrimmage(scrimmageId, userId);
+      if (!canManage) {
+        return res.status(403).json({ message: 'Only the creator or co-hosts can manage the backup queue' });
+      }
+      if (isCoHost && permissions && !permissions.canApproveRequests) {
+        return res.status(403).json({ message: 'You do not have permission to manage player requests for this scrimmage' });
+      }
+
+      const player = await storage.getUser(playerId);
+      if (!player) {
+        return res.status(404).json({ message: 'Player not found' });
+      }
+      if (scrimmage.leagueId) {
+        const membership = await storage.getUserLeagueMembership(playerId, scrimmage.leagueId);
+        if (!membership || membership.status !== 'approved') {
+          return res.status(409).json({ message: 'Player must be an approved member of this league' });
+        }
+      }
+
+      const existingRequest = await storage.getScrimmageRequest(scrimmageId, playerId);
+      if (existingRequest) {
+        return res.status(409).json({
+          message: existingRequest.status === 'backup'
+            ? 'Player is already on the backup list'
+            : 'Player already has a request for this scrimmage',
+        });
+      }
+
+      const pendingRequest = await storage.createScrimmageRequest(
+        insertScrimmageRequestSchema.parse({
+          scrimmageId,
+          playerId,
+          status: 'pending',
+        }),
+      );
+      const backupRequest = await storage.approveAsBackup(pendingRequest.id);
+      await broadcastScrimmageUpdate(scrimmageId, [playerId]);
+
+      try {
+        const timezone = getScrimmageTimezone(scrimmage);
+        const { date: backupDate, time: backupTime } = formatDayAndTime(scrimmage.dateTime, timezone);
+        await storage.createNotification({
+          userId: player.id,
+          type: 'scrimmage_backup',
+          title: `You're on the backup list — ${scrimmage.title}`,
+          message: `You've been added to the backup list for "${scrimmage.title}" on ${backupDate} at ${backupTime}. You'll be notified if a spot opens up.`,
+          actionUrl: `/scrimmage/${scrimmage.id}`,
+          actionText: 'View Scrimmage',
+          scrimmageId: scrimmage.id,
+        });
+        broadcastNotificationUpdate(player.id);
+        const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+        await sendPushNotificationToUser({
+          userId: player.id,
+          title: `You're on the backup list`,
+          message: `Added to backup #${backupRequest.backupPosition} for "${scrimmage.title}". We'll alert you if a spot opens.`,
+        });
+      } catch (notificationError) {
+        console.error('[BackupQueue] Failed to notify organizer-added backup player:', notificationError);
+      }
+
+      res.status(201).json(backupRequest);
+    } catch (error) {
+      console.error('[BackupQueue] Error adding player directly to backup:', error);
+      res.status(500).json({ message: 'Failed to add player to backup queue' });
     }
   });
 
@@ -22918,6 +23077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const linkedScrimmageId = recipient.paymentRequest.relatedScrimmageId;
         let scrimmageAdmission: 'approved' | 'at_capacity' | null = null;
+        let scrimmageBackupPosition: number | null = null;
         let linkedScrimmage: any = null;
 
         if (linkedScrimmageId && lockedRecipient.userId) {
@@ -22977,6 +23137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   AND status = 'backup'
               `);
               const nextPosition = Number((positionResult.rows[0] as any)?.max_position ?? 0) + 1;
+              scrimmageBackupPosition = nextPosition;
               await tx
                 .update(scrimmageRequests)
                 .set({
@@ -23021,6 +23182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           kind: 'updated' as const,
           updatedRecipient,
           scrimmageAdmission,
+          scrimmageBackupPosition,
           linkedScrimmage,
         };
       });
@@ -23035,7 +23197,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: 'This player is no longer eligible for the scrimmage' });
       }
 
-      const { updatedRecipient, scrimmageAdmission, linkedScrimmage } = confirmation;
+      const {
+        updatedRecipient,
+        scrimmageAdmission,
+        scrimmageBackupPosition,
+        linkedScrimmage,
+      } = confirmation;
       if (scrimmageAdmission === 'approved' && recipient.userId && linkedScrimmage) {
         const timezone = getScrimmageTimezone(linkedScrimmage);
         const { date: approvalDate, time: approvalTime } = formatDayAndTime(linkedScrimmage.dateTime, timezone);
@@ -23059,6 +23226,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
         } catch (notificationError) {
           console.error('[FirstPay] Payment confirmed, but approval notification failed:', notificationError);
+        }
+      } else if (scrimmageAdmission === 'at_capacity' && recipient.userId && linkedScrimmage) {
+        try {
+          await storage.createNotification({
+            userId: recipient.userId,
+            type: 'scrimmage_backup',
+            title: `You're on the backup list — ${linkedScrimmage.title}`,
+            message: `Your payment was confirmed. The approved roster is full, so you're now backup #${scrimmageBackupPosition}.`,
+            actionUrl: `/scrimmage/${linkedScrimmage.id}`,
+            actionText: 'View Scrimmage',
+            scrimmageId: linkedScrimmage.id,
+          });
+          broadcastNotificationUpdate(recipient.userId);
+          const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
+          await sendPushNotificationToUser({
+            userId: recipient.userId,
+            title: `You're on the backup list`,
+            message: `Payment confirmed for "${linkedScrimmage.title}". You're now backup #${scrimmageBackupPosition}.`,
+          });
+        } catch (notificationError) {
+          console.error('[FirstPay] Payment confirmed, but backup notification failed:', notificationError);
         }
       }
 
