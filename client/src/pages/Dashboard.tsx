@@ -3458,7 +3458,7 @@ function DashboardMobile() {
                         </div>
                          {!isPending && (
                            <span
-                             className="text-sm font-semibold text-green-700 dark:text-green-400 flex-shrink-0"
+                             className="text-xs text-white px-2 py-0.5 rounded flex-shrink-0 bg-green-600"
                              data-testid={`text-scrimmage-approved-${scrimmage.id}`}
                            >
                              Approved
