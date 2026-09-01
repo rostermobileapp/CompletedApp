@@ -171,6 +171,34 @@ export default function GameDetails() {
     },
   });
 
+  const cancelScrimmageMutation = useMutation({
+    mutationFn: async () => {
+      if (!gameId) {
+        throw new Error('Scrimmage not found');
+      }
+      const response = await apiRequest('DELETE', `/api/scrimmages/${gameId}`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Scrimmage Cancelled',
+        description: 'Participants and invited players have been notified.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      navigate('/calendar');
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Unable to Cancel Scrimmage',
+        description: error.message || 'Failed to cancel scrimmage.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Derived flags used to gate management hooks below
   const _scrimmageForHooks = (scrimmageData as any)?.scrimmage;
   const _canManageForHooks = !!(scrimmageData as any)?.canManagePlayers ||
@@ -632,6 +660,26 @@ export default function GameDetails() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <h1 className="text-xl font-semibold">Scrimmage Details</h1>
+            {isScrimmageCreator && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm(
+                    'Cancel this scrimmage? This individual event will be cancelled, and all participants and invited players will be notified.',
+                  )) {
+                    cancelScrimmageMutation.mutate();
+                  }
+                }}
+                disabled={cancelScrimmageMutation.isPending}
+                className="ml-auto p-2 text-red-500 hover:bg-red-500/10 hover:text-red-600"
+                aria-label="Cancel scrimmage"
+                title="Cancel scrimmage"
+                data-testid="button-cancel-scrimmage-details"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            )}
           </div>
         </div>
         <div className="px-6 py-6 space-y-6">
