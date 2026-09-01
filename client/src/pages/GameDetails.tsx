@@ -549,7 +549,7 @@ export default function GameDetails() {
               size="sm"
               onClick={() => {
                 setPageTransitionDirection('down');
-                navigate("/calendar");
+                navigate("/");
               }}
               className="p-2"
               data-testid="button-back"
@@ -652,7 +652,7 @@ export default function GameDetails() {
               size="sm"
               onClick={() => {
                 setPageTransitionDirection('down');
-                navigate("/calendar");
+                navigate("/");
               }}
               className="p-2"
               data-testid="button-back-scrimmage"
@@ -1297,11 +1297,7 @@ export default function GameDetails() {
               size="sm"
               onClick={() => {
                 setPageTransitionDirection('down');
-                if (window.history.length > 1) {
-                  window.history.back();
-                } else {
-                  navigate("/");
-                }
+                navigate("/");
               }}
               className="p-2"
               data-testid="button-back"
