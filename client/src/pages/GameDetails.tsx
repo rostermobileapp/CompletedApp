@@ -664,6 +664,18 @@ export default function GameDetails() {
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => navigate(`/edit-scrimmage/${gameId}`)}
+                className="text-primary font-semibold hover:bg-primary/10"
+                aria-label="Edit scrimmage"
+                data-testid="button-edit-scrimmage-details"
+              >
+                Edit
+              </Button>
+            )}
+            {isScrimmageCreator && (
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   if (window.confirm(
                     'Cancel this scrimmage? This individual event will be cancelled, and all participants and invited players will be notified.',
