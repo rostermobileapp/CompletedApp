@@ -17542,7 +17542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Respond immediately after the database work; approval notifications
         // continue outside the transaction to avoid holding locks during
         // network I/O.
-        void broadcastScrimmageUpdate(scrimmageId, [userId]);
+        await broadcastScrimmageUpdate(scrimmageId, [userId]);
         res.status(201).json(request);
 
         // Mirror the same notification side-effects as a manual approval so the
@@ -17624,7 +17624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           scrimmage.creatorId,
           false,
         );
-        void broadcastScrimmageUpdate(scrimmageId, [userId]);
+        await broadcastScrimmageUpdate(scrimmageId, [userId]);
         return res.status(201).json(coHostResult);
       }
 
@@ -17738,7 +17738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('[FirstPay] Payment request created, but push notification failed:', paymentNotificationError);
           }
         }
-        void broadcastScrimmageUpdate(scrimmageId, [userId]);
+        await broadcastScrimmageUpdate(scrimmageId, [userId]);
         return res.status(201).json(firstPayJoin.request);
       }
 
@@ -17749,7 +17749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scrimmage.creatorId,
         false,
       );
-      void broadcastScrimmageUpdate(scrimmageId, [userId]);
+      await broadcastScrimmageUpdate(scrimmageId, [userId]);
       res.status(201).json(request);
     } catch (error) {
       console.error('[Scrimmage Request] Error creating scrimmage request:', error);
@@ -17956,7 +17956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle backup approval separately — no capacity check, auto-assigned position
       if (status === 'backup') {
         const backupRequest = await storage.approveAsBackup(requestId);
-        void broadcastScrimmageUpdate(scrimmage.id, [request.playerId]);
+        await broadcastScrimmageUpdate(scrimmage.id, [request.playerId]);
         // Notify the player they're in the backup queue
         try {
           const player = await storage.getUser(request.playerId);
@@ -18109,7 +18109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      void broadcastScrimmageUpdate(scrimmage.id, [request.playerId]);
+      await broadcastScrimmageUpdate(scrimmage.id, [request.playerId]);
       res.json(updatedRequest);
     } catch (error) {
       console.error('Error updating request status:', error);

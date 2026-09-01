@@ -53,7 +53,12 @@ export function ScrimmageRSVPButtons({ scrimmageId, className, isCreator }: Scri
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", "scrimmage-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/scrimmage-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/scrimmage-invites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scrimmages", scrimmageId, "requests"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${scrimmageId}/approved-players`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
       if (!isCreator) fireFirstRsvpTrigger();
       const autoApproved = data?.status === 'approved';
       toast({
@@ -81,7 +86,12 @@ export function ScrimmageRSVPButtons({ scrimmageId, className, isCreator }: Scri
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users", "scrimmage-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/scrimmage-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/scrimmage-invites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/scrimmages", scrimmageId, "requests"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${scrimmageId}/approved-players`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/games/upcoming"] });
       toast({
         title: "Request Withdrawn",
         description: "Your request has been withdrawn.",

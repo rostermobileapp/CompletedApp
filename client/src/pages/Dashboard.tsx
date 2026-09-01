@@ -2417,9 +2417,13 @@ function DashboardMobile() {
       const res = await apiRequest("POST", `/api/scrimmages/${scrimmageId}/requests`, {});
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, scrimmageId) => {
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmage-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId, 'requests'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${scrimmageId}/approved-players`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
       const autoApproved = data?.status === 'approved';
       toast({
