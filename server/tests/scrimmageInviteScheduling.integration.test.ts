@@ -203,7 +203,7 @@ describe('scrimmage invite visibility', () => {
     assert.equal(ids.has(PARENT_ID), true);
   });
 
-  test('creator receives the approved-player open spot count, but other users do not', async () => {
+  test('all viewers receive the approved-player open spot count', async () => {
     const requestId = randomUUID();
     await db.execute(sql`
       INSERT INTO scrimmage_requests (id, scrimmage_id, player_id, status, approved_at)
@@ -217,7 +217,7 @@ describe('scrimmage invite visibility', () => {
 
       const playerInvites = await storage.getScrimmageInvitesForUser(PLAYER_ID);
       const playerDelivered = playerInvites.find((invite) => invite.id === DELIVERED_ID);
-      assert.equal(playerDelivered && 'openSpots' in playerDelivered, false);
+      assert.equal(playerDelivered?.openSpots, 20);
     } finally {
       await db.execute(sql`DELETE FROM scrimmage_requests WHERE id = ${requestId}`);
     }

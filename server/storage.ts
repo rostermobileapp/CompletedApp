@@ -10265,7 +10265,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(scrimmageRequests).where(eq(scrimmageRequests.id, requestId));
   }
 
-  async getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User } })[]> {
+  async getScrimmageRequestsByPlayer(playerId: string): Promise<(ScrimmageRequest & { scrimmage: Scrimmage & { creator: User; openSpots: number } })[]> {
     const results = await db
       .select()
       .from(scrimmageRequests)
@@ -10274,11 +10274,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scrimmageRequests.playerId, playerId))
       .orderBy(desc(scrimmageRequests.requestedAt));
 
+    const scrimmageIds = Array.from(new Set(results.map((result) => result.scrimmages.id)));
+    const approvedCounts = scrimmageIds.length > 0
+      ? await db
+          .select({
+            scrimmageId: scrimmageRequests.scrimmageId,
+            approvedCount: sql<number>`count(*)`,
+          })
+          .from(scrimmageRequests)
+          .where(and(
+            inArray(scrimmageRequests.scrimmageId, scrimmageIds),
+            eq(scrimmageRequests.status, 'approved'),
+          ))
+          .groupBy(scrimmageRequests.scrimmageId)
+      : [];
+    const approvedCountByScrimmageId = new Map(
+      approvedCounts.map((row) => [row.scrimmageId, Number(row.approvedCount)]),
+    );
+
     return results.map(r => ({
       ...r.scrimmage_requests,
       scrimmage: {
         ...r.scrimmages,
-        creator: r.users
+        creator: r.users,
+        openSpots: Math.max(
+          0,
+          r.scrimmages.maxPlayers - (approvedCountByScrimmageId.get(r.scrimmages.id) ?? 0),
+        ),
       }
     }));
   }
@@ -10403,14 +10425,10 @@ export class DatabaseStorage implements IStorage {
         merged.push({
           ...r.scrimmage,
           creator: r.creator,
-          ...(r.scrimmage.creatorId === userId
-            ? {
-                openSpots: Math.max(
-                  0,
-                  r.scrimmage.maxPlayers - (approvedCountByScrimmageId.get(r.scrimmage.id) ?? 0),
-                ),
-              }
-            : {}),
+          openSpots: Math.max(
+            0,
+            r.scrimmage.maxPlayers - (approvedCountByScrimmageId.get(r.scrimmage.id) ?? 0),
+          ),
         });
       }
     }

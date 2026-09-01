@@ -3354,7 +3354,7 @@ function DashboardMobile() {
                             <span className="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded flex-shrink-0">
                               {isOwnScrimmage ? 'My Scrimmage' : 'Invite'}
                             </span>
-                            {isOwnScrimmage && invite.joinMode === 'first_come' && (
+                             {invite.openSpots !== undefined && (
                               <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-first-come-${invite.id}`}>
                                 {invite.openSpots ?? 0} Open Spots
                               </span>
@@ -3435,6 +3435,11 @@ function DashboardMobile() {
                             <span className={`text-xs text-white px-2 py-0.5 rounded flex-shrink-0 ${isPending ? 'bg-amber-500' : 'bg-orange-500'}`}>
                               {isPending ? 'Pending' : 'Scrimmage'}
                             </span>
+                            {scrimmage.openSpots !== undefined && (
+                              <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-request-open-spots-${scrimmage.id}`}>
+                                {scrimmage.openSpots} Open Spots
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground" data-testid={`text-scrimmage-time-${scrimmage.id}`}>
                             {timeTbd

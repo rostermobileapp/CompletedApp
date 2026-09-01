@@ -245,10 +245,19 @@ async function broadcastTeamEventRsvpUpdate(teamId: string, teamEventId: string)
 
 async function broadcastScrimmageUpdate(scrimmageId: string, additionalUserIds: string[] = []) {
   try {
-    const [scrimmage, requests, coHosts] = await Promise.all([
+    const [scrimmage, requests, coHosts, emailInvites, deliveredInviteNotifications] = await Promise.all([
       storage.getScrimmage(scrimmageId),
       storage.getScrimmageRequests(scrimmageId).catch(() => []),
       storage.getScrimmageCoHosts(scrimmageId).catch(() => []),
+      storage.getScrimmageInvites(scrimmageId).catch(() => []),
+      db
+        .select({ userId: userNotifications.userId })
+        .from(userNotifications)
+        .where(and(
+          eq(userNotifications.scrimmageId, scrimmageId),
+          eq(userNotifications.type, 'scrimmage_invite'),
+        ))
+        .catch(() => []),
     ]);
     if (!scrimmage) return;
     broadcastRealtimeEvent([
@@ -256,6 +265,8 @@ async function broadcastScrimmageUpdate(scrimmageId: string, additionalUserIds: 
       ...(scrimmage.inviteUserIds || []).filter((id: string) => !id.startsWith('placeholder:')),
       ...requests.map((request) => request.playerId),
       ...coHosts.map((coHost) => coHost.userId),
+      ...emailInvites.map((invite) => invite.userId),
+      ...deliveredInviteNotifications.map((notification) => notification.userId),
       ...additionalUserIds,
     ], {
       type: 'scrimmage_update',
@@ -17107,6 +17118,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const wasFreeScrimmage = Number(existingScrimmage.costPerPlayer ?? 0) <= 0;
       const willBePaidScrimmage = Number(updateData.costPerPlayer ?? existingScrimmage.costPerPlayer ?? 0) > 0;
       const updatedScrimmage = await storage.updateScrimmage(scrimmageId, updateData);
+      // Keep schedule/calendar views in sync immediately for the organizer,
+      // invitees, approved players, and co-hosts instead of waiting for polling.
+      void broadcastScrimmageUpdate(scrimmageId);
 
       const previousCost = Number(existingScrimmage.costPerPlayer ?? 0);
       const updatedCost = Number(updatedScrimmage.costPerPlayer ?? 0);
@@ -17340,6 +17354,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await storage.deleteScrimmage(scrimmageId);
           deleted++;
+           broadcastRealtimeEvent(targetUserIds, {
+             type: 'scrimmage_update',
+             scrimmageId,
+           });
 
           // Send cancellation notification to invitees and approved players.
           if (targetUserIds.length > 0) {
@@ -17409,6 +17427,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const scrimmage of seriesScrimmages) {
         await storage.deleteScrimmage(scrimmage.id);
       }
+      broadcastRealtimeEvent(Array.from(allAffectedPlayerIds), {
+        type: 'scrimmage_update',
+        scrimmageId: representative.id,
+      });
 
       // Send a single series-cancellation notification to all affected players: bell + push
       if (allAffectedPlayerIds.size > 0) {
@@ -18889,6 +18911,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Delete the scrimmage (cascades requests + invites)
       await storage.deleteScrimmage(scrimmageId);
+      broadcastRealtimeEvent(targetUserIds, {
+        type: 'scrimmage_update',
+        scrimmageId,
+      });
       
       // Notify all confirmed players: bell notification + OneSignal push
       if (targetUserIds.length > 0) {

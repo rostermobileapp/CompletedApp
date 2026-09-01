@@ -43,6 +43,7 @@ interface MobileCalendarEvent {
   scrimmageId?: string;
   isPending?: boolean;
   timeTbd?: boolean;
+  openSpots?: number;
 }
 
 interface ScheduleCalendarMobileProps {
@@ -181,6 +182,7 @@ export function ScheduleCalendarMobile({
           navigateTo: `/scrimmage/${i.id}`,
           scrimmageId: i.id,
           timeTbd: isScrimmageTimeTbd(i.timeTbd, i.dateTime),
+          openSpots: i.openSpots,
         });
       }
     }
@@ -202,6 +204,7 @@ export function ScheduleCalendarMobile({
           teamAssignment: r.teamAssignment ?? null,
           isPending: r.status === 'pending',
           timeTbd: isScrimmageTimeTbd(s.timeTbd, s.dateTime),
+          openSpots: s.openSpots,
         });
       }
     }
@@ -502,6 +505,11 @@ export function ScheduleCalendarMobile({
                         {ev.kind === 'scrimmage' && !ev.isPending && ev.teamAssignment === 'dark' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-gray-800 text-white">
                             Team Dark
+                          </span>
+                        )}
+                        {(ev.kind === 'invite' || ev.kind === 'scrimmage') && ev.openSpots !== undefined && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-600/15 text-emerald-700 dark:text-emerald-300">
+                            {ev.openSpots} Open Spots
                           </span>
                         )}
                       </div>
