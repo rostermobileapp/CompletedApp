@@ -17381,8 +17381,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         const request = fcResult;
 
-        // Respond immediately; send notifications outside the transaction to
-        // avoid holding locks during network I/O.
+        // Both the invite card and calendar card use this join endpoint. Create
+        // the linked unpaid invoice now so it immediately appears in Payments
+        // under "Requests for Me", rather than waiting until the player marks it
+        // paid or the organizer finalizes the roster.
+        await createScrimmagePaymentRequestForPlayers(
+          scrimmage,
+          [userId],
+          scrimmage.creatorId,
+          false,
+        );
+
+        // Respond immediately after the database work; approval notifications
+        // continue outside the transaction to avoid holding locks during
+        // network I/O.
         void broadcastScrimmageUpdate(scrimmageId, [userId]);
         res.status(201).json(request);
 
@@ -17459,6 +17471,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (coHostResult === 'not_open') {
           return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
         }
+        await createScrimmagePaymentRequestForPlayers(
+          scrimmage,
+          [userId],
+          scrimmage.creatorId,
+          false,
+        );
         void broadcastScrimmageUpdate(scrimmageId, [userId]);
         return res.status(201).json(coHostResult);
       }
@@ -17578,6 +17596,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const request = await storage.createScrimmageRequest(requestData);
+      await createScrimmagePaymentRequestForPlayers(
+        scrimmage,
+        [userId],
+        scrimmage.creatorId,
+        false,
+      );
       void broadcastScrimmageUpdate(scrimmageId, [userId]);
       res.status(201).json(request);
     } catch (error) {
