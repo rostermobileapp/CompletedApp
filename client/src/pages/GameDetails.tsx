@@ -24,6 +24,7 @@ import { useState } from "react";
 import * as React from "react";
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import { getScrimmageCoverSrc } from '@/lib/scrimmageCoverOptions';
+import queueIconUrl from '@assets/image_1788289865365.png';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
@@ -603,7 +604,14 @@ export default function GameDetails() {
 
   // Early return with scrimmage-specific UI if viewing a scrimmage
   if (isScrimmage) {
-    const { scrimmage, approvedPlayers, openSpots, creator: scrimmageCreator, canManagePlayers } = scrimmageData as any;
+    const {
+      scrimmage,
+      approvedPlayers,
+      backupPlayers = [],
+      openSpots,
+      creator: scrimmageCreator,
+      canManagePlayers,
+    } = scrimmageData as any;
     const isScrimmageCreator = scrimmage.creatorId === (user as any)?.id;
     const scrimmageVenmoUrl = resolveVenmoLink(
       scrimmage.venmoLinkOverride,
@@ -1002,6 +1010,50 @@ export default function GameDetails() {
             )}
           </div>
 
+          {/* Backup queue — visible to every invitee who can view the scrimmage */}
+          {scrimmage.joinMode !== 'first_come' && (
+            <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 mt-[8px] pt-[8px] pb-[8px] pl-[8px]" data-testid="scrimmage-backup-queue">
+              <div className="flex items-center gap-2 mb-3">
+                <img
+                  src={queueIconUrl}
+                  alt=""
+                  className="w-5 h-5 object-contain mix-blend-multiply"
+                  aria-hidden="true"
+                />
+                <h3 className="text-lg font-semibold">
+                  Backup Queue ({backupPlayers.length})
+                </h3>
+              </div>
+              {backupPlayers.length > 0 ? (
+                <div className="space-y-2">
+                  {backupPlayers.map((request: ApprovedScrimmagePlayer & { backupPosition?: number | null }) => (
+                    <div
+                      key={request.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border"
+                      data-testid={`backup-player-${request.player?.id || request.id}`}
+                    >
+                      <span className="w-6 text-center font-semibold text-muted-foreground">
+                        {request.backupPosition ?? '—'}
+                      </span>
+                      <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-black dark:text-white text-xs font-semibold">
+                          {request.player?.firstName?.[0] || '?'}{request.player?.lastName?.[0] || ''}
+                        </span>
+                      </div>
+                      <p className="font-medium truncate">
+                        {request.player?.firstName || 'Unknown'} {request.player?.lastName || 'Player'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  No players are waiting in the backup queue.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Creator / co-host management panel */}
           {(isScrimmageCreator || canManagePlayers) && (
             <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6 space-y-4 mt-[8px] pt-[8px] pb-[8px] pr-[8px] pl-[8px]">
@@ -1070,17 +1122,6 @@ export default function GameDetails() {
                               >
                                 <Check className="w-4 h-4" />
                               </button>
-                              {scrimmage.joinMode !== 'first_come' && (
-                                <button
-                                  onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })}
-                                  disabled={manageRequestMutation.isPending}
-                                  className="w-8 h-8 rounded-full border border-amber-500 text-amber-600 flex items-center justify-center hover:bg-amber-500/10 disabled:opacity-50"
-                                  title="Add to backup list"
-                                  aria-label="Add to backup list"
-                                >
-                                  <Clock className="w-4 h-4" />
-                                </button>
-                              )}
                               <button
                                 onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })}
                                 disabled={manageRequestMutation.isPending}
@@ -1089,6 +1130,17 @@ export default function GameDetails() {
                               >
                                 <X className="w-4 h-4" />
                               </button>
+                              {scrimmage.joinMode !== 'first_come' && (
+                                <button
+                                  onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })}
+                                  disabled={manageRequestMutation.isPending}
+                                  className="w-8 h-8 rounded-full border border-amber-500 text-amber-600 flex items-center justify-center hover:bg-amber-500/10 disabled:opacity-50"
+                                  title="Add to backup list"
+                                  aria-label="Add to backup list"
+                                >
+                                  <img src={queueIconUrl} alt="" className="w-4 h-4 object-contain mix-blend-multiply" aria-hidden="true" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}

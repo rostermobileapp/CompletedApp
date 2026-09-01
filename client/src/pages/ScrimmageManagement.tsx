@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import LocationLink from "@/components/LocationLink";
 import { parseScrimmageDateTime } from '@/lib/scrimmageDateTime';
+import queueIconUrl from '@assets/image_1788289865365.png';
 
 const DEFAULT_SCRIMMAGE_COLOR = '#3b82f6';
 
@@ -705,14 +706,14 @@ export default function ScrimmageManagement() {
                                   <Button size="sm" variant="default" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved', teamAssignment: pendingTeamAssignment[request.id] ?? null })} disabled={manageRequestMutation.isPending} title="Approve">
                                     <Check className="w-4 h-4" />
                                   </Button>
-                                  {scrimmage.joinMode !== 'first_come' && (
-                                    <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })} disabled={manageRequestMutation.isPending} title="Add to backup list" className="text-amber-600 border-amber-500 hover:bg-amber-50">
-                                      <Clock className="w-4 h-4" />
-                                    </Button>
-                                  )}
                                   <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })} disabled={manageRequestMutation.isPending} title="Decline">
                                     <X className="w-4 h-4" />
                                   </Button>
+                                  {scrimmage.joinMode !== 'first_come' && (
+                                    <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })} disabled={manageRequestMutation.isPending} title="Add to backup list" className="text-amber-600 border-amber-500 hover:bg-amber-50">
+                                      <img src={queueIconUrl} alt="" className="w-4 h-4 object-contain mix-blend-multiply" aria-hidden="true" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -808,7 +809,7 @@ export default function ScrimmageManagement() {
                         if (allBackups.length === 0) {
                           return (
                             <div className="text-center py-8 text-muted-foreground">
-                              <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                              <img src={queueIconUrl} alt="" className="w-10 h-10 object-contain mx-auto mb-2 mix-blend-multiply opacity-60" aria-hidden="true" />
                               <p className="text-sm">No backup players</p>
                               <p className="text-xs mt-1">Use the clock icon on pending requests to add backups</p>
                             </div>

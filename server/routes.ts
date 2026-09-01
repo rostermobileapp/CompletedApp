@@ -18007,6 +18007,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get only approved requests
       const allRequests = await storage.getScrimmageRequests(scrimmageId);
       const approvedPlayers = allRequests.filter(request => request.status === 'approved');
+      const backupPlayers = allRequests
+        .filter(request => request.status === 'backup')
+        .sort((a, b) => (a.backupPosition ?? Number.MAX_SAFE_INTEGER) - (b.backupPosition ?? Number.MAX_SAFE_INTEGER));
       const openSpots = Math.max(0, scrimmage.maxPlayers - approvedPlayers.length);
 
       // Hydrate the creator so the scrimmage detail UI can render the
@@ -18032,6 +18035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         scrimmage,
         approvedPlayers,
+        backupPlayers,
         openSpots,
         creator,
         canManagePlayers,
