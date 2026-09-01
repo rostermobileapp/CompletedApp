@@ -276,14 +276,18 @@ export default function GameDetails() {
 
   // Approve or decline a pending scrimmage request
   const manageRequestMutation = useMutation({
-    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
+    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' | 'backup' }) => {
       const res = await apiRequest('PUT', `/api/scrimmage-requests/${requestId}/status`, { status, teamAssignment: null });
       return res.json();
     },
     onSuccess: (_, { status }) => {
       toast({
-        title: status === 'approved' ? 'Player approved' : 'Request declined',
-        description: status === 'approved' ? 'Player added to the roster.' : 'Request has been declined.',
+        title: status === 'approved' ? 'Player approved' : status === 'backup' ? 'Added to backup list' : 'Request declined',
+        description: status === 'approved'
+          ? 'Player added to the roster.'
+          : status === 'backup'
+            ? 'Player has been added to the backup queue.'
+            : 'Request has been declined.',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', gameId, 'requests'] });
       queryClient.invalidateQueries({ queryKey: [`/api/scrimmages/${gameId}/approved-players`] });
@@ -1066,6 +1070,17 @@ export default function GameDetails() {
                               >
                                 <Check className="w-4 h-4" />
                               </button>
+                              {scrimmage.joinMode !== 'first_come' && (
+                                <button
+                                  onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })}
+                                  disabled={manageRequestMutation.isPending}
+                                  className="w-8 h-8 rounded-full border border-amber-500 text-amber-600 flex items-center justify-center hover:bg-amber-500/10 disabled:opacity-50"
+                                  title="Add to backup list"
+                                  aria-label="Add to backup list"
+                                >
+                                  <Clock className="w-4 h-4" />
+                                </button>
+                              )}
                               <button
                                 onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })}
                                 disabled={manageRequestMutation.isPending}
