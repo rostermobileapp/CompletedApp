@@ -219,6 +219,7 @@ import {
   type InsertLeagueProGrant,
   type LeagueProSeat,
 } from "@shared/schema";
+import { canAcceptFreshScrimmageRequest } from "./scrimmageLifecycle";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists } from "drizzle-orm";
@@ -9883,17 +9884,27 @@ export class DatabaseStorage implements IStorage {
     return await db.transaction(async (tx) => {
       // Lock the scrimmage row to serialize all concurrent approval attempts.
       const lockResult = await tx.execute(
-        sql`SELECT max_players, status FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
+        sql`SELECT max_players, status, join_mode FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
       );
-      const scrimmageRow = lockResult.rows[0] as { max_players: number; status: string } | undefined;
+      const scrimmageRow = lockResult.rows[0] as { max_players: number; status: string; join_mode: string } | undefined;
       if (!scrimmageRow) throw new Error(`Scrimmage ${scrimmageId} not found`);
-      if (scrimmageRow.status !== 'open') return 'not_open' as const;
 
       // Re-count approved players under the lock.
       const countResult = await tx.execute(
         sql`SELECT COUNT(*) AS cnt FROM scrimmage_requests WHERE scrimmage_id = ${scrimmageId} AND status = 'approved'`
       );
       const approvedCount = parseInt((countResult.rows[0] as { cnt: string }).cnt, 10);
+
+      if (!canAcceptFreshScrimmageRequest(
+        scrimmageRow.status,
+        scrimmageRow.join_mode,
+        approvedCount,
+        scrimmageRow.max_players,
+      )) {
+        return approvedCount >= scrimmageRow.max_players
+          ? 'at_capacity' as const
+          : 'not_open' as const;
+      }
 
       if (approvedCount >= scrimmageRow.max_players) {
         return 'at_capacity' as const;

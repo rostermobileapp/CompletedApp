@@ -8,3 +8,9 @@ Invoice creation, paid-player admission, and roster finalization must serialize 
 **Why:** Independent read-then-write paths can duplicate invoices, bill players excluded from a finalized roster, or approve a paid player after finalization has already taken its roster snapshot.
 
 **How to apply:** Any new path that creates a scrimmage-linked invoice or transitions a request to approved must participate in the shared locking protocol and derive recipients from server-authorized scrimmage state.
+
+Manual Approval and Pay to Play finalization clears all still-pending join applications. A finalized roster may accept a fresh application only after its approved count falls below capacity; First Come remains closed after finalization.
+
+**Why:** Keeping pre-finalization pending rows blocks players from starting a new request after a confirmed player withdraws, while globally reopening a finalized scrimmage would lose the distinction between confirmed and unconfirmed rosters.
+
+**How to apply:** Preserve `roster_confirmed` for schedule visibility. Treat a vacancy as a narrow exception for new Manual Approval/Pay to Play requests and their locked approval/payment transitions, rather than changing the scrimmage back to `open`.

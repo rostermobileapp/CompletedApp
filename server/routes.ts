@@ -116,6 +116,10 @@ import { registerDraftRoutes, canViewDraft, canChatInDraft } from "./draftRoutes
 import { setNotificationBroadcaster } from "./notificationBroadcast";
 import { registerReferralRoutes } from "./referralRoutes";
 import {
+  canAcceptFreshScrimmageRequest,
+  resetsPendingRequestsOnFinalize,
+} from "./scrimmageLifecycle";
+import {
   setDraftBroadcaster,
   subscribeToDraft,
   unsubscribeFromDraft,
@@ -735,6 +739,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         END IF;
       END
       $$
+    `);
+
+    // Repair scrimmages finalized before pending-request cleanup was introduced.
+    // This remains idempotent because only still-pending rows are removed.
+    await db.execute(sql`
+      DELETE FROM scrimmage_requests AS request
+      USING scrimmages AS scrimmage
+      WHERE request.scrimmage_id = scrimmage.id
+        AND request.status = 'pending'
+        AND scrimmage.status = 'roster_confirmed'
+        AND scrimmage.join_mode IN ('approval', 'first_pay')
     `);
 
     console.log('[Init] scrimmages.join_mode column and constraint ensured');
@@ -16105,11 +16120,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // works across server processes and is released automatically.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmage.id}`}))`);
       const [currentScrimmage] = await tx
-        .select({ status: scrimmages.status })
+        .select({
+          status: scrimmages.status,
+          joinMode: scrimmages.joinMode,
+          maxPlayers: scrimmages.maxPlayers,
+        })
         .from(scrimmages)
         .where(eq(scrimmages.id, scrimmage.id))
         .limit(1);
-      if (currentScrimmage?.status !== 'open') {
+      const [{ approvedCount }] = currentScrimmage
+        ? await tx
+            .select({ approvedCount: sql<number>`COUNT(*)::int` })
+            .from(scrimmageRequests)
+            .where(and(
+              eq(scrimmageRequests.scrimmageId, scrimmage.id),
+              eq(scrimmageRequests.status, 'approved'),
+            ))
+        : [{ approvedCount: 0 }];
+      if (
+        !currentScrimmage
+        || !canAcceptFreshScrimmageRequest(
+          currentScrimmage.status,
+          currentScrimmage.joinMode,
+          Number(approvedCount),
+          currentScrimmage.maxPlayers,
+        )
+      ) {
         return {
           paymentRequest: null,
           requestedUserIds: [] as string[],
@@ -17564,8 +17600,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (scrimmage.status === 'cancelled') {
         return res.status(409).json({ message: 'Cannot join cancelled scrimmage' });
       }
+      let requestsAtJoinCheck: Awaited<ReturnType<typeof storage.getScrimmageRequests>> | null = null;
       if (scrimmage.status !== 'open') {
-        return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
+        requestsAtJoinCheck = await storage.getScrimmageRequests(scrimmageId);
+        const approvedCount = requestsAtJoinCheck.filter(
+          (request) => request.status === 'approved',
+        ).length;
+        if (!canAcceptFreshScrimmageRequest(
+          scrimmage.status,
+          scrimmage.joinMode,
+          approvedCount,
+          scrimmage.maxPlayers,
+        )) {
+          return res.status(409).json({ message: 'Cannot join after the scrimmage roster is finalized' });
+        }
       }
       
       if (!(await canUserAccessScrimmage(scrimmage, userId))) {
@@ -17696,7 +17744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Non-co-host, approval-mode: insert a pending request (no capacity concern yet).
-      const currentRequests = await storage.getScrimmageRequests(scrimmageId);
+      const currentRequests = requestsAtJoinCheck ?? await storage.getScrimmageRequests(scrimmageId);
       const acceptedCount = currentRequests.filter(req => req.status === 'approved').length;
 
       if (!isFirstPay && acceptedCount >= scrimmage.maxPlayers) {
@@ -17727,7 +17775,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(scrimmages.id, scrimmageId))
             .limit(1)
             .for('update');
-          if (!currentScrimmage || currentScrimmage.status !== 'open') {
+          if (!currentScrimmage) {
+            return { kind: 'not_open' as const };
+          }
+          const [{ approvedCount }] = await tx
+            .select({ approvedCount: sql<number>`COUNT(*)::int` })
+            .from(scrimmageRequests)
+            .where(and(
+              eq(scrimmageRequests.scrimmageId, scrimmageId),
+              eq(scrimmageRequests.status, 'approved'),
+            ));
+          if (!canAcceptFreshScrimmageRequest(
+            currentScrimmage.status,
+            currentScrimmage.joinMode,
+            Number(approvedCount),
+            currentScrimmage.maxPlayers,
+          )) {
             return { kind: 'not_open' as const };
           }
 
@@ -18648,6 +18711,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { kind: 'no_players' as const };
         }
 
+        const clearedPendingRequests = resetsPendingRequestsOnFinalize(currentScrimmage.joinMode)
+          ? await tx
+              .delete(scrimmageRequests)
+              .where(and(
+                eq(scrimmageRequests.scrimmageId, scrimmageId),
+                eq(scrimmageRequests.status, 'pending'),
+              ))
+              .returning({ playerId: scrimmageRequests.playerId })
+          : [];
+
         let finalizationInvoice: {
           paymentRequest: typeof paymentRequests.$inferSelect;
           requestedUserIds: string[];
@@ -18711,6 +18784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           kind: 'finalized' as const,
           scrimmage: currentScrimmage,
           approvedRequests,
+          clearedPendingPlayerIds: clearedPendingRequests.map((request) => request.playerId),
           finalizationInvoice,
           updatedScrimmage,
         };
@@ -18734,6 +18808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         scrimmage: lockedScrimmage,
         approvedRequests,
+        clearedPendingPlayerIds,
         finalizationInvoice,
         updatedScrimmage,
       } = finalizeResult;
@@ -18786,7 +18861,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      void broadcastScrimmageUpdate(lockedScrimmage.id, approvedRequests.map((request) => request.playerId));
+      void broadcastScrimmageUpdate(
+        lockedScrimmage.id,
+        [
+          ...approvedRequests.map((request) => request.playerId),
+          ...clearedPendingPlayerIds,
+        ],
+      );
       res.json(updatedScrimmage);
     } catch (error) {
       console.error('Error finalizing scrimmage:', error);
@@ -22832,17 +22913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             linkedScrimmage?.joinMode === 'first_pay' &&
             recipient.paymentRequest.creatorId === linkedScrimmage.creatorId &&
             joinRequest.status === 'pending';
-          const canStillAdmit =
-            linkedScrimmage?.status === 'open' &&
-            (
-              linkedScrimmage.timeTbd ||
-              !hasLeagueLocalDateTimeStarted(
-                linkedScrimmage.dateTime,
-                getScrimmageTimezone(linkedScrimmage),
-              )
-            );
-
-          if (shouldHandleFirstPay && canStillAdmit) {
+          if (shouldHandleFirstPay) {
             const countResult = await tx.execute(sql`
               SELECT COUNT(*)::int AS count
               FROM scrimmage_requests
@@ -22850,7 +22921,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 AND status = 'approved'
             `);
             const approvedCount = Number((countResult.rows[0] as any)?.count ?? 0);
-            if (approvedCount >= linkedScrimmage.maxPlayers) {
+            const canProcessAdmission =
+              (
+                linkedScrimmage.status === 'open'
+                || (
+                  linkedScrimmage.status === 'roster_confirmed'
+                  && resetsPendingRequestsOnFinalize(linkedScrimmage.joinMode)
+                )
+              )
+              && (
+                linkedScrimmage.timeTbd
+                || !hasLeagueLocalDateTimeStarted(
+                  linkedScrimmage.dateTime,
+                  getScrimmageTimezone(linkedScrimmage),
+                )
+              );
+            if (canProcessAdmission && approvedCount >= linkedScrimmage.maxPlayers) {
               const positionResult = await tx.execute(sql`
                 SELECT COALESCE(MAX(backup_position), 0)::int AS max_position
                 FROM scrimmage_requests
@@ -22871,7 +22957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   eq(scrimmageRequests.status, 'pending'),
                 ));
               scrimmageAdmission = 'at_capacity';
-            } else {
+            } else if (canProcessAdmission) {
               await tx
                 .update(scrimmageRequests)
                 .set({
