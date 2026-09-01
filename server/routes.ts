@@ -18416,18 +18416,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Unauthorized to delete this request' });
       }
 
-      // Business invariant: 24-hour lockout applies only to self-withdrawals, not manager removals
-      if (request.status === 'approved' && request.playerId === userId && !isManager) {
-        const now = new Date();
-        const hoursUntil = (
-          parseLeagueLocalDateTime(scrimmage.dateTime, getScrimmageTimezone(scrimmage)).getTime() - now.getTime()
-        ) / (1000 * 60 * 60);
-        
-        if (!scrimmage.timeTbd && hoursUntil < 24) {
-          return res.status(409).json({ 
-            message: 'Cannot withdraw from approved scrimmage less than 24 hours before scheduled time' 
-          });
-        }
+      // Players may withdraw at any point before the scrimmage starts.
+      // There is intentionally no 24-hour lockout; keep only the lifecycle
+      // guard so a request cannot be withdrawn after play has begun.
+      if (
+        request.status === 'approved' &&
+        request.playerId === userId &&
+        !isManager &&
+        !scrimmage.timeTbd &&
+        hasLeagueLocalDateTimeStarted(scrimmage.dateTime, getScrimmageTimezone(scrimmage))
+      ) {
+        return res.status(409).json({
+          message: 'Cannot withdraw from a scrimmage that has already started',
+        });
       }
 
       const priorStatus = request.status;
@@ -18458,6 +18459,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
               message: notifMessage,
             });
           } catch (_) {}
+        }
+
+        // Keep the remaining invitees informed as well. This is separate from
+        // the open-spot cascade: invitees should know that the roster changed
+        // even when the scrimmage was not full before the withdrawal.
+        try {
+          const inviteeIds = (await getScrimmageChangeRecipientIds(scrimmage))
+            .filter((recipientId) => recipientId !== userId);
+          const { sendScrimmagePlayerWithdrawalPushNotification } =
+            await import('./oneSignalNotifications');
+          await Promise.allSettled(
+            inviteeIds.map((recipientId) =>
+              sendScrimmagePlayerWithdrawalPushNotification(
+                recipientId,
+                scrimmage.title,
+                notifMessage,
+                scrimmage.id,
+              ),
+            ),
+          );
+        } catch (notifyError) {
+          console.error('[Scrimmage] failed to send withdrawal push notifications:', notifyError);
         }
       }
 

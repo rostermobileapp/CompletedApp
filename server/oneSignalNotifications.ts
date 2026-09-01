@@ -566,6 +566,30 @@ export async function sendScrimmageUpdatePushNotification(
   });
 }
 
+export async function sendScrimmagePlayerWithdrawalPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  message: string,
+  scrimmageId: string,
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `🏒 Player withdrew from ${scrimmageTitle}`,
+    message,
+    data: {
+      type: 'scrimmage_player_withdrawn',
+      scrimmageId,
+    },
+  });
+}
+
 export async function sendTeamAssignmentPushNotification(
   recipientId: string,
   scrimmageTitle: string,
