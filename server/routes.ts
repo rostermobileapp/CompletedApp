@@ -16326,6 +16326,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!completed) {
         return { delivered: false, reason: 'delivery_completion_failed' };
       }
+      // The earlier notification event can arrive while inviteSentAt is still
+      // null. Broadcast the schedule change only after delivery is committed so
+      // Home's refetch can immediately include the invite card.
+      for (const recipientId of recipients) {
+        broadcastScheduleUpdate(recipientId);
+      }
       return { delivered: true, recipientCount: recipients.length, emailCount: emails.length };
     } catch (error) {
       await storage.releaseScrimmageInviteDelivery(scrimmage.id, claimToken);

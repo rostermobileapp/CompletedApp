@@ -8,6 +8,7 @@ import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSi
 import { addCalendarMonthsInTimezone, formatDateInTimezone, formatScrimmageDateTime, formatDayAndTime, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from './dateUtils';
 import { sendBulkScrimmageInvites } from './emails';
 import { isDemoLeague } from './demo';
+import { broadcastNotificationUpdate } from './notificationBroadcast';
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -372,6 +373,13 @@ async function checkAndSendInvitations() {
           const completed = await storage.completeScrimmageInviteDelivery(scrimmage.id, claimToken);
           if (!completed) {
             throw new Error(`Could not complete invite delivery claim for ${scrimmage.id}`);
+          }
+          // Reconcile Home only after inviteSentAt has been committed. Reusing
+          // the notification channel avoids a routes.ts import cycle in this job.
+          for (const member of approvedMembers) {
+            if (member.userId !== scrimmage.creatorId) {
+              broadcastNotificationUpdate(member.userId);
+            }
           }
           console.log(`✅ Sent ${sentCount} invitations for scrimmage ${scrimmage.id}`);
         } catch (deliveryError) {

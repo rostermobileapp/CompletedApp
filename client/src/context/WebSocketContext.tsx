@@ -23,6 +23,7 @@ function invalidateRealtimeQueries() {
   queryClient.invalidateQueries({ queryKey: ['/api/payment-requests/unpaid-count'] });
   queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmage-requests'] });
   queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+  queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
   queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
   queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
   queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
@@ -200,6 +201,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               break;
 
             case 'schedule_update':
+              queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
               queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
               queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
               queryClient.invalidateQueries({ queryKey: ['/api/user/team-events'] });
@@ -280,6 +283,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
               queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread'] });
               queryClient.invalidateQueries({ queryKey: ['/api/user/notification-counts'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/user/games/upcoming'] });
               break;
 
             case 'rsvp_update':
@@ -303,6 +308,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             case 'scrimmage_update':
               queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmage-requests'] });
               queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-requests'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
               queryClient.invalidateQueries({ queryKey: ['/api/users', 'scrimmages'] });
               if (data.scrimmageId) {
                 queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', data.scrimmageId, 'requests'] });
