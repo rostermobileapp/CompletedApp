@@ -3337,7 +3337,7 @@ function DashboardMobile() {
               }).map((invite: any) => (
                 <div 
                   key={`invite-${invite.id}`}
-                  className="rounded-xl border border-yellow-500/50 elev-rest relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer hover:border-yellow-500 transition-colors"
+                  className="rounded-xl border border-yellow-500/50 elev-rest relative pt-[5px] pb-[5px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer hover:border-yellow-500 transition-colors pl-[20px]"
                   style={{ order: getListOrder(`invite-${invite.id}`) }}
                   data-testid={`card-scrimmage-invite-${invite.id}`}
                   onClick={() => {
@@ -3360,7 +3360,7 @@ function DashboardMobile() {
                             </span>
                              {invite.openSpots !== undefined && (
                               <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-first-come-${invite.id}`}>
-                                {invite.openSpots ?? 0} Open Spots
+                                {invite.openSpots > 0 ? `${invite.openSpots} Open Spots` : 'FULL'}
                               </span>
                             )}
                           </div>
@@ -3388,7 +3388,7 @@ function DashboardMobile() {
                             <button
                               onClick={() => scrimmageDeclineMutation.mutate(invite.id)}
                               disabled={scrimmageCheckInMutation.isPending || scrimmageDeclineMutation.isPending}
-                              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm disabled:opacity-50"
+                               className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm disabled:opacity-50 pl-[8px] pr-[8px]"
                               data-testid={`button-rsvp-out-${invite.id}`}
                             >
                               Out
@@ -3441,7 +3441,7 @@ function DashboardMobile() {
                             </span>
                             {scrimmage.openSpots !== undefined && (
                               <span className="text-xs bg-green-600/20 text-green-600 dark:text-green-400 border border-green-600/30 px-2 py-0.5 rounded flex-shrink-0" data-testid={`badge-request-open-spots-${scrimmage.id}`}>
-                                {scrimmage.openSpots} Open Spots
+                                {scrimmage.openSpots > 0 ? `${scrimmage.openSpots} Open Spots` : 'FULL'}
                               </span>
                             )}
                           </div>
