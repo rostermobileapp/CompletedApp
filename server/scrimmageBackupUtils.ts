@@ -44,28 +44,38 @@ export async function promoteNextBackup(scrimmageId: string): Promise<string | u
       return promoted.playerId;
     }
 
-    const timezone = scrimmage.timezone || "America/New_York";
-    const { date, time } = formatDayAndTime(scrimmage.dateTime, timezone);
-    const message = `A player dropped out of "${scrimmage.title}", and you're now approved to play on ${date} at ${time}.`;
+    // Return the successful roster transition immediately so callers can push
+    // the realtime status refresh to the promoted player's home screen.
+    // Notification delivery is best-effort and must never hide a completed
+    // promotion from the caller.
+    void (async () => {
+      try {
+        const timezone = scrimmage.timezone || "America/New_York";
+        const { date, time } = formatDayAndTime(scrimmage.dateTime, timezone);
+        const message = `A player dropped out of "${scrimmage.title}", and you're now approved to play on ${date} at ${time}.`;
 
-    await storage.createNotification({
-      userId: player.id,
-      type: "scrimmage_approved",
-      title: `You're in! ${scrimmage.title}`,
-      message,
-      actionUrl: `/scrimmage/${scrimmageId}`,
-      actionText: "View Scrimmage",
-      scrimmageId,
-    });
-    broadcastNotificationUpdate(player.id);
+        await storage.createNotification({
+          userId: player.id,
+          type: "scrimmage_approved",
+          title: `You're in! ${scrimmage.title}`,
+          message,
+          actionUrl: `/scrimmage/${scrimmageId}`,
+          actionText: "View Scrimmage",
+          scrimmageId,
+        });
+        broadcastNotificationUpdate(player.id);
 
-    const { sendScrimmageBackupPromotionPushNotification } = await import("./oneSignalNotifications");
-    await sendScrimmageBackupPromotionPushNotification(
-      player.id,
-      scrimmage.title,
-      `${date} at ${time}`,
-      scrimmageId,
-    );
+        const { sendScrimmageBackupPromotionPushNotification } = await import("./oneSignalNotifications");
+        await sendScrimmageBackupPromotionPushNotification(
+          player.id,
+          scrimmage.title,
+          `${date} at ${time}`,
+          scrimmageId,
+        );
+      } catch (notificationError) {
+        console.error("[BackupQueue] Promotion notification failed:", notificationError);
+      }
+    })();
 
     console.log(`[BackupQueue] Promoted backup player ${player.id} for scrimmage ${scrimmageId}`);
     return player.id;

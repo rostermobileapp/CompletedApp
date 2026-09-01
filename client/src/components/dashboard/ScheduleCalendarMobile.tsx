@@ -497,6 +497,11 @@ export function ScheduleCalendarMobile({
                             Pending
                           </span>
                         )}
+                        {ev.kind === 'scrimmage' && !ev.isPending && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-green-600 text-white">
+                            Approved
+                          </span>
+                        )}
                         {ev.kind === 'scrimmage' && !ev.isPending && ev.teamAssignment === 'light' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-white text-gray-800 border border-gray-300">
                             Team Light

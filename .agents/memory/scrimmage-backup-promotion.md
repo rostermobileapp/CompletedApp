@@ -10,3 +10,5 @@ Full rosters must continue accepting new RSVPs into the backup queue, including 
 **Why:** The organizer already approved and ranked the backup list. A withdrawal should fill the open roster spot immediately and tell the promoted player that someone dropped out and they are now in.
 
 **How to apply:** Never reject an eligible RSVP solely because the approved roster is full; queue it, preserve ordering, and notify. Show organizer queue controls in every join mode and promote position 1 atomically after a vacancy.
+
+Broadcast the committed promotion to the promoted player before waiting on in-app or push delivery. Notification failures must not suppress the home-screen status refresh.
