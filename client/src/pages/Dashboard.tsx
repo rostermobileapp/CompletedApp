@@ -3337,7 +3337,7 @@ function DashboardMobile() {
               }).map((invite: any) => (
                 <div 
                   key={`invite-${invite.id}`}
-                  className="rounded-xl border border-yellow-500/50 elev-rest relative pt-[5px] pb-[5px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer hover:border-yellow-500 transition-colors pl-[20px]"
+                   className="rounded-xl border border-yellow-500/50 elev-rest relative pt-[5px] pb-[5px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] cursor-pointer hover:border-yellow-500 transition-colors pl-[20px]"
                   style={{ order: getListOrder(`invite-${invite.id}`) }}
                   data-testid={`card-scrimmage-invite-${invite.id}`}
                   onClick={() => {
@@ -3425,7 +3425,7 @@ function DashboardMobile() {
                   return (
                     <div 
                       key={`scrimmage-${scrimmage.id}`}
-                      className={`rounded-xl elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${isPending ? 'border border-amber-500/50' : 'hairline'}`}
+                      className={`rounded-xl elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] ${isPending ? 'border border-amber-500/50' : 'hairline'}`}
                       style={{ order: getListOrder(`scrimmage-${scrimmage.id}`) }}
                       onClick={() => navigate(`/scrimmage/${scrimmage.id}`)}
                       data-testid={`card-scrimmage-${scrimmage.id}`}
@@ -3491,7 +3491,7 @@ function DashboardMobile() {
                       }}
                     >
                       <div 
-                        className="rounded-xl border border-green-200 dark:border-green-800 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]"
+                        className="rounded-xl border border-green-200 dark:border-green-800 elev-rest p-4 relative pt-[5px] pb-[5px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121]"
                         data-testid={`card-reminder-${reminder.id}`}
                       >
                       <div className="flex items-center gap-4">
@@ -3543,7 +3543,7 @@ function DashboardMobile() {
                 .map((event: any) => (
                   <div 
                     key={`team-event-${event.id}`}
-                    className={`rounded-xl border elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] ${
+                    className={`rounded-xl border elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] ${
                       event.eventType === 'scrimmage' 
                         ? 'border-orange-200 dark:border-orange-800' 
                         : 'border-blue-200 dark:border-blue-800'
@@ -3620,7 +3620,7 @@ function DashboardMobile() {
                 .map((tournament: any) => (
                 <div 
                   key={`bracket-${tournament.id}`}
-                  className="rounded-xl hairline p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
+                  className="rounded-xl hairline p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121] bracket-glow"
                   style={{ order: sortableListEvents.length }}
                   onClick={() => navigate(`/tournaments/${tournament.id}?tab=bracket&readonly=true`)}
                   data-testid={`card-bracket-${tournament.id}`}
@@ -3689,7 +3689,7 @@ function DashboardMobile() {
                 .slice(0, 5).map((game: any) => (
                 <div 
                   key={game.id} 
-                  className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[20px] bg-[#e2e2e2] dark:bg-[#212121]" 
+                   className="rounded-xl hairline elev-rest p-4 relative cursor-pointer hover:bg-muted/50 transition-colors pt-[5px] pb-[5px] pl-[20px] pr-[4px] bg-[#e2e2e2] dark:bg-[#212121]"
                   style={{ order: getListOrder(`game-${game.id}`) }}
                   onClick={() => navigate(`/game/${game.id}`)}
                   data-testid={`card-game-${game.id}`}
