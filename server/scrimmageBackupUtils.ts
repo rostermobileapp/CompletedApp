@@ -18,6 +18,64 @@ import { isDemoLeague } from "./demo";
 export const BACKUP_CASCADE_CUTOFF_MINUTES = 60;
 
 /**
+ * Promote the first organizer-approved backup into an open roster spot and
+ * notify them immediately. The promotion itself is atomic; notification
+ * failures must not undo the roster change.
+ */
+export async function promoteNextBackup(scrimmageId: string): Promise<string | undefined> {
+  try {
+    const scrimmage = await storage.getScrimmage(scrimmageId);
+    if (!scrimmage || scrimmage.status === "cancelled") return;
+    if (
+      !scrimmage.timeTbd &&
+      parseLeagueLocalDateTime(scrimmage.dateTime, scrimmage.timezone || "America/New_York").getTime() <= Date.now()
+    ) {
+      console.log(`[BackupQueue] Skipping promotion — scrimmage ${scrimmageId} has already started`);
+      return;
+    }
+    if (await isDemoLeague(scrimmage.leagueId)) return;
+
+    const promoted = await storage.promoteNextBackupAtomically(scrimmageId);
+    if (!promoted) return;
+
+    const player = await storage.getUser(promoted.playerId);
+    if (!player) {
+      console.error(`[BackupQueue] Promoted backup ${promoted.id} has no user record`);
+      return promoted.playerId;
+    }
+
+    const timezone = scrimmage.timezone || "America/New_York";
+    const { date, time } = formatDayAndTime(scrimmage.dateTime, timezone);
+    const message = `A player dropped out of "${scrimmage.title}", and you're now approved to play on ${date} at ${time}.`;
+
+    await storage.createNotification({
+      userId: player.id,
+      type: "scrimmage_approved",
+      title: `You're in! ${scrimmage.title}`,
+      message,
+      actionUrl: `/scrimmage/${scrimmageId}`,
+      actionText: "View Scrimmage",
+      scrimmageId,
+    });
+    broadcastNotificationUpdate(player.id);
+
+    const { sendScrimmageBackupPromotionPushNotification } = await import("./oneSignalNotifications");
+    await sendScrimmageBackupPromotionPushNotification(
+      player.id,
+      scrimmage.title,
+      `${date} at ${time}`,
+      scrimmageId,
+    );
+
+    console.log(`[BackupQueue] Promoted backup player ${player.id} for scrimmage ${scrimmageId}`);
+    return player.id;
+  } catch (err) {
+    console.error("[BackupQueue] promoteNextBackup error:", err);
+    return undefined;
+  }
+}
+
+/**
  * Find the next unnotified backup for a scrimmage and send them an open-spot
  * push + in-app notification. Safe to call when the queue is empty (no-op).
  */
@@ -29,6 +87,10 @@ export async function notifyNextBackup(scrimmageId: string): Promise<void> {
     const scrimmage = await storage.getScrimmage(scrimmageId);
     if (!scrimmage) return;
     if (await isDemoLeague(scrimmage.leagueId)) return;
+    if (scrimmage.joinMode === "first_come") {
+      console.log(`[BackupQueue] Skipping notification — scrimmage ${scrimmageId} uses First to RSVP`);
+      return;
+    }
     if (scrimmage.timeTbd) {
       console.log(`[BackupQueue] Skipping cascade — scrimmage ${scrimmageId} has no confirmed time`);
       return;

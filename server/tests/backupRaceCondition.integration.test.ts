@@ -3,8 +3,9 @@
  *
  * These tests hit the real database (same DATABASE_URL used by the app) and
  * verify that the production storage methods — acceptBackupAtomically,
- * resolveBackupResponse, and claimAndNotifyNextBackup — behave correctly
- * under concurrent load and edge cases.
+ * promoteNextBackupAtomically, resolveBackupResponse, and
+ * claimAndNotifyNextBackup — behave correctly under concurrent load and edge
+ * cases.
  *
  * Run with:
  *   npx tsx --test server/tests/backupRaceCondition.integration.test.ts
@@ -199,7 +200,91 @@ describe('acceptBackupAtomically — race condition', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Decline path — resolveBackupResponse(id, false)
+// 4. Automatic promotion after an approved player withdraws
+// ---------------------------------------------------------------------------
+describe('promoteNextBackupAtomically — ordered automatic promotion', () => {
+  test('promotes only the first backup when exactly one vacancy exists', async () => {
+    await db.execute(sql`UPDATE scrimmages SET max_players = 2 WHERE id = ${SCRIM}`);
+
+    try {
+      await db.execute(sql`
+        UPDATE scrimmage_requests
+        SET status = 'dismissed',
+            backup_position = NULL,
+            backup_notified_at = NULL,
+            approved_at = NULL,
+            dismissed_at = NOW()
+        WHERE scrimmage_id = ${SCRIM}
+      `);
+      await db.execute(sql`
+        INSERT INTO scrimmage_requests
+          (scrimmage_id, player_id, status, approved_at, requested_at)
+        VALUES (${SCRIM}, ${UID_C}, 'approved', NOW(), NOW())
+        ON CONFLICT (scrimmage_id, player_id) DO UPDATE
+          SET status = 'approved',
+              approved_at = NOW(),
+              dismissed_at = NULL,
+              backup_position = NULL,
+              backup_notified_at = NULL
+      `);
+      await insertBackupRequest(UID_A, 2, null);
+      await insertBackupRequest(UID_B, 1, null);
+
+      const results = await Promise.all([
+        storage.promoteNextBackupAtomically(SCRIM),
+        storage.promoteNextBackupAtomically(SCRIM),
+      ]);
+      const promotions = results.filter(
+        (result): result is NonNullable<typeof result> => result != null,
+      );
+
+      assert.equal(promotions.length, 1, 'Only one backup may consume one vacancy');
+      assert.equal(promotions[0].playerId, UID_B, 'Lowest backup position must be promoted first');
+      assert.equal(promotions[0].status, 'approved');
+      assert.equal(promotions[0].backupPosition, null);
+
+      const queueRows = await db.execute(sql`
+        SELECT player_id, status, backup_position
+        FROM scrimmage_requests
+        WHERE scrimmage_id = ${SCRIM}
+          AND player_id IN (${UID_A}, ${UID_B})
+      `);
+      const playerA = queueRows.rows.find((row: any) => row.player_id === UID_A) as any;
+      assert.equal(playerA.status, 'backup', 'Second backup must remain queued');
+      assert.equal(playerA.backup_position, 2);
+    } finally {
+      await db.execute(sql`UPDATE scrimmages SET max_players = 1 WHERE id = ${SCRIM}`);
+    }
+  });
+
+  test('does not promote backups for First to RSVP scrimmages', async () => {
+    await db.execute(sql`
+      UPDATE scrimmages SET join_mode = 'first_come' WHERE id = ${SCRIM}
+    `);
+
+    try {
+      await db.execute(sql`
+        UPDATE scrimmage_requests
+        SET status = 'dismissed', backup_position = NULL,
+            backup_notified_at = NULL, approved_at = NULL, dismissed_at = NOW()
+        WHERE scrimmage_id = ${SCRIM}
+      `);
+      const requestId = await insertBackupRequest(UID_A, 1, null);
+
+      const promoted = await storage.promoteNextBackupAtomically(SCRIM);
+
+      assert.equal(promoted, undefined);
+      assert.equal((await storage.getScrimmageRequestById(requestId))?.status, 'backup');
+    } finally {
+      await db.execute(sql`
+        UPDATE scrimmages SET join_mode = 'approval' WHERE id = ${SCRIM}
+      `);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Decline path — resolveBackupResponse(id, false)
 // ---------------------------------------------------------------------------
 describe('resolveBackupResponse — decline', () => {
   test('sets status to dismissed and clears backupPosition', async () => {
@@ -222,7 +307,7 @@ describe('resolveBackupResponse — decline', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. resolveBackupResponse — no-op when row is already resolved
+// 6. resolveBackupResponse — no-op when row is already resolved
 // ---------------------------------------------------------------------------
 describe('resolveBackupResponse — already resolved (zero-row case)', () => {
   test('returns undefined without throwing when the row is not in backup status', async () => {
@@ -246,7 +331,7 @@ describe('resolveBackupResponse — already resolved (zero-row case)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. claimAndNotifyNextBackup — atomic single-claim guarantee
+// 7. claimAndNotifyNextBackup — atomic single-claim guarantee
 //
 // FOR UPDATE SKIP LOCKED ensures that when two concurrent transactions race
 // for the SAME eligible row, only one wins.  We verify this by having a
@@ -321,7 +406,7 @@ describe('claimAndNotifyNextBackup — exactly one row stamped per eligible row'
 });
 
 // ---------------------------------------------------------------------------
-// 7. Organiser count integrity — approved count after race
+// 8. Organiser count integrity — approved count after race
 // ---------------------------------------------------------------------------
 describe('organiser view — approved count after concurrent accepts', () => {
   test('approved count never exceeds maxPlayers after concurrent accepts', async () => {

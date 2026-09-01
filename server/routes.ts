@@ -315,8 +315,8 @@ async function broadcastScheduleUpdateToTeam(teamId: string) {
 }
 
 // Import backup utility (exported for use in scrimmageReminderJob without importing all of routes.ts)
-import { notifyNextBackup } from './scrimmageBackupUtils';
-export { notifyNextBackup } from './scrimmageBackupUtils';
+import { notifyNextBackup, promoteNextBackup } from './scrimmageBackupUtils';
+export { notifyNextBackup, promoteNextBackup } from './scrimmageBackupUtils';
 
 // In-memory map of subscribed users per tournament (tournamentId -> Set<userId>)
 const tournamentSubscribers = new Map<string, Set<string>>();
@@ -750,6 +750,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         AND request.status = 'pending'
         AND scrimmage.status = 'roster_confirmed'
         AND scrimmage.join_mode IN ('approval', 'first_pay')
+    `);
+    // First to RSVP scrimmages never support a backup queue. Dismiss any
+    // legacy rows created before that rule was enforced.
+    await db.execute(sql`
+      UPDATE scrimmage_requests AS request
+      SET status = 'dismissed',
+          backup_position = NULL,
+          backup_notified_at = NULL,
+          dismissed_at = COALESCE(request.dismissed_at, NOW())
+      FROM scrimmages AS scrimmage
+      WHERE request.scrimmage_id = scrimmage.id
+        AND request.status = 'backup'
+        AND scrimmage.join_mode = 'first_come'
     `);
 
     console.log('[Init] scrimmages.join_mode column and constraint ensured');
@@ -18056,6 +18069,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isCoHost && permissions && !permissions.canApproveRequests) {
         return res.status(403).json({ message: 'You do not have permission to approve requests for this scrimmage' });
       }
+
+      if (status === 'backup' && scrimmage.joinMode === 'first_come') {
+        return res.status(409).json({
+          message: 'The backup queue is not available for First to RSVP scrimmages',
+        });
+      }
       
       // Business invariant: Cannot approve requests for scrimmages that have passed.
       if (!scrimmage.timeTbd && (status === 'approved' || status === 'backup')) {
@@ -18346,6 +18365,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!canManage || (isCoHost && permissions && !permissions.canApproveRequests)) {
         return res.status(403).json({ message: 'Not authorized to manage this scrimmage' });
       }
+      const managedScrimmage = await storage.getScrimmage(authorizedScrimmageId);
+      if (managedScrimmage?.joinMode === 'first_come') {
+        return res.status(409).json({
+          message: 'The backup queue is not available for First to RSVP scrimmages',
+        });
+      }
       // Ensure every request is an active backup (status=backup AND backupPosition not null)
       for (const rec of requestRecords) {
         if (rec!.status !== 'backup') {
@@ -18398,6 +18423,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const scrimmage = await storage.getScrimmage(request.scrimmageId);
       if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
+      if (scrimmage.joinMode === 'first_come') {
+        return res.status(409).json({
+          message: 'The backup queue is not available for First to RSVP scrimmages',
+        });
+      }
 
       // Guard: reject any acceptance or decline response after the scrimmage has started.
       if (!scrimmage.timeTbd) {
@@ -18568,9 +18598,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('[Scrimmage] open-spot invite notifications failed:', err)
           );
         }
-        notifyNextBackup(request.scrimmageId).catch(err =>
-          console.error('[BackupQueue] cascade after removal:', err)
-        );
+        void (async () => {
+          const promotedPlayerId = await promoteNextBackup(request.scrimmageId);
+          if (promotedPlayerId) {
+            await broadcastScrimmageUpdate(request.scrimmageId, [promotedPlayerId]);
+          }
+        })().catch(err => console.error('[BackupQueue] promotion after removal:', err));
       }
 
       void broadcastScrimmageUpdate(request.scrimmageId, [request.playerId]);

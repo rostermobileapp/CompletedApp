@@ -633,10 +633,12 @@ export default function ScrimmageManagement() {
                 </div>
               ) : (
                 <Tabs defaultValue="pending" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className={`grid w-full ${scrimmage.joinMode === 'first_come' ? 'grid-cols-3' : 'grid-cols-4'}`}>
                     <TabsTrigger value="pending">Pending ({getPendingRequests(requests).length})</TabsTrigger>
                     <TabsTrigger value="approved">Approved ({getApprovedRequests(requests).length})</TabsTrigger>
-                    <TabsTrigger value="backup">Backup ({getBackupRequests(requests).length})</TabsTrigger>
+                    {scrimmage.joinMode !== 'first_come' && (
+                      <TabsTrigger value="backup">Backup ({getBackupRequests(requests).length})</TabsTrigger>
+                    )}
                     <TabsTrigger value="cohosts"><Shield className="w-3 h-3 mr-1" />Co-Hosts ({coHosts.length})</TabsTrigger>
                   </TabsList>
 
@@ -683,9 +685,11 @@ export default function ScrimmageManagement() {
                                   <Button size="sm" variant="default" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'approved', teamAssignment: pendingTeamAssignment[request.id] ?? null })} disabled={manageRequestMutation.isPending} title="Approve">
                                     <Check className="w-4 h-4" />
                                   </Button>
-                                  <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })} disabled={manageRequestMutation.isPending} title="Add to backup list" className="text-amber-600 border-amber-500 hover:bg-amber-50">
-                                    <Clock className="w-4 h-4" />
-                                  </Button>
+                                  {scrimmage.joinMode !== 'first_come' && (
+                                    <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'backup' })} disabled={manageRequestMutation.isPending} title="Add to backup list" className="text-amber-600 border-amber-500 hover:bg-amber-50">
+                                      <Clock className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                   <Button size="sm" variant="outline" onClick={() => manageRequestMutation.mutate({ requestId: request.id, status: 'dismissed' })} disabled={manageRequestMutation.isPending} title="Decline">
                                     <X className="w-4 h-4" />
                                   </Button>
@@ -698,9 +702,10 @@ export default function ScrimmageManagement() {
                     </ScrollArea>
                   </TabsContent>
 
-                  <TabsContent value="backup" className="mt-4">
-                    <ScrollArea className="h-64">
-                      {(() => {
+                  {scrimmage.joinMode !== 'first_come' && (
+                    <TabsContent value="backup" className="mt-4">
+                      <ScrollArea className="h-64">
+                        {(() => {
                         const allBackups = getBackupRequests(requests);
                         // Split into active queue (position set) and timed-out/dequeued (position null)
                         const activeBackups = allBackups.filter(r => (r as any).backupPosition != null);
@@ -791,9 +796,10 @@ export default function ScrimmageManagement() {
                             )}
                           </div>
                         );
-                      })()}
-                    </ScrollArea>
-                  </TabsContent>
+                        })()}
+                      </ScrollArea>
+                    </TabsContent>
+                  )}
 
                   <TabsContent value="approved" className="mt-4">
                     <ScrollArea className="h-64">

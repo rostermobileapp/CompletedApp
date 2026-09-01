@@ -540,6 +540,31 @@ export async function sendScrimmageApprovalPushNotification(
   });
 }
 
+export async function sendScrimmageBackupPromotionPushNotification(
+  recipientId: string,
+  scrimmageTitle: string,
+  dateTime: string,
+  scrimmageId: string,
+): Promise<boolean> {
+  const prefs = await storage.getNotificationPreferences(recipientId);
+  const settings = prefs?.notificationSettings as Record<string, boolean> | undefined;
+  if (settings?.scrimmageInvites === false) {
+    console.log(`[OneSignal] Scrimmage notifications disabled for user ${recipientId}`);
+    return false;
+  }
+
+  return sendPushNotificationToUser({
+    userId: recipientId,
+    title: `✅ You're in! ${scrimmageTitle}`,
+    message: `A player dropped out, and you're now approved to play on ${dateTime}.`,
+    data: {
+      type: 'scrimmage_approved',
+      scrimmageId,
+      source: 'backup_promotion',
+    },
+  });
+}
+
 export async function sendScrimmageUpdatePushNotification(
   recipientId: string,
   scrimmageTitle: string,

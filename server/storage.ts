@@ -622,6 +622,7 @@ export interface IStorage {
   getScrimmageRequestById(requestId: string): Promise<ScrimmageRequest | undefined>;
   approveAsBackup(requestId: string): Promise<ScrimmageRequest>;
   reorderBackupQueue(positions: { requestId: string; position: number }[]): Promise<void>;
+  promoteNextBackupAtomically(scrimmageId: string): Promise<ScrimmageRequest | undefined>;
   claimAndNotifyNextBackup(scrimmageId: string): Promise<ScrimmageRequest | undefined>;
   getNextUnnotifiedBackup(scrimmageId: string): Promise<ScrimmageRequest | undefined>;
   markBackupNotified(requestId: string): Promise<ScrimmageRequest>;
@@ -10046,9 +10047,16 @@ export class DatabaseStorage implements IStorage {
       if (!request) throw new Error('Request not found');
 
       // Lock the parent scrimmage row — serialises all concurrent enqueues for this scrimmage
-      await tx.execute(
-        sql`SELECT id FROM scrimmages WHERE id = ${request.scrimmageId} FOR UPDATE`
+      const scrimmageResult = await tx.execute(
+        sql`SELECT id, join_mode FROM scrimmages WHERE id = ${request.scrimmageId} FOR UPDATE`
       );
+      const scrimmageRow = scrimmageResult.rows[0] as
+        | { id: string; join_mode: string }
+        | undefined;
+      if (!scrimmageRow) throw new Error('Scrimmage not found');
+      if (scrimmageRow.join_mode === 'first_come') {
+        throw new Error('Backup queue is not available for First to RSVP scrimmages');
+      }
 
       // Safe to compute MAX(position) now that we hold the scrimmage lock
       const existing = await tx
@@ -10087,6 +10095,64 @@ export class DatabaseStorage implements IStorage {
           eq(scrimmageRequests.status, 'backup')
         ));
     }
+  }
+
+  /**
+   * Promote the first active backup into an approved roster spot.
+   * The scrimmage row lock serializes this with every other approved-player
+   * transition, so concurrent withdrawals can only consume real vacancies.
+   */
+  async promoteNextBackupAtomically(scrimmageId: string): Promise<ScrimmageRequest | undefined> {
+    return db.transaction(async (tx) => {
+      const scrimmageResult = await tx.execute(
+        sql`SELECT max_players, status, join_mode FROM scrimmages WHERE id = ${scrimmageId} FOR UPDATE`
+      );
+      const scrimmageRow = scrimmageResult.rows[0] as
+        | { max_players: number; status: string; join_mode: string }
+        | undefined;
+      if (
+        !scrimmageRow ||
+        scrimmageRow.status === 'cancelled' ||
+        scrimmageRow.join_mode === 'first_come'
+      ) return undefined;
+
+      const [{ count: approvedCount }] = await tx
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(scrimmageRequests)
+        .where(and(
+          eq(scrimmageRequests.scrimmageId, scrimmageId),
+          eq(scrimmageRequests.status, 'approved'),
+        ));
+      if (approvedCount >= scrimmageRow.max_players) return undefined;
+
+      const [nextBackup] = await tx
+        .select({ id: scrimmageRequests.id })
+        .from(scrimmageRequests)
+        .where(and(
+          eq(scrimmageRequests.scrimmageId, scrimmageId),
+          eq(scrimmageRequests.status, 'backup'),
+          sql`${scrimmageRequests.backupPosition} IS NOT NULL`,
+        ))
+        .orderBy(asc(scrimmageRequests.backupPosition))
+        .limit(1)
+        .for('update');
+      if (!nextBackup) return undefined;
+
+      const [promoted] = await tx
+        .update(scrimmageRequests)
+        .set({
+          status: 'approved',
+          approvedAt: new Date(),
+          backupPosition: null,
+          backupNotifiedAt: null,
+        })
+        .where(and(
+          eq(scrimmageRequests.id, nextBackup.id),
+          eq(scrimmageRequests.status, 'backup'),
+        ))
+        .returning();
+      return promoted;
+    });
   }
 
   /**
