@@ -16110,9 +16110,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   /**
-   * Create the payment request for approved scrimmage players that do not
-   * already have one. This is shared by finalization and by edits that add a
-   * cost after the scrimmage was created.
+   * Keep one payment request per scrimmage and add newly eligible players as
+   * recipients. This is shared by join-time billing, manual sends, and the
+   * finalization fallback.
    */
   const createScrimmagePaymentRequestForPlayers = async (
     scrimmage: any,
@@ -16150,62 +16150,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
               eq(scrimmageRequests.status, 'approved'),
             ))
         : [{ approvedCount: 0 }];
-      if (
-        !currentScrimmage
-        || !canAcceptFreshScrimmageRequest(
-          currentScrimmage.status,
-          currentScrimmage.joinMode,
-          Number(approvedCount),
-          currentScrimmage.maxPlayers,
-        )
-      ) {
+      const linkedPaymentRequests = await tx
+        .select()
+        .from(paymentRequests)
+        .where(eq(paymentRequests.relatedScrimmageId, scrimmage.id))
+        .orderBy(paymentRequests.createdAt)
+        .for('update');
+
+      const canAddRecipients = !!currentScrimmage && canAcceptFreshScrimmageRequest(
+        currentScrimmage.status,
+        currentScrimmage.joinMode,
+        Number(approvedCount),
+        currentScrimmage.maxPlayers,
+      );
+      let canonicalPaymentRequest = linkedPaymentRequests[0] ?? null;
+      if (!canonicalPaymentRequest && !canAddRecipients) {
         return {
           paymentRequest: null,
           requestedUserIds: [] as string[],
           blockedReason: 'not_open' as const,
         };
       }
+      if (!canonicalPaymentRequest) {
+        [canonicalPaymentRequest] = await tx
+          .insert(paymentRequests)
+          .values({
+            creatorId,
+            title: `Payment for ${scrimmage.title}`,
+            description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
+            amountPerPerson: String(scrimmage.costPerPlayer),
+            relatedScrimmageId: scrimmage.id,
+            deadline: null,
+            notes: null,
+            venmoLinkOverride: scrimmage.venmoLinkOverride,
+            cashappLinkOverride: scrimmage.cashappLinkOverride,
+            relatedConversationId: null,
+          })
+          .returning();
+      }
 
-      const existingRecipients = await tx
-        .select({ userId: paymentRequestRecipients.userId })
-        .from(paymentRequestRecipients)
-        .innerJoin(paymentRequests, eq(paymentRequestRecipients.paymentRequestId, paymentRequests.id))
-        .where(and(
-          eq(paymentRequests.relatedScrimmageId, scrimmage.id),
-          isNotNull(paymentRequestRecipients.userId),
-        ));
+      const linkedPaymentRequestIds = linkedPaymentRequests.map((request) => request.id);
+      const existingRecipientRows = linkedPaymentRequestIds.length > 0
+        ? await tx
+            .select()
+            .from(paymentRequestRecipients)
+            .where(inArray(paymentRequestRecipients.paymentRequestId, linkedPaymentRequestIds))
+            .for('update')
+        : [];
+
+      // Older versions created one request per player/batch. Merge those rows
+      // into the oldest request so organizers immediately get the same grouped
+      // recipient view as a manual payment request.
+      const canonicalRecipientsByKey = new Map<string, typeof paymentRequestRecipients.$inferSelect>();
+      const recipientKey = (recipient: typeof paymentRequestRecipients.$inferSelect) =>
+        recipient.userId ? `user:${recipient.userId}` : `placeholder:${recipient.placeholderPlayerId}`;
+
+      for (const recipient of existingRecipientRows.filter(
+        (item) => item.paymentRequestId === canonicalPaymentRequest.id,
+      )) {
+        canonicalRecipientsByKey.set(recipientKey(recipient), recipient);
+      }
+
+      for (const recipient of existingRecipientRows.filter(
+        (item) => item.paymentRequestId !== canonicalPaymentRequest.id,
+      )) {
+        const key = recipientKey(recipient);
+        const canonicalRecipient = canonicalRecipientsByKey.get(key);
+        if (!canonicalRecipient) {
+          const [movedRecipient] = await tx
+            .update(paymentRequestRecipients)
+            .set({ paymentRequestId: canonicalPaymentRequest.id, updatedAt: new Date() })
+            .where(eq(paymentRequestRecipients.id, recipient.id))
+            .returning();
+          canonicalRecipientsByKey.set(key, movedRecipient);
+          continue;
+        }
+
+        const mergedIsPaid = canonicalRecipient.isPaid || recipient.isPaid;
+        const mergedIsConfirmed = canonicalRecipient.isConfirmed || recipient.isConfirmed;
+        const [mergedRecipient] = await tx
+          .update(paymentRequestRecipients)
+          .set({
+            isPaid: mergedIsPaid,
+            paymentMethod: canonicalRecipient.isPaid
+              ? canonicalRecipient.paymentMethod
+              : recipient.paymentMethod,
+            paidAt: canonicalRecipient.paidAt ?? recipient.paidAt,
+            isConfirmed: mergedIsConfirmed,
+            confirmedAt: canonicalRecipient.confirmedAt ?? recipient.confirmedAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentRequestRecipients.id, canonicalRecipient.id))
+          .returning();
+        canonicalRecipientsByKey.set(key, mergedRecipient);
+        await tx
+          .delete(paymentRequestRecipients)
+          .where(eq(paymentRequestRecipients.id, recipient.id));
+      }
+
+      const duplicatePaymentRequestIds = linkedPaymentRequests
+        .slice(1)
+        .map((request) => request.id);
+      if (duplicatePaymentRequestIds.length > 0) {
+        await tx
+          .delete(paymentRequests)
+          .where(inArray(paymentRequests.id, duplicatePaymentRequestIds));
+      }
+
       const alreadyRequestedUserIds = new Set(
-        existingRecipients
+        Array.from(canonicalRecipientsByKey.values())
           .map((recipient) => recipient.userId)
           .filter((userId): userId is string => !!userId),
       );
       const newRecipientIds = uniqueRecipientIds.filter((userId) => !alreadyRequestedUserIds.has(userId));
-      if (newRecipientIds.length === 0) {
-        return { paymentRequest: null, requestedUserIds: [] as string[], blockedReason: null };
+      if (!canAddRecipients) {
+        return {
+          paymentRequest: canonicalPaymentRequest,
+          requestedUserIds: [] as string[],
+          blockedReason: 'not_open' as const,
+        };
       }
-
-      const [createdPaymentRequest] = await tx
-        .insert(paymentRequests)
-        .values({
-          creatorId,
-          title: `Payment for ${scrimmage.title}`,
-          description: `Payment for scrimmage on ${formatFullDateTime(scrimmage.dateTime, timezone)} at ${scrimmage.location}`,
-          amountPerPerson: String(scrimmage.costPerPlayer),
-          relatedScrimmageId: scrimmage.id,
-          deadline: null,
-          notes: null,
-          venmoLinkOverride: scrimmage.venmoLinkOverride,
-          cashappLinkOverride: scrimmage.cashappLinkOverride,
-          relatedConversationId: null,
-        })
-        .returning();
-      await tx.insert(paymentRequestRecipients).values(
-        newRecipientIds.map((userId) => ({
-          paymentRequestId: createdPaymentRequest.id,
-          userId,
-        })),
-      );
-      return { paymentRequest: createdPaymentRequest, requestedUserIds: newRecipientIds, blockedReason: null };
+      if (newRecipientIds.length > 0) {
+        await tx.insert(paymentRequestRecipients).values(
+          newRecipientIds.map((userId) => ({
+            paymentRequestId: canonicalPaymentRequest.id,
+            userId,
+          })),
+        );
+      }
+      return {
+        paymentRequest: canonicalPaymentRequest,
+        requestedUserIds: newRecipientIds,
+        blockedReason: null,
+      };
     });
     if (!paymentRequest) {
       return { paymentRequest: null, requestedUserIds, blockedReason };
@@ -22767,7 +22844,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/payment-requests/created/by-me', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const paymentRequests = await storage.getPaymentRequestsByCreator(userId);
+      let paymentRequests = await storage.getPaymentRequestsByCreator(userId);
+
+      // Repair scrimmage invoices created by older releases. Opening the
+      // organizer's list is enough to collapse each scrimmage back to one
+      // request while retaining every recipient's payment state.
+      const requestsByScrimmage = new Map<string, typeof paymentRequests>();
+      for (const request of paymentRequests) {
+        if (!request.relatedScrimmageId) continue;
+        const existing = requestsByScrimmage.get(request.relatedScrimmageId) ?? [];
+        existing.push(request);
+        requestsByScrimmage.set(request.relatedScrimmageId, existing);
+      }
+      let repairedDuplicates = false;
+      for (const [scrimmageId, linkedRequests] of requestsByScrimmage) {
+        if (linkedRequests.length < 2) continue;
+        const scrimmage = await storage.getScrimmage(scrimmageId);
+        if (!scrimmage) continue;
+        const recipientUserIds = linkedRequests.flatMap((request) =>
+          request.recipients
+            .map((recipient) => recipient.userId)
+            .filter((recipientId): recipientId is string => !!recipientId),
+        );
+        await createScrimmagePaymentRequestForPlayers(
+          scrimmage,
+          recipientUserIds,
+          scrimmage.creatorId,
+          false,
+        );
+        repairedDuplicates = true;
+      }
+      if (repairedDuplicates) {
+        paymentRequests = await storage.getPaymentRequestsByCreator(userId);
+      }
       res.json(paymentRequests);
     } catch (error) {
       console.error("Error fetching created payment requests:", error);

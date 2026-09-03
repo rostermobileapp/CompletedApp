@@ -9,6 +9,12 @@ Invoice creation, paid-player admission, and roster finalization must serialize 
 
 **How to apply:** Any new path that creates a scrimmage-linked invoice or transitions a request to approved must participate in the shared locking protocol and derive recipients from server-authorized scrimmage state.
 
+A scrimmage has one organizer-facing payment request with one recipient row per player. Later joins append recipients to that request; legacy duplicate requests must merge without losing paid or confirmed state.
+
+**Why:** Organizers need to review and mark every scrimmage payment from one recipient list, matching manual payment requests rather than managing one card per player.
+
+**How to apply:** Keep the scrimmage-level lock around request lookup, recipient insertion, and duplicate repair. Preserve the strongest recipient state when consolidating historical rows.
+
 Manual Approval and Pay to Play finalization clears all still-pending join applications. A finalized roster may accept a fresh application only after its approved count falls below capacity; First Come remains closed after finalization.
 
 **Why:** Keeping pre-finalization pending rows blocks players from starting a new request after a confirmed player withdraws, while globally reopening a finalized scrimmage would lose the distinction between confirmed and unconfirmed rosters.
