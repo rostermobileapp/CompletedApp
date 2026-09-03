@@ -32,7 +32,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -285,15 +285,53 @@ function broadcastPaymentUpdate(
   paymentRequest: { id: string; creatorId: string; relatedScrimmageId?: string | null },
   recipientUserIds: Array<string | null | undefined>,
 ) {
-  broadcastRealtimeEvent([paymentRequest.creatorId, ...recipientUserIds], {
+  const event = {
     type: 'payment_update',
     paymentRequestId: paymentRequest.id,
     scrimmageId: paymentRequest.relatedScrimmageId || undefined,
-  });
+  };
+  broadcastRealtimeEvent([paymentRequest.creatorId, ...recipientUserIds], event);
+
+  if (paymentRequest.relatedScrimmageId) {
+    storage.getScrimmageCoHosts(paymentRequest.relatedScrimmageId)
+      .then((coHosts) => {
+        broadcastRealtimeEvent(coHosts.map((coHost) => coHost.userId), event);
+      })
+      .catch((error) => {
+        console.error('[Realtime] Failed to broadcast payment update to scrimmage co-hosts:', error);
+      });
+  }
 }
 
 function broadcastPaymentListUpdate(userIds: Array<string | null | undefined>) {
   broadcastRealtimeEvent(userIds, { type: 'payment_update' });
+}
+
+async function getCoHostedScrimmagePaymentRequests(userId: string) {
+  const coHostedScrimmages = await db
+    .select({
+      scrimmageId: scrimmageCoHosts.scrimmageId,
+      canManagePayments: scrimmageCoHosts.canManagePayments,
+    })
+    .from(scrimmageCoHosts)
+    .where(eq(scrimmageCoHosts.userId, userId));
+
+  const requestsByScrimmage = await Promise.all(
+    coHostedScrimmages.map(async ({ scrimmageId, canManagePayments }) => {
+      const [requests, scrimmage] = await Promise.all([
+        storage.getPaymentRequestsByScrimmage(scrimmageId),
+        storage.getScrimmage(scrimmageId),
+      ]);
+      return requests.map((request) => ({
+        ...request,
+        leagueId: scrimmage?.leagueId ?? null,
+        viewerIsScrimmageOrganizer: true,
+        viewerCanManagePayments: !!canManagePayments,
+      }));
+    }),
+  );
+
+  return requestsByScrimmage.flat();
 }
 
 // Broadcast schedule update to all approved members of a team
@@ -16346,6 +16384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     recipientId: string,
     actorUserId: string,
     updates: { isPaid: boolean; paymentMethod?: 'venmo' | 'cashapp' | 'cash' | 'other' | null },
+    allowCoHostPaymentManager = false,
   ) => {
     return db.transaction(async (tx) => {
       // Use the same recipient → scrimmage → request lock order as organizer
@@ -16369,7 +16408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const isCreator = paymentRequest.creatorId === actorUserId;
       const isRecipient = lockedRecipient.userId === actorUserId;
-      if (!isCreator && !isRecipient) return { kind: 'forbidden' as const };
+      if (!isCreator && !isRecipient && !allowCoHostPaymentManager) return { kind: 'forbidden' as const };
       if (lockedRecipient.isConfirmed) return { kind: 'confirmed' as const };
 
       await tx
@@ -22877,7 +22916,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (repairedDuplicates) {
         paymentRequests = await storage.getPaymentRequestsByCreator(userId);
       }
-      res.json(paymentRequests);
+
+      const coHostedRequests = await getCoHostedScrimmagePaymentRequests(userId);
+      const ownRequestIds = new Set(paymentRequests.map((request) => request.id));
+      const visibleRequests = [
+        ...paymentRequests.map((request) => ({
+          ...request,
+          viewerIsScrimmageOrganizer: true,
+          viewerCanManagePayments: true,
+        })),
+        ...coHostedRequests.filter((request) => !ownRequestIds.has(request.id)),
+      ].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      res.json(visibleRequests);
     } catch (error) {
       console.error("Error fetching created payment requests:", error);
       res.status(500).json({ message: "Failed to fetch payment requests" });
@@ -22927,17 +22982,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Payment request not found" });
       }
 
-      // Check if user is creator or recipient
+      // Check if user is creator, recipient, or co-host of the linked scrimmage.
       const isCreator = paymentRequest.creatorId === userId;
       const isRecipient = paymentRequest.recipients.some(r => r.userId === userId);
+      let isScrimmageCoHost = false;
+      let canManagePayments = false;
+      if (paymentRequest.relatedScrimmageId && !isCreator) {
+        const access = await storage.canUserManageScrimmage(paymentRequest.relatedScrimmageId, userId);
+        isScrimmageCoHost = access.isCoHost;
+        canManagePayments = access.isCoHost && !!access.permissions?.canManagePayments;
+      }
 
-      if (!isCreator && !isRecipient) {
+      if (!isCreator && !isRecipient && !isScrimmageCoHost) {
         return res.status(403).json({ message: "You do not have access to this payment request" });
       }
 
-      // Non-creators only see their own recipient row — never other players' statuses
-      const responseData = isCreator
-        ? paymentRequest
+      // Scrimmage co-hosts receive the same organizer view as the creator.
+      // Regular recipients only see their own recipient row.
+      const hasOrganizerView = isCreator || isScrimmageCoHost;
+      const responseData = hasOrganizerView
+        ? {
+            ...paymentRequest,
+            viewerIsScrimmageOrganizer: true,
+            viewerCanManagePayments: isCreator || canManagePayments,
+          }
         : { ...paymentRequest, recipients: paymentRequest.recipients.filter((r: any) => r.userId === userId) };
 
       res.json(responseData);
@@ -22959,8 +23027,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Scrimmage not found" });
       }
 
-      // Check if user is the creator or a participant in the scrimmage
+      // Check if user is the creator, a co-host, or a participant.
       const isCreator = scrimmage.creatorId === userId;
+      const access = await storage.canUserManageScrimmage(scrimmageId, userId);
+      const isScrimmageCoHost = access.isCoHost;
       const userRequest = await db.query.scrimmageRequests.findFirst({
         where: (requests, { eq, and }) => and(
           eq(requests.scrimmageId, scrimmageId),
@@ -22969,14 +23039,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const isParticipant = !!userRequest;
 
-      if (!isCreator && !isParticipant) {
+      if (!isCreator && !isScrimmageCoHost && !isParticipant) {
         return res.status(403).json({ message: "You do not have access to this scrimmage" });
       }
 
       const paymentRequests = await storage.getPaymentRequestsByScrimmage(scrimmageId);
-      // Non-creators only see their own recipient row
-      const responseData = isCreator
-        ? paymentRequests
+      // Co-hosts receive the same complete request as the creator.
+      const hasOrganizerView = isCreator || isScrimmageCoHost;
+      const responseData = hasOrganizerView
+        ? paymentRequests.map((request) => ({
+            ...request,
+            viewerIsScrimmageOrganizer: true,
+            viewerCanManagePayments: isCreator || !!access.permissions?.canManagePayments,
+          }))
         : paymentRequests.map((pr: any) => ({
             ...pr,
             recipients: pr.recipients.filter((r: any) => r.userId === userId),
@@ -23108,18 +23183,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Payment recipient not found" });
       }
 
-      // Only the creator or the recipient themselves can update the payment status
+      // The creator, recipient, or a linked scrimmage co-host with payment
+      // management permission can update the payment status.
       const isCreator = recipient.paymentRequest.creatorId === userId;
       const isRecipient = recipient.userId === userId;
+      let isCoHostPaymentManager = false;
+      if (recipient.paymentRequest.relatedScrimmageId && !isCreator && !isRecipient) {
+        const access = await storage.canUserManageScrimmage(recipient.paymentRequest.relatedScrimmageId, userId);
+        isCoHostPaymentManager = access.isCoHost && !!access.permissions?.canManagePayments;
+      }
 
-      if (!isCreator && !isRecipient) {
+      if (!isCreator && !isRecipient && !isCoHostPaymentManager) {
         return res.status(403).json({ message: "You do not have permission to update this payment" });
       }
       if (recipient.paymentRequest.relatedScrimmageId) {
         const updateResult = await updateLinkedScrimmagePaymentRecipient(recipientId, userId, {
           isPaid: validatedData.isPaid,
           paymentMethod: validatedData.paymentMethod,
-        });
+        }, isCoHostPaymentManager);
         if (updateResult.kind === 'confirmed') {
           return res.status(409).json({ message: 'The organizer has already confirmed this payment' });
         }
@@ -23152,7 +23233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Confirm a payment request recipient (creator only)
+  // Confirm a payment request recipient (creator or permitted scrimmage co-host)
   app.patch('/api/payment-request-recipients/:recipientId/confirm', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -23174,11 +23255,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Payment recipient not found" });
       }
 
-      // Only the creator can confirm payments
+      // The request creator or a linked scrimmage co-host with payment
+      // management permission can confirm payments.
       const isCreator = recipient.paymentRequest.creatorId === userId;
+      let isCoHostPaymentManager = false;
+      if (recipient.paymentRequest.relatedScrimmageId && !isCreator) {
+        const access = await storage.canUserManageScrimmage(recipient.paymentRequest.relatedScrimmageId, userId);
+        isCoHostPaymentManager = access.isCoHost && !!access.permissions?.canManagePayments;
+      }
 
-      if (!isCreator) {
-        return res.status(403).json({ message: "Only the payment request creator can confirm payments" });
+      if (!isCreator && !isCoHostPaymentManager) {
+        return res.status(403).json({ message: "You do not have permission to confirm payments for this scrimmage" });
       }
 
       const confirmation = await db.transaction(async (tx) => {
@@ -23536,7 +23623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send a push reminder to every recipient on this payment request who has
-  // not yet been marked paid. Creator-only. Skips placeholder players (they
+  // not yet been marked paid. Skips placeholder players (they
   // have no account / push subscription) and recipients who have notifications
   // disabled (handled inside sendPaymentRequestPushNotification).
   app.post('/api/payment-requests/:id/remind-unpaid', isAuthenticated, async (req: any, res) => {
@@ -23548,8 +23635,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!paymentRequest) {
         return res.status(404).json({ message: "Payment request not found" });
       }
-      if (paymentRequest.creatorId !== userId) {
-        return res.status(403).json({ message: "Only the creator can remind recipients" });
+      const isCreator = paymentRequest.creatorId === userId;
+      let isCoHostPaymentManager = false;
+      if (paymentRequest.relatedScrimmageId && !isCreator) {
+        const access = await storage.canUserManageScrimmage(paymentRequest.relatedScrimmageId, userId);
+        isCoHostPaymentManager = access.isCoHost && !!access.permissions?.canManagePayments;
+      }
+      if (!isCreator && !isCoHostPaymentManager) {
+        return res.status(403).json({ message: "You do not have permission to remind recipients for this scrimmage" });
       }
 
       const unpaidUserIds = paymentRequest.recipients

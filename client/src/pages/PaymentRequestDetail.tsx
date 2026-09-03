@@ -114,6 +114,8 @@ export default function PaymentRequestDetail() {
   }
 
   const isCreator = request.creatorId === (user as any)?.id;
+  const hasOrganizerView = isCreator || request.viewerIsScrimmageOrganizer === true;
+  const canManagePayments = isCreator || request.viewerCanManagePayments === true;
   const myRecipient = recipients.find((r: any) => r.userId === (user as any)?.id);
   const totalRecipients = recipients.length;
   const paidCount = recipients.filter((r: any) => r.isPaid).length;
@@ -186,25 +188,28 @@ export default function PaymentRequestDetail() {
 
         {/* Payment Summary Card — shared component, identical to the list cards */}
         <div className="mb-6">
-          <PaymentSummaryCard request={request} isCreator={isCreator} clickable={false} />
+          <PaymentSummaryCard
+            request={request}
+            isCreator={hasOrganizerView}
+            canManagePayments={canManagePayments}
+            clickable={false}
+          />
         </div>
 
         {/* Recipient payment-method picker. Creators keep the existing
             informational link card; recipients choose a method and confirm
             it after paying or arranging payment. */}
-        {isCreator ? (
+        {hasOrganizerView ? (
           (venmoUrl || cashappUrl) ? (
             <div
               className="mb-6 bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5"
               data-testid="card-pay-creator"
             >
               <h2 className="text-base font-semibold mb-1">
-                {isCreator ? 'How recipients will pay you' : `Pay ${creatorName}`}
+                How recipients will pay the organizer
               </h2>
               <p className="text-xs text-muted-foreground mb-3">
-                {isCreator
-                  ? 'These are the links recipients will see. Set a per-invoice override to send payments somewhere else.'
-                  : 'Send payment for this invoice using one of the options below.'}
+                These are the links recipients will see. The payment request creator can change per-invoice overrides.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 {venmoUrl && (
@@ -265,9 +270,9 @@ export default function PaymentRequestDetail() {
         <div className="bg-[#e2e2e2] dark:bg-card rounded-2xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-5 pl-[4px] pr-[4px] pt-[4px] pb-[4px]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold" data-testid="text-recipients-title">
-              {isCreator ? 'Recipients' : 'Your Status'}
+              {hasOrganizerView ? 'Recipients' : 'Your Status'}
             </h2>
-            {isCreator && (
+            {hasOrganizerView && (
               <span className="text-xs text-muted-foreground">
                 {paidCount} / {totalRecipients} paid
               </span>
@@ -275,9 +280,9 @@ export default function PaymentRequestDetail() {
           </div>
 
           <div className="space-y-2">
-            {(isCreator ? recipients : recipients.filter((r: any) => r.userId === (user as any)?.id)).map((recipient: any) => {
+            {(hasOrganizerView ? recipients : recipients.filter((r: any) => r.userId === (user as any)?.id)).map((recipient: any) => {
               const isMe = recipient.userId === (user as any)?.id;
-              const canUpdate = isCreator || isMe;
+              const canUpdate = canManagePayments || isMe;
               const recipientTheme = recipient.isPaid ? STATUS_THEME.settled : theme;
 
               return (
@@ -359,7 +364,7 @@ export default function PaymentRequestDetail() {
                             <span className="text-xs text-muted-foreground">{recipient.paymentMethod}</span>
                           )}
                         </div>
-                        {isCreator && (
+                        {canManagePayments && (
                           recipient.isConfirmed ? (
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-emerald-600 dark:text-emerald-300 font-medium">✓ Confirmed</span>
@@ -386,7 +391,7 @@ export default function PaymentRequestDetail() {
                           )
                         )}
                       </div>
-                    ) : isCreator ? (
+                    ) : canManagePayments ? (
                       <Select
                         onValueChange={(method) => {
                           updateRecipientMutation.mutate({

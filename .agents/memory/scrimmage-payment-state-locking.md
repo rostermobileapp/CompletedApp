@@ -15,6 +15,12 @@ A scrimmage has one organizer-facing payment request with one recipient row per 
 
 **How to apply:** Keep the scrimmage-level lock around request lookup, recipient insertion, and duplicate repair. Preserve the strongest recipient state when consolidating historical rows.
 
+Scrimmage co-hosts share the creator's complete organizer-facing payment request view. Viewing is granted by current co-host membership; changing or confirming another player's payment and sending payment reminders additionally requires the co-host's payment-management permission.
+
+**Why:** Co-hosts need one shared source of truth with the main host, while the per-co-host permission must still prevent a view-only helper from changing financial state.
+
+**How to apply:** Include co-hosted scrimmage requests in the organizer payment list, expose all recipient rows to current co-hosts, gate mutations on payment-management permission, and broadcast payment updates to the creator, recipients, and co-hosts.
+
 Manual Approval and Pay to Play finalization clears all still-pending join applications. A finalized roster may accept a fresh application only after its approved count falls below capacity; First Come remains closed after finalization.
 
 **Why:** Keeping pre-finalization pending rows blocks players from starting a new request after a confirmed player withdraws, while globally reopening a finalized scrimmage would lose the distinction between confirmed and unconfirmed rosters.

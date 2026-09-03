@@ -16,10 +16,16 @@ import {
 interface PaymentSummaryCardProps {
   request: any;
   isCreator: boolean;
+  canManagePayments?: boolean;
   clickable?: boolean;
 }
 
-export function PaymentSummaryCard({ request, isCreator, clickable = true }: PaymentSummaryCardProps) {
+export function PaymentSummaryCard({
+  request,
+  isCreator,
+  canManagePayments = isCreator,
+  clickable = true,
+}: PaymentSummaryCardProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -73,7 +79,7 @@ export function PaymentSummaryCard({ request, isCreator, clickable = true }: Pay
     },
   });
 
-  const showRemindButton = isCreator && status !== 'settled' && unpaidRegisteredCount > 0;
+  const showRemindButton = isCreator && canManagePayments && status !== 'settled' && unpaidRegisteredCount > 0;
   const showAllPaidLabel = isCreator && status === 'settled';
 
   const wrapperClass = clickable

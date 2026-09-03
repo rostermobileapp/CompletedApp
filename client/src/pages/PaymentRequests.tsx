@@ -159,7 +159,7 @@ export default function PaymentRequests() {
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="created" data-testid="tab-created">
               <DollarSign className="w-4 h-4 mr-2" />
-              Created by Me
+              Manage
             </TabsTrigger>
             <TabsTrigger value="received" data-testid="tab-received" className="relative">
               <Users className="w-4 h-4 mr-2" />
@@ -180,7 +180,7 @@ export default function PaymentRequests() {
             ) : createdRequestsArray.length === 0 ? (
               <div className="text-center py-12">
                 <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">You haven't created any payment requests yet.</p>
+                <p className="text-muted-foreground mb-4">You don't have any payment requests to manage yet.</p>
                 {isFreeTier ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Lock className="w-4 h-4" />
@@ -198,7 +198,12 @@ export default function PaymentRequests() {
               </div>
             ) : (
               createdRequestsArray.map((request: any) => (
-                <PaymentSummaryCard key={request.id} request={request} isCreator={true} />
+                <PaymentSummaryCard
+                  key={request.id}
+                  request={request}
+                  isCreator={request.viewerIsScrimmageOrganizer === true}
+                  canManagePayments={request.viewerCanManagePayments === true}
+                />
               ))
             )}
           </TabsContent>
