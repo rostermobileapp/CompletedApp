@@ -21,6 +21,12 @@ Scrimmage co-hosts share the creator's complete organizer-facing payment request
 
 **How to apply:** Include co-hosted scrimmage requests in the organizer payment list, expose all recipient rows to current co-hosts, gate mutations on payment-management permission, and broadcast payment updates to the creator, recipients, and co-hosts.
 
+Shared co-host scrimmage payment requests must remain visible in Manage regardless of the dashboard's currently selected team, league, or tournament.
+
+**Why:** Dashboard selection is stored locally and can point at another league or a stale context after switching accounts; applying that filter silently hides a valid co-host request even though server authorization is correct.
+
+**How to apply:** Mark shared co-host requests explicitly in the organizer-list response and exempt only those shared requests from dashboard-context filtering.
+
 Manual Approval and Pay to Play finalization clears all still-pending join applications. A finalized roster may accept a fresh application only after its approved count falls below capacity; First Come remains closed after finalization.
 
 **Why:** Keeping pre-finalization pending rows blocks players from starting a new request after a confirmed player withdraws, while globally reopening a finalized scrimmage would lose the distinction between confirmed and unconfirmed rosters.

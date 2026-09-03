@@ -326,6 +326,7 @@ async function getCoHostedScrimmagePaymentRequests(userId: string) {
         ...request,
         leagueId: scrimmage?.leagueId ?? null,
         viewerIsScrimmageOrganizer: true,
+        viewerIsSharedScrimmageCoHost: true,
         viewerCanManagePayments: !!canManagePayments,
       }));
     }),
@@ -22923,6 +22924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...paymentRequests.map((request) => ({
           ...request,
           viewerIsScrimmageOrganizer: true,
+          viewerIsSharedScrimmageCoHost: false,
           viewerCanManagePayments: true,
         })),
         ...coHostedRequests.filter((request) => !ownRequestIds.has(request.id)),

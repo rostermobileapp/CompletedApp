@@ -83,29 +83,42 @@ export default function PaymentRequests() {
   });
 
   const filterCreatedRequests = (requests: any[]) => {
+    const alwaysVisibleSharedRequests = requests.filter(
+      request => request.viewerIsSharedScrimmageCoHost === true,
+    );
+    const contextRequests = requests.filter(
+      request => request.viewerIsSharedScrimmageCoHost !== true,
+    );
+
     if (selectedType === 'tournament') {
-      return [];
+      return alwaysVisibleSharedRequests;
     }
     if (selectedType === 'league' && selectedLeagueId) {
-      return requests.filter(request => {
-        if (request.leagueId !== selectedLeagueId) return false;
-        // If the request is tied to a specific team, only show it when that team
-        // belongs to the currently active season. This hides prior-season team
-        // payments when the user has a league selected.
-        if (request.teamId) return activeSeasonTeamIds.has(request.teamId);
-        return true;
-      });
+      return [
+        ...alwaysVisibleSharedRequests,
+        ...contextRequests.filter(request => {
+          if (request.leagueId !== selectedLeagueId) return false;
+          // If the request is tied to a specific team, only show it when that team
+          // belongs to the currently active season. This hides prior-season team
+          // payments when the user has a league selected.
+          if (request.teamId) return activeSeasonTeamIds.has(request.teamId);
+          return true;
+        }),
+      ];
     }
     if (selectedType === 'team' && selectedTeamId) {
       const selectedTeamLeagueId = teamLeagueMap[selectedTeamId];
-      return requests.filter(request => {
-        if (request.teamId === selectedTeamId) return true;
-        if (request.leagueId && !request.teamId && selectedTeamLeagueId) {
-          return request.leagueId === selectedTeamLeagueId;
-        }
-        if (!request.leagueId && !request.teamId) return true;
-        return false;
-      });
+      return [
+        ...alwaysVisibleSharedRequests,
+        ...contextRequests.filter(request => {
+          if (request.teamId === selectedTeamId) return true;
+          if (request.leagueId && !request.teamId && selectedTeamLeagueId) {
+            return request.leagueId === selectedTeamLeagueId;
+          }
+          if (!request.leagueId && !request.teamId) return true;
+          return false;
+        }),
+      ];
     }
     return requests;
   };
