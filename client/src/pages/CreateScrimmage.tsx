@@ -65,11 +65,51 @@ const createScrimmageSchema = createScrimmageRequestSchema.extend({
 
 type CreateScrimmageForm = z.infer<typeof createScrimmageSchema>;
 
+type CreateScrimmageDraft = {
+  formValues?: Partial<CreateScrimmageForm>;
+  selectedLeagueId?: string | null;
+  selectedMemberIds?: string[];
+  selectedEmails?: string[];
+  selectedCoHostIds?: string[];
+  selectedCoHostUsers?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    profileImageUrl: string | null;
+    isAtRink: boolean;
+  }[];
+  coHostEmails?: string[];
+  selectedRinkFacilityId?: string | null;
+  selectedRink?: RinkSelection | null;
+  loadedInviteGroupIds?: string[];
+  groupLoadedUserIds?: string[];
+  groupMembersById?: Record<string, { userIds: string[]; emails: string[] }>;
+  selectedColor?: string;
+  joinMode?: 'approval' | 'first_come' | 'first_pay';
+  showVenmoOverride?: boolean;
+  showCashAppOverride?: boolean;
+};
+
+const CREATE_SCRIMMAGE_DRAFT_KEY = 'create-scrimmage-draft';
+
+function readCreateScrimmageDraft(): CreateScrimmageDraft | null {
+  try {
+    const saved = localStorage.getItem(CREATE_SCRIMMAGE_DRAFT_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateScrimmage() {
   const [, navigate] = useLocation();
   const [, params] = useRoute('/edit-scrimmage/:id');
   const scrimmageId = params?.id;
   const isEditMode = !!scrimmageId;
+  const [savedDraft] = useState<CreateScrimmageDraft | null>(() =>
+    isEditMode ? null : readCreateScrimmageDraft()
+  );
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,23 +121,23 @@ export default function CreateScrimmage() {
   const [skaterPickerOpen, setSkaterPickerOpen] = useState(false);
   // 'approval' = organiser manually approves each request (default)
   // 'first_come' = requests are auto-approved on creation while capacity remains
-  const [joinMode, setJoinMode] = useState<'approval' | 'first_come' | 'first_pay'>('approval');
-  const [loadedInviteGroupIds, setLoadedInviteGroupIds] = useState<string[]>([]);
+  const [joinMode, setJoinMode] = useState<'approval' | 'first_come' | 'first_pay'>(savedDraft?.joinMode || 'approval');
+  const [loadedInviteGroupIds, setLoadedInviteGroupIds] = useState<string[]>(savedDraft?.loadedInviteGroupIds || []);
   // Tracks which selectedMemberIds originated from the invite group snapshot vs manual selection.
   // Only manually-selected users are persisted as inviteUserIds on the scrimmage so that
   // the recurring invite job can treat the live group as the authoritative source.
-  const [groupLoadedUserIds, setGroupLoadedUserIds] = useState<Set<string>>(new Set());
-  const [groupMembersById, setGroupMembersById] = useState<Record<string, { userIds: string[]; emails: string[] }>>({});
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>([]);
-  const [selectedCoHostUsers, setSelectedCoHostUsers] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
-  const [coHostEmails, setCoHostEmails] = useState<string[]>([]); // email-only invites (no account)
+  const [groupLoadedUserIds, setGroupLoadedUserIds] = useState<Set<string>>(new Set(savedDraft?.groupLoadedUserIds || []));
+  const [groupMembersById, setGroupMembersById] = useState<Record<string, { userIds: string[]; emails: string[] }>>(savedDraft?.groupMembersById || {});
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(savedDraft?.selectedMemberIds || []);
+  const [selectedCoHostIds, setSelectedCoHostIds] = useState<string[]>(savedDraft?.selectedCoHostIds || []);
+  const [selectedCoHostUsers, setSelectedCoHostUsers] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>(savedDraft?.selectedCoHostUsers || []);
+  const [coHostEmails, setCoHostEmails] = useState<string[]>(savedDraft?.coHostEmails || []); // email-only invites (no account)
   const [coHostSearchTerm, setCoHostSearchTerm] = useState("");
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const [coHostSearchResults, setCoHostSearchResults] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
   const [coHostSearchLoading, setCoHostSearchLoading] = useState(false);
-  const [selectedRinkFacilityId, setSelectedRinkFacilityId] = useState<string | null>(null);
-  const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(null);
+  const [selectedRinkFacilityId, setSelectedRinkFacilityId] = useState<string | null>(savedDraft?.selectedRinkFacilityId || null);
+  const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(savedDraft?.selectedRink || null);
   const [playerLeagueFilter, setPlayerLeagueFilter] = useState('all');
   const rinkDefaultInitializedRef = useRef(false);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
@@ -108,7 +148,7 @@ export default function CreateScrimmage() {
   // Email invite states
   const [emailSearchTerm, setEmailSearchTerm] = useState("");
   const [manualEmail, setManualEmail] = useState("");
-  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>(savedDraft?.selectedEmails || []);
   const [submitError, setSubmitError] = useState<string | null>(null);
   
   // Invite group states
@@ -125,12 +165,12 @@ export default function CreateScrimmage() {
     { value: '#ec4899', label: 'Pink' },
     { value: '#14b8a6', label: 'Teal' },
   ];
-  const [selectedColor, setSelectedColor] = useState<string>(SCRIMMAGE_COLORS[4].value); // Default: Blue
+  const [selectedColor, setSelectedColor] = useState<string>(savedDraft?.selectedColor || SCRIMMAGE_COLORS[4].value); // Default: Blue
 
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showVenmoOverride, setShowVenmoOverride] = useState(false);
-  const [showCashAppOverride, setShowCashAppOverride] = useState(false);
+  const [showVenmoOverride, setShowVenmoOverride] = useState(savedDraft?.showVenmoOverride || false);
+  const [showCashAppOverride, setShowCashAppOverride] = useState(savedDraft?.showCashAppOverride || false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   
   // Time picker state
@@ -181,6 +221,7 @@ export default function CreateScrimmage() {
       enableReminders: true,
       reminderHoursBefore: [24], // Default to 24 hours before
       coverPhoto: null,
+      ...savedDraft?.formValues,
     },
   });
   const hasScheduledInvitationRule =
@@ -195,6 +236,9 @@ export default function CreateScrimmage() {
   // Which league's roster to browse in the invite picker.
   // Prefer: (1) URL ?leagueId param, (2) Dashboard's localStorage selection, (3) first league.
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(() => {
+    if (savedDraft?.selectedLeagueId !== undefined) {
+      return savedDraft.selectedLeagueId;
+    }
     // Check URL search params first
     const params = new URLSearchParams(window.location.search);
     const urlLeagueId = params.get('leagueId');
@@ -611,6 +655,13 @@ export default function CreateScrimmage() {
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scrimmages', scrimmageId] });
       queryClient.invalidateQueries({ queryKey: ['/api/users/scrimmage-invites'] });
+      if (!isEditMode) {
+        try {
+          localStorage.removeItem(CREATE_SCRIMMAGE_DRAFT_KEY);
+        } catch {
+          // Ignore storage cleanup failures; the scrimmage was created successfully.
+        }
+      }
       setPageTransitionDirection('down');
       navigate(`/scrimmage/${scrimmage.id}`);
     },
@@ -672,6 +723,37 @@ export default function CreateScrimmage() {
       coHostEmails,
     };
     createScrimmageRequest.mutate(formData);
+  };
+
+  const openInviteGroups = () => {
+    if (!isEditMode) {
+      try {
+        localStorage.setItem(
+          CREATE_SCRIMMAGE_DRAFT_KEY,
+          JSON.stringify({
+            formValues: form.getValues(),
+            selectedLeagueId,
+            selectedMemberIds,
+            selectedEmails,
+            selectedCoHostIds,
+            selectedCoHostUsers,
+            coHostEmails,
+            selectedRinkFacilityId,
+            selectedRink,
+            loadedInviteGroupIds,
+            groupLoadedUserIds: Array.from(groupLoadedUserIds),
+            groupMembersById,
+            selectedColor,
+            joinMode,
+            showVenmoOverride,
+            showCashAppOverride,
+          } satisfies CreateScrimmageDraft),
+        );
+      } catch {
+        // The form remains usable even if browser storage is unavailable.
+      }
+    }
+    navigate('/invite-groups');
   };
 
   const toggleMemberSelection = (memberId: string) => {
@@ -1862,7 +1944,7 @@ export default function CreateScrimmage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate('/invite-groups')}
+                    onClick={openInviteGroups}
                     data-testid="button-manage-groups"
                   >
                     Manage
@@ -1904,7 +1986,7 @@ export default function CreateScrimmage() {
                   type="button"
                   variant="default"
                   size="sm"
-                  onClick={() => navigate('/invite-groups')}
+                  onClick={openInviteGroups}
                   data-testid="button-create-group"
                 >
                   Create Group
