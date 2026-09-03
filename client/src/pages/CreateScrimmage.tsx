@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { FixedBottomButton } from '@/components/FixedBottomButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { createPortal } from 'react-dom';
 
 // Create form schema - includes UI fields that map to database fields
 const createScrimmageSchema = createScrimmageRequestSchema.extend({
@@ -136,11 +137,13 @@ export default function CreateScrimmage() {
   const [showCoHostDropdown, setShowCoHostDropdown] = useState(false);
   const [coHostSearchResults, setCoHostSearchResults] = useState<{id: string; firstName: string|null; lastName: string|null; email: string|null; profileImageUrl: string|null; isAtRink: boolean}[]>([]);
   const [coHostSearchLoading, setCoHostSearchLoading] = useState(false);
+  const [coHostDropdownPosition, setCoHostDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [selectedRinkFacilityId, setSelectedRinkFacilityId] = useState<string | null>(savedDraft?.selectedRinkFacilityId || null);
   const [selectedRink, setSelectedRink] = useState<RinkSelection | null>(savedDraft?.selectedRink || null);
   const [playerLeagueFilter, setPlayerLeagueFilter] = useState('all');
   const rinkDefaultInitializedRef = useRef(false);
   const coHostSearchRef = useRef<HTMLDivElement>(null);
+  const coHostDropdownRef = useRef<HTMLDivElement>(null);
   const coverPhotoTrayRef = useRef<HTMLDivElement>(null);
   const [canScrollCoverPhotos, setCanScrollCoverPhotos] = useState(false);
   const [formInitialized, setFormInitialized] = useState(false);
@@ -453,7 +456,11 @@ export default function CreateScrimmage() {
   // Close co-host dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (coHostSearchRef.current && !coHostSearchRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !coHostSearchRef.current?.contains(target) &&
+        !coHostDropdownRef.current?.contains(target)
+      ) {
         setShowCoHostDropdown(false);
       }
     };
@@ -464,6 +471,39 @@ export default function CreateScrimmage() {
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCoHostDropdown]);
+
+  // Render the co-host results at document level so card transforms and sibling
+  // stacking contexts cannot place the dropdown behind Invite Members.
+  useEffect(() => {
+    if (!showCoHostDropdown) {
+      setCoHostDropdownPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const anchor = coHostSearchRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const dropdownHeight = 240;
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const top = spaceBelow < dropdownHeight && rect.top > dropdownHeight
+        ? rect.top - dropdownHeight - 4
+        : rect.bottom + 4;
+      setCoHostDropdownPosition({
+        top,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
   }, [showCoHostDropdown]);
 
@@ -1788,8 +1828,16 @@ export default function CreateScrimmage() {
               data-testid="input-cohost-search"
             />
 
-            {showCoHostDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-auto">
+            {showCoHostDropdown && coHostDropdownPosition && createPortal(
+              <div
+                ref={coHostDropdownRef}
+                className="fixed z-[10000] bg-background border border-border rounded-lg shadow-lg max-h-60 overflow-auto"
+                style={{
+                  top: coHostDropdownPosition.top,
+                  left: coHostDropdownPosition.left,
+                  width: coHostDropdownPosition.width,
+                }}
+              >
                 {coHostSearchLoading ? (
                   <div className="p-3 text-center text-muted-foreground text-sm">Loading rink users…</div>
                 ) : (() => {
@@ -1856,7 +1904,8 @@ export default function CreateScrimmage() {
                     </>
                   );
                 })()}
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
         </div>

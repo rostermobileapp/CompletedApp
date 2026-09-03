@@ -16,3 +16,4 @@
 - [Scrimmage invite delivery leases](scrimmage-invite-delivery-leases.md) — mark sent only after full delivery; use owner-token heartbeats and revalidate before every side effect.
 - [Scrimmage change recipients](scrimmage-change-recipients.md) — notify delivered invitees plus approved players; persisted invite notifications preserve group recipients.
 - [Scrimmage backup promotion](scrimmage-backup-promotion.md) — all join modes use ranked backups; vacancies atomically promote position 1 without another acceptance.
+- [Card dropdown stacking](card-dropdown-stacking.md) — elevated cards use transforms that isolate z-index; menus overlapping sibling cards must render through a body portal.
