@@ -1644,7 +1644,7 @@ export default function CreateScrimmage() {
         </div>
 
         {/* Co-Host Selection - Global user search */}
-        <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
+        <div className="relative z-20 rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] pl-[8px] pr-[8px] mt-[8px] mb-[8px]">
           <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
             <Crown className="w-5 h-5" />
             Add Co-Hosts (Optional)
@@ -1781,7 +1781,7 @@ export default function CreateScrimmage() {
 
         {/* Member Selection - Only show if user has leagues */}
         {selectedLeague ? (
-          <div className="rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] mt-[8px] mb-[8px] pl-[8px] pr-[8px]">
+          <div className="relative z-10 rounded-xl hairline elev-rest p-6 bg-[#e2e2e2] dark:bg-[#212121] pt-[4px] pb-[4px] mt-[8px] mb-[8px] pl-[8px] pr-[8px]">
             <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Invite Members
