@@ -662,6 +662,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ADD COLUMN IF NOT EXISTS venmo_link_override text,
         ADD COLUMN IF NOT EXISTS cashapp_link_override text
     `);
+    // Repair linked requests created before scrimmage cost edits were kept in
+    // sync. IS DISTINCT FROM also handles null safely.
+    await db.execute(sql`
+      UPDATE payment_requests AS payment_request
+      SET
+        amount_per_person = COALESCE(scrimmage.cost_per_player, 0),
+        updated_at = NOW()
+      FROM scrimmages AS scrimmage
+      WHERE payment_request.related_scrimmage_id = scrimmage.id
+        AND payment_request.amount_per_person IS DISTINCT FROM COALESCE(scrimmage.cost_per_player, 0)
+    `);
     console.log('[Init] payment request link-override columns ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure payment request link-override columns:', err);
@@ -17481,6 +17492,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (notificationError) {
           console.error(`Scrimmage ${scrimmageId} updated, but change notifications failed:`, notificationError);
           // Do not fail an otherwise successful edit.
+        }
+      }
+
+      if (costChanged) {
+        const linkedPaymentRequests = await storage.getPaymentRequestsByScrimmage(scrimmageId);
+        for (const paymentRequest of linkedPaymentRequests) {
+          broadcastPaymentUpdate(
+            paymentRequest,
+            paymentRequest.recipients.map((recipient) => recipient.userId),
+          );
         }
       }
 

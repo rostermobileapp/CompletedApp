@@ -15,6 +15,12 @@ A scrimmage has one organizer-facing payment request with one recipient row per 
 
 **How to apply:** Keep the scrimmage-level lock around request lookup, recipient insertion, and duplicate repair. Preserve the strongest recipient state when consolidating historical rows.
 
+Scrimmage cost edits and the amount on every linked payment request must update atomically while holding the same scrimmage-level payment lock.
+
+**Why:** A payment request snapshots the cost when it is created; changing only the scrimmage leaves organizers and players seeing and paying the old amount.
+
+**How to apply:** Any path that changes cost per player must update linked payment requests in the same transaction, then broadcast both scrimmage and payment realtime updates. Reconcile historical mismatches when introducing this invariant.
+
 Scrimmage co-hosts share the creator's complete organizer-facing payment request view. Viewing is granted by current co-host membership; changing or confirming another player's payment and sending payment reminders additionally requires the co-host's payment-management permission.
 
 **Why:** Co-hosts need one shared source of truth with the main host, while the per-co-host permission must still prevent a view-only helper from changing financial state.

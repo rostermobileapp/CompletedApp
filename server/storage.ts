@@ -9845,12 +9845,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateScrimmage(scrimmageId: string, updates: Partial<InsertScrimmage>): Promise<Scrimmage> {
-    const [updatedScrimmage] = await db
-      .update(scrimmages)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(scrimmages.id, scrimmageId))
-      .returning();
-    return updatedScrimmage;
+    return db.transaction(async (tx) => {
+      const costIsBeingUpdated = Object.prototype.hasOwnProperty.call(updates, 'costPerPlayer');
+      if (costIsBeingUpdated) {
+        // Serialize edits with join-time/finalization invoice creation so a
+        // newly-created request cannot retain the previous scrimmage price.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`scrimmage-payment:${scrimmageId}`}))`);
+      }
+
+      const [updatedScrimmage] = await tx
+        .update(scrimmages)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(scrimmages.id, scrimmageId))
+        .returning();
+
+      if (updatedScrimmage && costIsBeingUpdated) {
+        await tx
+          .update(paymentRequests)
+          .set({
+            amountPerPerson: String(updatedScrimmage.costPerPlayer ?? 0),
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentRequests.relatedScrimmageId, scrimmageId));
+      }
+
+      return updatedScrimmage;
+    });
   }
 
   async deleteScrimmage(scrimmageId: string): Promise<void> {
