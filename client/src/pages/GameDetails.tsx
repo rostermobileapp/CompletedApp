@@ -610,6 +610,7 @@ export default function GameDetails() {
       backupPlayers = [],
       openSpots,
       creator: scrimmageCreator,
+      canEditScrimmage,
       canManagePlayers,
     } = scrimmageData as any;
     const isScrimmageCreator = scrimmage.creatorId === (user as any)?.id;
@@ -672,7 +673,7 @@ export default function GameDetails() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <h1 className="text-xl font-semibold">Scrimmage Details</h1>
-            {isScrimmageCreator && (
+            {canEditScrimmage && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1071,7 +1072,7 @@ export default function GameDetails() {
                 </button>
               </div>
 
-              {isScrimmageCreator && (
+              {canEditScrimmage && (
                 <Button
                   type="button"
                   variant={scrimmage.timeTbd ? "default" : "outline"}

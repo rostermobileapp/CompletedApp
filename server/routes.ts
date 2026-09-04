@@ -17215,7 +17215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update scrimmage (Creator only)
+  // Update scrimmage (creator or co-host)
   const updateScrimmageHandler = async (req: any, res: any) => {
     try {
       const scrimmageId = req.params.id;
@@ -17227,8 +17227,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Scrimmage not found' });
       }
 
-      if (existingScrimmage.creatorId !== userId) {
-        return res.status(403).json({ message: 'Only the creator can update this scrimmage' });
+      const managementAccess = await storage.canUserManageScrimmage(scrimmageId, userId);
+      if (!managementAccess.canManage) {
+        return res.status(403).json({ message: 'Only the creator or a co-host can update this scrimmage' });
       }
       
       // A Time TBD row uses date_time only as a calendar anchor, so it remains
@@ -17362,19 +17363,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ? [updateData.inviteGroupId]
                 : [],
         ));
+        const existingGroupIds = getInviteGroupIds(existingScrimmage);
         for (const groupId of requestedInviteGroupIds) {
           const inviteGroup = await storage.getInviteGroup(groupId);
           if (!inviteGroup) {
             return res.status(400).json({ message: 'Invite group not found' });
           }
-          if (inviteGroup.creatorId !== userId) {
+          if (inviteGroup.creatorId !== userId && !existingGroupIds.includes(groupId)) {
             return res.status(403).json({ message: 'You can only link invite groups that you created' });
           }
           if (inviteGroup.leagueId && inviteGroup.leagueId !== existingScrimmage.leagueId) {
             return res.status(400).json({ message: 'Invite group does not belong to this league' });
           }
         }
-        const existingGroupIds = getInviteGroupIds(existingScrimmage);
         const groupsChanged =
           requestedInviteGroupIds.length !== existingGroupIds.length ||
           requestedInviteGroupIds.some((id) => !existingGroupIds.includes(id));
@@ -18247,6 +18248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         backupPlayers,
         openSpots,
         creator,
+        canEditScrimmage: canManage,
         canManagePlayers,
       });
     } catch (error) {
