@@ -307,6 +307,78 @@ function broadcastPaymentListUpdate(userIds: Array<string | null | undefined>) {
   broadcastRealtimeEvent(userIds, { type: 'payment_update' });
 }
 
+async function notifyScrimmageCoHostAdded({
+  coHostUserId,
+  scrimmageId,
+  scrimmageTitle,
+  dateTime,
+  timeTbd,
+  timezone,
+  creatorId,
+  leagueId,
+}: {
+  coHostUserId: string;
+  scrimmageId: string;
+  scrimmageTitle: string;
+  dateTime: string | Date;
+  timeTbd: boolean;
+  timezone: string;
+  creatorId: string;
+  leagueId: string;
+}) {
+  const dateTimeLabel = timeTbd
+    ? `${getStoredDateOnlyKey(dateTime)} (time TBD)`
+    : formatFullDateTime(dateTime, timezone);
+
+  const notificationResult = await Promise.allSettled([
+    storage.createNotification({
+      userId: coHostUserId,
+      type: 'scrimmage_cohost_added',
+      title: `You're a co-host for ${scrimmageTitle}`,
+      message: `You have been added as a co-host for "${scrimmageTitle}" on ${dateTimeLabel}. You can now help manage players and payments.`,
+      actionUrl: `/scrimmage/${scrimmageId}`,
+      scrimmageId,
+    }),
+    (async () => {
+      let teamLogoUrl: string | undefined;
+      try {
+        const teamRows = await db
+          .select({ logoUrl: teams.logoUrl })
+          .from(teamMemberships)
+          .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+          .where(and(
+            eq(teamMemberships.userId, creatorId),
+            eq(teams.leagueId, leagueId),
+            eq(teamMemberships.status, 'approved'),
+          ))
+          .limit(1);
+        teamLogoUrl = resolveTeamLogoUrl(teamRows[0]?.logoUrl);
+      } catch {
+        // The standard Roster icon is used when no team logo is available.
+      }
+
+      const { sendCoHostPushNotification } = await import('./oneSignalNotifications');
+      return sendCoHostPushNotification(
+        coHostUserId,
+        scrimmageTitle,
+        dateTimeLabel,
+        scrimmageId,
+        teamLogoUrl,
+      );
+    })(),
+  ]);
+
+  if (notificationResult[0].status === 'rejected') {
+    console.error('[Notification] Failed to create co-host notification:', notificationResult[0].reason);
+  }
+  if (notificationResult[1].status === 'rejected') {
+    console.error('[Push] Failed to send co-host notification:', notificationResult[1].reason);
+  } else {
+    console.log(`[Push] Co-host notification to ${coHostUserId}: ${notificationResult[1].value ? 'sent' : 'skipped/failed'}`);
+  }
+  broadcastNotificationUpdate(coHostUserId);
+}
+
 async function getCoHostedScrimmagePaymentRequests(userId: string) {
   const coHostedScrimmages = await db
     .select({
@@ -16898,17 +16970,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 canManagePayments: true,
                 addedBy: userId,
               });
-              if (!scrimmageData.timeTbd) {
-                await storage.createNotification({
-                  userId: coHostId,
-                  type: 'scrimmage_cohost_added',
-                  title: `You're a co-host for ${scrimmageData.title}`,
-                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, scrimmageTimezone)}. You can now help manage players and payments.`,
-                  actionUrl: `/scrimmage/${parentScrimmage.id}`,
-                  scrimmageId: parentScrimmage.id,
-                });
-                broadcastNotificationUpdate(coHostId);
-              }
+              await notifyScrimmageCoHostAdded({
+                coHostUserId: coHostId,
+                scrimmageId: parentScrimmage.id,
+                scrimmageTitle: parentScrimmage.title,
+                dateTime: parentScrimmage.dateTime,
+                timeTbd: parentScrimmage.timeTbd,
+                timezone: scrimmageTimezone,
+                creatorId: parentScrimmage.creatorId,
+                leagueId: parentScrimmage.leagueId,
+              });
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
@@ -16917,8 +16988,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Handle email-invited co-hosts (may or may not have accounts)
         if (req.body.coHostEmails && Array.isArray(req.body.coHostEmails) && req.body.coHostEmails.length > 0) {
-          const creator = await storage.getUser(userId);
-          const creatorName = creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'A scrimmage organizer' : 'A scrimmage organizer';
           for (const email of req.body.coHostEmails as string[]) {
             try {
               const [existingUser] = await storage.searchUsersByEmail(email, 1);
@@ -16931,17 +17000,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   canManagePayments: true,
                   addedBy: userId,
                 });
-                if (!scrimmageData.timeTbd) {
-                  await storage.createNotification({
-                    userId: existingUser.id,
-                    type: 'scrimmage_cohost_added',
-                    title: `You're a co-host for ${scrimmageData.title}`,
-                    message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
-                    actionUrl: `/scrimmage/${parentScrimmage.id}`,
-                    scrimmageId: parentScrimmage.id,
-                  });
-                  broadcastNotificationUpdate(existingUser.id);
-                }
+                await notifyScrimmageCoHostAdded({
+                  coHostUserId: existingUser.id,
+                  scrimmageId: parentScrimmage.id,
+                  scrimmageTitle: parentScrimmage.title,
+                  dateTime: parentScrimmage.dateTime,
+                  timeTbd: parentScrimmage.timeTbd,
+                  timezone: scrimmageTimezone,
+                  creatorId: parentScrimmage.creatorId,
+                  leagueId: parentScrimmage.leagueId,
+                });
               } else if (!scrimmageData.timeTbd) {
                 await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: scrimmageData.title });
               }
@@ -17032,17 +17100,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 canManagePayments: true,
                 addedBy: userId,
               });
-              if (!scrimmageData.timeTbd) {
-                await storage.createNotification({
-                  userId: coHostId,
-                  type: 'scrimmage_cohost_added',
-                  title: `You're a co-host for ${scrimmageData.title}`,
-                  message: `You have been added as a co-host for "${scrimmageData.title}" on ${formatFullDateTime(scrimmageData.dateTime, scrimmageTimezone)}. You can now help manage players and payments.`,
-                  actionUrl: `/scrimmage/${scrimmage.id}`,
-                  scrimmageId: scrimmage.id,
-                });
-                broadcastNotificationUpdate(coHostId);
-              }
+              await notifyScrimmageCoHostAdded({
+                coHostUserId: coHostId,
+                scrimmageId: scrimmage.id,
+                scrimmageTitle: scrimmage.title,
+                dateTime: scrimmage.dateTime,
+                timeTbd: scrimmage.timeTbd,
+                timezone: scrimmageTimezone,
+                creatorId: scrimmage.creatorId,
+                leagueId: scrimmage.leagueId,
+              });
             } catch (coHostError) {
               console.error(`Failed to add co-host ${coHostId}:`, coHostError);
             }
@@ -17051,8 +17118,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Handle email-invited co-hosts (may or may not have accounts)
         if (req.body.coHostEmails && Array.isArray(req.body.coHostEmails) && req.body.coHostEmails.length > 0) {
-          const creator = await storage.getUser(userId);
-          const creatorName = creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'A scrimmage organizer' : 'A scrimmage organizer';
           for (const email of req.body.coHostEmails as string[]) {
             try {
               const [existingUser] = await storage.searchUsersByEmail(email, 1);
@@ -17065,17 +17130,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   canManagePayments: true,
                   addedBy: userId,
                 });
-                if (!scrimmageData.timeTbd) {
-                  await storage.createNotification({
-                    userId: existingUser.id,
-                    type: 'scrimmage_cohost_added',
-                    title: `You're a co-host for ${scrimmageData.title}`,
-                    message: `${creatorName} added you as a co-host for "${scrimmageData.title}".`,
-                    actionUrl: `/scrimmage/${scrimmage.id}`,
-                    scrimmageId: scrimmage.id,
-                  });
-                  broadcastNotificationUpdate(existingUser.id);
-                }
+                await notifyScrimmageCoHostAdded({
+                  coHostUserId: existingUser.id,
+                  scrimmageId: scrimmage.id,
+                  scrimmageTitle: scrimmage.title,
+                  dateTime: scrimmage.dateTime,
+                  timeTbd: scrimmage.timeTbd,
+                  timezone: scrimmageTimezone,
+                  creatorId: scrimmage.creatorId,
+                  leagueId: scrimmage.leagueId,
+                });
               } else if (!scrimmageData.timeTbd) {
                 await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: scrimmageData.title });
               }
@@ -17469,15 +17533,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               canManagePayments: true,
               addedBy: userId,
             });
-            await storage.createNotification({
-              userId: coHostId,
-              type: 'scrimmage_cohost_added',
-              title: `You're a co-host for ${updatedScrimmage.title}`,
-              message: `You have been added as a co-host for "${updatedScrimmage.title}" on ${formatFullDateTime(updatedScrimmage.dateTime, getScrimmageTimezone(updatedScrimmage))}. You can now help manage players and payments.`,
-              actionUrl: `/scrimmage/${scrimmageId}`,
+            await notifyScrimmageCoHostAdded({
+              coHostUserId: coHostId,
               scrimmageId,
+              scrimmageTitle: updatedScrimmage.title,
+              dateTime: updatedScrimmage.dateTime,
+              timeTbd: updatedScrimmage.timeTbd,
+              timezone: getScrimmageTimezone(updatedScrimmage),
+              creatorId: updatedScrimmage.creatorId,
+              leagueId: updatedScrimmage.leagueId,
             });
-            broadcastNotificationUpdate(coHostId);
           } catch (coHostError) {
             console.error(`Failed to add co-host ${coHostId} during update:`, coHostError);
           }
@@ -17486,8 +17551,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Handle email-invited co-hosts during update
       if (req.body.coHostEmails && Array.isArray(req.body.coHostEmails) && req.body.coHostEmails.length > 0) {
-        const creator = await storage.getUser(userId);
-        const creatorName = creator ? `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'A scrimmage organizer' : 'A scrimmage organizer';
         for (const email of req.body.coHostEmails as string[]) {
           try {
             const [existingUser] = await storage.searchUsersByEmail(email, 1);
@@ -17500,15 +17563,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 canManagePayments: true,
                 addedBy: userId,
               });
-              await storage.createNotification({
-                userId: existingUser.id,
-                type: 'scrimmage_cohost_added',
-                title: `You're a co-host for ${updatedScrimmage.title}`,
-                message: `${creatorName} added you as a co-host for "${updatedScrimmage.title}".`,
-                actionUrl: `/scrimmage/${scrimmageId}`,
+              await notifyScrimmageCoHostAdded({
+                coHostUserId: existingUser.id,
                 scrimmageId,
+                scrimmageTitle: updatedScrimmage.title,
+                dateTime: updatedScrimmage.dateTime,
+                timeTbd: updatedScrimmage.timeTbd,
+                timezone: getScrimmageTimezone(updatedScrimmage),
+                creatorId: updatedScrimmage.creatorId,
+                leagueId: updatedScrimmage.leagueId,
               });
-              broadcastNotificationUpdate(existingUser.id);
             } else {
               await sendWelcomeEmail(email, { playerName: email.split('@')[0], leagueName: updatedScrimmage.title });
             }
@@ -19276,48 +19340,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         addedBy: userId,
       });
       
-      const timezone = getScrimmageTimezone(scrimmage);
-      
-      // Notify the new co-host
-      const dateTimeStr = formatFullDateTime(scrimmage.dateTime, timezone);
-      await storage.createNotification({
-        userId: coHostUserId,
-        type: 'scrimmage_cohost_added',
-        title: `You're a co-host for ${scrimmage.title}`,
-        message: `You have been added as a co-host for "${scrimmage.title}" on ${dateTimeStr}. You can now help manage players and payments.`,
-        actionUrl: `/scrimmage/${scrimmageId}`,
-        scrimmageId: scrimmageId,
+      await notifyScrimmageCoHostAdded({
+        coHostUserId,
+        scrimmageId,
+        scrimmageTitle: scrimmage.title,
+        dateTime: scrimmage.dateTime,
+        timeTbd: scrimmage.timeTbd,
+        timezone: getScrimmageTimezone(scrimmage),
+        creatorId: scrimmage.creatorId,
+        leagueId: scrimmage.leagueId,
       });
-      broadcastNotificationUpdate(coHostUserId);
-      
-      // Send push notification
-      try {
-        let coHostLogoUrl: string | undefined;
-        try {
-          const coHostTeamRows = await db
-            .select({ logoUrl: teams.logoUrl })
-            .from(teamMemberships)
-            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-            .where(and(
-              eq(teamMemberships.userId, scrimmage.creatorId),
-              eq(teams.leagueId, scrimmage.leagueId),
-              eq(teamMemberships.status, 'approved')
-            ))
-            .limit(1);
-          coHostLogoUrl = resolveTeamLogoUrl(coHostTeamRows[0]?.logoUrl);
-        } catch (e) { /* keep undefined */ }
-        const { sendCoHostPushNotification } = await import('./oneSignalNotifications');
-        const pushResult = await sendCoHostPushNotification(
-          coHostUserId,
-          scrimmage.title,
-          dateTimeStr,
-          scrimmageId,
-          coHostLogoUrl
-        );
-        console.log(`[Push] Co-host notification to ${coHostUserId}: ${pushResult ? 'sent' : 'skipped/failed'}`);
-      } catch (pushError) {
-        console.error('[Push] Failed to send co-host notification:', pushError);
-      }
       
       res.status(201).json(coHost);
     } catch (error) {
