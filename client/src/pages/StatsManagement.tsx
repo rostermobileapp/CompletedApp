@@ -66,6 +66,7 @@ export default function StatsManagement() {
   const [selectedLeague, setSelectedLeague] = useState<string>(urlLeagueId || '');
   const [selectedSeason, setSelectedSeason] = useState<string>(urlSeasonId || '');
   const [selectedGame, setSelectedGame] = useState<string>('');
+  const [gamePickerOpen, setGamePickerOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [playerGameStats, setPlayerGameStats] = useState<Record<string, { goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>>({});
   const [individualPlayerStats, setIndividualPlayerStats] = useState<{ goals: string; assists: string; penaltyMinutes: string; gamesPlayed: string }>({ goals: '', assists: '', penaltyMinutes: '', gamesPlayed: '' });
@@ -700,29 +701,81 @@ export default function StatsManagement() {
                 <CardContent className="p-6 space-y-4 pt-[0px] pb-[0px]">
                   <div className="flex items-center gap-3">
                     <Label htmlFor="stats-game-select">Game</Label>
-                    <select
+                    <button
                       id="stats-game-select"
-                      value={selectedGame}
-                      onChange={(event) => setSelectedGame(event.target.value)}
+                      type="button"
+                      onClick={() => setGamePickerOpen(true)}
                       disabled={gamesLoading || filteredGames.length === 0}
-                      className="h-10 min-w-0 flex-1 rounded-md border border-[hsl(var(--hairline))] bg-background px-3 py-2 text-sm shadow-[var(--elev-inset)] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 min-w-0 flex-1 items-center justify-between rounded-md border border-[hsl(var(--hairline))] bg-background px-3 py-2 text-left text-sm shadow-[var(--elev-inset)] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       data-testid="select-game"
                     >
-                      <option value="">
+                      <span className="min-w-0 truncate">
                         {gamesLoading
                           ? 'Loading games…'
                           : filteredGames.length === 0
                             ? 'No games found for this season'
-                            : 'Select a game'}
-                      </option>
-                      {filteredGames.map((game: Game) => (
-                        <option key={game.id} value={game.id}>
-                          {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
-                          {game.isScrimmage ? ' (Scrimmage)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                            : selectedGame
+                              ? (() => {
+                                  const game = filteredGames.find((item) => item.id === selectedGame);
+                                  return game
+                                    ? `${game.homeTeam.name} vs ${game.awayTeam.name} - ${format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}${game.isScrimmage ? ' (Scrimmage)' : ''}`
+                                    : 'Select a game';
+                                })()
+                              : 'Select a game'}
+                      </span>
+                      <span aria-hidden="true" className="ml-2 shrink-0 text-muted-foreground">⌄</span>
+                    </button>
                   </div>
+
+                  {gamePickerOpen && (
+                    <div
+                      className="fixed inset-0 z-[100] flex items-end bg-black/60 sm:items-center sm:justify-center"
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label="Select a game"
+                      onClick={() => setGamePickerOpen(false)}
+                    >
+                      <div
+                        className="max-h-[75dvh] w-full overflow-hidden rounded-t-2xl border bg-background shadow-2xl sm:max-w-xl sm:rounded-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between border-b px-4 py-3">
+                          <h2 className="text-lg font-semibold">Select a game</h2>
+                          <button
+                            type="button"
+                            onClick={() => setGamePickerOpen(false)}
+                            className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
+                          >
+                            Close
+                          </button>
+                        </div>
+                        <div className="max-h-[calc(75dvh-3.75rem)] overflow-y-auto overscroll-contain p-2">
+                          {filteredGames.map((game: Game) => (
+                            <button
+                              key={game.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedGame(game.id);
+                                setGamePickerOpen(false);
+                              }}
+                              className={`w-full rounded-lg px-3 py-3 text-left text-base active:bg-accent ${
+                                selectedGame === game.id ? 'bg-accent font-medium' : 'hover:bg-muted'
+                              }`}
+                              data-testid={`game-option-${game.id}`}
+                            >
+                              <span className="block">
+                                {game.homeTeam.name} vs {game.awayTeam.name}
+                              </span>
+                              <span className="block text-sm text-muted-foreground">
+                                {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
+                                {game.isScrimmage ? ' · Scrimmage' : ''}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {selectedGame && Array.isArray(nonGoalieParticipants) && nonGoalieParticipants.length > 0 && (
                     <div className="space-y-4">
