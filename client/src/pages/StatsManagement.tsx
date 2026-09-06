@@ -650,30 +650,29 @@ export default function StatsManagement() {
               <Card>
                 <CardContent className="p-6 space-y-4 pt-[0px] pb-[0px]">
                   <div className="flex items-center gap-3">
-                    <Label>Game</Label>
-                    <Select value={selectedGame} onValueChange={setSelectedGame} data-testid="select-game">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a game" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {gamesLoading && (
-                          <SelectItem value="loading" disabled>
-                            Loading games…
-                          </SelectItem>
-                        )}
-                        {!gamesLoading && filteredGames.length === 0 && (
-                          <SelectItem value="no-games" disabled>
-                            No games found for this season
-                          </SelectItem>
-                        )}
-                        {Array.isArray(filteredGames) && filteredGames.map((game: Game) => (
-                          <SelectItem key={game.id} value={game.id}>
-                            {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
-                            {game.isScrimmage && ' (Scrimmage)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="stats-game-select">Game</Label>
+                    <select
+                      id="stats-game-select"
+                      value={selectedGame}
+                      onChange={(event) => setSelectedGame(event.target.value)}
+                      disabled={gamesLoading || filteredGames.length === 0}
+                      className="h-10 min-w-0 flex-1 rounded-md border border-[hsl(var(--hairline))] bg-background px-3 py-2 text-sm shadow-[var(--elev-inset)] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid="select-game"
+                    >
+                      <option value="">
+                        {gamesLoading
+                          ? 'Loading games…'
+                          : filteredGames.length === 0
+                            ? 'No games found for this season'
+                            : 'Select a game'}
+                      </option>
+                      {filteredGames.map((game: Game) => (
+                        <option key={game.id} value={game.id}>
+                          {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
+                          {game.isScrimmage ? ' (Scrimmage)' : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {selectedGame && Array.isArray(nonGoalieParticipants) && nonGoalieParticipants.length > 0 && (
