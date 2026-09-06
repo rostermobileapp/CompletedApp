@@ -100,10 +100,13 @@ export default function StatsManagement() {
     enabled: !!selectedLeague,
   });
 
-  // Get games for selected league
-  const { data: games = [] } = useQuery({
-    queryKey: [`/api/leagues/${selectedLeague}/games`],
-    enabled: !!selectedLeague,
+  // Ask the server for the selected season's games. Games have an explicit
+  // season assignment, so inferring it again from browser-parsed dates can
+  // incorrectly empty the dropdown at season boundaries or across timezones.
+  const gamesUrl = `/api/leagues/${selectedLeague}/games?seasonId=${selectedSeason}`;
+  const { data: games = [], isLoading: gamesLoading } = useQuery<Game[]>({
+    queryKey: [gamesUrl],
+    enabled: !!selectedLeague && !!selectedSeason,
   });
 
   // Get game participants for selected game
@@ -595,20 +598,10 @@ export default function StatsManagement() {
     });
   };
 
-  // Filtered games for current season
+  // The API has already filtered these by their assigned season.
   const filteredGames = useMemo(() => {
-    if (!selectedSeason || !Array.isArray(games)) return [];
-    return games.filter((game: Game) => {
-      // Find season for this game
-      const gameSeason = Array.isArray(seasons) ? seasons.find((s: any) => {
-        const gameDate = new Date(game.scheduledAt);
-        const seasonStart = new Date(s.startDate);
-        const seasonEnd = new Date(s.endDate);
-        return gameDate >= seasonStart && gameDate <= seasonEnd;
-      }) : null;
-      return gameSeason?.id === selectedSeason;
-    });
-  }, [games, seasons, selectedSeason]);
+    return Array.isArray(games) ? games : [];
+  }, [games]);
 
   // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
   return (
@@ -663,6 +656,16 @@ export default function StatsManagement() {
                         <SelectValue placeholder="Select a game" />
                       </SelectTrigger>
                       <SelectContent>
+                        {gamesLoading && (
+                          <SelectItem value="loading" disabled>
+                            Loading games…
+                          </SelectItem>
+                        )}
+                        {!gamesLoading && filteredGames.length === 0 && (
+                          <SelectItem value="no-games" disabled>
+                            No games found for this season
+                          </SelectItem>
+                        )}
                         {Array.isArray(filteredGames) && filteredGames.map((game: Game) => (
                           <SelectItem key={game.id} value={game.id}>
                             {game.homeTeam.name} vs {game.awayTeam.name} - {format(new Date(game.scheduledAt), 'MMM d, yyyy h:mm a')}
