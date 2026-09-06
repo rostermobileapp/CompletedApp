@@ -1,10 +1,10 @@
 ---
 name: Mobile game selector
-description: Mobile-shell interaction constraint for the Stats Management game picker.
+description: League and season context rules for the Stats Management game picker.
 ---
 
-Use a native HTML selector for the Stats Management game picker rather than the shared Radix selector.
+Stats Management must expose native league, season, and game selectors rather than silently locking the page to URL or auto-selected context.
 
-**Why:** In the mobile app shell, the Radix menu can display game options but fail to commit a tapped option. This was reproduced after the game data and season filtering were already correct.
+**Why:** An empty game dropdown was initially mistaken for a touch failure. The expected game existed and had a valid explicit season assignment, but the page offered no way to escape a different selected league/season context.
 
-**How to apply:** Preserve native select behavior for this picker when restyling Stats Management. Fetch games by their explicit season assignment; do not infer season membership from browser-parsed dates.
+**How to apply:** Preserve visible league and season controls when restyling Stats Management. Fetch games by their explicit season assignment; do not infer season membership from browser-parsed dates.

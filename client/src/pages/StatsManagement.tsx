@@ -615,6 +615,55 @@ export default function StatsManagement() {
           </div>
         </div>
 
+        {Array.isArray(commissionerLeagues) && commissionerLeagues.length > 0 && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="stats-league-select">League</Label>
+              <select
+                id="stats-league-select"
+                value={selectedLeague}
+                onChange={(event) => {
+                  setSelectedLeague(event.target.value);
+                  setSelectedSeason('');
+                  setSelectedGame('');
+                  setSelectedPlayer('');
+                }}
+                className="h-10 w-full rounded-md border border-[hsl(var(--hairline))] bg-background px-3 py-2 text-sm shadow-[var(--elev-inset)] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                data-testid="select-stats-league"
+              >
+                {commissionerLeagues.map((league: any) => (
+                  <option key={league.id} value={league.id}>
+                    {league.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="stats-season-select">Season</Label>
+              <select
+                id="stats-season-select"
+                value={selectedSeason}
+                onChange={(event) => {
+                  setSelectedSeason(event.target.value);
+                  setSelectedGame('');
+                  setSelectedPlayer('');
+                }}
+                disabled={!selectedLeague || seasons.length === 0}
+                className="h-10 w-full rounded-md border border-[hsl(var(--hairline))] bg-background px-3 py-2 text-sm shadow-[var(--elev-inset)] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                data-testid="select-stats-season"
+              >
+                {seasons.length === 0 && <option value="">No seasons found</option>}
+                {seasons.map((season: any) => (
+                  <option key={season.id} value={season.id}>
+                    {season.name}{season.isActive ? ' (Active)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* No Leagues Empty State */}
         {Array.isArray(commissionerLeagues) && commissionerLeagues.length === 0 && (
           <Card>
