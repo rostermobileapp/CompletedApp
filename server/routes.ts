@@ -11487,13 +11487,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
       }
 
-      // Submit all goals and penalties
-      await storage.submitGameGoals(gameId);
-      await storage.submitGamePenalties(gameId);
-
-      // Get all goals and penalties for this game
+      // Capture only newly-entered details before marking them submitted.
+      // This keeps re-opening and saving a completed game idempotent instead
+      // of incrementing player totals again for previously submitted rows.
       const goals = await storage.getGameGoals(gameId);
       const penalties = await storage.getGamePenalties(gameId);
+      const pendingGoals = goals.filter((goal) => !goal.isSubmitted);
+      const pendingPenalties = penalties.filter((penalty) => !penalty.isSubmitted);
+
+      await storage.submitGameGoals(gameId);
+      await storage.submitGamePenalties(gameId);
 
       // Update player stats if this is a league game (not a scrimmage)
       // Scrimmages don't count towards player stats
@@ -11501,7 +11504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Build stats updates from goals
         const statsMap = new Map<string, { goals: number; assists: number; penaltyMinutes: number }>();
 
-        for (const goal of goals) {
+        for (const goal of pendingGoals) {
           // Update scorer
           const scorerStats = statsMap.get(goal.scorerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
           scorerStats.goals += 1;
@@ -11523,7 +11526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Add penalty minutes
-        for (const penalty of penalties) {
+        for (const penalty of pendingPenalties) {
           const playerStats = statsMap.get(penalty.playerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
           playerStats.penaltyMinutes += penalty.minutes || 0;
           statsMap.set(penalty.playerId, playerStats);

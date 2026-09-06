@@ -279,16 +279,32 @@ export default function ScorekeeperDashboard() {
 
   const homeScore = homeGoals.length;
   const awayScore = awayGoals.length;
+  const selectedGameIsCompleted =
+    selectedGame?.isCompleted === true || selectedGame?.status === 'completed';
+  const recordedHomeScore = selectedGame?.homeScore ?? 0;
+  const recordedAwayScore = selectedGame?.awayScore ?? 0;
+  // Historical games may have a final score but no goal-detail rows yet.
+  // Preserve that score while the scorekeeper adds the missing goal/assist
+  // details, then resume deriving it from goals once both totals catch up.
+  const isBackfillingCompletedGame =
+    selectedGameIsCompleted &&
+    (homeScore < recordedHomeScore || awayScore < recordedAwayScore);
+  const displayedHomeScore = isBackfillingCompletedGame ? recordedHomeScore : homeScore;
+  const displayedAwayScore = isBackfillingCompletedGame ? recordedAwayScore : awayScore;
 
   useEffect(() => {
-    if (selectedGame && (homeScore !== selectedGame.homeScore || awayScore !== selectedGame.awayScore)) {
+    if (
+      selectedGame &&
+      !isBackfillingCompletedGame &&
+      (homeScore !== selectedGame.homeScore || awayScore !== selectedGame.awayScore)
+    ) {
       updateScoresMutation.mutate({
         gameId: selectedGame.id,
         homeScore,
         awayScore
       });
     }
-  }, [homeScore, awayScore, selectedGame?.id]);
+  }, [homeScore, awayScore, selectedGame?.id, isBackfillingCompletedGame]);
 
   const upcomingGames = games.filter(g => {
     return g.isCompleted !== true && g.status !== 'completed';
@@ -738,10 +754,12 @@ export default function ScorekeeperDashboard() {
           <div className="flex items-center justify-between landscape:gap-4">
             {/* Score Display */}
             <div className="flex items-center gap-4">
-              <span className="text-3xl font-bold text-blue-500">{awayScore}</span>
+              <span className="text-3xl font-bold text-blue-500">{displayedAwayScore}</span>
               <span className="text-2xl text-muted-foreground">-</span>
-              <span className="text-3xl font-bold text-blue-500">{homeScore}</span>
-              <Badge variant="destructive" className="ml-2">LIVE</Badge>
+              <span className="text-3xl font-bold text-blue-500">{displayedHomeScore}</span>
+              <Badge variant={selectedGameIsCompleted ? "secondary" : "destructive"} className="ml-2">
+                {selectedGameIsCompleted ? 'EDITING' : 'LIVE'}
+              </Badge>
             </div>
 
             {/* Action Buttons */}
@@ -757,7 +775,7 @@ export default function ScorekeeperDashboard() {
               <Button 
                 size="sm"
                 onClick={() => {
-                  if (window.confirm(`Finalize game?\n\n${selectedGame.awayTeam?.name}: ${awayScore}\n${selectedGame.homeTeam?.name}: ${homeScore}\n\nThis will update all player stats.`)) {
+                  if (window.confirm(`${selectedGameIsCompleted ? 'Save added game details?' : 'Finalize game?'}\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}\n\nThis will update player stats for newly entered details.`)) {
                     finalizeGameMutation.mutate(selectedGame.id);
                   }
                 }}
@@ -765,7 +783,7 @@ export default function ScorekeeperDashboard() {
                 data-testid="finalize-game"
               >
                 <Check className="mr-1 h-4 w-4" />
-                Finalize
+                {selectedGameIsCompleted ? 'Save Stats' : 'Finalize'}
               </Button>
             </div>
           </div>
@@ -961,9 +979,10 @@ export default function ScorekeeperDashboard() {
                   ) : (
                     <div className="space-y-2 max-h-[50vh] overflow-y-auto">
                       {completedGames.map((game) => (
-                        <div 
+                        <div
                           key={game.id} 
                           className="flex items-center justify-between p-2 bg-muted rounded-lg"
+                          data-testid={`completed-game-row-${game.id}`}
                         >
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium truncate">
@@ -976,8 +995,21 @@ export default function ScorekeeperDashboard() {
                               )}
                             </div>
                           </div>
-                          <div className="font-bold text-sm ml-2">
-                            {game.awayScore ?? 0} - {game.homeScore ?? 0}
+                          <div className="ml-2 flex items-center gap-2">
+                            <div className="font-bold text-sm whitespace-nowrap">
+                              {game.awayScore ?? 0} - {game.homeScore ?? 0}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => selectGame(game)}
+                              disabled={isTournamentUnpaid}
+                              title={isTournamentUnpaid ? 'Tournament payment required to score games' : 'Add or edit goal, assist, and penalty details'}
+                              data-testid={`edit-scoring-${game.id}`}
+                            >
+                              <Target className="mr-1 h-3 w-3" />
+                              Stats
+                            </Button>
                           </div>
                         </div>
                       ))}
