@@ -12309,7 +12309,7 @@ export class DatabaseStorage implements IStorage {
         team: teams,
       })
       .from(gameGoals)
-      .innerJoin(users, eq(gameGoals.scorerId, users.id))
+      .leftJoin(users, eq(gameGoals.scorerId, users.id))
       .innerJoin(teams, eq(gameGoals.teamId, teams.id))
       .where(eq(gameGoals.gameId, gameId))
       .orderBy(gameGoals.goalNumber);
@@ -12350,7 +12350,7 @@ export class DatabaseStorage implements IStorage {
         team: teams,
       })
       .from(gameGoals)
-      .innerJoin(users, eq(gameGoals.scorerId, users.id))
+      .leftJoin(users, eq(gameGoals.scorerId, users.id))
       .innerJoin(teams, eq(gameGoals.teamId, teams.id))
       .where(eq(gameGoals.id, id));
     

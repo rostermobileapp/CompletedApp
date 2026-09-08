@@ -1912,7 +1912,9 @@ export const gameGoals = pgTable("game_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").references(() => games.id).notNull(),
   teamId: varchar("team_id").references(() => teams.id).notNull(),
-  scorerId: varchar("scorer_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  // Null represents a substitute scorer: the goal counts toward the game
+  // score but is not attributed to an individual player's season stats.
+  scorerId: varchar("scorer_id").references(() => users.id, { onDelete: 'cascade' }),
   primaryAssistId: varchar("primary_assist_id").references(() => users.id, { onDelete: 'cascade' }),
   secondaryAssistId: varchar("secondary_assist_id").references(() => users.id, { onDelete: 'cascade' }),
   goalNumber: integer("goal_number").notNull(),
@@ -3659,7 +3661,7 @@ export type InsertGamePenalty = z.infer<typeof insertGamePenaltySchema>;
 
 // Extended game goal and penalty types with relationships
 export type GameGoalWithDetails = GameGoal & {
-  scorer: User;
+  scorer: User | null;
   primaryAssist?: User | null;
   secondaryAssist?: User | null;
   team: Team;

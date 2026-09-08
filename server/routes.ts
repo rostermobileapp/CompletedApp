@@ -11251,6 +11251,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { teamId, scorerId, primaryAssistId, secondaryAssistId, period, timestamp } = req.body;
+      const normalizedScorerId = scorerId === 'substitute' ? null : scorerId;
+      const normalizedPrimaryAssistId = primaryAssistId === 'substitute' ? null : (primaryAssistId || null);
+      const normalizedSecondaryAssistId = secondaryAssistId === 'substitute' ? null : (secondaryAssistId || null);
       
       // Get the current goal count for this game to set the goal number
       const existingGoals = await storage.getGameGoals(gameId);
@@ -11259,9 +11262,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const goal = await storage.createGameGoal({
         gameId,
         teamId,
-        scorerId,
-        primaryAssistId: primaryAssistId || null,
-        secondaryAssistId: secondaryAssistId || null,
+        scorerId: normalizedScorerId,
+        primaryAssistId: normalizedPrimaryAssistId,
+        secondaryAssistId: normalizedSecondaryAssistId,
         goalNumber,
         period: period || 1,
         timestamp: timestamp || null,
@@ -11506,9 +11509,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         for (const goal of pendingGoals) {
           // Update scorer
-          const scorerStats = statsMap.get(goal.scorerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
-          scorerStats.goals += 1;
-          statsMap.set(goal.scorerId, scorerStats);
+          if (goal.scorerId) {
+            const scorerStats = statsMap.get(goal.scorerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
+            scorerStats.goals += 1;
+            statsMap.set(goal.scorerId, scorerStats);
+          }
 
           // Update primary assist
           if (goal.primaryAssistId) {

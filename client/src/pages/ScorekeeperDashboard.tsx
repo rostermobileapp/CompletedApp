@@ -66,7 +66,7 @@ interface GameGoal {
   id: string;
   gameId: string;
   teamId: string;
-  scorerId: string;
+  scorerId: string | null;
   primaryAssistId: string | null;
   secondaryAssistId: string | null;
   goalNumber: number;

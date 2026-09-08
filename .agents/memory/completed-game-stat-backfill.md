@@ -14,3 +14,9 @@ Finalization may increment season totals only from goal and penalty rows that we
 **Why:** Reopening and saving a completed game must not count previously finalized goals or assists a second time.
 
 **How to apply:** Capture unsubmitted events before submission, build aggregate stat increments only from that pending set, and treat repeated saves as idempotent.
+
+Substitute scorers and substitute assists are unattributed participants: the goal event still counts toward the game's score, but no individual goal or assist is awarded for a substitute selection.
+
+**Why:** A game score must remain accurate even when the player is not registered, while season leaderboards must only reference real user accounts.
+
+**How to apply:** Store substitute participant references as null, keep the goal row itself, load scorer relationships with a left join, and skip null participant IDs during stat aggregation.
