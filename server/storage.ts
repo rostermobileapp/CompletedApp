@@ -12480,7 +12480,7 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(games)
       .set({ 
-        status: 'completed',
+        isCompleted: true,
       })
       .where(eq(games.id, gameId))
       .returning();
