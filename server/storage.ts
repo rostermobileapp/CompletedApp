@@ -220,6 +220,7 @@ import {
   type LeagueProSeat,
 } from "@shared/schema";
 import { canAcceptFreshScrimmageRequest } from "./scrimmageLifecycle";
+import { normalizeEmail } from "./emailNormalization";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists } from "drizzle-orm";
@@ -934,7 +935,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) return undefined;
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`LOWER(TRIM(${users.email})) = ${normalizedEmail}`)
+      .orderBy(sql`${users.onboardingCompleted} DESC`, sql`${users.createdAt} DESC`)
+      .limit(1);
     return user;
   }
 
@@ -966,6 +974,7 @@ export class DatabaseStorage implements IStorage {
       await tx.execute(sql`UPDATE conversation_participants SET user_id = ${newId} WHERE user_id = ${oldId}`);
       await tx.execute(sql`UPDATE conversations SET created_by = ${newId} WHERE created_by = ${oldId}`);
       await tx.execute(sql`UPDATE message_read_receipts SET user_id = ${newId} WHERE user_id = ${oldId}`);
+      await tx.execute(sql`UPDATE message_reactions SET user_id = ${newId} WHERE user_id = ${oldId}`);
       await tx.execute(sql`UPDATE user_notifications SET user_id = ${newId} WHERE user_id = ${oldId}`);
       await tx.execute(sql`UPDATE notification_preferences SET user_id = ${newId} WHERE user_id = ${oldId}`);
       await tx.execute(sql`UPDATE announcements SET author_id = ${newId} WHERE author_id = ${oldId}`);
@@ -1034,7 +1043,198 @@ export class DatabaseStorage implements IStorage {
     console.log(`[Storage] Migrated all FK references from ${oldId} to ${newId}`);
   }
 
+  private async reconcileDuplicateUsersForUser(userId: string): Promise<number> {
+    const canonical = await this.getUser(userId);
+    const normalizedEmail = normalizeEmail(canonical?.email);
+    if (!canonical || !normalizedEmail) return 0;
+
+    const caseDuplicates = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(
+        ne(users.id, userId),
+        sql`LOWER(TRIM(${users.email})) = ${normalizedEmail}`,
+      ));
+
+    // A NULL-email legacy row is only safe to claim when both the normalized
+    // name and an existing league membership overlap with the real account.
+    // Name matching by itself is deliberately insufficient.
+    const legacyNullDuplicates = canonical.firstName && canonical.lastName
+      ? await db.execute(sql`
+          SELECT candidate.id
+          FROM users candidate
+          WHERE candidate.id <> ${userId}
+            AND candidate.email IS NULL
+            AND LOWER(TRIM(candidate.first_name)) = LOWER(TRIM(${canonical.firstName}))
+            AND LOWER(TRIM(candidate.last_name)) = LOWER(TRIM(${canonical.lastName}))
+            AND EXISTS (
+              SELECT 1
+              FROM league_memberships old_lm
+              JOIN league_memberships real_lm
+                ON real_lm.league_id = old_lm.league_id
+               AND real_lm.user_id = ${userId}
+              WHERE old_lm.user_id = candidate.id
+            )
+        `)
+      : { rows: [] as Array<{ id: string }> };
+
+    const duplicateIds = new Set<string>([
+      ...caseDuplicates.map(({ id }) => id),
+      ...(legacyNullDuplicates.rows as Array<{ id: string }>).map(({ id }) => id),
+    ]);
+
+    let merged = 0;
+    for (const oldId of duplicateIds) {
+      try {
+        // Remove only duplicate join rows that would violate composite unique
+        // constraints when their remaining counterpart is moved.
+        await db.execute(sql`
+          DELETE FROM conversation_participants old
+          WHERE old.user_id = ${oldId}
+            AND EXISTS (
+              SELECT 1 FROM conversation_participants current
+              WHERE current.conversation_id = old.conversation_id
+                AND current.user_id = ${userId}
+            )
+        `);
+        await db.execute(sql`
+          DELETE FROM announcement_visibility old
+          WHERE old.user_id = ${oldId}
+            AND EXISTS (
+              SELECT 1 FROM announcement_visibility current
+              WHERE current.announcement_id = old.announcement_id
+                AND current.user_id = ${userId}
+            )
+        `);
+        await db.execute(sql`
+          DELETE FROM announcement_read_status old
+          WHERE old.user_id = ${oldId}
+            AND EXISTS (
+              SELECT 1 FROM announcement_read_status current
+              WHERE current.announcement_id = old.announcement_id
+                AND current.user_id = ${userId}
+            )
+        `);
+        await db.execute(sql`
+          DELETE FROM game_rsvps old
+          WHERE old.user_id = ${oldId}
+            AND EXISTS (
+              SELECT 1 FROM game_rsvps current
+              WHERE current.game_id = old.game_id
+                AND current.team_id = old.team_id
+                AND current.user_id = ${userId}
+            )
+        `);
+        await this.migrateUserForeignKeys(oldId, userId);
+        await db.delete(users).where(eq(users.id, oldId));
+        merged++;
+      } catch (error) {
+        console.error(`[Storage] Could not safely merge duplicate user ${oldId} into ${userId}:`, error);
+      }
+    }
+
+    if (merged > 0) {
+      // Membership tables predate normalized uniqueness constraints. Collapse
+      // duplicate rows created when two identities in the same league/team merge.
+      await db.execute(sql`
+        DELETE FROM league_memberships
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (
+              PARTITION BY user_id, league_id
+              ORDER BY CASE WHEN status = 'approved' THEN 0 ELSE 1 END, approved_at DESC NULLS LAST, requested_at
+            ) AS row_num
+            FROM league_memberships
+            WHERE user_id = ${userId}
+          ) ranked
+          WHERE row_num > 1
+        )
+      `);
+      await db.execute(sql`
+        DELETE FROM team_memberships
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id, ROW_NUMBER() OVER (
+              PARTITION BY user_id, team_id
+              ORDER BY CASE WHEN status = 'approved' THEN 0 ELSE 1 END, joined_at
+            ) AS row_num
+            FROM team_memberships
+            WHERE user_id = ${userId}
+          ) ranked
+          WHERE row_num > 1
+        )
+      `);
+      console.log(`[Storage] Reconciled ${merged} duplicate user record(s) into ${userId}`);
+    }
+    return merged;
+  }
+
+  private async migrateUserToAuthenticatedId(
+    oldId: string,
+    userData: UpsertUser & { id: string },
+  ): Promise<User> {
+    const fkResult = await db.execute(sql`
+      SELECT c.conrelid::regclass::text AS table_name, a.attname AS column_name
+      FROM pg_constraint c
+      JOIN unnest(c.conkey) WITH ORDINALITY key_column(attnum, ordinality) ON true
+      JOIN pg_attribute a
+        ON a.attrelid = c.conrelid
+       AND a.attnum = key_column.attnum
+      WHERE c.contype = 'f'
+        AND c.confrelid = 'users'::regclass
+        AND array_length(c.conkey, 1) = 1
+    `);
+    const foreignKeys = fkResult.rows as Array<{ table_name: string; column_name: string }>;
+
+    return db.transaction(async (tx) => {
+      const [source] = await tx.select().from(users).where(eq(users.id, oldId)).for('update');
+      if (!source) throw new Error(`Source user ${oldId} no longer exists`);
+
+      const [alreadyMigrated] = await tx.select().from(users).where(eq(users.id, userData.id)).limit(1);
+      if (alreadyMigrated) return alreadyMigrated;
+
+      // Release source-row unique values before creating the authenticated row.
+      // The transaction restores them automatically if any later reference move fails.
+      await tx
+        .update(users)
+        .set({ email: null, displayId: null })
+        .where(eq(users.id, oldId));
+
+      const [target] = await tx
+        .insert(users)
+        .values({
+          ...source,
+          ...userData,
+          id: userData.id,
+          email: normalizeEmail(userData.email) ?? normalizeEmail(source.email),
+          displayId: source.displayId,
+          createdAt: source.createdAt,
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      for (const { table_name: tableName, column_name: columnName } of foreignKeys) {
+        // Names come only from PostgreSQL's catalog; reject anything unexpected
+        // before using them as identifiers.
+        if (!/^[a-z_][a-z0-9_]*$/.test(tableName) || !/^[a-z_][a-z0-9_]*$/.test(columnName)) {
+          throw new Error(`Unsafe foreign-key identifier: ${tableName}.${columnName}`);
+        }
+        await tx.execute(sql`
+          UPDATE ${sql.identifier(tableName)}
+          SET ${sql.identifier(columnName)} = ${userData.id}
+          WHERE ${sql.identifier(columnName)} = ${oldId}
+        `);
+      }
+
+      await tx.delete(users).where(eq(users.id, oldId));
+      return target;
+    });
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (userData.email !== undefined) {
+      userData = { ...userData, email: normalizeEmail(userData.email) };
+    }
     if (userData.city !== undefined && userData.city === '') {
       userData = { ...userData, city: null };
     }
@@ -1055,8 +1255,10 @@ export class DatabaseStorage implements IStorage {
           
           if (Object.keys(updateSet).length > 1) {
             const [user] = await db.update(users).set(updateSet).where(eq(users.id, existingByEmail.id)).returning();
+            await this.claimPlaceholdersForUser(user.id);
             return user;
           }
+          await this.claimPlaceholdersForUser(existingByEmail.id);
           return existingByEmail;
         }
         if (existingByEmail && userData.id && existingByEmail.id !== userData.id) {
@@ -1068,16 +1270,11 @@ export class DatabaseStorage implements IStorage {
             const oldId = existingByEmail.id;
             const newId = userData.id;
             
-            await this.migrateUserForeignKeys(oldId, newId);
-            
-            const [user] = await db
-              .update(users)
-              .set({
-                id: newId,
-                updatedAt: new Date(),
-              })
-              .where(eq(users.email, userData.email))
-              .returning();
+            const user = await this.migrateUserToAuthenticatedId(oldId, {
+              ...userData,
+              id: newId,
+            });
+            await this.claimPlaceholdersForUser(user.id);
             console.log(`[Storage] Successfully migrated user to new ID: ${newId}`);
             return user;
           } catch (migrationError: any) {
@@ -1152,18 +1349,18 @@ export class DatabaseStorage implements IStorage {
           console.error('[Storage] Failed to increment user registration count:', countError);
         }
 
-        // Auto-claim any placeholder_players rows that match this signup's
-        // email — turns commissioner-added stubs into real memberships.
-        try {
-          await this.claimPlaceholdersForUser(user.id);
-        } catch (claimErr) {
-          console.error('[Storage] claimPlaceholdersForUser failed for new user:', claimErr);
-        }
-
         // NOTE: The founder new-signup alert is intentionally NOT sent here.
         // It fires only after the user completes onboarding (PATCH /api/user/onboarding
         // with onboardingCompleted=true), so the notification carries a real name
         // and profile rather than a bare auth record.
+      }
+
+      // Run on every authenticated reconciliation, not just first signup.
+      // This also claims placeholders imported after the account was created.
+      try {
+        await this.claimPlaceholdersForUser(user.id);
+      } catch (claimErr) {
+        console.error('[Storage] imported identity reconciliation failed:', claimErr);
       }
 
       return user;
@@ -1179,16 +1376,11 @@ export class DatabaseStorage implements IStorage {
           try {
             const oldId = existingByEmail.id;
             const newId = userData.id;
-            await this.migrateUserForeignKeys(oldId, newId);
-            
-            const [user] = await db
-              .update(users)
-              .set({
-                id: newId,
-                updatedAt: new Date(),
-              })
-              .where(eq(users.email, userData.email))
-              .returning();
+            if (!newId) return existingByEmail;
+            const user = await this.migrateUserToAuthenticatedId(oldId, {
+              ...userData,
+              id: newId,
+            });
             console.log(`[Storage] Fallback migration successful`);
             return user;
           } catch (migrationError: any) {
@@ -3301,7 +3493,7 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
-        const email = (row.email || row.Email || row.EMAIL || '').toString().trim() || null;
+        const email = normalizeEmail((row.email || row.Email || row.EMAIL || '').toString());
         const jerseyNumber = (row.jerseyNumber || row['Jersey Number'] || row.jersey_number || row['Jersey #'] || '').toString().trim() || null;
         const position = (row.position || row.Position || '').toString().trim() || null;
 
@@ -3360,6 +3552,7 @@ export class DatabaseStorage implements IStorage {
     jerseyNumber?: string | null,
     position?: string | null
   ): Promise<TeamMembership | PlaceholderPlayer> {
+    email = normalizeEmail(email);
     // Check if user exists by email (only if email provided)
     let user = email ? await this.getUserByEmail(email) : null;
     
@@ -3471,7 +3664,7 @@ export class DatabaseStorage implements IStorage {
         teamId: input.teamId ?? null,
         firstName: input.firstName,
         lastName: input.lastName,
-        email: input.email ?? null,
+        email: normalizeEmail(input.email),
         phoneNumber: input.phoneNumber ?? null,
         position: input.position ?? null,
         jerseyNumber: input.jerseyNumber ?? null,

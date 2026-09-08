@@ -20,3 +20,4 @@
 - [Scrimmage co-host authority](scrimmage-cohost-authority.md) — co-host status grants full detail editing; granular flags govern player, reminder, and payment operations.
 - [Stats game context](mobile-game-selector.md) — Stats Management must expose league/season selectors and query games by explicit season assignment.
 - [Completed-game stat backfill](completed-game-stat-backfill.md) — preserve recorded scores while adding missing goal details; only newly submitted events may increment player totals.
+- [Email identity normalization](email-identity-normalization.md) — imported-player linking uses trimmed lowercase email; NULL-email legacy rows require corroborating context before merge.

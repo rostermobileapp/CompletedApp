@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
 import { setupAuth, isAuthenticated, supabase, getAuthenticatedDatabaseUser } from "./supabaseAuth";
@@ -1599,7 +1600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: any = {};
       if (firstName !== undefined) updateData.firstName = firstName;
       if (lastName !== undefined) updateData.lastName = lastName;
-      if (email !== undefined) updateData.email = email;
+      if (email !== undefined) updateData.email = normalizeEmail(email);
       if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
       if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
       if (city !== undefined) updateData.city = city;
