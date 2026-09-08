@@ -11006,19 +11006,24 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.leagueId, leagueId),
           eq(leagueMemberships.status, "approved"),
-          // Only include players who are on an approved team in this league.
-          // Free agents (approved league members with no team) must not appear on the stats board.
-          exists(
-            db.select({ one: sql`1` })
-              .from(teamMemberships)
-              .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-              .where(
-                and(
-                  eq(teamMemberships.userId, users.id),
-                  eq(teams.leagueId, leagueId),
-                  eq(teamMemberships.status, 'approved')
+          // Keep true free agents with no stats off the leaderboard, but do
+          // not hide historical players whose official season stats exist
+          // after their team-membership row has been removed or was never
+          // created.
+          or(
+            isNotNull(playerStats.id),
+            exists(
+              db.select({ one: sql`1` })
+                .from(teamMemberships)
+                .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+                .where(
+                  and(
+                    eq(teamMemberships.userId, users.id),
+                    eq(teams.leagueId, leagueId),
+                    eq(teamMemberships.status, 'approved')
+                  )
                 )
-              )
+            )
           ),
           // Filter by player type if specified
           ...(playerType === 'goalies' ? [eq(leagueMemberships.isGoalie, true)] : []),

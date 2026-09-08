@@ -251,6 +251,11 @@ export default function ScorekeeperDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [gamesQueryKey] });
+      if (selectedGame?.leagueId) {
+        queryClient.invalidateQueries({
+          queryKey: ['/api/leagues', selectedGame.leagueId, 'stats'],
+        });
+      }
       toast({ title: 'Game finalized', description: 'Stats have been updated' });
       setSelectedGame(null);
       setActiveTab('schedule');
