@@ -26,3 +26,9 @@ Submitting event rows, incrementing player totals, and marking the game complete
 **Why:** If event rows are marked submitted before a later stats write fails, retries can skip those events and permanently lose valid player totals.
 
 **How to apply:** Lock the game during finalization, validate participant references, perform every related write in one transaction, and recover incomplete games whose events were prematurely submitted by older code.
+
+Authorized Scorekeeper finalization counts as official score verification and must clear the league's verification alert.
+
+**Why:** Game completion and detailed stat submission are stronger evidence than a separate captain score entry; requiring both leaves already-finalized games in the alert queue.
+
+**How to apply:** Upsert a commissioner-override score submission in the finalization transaction and invalidate both game-verification and notification-count queries on success.

@@ -255,6 +255,12 @@ export default function ScorekeeperDashboard() {
         queryClient.invalidateQueries({
           queryKey: ['/api/leagues', selectedGame.leagueId, 'stats'],
         });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/leagues', selectedGame.leagueId, 'games-needing-verification'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/user/notification-counts'],
+        });
       }
       toast({ title: 'Game finalized', description: 'Stats have been updated' });
       setSelectedGame(null);

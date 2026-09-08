@@ -11609,6 +11609,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(games.id, gameId))
           .returning();
 
+        // Finalizing through the authorized Scorekeeper is itself an official
+        // verification. Keep this in the same transaction so the game cannot
+        // complete while remaining in the verification alert queue.
+        const [existingVerification] = await tx.select({ id: gameScoreSubmissions.id })
+          .from(gameScoreSubmissions)
+          .where(and(
+            eq(gameScoreSubmissions.gameId, gameId),
+            eq(gameScoreSubmissions.isCommissionerOverride, true),
+          ))
+          .limit(1);
+
+        if (existingVerification) {
+          await tx.update(gameScoreSubmissions)
+            .set({
+              submittedBy: userId,
+              submitterRole: 'commissioner',
+              homeScore: updatedGame.homeScore ?? 0,
+              awayScore: updatedGame.awayScore ?? 0,
+              isCommissionerOverride: true,
+              submittedAt: new Date(),
+            })
+            .where(eq(gameScoreSubmissions.id, existingVerification.id));
+        } else {
+          await tx.insert(gameScoreSubmissions).values({
+            gameId,
+            submittedBy: userId,
+            submitterRole: 'commissioner',
+            homeScore: updatedGame.homeScore ?? 0,
+            awayScore: updatedGame.awayScore ?? 0,
+            isCommissionerOverride: true,
+          });
+        }
+
         return {
           game: updatedGame,
           goalsCount: goals.length,
