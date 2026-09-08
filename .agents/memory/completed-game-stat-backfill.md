@@ -20,3 +20,9 @@ Substitute scorers and substitute assists are unattributed participants: the goa
 **Why:** A game score must remain accurate even when the player is not registered, while season leaderboards must only reference real user accounts.
 
 **How to apply:** Store substitute participant references as null, keep the goal row itself, load scorer relationships with a left join, and skip null participant IDs during stat aggregation.
+
+Submitting event rows, incrementing player totals, and marking the game completed must be one database transaction.
+
+**Why:** If event rows are marked submitted before a later stats write fails, retries can skip those events and permanently lose valid player totals.
+
+**How to apply:** Lock the game during finalization, validate participant references, perform every related write in one transaction, and recover incomplete games whose events were prematurely submitted by older code.

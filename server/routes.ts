@@ -32,6 +32,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db } from "./db";
+import { gamePenalties } from "@shared/schema";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
@@ -11490,73 +11491,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
       }
 
-      // Capture only newly-entered details before marking them submitted.
-      // This keeps re-opening and saving a completed game idempotent instead
-      // of incrementing player totals again for previously submitted rows.
-      const goals = await storage.getGameGoals(gameId);
-      const penalties = await storage.getGamePenalties(gameId);
-      const pendingGoals = goals.filter((goal) => !goal.isSubmitted);
-      const pendingPenalties = penalties.filter((penalty) => !penalty.isSubmitted);
+      const result = await db.transaction(async (tx) => {
+        // Serialize finalization attempts and commit every related write
+        // together so a failure cannot leave a game half-finalized.
+        await tx.execute(sql`SELECT id FROM games WHERE id = ${gameId} FOR UPDATE`);
 
-      await storage.submitGameGoals(gameId);
-      await storage.submitGamePenalties(gameId);
+        const [lockedGame] = await tx.select().from(games).where(eq(games.id, gameId));
+        if (!lockedGame) throw new Error('Game disappeared during finalization');
 
-      // Update player stats if this is a league game (not a scrimmage)
-      // Scrimmages don't count towards player stats
-      if (game.leagueId && !game.isScrimmage) {
-        // Build stats updates from goals
-        const statsMap = new Map<string, { goals: number; assists: number; penaltyMinutes: number }>();
+        const goals = await tx.select().from(gameGoals).where(eq(gameGoals.gameId, gameId));
+        const penalties = await tx.select().from(gamePenalties).where(eq(gamePenalties.gameId, gameId));
 
-        for (const goal of pendingGoals) {
-          // Update scorer
-          if (goal.scorerId) {
-            const scorerStats = statsMap.get(goal.scorerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
-            scorerStats.goals += 1;
-            statsMap.set(goal.scorerId, scorerStats);
+        // Recover older failed attempts that submitted every event but never
+        // completed the game or committed any player-stat changes.
+        const recoverGoals = !lockedGame.isCompleted
+          && goals.length > 0
+          && goals.every((goal) => goal.isSubmitted);
+        const recoverPenalties = !lockedGame.isCompleted
+          && penalties.length > 0
+          && penalties.every((penalty) => penalty.isSubmitted);
+        const pendingGoals = goals.filter((goal) => recoverGoals || !goal.isSubmitted);
+        const pendingPenalties = penalties.filter((penalty) => recoverPenalties || !penalty.isSubmitted);
+
+        if (lockedGame.leagueId && !lockedGame.isScrimmage) {
+          const statsMap = new Map<string, { goals: number; assists: number; penaltyMinutes: number }>();
+          const addStat = (
+            playerId: string | null,
+            stat: 'goals' | 'assists' | 'penaltyMinutes',
+            amount: number,
+          ) => {
+            // Both forms represent an unattributed substitute.
+            if (!playerId || playerId === 'substitute') return;
+            const totals = statsMap.get(playerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
+            totals[stat] += amount;
+            statsMap.set(playerId, totals);
+          };
+
+          for (const goal of pendingGoals) {
+            addStat(goal.scorerId, 'goals', 1);
+            addStat(goal.primaryAssistId, 'assists', 1);
+            addStat(goal.secondaryAssistId, 'assists', 1);
+          }
+          for (const penalty of pendingPenalties) {
+            addStat(penalty.playerId, 'penaltyMinutes', penalty.minutes || 0);
           }
 
-          // Update primary assist
-          if (goal.primaryAssistId) {
-            const assistStats = statsMap.get(goal.primaryAssistId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
-            assistStats.assists += 1;
-            statsMap.set(goal.primaryAssistId, assistStats);
-          }
+          // Stale participant references should not prevent the valid parts of
+          // a game from finalizing. Only existing users receive player stats.
+          const candidateIds = Array.from(statsMap.keys());
+          const validIds = candidateIds.length > 0
+            ? new Set(
+                (await tx.select({ id: users.id }).from(users).where(inArray(users.id, candidateIds)))
+                  .map(({ id }) => id),
+              )
+            : new Set<string>();
 
-          // Update secondary assist
-          if (goal.secondaryAssistId) {
-            const assistStats = statsMap.get(goal.secondaryAssistId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
-            assistStats.assists += 1;
-            statsMap.set(goal.secondaryAssistId, assistStats);
+          for (const [playerId, totals] of statsMap) {
+            if (!validIds.has(playerId)) continue;
+
+            if (lockedGame.seasonId) {
+              await tx.insert(playerStats)
+                .values({
+                  userId: playerId,
+                  leagueId: lockedGame.leagueId,
+                  seasonId: lockedGame.seasonId,
+                  gamesPlayed: 0,
+                  ...totals,
+                })
+                .onConflictDoUpdate({
+                  target: [playerStats.userId, playerStats.leagueId, playerStats.seasonId],
+                  set: {
+                    goals: sql`${playerStats.goals} + ${totals.goals}`,
+                    assists: sql`${playerStats.assists} + ${totals.assists}`,
+                    penaltyMinutes: sql`${playerStats.penaltyMinutes} + ${totals.penaltyMinutes}`,
+                    updatedAt: new Date(),
+                  },
+                });
+            } else {
+              const updated = await tx.update(playerStats)
+                .set({
+                  goals: sql`${playerStats.goals} + ${totals.goals}`,
+                  assists: sql`${playerStats.assists} + ${totals.assists}`,
+                  penaltyMinutes: sql`${playerStats.penaltyMinutes} + ${totals.penaltyMinutes}`,
+                  updatedAt: new Date(),
+                })
+                .where(and(
+                  eq(playerStats.userId, playerId),
+                  eq(playerStats.leagueId, lockedGame.leagueId),
+                  isNull(playerStats.seasonId),
+                ))
+                .returning({ id: playerStats.id });
+
+              if (updated.length === 0) {
+                await tx.insert(playerStats).values({
+                  userId: playerId,
+                  leagueId: lockedGame.leagueId,
+                  seasonId: null,
+                  gamesPlayed: 0,
+                  ...totals,
+                });
+              }
+            }
           }
         }
 
-        // Add penalty minutes
-        for (const penalty of pendingPenalties) {
-          const playerStats = statsMap.get(penalty.playerId) || { goals: 0, assists: 0, penaltyMinutes: 0 };
-          playerStats.penaltyMinutes += penalty.minutes || 0;
-          statsMap.set(penalty.playerId, playerStats);
-        }
+        await tx.update(gameGoals)
+          .set({
+            isSubmitted: true,
+            scorerId: sql`NULLIF(${gameGoals.scorerId}, 'substitute')`,
+          })
+          .where(eq(gameGoals.gameId, gameId));
+        await tx.update(gamePenalties)
+          .set({ isSubmitted: true })
+          .where(eq(gamePenalties.gameId, gameId));
+        const [updatedGame] = await tx.update(games)
+          .set({ isCompleted: true })
+          .where(eq(games.id, gameId))
+          .returning();
 
-        // Update player stats in bulk
-        const statsUpdates = Array.from(statsMap.entries()).map(([playerId, stats]) => ({
-          userId: playerId,
-          updates: stats
-        }));
-
-        if (statsUpdates.length > 0) {
-          // Pass the game's seasonId to ensure stats are associated with the correct season
-          await storage.bulkUpdatePlayerStats(game.leagueId, statsUpdates, 'increment', game.seasonId || undefined);
-        }
-      }
-
-      // Finalize the game
-      const updatedGame = await storage.finalizeGame(gameId);
+        return {
+          game: updatedGame,
+          goalsCount: goals.length,
+          penaltiesCount: penalties.length,
+        };
+      });
       
       res.json({ 
         message: 'Game finalized successfully', 
-        game: updatedGame,
-        goalsCount: goals.length,
-        penaltiesCount: penalties.length
+        game: result.game,
+        goalsCount: result.goalsCount,
+        penaltiesCount: result.penaltiesCount
       });
     } catch (error) {
       console.error('Error finalizing game:', error);
