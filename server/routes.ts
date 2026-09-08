@@ -7726,6 +7726,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team pages need stats for the actual roster, including players who have a
+  // team assignment but do not have a separate league_memberships row. Starting
+  // from league_memberships (as the league leaderboard does) silently omits
+  // those opposing players.
+  app.get("/api/teams/:id/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const teamId = req.params.id;
+      const userId = req.user.claims.sub;
+      const team = await storage.getTeam(teamId);
+
+      if (!team?.leagueId) {
+        return res.status(404).json({ message: "Team or league not found" });
+      }
+
+      const viewerMembership = await storage.getUserLeagueMembership(userId, team.leagueId);
+      if (!viewerMembership || viewerMembership.status !== 'approved') {
+        return res.status(403).json({ message: "Access denied - not an approved league member" });
+      }
+
+      const result = await db.execute(sql`
+        WITH roster AS (
+          SELECT tm.user_id
+          FROM team_memberships tm
+          WHERE tm.team_id = ${teamId}
+            AND tm.status = 'approved'
+          UNION
+          SELECT lm.user_id
+          FROM league_memberships lm
+          WHERE lm.assigned_team_id = ${teamId}
+            AND lm.status = 'approved'
+        ),
+        aggregated_stats AS (
+          SELECT
+            ps.user_id,
+            COALESCE(SUM(ps.games_played), 0)::int AS games_played,
+            COALESCE(SUM(ps.goals), 0)::int AS goals,
+            COALESCE(SUM(ps.assists), 0)::int AS assists,
+            COALESCE(SUM(ps.penalty_minutes), 0)::int AS penalty_minutes
+          FROM player_stats ps
+          WHERE ps.league_id = ${team.leagueId}
+            AND ps.user_id IS NOT NULL
+          GROUP BY ps.user_id
+        )
+        SELECT
+          u.id AS user_id,
+          u.email,
+          u.first_name,
+          u.last_name,
+          u.profile_image_url,
+          COALESCE(ast.games_played, 0) AS games_played,
+          COALESCE(ast.goals, 0) AS goals,
+          COALESCE(ast.assists, 0) AS assists,
+          COALESCE(ast.penalty_minutes, 0) AS penalty_minutes,
+          COALESCE(lm.is_goalie, false) AS is_goalie
+        FROM roster r
+        INNER JOIN users u ON u.id = r.user_id
+        LEFT JOIN aggregated_stats ast ON ast.user_id = u.id
+        LEFT JOIN LATERAL (
+          SELECT is_goalie
+          FROM league_memberships
+          WHERE user_id = u.id
+            AND league_id = ${team.leagueId}
+            AND status = 'approved'
+          ORDER BY requested_at DESC
+          LIMIT 1
+        ) lm ON true
+        ORDER BY LOWER(COALESCE(u.last_name, '')), LOWER(COALESCE(u.first_name, ''))
+      `);
+
+      const rows = (result.rows ?? result) as any[];
+      res.json(rows.map((row: any) => ({
+        type: 'skater',
+        userId: row.user_id,
+        gamesPlayed: Number(row.games_played ?? 0),
+        goals: Number(row.goals ?? 0),
+        assists: Number(row.assists ?? 0),
+        penaltyMinutes: Number(row.penalty_minutes ?? 0),
+        points: Number(row.goals ?? 0) + Number(row.assists ?? 0),
+        isGoalie: Boolean(row.is_goalie),
+        user: {
+          id: row.user_id,
+          email: row.email,
+          firstName: row.first_name,
+          lastName: row.last_name,
+          profileImageUrl: row.profile_image_url,
+        },
+      })));
+    } catch (error) {
+      console.error("Error fetching team stats:", error);
+      res.status(500).json({ message: "Failed to fetch team stats" });
+    }
+  });
+
   app.get("/api/user/teams", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

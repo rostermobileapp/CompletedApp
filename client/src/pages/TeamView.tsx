@@ -68,30 +68,11 @@ export default function TeamView() {
   const { data: teamStats = [] } = useQuery({
     queryKey: ['/api/leagues', (team as any)?.leagueId, 'stats', 'team', teamId, 'members', teamMembers?.length],
     queryFn: async () => {
-      if (!(team as any)?.leagueId || !teamMembers || teamMembers.length === 0) return [];
-       // Team leader cards and inline roster stats are for skaters only.
-       // Ask the API for the narrowed dataset as well as filtering defensively
-       // below, since the regular stats response uses the skater-shaped
-       // response type even when a row is marked isGoalie.
-       const response = await apiRequest(
-         'GET',
-         `/api/leagues/${(team as any).leagueId}/stats?playerType=non-goalies`,
-       );
-      const allStats = await response.json();
-      
-      const memberUserIds = new Set((teamMembers || []).map((member: any) => 
-        String(member.userId ?? member.user?.id)
-      ));
-      
-      const filteredStats = allStats.filter((stat: any) => {
-         if (stat.type === 'goalie' || stat.isGoalie === true) return false;
-        const statUserId = String(stat.userId ?? stat.user?.id);
-        return memberUserIds.has(statUserId);
-      });
-      
-      return filteredStats;
+      if (!teamId || !teamMembers || teamMembers.length === 0) return [];
+      const response = await apiRequest('GET', `/api/teams/${teamId}/stats`);
+      return response.json();
     },
-    enabled: !!(team as any)?.leagueId && !!teamMembers && teamMembers.length > 0,
+    enabled: !!teamId && !!teamMembers && teamMembers.length > 0,
   });
 
   const { data: leagueStandings = [] } = useQuery({
