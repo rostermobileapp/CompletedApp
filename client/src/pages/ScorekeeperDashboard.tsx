@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -373,7 +373,7 @@ export default function ScorekeeperDashboard() {
   }, [selectedGame, activeTab, isAndroid]);
 
   // Compact Team Scoring Panel
-  const TeamScoringPanel = ({ 
+  const TeamScoringPanel = useMemo(() => ({
     team, 
     teamName,
     teamId,
@@ -670,7 +670,14 @@ export default function ScorekeeperDashboard() {
         )}
       </div>
     );
-  };
+  }, [
+    selectedGame?.id,
+    showPenalties,
+    createGoalMutation.isPending,
+    deleteGoalMutation.isPending,
+    createPenaltyMutation.isPending,
+    deletePenaltyMutation.isPending,
+  ]);
 
   if (!user) {
     return (
