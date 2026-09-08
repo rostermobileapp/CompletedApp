@@ -1,0 +1,47 @@
+Something went wrong
+The page hit an unexpected error and couldn't render. You can try reloading the page, or head back to the home screen.
+
+Reload page
+Go to home
+Error:
+TypeError: Cannot read properties of null (reading 'firstName')
+Stack:
+TypeError: Cannot read properties of null (reading 'firstName')
+    at https://www.roster-app.com/assets/index-C1Cznskq.js:1068:213507
+    at Array.map (<anonymous>)
+    at Pt (https://www.roster-app.com/assets/index-C1Cznskq.js:1068:213454)
+    at I6 (https://www.roster-app.com/assets/index-C1Cznskq.js:38:17050)
+    at Mre (https://www.roster-app.com/assets/index-C1Cznskq.js:40:44191)
+    at Ire (https://www.roster-app.com/assets/index-C1Cznskq.js:40:39894)
+    at o0e (https://www.roster-app.com/assets/index-C1Cznskq.js:40:39817)
+    at E5 (https://www.roster-app.com/assets/index-C1Cznskq.js:40:39666)
+    at hO (https://www.roster-app.com/assets/index-C1Cznskq.js:40:36022)
+    at yB (https://www.roster-app.com/assets/index-C1Cznskq.js:40:36827)
+Component stack:
+
+    at Pt (https://www.roster-app.com/assets/index-C1Cznskq.js:1068:209709)
+    at div
+    at div
+    at wqe (https://www.roster-app.com/assets/index-C1Cznskq.js:1068:204695)
+    at Dr (https://www.roster-app.com/assets/index-C1Cznskq.js:48:3501)
+    at AB (https://www.roster-app.com/assets/index-C1Cznskq.js:48:4333)
+    at div
+    at Nq (https://www.roster-app.com/assets/index-C1Cznskq.js:873:358)
+    at div
+    at main
+    at div
+    at div
+    at AFe (https://www.roster-app.com/assets/index-C1Cznskq.js:1040:380080)
+    at DAe (https://www.roster-app.com/assets/index-C1Cznskq.js:869:72817)
+    at TAe (https://www.roster-app.com/assets/index-C1Cznskq.js:869:66333)
+    at Xbt (https://www.roster-app.com/assets/index-C1Cznskq.js:1315:31947)
+    at AAe (https://www.roster-app.com/assets/index-C1Cznskq.js:869:62150)
+    at tV (https://www.roster-app.com/assets/index-C1Cznskq.js:1040:396888)
+    at dwe (https://www.roster-app.com/assets/index-C1Cznskq.js:56:6053)
+    at BAe (https://www.roster-app.com/assets/index-C1Cznskq.js:869:80719)
+    at d (https://www.roster-app.com/assets/index-C1Cznskq.js:99:61415)
+    at Nie (https://www.roster-app.com/assets/index-C1Cznskq.js:869:52064)
+    at EAe (https://www.roster-app.com/assets/index-C1Cznskq.js:869:69307)
+    at J2e (https://www.roster-app.com/assets/index-C1Cznskq.js:56:154961)
+    at tV (https://www.roster-app.com/assets/index-C1Cznskq.js:1040:396888)
+    at Jbt

@@ -59,7 +59,7 @@ interface Player {
 
 interface TeamMember {
   userId: string;
-  user: Player;
+  user: Player | null;
 }
 
 interface GameGoal {
@@ -389,6 +389,11 @@ export default function ScorekeeperDashboard() {
     const [penaltyPlayerId, setPenaltyPlayerId] = useState('');
     const [penaltyMinutes, setPenaltyMinutes] = useState(2);
     const [goalModalOpen, setGoalModalOpen] = useState(false);
+    const getPlayerName = (member: TeamMember) => {
+      if (!member.user) return 'Former player';
+      const fullName = `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim();
+      return fullName || 'Unnamed player';
+    };
 
     const addGoal = () => {
       if (!scorerId || !selectedGame || !teamId) {
@@ -467,7 +472,7 @@ export default function ScorekeeperDashboard() {
                         </SelectItem>
                         {players.map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
-                            {p.user.firstName} {p.user.lastName}
+                            {getPlayerName(p)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -486,7 +491,7 @@ export default function ScorekeeperDashboard() {
                         </SelectItem>
                         {players.filter(p => p.userId !== scorerId).map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
-                            {p.user.firstName} {p.user.lastName}
+                            {getPlayerName(p)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -505,7 +510,7 @@ export default function ScorekeeperDashboard() {
                         </SelectItem>
                         {players.filter(p => p.userId !== scorerId && p.userId !== assistId).map(p => (
                           <SelectItem key={p.userId} value={p.userId}>
-                            {p.user.firstName} {p.user.lastName}
+                            {getPlayerName(p)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -596,7 +601,7 @@ export default function ScorekeeperDashboard() {
                   </SelectItem>
                   {players.map(p => (
                     <SelectItem key={p.userId} value={p.userId}>
-                      {p.user.firstName} {p.user.lastName}
+                      {getPlayerName(p)}
                     </SelectItem>
                   ))}
                 </SelectContent>
