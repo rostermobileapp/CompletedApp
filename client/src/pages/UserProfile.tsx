@@ -128,7 +128,7 @@ export default function UserProfile() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground">Placeholder Account.
+          <p className="text-muted-foreground ml-[12px] mr-[12px]">Placeholder Account.
 
           This player has not yet set up a profile
 </p>
