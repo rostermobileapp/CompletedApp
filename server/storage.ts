@@ -11266,6 +11266,58 @@ export class DatabaseStorage implements IStorage {
       }
     }));
 
+    // Keep placeholder goalies visible in the regular player-stats response
+    // with the same synthetic identity used by the League Players screen.
+    // The dedicated goalie-stats response calculates their goalie record;
+    // this row gives the regular stats table a zero-valued placeholder row.
+    const placeholderGoalieRows = playerType === 'goalies'
+      ? []
+      : (await this.getLeaguePlaceholderPlayers(leagueId))
+        .filter(placeholder => placeholder.isGoalie)
+        .map(placeholder => {
+          const placeholderUserId = `placeholder:${placeholder.id}`;
+          const timestamp = placeholder.createdAt;
+          return {
+            id: `${placeholderUserId}-${leagueId}-${seasonId || 'null'}`,
+            leagueId,
+            seasonId: seasonId || null,
+            userId: placeholderUserId,
+            importedPlayerId: null as string | null,
+            gamesPlayed: 0,
+            goals: 0,
+            assists: 0,
+            penaltyMinutes: 0,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            isGoalie: true,
+            user: {
+              id: placeholderUserId,
+              email: placeholder.email ?? null,
+              firstName: placeholder.firstName,
+              lastName: placeholder.lastName,
+              profileImageUrl: null,
+              age: null,
+              phoneNumber: placeholder.phoneNumber ?? null,
+              city: null,
+              primarySport: null,
+              playerType: null,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              role: 'free_tier' as any,
+              specialPermissions: null,
+              isPrimaryCommissioner: false,
+              createdBy: placeholder.addedBy ?? null,
+              lastUpdated: timestamp,
+              dateOfBirth: null,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              venmoUsername: null,
+              cashappUsername: null,
+              navigationPreferences: null,
+            }
+          };
+        });
+
     // Also fetch stats stored for unregistered imported players and append them.
     // These are rows where importedPlayerId IS NOT NULL (userId IS NULL).
     let importedStatsConditions: any[] = [
@@ -11335,7 +11387,7 @@ export class DatabaseStorage implements IStorage {
       }
     }));
 
-    return [...registeredRows, ...importedMappedRows];
+    return [...registeredRows, ...placeholderGoalieRows, ...importedMappedRows];
   }
 
   async getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined> {
