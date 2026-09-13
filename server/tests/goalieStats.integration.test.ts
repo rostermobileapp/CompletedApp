@@ -9,6 +9,7 @@ test('goalie stats include approved goalies with no completed games', async () =
   const run = randomUUID().replace(/-/g, '');
   const commissionerId = `test_${run}_commissioner`;
   const goalieId = `test_${run}_goalie`;
+  const placeholderId = `test_${run}_placeholder`;
   const leagueId = `test_${run}_league`;
   const membershipId = `test_${run}_membership`;
   const seasonId = `test_${run}_season`;
@@ -47,38 +48,37 @@ test('goalie stats include approved goalies with no completed games', async () =
         (${membershipId}, ${goalieId}, ${leagueId}, 'approved', NOW(), true, false)
     `);
 
+    await db.execute(sql`
+      INSERT INTO placeholder_players
+        (id, league_id, first_name, last_name, is_goalie, is_skater, created_at)
+      VALUES
+        (${placeholderId}, ${leagueId}, 'Placeholder', 'Goalie', true, false, NOW())
+    `);
+
     const allSeasonStats = await storage.getGoalieStats(leagueId);
-    assert.deepEqual(
-      allSeasonStats.map(stat => ({
-        userId: stat.userId,
-        gamesPlayed: stat.gamesPlayed,
-        wins: stat.wins,
-        losses: stat.losses,
-        ties: stat.ties,
-        shootoutLosses: stat.shootoutLosses,
-        goalsAgainst: stat.goalsAgainst,
-        shutouts: stat.shutouts,
-        goalsAgainstAverage: stat.goalsAgainstAverage,
-      })),
-      [{
-        userId: goalieId,
-        gamesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        ties: 0,
-        shootoutLosses: 0,
-        goalsAgainst: 0,
-        shutouts: 0,
-        goalsAgainstAverage: 0,
-      }],
+    assert.equal(allSeasonStats.length, 2);
+    for (const stat of allSeasonStats) {
+      assert.equal(stat.gamesPlayed, 0);
+      assert.equal(stat.wins, 0);
+      assert.equal(stat.losses, 0);
+      assert.equal(stat.ties, 0);
+      assert.equal(stat.shootoutLosses, 0);
+      assert.equal(stat.goalsAgainst, 0);
+      assert.equal(stat.shutouts, 0);
+      assert.equal(stat.goalsAgainstAverage, 0);
+    }
+    assert.ok(allSeasonStats.some(stat => stat.userId === goalieId));
+    assert.ok(allSeasonStats.some(stat => stat.userId === `placeholder:${placeholderId}`));
+    assert.equal(
+      allSeasonStats.find(stat => stat.userId === `placeholder:${placeholderId}`)?.user.firstName,
+      'Placeholder',
     );
 
     const selectedSeasonStats = await storage.getGoalieStats(leagueId, seasonId);
-    assert.equal(selectedSeasonStats.length, 1);
-    assert.equal(selectedSeasonStats[0].userId, goalieId);
-    assert.equal(selectedSeasonStats[0].gamesPlayed, 0);
-    assert.equal(selectedSeasonStats[0].goalsAgainstAverage, 0);
+    assert.equal(selectedSeasonStats.length, 2);
+    assert.ok(selectedSeasonStats.every(stat => stat.gamesPlayed === 0));
   } finally {
+    await db.execute(sql`DELETE FROM placeholder_players WHERE id = ${placeholderId}`);
     await db.execute(sql`DELETE FROM league_memberships WHERE id = ${membershipId}`);
     await db.execute(sql`DELETE FROM seasons WHERE id = ${seasonId}`);
     await db.execute(sql`DELETE FROM leagues WHERE id = ${leagueId}`);

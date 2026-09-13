@@ -11631,6 +11631,46 @@ export class DatabaseStorage implements IStorage {
       });
     });
 
+    // League Players also includes active placeholder players. Keep goalie
+    // placeholders in the stats response with the same synthetic identity
+    // used by the league-members endpoint until they claim a real account.
+    const placeholderGoalies = (await this.getLeaguePlaceholderPlayers(leagueId))
+      .filter(placeholder => placeholder.isGoalie);
+    placeholderGoalies.forEach(placeholder => {
+      const placeholderUserId = `placeholder:${placeholder.id}`;
+      goalieStatsMap.set(placeholderUserId, {
+        userId: placeholderUserId,
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        shootoutLosses: 0,
+        goalsAgainst: 0,
+        shutouts: 0,
+        totalMinutes: 0,
+        teamId: placeholder.teamId ?? undefined,
+        user: buildGoalieUser({
+          userId: placeholderUserId,
+          userEmail: placeholder.email,
+          userFirstName: placeholder.firstName,
+          userLastName: placeholder.lastName,
+          userProfileImageUrl: null,
+          userAge: null,
+          userPhoneNumber: placeholder.phoneNumber,
+          userCity: null,
+          userPrimarySport: null,
+          userPlayerType: null,
+          userCreatedAt: placeholder.createdAt,
+          userUpdatedAt: placeholder.createdAt,
+          userRole: 'free_tier',
+          userSpecialPermissions: null,
+          userIsPrimaryCommissioner: false,
+          userCreatedBy: placeholder.addedBy,
+          userLastUpdated: placeholder.createdAt,
+        }),
+      });
+    });
+
     goalieGameStats.forEach(gameStat => {
       const goalieId = gameStat.userId;
       
