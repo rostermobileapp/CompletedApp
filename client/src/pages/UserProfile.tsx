@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getImageUrl, apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardSelection } from '@/hooks/useDashboardSelection';
+import placeholderAccountGif from '@assets/giphy_1789318557684.gif';
 
 interface UserProfileData {
   id: string;
@@ -132,6 +133,12 @@ export default function UserProfile() {
 
           This player has not yet set up a profile
 </p>
+          <img
+            src={placeholderAccountGif}
+            alt="Placeholder account animation"
+            className="mt-4 w-full max-w-md mx-auto rounded-lg"
+            data-testid="img-placeholder-account-gif"
+          />
         </div>
       </div>
     );
