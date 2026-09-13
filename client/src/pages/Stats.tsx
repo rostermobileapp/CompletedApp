@@ -325,9 +325,13 @@ export default function Stats() {
         case 'wins':
           return goalieStats.sort((a, b) => (b.wins || 0) - (a.wins || 0));
         case 'goalsAgainstAverage':
-          return goalieStats
-            .filter(g => g.gamesPlayed > 0)
-            .sort((a, b) => (a.goalsAgainstAverage || 999) - (b.goalsAgainstAverage || 999));
+          return goalieStats.sort((a, b) => {
+            // Keep zero-game goalies in the table, but place them after
+            // goalies with a meaningful GAA.
+            if (a.gamesPlayed === 0 && b.gamesPlayed > 0) return 1;
+            if (a.gamesPlayed > 0 && b.gamesPlayed === 0) return -1;
+            return (a.goalsAgainstAverage || 0) - (b.goalsAgainstAverage || 0);
+          });
         case 'shutouts':
           return goalieStats.sort((a, b) => (b.shutouts || 0) - (a.shutouts || 0));
         default:
@@ -566,6 +570,7 @@ export default function Stats() {
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GP</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">W</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">L</th>
+                          <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">T</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GAA</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">SO</th>
                         </>
@@ -624,6 +629,7 @@ export default function Stats() {
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.gamesPlayed || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.wins || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.losses || 0}</td>
+                              <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.ties || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goalsAgainstAverage?.toFixed(2) || '0.00'}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.shutouts || 0}</td>
                             </>

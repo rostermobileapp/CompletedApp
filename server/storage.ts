@@ -11543,6 +11543,37 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    // Start with every approved goalie in the league so goalies who have not
+    // appeared in a completed game still receive a zero-valued stats row.
+    const goalieMemberships = await db
+      .select({
+        userId: users.id,
+        assignedTeamId: leagueMemberships.assignedTeamId,
+        userEmail: users.email,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userProfileImageUrl: users.profileImageUrl,
+        userAge: users.age,
+        userPhoneNumber: users.phoneNumber,
+        userCity: users.city,
+        userPrimarySport: users.primarySport,
+        userPlayerType: users.playerType,
+        userCreatedAt: users.createdAt,
+        userUpdatedAt: users.updatedAt,
+        userRole: users.role,
+        userSpecialPermissions: users.specialPermissions,
+        userIsPrimaryCommissioner: users.isPrimaryCommissioner,
+        userCreatedBy: users.createdBy,
+        userLastUpdated: users.lastUpdated,
+      })
+      .from(leagueMemberships)
+      .innerJoin(users, eq(leagueMemberships.userId, users.id))
+      .where(and(
+        eq(leagueMemberships.leagueId, leagueId),
+        eq(leagueMemberships.status, 'approved'),
+        eq(leagueMemberships.isGoalie, true),
+      ));
+
     // Group stats by goalie userId
     const goalieStatsMap = new Map<string, {
       userId: string;
@@ -11557,6 +11588,48 @@ export class DatabaseStorage implements IStorage {
       teamId?: string;
       user: User;
     }>();
+
+    const buildGoalieUser = (row: any): User => ({
+      id: row.userId,
+      email: row.userEmail,
+      firstName: row.userFirstName,
+      lastName: row.userLastName,
+      profileImageUrl: row.userProfileImageUrl,
+      age: row.userAge,
+      phoneNumber: row.userPhoneNumber,
+      city: row.userCity,
+      primarySport: row.userPrimarySport,
+      playerType: row.userPlayerType,
+      createdAt: row.userCreatedAt,
+      updatedAt: row.userUpdatedAt,
+      role: row.userRole,
+      specialPermissions: row.userSpecialPermissions,
+      isPrimaryCommissioner: row.userIsPrimaryCommissioner,
+      createdBy: row.userCreatedBy,
+      lastUpdated: row.userLastUpdated,
+      dateOfBirth: null,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      venmoUsername: null,
+      cashappUsername: null,
+      navigationPreferences: null,
+    });
+
+    goalieMemberships.forEach(goalie => {
+      goalieStatsMap.set(goalie.userId, {
+        userId: goalie.userId,
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        shootoutLosses: 0,
+        goalsAgainst: 0,
+        shutouts: 0,
+        totalMinutes: 0,
+        teamId: goalie.assignedTeamId ?? undefined,
+        user: buildGoalieUser(goalie),
+      });
+    });
 
     goalieGameStats.forEach(gameStat => {
       const goalieId = gameStat.userId;
@@ -11573,36 +11646,17 @@ export class DatabaseStorage implements IStorage {
           shutouts: 0,
           totalMinutes: 0,
           teamId: gameStat.teamId,
-          user: {
-            id: goalieId,
-            email: gameStat.userEmail,
-            firstName: gameStat.userFirstName,
-            lastName: gameStat.userLastName,
-            profileImageUrl: gameStat.userProfileImageUrl,
-            age: gameStat.userAge,
-            phoneNumber: gameStat.userPhoneNumber,
-            city: gameStat.userCity,
-            primarySport: gameStat.userPrimarySport,
-            playerType: gameStat.userPlayerType,
-            createdAt: gameStat.userCreatedAt,
-            updatedAt: gameStat.userUpdatedAt,
-            // New permission fields
-            role: gameStat.userRole,
-            specialPermissions: gameStat.userSpecialPermissions,
-            isPrimaryCommissioner: gameStat.userIsPrimaryCommissioner,
-            createdBy: gameStat.userCreatedBy,
-            lastUpdated: gameStat.userLastUpdated,
-            dateOfBirth: null,
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-            venmoUsername: null,
-            cashappUsername: null,
-            navigationPreferences: null,
-          }
+          user: buildGoalieUser(gameStat),
         });
       }
 
       const goalieStats = goalieStatsMap.get(goalieId)!;
+
+      // Preserve the game-assigned team for goalies with recorded games.
+      // Goalies without games retain their current league membership team.
+      if (goalieStats.gamesPlayed === 0 && gameStat.teamId) {
+        goalieStats.teamId = gameStat.teamId;
+      }
       
       // Update games played and minutes
       goalieStats.gamesPlayed++;
