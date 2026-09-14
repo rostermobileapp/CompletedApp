@@ -178,6 +178,85 @@ function broadcastRealtimeEvent(userIds: Iterable<string | null | undefined>, me
   }
 }
 
+type GoalStatParticipants = {
+  scorerId?: string | null;
+  primaryAssistId?: string | null;
+  secondaryAssistId?: string | null;
+};
+
+/**
+ * Keep aggregate player stats in sync when a submitted goal is edited or
+ * removed after finalization. Finalization adds each pending event once, but
+ * previously submitted events can still be edited from the scorekeeper.
+ */
+async function applyGoalStatDelta(
+  tx: any,
+  game: { leagueId: string | null; seasonId: string | null; isScrimmage: boolean },
+  goal: GoalStatParticipants,
+  direction: 1 | -1,
+) {
+  if (!game.leagueId || game.isScrimmage) return;
+
+  const deltas = new Map<string, { goals: number; assists: number }>();
+  const add = (playerId: string | null | undefined, stat: 'goals' | 'assists') => {
+    if (!playerId || playerId === 'substitute') return;
+    const current = deltas.get(playerId) || { goals: 0, assists: 0 };
+    current[stat] += direction;
+    deltas.set(playerId, current);
+  };
+
+  add(goal.scorerId, 'goals');
+  add(goal.primaryAssistId, 'assists');
+  add(goal.secondaryAssistId, 'assists');
+
+  for (const [userId, delta] of deltas) {
+    const statsCondition = game.seasonId
+      ? and(
+          eq(playerStats.userId, userId),
+          eq(playerStats.leagueId, game.leagueId),
+          eq(playerStats.seasonId, game.seasonId),
+        )
+      : and(
+          eq(playerStats.userId, userId),
+          eq(playerStats.leagueId, game.leagueId),
+          isNull(playerStats.seasonId),
+        );
+
+    if (direction === 1) {
+      const updated = await tx
+        .update(playerStats)
+        .set({
+          goals: sql`${playerStats.goals} + ${delta.goals}`,
+          assists: sql`${playerStats.assists} + ${delta.assists}`,
+          updatedAt: new Date(),
+        })
+        .where(statsCondition)
+        .returning({ id: playerStats.id });
+
+      if (updated.length === 0) {
+        await tx.insert(playerStats).values({
+          userId,
+          leagueId: game.leagueId,
+          seasonId: game.seasonId,
+          gamesPlayed: 0,
+          goals: delta.goals,
+          assists: delta.assists,
+          penaltyMinutes: 0,
+        });
+      }
+    } else {
+      await tx
+        .update(playerStats)
+        .set({
+          goals: sql`GREATEST(0, ${playerStats.goals} + ${delta.goals})`,
+          assists: sql`GREATEST(0, ${playerStats.assists} + ${delta.assists})`,
+          updatedAt: new Date(),
+        })
+        .where(statsCondition);
+    }
+  }
+}
+
 async function broadcastGameRsvpUpdate(
   game: { id?: string; leagueId?: string | null },
   gameId: string,
@@ -11563,9 +11642,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
       }
 
-      const updates = req.body;
-      const goal = await storage.updateGameGoal(goalId, updates);
-      res.json(goal);
+      const currentGoal = await storage.getGameGoal(goalId);
+      if (!currentGoal || currentGoal.gameId !== gameId) {
+        return res.status(404).json({ message: 'Goal not found' });
+      }
+
+      const updates = req.body || {};
+      const nextGoal = {
+        ...currentGoal,
+        ...updates,
+        scorerId: updates.scorerId === 'substitute'
+          ? null
+          : updates.scorerId !== undefined
+            ? updates.scorerId
+            : currentGoal.scorerId,
+        primaryAssistId: updates.primaryAssistId === 'substitute'
+          ? null
+          : updates.primaryAssistId !== undefined
+            ? updates.primaryAssistId
+            : currentGoal.primaryAssistId,
+        secondaryAssistId: updates.secondaryAssistId === 'substitute'
+          ? null
+          : updates.secondaryAssistId !== undefined
+            ? updates.secondaryAssistId
+            : currentGoal.secondaryAssistId,
+      };
+
+      const goalUpdates = {
+        ...updates,
+        scorerId: nextGoal.scorerId,
+        primaryAssistId: nextGoal.primaryAssistId,
+        secondaryAssistId: nextGoal.secondaryAssistId,
+      };
+
+      const updatedGoal = await db.transaction(async (tx) => {
+        const [lockedGoal] = await tx
+          .select()
+          .from(gameGoals)
+          .where(and(eq(gameGoals.id, goalId), eq(gameGoals.gameId, gameId)));
+        if (!lockedGoal) throw new Error('Goal not found');
+
+        if (lockedGoal.isSubmitted) {
+          await applyGoalStatDelta(tx, game, lockedGoal, -1);
+        }
+
+        const [updated] = await tx
+          .update(gameGoals)
+          .set(goalUpdates)
+          .where(and(eq(gameGoals.id, goalId), eq(gameGoals.gameId, gameId)))
+          .returning();
+
+        if (lockedGoal.isSubmitted) {
+          await applyGoalStatDelta(tx, game, updated, 1);
+        }
+
+        return updated;
+      });
+
+      res.json(updatedGoal);
     } catch (error) {
       console.error('Error updating game goal:', error);
       res.status(500).json({ message: 'Failed to update game goal' });
@@ -11589,7 +11723,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
       }
 
-      await storage.deleteGameGoal(goalId);
+      const currentGoal = await storage.getGameGoal(goalId);
+      if (!currentGoal || currentGoal.gameId !== gameId) {
+        return res.status(404).json({ message: 'Goal not found' });
+      }
+
+      await db.transaction(async (tx) => {
+        const [lockedGoal] = await tx
+          .select()
+          .from(gameGoals)
+          .where(and(eq(gameGoals.id, goalId), eq(gameGoals.gameId, gameId)));
+        if (!lockedGoal) throw new Error('Goal not found');
+
+        if (lockedGoal.isSubmitted) {
+          await applyGoalStatDelta(tx, game, lockedGoal, -1);
+        }
+
+        await tx
+          .delete(gameGoals)
+          .where(and(eq(gameGoals.id, goalId), eq(gameGoals.gameId, gameId)));
+      });
       res.json({ message: 'Goal deleted successfully' });
     } catch (error) {
       console.error('Error deleting game goal:', error);

@@ -15,6 +15,12 @@ Finalization may increment season totals only from goal and penalty rows that we
 
 **How to apply:** Capture unsubmitted events before submission, build aggregate stat increments only from that pending set, and treat repeated saves as idempotent.
 
+Submitted goal edits and deletions must reverse the prior player-stat contribution before applying the replacement.
+
+**Why:** Scorekeepers can reopen completed games and replace detailed goal rows; leaving aggregate totals untouched makes re-entered assists and goals count twice.
+
+**How to apply:** Perform the event mutation and its aggregate stat delta in one transaction, keyed by the event's submitted participant IDs.
+
 Substitute scorers and substitute assists are unattributed participants: the goal event still counts toward the game's score, but no individual goal or assist is awarded for a substitute selection.
 
 **Why:** A game score must remain accurate even when the player is not registered, while season leaderboards must only reference real user accounts.
