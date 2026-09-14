@@ -828,7 +828,6 @@ export default function ScorekeeperDashboard() {
   }, [
     selectedGame?.id,
     showPenalties,
-    selectedAttendanceIds,
     rsvpStatusByPlayer,
     createGoalMutation.isPending,
     deleteGoalMutation.isPending,
