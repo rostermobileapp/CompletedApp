@@ -910,6 +910,26 @@ export const gameRsvps = pgTable("game_rsvps", {
   unique("unique_game_user_team_rsvp").on(table.gameId, table.userId, table.teamId),
 ]);
 
+// Scorekeeper-confirmed game attendance is deliberately separate from RSVP.
+// A row represents a player who was actually present, including a placeholder
+// roster player who does not yet have a users row.
+export const gameAttendance = pgTable("game_attendance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").references(() => games.id, { onDelete: 'cascade' }).notNull(),
+  teamId: varchar("team_id").references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  placeholderPlayerId: varchar("placeholder_player_id").references(() => placeholderPlayers.id, { onDelete: 'cascade' }),
+  recordedBy: varchar("recorded_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("unique_game_attendance_user").on(table.gameId, table.userId),
+  unique("unique_game_attendance_placeholder").on(table.gameId, table.placeholderPlayerId),
+  index("idx_game_attendance_game_id").on(table.gameId),
+  index("idx_game_attendance_user_id").on(table.userId),
+  index("idx_game_attendance_placeholder_id").on(table.placeholderPlayerId),
+]);
+
 // Tournament Match RSVPs table - separate from game_rsvps due to different foreign key
 export const tournamentMatchRsvps = pgTable("tournament_match_rsvps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2092,6 +2112,7 @@ export const gamesRelations = relations(games, ({ one, many }) => ({
   dutyAssignments: many(dutyAssignments),
   goals: many(gameGoals),
   penalties: many(gamePenalties),
+  attendance: many(gameAttendance),
 }));
 
 // Game goals relations
@@ -2596,6 +2617,30 @@ export const gameRsvpsRelations = relations(gameRsvps, ({ one }) => ({
   }),
 }));
 
+export const gameAttendanceRelations = relations(gameAttendance, ({ one }) => ({
+  game: one(games, {
+    fields: [gameAttendance.gameId],
+    references: [games.id],
+  }),
+  team: one(teams, {
+    fields: [gameAttendance.teamId],
+    references: [teams.id],
+  }),
+  user: one(users, {
+    fields: [gameAttendance.userId],
+    references: [users.id],
+  }),
+  placeholderPlayer: one(placeholderPlayers, {
+    fields: [gameAttendance.placeholderPlayerId],
+    references: [placeholderPlayers.id],
+  }),
+  recorder: one(users, {
+    fields: [gameAttendance.recordedBy],
+    references: [users.id],
+    relationName: "gameAttendanceRecorder",
+  }),
+}));
+
 export const substituteRequestsRelations = relations(substituteRequests, ({ one, many }) => ({
   game: one(games, {
     fields: [substituteRequests.gameId],
@@ -2961,6 +3006,12 @@ export const insertImportedScheduleSchema = createInsertSchema(importedSchedules
 });
 
 export const insertGameRsvpSchema = createInsertSchema(gameRsvps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertGameAttendanceSchema = createInsertSchema(gameAttendance).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -3682,6 +3733,8 @@ export type ImportedSchedule = typeof importedSchedules.$inferSelect;
 export type InsertImportedSchedule = z.infer<typeof insertImportedScheduleSchema>;
 export type GameRsvp = typeof gameRsvps.$inferSelect;
 export type InsertGameRsvp = z.infer<typeof insertGameRsvpSchema>;
+export type GameAttendance = typeof gameAttendance.$inferSelect;
+export type InsertGameAttendance = z.infer<typeof insertGameAttendanceSchema>;
 export type SubstituteRequest = typeof substituteRequests.$inferSelect;
 export type InsertSubstituteRequest = z.infer<typeof insertSubstituteRequestSchema>;
 export type SubstitutionApproval = typeof substitutionApprovals.$inferSelect;

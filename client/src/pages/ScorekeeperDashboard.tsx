@@ -59,7 +59,11 @@ interface Player {
 
 interface TeamMember {
   userId: string;
+  teamId: string;
   user: Player | null;
+  displayFirstName?: string | null;
+  displayLastName?: string | null;
+  isPlaceholder?: boolean;
 }
 
 interface GameGoal {
@@ -94,6 +98,12 @@ interface GamePenalty {
   team: { id: string; name: string };
 }
 
+interface GameAttendanceData {
+  attendees: { playerId: string; teamId: string }[];
+  rsvps: { userId: string; teamId: string; status: 'attending' | 'not_attending' | 'no_response' }[];
+  attendanceRecorded: boolean;
+}
+
 export default function ScorekeeperDashboard() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
@@ -109,6 +119,8 @@ export default function ScorekeeperDashboard() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [activeTab, setActiveTab] = useState('schedule');
   const [showPenalties, setShowPenalties] = useState(false);
+  const [selectedAttendanceIds, setSelectedAttendanceIds] = useState<Set<string>>(new Set());
+  const [attendanceInitializedGameId, setAttendanceInitializedGameId] = useState<string | null>(null);
 
   // Fetch scorekeeper options (leagues + tournaments)
   const { data: scorekeeperOptions } = useQuery<ScorekeeperOptions>({
@@ -158,6 +170,12 @@ export default function ScorekeeperDashboard() {
     enabled: !!selectedGame?.id,
   });
 
+  const attendanceQueryKey = `/api/games/${selectedGame?.id}/attendance`;
+  const { data: attendanceData } = useQuery<GameAttendanceData>({
+    queryKey: [attendanceQueryKey],
+    enabled: !!selectedGame?.id,
+  });
+
   // For tournament matches, use tournament team endpoint; for league games, use regular team endpoint
   const isTournamentGame = !!selectedGame?.tournamentId;
   
@@ -192,6 +210,14 @@ export default function ScorekeeperDashboard() {
   
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
+
+  const rsvpStatusByPlayer = useMemo(() => {
+    const statuses = new Map<string, 'attending' | 'not_attending' | 'no_response'>();
+    for (const rsvp of attendanceData?.rsvps || []) {
+      statuses.set(`${rsvp.teamId}:${rsvp.userId}`, rsvp.status);
+    }
+    return statuses;
+  }, [attendanceData?.rsvps]);
 
   const createGoalMutation = useMutation({
     mutationFn: async (data: { gameId: string; teamId: string; scorerId: string; primaryAssistId?: string; secondaryAssistId?: string; period?: number }) => {
@@ -246,8 +272,8 @@ export default function ScorekeeperDashboard() {
   });
 
   const finalizeGameMutation = useMutation({
-    mutationFn: async (gameId: string) => {
-      return apiRequest('POST', `/api/games/${gameId}/finalize`);
+    mutationFn: async (data: { gameId: string; attendees: { playerId: string; teamId: string }[] }) => {
+      return apiRequest('POST', `/api/games/${data.gameId}/finalize`, { attendees: data.attendees });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [gamesQueryKey] });
@@ -262,6 +288,7 @@ export default function ScorekeeperDashboard() {
           queryKey: ['/api/user/notification-counts'],
         });
       }
+      queryClient.invalidateQueries({ queryKey: [attendanceQueryKey] });
       toast({ title: 'Game finalized', description: 'Stats have been updated' });
       setSelectedGame(null);
       setActiveTab('schedule');
@@ -317,6 +344,60 @@ export default function ScorekeeperDashboard() {
     }
   }, [homeScore, awayScore, selectedGame?.id, isBackfillingCompletedGame]);
 
+  // Attendance is initialized only after the roster and saved attendance have
+  // loaded. RSVP remains context only; saved attendance and recorded events
+  // drive the checklist.
+  useEffect(() => {
+    if (
+      !selectedGame ||
+      !attendanceData ||
+      rostersLoading ||
+      attendanceInitializedGameId === selectedGame.id
+    ) return;
+
+    const initialIds = new Set(
+      attendanceData.attendees.map((attendee) => `${attendee.teamId}:${attendee.playerId}`),
+    );
+    setSelectedAttendanceIds(initialIds);
+    setAttendanceInitializedGameId(selectedGame.id);
+  }, [
+    selectedGame?.id,
+    attendanceData,
+    rostersLoading,
+    attendanceInitializedGameId,
+  ]);
+
+  // A newly recorded scoring event should make that player present by default.
+  // This does not overwrite an explicit uncheck once the scorekeeper has
+  // initialized the checklist.
+  useEffect(() => {
+    if (!selectedGame || attendanceInitializedGameId !== selectedGame.id) return;
+    const eventKeys = [
+      ...gameGoals.flatMap((goal) => [
+        goal.scorerId ? `${goal.teamId}:${goal.scorerId}` : null,
+        goal.primaryAssistId ? `${goal.teamId}:${goal.primaryAssistId}` : null,
+        goal.secondaryAssistId ? `${goal.teamId}:${goal.secondaryAssistId}` : null,
+      ]),
+      ...gamePenalties.map((penalty) => `${penalty.teamId}:${penalty.playerId}`),
+    ].filter((key): key is string => !!key && !key.endsWith(':substitute'));
+    if (eventKeys.length === 0) return;
+    setSelectedAttendanceIds((previous) => {
+      const next = new Set(previous);
+      eventKeys.forEach((key) => next.add(key));
+      return next;
+    });
+  }, [gameGoals, gamePenalties, selectedGame?.id, attendanceInitializedGameId]);
+
+  const onToggleAttendance = (playerId: string, teamId: string) => {
+    const key = `${teamId}:${playerId}`;
+    setSelectedAttendanceIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const upcomingGames = games.filter(g => {
     return g.isCompleted !== true && g.status !== 'completed';
   }).sort((a, b) => 
@@ -331,6 +412,8 @@ export default function ScorekeeperDashboard() {
     setSelectedGame(game);
     setActiveTab('scoring');
     setShowPenalties(false);
+    setSelectedAttendanceIds(new Set());
+    setAttendanceInitializedGameId(null);
   };
 
   // Request landscape orientation when entering scoring mode.
@@ -385,7 +468,10 @@ export default function ScorekeeperDashboard() {
     teamId,
     goals, 
     penalties,
-    players 
+    players,
+    selectedAttendanceIds,
+    rsvpStatusByPlayer,
+    onToggleAttendance,
   }: { 
     team: 'home' | 'away';
     teamName: string;
@@ -393,6 +479,9 @@ export default function ScorekeeperDashboard() {
     goals: GameGoal[];
     penalties: GamePenalty[];
     players: TeamMember[];
+    selectedAttendanceIds: Set<string>;
+    rsvpStatusByPlayer: Map<string, 'attending' | 'not_attending' | 'no_response'>;
+    onToggleAttendance: (playerId: string, teamId: string) => void;
   }) => {
     const [scorerId, setScorerId] = useState('');
     const [assistId, setAssistId] = useState('');
@@ -401,8 +490,11 @@ export default function ScorekeeperDashboard() {
     const [penaltyMinutes, setPenaltyMinutes] = useState(2);
     const [goalModalOpen, setGoalModalOpen] = useState(false);
     const getPlayerName = (member: TeamMember) => {
-      if (!member.user) return 'Former player';
-      const fullName = `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim();
+      if (!member.user) {
+        const fullName = `${member.displayFirstName || ''} ${member.displayLastName || ''}`.trim();
+        return fullName || 'Former player';
+      }
+      const fullName = `${member.user.firstName || member.displayFirstName || ''} ${member.user.lastName || member.displayLastName || ''}`.trim();
       return fullName || 'Unnamed player';
     };
 
@@ -448,6 +540,53 @@ export default function ScorekeeperDashboard() {
           <h3 className="font-bold text-lg truncate text-card-foreground">{team === 'home' ? 'HOME' : 'AWAY'}: {teamName}</h3>
           <div className={`text-5xl font-bold ${textColor}`} data-testid={`score-${team}`}>
             {goals.length}
+          </div>
+        </div>
+        <div className="mb-3 rounded-md border border-border bg-muted/20 p-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Attendance
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {players.filter((player) => selectedAttendanceIds.has(`${teamId}:${player.userId}`)).length}/{players.length}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Check everyone who was actually at the game.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1">
+            {players.map((player) => {
+              const playerId = player.userId;
+              const attendanceKey = `${teamId}:${playerId}`;
+              const rsvpStatus = rsvpStatusByPlayer.get(attendanceKey);
+              const rsvpLabel = rsvpStatus === 'attending'
+                ? 'RSVP yes'
+                : rsvpStatus === 'not_attending'
+                  ? 'RSVP no'
+                  : null;
+              return (
+                <label
+                  key={playerId}
+                  className="flex items-center gap-2 rounded px-1 py-1 text-xs cursor-pointer hover:bg-background/70"
+                  data-testid={`attendance-player-${team}-${playerId}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={selectedAttendanceIds.has(attendanceKey)}
+                    onChange={() => onToggleAttendance(playerId, teamId)}
+                    data-testid={`attendance-checkbox-${team}-${playerId}`}
+                  />
+                  <span className="truncate flex-1">{getPlayerName(player)}</span>
+                  {rsvpLabel && (
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">{rsvpLabel}</span>
+                  )}
+                </label>
+              );
+            })}
+            {players.length === 0 && (
+              <span className="text-xs text-muted-foreground py-1">No rostered players</span>
+            )}
           </div>
         </div>
         {!showPenalties ? (
@@ -679,6 +818,8 @@ export default function ScorekeeperDashboard() {
   }, [
     selectedGame?.id,
     showPenalties,
+    selectedAttendanceIds,
+    rsvpStatusByPlayer,
     createGoalMutation.isPending,
     deleteGoalMutation.isPending,
     createPenaltyMutation.isPending,
@@ -799,7 +940,16 @@ export default function ScorekeeperDashboard() {
                 size="sm"
                 onClick={() => {
                   if (window.confirm(`${selectedGameIsCompleted ? 'Save added game details?' : 'Finalize game?'}\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}\n\nThis will update player stats for newly entered details.`)) {
-                    finalizeGameMutation.mutate(selectedGame.id);
+                    finalizeGameMutation.mutate({
+                      gameId: selectedGame.id,
+                      attendees: Array.from(selectedAttendanceIds).map((key) => {
+                        const separatorIndex = key.indexOf(':');
+                        return {
+                          teamId: key.slice(0, separatorIndex),
+                          playerId: key.slice(separatorIndex + 1),
+                        };
+                      }),
+                    });
                   }
                 }}
                 disabled={finalizeGameMutation.isPending || rostersLoading}
@@ -838,6 +988,9 @@ export default function ScorekeeperDashboard() {
               goals={awayGoals}
               penalties={awayPenalties}
               players={awayTeamMembers}
+              selectedAttendanceIds={selectedAttendanceIds}
+              rsvpStatusByPlayer={rsvpStatusByPlayer}
+              onToggleAttendance={onToggleAttendance}
             />
             <TeamScoringPanel 
               team="home"
@@ -846,6 +999,9 @@ export default function ScorekeeperDashboard() {
               goals={homeGoals}
               penalties={homePenalties}
               players={homeTeamMembers}
+              selectedAttendanceIds={selectedAttendanceIds}
+              rsvpStatusByPlayer={rsvpStatusByPlayer}
+              onToggleAttendance={onToggleAttendance}
             />
           </div>
         )}

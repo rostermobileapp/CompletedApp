@@ -34,7 +34,7 @@ import {
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { gamePenalties } from "@shared/schema";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -678,6 +678,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[Init] payment request link-override columns ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure payment request link-override columns:', err);
+    throw err;
+  }
+
+  // Scorekeeper-confirmed attendance is separate from player RSVP. The
+  // startup-safe DDL keeps existing deployments compatible until the next
+  // schema push while the Drizzle table remains the source of truth.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS game_attendance (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        game_id varchar NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        team_id varchar NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        user_id varchar REFERENCES users(id) ON DELETE CASCADE,
+        placeholder_player_id varchar REFERENCES placeholder_players(id) ON DELETE CASCADE,
+        recorded_by varchar REFERENCES users(id) ON DELETE SET NULL,
+        created_at timestamp DEFAULT NOW() NOT NULL,
+        updated_at timestamp DEFAULT NOW() NOT NULL,
+        CONSTRAINT game_attendance_one_player CHECK (
+          (user_id IS NOT NULL AND placeholder_player_id IS NULL)
+          OR (user_id IS NULL AND placeholder_player_id IS NOT NULL)
+        )
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS unique_game_attendance_user
+        ON game_attendance(game_id, user_id)
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS unique_game_attendance_placeholder
+        ON game_attendance(game_id, placeholder_player_id)
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_attendance_game_id ON game_attendance(game_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_attendance_user_id ON game_attendance(user_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_game_attendance_placeholder_id ON game_attendance(placeholder_player_id)`);
+    console.log('[Init] game_attendance table ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure game_attendance table:', err);
     throw err;
   }
 
@@ -7773,6 +7810,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE ps.league_id = ${team.leagueId}
             AND ps.user_id IS NOT NULL
           GROUP BY ps.user_id
+         ),
+         attendance_stats AS (
+           SELECT
+             ga.user_id,
+             COUNT(DISTINCT ga.game_id)::int AS games_played
+           FROM game_attendance ga
+           JOIN games g ON g.id = ga.game_id
+           WHERE ga.user_id IS NOT NULL
+             AND g.league_id = ${team.leagueId}
+             AND g.is_completed = true
+           GROUP BY ga.user_id
         )
         SELECT
           u.id AS user_id,
@@ -7782,6 +7830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           u.profile_image_url,
            GREATEST(
              COALESCE(ast.games_played, 0),
+             COALESCE(att.games_played, 0),
              COALESCE(ast.recorded_stat_rows, 0)
            ) AS games_played,
           COALESCE(ast.goals, 0) AS goals,
@@ -7791,6 +7840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM roster r
         INNER JOIN users u ON u.id = r.user_id
         LEFT JOIN aggregated_stats ast ON ast.user_id = u.id
+         LEFT JOIN attendance_stats att ON att.user_id = u.id
         LEFT JOIN LATERAL (
           SELECT is_goalie
           FROM league_memberships
@@ -7832,6 +7882,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: placeholderPlayers.lastName,
           email: placeholderPlayers.email,
           isGoalie: placeholderPlayers.isGoalie,
+          gamesPlayed: sql<number>`(
+            SELECT COUNT(DISTINCT ga.game_id)::int
+            FROM game_attendance ga
+            JOIN games g ON g.id = ga.game_id
+            WHERE ga.placeholder_player_id = ${placeholderPlayers.id}
+              AND g.league_id = ${team.leagueId}
+              AND g.is_completed = true
+          )`,
         })
         .from(placeholderPlayers)
         .where(eq(placeholderPlayers.teamId, teamId));
@@ -7841,7 +7899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...placeholderRows.map((placeholder) => ({
           type: 'skater',
           userId: `placeholder:${placeholder.id}`,
-          gamesPlayed: 0,
+          gamesPlayed: Number(placeholder.gamesPlayed ?? 0),
           goals: 0,
           assists: 0,
           penaltyMinutes: 0,
@@ -11360,6 +11418,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Scorekeeper Dashboard - confirmed attendance. This deliberately does not
+  // create or update an RSVP: RSVP describes a player's response, while this
+  // table records the scorekeeper's post-game verification.
+  app.get('/api/games/:gameId/attendance', isAuthenticated, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user.claims.sub;
+      const game = await storage.getGameById(gameId);
+      if (!game) return res.status(404).json({ message: 'Game not found' });
+
+      const hasPermission = await checkScorekeeperPermission(userId, game);
+      if (!hasPermission) {
+        return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      const [attendance, rsvps] = await Promise.all([
+        db.select({
+          userId: gameAttendance.userId,
+          placeholderPlayerId: gameAttendance.placeholderPlayerId,
+          teamId: gameAttendance.teamId,
+        }).from(gameAttendance).where(eq(gameAttendance.gameId, gameId)),
+        db.select({
+          userId: gameRsvps.userId,
+          teamId: gameRsvps.teamId,
+          status: gameRsvps.status,
+        }).from(gameRsvps).where(eq(gameRsvps.gameId, gameId)),
+      ]);
+
+      res.json({
+        attendees: attendance.map((row) => ({
+          playerId: row.userId || `placeholder:${row.placeholderPlayerId}`,
+          teamId: row.teamId,
+        })),
+        rsvps,
+        // A completed game with no rows is an intentional empty selection
+        // after an attendance save, or a historical game from before this
+        // feature. Do not repopulate it from RSVP on reopen.
+        attendanceRecorded: game.isCompleted === true,
+      });
+    } catch (error) {
+      console.error('Error fetching game attendance:', error);
+      res.status(500).json({ message: 'Failed to fetch game attendance' });
+    }
+  });
+
   // Scorekeeper Dashboard Routes - Game Goals
   app.get('/api/games/:gameId/goals', isAuthenticated, async (req: any, res) => {
     try {
@@ -11629,6 +11732,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
       }
 
+      const attendanceProvided = Array.isArray(req.body?.attendees);
+      const normalizedAttendance: Array<{
+        gameId: string;
+        teamId: string;
+        userId?: string;
+        placeholderPlayerId?: string;
+        recordedBy: string;
+      }> = [];
+
+      if (attendanceProvided) {
+        const teamIds = [game.homeTeamId, game.awayTeamId].filter((id): id is string => !!id);
+        const [homeMembers, awayMembers, placeholders] = await Promise.all([
+          storage.getTeamMembers(game.homeTeamId),
+          game.awayTeamId ? storage.getTeamMembers(game.awayTeamId) : Promise.resolve([]),
+          db.select({
+            id: placeholderPlayers.id,
+            teamId: placeholderPlayers.teamId,
+          }).from(placeholderPlayers).where(inArray(placeholderPlayers.teamId, teamIds)),
+        ]);
+
+        const rosterUsers = new Map<string, string>();
+        for (const member of [...homeMembers, ...awayMembers]) {
+          rosterUsers.set(member.userId, member.teamId);
+        }
+        const rosterPlaceholders = new Map<string, string>();
+        for (const placeholder of placeholders) {
+          if (placeholder.teamId) rosterPlaceholders.set(placeholder.id, placeholder.teamId);
+        }
+
+        const seen = new Set<string>();
+        for (const rawAttendee of req.body.attendees) {
+          const playerId = typeof rawAttendee?.playerId === 'string' ? rawAttendee.playerId : '';
+          const teamId = typeof rawAttendee?.teamId === 'string' ? rawAttendee.teamId : '';
+          if (!playerId || !teamIds.includes(teamId)) continue;
+
+          if (playerId.startsWith('placeholder:')) {
+            const placeholderId = playerId.slice('placeholder:'.length);
+            if (rosterPlaceholders.get(placeholderId) !== teamId) {
+              return res.status(400).json({ message: 'Attendance includes a player who is not on this game roster' });
+            }
+            const key = `placeholder:${placeholderId}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            normalizedAttendance.push({ gameId, teamId, placeholderPlayerId: placeholderId, recordedBy: userId });
+          } else {
+            if (rosterUsers.get(playerId) !== teamId) {
+              return res.status(400).json({ message: 'Attendance includes a player who is not on this game roster' });
+            }
+            const key = `user:${playerId}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            normalizedAttendance.push({ gameId, teamId, userId: playerId, recordedBy: userId });
+          }
+        }
+      }
+
       const result = await db.transaction(async (tx) => {
         // Serialize finalization attempts and commit every related write
         // together so a failure cannot leave a game half-finalized.
@@ -11639,6 +11798,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const goals = await tx.select().from(gameGoals).where(eq(gameGoals.gameId, gameId));
         const penalties = await tx.select().from(gamePenalties).where(eq(gamePenalties.gameId, gameId));
+
+        if (attendanceProvided) {
+          // Replace the set inside the same transaction as finalization. The
+          // unique identity constraints make retries safe, and the delete +
+          // insert means edits remove stale attendees rather than accumulating
+          // duplicate game participation.
+          await tx.delete(gameAttendance).where(eq(gameAttendance.gameId, gameId));
+          if (normalizedAttendance.length > 0) {
+            await tx.insert(gameAttendance).values(normalizedAttendance);
+          }
+        }
 
         // Recover older failed attempts that submitted every event but never
         // completed the game or committed any player-stat changes.
@@ -29331,6 +29501,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
              AND g.is_completed = true
              AND gp.is_submitted = true
              ${seasonFilter}
+           UNION ALL
+           -- Scorekeeper-confirmed attendance counts as a zero-point game.
+           SELECT ga.user_id, ga.game_id, 0
+           FROM game_attendance ga
+           JOIN games g ON g.id = ga.game_id
+           WHERE ga.user_id IS NOT NULL
+             AND g.league_id = ${leagueId}
+             AND g.is_completed = true
+             ${seasonFilter}
+           UNION ALL
+           SELECT 'placeholder:' || ga.placeholder_player_id, ga.game_id, 0
+           FROM game_attendance ga
+           JOIN games g ON g.id = ga.game_id
+           WHERE ga.placeholder_player_id IS NOT NULL
+             AND g.league_id = ${leagueId}
+             AND g.is_completed = true
+             ${seasonFilter}
         ),
         player_game_totals AS (
            -- One row per player/game. A scoreless penalty-only game remains 0 points.
@@ -29397,8 +29584,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Returns full player stats for the Stats & Trends screen:
    *   { seasonTotals, gameLog, streakStatus, streakRatio }
    *
-    * Game participation is established only from submitted player-stat records
-    * (goals, assists, or penalties). RSVPs do not create games in this view.
+     * Game participation is established from submitted player-stat records
+     * (goals, assists, or penalties) or scorekeeper-confirmed attendance.
+     * RSVPs do not create games in this view.
    * Requires the requester to be a member of the specified league.
    */
   app.get('/api/users/:userId/stats-trends', isAuthenticated, async (req: any, res) => {
@@ -29471,6 +29659,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
        // itself is not a recorded stat and must not count as participation here.
       const gameLogLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
       const seasonSqlFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+      const attendanceIdentityFilter = isSyntheticPlaceholder
+        ? sql`AND ga.placeholder_player_id = ${placeholderId}`
+        : sql`AND ga.user_id = ${userId}`;
 
       const gameLogResult = await db.execute(sql`
          WITH recorded_games AS (
@@ -29497,6 +29688,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             AND gp.player_id = ${userId}
             ${gameLogLeagueFilter}
             ${seasonSqlFilter}
+           UNION
+           -- Scorekeeper-confirmed attendance establishes a zero-point game,
+           -- including for a placeholder player with a synthetic ID.
+           SELECT DISTINCT g.id AS game_id
+           FROM game_attendance ga
+           JOIN games g ON g.id = ga.game_id
+           WHERE g.is_completed = true
+             ${attendanceIdentityFilter}
+             ${gameLogLeagueFilter}
+             ${seasonSqlFilter}
         ),
         goal_pts AS (
           -- Points scored in each game for this player
@@ -29633,9 +29834,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
        };
 
       // --- Streak (identical algorithm to the team-level streak endpoint) ---
-      // Aggregate/manual stats are useful for the progression and log, but they
-      // do not represent a dated game and must not become a synthetic streak
-      // game. RSVP-only records are already absent from eventGameLog.
+       // Aggregate/manual stats are useful for the progression and log, but they
+       // do not represent a dated game and must not become a synthetic streak
+       // game. RSVP-only records are already absent from eventGameLog.
       const streakGameLog = gameLog.filter((entry: any) => !entry.isAggregate);
       let streakStatus = 'NEUTRAL';
       let streakRatio = 1.0;
