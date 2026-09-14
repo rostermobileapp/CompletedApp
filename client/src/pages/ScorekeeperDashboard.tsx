@@ -519,7 +519,7 @@ export default function ScorekeeperDashboard() {
           <p className="text-[11px] text-muted-foreground mb-2">
             Check everyone who was actually at the game.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1 bg-[#3b3b3b]">
             {players.map((player) => {
               const playerId = player.userId;
               const attendanceKey = `${teamId}:${playerId}`;
