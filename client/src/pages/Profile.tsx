@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNativelyNotifications } from '@/hooks/useNativelyNotifications';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -49,7 +49,6 @@ const profileSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  city: z.string().optional(),
   zipCode: z.string().optional(),
   playerType: z.enum(['Skater', 'Goalie']).optional(),
   shoots: z.enum(['left', 'right']).optional(),
@@ -81,6 +80,7 @@ export default function Profile() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
   const [teamJoinLeagueMessage, setTeamJoinLeagueMessage] = useState('');
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
+  const [teamJerseyNumbers, setTeamJerseyNumbers] = useState<Record<string, string>>({});
   const isDesktopWeb = useIsDesktopWeb();
 
   // Referral section local state
@@ -141,7 +141,6 @@ export default function Profile() {
       firstName: (user as any)?.firstName || '',
       lastName: (user as any)?.lastName || '',
       dateOfBirth: (user as any)?.dateOfBirth || '',
-      city: (user as any)?.city || '',
       zipCode: (user as any)?.zipCode || '',
       playerType: (user as any)?.playerType || undefined,
       shoots: (user as any)?.shoots || undefined,
@@ -161,7 +160,19 @@ export default function Profile() {
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileForm) => {
       const response = await apiRequest('PATCH', '/api/auth/user/profile', data);
-      return response.json();
+      const profileResult = await response.json();
+
+      // Jersey numbers belong to team memberships, not to the global profile.
+      // Save all of the user's current team values with the profile edit.
+      await Promise.all(
+        Object.entries(teamJerseyNumbers).map(async ([teamId, jerseyNumber]) => {
+          await apiRequest('PATCH', `/api/user/teams/${teamId}/jersey-number`, {
+            jerseyNumber: jerseyNumber === '' ? null : Number(jerseyNumber),
+          });
+        }),
+      );
+
+      return profileResult;
     },
     onSuccess: () => {
       toast({ title: 'Profile updated successfully' });
@@ -223,6 +234,21 @@ export default function Profile() {
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
   });
+
+  useEffect(() => {
+    if (Array.isArray(userTeams)) {
+      setTeamJerseyNumbers(
+        Object.fromEntries(
+          userTeams.map((team: any) => [
+            team.id,
+            team.jerseyNumber === null || team.jerseyNumber === undefined
+              ? ''
+              : String(team.jerseyNumber),
+          ]),
+        ),
+      );
+    }
+  }, [userTeams]);
 
   // Leave league mutation
   const leaveLeagueMutation = useMutation({
@@ -562,7 +588,7 @@ export default function Profile() {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-1">Email</label>
                 <input
@@ -586,16 +612,38 @@ export default function Profile() {
                   data-testid="input-date-of-birth"
                 />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">City</label>
-                <input
-                  {...form.register('city')}
-                  className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Your city of residence"
-                  data-testid="input-city"
-                />
-              </div>
+
+               {Array.isArray(userTeams) && userTeams.length > 0 && (
+                 <div className="space-y-3">
+                   <label className="block text-sm font-medium">Jersey Number</label>
+                   {userTeams.map((team: any) => (
+                     <div key={team.id}>
+                       <label className="block text-xs text-muted-foreground mb-1">
+                         {team.name}
+                       </label>
+                       <input
+                         type="number"
+                         min="0"
+                         step="1"
+                         inputMode="numeric"
+                         value={teamJerseyNumbers[team.id] ?? ''}
+                         onChange={(event) =>
+                           setTeamJerseyNumbers((current) => ({
+                             ...current,
+                             [team.id]: event.target.value,
+                           }))
+                         }
+                         className="w-full p-2 bg-background border border-[hsl(var(--hairline))] shadow-[var(--elev-inset)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                         placeholder="Enter your jersey number"
+                         data-testid={`input-jersey-number-${team.id}`}
+                       />
+                     </div>
+                   ))}
+                   <p className="text-xs text-muted-foreground">
+                     Your jersey number can be different for each team.
+                   </p>
+                 </div>
+               )}
 
               <div>
                 <label className="block text-sm font-medium mb-1">Zip Code</label>
@@ -693,6 +741,23 @@ export default function Profile() {
                 <span className="text-muted-foreground">Name:</span>
                 <span data-testid="text-profile-name">{`${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() || 'Not specified'}</span>
               </div>
+               {Array.isArray(userTeams) && userTeams.length > 0 ? (
+                 userTeams.map((team: any) => (
+                   <div className="flex justify-between gap-4" key={team.id}>
+                     <span className="text-muted-foreground">
+                       Jersey Number{userTeams.length > 1 ? ` (${team.name})` : ''}:
+                     </span>
+                     <span data-testid={`text-jersey-number-${team.id}`}>
+                       {team.jerseyNumber ?? 'Not specified'}
+                     </span>
+                   </div>
+                 ))
+               ) : (
+                 <div className="flex justify-between">
+                   <span className="text-muted-foreground">Jersey Number:</span>
+                   <span>Not specified</span>
+                 </div>
+               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Email:</span>
                 <span data-testid="text-profile-email">{(user as any)?.email || 'Not specified'}</span>
@@ -700,10 +765,6 @@ export default function Profile() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date of Birth:</span>
                 <span>{(user as any)?.dateOfBirth || 'Not specified'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">City:</span>
-                <span>{(user as any)?.city || 'Not specified'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Zip Code:</span>

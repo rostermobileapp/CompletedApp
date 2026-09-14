@@ -261,6 +261,7 @@ export interface IStorage {
   getUserByDisplayId(displayId: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProfile(id: string, profileData: Partial<Pick<User, 'firstName' | 'lastName' | 'city' | 'age' | 'phoneNumber' | 'zipCode' | 'lat' | 'lng' | 'playerType' | 'shoots' | 'email' | 'timezone' | 'timezoneManuallySet'>>): Promise<User>;
+  updateUserTeamJerseyNumber(userId: string, teamId: string, jerseyNumber: number | null): Promise<boolean>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
@@ -3159,10 +3160,10 @@ export class DatabaseStorage implements IStorage {
     return team;
   }
 
-  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null })[]> {
+  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null; jerseyNumber?: number | null })[]> {
     // Get teams from direct team memberships
     const teamMembershipResult = await db
-      .select({ team: teams })
+      .select({ team: teams, jerseyNumber: teamMemberships.jerseyNumber })
       .from(teams)
       .innerJoin(teamMemberships, eq(teams.id, teamMemberships.teamId))
       .where(
@@ -3174,7 +3175,7 @@ export class DatabaseStorage implements IStorage {
 
     // Get teams from league memberships with assigned teams
     const leagueMembershipResult = await db
-      .select({ team: teams, leagueId: leagueMemberships.leagueId })
+      .select({ team: teams, leagueId: leagueMemberships.leagueId, jerseyNumber: leagueMemberships.jerseyNumber })
       .from(teams)
       .innerJoin(leagueMemberships, eq(teams.id, leagueMemberships.assignedTeamId))
       .where(
@@ -3309,6 +3310,20 @@ export class DatabaseStorage implements IStorage {
       teamIdToMembershipLeagueId.set(teamId, leagueId);
     }
 
+    // Direct memberships have the same precedence used by getTeamMembers when
+    // both direct and league-assigned rows exist.
+    const jerseyNumberByTeamId = new Map<string, number | null>();
+    for (const row of teamMembershipResult) {
+      if (!jerseyNumberByTeamId.has(row.team.id)) {
+        jerseyNumberByTeamId.set(row.team.id, row.jerseyNumber ?? null);
+      }
+    }
+    for (const row of leagueMembershipResult) {
+      if (!jerseyNumberByTeamId.has(row.team.id)) {
+        jerseyNumberByTeamId.set(row.team.id, row.jerseyNumber ?? null);
+      }
+    }
+
     return uniqueTeams.map(team => {
       const info = team.seasonId ? seasonInfoMap[team.seasonId] : undefined;
       return {
@@ -3322,8 +3337,37 @@ export class DatabaseStorage implements IStorage {
         // The league the user is actually a member of for this team.
         // Preferred over team.leagueId on the frontend for display purposes.
         membershipLeagueId: teamIdToMembershipLeagueId.get(team.id) ?? null,
+        jerseyNumber: jerseyNumberByTeamId.get(team.id) ?? null,
       };
     });
+  }
+
+  async updateUserTeamJerseyNumber(userId: string, teamId: string, jerseyNumber: number | null): Promise<boolean> {
+    const updatedCount = await db.transaction(async (tx) => {
+      const directMemberships = await tx
+        .update(teamMemberships)
+        .set({ jerseyNumber })
+        .where(and(
+          eq(teamMemberships.userId, userId),
+          eq(teamMemberships.teamId, teamId),
+          eq(teamMemberships.status, "approved"),
+        ))
+        .returning({ id: teamMemberships.id });
+
+      const leagueMembershipsForTeam = await tx
+        .update(leagueMemberships)
+        .set({ jerseyNumber })
+        .where(and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.assignedTeamId, teamId),
+          eq(leagueMemberships.status, "approved"),
+        ))
+        .returning({ id: leagueMemberships.id });
+
+      return directMemberships.length + leagueMembershipsForTeam.length;
+    });
+
+    return updatedCount > 0;
   }
 
   async getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]> {

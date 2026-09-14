@@ -7946,6 +7946,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/user/teams/:teamId/jersey-number", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { teamId } = req.params;
+      const rawJerseyNumber = req.body?.jerseyNumber;
+
+      let jerseyNumber: number | null = null;
+      if (rawJerseyNumber !== null && rawJerseyNumber !== undefined && rawJerseyNumber !== '') {
+        const parsed = Number(rawJerseyNumber);
+        if (!Number.isInteger(parsed) || parsed < 0) {
+          return res.status(400).json({ message: "Jersey number must be a non-negative whole number" });
+        }
+        jerseyNumber = parsed;
+      }
+
+      const updated = await storage.updateUserTeamJerseyNumber(userId, teamId, jerseyNumber);
+      if (!updated) {
+        return res.status(403).json({ message: "You are not an approved member of this team" });
+      }
+
+      res.json({ teamId, jerseyNumber });
+    } catch (error) {
+      console.error("Error updating team jersey number:", error);
+      res.status(500).json({ message: "Failed to update jersey number" });
+    }
+  });
+
   // Approved tournament participations for the current user. Used by the
   // "My Team" page so tournament-only players (who have no real team_membership)
   // can still see their tournament team and navigate to it.
