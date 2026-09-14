@@ -657,7 +657,7 @@ export default function ScorekeeperDashboard() {
             </Dialog>
 
             {/* Goals List */}
-            <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
+            <div className="space-y-1 landscape:max-h-[calc(100vh-380px)] landscape:overflow-y-auto">
               {goals.map((goal, idx) => {
                 const scorerName = goal.scorer 
                   ? `${goal.scorer.firstName} ${goal.scorer.lastName}` 
@@ -744,7 +744,7 @@ export default function ScorekeeperDashboard() {
             </div>
 
             {/* Penalties List */}
-            <div className="space-y-1 max-h-[calc(100vh-380px)] overflow-y-auto">
+            <div className="space-y-1 landscape:max-h-[calc(100vh-380px)] landscape:overflow-y-auto">
               {penalties.map((penalty, idx) => {
                 const playerName = penalty.player 
                   ? `${penalty.player.firstName} ${penalty.player.lastName}` 
