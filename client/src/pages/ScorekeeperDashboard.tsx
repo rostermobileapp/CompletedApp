@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -114,6 +114,7 @@ export default function ScorekeeperDashboard() {
   const [selectedId, setSelectedId] = useState<string>(urlLeagueId || urlTournamentId || '');
   const [selectionType, setSelectionType] = useState<'league' | 'tournament'>(urlTournamentId ? 'tournament' : 'league');
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const scoringContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState('schedule');
   const [showPenalties, setShowPenalties] = useState(false);
   const [selectedAttendanceIds, setSelectedAttendanceIds] = useState<Set<string>>(new Set());
@@ -412,6 +413,14 @@ export default function ScorekeeperDashboard() {
     setSelectedAttendanceIds(new Set());
     setAttendanceInitializedGameId(null);
   };
+
+  // The schedule and scoring views share the same route. Always start a newly
+  // opened game at the top instead of preserving a lower schedule scroll offset.
+  useEffect(() => {
+    if (!selectedGame || activeTab !== 'scoring') return;
+    scoringContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [selectedGame?.id, activeTab]);
 
   // Compact Team Scoring Panel
   const TeamScoringPanel = useMemo(() => ({
@@ -817,7 +826,11 @@ export default function ScorekeeperDashboard() {
   // Live Scoring Mode - Compact Full-Screen Layout
   if (selectedGame && activeTab === 'scoring') {
     return (
-      <div className="min-h-screen landscape:h-screen flex flex-col p-3 overflow-y-auto landscape:overflow-hidden">
+      <div
+        ref={scoringContainerRef}
+        className="relative h-[100dvh] max-h-[100dvh] flex flex-col overflow-y-scroll overscroll-y-contain touch-pan-y p-3 pb-24 pt-[calc(0.75rem+env(safe-area-inset-top))] landscape:overflow-hidden"
+        data-testid="scorekeeping-scroll-container"
+      >
         {/* Compact Header Bar */}
         <div className="flex flex-col landscape:flex-row landscape:items-center landscape:justify-between mb-3 gap-2">
           {/* Back button + Game title */}
