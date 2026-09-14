@@ -357,7 +357,7 @@ export interface IStorage {
   getTeam(id: string): Promise<Team | undefined>;
   getTeamByUniqueId(uniqueTeamId: string): Promise<Team | undefined>;
   searchTeams(search?: string): Promise<(Team & { league?: League | null })[]>;
-  getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null; membershipLeagueId?: string | null })[]>;
+  getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null; membershipLeagueId?: string | null; jerseyNumber?: number | null; isInCompletedTournament?: boolean })[]>;
   getUserTeamMemberships(userId: string, teamIds: string[]): Promise<{ teamId: string; isCaptain: boolean }[]>;
   getTeamsWhereCaptain(userId: string): Promise<{ id: string; name: string }[]>;
   updateTeam(id: string, data: Partial<Pick<Team, 'name'>>): Promise<Team>;
@@ -3160,7 +3160,7 @@ export class DatabaseStorage implements IStorage {
     return team;
   }
 
-  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null; jerseyNumber?: number | null })[]> {
+  async getUserTeams(userId: string): Promise<(Team & { seasonName?: string | null; seasonIsActive?: boolean | null; seasonStartDate?: Date | null; jerseyNumber?: number | null; isInCompletedTournament?: boolean })[]> {
     // Get teams from direct team memberships
     const teamMembershipResult = await db
       .select({ team: teams, jerseyNumber: teamMemberships.jerseyNumber })
@@ -3324,6 +3324,26 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // Keep the profile from presenting a jersey number tied to a finished
+    // tournament. This flag is additive so other consumers can continue to
+    // receive historical teams for schedules and reporting.
+    const completedTournamentTeamIds = new Set<string>();
+    if (uniqueTeams.length > 0) {
+      const completedTournamentTeams = await db
+        .select({ teamId: tournamentTeams.teamId })
+        .from(tournamentTeams)
+        .innerJoin(tournaments, eq(tournamentTeams.tournamentId, tournaments.id))
+        .where(and(
+          eq(tournaments.status, "completed"),
+          inArray(tournamentTeams.teamId, uniqueTeams.map(team => team.id)),
+          isNotNull(tournamentTeams.teamId),
+        ));
+
+      for (const row of completedTournamentTeams) {
+        if (row.teamId) completedTournamentTeamIds.add(row.teamId);
+      }
+    }
+
     return uniqueTeams.map(team => {
       const info = team.seasonId ? seasonInfoMap[team.seasonId] : undefined;
       return {
@@ -3338,6 +3358,7 @@ export class DatabaseStorage implements IStorage {
         // Preferred over team.leagueId on the frontend for display purposes.
         membershipLeagueId: teamIdToMembershipLeagueId.get(team.id) ?? null,
         jerseyNumber: jerseyNumberByTeamId.get(team.id) ?? null,
+        isInCompletedTournament: completedTournamentTeamIds.has(team.id),
       };
     });
   }

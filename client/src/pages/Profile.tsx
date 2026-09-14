@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNativelyNotifications } from '@/hooks/useNativelyNotifications';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -235,11 +235,18 @@ export default function Profile() {
     queryKey: ['/api/user/teams'],
   });
 
+  const profileTeams = useMemo(
+    () => Array.isArray(userTeams)
+      ? userTeams.filter((team: any) => team.seasonIsActive !== false && !team.isInCompletedTournament)
+      : [],
+    [userTeams],
+  );
+
   useEffect(() => {
-    if (Array.isArray(userTeams)) {
+    if (Array.isArray(profileTeams)) {
       setTeamJerseyNumbers(
         Object.fromEntries(
-          userTeams.map((team: any) => [
+          profileTeams.map((team: any) => [
             team.id,
             team.jerseyNumber === null || team.jerseyNumber === undefined
               ? ''
@@ -248,7 +255,7 @@ export default function Profile() {
         ),
       );
     }
-  }, [userTeams]);
+  }, [profileTeams]);
 
   // Leave league mutation
   const leaveLeagueMutation = useMutation({
@@ -613,10 +620,10 @@ export default function Profile() {
                 />
               </div>
 
-               {Array.isArray(userTeams) && userTeams.length > 0 && (
+               {profileTeams.length > 0 && (
                  <div className="space-y-3">
                    <label className="block text-sm font-medium">Jersey Number</label>
-                   {userTeams.map((team: any) => (
+                   {profileTeams.map((team: any) => (
                      <div key={team.id}>
                        <label className="block text-xs text-muted-foreground mb-1">
                          {team.name}
@@ -741,11 +748,11 @@ export default function Profile() {
                 <span className="text-muted-foreground">Name:</span>
                 <span data-testid="text-profile-name">{`${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() || 'Not specified'}</span>
               </div>
-               {Array.isArray(userTeams) && userTeams.length > 0 ? (
-                 userTeams.map((team: any) => (
+               {profileTeams.length > 0 ? (
+                 profileTeams.map((team: any) => (
                    <div className="flex justify-between gap-4" key={team.id}>
                      <span className="text-muted-foreground">
-                       Jersey Number{userTeams.length > 1 ? ` (${team.name})` : ''}:
+                       Jersey Number{profileTeams.length > 1 ? ` (${team.name})` : ''}:
                      </span>
                      <span data-testid={`text-jersey-number-${team.id}`}>
                        {team.jerseyNumber ?? 'Not specified'}
