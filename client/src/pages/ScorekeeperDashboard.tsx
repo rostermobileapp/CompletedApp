@@ -499,7 +499,7 @@ export default function ScorekeeperDashboard() {
     const textColor = 'text-blue-500';
 
     return (
-      <div className="flex-1 border rounded-lg p-3 bg-card border-border">
+      <div className="flex-none landscape:flex-1 border rounded-lg p-3 bg-card border-border">
         {/* Team Header with Score */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-lg truncate text-card-foreground">{team === 'home' ? 'HOME' : 'AWAY'}: {teamName}</h3>
@@ -925,7 +925,7 @@ export default function ScorekeeperDashboard() {
 
         {/* Main Scoring Area - Two Columns */}
         {!rostersLoading && !rostersError && (
-          <div className="flex-1 flex flex-col landscape:flex-row gap-4 min-h-0">
+          <div className="flex flex-col gap-4 landscape:flex-1 landscape:min-h-0 landscape:flex-row">
             <TeamScoringPanel 
               team="away"
               teamName={selectedGame.awayTeam?.name || 'Away'}
