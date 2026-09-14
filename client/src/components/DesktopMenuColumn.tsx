@@ -11,6 +11,7 @@ import {
   UserPlus,
   Trophy,
   Target,
+  BrickWall,
   Lock,
   Search,
   MessageSquare,
@@ -114,6 +115,14 @@ export function DesktopMenuColumn() {
       locked: scorekeeperLocked,
       bgColor: 'bg-red-500/20',
       iconColor: 'text-red-500',
+    },
+    {
+      icon: BrickWall,
+      label: 'Wall',
+      path: '/announcements',
+      locked: false,
+      bgColor: 'bg-blue-500/20',
+      iconColor: 'text-blue-500',
     },
     {
       icon: Search,
