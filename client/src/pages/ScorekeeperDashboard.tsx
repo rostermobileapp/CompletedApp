@@ -210,6 +210,26 @@ export default function ScorekeeperDashboard() {
   const rostersLoading = homeTeamLoading || awayTeamLoading;
   const rostersError = homeTeamError || awayTeamError;
 
+  const currentGameRosterKeys = useMemo(() => {
+    const homeTeamId = selectedGame?.homeTeam?.id;
+    const awayTeamId = selectedGame?.awayTeam?.id;
+    const keys = new Set<string>();
+
+    if (homeTeamId) {
+      homeTeamMembers.forEach((member) => keys.add(`${homeTeamId}:${member.userId}`));
+    }
+    if (awayTeamId) {
+      awayTeamMembers.forEach((member) => keys.add(`${awayTeamId}:${member.userId}`));
+    }
+
+    return keys;
+  }, [
+    selectedGame?.homeTeam?.id,
+    selectedGame?.awayTeam?.id,
+    homeTeamMembers,
+    awayTeamMembers,
+  ]);
+
   const rsvpStatusByPlayer = useMemo(() => {
     const statuses = new Map<string, 'attending' | 'not_attending' | 'no_response'>();
     for (const rsvp of attendanceData?.rsvps || []) {
@@ -355,7 +375,9 @@ export default function ScorekeeperDashboard() {
     ) return;
 
     const initialIds = new Set(
-      attendanceData.attendees.map((attendee) => `${attendee.teamId}:${attendee.playerId}`),
+      attendanceData.attendees
+        .map((attendee) => `${attendee.teamId}:${attendee.playerId}`)
+        .filter((key) => currentGameRosterKeys.has(key)),
     );
     setSelectedAttendanceIds(initialIds);
     setAttendanceInitializedGameId(selectedGame.id);
@@ -364,6 +386,7 @@ export default function ScorekeeperDashboard() {
     attendanceData,
     rostersLoading,
     attendanceInitializedGameId,
+    currentGameRosterKeys,
   ]);
 
   // A newly recorded scoring event should make that player present by default.
@@ -931,13 +954,15 @@ export default function ScorekeeperDashboard() {
                   if (window.confirm(`${selectedGameIsCompleted ? 'Save added game details?' : 'Finalize game?'}\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}\n\nThis will update player stats for newly entered details.`)) {
                     finalizeGameMutation.mutate({
                       gameId: selectedGame.id,
-                      attendees: Array.from(selectedAttendanceIds).map((key) => {
+                      attendees: Array.from(selectedAttendanceIds)
+                        .filter((key) => currentGameRosterKeys.has(key))
+                        .map((key) => {
                         const separatorIndex = key.indexOf(':');
                         return {
                           teamId: key.slice(0, separatorIndex),
                           playerId: key.slice(separatorIndex + 1),
                         };
-                      }),
+                        }),
                     });
                   }
                 }}
