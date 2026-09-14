@@ -131,7 +131,12 @@ export default function PlayerStatsTrends() {
     let cumulative = 0;
     return reversed.map((g, i) => {
       cumulative += g.points;
-      return { game: i + 1, gamePoints: g.points, cumulative };
+      return {
+        game: i + 1,
+        gameLabel: g.isAggregate ? 'Recorded' : String(i + 1),
+        gamePoints: g.points,
+        cumulative,
+      };
     });
   })();
 
@@ -276,7 +281,7 @@ export default function PlayerStatsTrends() {
                     <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis
-                        dataKey="game"
+                        dataKey="gameLabel"
                         tick={{ fontSize: 11 }}
                         label={{ value: 'Game', position: 'insideBottom', offset: -2, fontSize: 11 }}
                         height={28}
@@ -287,7 +292,7 @@ export default function PlayerStatsTrends() {
                           value,
                           name === 'cumulative' ? 'Cumulative Pts' : 'Game Pts',
                         ]}
-                        labelFormatter={(label) => `Game ${label}`}
+                        labelFormatter={(label) => label === 'Recorded' ? 'Recorded stats' : `Game ${label}`}
                       />
                       <Bar dataKey="gamePoints" fill="hsl(var(--primary) / 0.35)" name="Game Pts" radius={[2, 2, 0, 0]} />
                       <Line
@@ -349,11 +354,15 @@ export default function PlayerStatsTrends() {
                     <tbody>
                       {gameLog.length > 0 ? (
                         gameLog.map((entry, idx) => (
-                          <tr key={entry.gameId} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                          <tr
+                            key={entry.gameId}
+                            className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}
+                            data-testid={entry.isAggregate ? 'row-recorded-stats' : undefined}
+                          >
                             <td className="px-4 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                              {formatDate(entry.date)}
+                              {entry.isAggregate ? 'Recorded' : formatDate(entry.date)}
                             </td>
-                            <td className="px-2 py-2 text-xs truncate max-w-[120px]">
+                            <td className={`px-2 py-2 text-xs truncate max-w-[120px] ${entry.isAggregate ? 'font-medium' : ''}`}>
                               {getOpponentDisplay(entry)}
                             </td>
                             <td className="px-2 py-2 text-center font-medium">{entry.goals}</td>

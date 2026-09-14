@@ -29450,7 +29450,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 OR COALESCE(assists, 0) > 0
                 OR COALESCE(penalty_minutes, 0) > 0
            )::int AS recorded_stat_rows,
-           MAX(updated_at) AS stats_updated_at,
           COUNT(*)::int                          AS row_count
         FROM player_stats
         WHERE user_id = ${userId}
@@ -29634,18 +29633,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
        };
 
       // --- Streak (identical algorithm to the team-level streak endpoint) ---
+      // Aggregate/manual stats are useful for the progression and log, but they
+      // do not represent a dated game and must not become a synthetic streak
+      // game. RSVP-only records are already absent from eventGameLog.
+      const streakGameLog = gameLog.filter((entry: any) => !entry.isAggregate);
       let streakStatus = 'NEUTRAL';
       let streakRatio = 1.0;
 
       const RECENT_GAME_COUNT = 2;
       const priorBoost = RECENT_GAME_COUNT * ASSUMED_BASELINE_PPG;
-      if (gameLog.length >= RECENT_GAME_COUNT) {
-        // gameLog is newest-first; last-2 = most recent 2 participated games
-        const recentPoints = gameLog
+      if (streakGameLog.length >= RECENT_GAME_COUNT) {
+        // streakGameLog is newest-first; last-2 = most recent 2 participated games
+        const recentPoints = streakGameLog
           .slice(0, RECENT_GAME_COUNT)
           .reduce((s: number, g: any) => s + g.points, 0);
         const recentPpg = recentPoints / RECENT_GAME_COUNT;
-        const priorGames = gameLog.slice(RECENT_GAME_COUNT);
+        const priorGames = streakGameLog.slice(RECENT_GAME_COUNT);
         const priorPoints = priorGames.reduce((s: number, g: any) => s + g.points, 0);
         const priorGameCount = priorGames.length;
         const baselinePpg = (priorPoints + priorBoost) / (priorGameCount + RECENT_GAME_COUNT);
