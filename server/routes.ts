@@ -7763,7 +7763,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COALESCE(SUM(ps.games_played), 0)::int AS games_played,
             COALESCE(SUM(ps.goals), 0)::int AS goals,
             COALESCE(SUM(ps.assists), 0)::int AS assists,
-            COALESCE(SUM(ps.penalty_minutes), 0)::int AS penalty_minutes
+             COALESCE(SUM(ps.penalty_minutes), 0)::int AS penalty_minutes,
+             COUNT(*) FILTER (
+               WHERE COALESCE(ps.goals, 0) > 0
+                  OR COALESCE(ps.assists, 0) > 0
+                  OR COALESCE(ps.penalty_minutes, 0) > 0
+             )::int AS recorded_stat_rows
           FROM player_stats ps
           WHERE ps.league_id = ${team.leagueId}
             AND ps.user_id IS NOT NULL
@@ -7775,7 +7780,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           u.first_name,
           u.last_name,
           u.profile_image_url,
-          COALESCE(ast.games_played, 0) AS games_played,
+           GREATEST(
+             COALESCE(ast.games_played, 0),
+             COALESCE(ast.recorded_stat_rows, 0)
+           ) AS games_played,
           COALESCE(ast.goals, 0) AS goals,
           COALESCE(ast.assists, 0) AS assists,
           COALESCE(ast.penalty_minutes, 0) AS penalty_minutes,
@@ -29437,6 +29445,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(goals), 0)::int          AS goals,
           COALESCE(SUM(assists), 0)::int        AS assists,
           COALESCE(SUM(penalty_minutes), 0)::int AS penalty_minutes,
+           COUNT(*) FILTER (
+             WHERE COALESCE(goals, 0) > 0
+                OR COALESCE(assists, 0) > 0
+                OR COALESCE(penalty_minutes, 0) > 0
+           )::int AS recorded_stat_rows,
           COUNT(*)::int                          AS row_count
         FROM player_stats
         WHERE user_id = ${userId}
@@ -29445,6 +29458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const totalsRow = seasonTotalsResult.rows?.[0];
       const hasStats = Number(totalsRow?.row_count ?? 0) > 0;
+       const recordedStatRows = Number(totalsRow?.recorded_stat_rows ?? 0);
       const storedSeasonTotals = hasStats ? {
         gamesPlayed:    Number(totalsRow.games_played),
         goals:          Number(totalsRow.goals),
@@ -29557,7 +29571,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
        // Always return a complete totals object. Players without recorded stats
        // should see zeros, not a partially populated/no-data response.
        const seasonTotals = {
-         gamesPlayed: Math.max(storedSeasonTotals?.gamesPlayed ?? 0, gameLogTotals.gamesPlayed),
+         // Some historical score finalizations wrote goals/assists/PIM to
+         // player_stats but left games_played at zero and created no event
+         // rows. Each such aggregate row proves at least one recorded game.
+         gamesPlayed: Math.max(
+           storedSeasonTotals?.gamesPlayed ?? 0,
+           gameLogTotals.gamesPlayed,
+           recordedStatRows,
+         ),
          goals: Math.max(storedSeasonTotals?.goals ?? 0, gameLogTotals.goals),
          assists: Math.max(storedSeasonTotals?.assists ?? 0, gameLogTotals.assists),
          penaltyMinutes: Math.max(
