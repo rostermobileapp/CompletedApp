@@ -294,7 +294,18 @@ export default function ScorekeeperDashboard() {
     mutationFn: async (data: { gameId: string; attendees: { playerId: string; teamId: string }[] }) => {
       return apiRequest('POST', `/api/games/${data.gameId}/finalize`, { attendees: data.attendees });
     },
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
+      // Keep the exact attendance selection available when a completed game is
+      // reopened. The query is invalidated below, but the scoring view closes
+      // immediately and could otherwise briefly reuse its pre-save cache.
+      queryClient.setQueryData<GameAttendanceData>(
+        [`/api/games/${variables.gameId}/attendance`],
+        (previous) => ({
+          attendees: variables.attendees,
+          rsvps: previous?.rsvps || [],
+          attendanceRecorded: true,
+        }),
+      );
       queryClient.invalidateQueries({ queryKey: [gamesQueryKey] });
       if (selectedGame?.leagueId) {
         queryClient.invalidateQueries({
