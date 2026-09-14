@@ -420,6 +420,10 @@ export default function ScorekeeperDashboard() {
     if (!selectedGame || activeTab !== 'scoring') return;
     scoringContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
     window.scrollTo({ top: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const appRoot = document.getElementById('root');
+    appRoot?.scrollTo({ top: 0, behavior: 'auto' });
   }, [selectedGame?.id, activeTab]);
 
   // Compact Team Scoring Panel
@@ -828,7 +832,8 @@ export default function ScorekeeperDashboard() {
     return (
       <div
         ref={scoringContainerRef}
-        className="relative h-[100dvh] max-h-[100dvh] flex flex-col overflow-y-scroll overscroll-y-contain touch-pan-y p-3 pb-24 pt-[calc(0.75rem+env(safe-area-inset-top))] landscape:overflow-hidden"
+        className="fixed inset-0 z-10 flex h-[100dvh] max-h-[100dvh] flex-col overflow-y-auto overscroll-y-contain touch-pan-y bg-background p-3 pb-28 pt-[calc(0.75rem+env(safe-area-inset-top))]"
+        style={{ overflowAnchor: 'none' }}
         data-testid="scorekeeping-scroll-container"
       >
         {/* Compact Header Bar */}
