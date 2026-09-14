@@ -29450,6 +29450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 OR COALESCE(assists, 0) > 0
                 OR COALESCE(penalty_minutes, 0) > 0
            )::int AS recorded_stat_rows,
+           MAX(updated_at) AS stats_updated_at,
           COUNT(*)::int                          AS row_count
         FROM player_stats
         WHERE user_id = ${userId}
@@ -29540,8 +29541,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY g.scheduled_at DESC
       `);
 
-      const gameLogRows = (gameLogResult as any).rows ?? (gameLogResult as any);
-      const gameLog = gameLogRows.map((row: any) => ({
+       const gameLogRows = (gameLogResult as any).rows ?? (gameLogResult as any);
+       const eventGameLog = gameLogRows.map((row: any) => ({
         gameId: row.game_id,
         date: row.scheduled_at,
         homeTeamId: row.home_team_id,
@@ -29554,6 +29555,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         points: Number(row.points),
         penaltyMinutes: Number(row.penalty_minutes),
       }));
+
+       // Older/manual stat imports can contain valid aggregate goals/assists/PIM
+       // without game_goals or game_penalties rows. Preserve that recorded data
+       // in the progression and log instead of silently rendering blank sections.
+       const eventTotals = eventGameLog.reduce(
+         (totals: { goals: number; assists: number; penaltyMinutes: number }, game: any) => ({
+           goals: totals.goals + game.goals,
+           assists: totals.assists + game.assists,
+           penaltyMinutes: totals.penaltyMinutes + game.penaltyMinutes,
+         }),
+         { goals: 0, assists: 0, penaltyMinutes: 0 },
+       );
+       const aggregateGoals = Math.max(
+         0,
+         (storedSeasonTotals?.goals ?? 0) - eventTotals.goals,
+       );
+       const aggregateAssists = Math.max(
+         0,
+         (storedSeasonTotals?.assists ?? 0) - eventTotals.assists,
+       );
+       const aggregatePenaltyMinutes = Math.max(
+         0,
+         (storedSeasonTotals?.penaltyMinutes ?? 0) - eventTotals.penaltyMinutes,
+       );
+       const aggregateGameLogEntry = (
+         aggregateGoals > 0 ||
+         aggregateAssists > 0 ||
+         aggregatePenaltyMinutes > 0
+       ) ? {
+         gameId: `aggregate:${userId}:${leagueId || 'career'}:${seasonId || 'all'}`,
+         date: null,
+         homeTeamId: null,
+         awayTeamId: null,
+         homeTeamName: null,
+         awayTeamName: null,
+         opponentName: null,
+         goals: aggregateGoals,
+         assists: aggregateAssists,
+         points: aggregateGoals + aggregateAssists,
+         penaltyMinutes: aggregatePenaltyMinutes,
+         isAggregate: true,
+       } : null;
+       const gameLog = aggregateGameLogEntry
+         ? [...eventGameLog, aggregateGameLogEntry]
+         : eventGameLog;
 
       // Score-entry finalization historically updated goals/assists/PIM but
       // left gamesPlayed at zero. Use the game log for participation and

@@ -28,7 +28,7 @@ interface SeasonTotals {
 
 interface GameLogEntry {
   gameId: string;
-  date: string;
+  date: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
   homeTeamName: string | null;
@@ -38,6 +38,7 @@ interface GameLogEntry {
   assists: number;
   points: number;
   penaltyMinutes: number;
+  isAggregate?: boolean;
 }
 
 interface StatsTrendsData {
@@ -134,15 +135,19 @@ export default function PlayerStatsTrends() {
     });
   })();
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return 'Recorded';
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const date = new Date(dateStr);
+      if (Number.isNaN(date.getTime())) return 'Recorded';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } catch {
-      return dateStr;
+      return 'Recorded';
     }
   };
 
   const getOpponentDisplay = (entry: GameLogEntry) => {
+    if (entry.isAggregate) return 'Recorded stats';
     if (entry.homeTeamName && entry.awayTeamName) return `${entry.homeTeamName} vs ${entry.awayTeamName}`;
     if (entry.opponentName) return `vs ${entry.opponentName}`;
     if (entry.homeTeamName) return entry.homeTeamName;
