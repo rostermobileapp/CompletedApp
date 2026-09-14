@@ -53,6 +53,7 @@ interface Player {
   id: string;
   firstName: string;
   lastName: string;
+  jerseyNumber?: number | string | null;
   email?: string | null;
 }
 
@@ -60,6 +61,7 @@ interface TeamMember {
   userId: string;
   teamId: string;
   user: Player | null;
+  jerseyNumber?: number | string | null;
   displayFirstName?: string | null;
   displayLastName?: string | null;
   isPlaceholder?: boolean;
@@ -519,13 +521,41 @@ export default function ScorekeeperDashboard() {
       };
     }, [players.length]);
 
+    const formatPlayerName = (
+      firstName: string | null | undefined,
+      lastName: string | null | undefined,
+      jerseyNumber?: number | string | null,
+    ) => {
+      const number = jerseyNumber === null || jerseyNumber === undefined || jerseyNumber === ''
+        ? '—'
+        : jerseyNumber;
+      return `${number} ${lastName || '—'}, ${firstName || '—'}`;
+    };
+
     const getPlayerName = (member: TeamMember) => {
       if (!member.user) {
         const fullName = `${member.displayFirstName || ''} ${member.displayLastName || ''}`.trim();
-        return fullName || 'Former player';
+        return fullName
+          ? formatPlayerName(member.displayFirstName, member.displayLastName, member.jerseyNumber)
+          : 'Former player';
       }
-      const fullName = `${member.user.firstName || member.displayFirstName || ''} ${member.user.lastName || member.displayLastName || ''}`.trim();
-      return fullName || 'Unnamed player';
+      const firstName = member.displayFirstName || member.user.firstName || '';
+      const lastName = member.displayLastName || member.user.lastName || '';
+      return `${firstName} ${lastName}`.trim()
+        ? formatPlayerName(firstName, lastName, member.jerseyNumber ?? member.user.jerseyNumber)
+        : 'Unnamed player';
+    };
+
+    const getEventPlayerName = (
+      player: Player | null | undefined,
+      playerId: string | null | undefined,
+    ) => {
+      const rosterMember = playerId
+        ? players.find((member) => member.userId === playerId)
+        : undefined;
+      if (rosterMember) return getPlayerName(rosterMember);
+      if (!player) return 'Sub';
+      return formatPlayerName(player.firstName, player.lastName, player.jerseyNumber);
     };
 
     const addGoal = () => {
@@ -738,14 +768,12 @@ export default function ScorekeeperDashboard() {
             {/* Goals List */}
             <div className="space-y-1 landscape:max-h-[calc(100vh-380px)] landscape:overflow-y-auto">
               {goals.map((goal, idx) => {
-                const scorerName = goal.scorer 
-                  ? `${goal.scorer.firstName} ${goal.scorer.lastName}` 
-                  : 'Sub';
-                const primaryAssistName = goal.primaryAssist 
-                  ? `${goal.primaryAssist.firstName.charAt(0)}. ${goal.primaryAssist.lastName}`
+                const scorerName = getEventPlayerName(goal.scorer, goal.scorerId);
+                const primaryAssistName = goal.primaryAssist
+                  ? getEventPlayerName(goal.primaryAssist, goal.primaryAssistId)
                   : (goal.primaryAssistId === 'substitute' ? 'Sub' : null);
                 const secondaryAssistName = goal.secondaryAssist
-                  ? `${goal.secondaryAssist.firstName.charAt(0)}. ${goal.secondaryAssist.lastName}`
+                  ? getEventPlayerName(goal.secondaryAssist, goal.secondaryAssistId)
                   : (goal.secondaryAssistId === 'substitute' ? 'Sub' : null);
                 const hasAnyAssist = primaryAssistName || secondaryAssistName;
                 
@@ -825,9 +853,7 @@ export default function ScorekeeperDashboard() {
             {/* Penalties List */}
             <div className="space-y-1 landscape:max-h-[calc(100vh-380px)] landscape:overflow-y-auto">
               {penalties.map((penalty, idx) => {
-                const playerName = penalty.player 
-                  ? `${penalty.player.firstName} ${penalty.player.lastName}` 
-                  : 'Sub';
+                const playerName = getEventPlayerName(penalty.player, penalty.playerId);
                 return (
                   <div 
                     key={penalty.id} 

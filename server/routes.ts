@@ -12301,11 +12301,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(tournamentParticipants.status, 'approved')
         ));
 
+      const linkedTeamMembers = tournamentTeam.teamId
+        ? await storage.getTeamMembers(tournamentTeam.teamId)
+        : [];
+      const jerseyNumbersByUserId = new Map(
+        linkedTeamMembers.map((member) => [member.userId, member.jerseyNumber ?? null]),
+      );
+
       // If no participants, try to get from regular team if linked
       if (participants.length === 0 && tournamentTeam.teamId) {
-        const members = await storage.getTeamMembers(tournamentTeam.teamId);
-        const formattedMembers = members.map(m => ({
+        const formattedMembers = linkedTeamMembers.map(m => ({
           userId: m.user.id,
+          teamId: tournamentTeamId,
+          jerseyNumber: m.jerseyNumber ?? null,
           user: {
             id: m.user.id,
             firstName: m.user.firstName,
@@ -12318,7 +12326,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Format as TeamMember-like structure
       const formattedParticipants = participants.map(p => ({
-        odId: p.odIdAsUserId || p.odId,
+        userId: p.odIdAsUserId || p.odId,
+        teamId: tournamentTeamId,
+        jerseyNumber: jerseyNumbersByUserId.get(p.odIdAsUserId || p.odId) ?? null,
         user: {
           id: p.odIdAsUserId || p.odId,
           firstName: p.firstName || 'Unknown',
