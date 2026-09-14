@@ -29218,7 +29218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *
    * Game participation is established from game_rsvps (status = 'attending') so that
    * scoreless games are included in the recent/baseline PPG calculation.
-   * Only players with >= 4 attended games receive a streak entry.
+   * Only players with >= 2 attended games receive a streak entry.
    * Requires the requester to be a member of the team's league.
    */
   app.get('/api/teams/:id/streaks', isAuthenticated, async (req: any, res) => {
@@ -29243,7 +29243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const leagueId = team.leagueId;
-      const priorBoost = 4 * ASSUMED_BASELINE_PPG; // = 2.0
+      const RECENT_GAME_COUNT = 2;
+      const priorBoost = RECENT_GAME_COUNT * ASSUMED_BASELINE_PPG; // = 1.0
       const seasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
 
       // Game participation comes from game_rsvps (status = 'attending'), so scoreless games
@@ -29298,12 +29299,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT
             user_id,
             MAX(total_games) AS total_games,
-            (SUM(CASE WHEN rn <= 4 THEN points ELSE 0 END)::float / 4) AS recent_ppg,
-            COALESCE(SUM(CASE WHEN rn > 4 THEN points ELSE 0 END), 0)::float AS prior_points,
-            COALESCE(SUM(CASE WHEN rn > 4 THEN 1 ELSE 0 END), 0)::int AS prior_games
+            (SUM(CASE WHEN rn <= ${RECENT_GAME_COUNT} THEN points ELSE 0 END)::float / ${RECENT_GAME_COUNT}) AS recent_ppg,
+            COALESCE(SUM(CASE WHEN rn > ${RECENT_GAME_COUNT} THEN points ELSE 0 END), 0)::float AS prior_points,
+            COALESCE(SUM(CASE WHEN rn > ${RECENT_GAME_COUNT} THEN 1 ELSE 0 END), 0)::int AS prior_games
           FROM ranked
           GROUP BY user_id
-          HAVING MAX(total_games) >= 4
+          HAVING MAX(total_games) >= ${RECENT_GAME_COUNT}
         )
         SELECT
           user_id,
@@ -29311,15 +29312,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recent_ppg,
           prior_points,
           prior_games,
-          (prior_points + ${priorBoost}::float) / (prior_games + 4) AS baseline_ppg,
+           (prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}) AS baseline_ppg,
           CASE
-            WHEN (prior_points + ${priorBoost}::float) / (prior_games + 4) = 0 THEN 1.0
-            ELSE recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + 4))
+             WHEN (prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}) = 0 THEN 1.0
+             ELSE recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}))
           END AS ratio,
           CASE
-            WHEN (prior_points + ${priorBoost}::float) / (prior_games + 4) = 0 THEN 'NEUTRAL'
-            WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + 4)) >= 1.25 THEN 'HOT'
-            WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + 4)) <= 0.75 THEN 'COLD'
+             WHEN (prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT}) = 0 THEN 'NEUTRAL'
+             WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT})) >= 1.25 THEN 'HOT'
+             WHEN recent_ppg / ((prior_points + ${priorBoost}::float) / (prior_games + ${RECENT_GAME_COUNT})) <= 0.75 THEN 'COLD'
             ELSE 'NEUTRAL'
           END AS streak
         FROM streak_data
@@ -29525,18 +29526,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : null;
 
       // --- Streak (identical algorithm to the team-level streak endpoint) ---
-      const PRIOR_BOOST = 4 * ASSUMED_BASELINE_PPG; // 2.0
       let streakStatus = 'NEUTRAL';
       let streakRatio = 1.0;
 
-      if (gameLog.length >= 4) {
-        // gameLog is newest-first; last-4 = most recent 4 attended games
-        const recent4Points = gameLog.slice(0, 4).reduce((s: number, g: any) => s + g.points, 0);
-        const recentPpg = recent4Points / 4;
-        const priorGames = gameLog.slice(4);
+      const RECENT_GAME_COUNT = 2;
+      const priorBoost = RECENT_GAME_COUNT * ASSUMED_BASELINE_PPG;
+      if (gameLog.length >= RECENT_GAME_COUNT) {
+        // gameLog is newest-first; last-2 = most recent 2 participated games
+        const recentPoints = gameLog
+          .slice(0, RECENT_GAME_COUNT)
+          .reduce((s: number, g: any) => s + g.points, 0);
+        const recentPpg = recentPoints / RECENT_GAME_COUNT;
+        const priorGames = gameLog.slice(RECENT_GAME_COUNT);
         const priorPoints = priorGames.reduce((s: number, g: any) => s + g.points, 0);
         const priorGameCount = priorGames.length;
-        const baselinePpg = (priorPoints + PRIOR_BOOST) / (priorGameCount + 4);
+        const baselinePpg = (priorPoints + priorBoost) / (priorGameCount + RECENT_GAME_COUNT);
         streakRatio = baselinePpg === 0 ? 1.0 : recentPpg / baselinePpg;
         if (streakRatio >= 1.25) streakStatus = 'HOT';
         else if (streakRatio <= 0.75) streakStatus = 'COLD';
