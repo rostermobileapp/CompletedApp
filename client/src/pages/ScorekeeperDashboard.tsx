@@ -617,7 +617,7 @@ export default function ScorekeeperDashboard() {
           <div className="relative">
             <div
               ref={attendanceListRef}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1 bg-[#3b3b3b] rounded-sm"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1 rounded-sm bg-[#f7f7f5] dark:bg-[#3b3b3b]"
               data-testid={`attendance-list-${team}`}
             >
               {players.map((player) => {
@@ -654,7 +654,7 @@ export default function ScorekeeperDashboard() {
               )}
             </div>
             {attendanceListOverflow && !attendanceListAtBottom && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-[#3b3b3b] via-[#3b3b3b]/80 to-transparent pb-0.5 pt-4">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-[#f7f7f5] via-[#f7f7f5]/80 to-transparent dark:from-[#3b3b3b] dark:via-[#3b3b3b]/80 pb-0.5 pt-4">
                 <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/95 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm">
                   <ChevronDown className="h-3 w-3" />
                   Scroll for more
