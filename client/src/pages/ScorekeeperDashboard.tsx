@@ -936,7 +936,7 @@ export default function ScorekeeperDashboard() {
     return (
       <div
         ref={scoringContainerRef}
-        className="fixed inset-0 lg:left-[368px] xl:left-[400px] [@media(min-width:1024px)_and_(max-height:760px)]:left-[360px] z-10 flex h-[100dvh] max-h-[100dvh] flex-col overflow-y-auto overscroll-y-contain touch-pan-y bg-background p-3 pb-28 pt-[calc(0.75rem+env(safe-area-inset-top))]"
+        className="fixed inset-0 lg:left-[368px] xl:left-[400px] [@media(min-width:1024px)_and_(max-height:760px)]:left-[360px] lg:top-[56px] lg:h-[calc(100dvh-56px)] lg:max-h-[calc(100dvh-56px)] z-10 flex h-[100dvh] max-h-[100dvh] flex-col overflow-y-auto overscroll-y-contain touch-pan-y bg-background p-3 pb-28 pt-[calc(0.75rem+env(safe-area-inset-top))]"
         style={{ overflowAnchor: 'none' }}
         data-testid="scorekeeping-scroll-container"
       >
