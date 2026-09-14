@@ -101,7 +101,9 @@ export default function PlayerStatsTrends() {
     position?: string;
   }>({
     queryKey: ['/api/users', userId],
-    enabled: !!userId,
+    // Synthetic placeholder IDs do not have a users-table profile. Their
+    // display name comes from the roster link's `name` query parameter.
+    enabled: !!userId && !userId.startsWith('placeholder:'),
   });
 
   const { data, isLoading } = useQuery<StatsTrendsData>({

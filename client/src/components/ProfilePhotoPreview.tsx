@@ -18,6 +18,8 @@ interface ProfilePhotoPreviewProps {
   leagueId?: string | null;
   /** Optional: pass to scope stats to a specific season */
   seasonId?: string | null;
+  /** Placeholder players have stats but no registered profile page. */
+  isPlaceholder?: boolean;
 }
 
 export function ProfilePhotoPreview({
@@ -29,6 +31,7 @@ export function ProfilePhotoPreview({
   lastName,
   leagueId,
   seasonId,
+  isPlaceholder = false,
 }: ProfilePhotoPreviewProps) {
   const [, navigate] = useLocation();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -127,14 +130,16 @@ export function ProfilePhotoPreview({
 
         {userId && (
           <div className="flex flex-col gap-2 w-48">
-            <Button
-              onClick={handleViewProfile}
-              variant="secondary"
-              className="w-full"
-              data-testid="button-view-profile"
-            >
-              View Profile
-            </Button>
+            {!isPlaceholder && (
+              <Button
+                onClick={handleViewProfile}
+                variant="secondary"
+                className="w-full"
+                data-testid="button-view-profile"
+              >
+                View Profile
+              </Button>
+            )}
             <Button
               onClick={handleStatsTrends}
               variant="secondary"

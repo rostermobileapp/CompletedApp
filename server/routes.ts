@@ -7796,7 +7796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
 
       const rows = (result.rows ?? result) as any[];
-      res.json(rows.map((row: any) => ({
+      const mappedRows = rows.map((row: any) => ({
         type: 'skater',
         userId: row.user_id,
         gamesPlayed: Number(row.games_played ?? 0),
@@ -7812,7 +7812,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: row.last_name,
           profileImageUrl: row.profile_image_url,
         },
-      })));
+      }));
+
+      // Placeholder roster players do not have users rows, but they still need
+      // a complete stats-shaped entry so the team view and stats screen behave
+      // the same as they do for registered players.
+      const placeholderRows = await db
+        .select({
+          id: placeholderPlayers.id,
+          firstName: placeholderPlayers.firstName,
+          lastName: placeholderPlayers.lastName,
+          email: placeholderPlayers.email,
+          isGoalie: placeholderPlayers.isGoalie,
+        })
+        .from(placeholderPlayers)
+        .where(eq(placeholderPlayers.teamId, teamId));
+
+      res.json([
+        ...mappedRows,
+        ...placeholderRows.map((placeholder) => ({
+          type: 'skater',
+          userId: `placeholder:${placeholder.id}`,
+          gamesPlayed: 0,
+          goals: 0,
+          assists: 0,
+          penaltyMinutes: 0,
+          points: 0,
+          isGoalie: Boolean(placeholder.isGoalie),
+          isPlaceholder: true,
+          user: {
+            id: `placeholder:${placeholder.id}`,
+            email: placeholder.email,
+            firstName: placeholder.firstName,
+            lastName: placeholder.lastName,
+            profileImageUrl: null,
+          },
+        })),
+      ]);
     } catch (error) {
       console.error("Error fetching team stats:", error);
       res.status(500).json({ message: "Failed to fetch team stats" });
@@ -29216,9 +29252,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * GET /api/teams/:id/streaks?seasonId=
    * Returns { streaks: { [userId]: "HOT" | "COLD" | "NEUTRAL" } }
    *
-   * Game participation is established from game_rsvps (status = 'attending') so that
-   * scoreless games are included in the recent/baseline PPG calculation.
-   * Only players with >= 2 attended games receive a streak entry.
+   * Game participation is established only from submitted goals, assists, or
+   * penalties so RSVP status cannot create a streak game.
+   * Only players with >= 2 recorded-stat games receive a streak entry.
    * Requires the requester to be a member of the team's league.
    */
   app.get('/api/teams/:id/streaks', isAuthenticated, async (req: any, res) => {
@@ -29247,47 +29283,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const priorBoost = RECENT_GAME_COUNT * ASSUMED_BASELINE_PPG; // = 1.0
       const seasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
 
-      // Game participation comes from game_rsvps (status = 'attending'), so scoreless games
-      // count against the baseline. Goal/assist points are left-joined in.
+       // Only submitted player-stat records create streak games. Penalties count
+       // as participation with zero points; goals and assists contribute points.
       const result = await db.execute(sql`
-        WITH attended_games AS (
-          -- All completed league games where the player RSVPd as attending
-          SELECT gr.user_id, gr.game_id, g.scheduled_at
-          FROM game_rsvps gr
-          JOIN games g ON g.id = gr.game_id
-          WHERE g.league_id = ${leagueId}
-            AND g.is_completed = true
-            AND gr.status = 'attending'
-            ${seasonFilter}
-        ),
-        goal_pts AS (
-          -- Expand each goal into one row per credited player
-          SELECT gg.scorer_id AS user_id, gg.game_id, 1 AS pts
+         WITH recorded_stats AS (
+           -- Expand each submitted goal into one row per credited player.
+           SELECT gg.scorer_id AS user_id, gg.game_id, 1 AS pts
           FROM game_goals gg
           JOIN games g ON g.id = gg.game_id
-          WHERE g.league_id = ${leagueId} AND gg.is_submitted = true ${seasonFilter}
+           WHERE g.league_id = ${leagueId}
+             AND g.is_completed = true
+             AND gg.is_submitted = true
+             AND gg.scorer_id IS NOT NULL
+             ${seasonFilter}
           UNION ALL
           SELECT gg.primary_assist_id, gg.game_id, 1
           FROM game_goals gg
           JOIN games g ON g.id = gg.game_id
-          WHERE g.league_id = ${leagueId} AND gg.is_submitted = true AND gg.primary_assist_id IS NOT NULL ${seasonFilter}
+           WHERE g.league_id = ${leagueId}
+             AND g.is_completed = true
+             AND gg.is_submitted = true
+             AND gg.primary_assist_id IS NOT NULL
+             ${seasonFilter}
           UNION ALL
           SELECT gg.secondary_assist_id, gg.game_id, 1
           FROM game_goals gg
           JOIN games g ON g.id = gg.game_id
-          WHERE g.league_id = ${leagueId} AND gg.is_submitted = true AND gg.secondary_assist_id IS NOT NULL ${seasonFilter}
-        ),
-        game_pts_agg AS (
-          SELECT user_id, game_id, SUM(pts)::int AS pts
-          FROM goal_pts
-          GROUP BY user_id, game_id
+           WHERE g.league_id = ${leagueId}
+             AND g.is_completed = true
+             AND gg.is_submitted = true
+             AND gg.secondary_assist_id IS NOT NULL
+             ${seasonFilter}
+           UNION ALL
+           -- A submitted penalty establishes participation but is worth zero points.
+           SELECT gp.player_id, gp.game_id, 0
+           FROM game_penalties gp
+           JOIN games g ON g.id = gp.game_id
+           WHERE g.league_id = ${leagueId}
+             AND g.is_completed = true
+             AND gp.is_submitted = true
+             ${seasonFilter}
         ),
         player_game_totals AS (
-          -- All attended games with points (0 when no scoring)
-          SELECT ag.user_id, ag.game_id, ag.scheduled_at,
-                 COALESCE(gpa.pts, 0) AS points
-          FROM attended_games ag
-          LEFT JOIN game_pts_agg gpa ON gpa.user_id = ag.user_id AND gpa.game_id = ag.game_id
+           -- One row per player/game. A scoreless penalty-only game remains 0 points.
+           SELECT rs.user_id, rs.game_id, g.scheduled_at,
+                  SUM(rs.pts)::int AS points
+           FROM recorded_stats rs
+           JOIN games g ON g.id = rs.game_id
+           GROUP BY rs.user_id, rs.game_id, g.scheduled_at
         ),
         ranked AS (
           SELECT user_id, game_id, points, scheduled_at,
@@ -29346,8 +29389,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Returns full player stats for the Stats & Trends screen:
    *   { seasonTotals, gameLog, streakStatus, streakRatio }
    *
-   * Game participation is established from game_rsvps (status = 'attending') so every
-   * attended game appears in the log, even those with zero points.
+    * Game participation is established only from submitted player-stat records
+    * (goals, assists, or penalties). RSVPs do not create games in this view.
    * Requires the requester to be a member of the specified league.
    */
   app.get('/api/users/:userId/stats-trends', isAuthenticated, async (req: any, res) => {
@@ -29355,6 +29398,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.params;
       const { leagueId, seasonId } = req.query as { leagueId?: string; seasonId?: string };
       const requesterId = req.user?.claims?.sub;
+      const isSyntheticPlaceholder = userId.startsWith('placeholder:');
+      const placeholderId = isSyntheticPlaceholder ? userId.slice('placeholder:'.length) : null;
+
+      if (placeholderId) {
+        const [placeholder] = await db
+          .select({ id: placeholderPlayers.id })
+          .from(placeholderPlayers)
+          .where(eq(placeholderPlayers.id, placeholderId))
+          .limit(1);
+        if (!placeholder) {
+          return res.status(404).json({ message: 'Player not found' });
+        }
+      }
 
       // leagueId is optional. When omitted (e.g. tapped from ClickableAvatar with no context),
       // show career totals across all leagues. When provided, scope to that league + verify access.
@@ -29396,30 +29452,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         penaltyMinutes: Number(totalsRow.penalty_minutes),
       } : null;
 
-      // --- Per-game log ---
-      // Attendance normally comes from game_rsvps, but a completed score can
-      // contain valid player stats even when an RSVP was never created (for
-      // example, a player added directly to the lineup). Treat those submitted
-      // events as participation so the game and its points are not lost.
+       // --- Per-game log ---
+       // Only submitted player-stat records create game-log entries. An RSVP by
+       // itself is not a recorded stat and must not count as participation here.
       const gameLogLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
       const seasonSqlFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
 
       const gameLogResult = await db.execute(sql`
-        WITH participated_games AS (
-          -- Completed league games where this player RSVPd as attending.
-          SELECT
-            g.id AS game_id
-          FROM game_rsvps gr
-          JOIN games g ON g.id = gr.game_id
-          WHERE gr.user_id = ${userId}
-            AND g.is_completed = true
-            AND gr.status = 'attending'
-            ${gameLogLeagueFilter}
-            ${seasonSqlFilter}
-          UNION
-          -- A submitted goal/assist is also proof that the player
-          -- participated, even if an RSVP row is missing.
-          SELECT g.id AS game_id
+         WITH recorded_games AS (
+           -- A submitted goal or assist is a recorded player stat.
+           SELECT DISTINCT g.id AS game_id
           FROM game_goals gg
           JOIN games g ON g.id = gg.game_id
           WHERE g.is_completed = true
@@ -29432,8 +29474,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ${gameLogLeagueFilter}
             ${seasonSqlFilter}
           UNION
-          -- Submitted penalties likewise identify a player's participation.
-          SELECT g.id AS game_id
+           -- A submitted penalty is also a recorded player stat.
+           SELECT DISTINCT g.id AS game_id
           FROM game_penalties gp
           JOIN games g ON g.id = gp.game_id
           WHERE g.is_completed = true
@@ -29464,7 +29506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           GROUP BY gp.game_id
         )
         SELECT
-          pg.game_id,
+           rg.game_id,
           g.scheduled_at,
           g.home_team_id,
           g.away_team_id,
@@ -29475,12 +29517,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(gp.assists, 0)::int AS assists,
           (COALESCE(gp.goals, 0) + COALESCE(gp.assists, 0))::int AS points,
           COALESCE(pp.pim, 0)::int AS penalty_minutes
-        FROM participated_games pg
-        JOIN games g ON g.id = pg.game_id
+         FROM recorded_games rg
+         JOIN games g ON g.id = rg.game_id
         LEFT JOIN teams t_home ON t_home.id = g.home_team_id
         LEFT JOIN teams t_away ON t_away.id = g.away_team_id
-        LEFT JOIN goal_pts gp ON gp.game_id = pg.game_id
-        LEFT JOIN pim_data pp ON pp.game_id = pg.game_id
+         LEFT JOIN goal_pts gp ON gp.game_id = rg.game_id
+         LEFT JOIN pim_data pp ON pp.game_id = rg.game_id
         ORDER BY g.scheduled_at DESC
       `);
 
@@ -29512,18 +29554,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
         { gamesPlayed: 0, goals: 0, assists: 0, penaltyMinutes: 0 },
       );
-      const hasAnyStats = Boolean(storedSeasonTotals) || gameLog.length > 0;
-      const seasonTotals = hasAnyStats
-        ? {
-            gamesPlayed: Math.max(storedSeasonTotals?.gamesPlayed ?? 0, gameLogTotals.gamesPlayed),
-            goals: Math.max(storedSeasonTotals?.goals ?? 0, gameLogTotals.goals),
-            assists: Math.max(storedSeasonTotals?.assists ?? 0, gameLogTotals.assists),
-            penaltyMinutes: Math.max(
-              storedSeasonTotals?.penaltyMinutes ?? 0,
-              gameLogTotals.penaltyMinutes,
-            ),
-          }
-        : null;
+       // Always return a complete totals object. Players without recorded stats
+       // should see zeros, not a partially populated/no-data response.
+       const seasonTotals = {
+         gamesPlayed: Math.max(storedSeasonTotals?.gamesPlayed ?? 0, gameLogTotals.gamesPlayed),
+         goals: Math.max(storedSeasonTotals?.goals ?? 0, gameLogTotals.goals),
+         assists: Math.max(storedSeasonTotals?.assists ?? 0, gameLogTotals.assists),
+         penaltyMinutes: Math.max(
+           storedSeasonTotals?.penaltyMinutes ?? 0,
+           gameLogTotals.penaltyMinutes,
+         ),
+       };
 
       // --- Streak (identical algorithm to the team-level streak endpoint) ---
       let streakStatus = 'NEUTRAL';
@@ -29560,20 +29601,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalBeers = Number(beerTrendResult.rows?.[0]?.total_beers ?? 0);
 
       return res.json({
-        seasonTotals: seasonTotals
-          ? {
-              gamesPlayed: seasonTotals.gamesPlayed,
-              goals: seasonTotals.goals,
-              assists: seasonTotals.assists,
-              penaltyMinutes: seasonTotals.penaltyMinutes,
-              points: seasonTotals.goals + seasonTotals.assists,
-              pointsPerGame:
-                seasonTotals.gamesPlayed > 0
-                  ? Number(((seasonTotals.goals + seasonTotals.assists) / seasonTotals.gamesPlayed).toFixed(2))
-                  : 0,
-              beers: totalBeers,
-            }
-          : null,
+         seasonTotals: {
+           gamesPlayed: seasonTotals.gamesPlayed,
+           goals: seasonTotals.goals,
+           assists: seasonTotals.assists,
+           penaltyMinutes: seasonTotals.penaltyMinutes,
+           points: seasonTotals.goals + seasonTotals.assists,
+           pointsPerGame:
+             seasonTotals.gamesPlayed > 0
+               ? Number(((seasonTotals.goals + seasonTotals.assists) / seasonTotals.gamesPlayed).toFixed(2))
+               : 0,
+           beers: totalBeers,
+         },
         beers: totalBeers,
         gameLog,
         streakStatus,

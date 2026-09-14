@@ -418,10 +418,12 @@ export default function TeamView() {
             {teamMembers.length > 0 ? (
               <div className="space-y-2">
                 {teamMembers.map((member: any) => {
-                  const memberStats = (teamStats as any[]).find((stat: any) => 
-                    String(stat.userId ?? stat.user?.id) === String(member.userId ?? member.user?.id)
-                  );
                   const memberId = member.user?.id || member.userId;
+                  const memberFirstName = member.user?.firstName || member.displayFirstName || '';
+                  const memberLastName = member.user?.lastName || member.displayLastName || '';
+                  const memberStats = (teamStats as any[]).find((stat: any) => 
+                    String(stat.userId ?? stat.user?.id) === String(memberId)
+                  );
                   const streak = memberId ? streaksData?.streaks?.[memberId] : undefined;
                   
                   return (
@@ -430,25 +432,25 @@ export default function TeamView() {
                       className="flex items-center justify-between p-3 rounded-lg bg-card border hover:bg-accent transition-colors cursor-pointer"
                       data-testid={`roster-member-${member.id}`}
                       onClick={() => {
-                        if (!member.user?.id) return;
+                        if (!memberId) return;
                         setPreviewPlayer({
-                          userId: member.user.id,
-                          firstName: member.user.firstName || '',
-                          lastName: member.user.lastName || '',
-                          profileImageUrl: member.user.profileImageUrl,
+                          userId: memberId,
+                          firstName: memberFirstName,
+                          lastName: memberLastName,
+                          profileImageUrl: member.user?.profileImageUrl,
                         });
                       }}
                       style={{ touchAction: 'manipulation' }}
                     >
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={getImageUrl(member.user?.profileImageUrl) || undefined} alt={member.user?.firstName || 'User'} />
-                          <AvatarFallback>{((member.user?.firstName?.[0] || '') + (member.user?.lastName?.[0] || '')).toUpperCase() || 'U'}</AvatarFallback>
+                          <AvatarImage src={getImageUrl(member.user?.profileImageUrl) || undefined} alt={memberFirstName || 'User'} />
+                          <AvatarFallback>{((memberFirstName[0] || '') + (memberLastName[0] || '')).toUpperCase() || 'U'}</AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="flex items-center gap-1.5" data-testid={`text-member-name-${member.id}`}>
                             <p className="font-medium">
-                              {member.user?.firstName || 'Unknown'} {member.user?.lastName || 'Player'}
+                              {memberFirstName || 'Unknown'} {memberLastName || 'Player'}
                             </p>
                             {streak === 'HOT' && <Flame className="w-3.5 h-3.5 text-orange-500 shrink-0" />}
                             {streak === 'COLD' && <Snowflake className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
@@ -489,6 +491,7 @@ export default function TeamView() {
         profileImageUrl={previewPlayer?.profileImageUrl}
         leagueId={(team as any)?.leagueId ?? null}
         seasonId={(team as any)?.seasonId ?? null}
+        isPlaceholder={previewPlayer?.userId.startsWith('placeholder:')}
       />
     </div>
   );
