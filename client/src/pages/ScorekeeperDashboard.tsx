@@ -22,7 +22,8 @@ import {
   Calendar,
   Users,
   X,
-  Zap
+  Zap,
+  ChevronDown
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
@@ -454,6 +455,36 @@ export default function ScorekeeperDashboard() {
     const [penaltyPlayerId, setPenaltyPlayerId] = useState('');
     const [penaltyMinutes, setPenaltyMinutes] = useState(2);
     const [goalModalOpen, setGoalModalOpen] = useState(false);
+    const attendanceListRef = useRef<HTMLDivElement>(null);
+    const [attendanceListOverflow, setAttendanceListOverflow] = useState(false);
+    const [attendanceListAtBottom, setAttendanceListAtBottom] = useState(false);
+
+    useEffect(() => {
+      const list = attendanceListRef.current;
+      if (!list) return;
+
+      const updateScrollCue = () => {
+        const hasOverflow = list.scrollHeight > list.clientHeight + 1;
+        const isAtBottom = !hasOverflow || list.scrollTop + list.clientHeight >= list.scrollHeight - 4;
+        setAttendanceListOverflow(hasOverflow);
+        setAttendanceListAtBottom(isAtBottom);
+      };
+
+      updateScrollCue();
+      list.addEventListener('scroll', updateScrollCue, { passive: true });
+      window.addEventListener('resize', updateScrollCue);
+      const resizeObserver = typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(updateScrollCue)
+        : null;
+      resizeObserver?.observe(list);
+
+      return () => {
+        list.removeEventListener('scroll', updateScrollCue);
+        window.removeEventListener('resize', updateScrollCue);
+        resizeObserver?.disconnect();
+      };
+    }, [players.length]);
+
     const getPlayerName = (member: TeamMember) => {
       if (!member.user) {
         const fullName = `${member.displayFirstName || ''} ${member.displayLastName || ''}`.trim();
@@ -519,38 +550,52 @@ export default function ScorekeeperDashboard() {
           <p className="text-[11px] text-muted-foreground mb-2">
             Check everyone who was actually at the game.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1 bg-[#3b3b3b]">
-            {players.map((player) => {
-              const playerId = player.userId;
-              const attendanceKey = `${teamId}:${playerId}`;
-              const rsvpStatus = rsvpStatusByPlayer.get(attendanceKey);
-              const rsvpLabel = rsvpStatus === 'attending'
-                ? 'RSVP yes'
-                : rsvpStatus === 'not_attending'
-                  ? 'RSVP no'
-                  : null;
-              return (
-                <label
-                  key={playerId}
-                  className="flex items-center gap-2 rounded px-1 py-1 text-xs cursor-pointer hover:bg-background/70"
-                  data-testid={`attendance-player-${team}-${playerId}`}
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-primary"
-                    checked={selectedAttendanceIds.has(attendanceKey)}
-                    onChange={() => onToggleAttendance(playerId, teamId)}
-                    data-testid={`attendance-checkbox-${team}-${playerId}`}
-                  />
-                  <span className="truncate flex-1">{getPlayerName(player)}</span>
-                  {rsvpLabel && (
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">{rsvpLabel}</span>
-                  )}
-                </label>
-              );
-            })}
-            {players.length === 0 && (
-              <span className="text-xs text-muted-foreground py-1">No rostered players</span>
+          <div className="relative">
+            <div
+              ref={attendanceListRef}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1 bg-[#3b3b3b] rounded-sm"
+              data-testid={`attendance-list-${team}`}
+            >
+              {players.map((player) => {
+                const playerId = player.userId;
+                const attendanceKey = `${teamId}:${playerId}`;
+                const rsvpStatus = rsvpStatusByPlayer.get(attendanceKey);
+                const rsvpLabel = rsvpStatus === 'attending'
+                  ? 'RSVP yes'
+                  : rsvpStatus === 'not_attending'
+                    ? 'RSVP no'
+                    : null;
+                return (
+                  <label
+                    key={playerId}
+                    className="flex items-center gap-2 rounded px-1 py-1 text-xs cursor-pointer hover:bg-background/70"
+                    data-testid={`attendance-player-${team}-${playerId}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={selectedAttendanceIds.has(attendanceKey)}
+                      onChange={() => onToggleAttendance(playerId, teamId)}
+                      data-testid={`attendance-checkbox-${team}-${playerId}`}
+                    />
+                    <span className="truncate flex-1">{getPlayerName(player)}</span>
+                    {rsvpLabel && (
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{rsvpLabel}</span>
+                    )}
+                  </label>
+                );
+              })}
+              {players.length === 0 && (
+                <span className="text-xs text-muted-foreground py-1">No rostered players</span>
+              )}
+            </div>
+            {attendanceListOverflow && !attendanceListAtBottom && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-[#3b3b3b] via-[#3b3b3b]/80 to-transparent pb-0.5 pt-4">
+                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/95 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm">
+                  <ChevronDown className="h-3 w-3" />
+                  Scroll for more
+                </span>
+              </div>
             )}
           </div>
         </div>
