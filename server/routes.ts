@@ -29388,35 +29388,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const totalsRow = seasonTotalsResult.rows?.[0];
       const hasStats = Number(totalsRow?.row_count ?? 0) > 0;
-      const seasonTotals = hasStats ? {
+      const storedSeasonTotals = hasStats ? {
         gamesPlayed:    Number(totalsRow.games_played),
         goals:          Number(totalsRow.goals),
         assists:        Number(totalsRow.assists),
         penaltyMinutes: Number(totalsRow.penalty_minutes),
       } : null;
 
-      // --- Per-game log (all attended games, 0-point rows included) ---
+      // --- Per-game log ---
+      // Attendance normally comes from game_rsvps, but a completed score can
+      // contain valid player stats even when an RSVP was never created (for
+      // example, a player added directly to the lineup). Treat those submitted
+      // events as participation so the game and its points are not lost.
       const gameLogLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
       const seasonSqlFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
 
       const gameLogResult = await db.execute(sql`
-        WITH attended_games AS (
-          -- Completed league games where this player RSVPd as attending
+        WITH participated_games AS (
+          -- Completed league games where this player RSVPd as attending.
           SELECT
-            g.id AS game_id,
-            g.scheduled_at,
-            g.home_team_id,
-            g.away_team_id,
-            g.opponent_name,
-            t_home.name AS home_team_name,
-            t_away.name AS away_team_name
+            g.id AS game_id
           FROM game_rsvps gr
           JOIN games g ON g.id = gr.game_id
-          LEFT JOIN teams t_home ON t_home.id = g.home_team_id
-          LEFT JOIN teams t_away ON t_away.id = g.away_team_id
           WHERE gr.user_id = ${userId}
             AND g.is_completed = true
             AND gr.status = 'attending'
+            ${gameLogLeagueFilter}
+            ${seasonSqlFilter}
+          UNION
+          -- A submitted goal/assist is also proof that the player
+          -- participated, even if an RSVP row is missing.
+          SELECT g.id AS game_id
+          FROM game_goals gg
+          JOIN games g ON g.id = gg.game_id
+          WHERE g.is_completed = true
+            AND gg.is_submitted = true
+            AND (
+              gg.scorer_id = ${userId}
+              OR gg.primary_assist_id = ${userId}
+              OR gg.secondary_assist_id = ${userId}
+            )
+            ${gameLogLeagueFilter}
+            ${seasonSqlFilter}
+          UNION
+          -- Submitted penalties likewise identify a player's participation.
+          SELECT g.id AS game_id
+          FROM game_penalties gp
+          JOIN games g ON g.id = gp.game_id
+          WHERE g.is_completed = true
+            AND gp.is_submitted = true
+            AND gp.player_id = ${userId}
             ${gameLogLeagueFilter}
             ${seasonSqlFilter}
         ),
@@ -29438,24 +29459,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT gp.game_id, SUM(gp.minutes)::int AS pim
           FROM game_penalties gp
           WHERE gp.player_id = ${userId}
+            AND gp.is_submitted = true
           GROUP BY gp.game_id
         )
         SELECT
-          ag.game_id,
-          ag.scheduled_at,
-          ag.home_team_id,
-          ag.away_team_id,
-          ag.opponent_name,
-          ag.home_team_name,
-          ag.away_team_name,
+          pg.game_id,
+          g.scheduled_at,
+          g.home_team_id,
+          g.away_team_id,
+          g.opponent_name,
+          t_home.name AS home_team_name,
+          t_away.name AS away_team_name,
           COALESCE(gp.goals, 0)::int AS goals,
           COALESCE(gp.assists, 0)::int AS assists,
           (COALESCE(gp.goals, 0) + COALESCE(gp.assists, 0))::int AS points,
           COALESCE(pp.pim, 0)::int AS penalty_minutes
-        FROM attended_games ag
-        LEFT JOIN goal_pts gp ON gp.game_id = ag.game_id
-        LEFT JOIN pim_data pp ON pp.game_id = ag.game_id
-        ORDER BY ag.scheduled_at DESC
+        FROM participated_games pg
+        JOIN games g ON g.id = pg.game_id
+        LEFT JOIN teams t_home ON t_home.id = g.home_team_id
+        LEFT JOIN teams t_away ON t_away.id = g.away_team_id
+        LEFT JOIN goal_pts gp ON gp.game_id = pg.game_id
+        LEFT JOIN pim_data pp ON pp.game_id = pg.game_id
+        ORDER BY g.scheduled_at DESC
       `);
 
       const gameLogRows = (gameLogResult as any).rows ?? (gameLogResult as any);
@@ -29472,6 +29497,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         points: Number(row.points),
         penaltyMinutes: Number(row.penalty_minutes),
       }));
+
+      // Score-entry finalization historically updated goals/assists/PIM but
+      // left gamesPlayed at zero. Use the game log for participation and
+      // preserve any larger manually entered totals rather than discarding
+      // them.
+      const gameLogTotals = gameLog.reduce(
+        (totals: { gamesPlayed: number; goals: number; assists: number; penaltyMinutes: number }, game: any) => ({
+          gamesPlayed: totals.gamesPlayed + 1,
+          goals: totals.goals + game.goals,
+          assists: totals.assists + game.assists,
+          penaltyMinutes: totals.penaltyMinutes + game.penaltyMinutes,
+        }),
+        { gamesPlayed: 0, goals: 0, assists: 0, penaltyMinutes: 0 },
+      );
+      const hasAnyStats = Boolean(storedSeasonTotals) || gameLog.length > 0;
+      const seasonTotals = hasAnyStats
+        ? {
+            gamesPlayed: Math.max(storedSeasonTotals?.gamesPlayed ?? 0, gameLogTotals.gamesPlayed),
+            goals: Math.max(storedSeasonTotals?.goals ?? 0, gameLogTotals.goals),
+            assists: Math.max(storedSeasonTotals?.assists ?? 0, gameLogTotals.assists),
+            penaltyMinutes: Math.max(
+              storedSeasonTotals?.penaltyMinutes ?? 0,
+              gameLogTotals.penaltyMinutes,
+            ),
+          }
+        : null;
 
       // --- Streak (identical algorithm to the team-level streak endpoint) ---
       const PRIOR_BOOST = 4 * ASSUMED_BASELINE_PPG; // 2.0
