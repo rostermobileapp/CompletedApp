@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useIosPlatform } from '@/hooks/useIosPlatform';
 import { 
   ArrowLeft, 
   Plus, 
@@ -23,8 +22,7 @@ import {
   Calendar,
   Users,
   X,
-  Zap,
-  RotateCw
+  Zap
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
@@ -108,7 +106,6 @@ export default function ScorekeeperDashboard() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { isAndroid } = useIosPlatform();
   
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const urlLeagueId = urlParams.get('league');
@@ -415,51 +412,6 @@ export default function ScorekeeperDashboard() {
     setSelectedAttendanceIds(new Set());
     setAttendanceInitializedGameId(null);
   };
-
-  // Request landscape orientation when entering scoring mode.
-  // NOTE: Android (especially in WebView wrappers like Natively/BuildNatively) requires
-  // the document to be in fullscreen mode for screen.orientation.lock() to succeed,
-  // and the WebView typically satisfies that by entering immersive mode — which hides
-  // the system back/home buttons. That immersive flag often persists after navigation.
-  // To avoid hiding the Android system nav bar, we skip the orientation lock on
-  // Android and instead show a CSS-based "rotate your phone" overlay (see scoring view).
-  useEffect(() => {
-    if (isAndroid) return;
-
-    const requestLandscape = async () => {
-      if (selectedGame && activeTab === 'scoring') {
-        try {
-          if (screen.orientation && screen.orientation.lock) {
-            await screen.orientation.lock('landscape');
-          }
-        } catch (err) {
-          // Silently fail if orientation lock is not supported
-          console.debug('Screen orientation lock not supported');
-        }
-      } else {
-        try {
-          if (screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-          }
-        } catch (err) {
-          console.debug('Screen orientation unlock not supported');
-        }
-      }
-    };
-
-    requestLandscape();
-
-    return () => {
-      // Cleanup: unlock orientation when component unmounts
-      try {
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      } catch (err) {
-        console.debug('Screen orientation unlock not supported');
-      }
-    };
-  }, [selectedGame, activeTab, isAndroid]);
 
   // Compact Team Scoring Panel
   const TeamScoringPanel = useMemo(() => ({
@@ -865,32 +817,7 @@ export default function ScorekeeperDashboard() {
   // Live Scoring Mode - Compact Full-Screen Layout
   if (selectedGame && activeTab === 'scoring') {
     return (
-      <div className="h-screen flex flex-col p-3 overflow-hidden">
-        {/* Portrait rotation prompt — shown only when the device is in portrait.
-            Especially important on Android, where we no longer call
-            screen.orientation.lock() (it would force the WebView into immersive
-            mode and hide the system nav bar). */}
-        <div
-          className="portrait:flex landscape:hidden fixed inset-0 z-50 flex-col items-center justify-center gap-4 bg-background p-6 text-center"
-          data-testid="rotate-prompt"
-        >
-          <RotateCw className="h-12 w-12 text-primary animate-pulse" />
-          <h2 className="text-xl font-semibold">Please rotate your phone</h2>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            The scorekeeper works best in landscape mode. Turn your device
-            sideways to start scoring.
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setSelectedGame(null); setActiveTab('schedule'); }}
-            data-testid="rotate-prompt-back"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to schedule
-          </Button>
-        </div>
-
+      <div className="min-h-screen landscape:h-screen flex flex-col p-3 overflow-y-auto landscape:overflow-hidden">
         {/* Compact Header Bar */}
         <div className="flex flex-col landscape:flex-row landscape:items-center landscape:justify-between mb-3 gap-2">
           {/* Back button + Game title */}
