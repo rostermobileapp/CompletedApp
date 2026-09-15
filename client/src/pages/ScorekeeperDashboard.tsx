@@ -469,6 +469,8 @@ export default function ScorekeeperDashboard() {
     teamName,
     teamId,
     goals, 
+    displayedScore,
+    scoreDetailsPending,
     penalties,
     players,
     selectedAttendanceIds,
@@ -479,6 +481,8 @@ export default function ScorekeeperDashboard() {
     teamName: string;
     teamId: string;
     goals: GameGoal[];
+    displayedScore: number;
+    scoreDetailsPending: boolean;
     penalties: GamePenalty[];
     players: TeamMember[];
     selectedAttendanceIds: Set<string>;
@@ -554,7 +558,7 @@ export default function ScorekeeperDashboard() {
         ? players.find((member) => member.userId === playerId)
         : undefined;
       if (rosterMember) return getPlayerName(rosterMember);
-      if (!player) return 'Sub';
+      if (!player) return 'Substitute player';
       return formatPlayerName(player.firstName, player.lastName, player.jerseyNumber);
     };
 
@@ -599,9 +603,14 @@ export default function ScorekeeperDashboard() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-lg truncate text-card-foreground">{team === 'home' ? 'HOME' : 'AWAY'}: {teamName}</h3>
           <div className={`text-5xl font-bold ${textColor}`} data-testid={`score-${team}`}>
-            {goals.length}
+            {displayedScore}
           </div>
         </div>
+        {scoreDetailsPending && (
+          <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+            Goal details recorded: {goals.length} of {displayedScore}. Add the remaining details below.
+          </div>
+        )}
         <div className="mb-3 rounded-md border border-border bg-muted/20 p-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -805,7 +814,9 @@ export default function ScorekeeperDashboard() {
                 );
               })}
               {goals.length === 0 && (
-                <div className="text-center text-muted-foreground text-sm py-2">No goals</div>
+                <div className="text-center text-muted-foreground text-sm py-2">
+                  {displayedScore > 0 ? 'No goal details recorded yet' : 'No goals'}
+                </div>
               )}
             </div>
           </>
@@ -1037,6 +1048,8 @@ export default function ScorekeeperDashboard() {
               teamName={selectedGame.awayTeam?.name || 'Away'}
               teamId={selectedGame.awayTeam?.id || ''}
               goals={awayGoals}
+               displayedScore={displayedAwayScore}
+               scoreDetailsPending={isBackfillingCompletedGame && awayGoals.length < displayedAwayScore}
               penalties={awayPenalties}
               players={awayTeamMembers}
               selectedAttendanceIds={selectedAttendanceIds}
@@ -1048,6 +1061,8 @@ export default function ScorekeeperDashboard() {
               teamName={selectedGame.homeTeam?.name || 'Home'}
               teamId={selectedGame.homeTeam?.id || ''}
               goals={homeGoals}
+               displayedScore={displayedHomeScore}
+               scoreDetailsPending={isBackfillingCompletedGame && homeGoals.length < displayedHomeScore}
               penalties={homePenalties}
               players={homeTeamMembers}
               selectedAttendanceIds={selectedAttendanceIds}
