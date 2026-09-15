@@ -2,71 +2,127 @@ import { useState, useEffect, useRef } from 'react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { ArrowLeft, Check, ChevronRight, Star, X, Users, Shield, Trophy, Calendar, MessageSquare, BarChart2, DollarSign, Zap } from 'lucide-react';
+import { ArrowLeft, BarChart2, Bell, Calendar, Check, DollarSign, MessageSquare, Star, Trophy, Users, Zap } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
 const TOTAL_STEPS = 9;
 
+type OnboardingRole =
+  | 'player'
+  | 'team_captain'
+  | 'league_manager'
+  | 'tournament_organizer'
+  | 'scorekeeper'
+  | 'coach'
+  | 'parent';
+
 type Screen =
   | 'welcome'
-  | 'goal'
+  | 'social_proof'
+  | 'role'
   | 'pain'
   | 'join_play_features'
-  | 'social_proof'
   | 'solution'
   | 'preferences'
   | 'processing'
-  | 'demo'
   | 'paywall';
 
 const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
   { value: 'welcome', label: 'Welcome' },
-  { value: 'goal', label: 'Goal' },
+  { value: 'social_proof', label: 'Social proof' },
+  { value: 'role', label: 'Role' },
   { value: 'pain', label: 'Pain points' },
   { value: 'join_play_features', label: 'Join-play features' },
-  { value: 'social_proof', label: 'Social proof' },
   { value: 'solution', label: 'Solution' },
   { value: 'preferences', label: 'Preferences' },
   { value: 'processing', label: 'Processing' },
-  { value: 'demo', label: 'Demo' },
   { value: 'paywall', label: 'Paywall' },
 ];
 
 interface QuestionnaireState {
-  goal: string;
+  role: OnboardingRole | '';
   pains: string[];
-  sport: string;
   referralCode: string;
   referralPartnerId: string;
   referralOtherText: string;
 }
 
-const GOALS = [
-  { value: 'join_play', label: "Join a team & just play", emoji: '🏒' },
-  { value: 'captain_manage', label: "Run my team like a pro", emoji: '🛡️' },
-  { value: 'schedule_organize', label: "Stop the scheduling chaos", emoji: '📅' },
-  { value: 'collect_fees', label: "Make collecting fees painless", emoji: '💳' },
-  { value: 'run_league', label: "Manage a full league", emoji: '🏆' },
-  { value: 'stats_track', label: "Track stats & standings", emoji: '📊' },
+const GOALS: Array<{
+  value: OnboardingRole;
+  label: string;
+  emoji: string;
+  comingSoon?: boolean;
+}> = [
+  { value: 'player', label: 'Player', emoji: '🏒' },
+  { value: 'team_captain', label: 'Team Captain', emoji: '🛡️' },
+  { value: 'league_manager', label: 'League Manager', emoji: '📅' },
+  { value: 'tournament_organizer', label: 'Tournament Organizer', emoji: '🏆' },
+  { value: 'scorekeeper', label: 'Scorekeeper', emoji: '📊' },
+  { value: 'coach', label: 'Coach', emoji: '🎓', comingSoon: true },
+  { value: 'parent', label: 'Parent', emoji: '👪', comingSoon: true },
 ];
 
-const PAIN_POINTS = [
-  { value: 'group_texts', label: "I live in group texts trying to coordinate", emoji: '📱' },
-  { value: 'no_shows', label: "Players confirm then no-show at game time", emoji: '👻' },
-  { value: 'fees_awkward', label: "Chasing people for money is awkward", emoji: '😬' },
-  { value: 'scattered_info', label: "Game info is scattered across 3 different apps", emoji: '🗂️' },
-  { value: 'subs_headache', label: "Finding a sub when someone bails is a nightmare", emoji: '🆘' },
-  { value: 'no_visibility', label: "I have no idea who's actually coming until ice time", emoji: '🤷' },
+interface PainPoint {
+  value: string;
+  label: string;
+  solution: string;
+  icon: typeof Calendar;
+}
+
+const ROLE_PAIN_POINTS: Record<OnboardingRole, PainPoint[]> = {
+  player: [
+    { value: 'player_game_status', label: 'Is the game still on tonight?', solution: 'Real-time game status and cancellation alerts', icon: Calendar },
+    { value: 'player_schedule_details', label: 'What time & which locker room?', solution: 'Full schedule with rink details in one place', icon: Calendar },
+    { value: 'player_rsvp', label: 'Did I RSVP?', solution: 'Push reminders before every game', icon: Bell },
+    { value: 'player_standings', label: 'What are the standings?', solution: 'Live standings updated after every game', icon: BarChart2 },
+    { value: 'player_teammate_contact', label: 'How do I reach a teammate?', solution: 'Team & Individual chats', icon: MessageSquare },
+  ],
+  team_captain: [
+    { value: 'captain_attendance', label: "Who's actually showing up?", solution: 'Live RSVP dashboard before every game', icon: Users },
+    { value: 'captain_fees', label: 'Tracking & collecting fees', solution: 'Built-in payment requests and tracking', icon: DollarSign },
+    { value: 'captain_subs', label: 'Finding Subs', solution: 'Smart sub tool', icon: Users },
+    { value: 'captain_lines', label: 'Line Combos', solution: 'Line tool with point projections', icon: BarChart2 },
+  ],
+  league_manager: [
+    { value: 'league_schedule_building', label: 'Schedules take forever to build', solution: 'Schedule upload tool', icon: Calendar },
+    { value: 'league_stats', label: 'Updating stats & standings', solution: 'Auto-updated after every score entry', icon: BarChart2 },
+    { value: 'league_fees', label: 'Fees coming in 10 different ways', solution: 'Centralized payment collection', icon: DollarSign },
+    { value: 'league_schedule_changes', label: 'Schedule changes', solution: 'Push all updates instantly to all teams', icon: Bell },
+  ],
+  tournament_organizer: [
+    { value: 'tournament_brackets', label: 'Bracket Updates mid-tournament', solution: 'Bracket management with live updates', icon: Trophy },
+    { value: 'tournament_announcements', label: 'Announcements', solution: 'Broadcast messaging to all participants', icon: MessageSquare },
+    { value: 'tournament_payments', label: 'Deposits and payments untracked', solution: 'Payment dashboard', icon: DollarSign },
+  ],
+  scorekeeper: [
+    { value: 'scorekeeper_updates', label: 'Delay with updates', solution: 'Enter stats live in the app', icon: Zap },
+    { value: 'scorekeeper_paper', label: 'Paper to Digital Conversion', solution: 'Eliminate paper completely', icon: BarChart2 },
+  ],
+  coach: [
+    { value: 'coach_lines', label: 'Line combos exist only in my head', solution: 'Build and share lines before the game', icon: Users },
+    { value: 'coach_notes', label: 'Game notes no one else can see', solution: 'Share notes with parents and players', icon: MessageSquare },
+    { value: 'coach_announcements', label: 'Announcements for parents', solution: 'Parent chat and announcements', icon: Bell },
+  ],
+  parent: [
+    { value: 'parent_schedule', label: 'Schedule changes', solution: 'Real-time updates', icon: Calendar },
+    { value: 'parent_progress', label: 'How is my child doing?', solution: 'Updates and progress from coach', icon: BarChart2 },
+    { value: 'parent_chat', label: 'Parent chat?', solution: 'Parents have their own chat', icon: MessageSquare },
+  ],
+};
+
+const SCREEN_ORDER: Screen[] = [
+  'welcome',
+  'social_proof',
+  'role',
+  'pain',
+  'join_play_features',
+  'solution',
+  'preferences',
+  'processing',
+  'paywall',
 ];
 
-const SPORTS = [
-  { value: 'hockey', label: "Hockey", emoji: '🏒' },
-  { value: 'soccer', label: "Soccer", emoji: '⚽' },
-  { value: 'basketball', label: "Basketball", emoji: '🏀' },
-  { value: 'baseball', label: "Baseball", emoji: '⚾' },
-  { value: 'other', label: "Another sport", emoji: '🏅' },
-];
-
+const PREVIEW_SAMPLE_PAINS = ROLE_PAIN_POINTS.player.slice(0, 3).map((pain) => pain.value);
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
@@ -90,9 +146,8 @@ export default function OnboardingQuestionnaire() {
   const isPreviewMode = import.meta.env.DEV && previewParam !== null;
   const [screen, setScreen] = useState<Screen>(previewScreen || 'welcome');
   const [state, setState] = useState<QuestionnaireState>({
-    goal: previewScreen === 'join_play_features' ? 'join_play' : 'captain_manage',
-    pains: ['group_texts', 'no_shows', 'fees_awkward'],
-    sport: '',
+    role: previewScreen ? 'player' : '',
+    pains: previewScreen ? PREVIEW_SAMPLE_PAINS : [],
     referralCode: '',
     referralPartnerId: '',
     referralOtherText: '',
@@ -106,10 +161,6 @@ export default function OnboardingQuestionnaire() {
   const [processingDone, setProcessingDone] = useState(false);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const SCREEN_ORDER: Screen[] = state.goal === 'join_play'
-    ? ['welcome', 'goal', 'join_play_features', 'social_proof', 'solution', 'preferences', 'processing', 'demo', 'paywall']
-    : ['welcome', 'goal', 'pain', 'social_proof', 'solution', 'preferences', 'processing', 'demo', 'paywall'];
-
   const currentStep = SCREEN_ORDER.indexOf(screen) + 1;
 
   useEffect(() => {
@@ -117,7 +168,7 @@ export default function OnboardingQuestionnaire() {
       setProcessingDone(false);
       processingTimerRef.current = setTimeout(() => {
         setProcessingDone(true);
-        setTimeout(() => goTo('demo'), 400);
+        setTimeout(() => goTo('paywall'), 400);
       }, 2200);
     }
     return () => {
@@ -137,8 +188,8 @@ export default function OnboardingQuestionnaire() {
     setScreen(nextScreen);
     setState(prev => ({
       ...prev,
-      goal: nextScreen === 'join_play_features' ? 'join_play' : prev.goal || 'captain_manage',
-      pains: prev.pains.length > 0 ? prev.pains : ['group_texts', 'no_shows', 'fees_awkward'],
+      role: prev.role || 'player',
+      pains: prev.pains.length > 0 ? prev.pains : PREVIEW_SAMPLE_PAINS,
     }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -155,8 +206,9 @@ export default function OnboardingQuestionnaire() {
     }));
   }
 
-  const selectedGoal = GOALS.find(g => g.value === state.goal);
-  const selectedPains = PAIN_POINTS.filter(p => state.pains.includes(p.value));
+  const selectedRole = GOALS.find(g => g.value === state.role);
+  const rolePainPoints = state.role ? ROLE_PAIN_POINTS[state.role] : [];
+  const selectedPains = rolePainPoints.filter(p => state.pains.includes(p.value));
 
   return (
     <div className="min-h-screen bg-white flex flex-col max-w-lg mx-auto">
@@ -230,7 +282,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('goal')}
+              onClick={() => goTo('social_proof')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg shadow-lg shadow-blue-200 hover:bg-[#3c82f4]/90 transition-colors"
             >
               Get Started — It's Free
@@ -246,8 +298,75 @@ export default function OnboardingQuestionnaire() {
           </div>
         )}
 
-        {/* ── GOAL ─────────────────────────────────────── */}
-        {screen === 'goal' && (
+        {/* ── SOCIAL PROOF ─────────────────────────────── */}
+        {screen === 'social_proof' && (
+          <div className="pt-[4px]">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-black mb-2 text-[#3c82f4]">What users are saying:</h2>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              {/* Real testimonial */}
+              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
+                </div>
+                <p className="text-gray-700 font-medium leading-relaxed mb-3">
+                  "I've had different leagues use different apps and Roster is the best BY FAR"
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">S</div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Scott C.</p>
+                    <p className="text-xs text-gray-400">Colorado</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
+                </div>
+                <p className="text-gray-700 font-medium leading-relaxed mb-3">
+                  "The substitute player request system is the crown jewel of this app. This feature alone makes Roster worth it if you are a Captain."
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">J</div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">James K.</p>
+                    <p className="text-xs text-gray-400">Ohio</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
+                </div>
+                <p className="text-gray-700 font-medium leading-relaxed mb-3">
+                  "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... Roster had us covered."
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">B</div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Brian W.</p>
+                    <p className="text-xs text-gray-400">Ohio</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => goTo('role')}
+              className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
+            >
+              Choose my role →
+            </button>
+          </div>
+        )}
+
+        {/* ── ROLE ──────────────────────────────────────── */}
+        {screen === 'role' && (
           <div className="pt-6">
             <h2 className="text-2xl font-black text-gray-900 mb-2">What is your Role?</h2>
             <p className="text-gray-500 mb-6">Pick the one that fits best.</p>
@@ -255,19 +374,28 @@ export default function OnboardingQuestionnaire() {
               {GOALS.map(g => (
                 <button
                   key={g.value}
+                  type="button"
+                  disabled={g.comingSoon}
                   onClick={() => {
-                    setState(prev => ({ ...prev, goal: g.value }));
-                    setTimeout(() => goTo(g.value === 'join_play' ? 'join_play_features' : 'pain'), 200);
+                    if (g.comingSoon) return;
+                    setState(prev => ({ ...prev, role: g.value, pains: [] }));
+                    setTimeout(() => goTo('pain'), 200);
                   }}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
-                    state.goal === g.value
+                    g.comingSoon
+                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                      : state.role === g.value
                       ? 'border-[#3c82f4] bg-blue-50 text-[#3c82f4]'
                       : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                   }`}
                 >
                   <span className="text-2xl">{g.emoji}</span>
-                  <span className="font-semibold text-gray-900">{g.label}</span>
-                  {state.goal === g.value && <Check className="w-5 h-5 ml-auto text-[#3c82f4]" />}
+                  <span className="font-semibold flex-1 text-gray-900">{g.label}</span>
+                  {g.comingSoon ? (
+                    <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Coming soon</span>
+                  ) : state.role === g.value ? (
+                    <Check className="w-5 h-5 ml-auto text-[#3c82f4]" />
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -277,14 +405,20 @@ export default function OnboardingQuestionnaire() {
         {/* ── PAIN ─────────────────────────────────────── */}
         {screen === 'pain' && (
           <div className="pt-6">
-            <h2 className="text-2xl font-black text-gray-900 mb-2">What's been driving you crazy?</h2>
-            <p className="text-gray-500 mb-6">Select all that apply.</p>
+            <h2 className="text-2xl font-black text-gray-900 mb-2">What is getting in your way?</h2>
+            <p className="text-gray-500 mb-2">Select all that apply.</p>
+            {selectedRole && (
+              <p className="text-sm text-[#3c82f4] font-semibold mb-6">
+                Showing challenges for {selectedRole.label}
+              </p>
+            )}
             <div className="space-y-3">
-              {PAIN_POINTS.map(p => {
+              {rolePainPoints.map(p => {
                 const selected = state.pains.includes(p.value);
                 return (
                   <button
                     key={p.value}
+                    type="button"
                     onClick={() => togglePain(p.value)}
                     className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
                       selected
@@ -292,7 +426,6 @@ export default function OnboardingQuestionnaire() {
                         : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
                   >
-                    <span className="text-2xl">{p.emoji}</span>
                     <span className={`font-semibold flex-1 ${selected ? 'text-[#3c82f4]' : 'text-gray-900'}`}>{p.label}</span>
                     <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${selected ? 'bg-[#3c82f4]' : 'border-2 border-gray-300'}`}>
                       {selected && <Check className="w-4 h-4 text-white" />}
@@ -302,7 +435,7 @@ export default function OnboardingQuestionnaire() {
               })}
             </div>
             <button
-              onClick={() => goTo('social_proof')}
+              onClick={() => goTo('join_play_features')}
               disabled={state.pains.length === 0}
               className="mt-6 w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#3c82f4]/90 transition-colors"
             >
@@ -369,78 +502,10 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('social_proof')}
-              className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
-            >
-              Looks good — let's go →
-            </button>
-          </div>
-        )}
-
-        {/* ── SOCIAL PROOF ─────────────────────────────── */}
-        {screen === 'social_proof' && (
-          <div className="pt-[4px]">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-black mb-2 text-[#3c82f4]">What users are saying:</h2>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              {/* Real testimonial */}
-              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                </div>
-                <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "I've had different leagues use different apps and Roster is the best BY FAR"
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">S</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Scott C.</p>
-                    <p className="text-xs text-gray-400">Colorado</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Placeholder testimonials */}
-              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                </div>
-                <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "The substitute player request system is the crown jewel of this app.  This feature alone makes Roster worth it if you are a Captain."
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">J</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">James K.</p>
-                    <p className="text-xs text-gray-400">Ohio</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-[#3c82f4]/5 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20">
-                <div className="flex gap-0.5 mb-3">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                </div>
-                <p className="text-gray-700 font-medium leading-relaxed mb-3">
-                  "As a league commissioner, my life was made easy whether it was scheduling, finding subs, assigning the drinks, or generating a complex tournament bracket... Roster had us covered."
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[#3c82f4] text-white flex items-center justify-center text-sm font-bold">B</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Brian W.</p>
-                    <p className="text-xs text-gray-400">Ohio</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
               onClick={() => goTo('solution')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
-              See how it works
+              Looks good — let's go →
             </button>
           </div>
         )}
@@ -457,17 +522,8 @@ export default function OnboardingQuestionnaire() {
 
             <div className="space-y-4 mb-8">
               {selectedPains.length > 0
-                ? selectedPains.slice(0, 4).map(pain => {
-                    const solutions: Record<string, { fix: string; stat: string; icon: typeof Calendar }> = {
-                      group_texts: { fix: "One app for everything — schedule, RSVP, chat", stat: "Players respond 4x faster in-app vs group text", icon: MessageSquare },
-                      no_shows: { fix: "Real-time RSVP with attendance tracking.\nPush notifications give players active reminders.", stat: "Teams see 60% fewer game-day no-shows", icon: Calendar },
-                      fees_awkward: { fix: "Built-in payment tracking with Venmo & CashApp links", stat: "Captains collect fees in days, not weeks", icon: DollarSign },
-                      scattered_info: { fix: "One home for schedules, rosters, stats & chat", stat: "Players stop asking 'what time is the game?'", icon: Zap },
-                      subs_headache: { fix: "Automated sub request tool notifies your whole pool", stat: "Most captains find a sub in under 5 minutes", icon: Users },
-                      no_visibility: { fix: "Live RSVP dashboard shows who's in, who's out", stat: "Know your lineup 48 hours before every game", icon: Shield },
-                    };
-                    const sol = solutions[pain.value] || solutions.scattered_info;
-                    const Icon = sol.icon;
+                ? selectedPains.map(pain => {
+                    const Icon = pain.icon;
                     return (
                       <div key={pain.value} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
                         <div className="flex items-start gap-3">
@@ -476,31 +532,17 @@ export default function OnboardingQuestionnaire() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-400 mb-0.5 line-through">{pain.label}</p>
-                            <p className="font-bold text-gray-900 text-sm whitespace-pre-line">{sol.fix}</p>
-                            <p className="text-xs text-[#3c82f4] font-medium mt-1">{sol.stat}</p>
+                            <p className="font-bold text-gray-900 text-sm">{pain.solution}</p>
                           </div>
                         </div>
                       </div>
                     );
                   })
-                : [
-                    { icon: Calendar, title: "Smart scheduling & RSVPs", stat: "Know your lineup 48 hours early" },
-                    { icon: MessageSquare, title: "Team messaging built-in", stat: "No more group text chaos" },
-                    { icon: DollarSign, title: "Fee tracking & payment links", stat: "Collect dues in days, not weeks" },
-                    { icon: Zap, title: "Automated sub requests", stat: "Find a sub in under 20 minutes" },
-                  ].map(({ icon: Icon, title, stat }) => (
-                    <div key={title} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-blue-50 p-2.5 rounded-xl">
-                          <Icon className="w-5 h-5 text-[#3c82f4]" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900 text-sm">{title}</p>
-                          <p className="text-xs text-[#3c82f4] font-medium">{stat}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                : (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 text-center text-sm text-gray-500">
+                    Select at least one challenge to see how Roster helps.
+                  </div>
+                )
               }
             </div>
 
@@ -640,21 +682,11 @@ export default function OnboardingQuestionnaire() {
           </div>
         )}
 
-        {/* ── DEMO ─────────────────────────────────────── */}
-        {screen === 'demo' && (
-          <DemoScreen
-            goal={state.goal}
-            sport={state.sport}
-            onContinue={() => goTo('paywall')}
-          />
-        )}
-
         {/* ── PAYWALL ──────────────────────────────────── */}
         {screen === 'paywall' && (
           <PaywallScreen
             isAuthenticated={isAuthenticated}
             onSignUp={() => navigate(isAuthenticated ? '/' : '/login')}
-            onSkip={() => navigate('/login')}
           />
         )}
       </div>
@@ -662,135 +694,7 @@ export default function OnboardingQuestionnaire() {
   );
 }
 
-function DemoScreen({
-  goal,
-  sport,
-  onContinue,
-}: {
-  goal: string;
-  sport: string;
-  onContinue: () => void;
-}) {
-  const [rsvps, setRsvps] = useState<Record<string, 'yes' | 'no' | null>>({});
-  const [submitted, setSubmitted] = useState(false);
-
-  const sportEmoji = sport === 'hockey' ? '🏒' : sport === 'soccer' ? '⚽' : sport === 'basketball' ? '🏀' : sport === 'baseball' ? '⚾' : '🏅';
-  const sportName = sport === 'hockey' ? 'Hockey' : sport === 'soccer' ? 'Soccer' : sport === 'basketball' ? 'Basketball' : sport === 'baseball' ? 'Baseball' : 'Sports';
-
-  const players = [
-    { name: 'Alex M.', number: '#11', position: 'Forward' },
-    { name: 'Jordan K.', number: '#4', position: 'Defense' },
-    { name: 'Sam R.', number: '#22', position: 'Goalie' },
-    { name: 'Chris T.', number: '#7', position: 'Forward' },
-    { name: 'Taylor N.', number: '#15', position: 'Defense' },
-  ];
-
-  const yesCount = Object.values(rsvps).filter(v => v === 'yes').length;
-  const noCount = Object.values(rsvps).filter(v => v === 'no').length;
-  const doneCount = yesCount + noCount;
-
-  if (submitted) {
-    return (
-      <div className="pt-6">
-        <div className="text-center mb-6">
-          <div className="text-5xl mb-3">{sportEmoji}</div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2">Your team's ready!</h2>
-          <p className="text-gray-500">Here's your live game status</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-[#3c82f4]/10 to-blue-50 rounded-2xl p-5 border border-[#3c82f4]/20 mb-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-bold text-gray-900">{sportEmoji} Thursday Night {sportName}</p>
-            <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">Live</span>
-          </div>
-          <div className="flex gap-4 mb-4">
-            <div className="flex-1 bg-white rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-green-600">{yesCount}</p>
-              <p className="text-xs text-gray-500 font-medium">Confirmed</p>
-            </div>
-            <div className="flex-1 bg-white rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-red-500">{noCount}</p>
-              <p className="text-xs text-gray-500 font-medium">Can't make it</p>
-            </div>
-            <div className="flex-1 bg-white rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-gray-400">{players.length - doneCount}</p>
-              <p className="text-xs text-gray-500 font-medium">No reply</p>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-sm text-center text-gray-400 mb-5">This is exactly what your dashboard looks like — live, for every game.</p>
-
-        <button
-          onClick={onContinue}
-          className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
-        >
-          Get this for my team →
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pt-6">
-      <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
-          {sportEmoji} Your team is ready
-        </div>
-        <h2 className="text-2xl font-black text-gray-900 mb-2">Try it — RSVP your players</h2>
-        <p className="text-gray-500 text-sm">Tap yes or no for each player, just like your team would.</p>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-5 shadow-sm">
-        <div className="bg-[#3c82f4]/5 border-b border-gray-100 px-4 py-3">
-          <p className="font-bold text-gray-900 text-sm">{sportEmoji} Thursday Night {sportName} — 8:00 PM</p>
-          <p className="text-xs text-gray-400">Pickwick Recreation Center</p>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {players.map(player => {
-            const rsvp = rsvps[player.name];
-            return (
-              <div key={player.name} className="flex items-center px-4 py-3 gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#3c82f4]/10 flex items-center justify-center text-sm font-bold text-[#3c82f4]">
-                  {player.name[0]}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-900">{player.name}</p>
-                  <p className="text-xs text-gray-400">{player.number} · {player.position}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setRsvps(prev => ({ ...prev, [player.name]: prev[player.name] === 'yes' ? null : 'yes' }))}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${rsvp === 'yes' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-green-50'}`}
-                  >
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setRsvps(prev => ({ ...prev, [player.name]: prev[player.name] === 'no' ? null : 'no' }))}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${rsvp === 'no' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-red-50'}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <button
-        onClick={() => setSubmitted(true)}
-        disabled={doneCount === 0}
-        className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#3c82f4]/90 transition-colors"
-      >
-        {doneCount === 0 ? 'RSVP at least one player to continue' : `See my team's game status →`}
-      </button>
-      <p className="text-center text-xs text-gray-400 mt-2">{doneCount}/{players.length} RSVPs recorded</p>
-    </div>
-  );
-}
-
-function PaywallScreen({ isAuthenticated, onSignUp, onSkip }: { isAuthenticated: boolean; onSignUp: () => void; onSkip: () => void }) {
+function PaywallScreen({ isAuthenticated, onSignUp }: { isAuthenticated: boolean; onSignUp: () => void }) {
   const { data: stripePrices } = useQuery<{
     player_pro_monthly?: { amount: number | null; currency: string | null };
     commissioner_monthly?: { amount: number | null; currency: string | null };
