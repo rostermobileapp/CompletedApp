@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Lock } from 'lucide-react';
+import { ChevronRight, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -43,6 +43,7 @@ export function TeamLeadersCard({
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<'season' | 'playoffs'>('season');
+  const [showAllLeaders, setShowAllLeaders] = useState(false);
 
   const isLocked = !canAccessPremiumFeatures();
 
@@ -94,12 +95,8 @@ export function TeamLeadersCard({
     ? stats.filter((s): s is SkaterStat => s.type === 'skater')
     : [];
 
-  const topPoints = [...skaters]
-    .sort((a, b) => (b.points || 0) - (a.points || 0))
-    .slice(0, 5);
-  const topGoals = [...skaters]
-    .sort((a, b) => (b.goals || 0) - (a.goals || 0))
-    .slice(0, 5);
+  const topPoints = [...skaters].sort((a, b) => (b.points || 0) - (a.points || 0));
+  const topGoals = [...skaters].sort((a, b) => (b.goals || 0) - (a.goals || 0));
 
   const seasonText = seasonLabel
     ? `${seasonLabel} Team leaders`
@@ -114,11 +111,11 @@ export function TeamLeadersCard({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className={sectionTitleClass}>{seasonText}</div>
         <div className="flex items-center gap-2">
-        <div
-          className="flex items-center text-[12px] rounded-md p-0.5 bg-black/[0.04]"
-          role="tablist"
-          aria-label="Team leader range"
-        >
+          <div
+            className="flex items-center text-[12px] rounded-md p-0.5 bg-black/[0.04]"
+            role="tablist"
+            aria-label="Team leader range"
+          >
           <button
             type="button"
             onClick={() => setMode('season')}
@@ -161,8 +158,23 @@ export function TeamLeadersCard({
           >
             Playoffs
           </button>
+          </div>
+          {skaters.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAllLeaders((expanded) => !expanded)}
+              className="inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[12px] text-[#3b82f6] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-1 transition-colors"
+              aria-expanded={showAllLeaders}
+              data-testid="leaders-toggle-all"
+            >
+              {showAllLeaders ? 'Top 5' : 'View all'}
+              <ChevronRight
+                className={`h-3.5 w-3.5 transition-transform ${showAllLeaders ? 'rotate-90' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          )}
         </div>
-        </div>{/* end flex items-center gap-2 */}
       </div>
 
       {isLocked ? (
@@ -207,7 +219,7 @@ export function TeamLeadersCard({
           <LeaderColumn
             label="Points"
             category="points"
-            leaders={topPoints}
+            leaders={showAllLeaders ? topPoints : topPoints.slice(0, 5)}
             accentBg={POINTS_BG}
             accentColor={POINTS_BG_ACCENT}
             onPlayerClick={(userId) => {
@@ -218,7 +230,7 @@ export function TeamLeadersCard({
           <LeaderColumn
             label="Goals"
             category="goals"
-            leaders={topGoals}
+            leaders={showAllLeaders ? topGoals : topGoals.slice(0, 5)}
             accentBg={GOALS_BG}
             accentColor={GOALS_BG_ACCENT}
             onPlayerClick={(userId) => {
@@ -280,7 +292,7 @@ function LeaderColumn({
       <button
         type="button"
         onClick={() => onPlayerClick(top.userId)}
-        className="w-full flex items-center gap-3 rounded-md text-left hover:bg-black/[0.025] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2 transition-colors"
+        className="w-full flex cursor-pointer items-center gap-3 rounded-md text-left hover:bg-black/[0.025] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2 transition-colors"
         aria-label={`View ${getName(top)}'s profile`}
         data-testid={`leader-${category}-featured`}
       >
@@ -309,6 +321,7 @@ function LeaderColumn({
         <div className="text-[26px] font-medium leading-none text-[#212121]">
           {headlineNum}
         </div>
+        <ChevronRight className="h-4 w-4 flex-shrink-0 text-[#9ca3af]" aria-hidden="true" />
       </button>
 
       {/* Top-5 list */}
@@ -320,7 +333,7 @@ function LeaderColumn({
               type="button"
               onClick={() => onPlayerClick(p.userId)}
               key={p.userId + '-' + category}
-              className="w-full grid grid-cols-[20px_1fr_auto] items-center gap-2 px-2 py-1.5 rounded text-[12px] text-left hover:bg-black/[0.025] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset transition-colors"
+              className="w-full grid grid-cols-[20px_1fr_auto_auto] items-center gap-2 px-2 py-1.5 rounded text-[12px] text-left cursor-pointer hover:bg-black/[0.025] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset transition-colors"
               style={{
                 backgroundColor: isFirst ? accentBg : 'transparent',
                 color: '#212121',
@@ -341,6 +354,7 @@ function LeaderColumn({
               >
                 {getValue(p, category)}
               </div>
+              <ChevronRight className="h-3.5 w-3.5 text-[#9ca3af]" aria-hidden="true" />
             </button>
           );
         })}

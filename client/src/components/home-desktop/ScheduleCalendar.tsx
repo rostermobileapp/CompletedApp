@@ -23,7 +23,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import {
   compareScheduleEvents,
   isScrimmageTimeTbd,
@@ -56,6 +56,12 @@ interface ScheduleCalendarProps {
 
 export type EventType = 'game' | 'practice' | 'social' | 'tournament';
 
+interface ScheduleTeam {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+}
+
 interface ScheduleEvent {
   id: string;
   date: Date;
@@ -70,6 +76,8 @@ interface ScheduleEvent {
   isUserGame?: boolean;
   // Date-only scrimmages sort after timed events on their selected day.
   timeTbd?: boolean;
+  homeTeam?: ScheduleTeam | null;
+  awayTeam?: ScheduleTeam | null;
 }
 
 export function ScheduleCalendar({
@@ -175,6 +183,8 @@ export function ScheduleCalendar({
           location: g.venue || g.location || null,
           color: g.color ?? null,
           isUserGame: isUserInGame(g),
+          homeTeam: g.homeTeam ?? null,
+          awayTeam: g.awayTeam ?? null,
           timeTbd: g.isScrimmage
             ? isScrimmageTimeTbd(g.timeTbd, g.scheduledAt)
             : false,
@@ -245,6 +255,8 @@ export function ScheduleCalendar({
           location: g.venue || g.location || null,
           color: g.color ?? null,
           isUserGame: isUserInGame(g),
+           homeTeam: g.homeTeam ?? null,
+           awayTeam: g.awayTeam ?? null,
           timeTbd: g.isScrimmage
             ? isScrimmageTimeTbd(g.timeTbd, g.scheduledAt)
             : false,
@@ -570,12 +582,11 @@ function ListView({
             }}
             data-testid={`schedule-list-${e.id}`}
           >
-            <div
-              className="w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: c.bg }}
-            >
-              <Trophy className="w-4 h-4" style={{ color: c.text }} />
-            </div>
+            <TeamLogoStack
+              teams={[e.homeTeam, e.awayTeam]}
+              fallbackColor={c.bg}
+              fallbackIconColor={c.text}
+            />
             <div className="min-w-0 flex-1">
               <div className="text-[14px] font-medium text-[#212121] truncate">
                 {e.title}
@@ -606,6 +617,68 @@ function ListView({
       })}
     </div>
   );
+}
+
+function TeamLogoStack({
+  teams,
+  fallbackColor,
+  fallbackIconColor,
+}: {
+  teams: Array<ScheduleTeam | null | undefined>;
+  fallbackColor: string;
+  fallbackIconColor: string;
+}) {
+  const availableTeams = teams.filter((team): team is ScheduleTeam => !!team);
+
+  if (availableTeams.length === 0) {
+    return (
+      <div
+        className="w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: fallbackColor }}
+      >
+        <Trophy className="w-4 h-4" style={{ color: fallbackIconColor }} />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="w-10 h-10 rounded-md bg-white flex items-center justify-center flex-shrink-0"
+      aria-label={availableTeams.map((team) => `${team.name} logo`).join(' and ')}
+    >
+      <div className="flex items-center -space-x-1">
+        {availableTeams.slice(0, 2).map((team) => {
+          const logoUrl = getImageUrl(team.logoUrl) || undefined;
+          return logoUrl ? (
+            <img
+              key={team.id}
+              src={logoUrl}
+              alt={`${team.name} logo`}
+              className="h-7 w-7 rounded-full border border-white bg-white object-contain shadow-sm"
+            />
+          ) : (
+            <span
+              key={team.id}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-white bg-[#e5e7eb] text-[9px] font-semibold text-[#4b5563] shadow-sm"
+              title={`${team.name} logo unavailable`}
+            >
+              {getTeamInitials(team.name)}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function getTeamInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'T';
 }
 
 // Pick black or white text for the best contrast against an arbitrary hex bg.

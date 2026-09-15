@@ -418,11 +418,21 @@ export default function TeamView() {
             {teamMembers.length > 0 ? (
               <div className="space-y-2">
                 {teamMembers.map((member: any) => {
-                  const memberId = member.user?.id || member.userId;
+                  const memberIds = [
+                    member.user?.id,
+                    member.userId,
+                    member.id,
+                  ]
+                    .filter(Boolean)
+                    .map(String);
+                  const memberId = memberIds[0];
                   const memberFirstName = member.user?.firstName || member.displayFirstName || '';
                   const memberLastName = member.user?.lastName || member.displayLastName || '';
                   const memberStats = (teamStats as any[]).find((stat: any) => 
-                    String(stat.userId ?? stat.user?.id) === String(memberId)
+                    [stat.userId, stat.user?.id]
+                      .filter(Boolean)
+                      .map(String)
+                      .some((statId: string) => memberIds.includes(statId))
                   );
                   const streak = memberId ? streaksData?.streaks?.[memberId] : undefined;
                   
@@ -463,8 +473,13 @@ export default function TeamView() {
                         </div>
                       </div>
                       {memberStats && (
-                        <div className="text-right text-sm">
-                          <p className="font-medium">{memberStats.goals || 0}G {memberStats.assists || 0}A</p>
+                        <div
+                          className="min-w-[96px] shrink-0 whitespace-nowrap text-right text-sm"
+                          data-testid={`roster-member-stats-${member.id}`}
+                        >
+                          <p className="font-medium">
+                            {memberStats.gamesPlayed || 0} GP · {memberStats.goals || 0}G {memberStats.assists || 0}A
+                          </p>
                           <p className="text-muted-foreground">{memberStats.points || 0} pts</p>
                         </div>
                       )}

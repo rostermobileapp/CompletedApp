@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ChevronRight } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -121,11 +122,12 @@ export function StandingsTable({
                           setPageTransitionDirection('up');
                           navigate(`/team/${row.teamId}`);
                         }}
-                        className="w-full truncate text-left hover:text-[#2563eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset rounded-sm transition-colors"
+                        className="flex w-full cursor-pointer items-center justify-between gap-1 truncate text-left hover:text-[#2563eb] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset rounded-sm transition-colors"
                         aria-label={`View ${row.teamName} team`}
                         data-testid={`standings-team-link-${row.teamId}`}
                       >
-                        {row.teamName}
+                        <span className="truncate">{row.teamName}</span>
+                        <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-[#9ca3af]" aria-hidden="true" />
                       </button>
                     </td>
                     <td className="py-1 text-right">{row.gamesPlayed}</td>
