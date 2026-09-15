@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
+import { setPageTransitionDirection } from '@/components/PageTransition';
 import { cardClass, cardStyle, sectionTitleClass } from './cardStyles';
 
 interface StandingsRow {
@@ -28,6 +30,8 @@ export function StandingsTable({
   seasonLabel,
   seasonId,
 }: StandingsTableProps) {
+  const [, navigate] = useLocation();
+
   const { data: standings, isLoading } = useQuery<StandingsRow[]>({
     queryKey: ['/api/leagues', effectiveLeagueId, 'standings', seasonId ?? null],
     queryFn: async () => {
@@ -111,7 +115,18 @@ export function StandingsTable({
                   >
                     <td className="py-1 pl-1 text-[#666]">{idx + 1}</td>
                     <td className="py-1 truncate max-w-[160px]">
-                      {row.teamName}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPageTransitionDirection('up');
+                          navigate(`/team/${row.teamId}`);
+                        }}
+                        className="w-full truncate text-left hover:text-[#2563eb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset rounded-sm transition-colors"
+                        aria-label={`View ${row.teamName} team`}
+                        data-testid={`standings-team-link-${row.teamId}`}
+                      >
+                        {row.teamName}
+                      </button>
                     </td>
                     <td className="py-1 text-right">{row.gamesPlayed}</td>
                     <td className="py-1 text-right">{row.wins}</td>
