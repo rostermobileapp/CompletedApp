@@ -249,7 +249,7 @@ export default function OnboardingQuestionnaire() {
         {/* ── GOAL ─────────────────────────────────────── */}
         {screen === 'goal' && (
           <div className="pt-6">
-            <h2 className="text-2xl font-black text-gray-900 mb-2">What are you trying to do?</h2>
+            <h2 className="text-2xl font-black text-gray-900 mb-2">What is your Role?</h2>
             <p className="text-gray-500 mb-6">Pick the one that fits best.</p>
             <div className="space-y-3">
               {GOALS.map(g => (
