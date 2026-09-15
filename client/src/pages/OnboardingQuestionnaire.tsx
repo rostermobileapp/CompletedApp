@@ -19,6 +19,19 @@ type Screen =
   | 'demo'
   | 'paywall';
 
+const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
+  { value: 'welcome', label: 'Welcome' },
+  { value: 'goal', label: 'Goal' },
+  { value: 'pain', label: 'Pain points' },
+  { value: 'join_play_features', label: 'Join-play features' },
+  { value: 'social_proof', label: 'Social proof' },
+  { value: 'solution', label: 'Solution' },
+  { value: 'preferences', label: 'Preferences' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'demo', label: 'Demo' },
+  { value: 'paywall', label: 'Paywall' },
+];
+
 interface QuestionnaireState {
   goal: string;
   pains: string[];
@@ -70,10 +83,15 @@ export default function OnboardingQuestionnaire() {
   const [, navigate] = useLocation();
   const { data: userData } = useQuery<{ id?: string }>({ queryKey: ['/api/user'] });
   const isAuthenticated = !!userData?.id;
-  const [screen, setScreen] = useState<Screen>('welcome');
+  const previewParam = new URLSearchParams(window.location.search).get('preview');
+  const previewScreen = import.meta.env.DEV && QUESTIONNAIRE_SCREENS.some(({ value }) => value === previewParam)
+    ? previewParam as Screen
+    : null;
+  const isPreviewMode = import.meta.env.DEV && previewParam !== null;
+  const [screen, setScreen] = useState<Screen>(previewScreen || 'welcome');
   const [state, setState] = useState<QuestionnaireState>({
-    goal: '',
-    pains: [],
+    goal: previewScreen === 'join_play_features' ? 'join_play' : 'captain_manage',
+    pains: ['group_texts', 'no_shows', 'fees_awkward'],
     sport: '',
     referralCode: '',
     referralPartnerId: '',
@@ -112,6 +130,19 @@ export default function OnboardingQuestionnaire() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function selectPreviewScreen(nextScreen: Screen) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('preview', nextScreen);
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    setScreen(nextScreen);
+    setState(prev => ({
+      ...prev,
+      goal: nextScreen === 'join_play_features' ? 'join_play' : prev.goal || 'captain_manage',
+      pains: prev.pains.length > 0 ? prev.pains : ['group_texts', 'no_shows', 'fees_awkward'],
+    }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function goBack() {
     const idx = SCREEN_ORDER.indexOf(screen);
     if (idx > 0) goTo(SCREEN_ORDER[idx - 1]);
@@ -129,6 +160,21 @@ export default function OnboardingQuestionnaire() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col max-w-lg mx-auto">
+      {isPreviewMode && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-b border-amber-200 text-amber-950">
+          <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap">Dev preview</span>
+          <select
+            value={screen}
+            onChange={(event) => selectPreviewScreen(event.target.value as Screen)}
+            className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-gray-900"
+            aria-label="Preview onboarding screen"
+          >
+            {QUESTIONNAIRE_SCREENS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {/* Header with progress */}
       {screen !== 'welcome' && screen !== 'paywall' && (
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-gray-100">

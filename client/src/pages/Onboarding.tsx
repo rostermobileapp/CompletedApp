@@ -40,6 +40,11 @@ const COMPETITIVE_LEVELS = [
 ];
 
 const TOTAL_STEPS = 3;
+const PROFILE_PREVIEW_STEPS = [
+  { value: 1, label: 'Basic information' },
+  { value: 2, label: 'Additional information' },
+  { value: 3, label: 'About Roster' },
+];
 
 interface OnboardingData {
   firstName: string;
@@ -58,7 +63,12 @@ export default function Onboarding() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [currentStep, setCurrentStep] = useState(1);
+  const profilePreviewParam = new URLSearchParams(window.location.search).get('profileStep');
+  const profilePreviewStep = import.meta.env.DEV && PROFILE_PREVIEW_STEPS.some(({ value }) => String(value) === profilePreviewParam)
+    ? Number(profilePreviewParam)
+    : null;
+  const isPreviewMode = import.meta.env.DEV && window.location.pathname === '/onboarding-preview';
+  const [currentStep, setCurrentStep] = useState(profilePreviewStep || 1);
   const [formData, setFormData] = useState<OnboardingData>({
     firstName: '',
     lastName: '',
@@ -75,6 +85,14 @@ export default function Onboarding() {
 
   const updateField = (field: keyof OnboardingData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const selectPreviewStep = (step: number) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('profileStep', String(step));
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    setCurrentStep(step);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const saveMutation = useMutation({
@@ -168,6 +186,21 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
+      {isPreviewMode && (
+        <div className="flex items-center gap-3 px-6 py-3 bg-amber-950 border-b border-amber-700 text-amber-50">
+          <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap">Dev preview</span>
+          <select
+            value={currentStep}
+            onChange={(event) => selectPreviewStep(Number(event.target.value))}
+            className="min-w-0 flex-1 rounded-lg border border-amber-700 bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
+            aria-label="Preview profile onboarding step"
+          >
+            {PROFILE_PREVIEW_STEPS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="px-6 pt-8 pb-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-zinc-400 font-medium">Step {currentStep} of {TOTAL_STEPS}</span>

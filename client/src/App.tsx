@@ -197,6 +197,12 @@ function Router() {
     return <LoadingScreen />;
   }
 
+  // Development-only entry point for visually reviewing each profile onboarding step.
+  // This intentionally works without a session because the preview is visual-only.
+  if (import.meta.env.DEV && location === '/onboarding-preview') {
+    return <Onboarding />;
+  }
+
   if (!isAuthenticated) {
     return (
       <>
