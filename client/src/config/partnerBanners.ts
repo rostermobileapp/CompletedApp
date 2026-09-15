@@ -1,4 +1,5 @@
 import hpibBannerImage from "@assets/HPIB-Red2_(1)_1768339929994.png";
+import bestDamTapeBannerImage from "@assets/BDT_1_1789505101618.jpg";
 
 export interface PartnerBanner {
   id: string;
@@ -31,6 +32,15 @@ export const PARTNER_BANNERS: readonly PartnerBanner[] = [
     alt: "Hockey Players In Business - Join for only $50/yr",
     active: true,
     order: 0,
+  },
+  {
+    id: "best-dam-tape",
+    name: "Best Dam Tape",
+    image: bestDamTapeBannerImage,
+    href: "https://bestdamtape.com/",
+    alt: "Best Dam Tape - Get some Best Dam Tape here",
+    active: true,
+    order: 1,
   },
 ];
 
