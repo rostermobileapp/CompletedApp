@@ -280,7 +280,7 @@ function LeaderColumn({
       <button
         type="button"
         onClick={() => onPlayerClick(top.userId)}
-        className="w-full flex items-center gap-3 rounded-md text-left hover:bg-black/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2 transition-colors"
+        className="w-full flex items-center gap-3 rounded-md text-left hover:bg-black/[0.025] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2 transition-colors"
         aria-label={`View ${getName(top)}'s profile`}
         data-testid={`leader-${category}-featured`}
       >
@@ -320,7 +320,7 @@ function LeaderColumn({
               type="button"
               onClick={() => onPlayerClick(p.userId)}
               key={p.userId + '-' + category}
-              className="w-full grid grid-cols-[20px_1fr_auto] items-center gap-2 px-2 py-1.5 rounded text-[12px] text-left hover:bg-black/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset transition-colors"
+              className="w-full grid grid-cols-[20px_1fr_auto] items-center gap-2 px-2 py-1.5 rounded text-[12px] text-left hover:bg-black/[0.025] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-inset transition-colors"
               style={{
                 backgroundColor: isFirst ? accentBg : 'transparent',
                 color: '#212121',
