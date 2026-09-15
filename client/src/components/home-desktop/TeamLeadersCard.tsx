@@ -43,7 +43,6 @@ export function TeamLeadersCard({
   const { canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<'season' | 'playoffs'>('season');
-  const [showAllLeaders, setShowAllLeaders] = useState(false);
 
   const isLocked = !canAccessPremiumFeatures();
 
@@ -95,8 +94,12 @@ export function TeamLeadersCard({
     ? stats.filter((s): s is SkaterStat => s.type === 'skater')
     : [];
 
-  const topPoints = [...skaters].sort((a, b) => (b.points || 0) - (a.points || 0));
-  const topGoals = [...skaters].sort((a, b) => (b.goals || 0) - (a.goals || 0));
+  const topPoints = [...skaters]
+    .sort((a, b) => (b.points || 0) - (a.points || 0))
+    .slice(0, 5);
+  const topGoals = [...skaters]
+    .sort((a, b) => (b.goals || 0) - (a.goals || 0))
+    .slice(0, 5);
 
   const seasonText = seasonLabel
     ? `${seasonLabel} Team leaders`
@@ -159,21 +162,18 @@ export function TeamLeadersCard({
             Playoffs
           </button>
           </div>
-          {skaters.length > 5 && (
-            <button
-              type="button"
-              onClick={() => setShowAllLeaders((expanded) => !expanded)}
-              className="inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[12px] text-[#3b82f6] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-1 transition-colors"
-              aria-expanded={showAllLeaders}
-              data-testid="leaders-toggle-all"
-            >
-              {showAllLeaders ? 'Top 5' : 'View all'}
-              <ChevronRight
-                className={`h-3.5 w-3.5 transition-transform ${showAllLeaders ? 'rotate-90' : ''}`}
-                aria-hidden="true"
-              />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              setPageTransitionDirection('up');
+              navigate('/stats');
+            }}
+            className="inline-flex items-center gap-0.5 rounded px-1.5 py-1 text-[12px] text-[#3b82f6] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-1 transition-colors"
+            data-testid="leaders-view-all"
+          >
+            View all
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
@@ -219,7 +219,7 @@ export function TeamLeadersCard({
           <LeaderColumn
             label="Points"
             category="points"
-            leaders={showAllLeaders ? topPoints : topPoints.slice(0, 5)}
+            leaders={topPoints}
             accentBg={POINTS_BG}
             accentColor={POINTS_BG_ACCENT}
             onPlayerClick={(userId) => {
@@ -230,7 +230,7 @@ export function TeamLeadersCard({
           <LeaderColumn
             label="Goals"
             category="goals"
-            leaders={showAllLeaders ? topGoals : topGoals.slice(0, 5)}
+            leaders={topGoals}
             accentBg={GOALS_BG}
             accentColor={GOALS_BG_ACCENT}
             onPlayerClick={(userId) => {
