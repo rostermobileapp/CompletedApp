@@ -24,3 +24,4 @@
 - [Scorekeeper attendance](scorekeeper-attendance.md) — confirmed attendance is independent from RSVP/events and can create zero-point GP/streak participation.
 - [Scorekeeper orientation](scorekeeper-orientation.md) — scoring must remain usable in portrait; orientation is a layout preference, not a gate.
 - [Team-specific jersey numbers](team-jersey-number.md) — jersey numbers belong to team memberships, so a player can have a different number on each team.
+- [Goalie stat fallback](goalie-stat-fallback.md) — completed games may lack game_goalies rows; calculate from scores and roster goalie assignments, including placeholder identities.

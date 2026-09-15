@@ -15,6 +15,7 @@ import {
   personalReminders,
   gameScoreSubmissions,
   gameRsvps,
+  gameAttendance,
   tournamentMatchRsvps,
   gameGoalies,
   gameStars,
@@ -11788,7 +11789,110 @@ export class DatabaseStorage implements IStorage {
       });
     });
 
-    goalieGameStats.forEach(gameStat => {
+    // Some completed games were finalized through the scorekeeper flow without
+    // creating game_goalies rows. Derive one goalie of record per team for
+    // those games so historical and newly finalized games contribute equally.
+    // Prefer a goalie marked present for the game when attendance is available;
+    // otherwise use the first approved goalie assigned to that team.
+    const normalizedGoalieGameStats: any[] = [...goalieGameStats];
+    const completedGames = await db
+      .select({
+        gameId: games.id,
+        homeTeamId: games.homeTeamId,
+        awayTeamId: games.awayTeamId,
+        homeScore: games.homeScore,
+        awayScore: games.awayScore,
+        resultType: games.resultType,
+      })
+      .from(games)
+      .where(
+        and(
+          eq(games.leagueId, leagueId),
+          eq(games.isCompleted, true),
+          ...gameSeasonConditions,
+        ),
+      );
+    const completedGameIds = completedGames.map((game) => game.gameId);
+    const attendanceRows = completedGameIds.length
+      ? await db
+          .select({
+            gameId: gameAttendance.gameId,
+            teamId: gameAttendance.teamId,
+            userId: gameAttendance.userId,
+            placeholderPlayerId: gameAttendance.placeholderPlayerId,
+          })
+          .from(gameAttendance)
+          .where(
+            and(
+              inArray(gameAttendance.gameId, completedGameIds),
+              or(
+                isNotNull(gameAttendance.userId),
+                isNotNull(gameAttendance.placeholderPlayerId),
+              ),
+            ),
+          )
+      : [];
+    const attendanceByGameTeam = new Map<string, Set<string>>();
+    for (const attendance of attendanceRows) {
+      const attendeeId = attendance.userId
+        || (attendance.placeholderPlayerId
+          ? `placeholder:${attendance.placeholderPlayerId}`
+          : null);
+      if (!attendeeId) continue;
+      const key = `${attendance.gameId}:${attendance.teamId}`;
+      const userIds = attendanceByGameTeam.get(key) || new Set<string>();
+      userIds.add(attendeeId);
+      attendanceByGameTeam.set(key, userIds);
+    }
+    const recordedGameTeams = new Set(
+      normalizedGoalieGameStats.map((gameStat) => `${gameStat.gameId}:${gameStat.teamId}`),
+    );
+    const goaliesByTeam = new Map<string, any[]>();
+    for (const goalie of goalieMemberships) {
+      if (!goalie.assignedTeamId) continue;
+      const teamGoalies = goaliesByTeam.get(goalie.assignedTeamId) || [];
+      teamGoalies.push(goalie);
+      goaliesByTeam.set(goalie.assignedTeamId, teamGoalies);
+    }
+    for (const placeholder of placeholderGoalies) {
+      if (!placeholder.teamId) continue;
+      const teamGoalies = goaliesByTeam.get(placeholder.teamId) || [];
+      teamGoalies.push({
+        userId: `placeholder:${placeholder.id}`,
+        assignedTeamId: placeholder.teamId,
+      });
+      goaliesByTeam.set(placeholder.teamId, teamGoalies);
+    }
+
+    for (const game of completedGames) {
+      for (const teamId of [game.homeTeamId, game.awayTeamId]) {
+        if (!teamId || recordedGameTeams.has(`${game.gameId}:${teamId}`)) continue;
+        const teamGoalies = goaliesByTeam.get(teamId) || [];
+        if (teamGoalies.length === 0) continue;
+        const attendingIds = attendanceByGameTeam.get(`${game.gameId}:${teamId}`);
+        const goalie =
+          teamGoalies.find((candidate) => attendingIds?.has(candidate.userId)) ||
+          teamGoalies[0];
+        normalizedGoalieGameStats.push({
+          userId: goalie.userId,
+          teamId,
+          gameId: game.gameId,
+          goalsAgainst:
+            teamId === game.homeTeamId
+              ? Number(game.awayScore ?? 0)
+              : Number(game.homeScore ?? 0),
+          minutesPlayed: 60,
+          homeTeamId: game.homeTeamId,
+          awayTeamId: game.awayTeamId,
+          homeScore: game.homeScore,
+          awayScore: game.awayScore,
+          resultType: game.resultType,
+        });
+        recordedGameTeams.add(`${game.gameId}:${teamId}`);
+      }
+    }
+
+    normalizedGoalieGameStats.forEach((gameStat: any) => {
       const goalieId = gameStat.userId;
       
       if (!goalieStatsMap.has(goalieId)) {
@@ -11817,7 +11921,12 @@ export class DatabaseStorage implements IStorage {
       
       // Update games played and minutes
       goalieStats.gamesPlayed++;
-      const goalsAgainstInGame = gameStat.goalsAgainst || 0;
+      const goalsAgainstInGame =
+        gameStat.teamId === gameStat.homeTeamId
+          ? Number(gameStat.awayScore ?? 0)
+          : gameStat.teamId === gameStat.awayTeamId
+            ? Number(gameStat.homeScore ?? 0)
+            : Number(gameStat.goalsAgainst ?? 0);
       goalieStats.goalsAgainst += goalsAgainstInGame;
       goalieStats.totalMinutes += gameStat.minutesPlayed || 0;
       
