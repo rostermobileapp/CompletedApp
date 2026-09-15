@@ -1,6 +1,11 @@
-import hpibBannerImage from "@assets/HPIB-Red2_(1)_1768339929994.png";
+import { useEffect, useState } from "react";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { useLocation } from "wouter";
+import {
+  getPartnerBannerForHour,
+  getUtcHourSlot,
+  HOUR_IN_MILLISECONDS,
+} from "@/config/partnerBanners";
 
 interface HPIBBannerProps {
   placement: 'bottom-nav' | 'profile-header';
@@ -10,9 +15,28 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
   const { hasRole } = usePermissions();
   const isPaidUser = hasRole('player_pro');
   const [location] = useLocation();
+  const [utcHourSlot, setUtcHourSlot] = useState(() => getUtcHourSlot());
+  const partnerBanner = getPartnerBannerForHour(utcHourSlot);
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const scheduleNextHour = () => {
+      const millisecondsIntoHour = Date.now() % HOUR_IN_MILLISECONDS;
+      const millisecondsUntilNextHour = HOUR_IN_MILLISECONDS - millisecondsIntoHour + 50;
+
+      timeoutId = setTimeout(() => {
+        setUtcHourSlot(getUtcHourSlot());
+        scheduleNextHour();
+      }, millisecondsUntilNextHour);
+    };
+
+    scheduleNextHour();
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   const handleClick = () => {
-    window.open('https://hockeyplayersinbusiness.org/', '_blank');
+    window.open(partnerBanner.href, '_blank');
   };
 
   if (placement === 'bottom-nav') {
@@ -27,8 +51,8 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
         onClick={handleClick}
       >
         <img 
-          src={hpibBannerImage} 
-          alt="Hockey Players In Business - Join for only $50/yr"
+          src={partnerBanner.image}
+          alt={partnerBanner.alt}
           className="w-full max-w-2xl h-auto max-h-32 object-cover"
         />
       </div>
@@ -44,8 +68,8 @@ export function HPIBBanner({ placement }: HPIBBannerProps) {
         onClick={handleClick}
       >
         <img 
-          src={hpibBannerImage} 
-          alt="Hockey Players In Business - Join for only $50/yr"
+          src={partnerBanner.image}
+          alt={partnerBanner.alt}
           className="max-w-full h-auto rounded-lg"
           style={{ width: 'auto', maxWidth: '100%' }}
         />
