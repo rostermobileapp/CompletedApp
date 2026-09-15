@@ -32,8 +32,8 @@ const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
   { value: 'social_proof', label: 'Social proof' },
   { value: 'role', label: 'Role' },
   { value: 'pain', label: 'Pain points' },
-  { value: 'join_play_features', label: 'Join-play features' },
   { value: 'solution', label: 'Solution' },
+  { value: 'join_play_features', label: 'Join-play features' },
   { value: 'preferences', label: 'Preferences' },
   { value: 'processing', label: 'Processing' },
   { value: 'paywall', label: 'Paywall' },
@@ -115,8 +115,8 @@ const SCREEN_ORDER: Screen[] = [
   'social_proof',
   'role',
   'pain',
-  'join_play_features',
   'solution',
+  'join_play_features',
   'preferences',
   'processing',
   'paywall',
@@ -435,7 +435,7 @@ export default function OnboardingQuestionnaire() {
               })}
             </div>
             <button
-              onClick={() => goTo('join_play_features')}
+              onClick={() => goTo('solution')}
               disabled={state.pains.length === 0}
               className="mt-6 w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#3c82f4]/90 transition-colors"
             >
@@ -502,7 +502,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('solution')}
+              onClick={() => goTo('join_play_features')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Looks good — let's go →
