@@ -66,13 +66,20 @@ export default function TeamView() {
   });
 
   const { data: teamStats = [] } = useQuery({
-    queryKey: ['/api/leagues', (team as any)?.leagueId, 'stats', 'team', teamId, 'members', teamMembers?.length],
+    // Keep this distinct from the Teams page's league-stats query. That page
+    // uses the same old key for a different endpoint and could hydrate this
+    // view with stats for the viewer's current team instead of this team.
+    queryKey: ['/api/teams', teamId, 'stats', 'roster', teamMembers?.length],
     queryFn: async () => {
       if (!teamId || !teamMembers || teamMembers.length === 0) return [];
       const response = await apiRequest('GET', `/api/teams/${teamId}/stats`);
       return response.json();
     },
-    enabled: !!teamId && !!teamMembers && teamMembers.length > 0,
+    enabled:
+      !!teamId &&
+      !!teamMembers &&
+      teamMembers.length > 0 &&
+      (!isFreeTier || (!userTeamsLoading && isOwnTeam)),
   });
 
   const { data: leagueStandings = [] } = useQuery({

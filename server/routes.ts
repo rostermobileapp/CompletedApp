@@ -7856,13 +7856,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Team or league not found" });
       }
 
-      const [viewerMembership, viewer, league] = await Promise.all([
+      const [viewerMembership, viewer, league, viewerTeams, leagueProSeats] = await Promise.all([
         storage.getUserLeagueMembership(userId, team.leagueId),
         storage.getUser(userId),
         storage.getLeague(team.leagueId),
+        storage.getUserTeams(userId),
+        storage.getActiveLeagueProSeatsForUser(userId, currentMonth()),
       ]);
+      const isOwnTeam = viewerTeams.some((viewerTeam) => viewerTeam.id === teamId);
       const isLeagueCommissioner = league?.commissionerId === userId;
-      const isPlatformCommissioner = viewer && (
+      const hasGlobalPremiumAccess = viewer && (
         viewer.role === 'commissioner' ||
         viewer.role === 'secondary_commissioner' ||
         viewer.specialPermissions?.includes('admin') ||
@@ -7870,10 +7873,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         viewer.role === 'player_pro' ||
         viewer.feeExempt
       );
-      if ((!viewerMembership || viewerMembership.status !== 'approved') &&
-          !isLeagueCommissioner &&
-          !isPlatformCommissioner) {
-        return res.status(403).json({ message: "Access denied - not an approved league member" });
+      const hasLeagueProSeat = leagueProSeats.some((seat) => seat.leagueId === team.leagueId);
+      const canViewOpponentStats =
+        isLeagueCommissioner ||
+        !!hasGlobalPremiumAccess ||
+        hasLeagueProSeat;
+      if (!isOwnTeam && !canViewOpponentStats) {
+        return res.status(403).json({ message: "Premium access required to view opponent team stats" });
       }
 
       const result = await db.execute(sql`

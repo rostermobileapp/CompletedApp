@@ -26,3 +26,4 @@
 - [Team-specific jersey numbers](team-jersey-number.md) — jersey numbers belong to team memberships, so a player can have a different number on each team.
 - [Goalie stat fallback](goalie-stat-fallback.md) — completed games may lack game_goalies rows; calculate from scores and roster goalie assignments, including placeholder identities.
 - [Goalie stats trends](goalie-stats-trends.md) — league goalie views use the existing goals-against-per-game GAA convention and goalie game records.
+- [Team stats query isolation](team-stats-query-isolation.md) — team-specific stats queries need unique cache keys; league-wide and team-roster responses are not interchangeable.
