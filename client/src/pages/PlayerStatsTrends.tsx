@@ -24,6 +24,8 @@ interface SeasonTotals {
   penaltyMinutes: number;
   pointsPerGame: number;
   beers?: number;
+  goalsAgainst?: number;
+  goalsAgainstAverage?: number;
 }
 
 interface GameLogEntry {
@@ -38,6 +40,8 @@ interface GameLogEntry {
   assists: number;
   points: number;
   penaltyMinutes: number;
+  goalsAgainst?: number;
+  goalsAgainstAverage?: number;
   isAggregate?: boolean;
 }
 
@@ -47,6 +51,7 @@ interface StatsTrendsData {
   gameLog: GameLogEntry[];
   streakStatus: 'HOT' | 'COLD' | 'NEUTRAL';
   streakRatio: number;
+  isGoalie?: boolean;
 }
 
 function StreakBadge({ status }: { status: 'HOT' | 'COLD' | 'NEUTRAL' }) {
@@ -124,10 +129,21 @@ export default function PlayerStatsTrends() {
     ? `${profileData.firstName ?? ''} ${profileData.lastName ?? ''}`.trim() || displayName
     : displayName;
 
-  // Build chart data (oldest → newest for cumulative progression)
+  const isGoalie = data?.isGoalie === true;
+
+  // Build chart data (oldest → newest for cumulative progression).
+  // Goalies chart their per-game GAA instead of skater point totals.
   const chartData = (() => {
     if (!data?.gameLog?.length) return [];
     const reversed = [...data.gameLog].reverse();
+    if (isGoalie) {
+      return reversed.map((g, i) => ({
+        game: i + 1,
+        gameLabel: g.isAggregate ? 'Recorded' : String(i + 1),
+        goalsAgainstAverage: g.goalsAgainstAverage ?? 0,
+      }));
+    }
+
     let cumulative = 0;
     return reversed.map((g, i) => {
       cumulative += g.points;
@@ -218,14 +234,21 @@ export default function PlayerStatsTrends() {
                 {totals ? (
                   <>
                     <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { label: 'GP', value: totals.gamesPlayed },
-                        { label: 'G',  value: totals.goals },
-                        { label: 'A',  value: totals.assists },
-                        { label: 'PTS', value: totals.points },
-                        { label: 'PIM', value: totals.penaltyMinutes },
-                        { label: 'P/GP', value: totals.pointsPerGame },
-                      ].map(({ label, value }) => (
+                      {(isGoalie
+                        ? [
+                            { label: 'PTS', value: totals.points },
+                            { label: 'GP', value: totals.gamesPlayed },
+                            { label: 'GAA', value: (totals.goalsAgainstAverage ?? 0).toFixed(2) },
+                          ]
+                        : [
+                            { label: 'GP', value: totals.gamesPlayed },
+                            { label: 'G', value: totals.goals },
+                            { label: 'A', value: totals.assists },
+                            { label: 'PTS', value: totals.points },
+                            { label: 'PIM', value: totals.penaltyMinutes },
+                            { label: 'P/GP', value: totals.pointsPerGame },
+                          ]
+                      ).map(({ label, value }) => (
                         <div key={label} className="text-center bg-muted/40 rounded-lg py-3">
                           <div className="text-xl font-bold">{value}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
@@ -246,7 +269,7 @@ export default function PlayerStatsTrends() {
                   <>
                     {/* Show zeroed-out grid as skeleton */}
                     <div className="grid grid-cols-3 gap-3 mb-3">
-                      {['GP', 'G', 'A', 'PTS', 'PIM', 'P/GP'].map((label) => (
+                      {(isGoalie ? ['PTS', 'GP', 'GAA'] : ['GP', 'G', 'A', 'PTS', 'PIM', 'P/GP']).map((label) => (
                         <div key={label} className="text-center bg-muted/40 rounded-lg py-3 opacity-40">
                           <div className="text-xl font-bold">0</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
@@ -268,11 +291,11 @@ export default function PlayerStatsTrends() {
               </CardContent>
             </Card>
 
-            {/* Points Progression Chart */}
+            {/* Progression Chart */}
             <Card className="hairline elev-rest">
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Points Progression
+                  {isGoalie ? 'GAA Progression' : 'Points Progression'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-2 pb-4">
@@ -286,23 +309,41 @@ export default function PlayerStatsTrends() {
                         label={{ value: 'Game', position: 'insideBottom', offset: -2, fontSize: 11 }}
                         height={28}
                       />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        allowDecimals={isGoalie}
+                        domain={isGoalie ? [0, 'auto'] : undefined}
+                      />
                       <Tooltip
-                        formatter={(value: any, name: string) => [
-                          value,
-                          name === 'cumulative' ? 'Cumulative Pts' : 'Game Pts',
-                        ]}
+                        formatter={(value: any, name: string) =>
+                          isGoalie
+                            ? [Number(value).toFixed(2), 'GAA']
+                            : [value, name === 'cumulative' ? 'Cumulative Pts' : 'Game Pts']
+                        }
                         labelFormatter={(label) => label === 'Recorded' ? 'Recorded stats' : `Game ${label}`}
                       />
-                      <Bar dataKey="gamePoints" fill="hsl(var(--primary) / 0.35)" name="Game Pts" radius={[2, 2, 0, 0]} />
-                      <Line
-                        type="monotone"
-                        dataKey="cumulative"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: 'hsl(var(--primary))' }}
-                        name="Cumulative Pts"
-                      />
+                      {isGoalie ? (
+                        <Line
+                          type="monotone"
+                          dataKey="goalsAgainstAverage"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                          name="GAA"
+                        />
+                      ) : (
+                        <>
+                          <Bar dataKey="gamePoints" fill="hsl(var(--primary) / 0.35)" name="Game Pts" radius={[2, 2, 0, 0]} />
+                          <Line
+                            type="monotone"
+                            dataKey="cumulative"
+                            stroke="hsl(var(--primary))"
+                            strokeWidth={2}
+                            dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                            name="Cumulative Pts"
+                          />
+                        </>
+                      )}
                     </ComposedChart>
                   </ResponsiveContainer>
                 ) : (
@@ -317,7 +358,12 @@ export default function PlayerStatsTrends() {
                           label={{ value: 'Game', position: 'insideBottom', offset: -2, fontSize: 11 }}
                           height={28}
                         />
-                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          allowDecimals={isGoalie}
+                          domain={isGoalie ? [0, 5] : [0, 5]}
+                          ticks={isGoalie ? undefined : [0, 1, 2, 3, 4, 5]}
+                        />
                       </ComposedChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -345,10 +391,16 @@ export default function PlayerStatsTrends() {
                       <tr className="border-b border-border">
                         <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground">Date</th>
                         <th className="text-left px-2 py-2 text-xs font-medium text-muted-foreground">Matchup</th>
-                        <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">G</th>
-                        <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">A</th>
-                        <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">P</th>
-                        <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">PIM</th>
+                        {isGoalie ? (
+                          <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">GAA</th>
+                        ) : (
+                          <>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">G</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">A</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">P</th>
+                            <th className="text-center px-2 py-2 text-xs font-medium text-muted-foreground">PIM</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -365,15 +417,23 @@ export default function PlayerStatsTrends() {
                             <td className={`px-2 py-2 text-xs truncate max-w-[120px] ${entry.isAggregate ? 'font-medium' : ''}`}>
                               {getOpponentDisplay(entry)}
                             </td>
-                            <td className="px-2 py-2 text-center font-medium">{entry.goals}</td>
-                            <td className="px-2 py-2 text-center font-medium">{entry.assists}</td>
-                            <td className="px-2 py-2 text-center font-bold">{entry.points}</td>
-                            <td className="px-2 py-2 text-center text-muted-foreground">{entry.penaltyMinutes}</td>
+                            {isGoalie ? (
+                              <td className="px-2 py-2 text-center font-bold">
+                                {(entry.goalsAgainstAverage ?? 0).toFixed(2)}
+                              </td>
+                            ) : (
+                              <>
+                                <td className="px-2 py-2 text-center font-medium">{entry.goals}</td>
+                                <td className="px-2 py-2 text-center font-medium">{entry.assists}</td>
+                                <td className="px-2 py-2 text-center font-bold">{entry.points}</td>
+                                <td className="px-2 py-2 text-center text-muted-foreground">{entry.penaltyMinutes}</td>
+                              </>
+                            )}
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6}>
+                          <td colSpan={isGoalie ? 3 : 6}>
                             <NoDataMessage />
                           </td>
                         </tr>

@@ -7856,8 +7856,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Team or league not found" });
       }
 
-      const viewerMembership = await storage.getUserLeagueMembership(userId, team.leagueId);
-      if (!viewerMembership || viewerMembership.status !== 'approved') {
+      const [viewerMembership, viewer, league] = await Promise.all([
+        storage.getUserLeagueMembership(userId, team.leagueId),
+        storage.getUser(userId),
+        storage.getLeague(team.leagueId),
+      ]);
+      const isLeagueCommissioner = league?.commissionerId === userId;
+      const isPlatformCommissioner = viewer && (
+        viewer.role === 'commissioner' ||
+        viewer.role === 'secondary_commissioner' ||
+        viewer.specialPermissions?.includes('admin')
+      );
+      if ((!viewerMembership || viewerMembership.status !== 'approved') &&
+          !isLeagueCommissioner &&
+          !isPlatformCommissioner) {
         return res.status(403).json({ message: "Access denied - not an approved league member" });
       }
 
@@ -29786,16 +29798,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requesterId = req.user?.claims?.sub;
       const isSyntheticPlaceholder = userId.startsWith('placeholder:');
       const placeholderId = isSyntheticPlaceholder ? userId.slice('placeholder:'.length) : null;
+      let placeholderIsGoalie = false;
 
       if (placeholderId) {
         const [placeholder] = await db
-          .select({ id: placeholderPlayers.id })
+          .select({
+            id: placeholderPlayers.id,
+            isGoalie: placeholderPlayers.isGoalie,
+          })
           .from(placeholderPlayers)
           .where(eq(placeholderPlayers.id, placeholderId))
           .limit(1);
         if (!placeholder) {
           return res.status(404).json({ message: 'Player not found' });
         }
+        placeholderIsGoalie = Boolean(placeholder.isGoalie);
       }
 
       // leagueId is optional. When omitted (e.g. tapped from ClickableAvatar with no context),
@@ -29813,6 +29830,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // No leagueId: isAuthenticated (already checked) is sufficient — the requester can only see
       // another user's stats if they share a league (this is low-sensitivity data).
+
+      // Goalie stats are recorded separately from skater stats. Identify goalies
+      // from the league-specific assignment first, then fall back to the user's
+      // profile or completed goalie records when this is a career view.
+      let isGoalie = placeholderIsGoalie;
+      if (!isSyntheticPlaceholder) {
+        const profileGoalieCheck = leagueId
+          ? sql`false`
+          : sql`
+              EXISTS (
+                SELECT 1
+                FROM users u
+                WHERE u.id = ${userId}
+                  AND u.player_type = 'Goalie'
+              )
+            `;
+        const goalieIdentityResult = await db.execute(sql`
+          SELECT (
+            ${profileGoalieCheck}
+            OR EXISTS (
+              SELECT 1
+              FROM league_memberships lm
+              WHERE lm.user_id = ${userId}
+                ${leagueId ? sql`AND lm.league_id = ${leagueId}` : sql``}
+                AND lm.is_goalie = true
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM game_goalies gg
+              JOIN games goalie_games ON goalie_games.id = gg.game_id
+              WHERE gg.goalie_user_id = ${userId}
+                AND goalie_games.is_completed = true
+                ${leagueId ? sql`AND goalie_games.league_id = ${leagueId}` : sql``}
+                ${seasonId ? sql`AND goalie_games.season_id = ${seasonId}` : sql``}
+            )
+          ) AS is_goalie
+        `);
+        isGoalie = Boolean(goalieIdentityResult.rows?.[0]?.is_goalie);
+      }
+
+      if (isGoalie) {
+        const goalieLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
+        const goalieSeasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+        const goalieGameLogResult = isSyntheticPlaceholder
+          ? { rows: [] }
+          : await db.execute(sql`
+              SELECT
+                gg.game_id,
+                g.scheduled_at,
+                g.home_team_id,
+                g.away_team_id,
+                g.opponent_name,
+                t_home.name AS home_team_name,
+                t_away.name AS away_team_name,
+                COALESCE(gg.goals_against, 0)::int AS goals_against,
+                COALESCE(gg.minutes_played, 0)::int AS minutes_played
+              FROM game_goalies gg
+              JOIN games g ON g.id = gg.game_id
+              LEFT JOIN teams t_home ON t_home.id = g.home_team_id
+              LEFT JOIN teams t_away ON t_away.id = g.away_team_id
+              WHERE gg.goalie_user_id = ${userId}
+                AND g.is_completed = true
+                ${goalieLeagueFilter}
+                ${goalieSeasonFilter}
+              ORDER BY g.scheduled_at DESC
+            `);
+
+        const goalieGameLogRows = (goalieGameLogResult as any).rows ?? [];
+        const goalieGameLog = goalieGameLogRows.map((row: any) => {
+          const goalsAgainst = Number(row.goals_against ?? 0);
+          // Each goalie row represents one game. This matches the existing
+          // league goalie leaderboard's goals-against-per-game definition.
+          const goalsAgainstAverage = Number(goalsAgainst.toFixed(2));
+          return {
+            gameId: row.game_id,
+            date: row.scheduled_at,
+            homeTeamId: row.home_team_id,
+            awayTeamId: row.away_team_id,
+            homeTeamName: row.home_team_name ?? null,
+            awayTeamName: row.away_team_name ?? null,
+            opponentName: row.opponent_name ?? null,
+            goals: 0,
+            assists: 0,
+            points: 0,
+            penaltyMinutes: 0,
+            goalsAgainst,
+            goalsAgainstAverage,
+          };
+        });
+
+        const goalieTotalsResult = isSyntheticPlaceholder
+          ? { rows: [] }
+          : await db.execute(sql`
+              SELECT
+                COALESCE(SUM(games_played), 0)::int AS games_played,
+                COALESCE(SUM(goals), 0)::int AS goals,
+                COALESCE(SUM(assists), 0)::int AS assists
+              FROM player_stats
+              WHERE user_id = ${userId}
+                ${leagueId ? sql`AND league_id = ${leagueId}` : sql``}
+                ${seasonId ? sql`AND season_id = ${seasonId}` : sql``}
+            `);
+        const goalieTotalsRow = (goalieTotalsResult as any).rows?.[0];
+        const recordedGamesPlayed = Number(goalieTotalsRow?.games_played ?? 0);
+        const goalieGoals = Number(goalieTotalsRow?.goals ?? 0);
+        const goalieAssists = Number(goalieTotalsRow?.assists ?? 0);
+        const goalieGamesPlayed = Math.max(recordedGamesPlayed, goalieGameLog.length);
+        const goalieGoalsAgainst = goalieGameLog.reduce(
+          (total: number, entry: any) => total + entry.goalsAgainst,
+          0,
+        );
+        const goalieGaa = goalieGamesPlayed > 0
+          ? Number((goalieGoalsAgainst / goalieGamesPlayed).toFixed(2))
+          : 0;
+
+        const beerLeagueFilter = leagueId ? sql`AND g.league_id = ${leagueId}` : sql``;
+        const beerSeasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
+        const beerTrendResult = isSyntheticPlaceholder
+          ? { rows: [] }
+          : await db.execute(sql`
+              SELECT COALESCE(SUM(gbc.count), 0)::int AS total_beers
+              FROM game_beer_counts gbc
+              JOIN games g ON g.id = gbc.game_id
+              WHERE gbc.user_id = ${userId}
+                ${beerLeagueFilter}
+                ${beerSeasonFilter}
+            `);
+        const totalBeers = Number((beerTrendResult as any).rows?.[0]?.total_beers ?? 0);
+        const goaliePoints = goalieGoals + goalieAssists;
+
+        return res.json({
+          isGoalie: true,
+          seasonTotals: {
+            gamesPlayed: goalieGamesPlayed,
+            goals: goalieGoals,
+            assists: goalieAssists,
+            penaltyMinutes: 0,
+            points: goaliePoints,
+            pointsPerGame: goalieGamesPlayed > 0
+              ? Number((goaliePoints / goalieGamesPlayed).toFixed(2))
+              : 0,
+            beers: totalBeers,
+            goalsAgainst: goalieGoalsAgainst,
+            goalsAgainstAverage: goalieGaa,
+          },
+          beers: totalBeers,
+          gameLog: goalieGameLog,
+          streakStatus: 'NEUTRAL',
+          streakRatio: 1,
+        });
+      }
 
       // --- Season totals (SUM; when leagueId is omitted, sums career totals across all leagues) ---
       const seasonTotalsLeagueFilter = leagueId ? sql`AND league_id = ${leagueId}` : sql``;
