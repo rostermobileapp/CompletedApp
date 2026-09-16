@@ -7865,7 +7865,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isPlatformCommissioner = viewer && (
         viewer.role === 'commissioner' ||
         viewer.role === 'secondary_commissioner' ||
-        viewer.specialPermissions?.includes('admin')
+        viewer.specialPermissions?.includes('admin') ||
+        viewer.isPrimaryCommissioner ||
+        viewer.role === 'player_pro' ||
+        viewer.feeExempt
       );
       if ((!viewerMembership || viewerMembership.status !== 'approved') &&
           !isLeagueCommissioner &&
