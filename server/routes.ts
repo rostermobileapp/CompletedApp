@@ -7975,24 +7975,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Placeholder roster players do not have users rows, but they still need
       // a complete stats-shaped entry so the team view and stats screen behave
       // the same as they do for registered players.
-      const placeholderRows = await db
-        .select({
-          id: placeholderPlayers.id,
-          firstName: placeholderPlayers.firstName,
-          lastName: placeholderPlayers.lastName,
-          email: placeholderPlayers.email,
-          isGoalie: placeholderPlayers.isGoalie,
-          gamesPlayed: sql<number>`(
+      const placeholderResult = await db.execute(sql`
+        SELECT
+          pp.id,
+          pp.first_name,
+          pp.last_name,
+          pp.email,
+          pp.is_goalie,
+          (
             SELECT COUNT(DISTINCT ga.game_id)::int
             FROM game_attendance ga
             JOIN games g ON g.id = ga.game_id
-            WHERE ga.placeholder_player_id = ${placeholderPlayers.id}
+            WHERE ga.placeholder_player_id = pp.id
               AND g.league_id = ${team.leagueId}
               AND g.is_completed = true
-          )`,
-        })
-        .from(placeholderPlayers)
-        .where(eq(placeholderPlayers.teamId, teamId));
+          ) AS games_played
+        FROM placeholder_players pp
+        WHERE pp.team_id = ${teamId}
+      `);
+      const placeholderRows = ((placeholderResult.rows ?? placeholderResult) as any[]).map((row: any) => ({
+        id: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        email: row.email,
+        isGoalie: row.is_goalie,
+        gamesPlayed: row.games_played,
+      }));
 
       res.json([
         ...mappedRows,
