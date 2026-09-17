@@ -432,6 +432,15 @@ export function saveCalendarId(ownerKey: string | undefined, calendarId: string)
   }
 }
 
+export function clearSavedCalendarId(ownerKey?: string): void {
+  try {
+    localStorage.removeItem(storageKey(ownerKey, "selected"));
+  } catch {
+    // Continue notifying in case localStorage is unavailable.
+  }
+  notifyCalendarSync();
+}
+
 export function getExportedEventKey(ownerKey: string | undefined, calendarId: string, sourceKey: string): string {
   return storageKey(ownerKey, `exported:${calendarId}:${sourceKey}`);
 }

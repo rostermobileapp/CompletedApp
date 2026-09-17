@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   NativeCalendarInfo,
   NativeCalendarError,
+  clearSavedCalendarId,
   getCalendarErrorMessage,
   getSavedCalendarId,
   isNativeCalendarAvailable,
@@ -182,6 +183,19 @@ export default function Profile() {
     } finally {
       setIsSyncingNativeCalendar(false);
     }
+  };
+
+  const stopNativeCalendarSync = () => {
+    const ownerKey = (user as any)?.id;
+    if (!ownerKey || !savedNativeCalendarId) return;
+
+    clearSavedCalendarId(ownerKey);
+    setSelectedNativeCalendarId(null);
+    setSavedNativeCalendarId(null);
+    toast({
+      title: 'Calendar sync stopped',
+      description: 'Roster will no longer add or reconcile events in this calendar. Existing device events were left unchanged.',
+    });
   };
 
   // Fetch approved referral partners for the dropdown
@@ -1345,22 +1359,35 @@ export default function Profile() {
                                 </button>
                               ))}
                             </div>
-                            <button
-                              type="button"
-                               onClick={confirmAndSyncNativeCalendar}
-                              disabled={
-                                !selectedNativeCalendarId ||
-                                 !(user as any)?.id ||
-                                 isSyncingNativeCalendar
-                              }
-                              className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                               data-testid="button-confirm-sync-native-calendar"
-                            >
-                               {isSyncingNativeCalendar && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                               {isSyncingNativeCalendar ? 'Syncing calendar...' : 'Confirm & sync'}
-                            </button>
+                             <div className="flex flex-wrap items-center gap-2">
+                               <button
+                                 type="button"
+                                 onClick={confirmAndSyncNativeCalendar}
+                                 disabled={
+                                   !selectedNativeCalendarId ||
+                                   !(user as any)?.id ||
+                                   isSyncingNativeCalendar
+                                 }
+                                 className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                                 data-testid="button-confirm-sync-native-calendar"
+                               >
+                                 {isSyncingNativeCalendar && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                 {isSyncingNativeCalendar ? 'Syncing calendar...' : 'Confirm & sync'}
+                               </button>
+                             </div>
                           </>
                        )}
+                        {savedNativeCalendarId && (
+                          <button
+                            type="button"
+                            onClick={stopNativeCalendarSync}
+                            disabled={isSyncingNativeCalendar}
+                            className="inline-flex items-center justify-center rounded-md border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            data-testid="button-stop-native-calendar-sync"
+                          >
+                            Stop syncing
+                          </button>
+                        )}
                      </>
                    ) : (
                      <p className="text-sm text-muted-foreground">
