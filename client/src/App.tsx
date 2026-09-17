@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { useIsDesktopWeb } from "@/hooks/useIsDesktopWeb";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
+import { NativeCalendarAutoSync } from "@/components/NativeCalendarAutoSync";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
@@ -383,6 +384,7 @@ function App() {
                   active-tab morph). */}
               <MotionConfig reducedMotion="user">
                 <Toaster />
+                <NativeCalendarAutoSync />
                 <ErrorBoundary>
                   <DemoContextProvider>
                     <Router />

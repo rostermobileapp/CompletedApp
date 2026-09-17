@@ -349,6 +349,7 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/personal-reminders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
       toast({
         title: 'Reminder Created',
         description: 'Your personal reminder has been added to your calendar.',
