@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNativelyNotifications } from "@/hooks/useNativelyNotifications";
 import {
-  getSavedCalendarId,
   isNativeCalendarAvailable,
+  loadSavedCalendarId,
   syncNativeCalendarEvents,
   toNativeCalendarEventsFromCalendarData,
 } from "@/lib/nativeCalendar";
@@ -33,15 +33,26 @@ export function NativeCalendarAutoSync() {
       return;
     }
 
-    const calendarId = getSavedCalendarId(user.id);
-    if (!calendarId) return;
+    let cancelled = false;
 
-    const currentEvents = toNativeCalendarEventsFromCalendarData(calendarData)
-      .filter((event) => event.start.getTime() > Date.now());
+    void loadSavedCalendarId(user.id)
+      .then((calendarId) => {
+        if (cancelled || !calendarId) return;
 
-    syncNativeCalendarEvents(user.id, calendarId, currentEvents).catch((error) => {
-      console.warn("[NativeCalendarAutoSync] Schedule sync failed:", error);
-    });
+        const currentEvents = toNativeCalendarEventsFromCalendarData(calendarData)
+          .filter((event) => event.start.getTime() > Date.now());
+
+        return syncNativeCalendarEvents(user.id, calendarId, currentEvents);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("[NativeCalendarAutoSync] Schedule sync failed:", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     calendarData,
     canUseCalendarSync,

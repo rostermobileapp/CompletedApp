@@ -26,7 +26,7 @@ import {
   NativeCalendarInfo,
   NativeCalendarError,
   getCalendarErrorMessage,
-  getSavedCalendarId,
+  loadSavedCalendarId,
   isNativeCalendarAvailable,
   retrieveDeviceCalendars,
   saveCalendarId,
@@ -116,9 +116,22 @@ export default function Profile() {
     if (!showCalendarSync) return;
     const available = isNativeCalendarAvailable();
     setNativeCalendarAvailable(available);
-    const savedId = available && (user as any)?.id ? getSavedCalendarId((user as any).id) : null;
-    setSelectedNativeCalendarId(savedId);
-    setSavedNativeCalendarId(savedId);
+    let cancelled = false;
+    if (!available || !(user as any)?.id) {
+      setSelectedNativeCalendarId(null);
+      setSavedNativeCalendarId(null);
+      return;
+    }
+
+    void loadSavedCalendarId((user as any).id).then((savedId) => {
+      if (cancelled) return;
+      setSelectedNativeCalendarId(savedId);
+      setSavedNativeCalendarId(savedId);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [showCalendarSync, (user as any)?.id]);
 
   const loadNativeCalendars = async () => {
@@ -126,7 +139,7 @@ export default function Profile() {
     try {
       const calendars = await retrieveDeviceCalendars();
       setNativeCalendars(calendars);
-      const savedId = getSavedCalendarId((user as any)?.id);
+      const savedId = await loadSavedCalendarId((user as any)?.id);
       setSelectedNativeCalendarId(savedId);
       setSavedNativeCalendarId(savedId);
     } catch (error: any) {

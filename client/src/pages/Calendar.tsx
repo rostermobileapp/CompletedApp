@@ -16,8 +16,8 @@ import LocationLink from "@/components/LocationLink";
 import { parseScrimmageDateTime } from "@/lib/scrimmageDateTime";
 import NativeCalendarExportButton from "@/components/NativeCalendarExportButton";
 import {
-  getSavedCalendarId,
   isNativeCalendarAvailable,
+  loadSavedCalendarId,
   syncNativeCalendarEvents,
   toNativeCalendarEvent,
   toNativeCalendarEventsFromCalendarData,
@@ -220,19 +220,22 @@ export default function Calendar() {
       return;
     }
 
-    const calendarId = getSavedCalendarId(user.id);
-    if (!calendarId) {
-      setNativeCalendarSyncMessage(null);
-      return;
-    }
-
     let cancelled = false;
-    const currentNativeEvents = toNativeCalendarEventsFromCalendarData(calendarData)
-      .filter((event) => event.start.getTime() > Date.now());
+    void loadSavedCalendarId(user.id)
+      .then((calendarId) => {
+        if (cancelled) return null;
+        if (!calendarId) {
+          setNativeCalendarSyncMessage(null);
+          return null;
+        }
 
-    syncNativeCalendarEvents(user.id, calendarId, currentNativeEvents)
+        const currentNativeEvents = toNativeCalendarEventsFromCalendarData(calendarData)
+          .filter((event) => event.start.getTime() > Date.now());
+
+        return syncNativeCalendarEvents(user.id, calendarId, currentNativeEvents);
+      })
       .then((result) => {
-        if (cancelled) return;
+        if (cancelled || !result) return;
         if (result.staleEvents.length > 0) {
           const count = result.staleEvents.length;
           setNativeCalendarSyncMessage(

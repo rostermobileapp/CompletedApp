@@ -1,5 +1,5 @@
 import { fromZonedTime } from "date-fns-tz";
-import { NativelyCalendar } from "natively";
+import { NativelyCalendar, NativelyStorage } from "natively";
 import { parseScrimmageDateTime } from "./scrimmageDateTime";
 
 export type NativeCalendarResponse = {
@@ -70,6 +70,7 @@ export class NativeCalendarError extends Error {
 }
 
 const nativeCalendar = new NativelyCalendar();
+const nativeStorage = new NativelyStorage();
 let registeredMutationProvider: NativeCalendarMutationProvider | null = null;
 
 declare global {
@@ -424,11 +425,71 @@ export function getSavedCalendarId(ownerKey?: string): string | null {
   }
 }
 
+function extractStoredString(value: unknown): string | null {
+  if (typeof value === "string") return value || null;
+  if (!value || typeof value !== "object") return null;
+
+  const response = value as Record<string, unknown>;
+  if (response.status && response.status !== "SUCCESS") return null;
+
+  for (const candidate of [response.value, response.data, response.storageValue]) {
+    if (typeof candidate === "string" && candidate) return candidate;
+    if (candidate && typeof candidate === "object") {
+      const nested = extractStoredString(candidate);
+      if (nested) return nested;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Reads the selected calendar from native persistent storage, falling back to
+ * localStorage for web builds and for migrating existing selections.
+ */
+export async function loadSavedCalendarId(ownerKey?: string): Promise<string | null> {
+  const localValue = getSavedCalendarId(ownerKey);
+  if (!isNativeCalendarAvailable()) return localValue;
+
+  try {
+    const nativeValue = extractStoredString(
+      await withTimeout<unknown>((resolve) => {
+        nativeStorage.getStorageValue(storageKey(ownerKey, "selected"), resolve);
+      }, 5000),
+    );
+
+    if (nativeValue) {
+      try {
+        localStorage.setItem(storageKey(ownerKey, "selected"), nativeValue);
+      } catch {
+        // Native storage remains the durable copy.
+      }
+      return nativeValue;
+    }
+
+    // Migrate a selection saved by an older webview-based build.
+    if (localValue) {
+      nativeStorage.setStorageValue(storageKey(ownerKey, "selected"), localValue);
+    }
+    return localValue;
+  } catch {
+    return localValue;
+  }
+}
+
 export function saveCalendarId(ownerKey: string | undefined, calendarId: string): void {
   try {
     localStorage.setItem(storageKey(ownerKey, "selected"), calendarId);
   } catch {
-    // A private browsing context may not allow localStorage. Export still works.
+    // Native storage below remains the durable copy.
+  }
+
+  if (isNativeCalendarAvailable()) {
+    try {
+      nativeStorage.setStorageValue(storageKey(ownerKey, "selected"), calendarId);
+    } catch {
+      // The local copy still supports web and same-session use.
+    }
   }
 }
 
