@@ -477,17 +477,21 @@ export default function Profile() {
     }
   };
 
+  const canUseCalendarSync = (user as any)?.displayId === 'U00001';
+
   const settingsItems = [
     {
       icon: Bell,
       label: 'Notifications',
       action: () => setShowNotificationPreferences(true),
     },
-    {
-      icon: Calendar,
-      label: 'Calendar Sync',
-      action: () => setShowCalendarSync(true),
-    },
+    ...(canUseCalendarSync
+      ? [{
+          icon: Calendar,
+          label: 'Calendar Sync',
+          action: () => setShowCalendarSync(true),
+        }]
+      : []),
     {
       icon: Shield,
       label: 'Privacy',
@@ -1227,7 +1231,8 @@ export default function Profile() {
             </button>
           ))}
 
-           <Dialog open={showCalendarSync} onOpenChange={setShowCalendarSync}>
+            {canUseCalendarSync && (
+              <Dialog open={showCalendarSync} onOpenChange={setShowCalendarSync}>
              <DialogContent className="w-[calc(100vw-2rem)] max-w-[520px]" data-testid="dialog-calendar-sync">
                <DialogHeader>
                  <DialogTitle>Calendar Sync</DialogTitle>
@@ -1321,7 +1326,8 @@ export default function Profile() {
 
                </div>
              </DialogContent>
-           </Dialog>
+              </Dialog>
+            )}
 
            {/* Delete Profile */}
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
