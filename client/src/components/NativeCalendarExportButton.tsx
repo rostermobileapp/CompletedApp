@@ -14,13 +14,16 @@ import {
   NativeCalendarEvent,
   NativeCalendarInfo,
   createDeviceCalendarEvent,
+  getExportedEventRecord,
+  getExportedEventState,
   getCalendarErrorMessage,
   getSavedCalendarId,
-  hasExportedEvent,
   isNativeCalendarAvailable,
   markEventExported,
   retrieveDeviceCalendars,
   saveCalendarId,
+  subscribeToNativeCalendarSync,
+  syncNativeCalendarEvents,
 } from "@/lib/nativeCalendar";
 
 interface NativeCalendarExportButtonProps {
@@ -40,7 +43,9 @@ export default function NativeCalendarExportButton({
   const [isLoadingCalendars, setIsLoadingCalendars] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isExported, setIsExported] = useState(false);
+  const [exportState, setExportState] = useState<
+    "not_exported" | "exported" | "legacy" | "changed" | "stale"
+  >("not_exported");
 
   useEffect(() => {
     const nativeAvailable = isNativeCalendarAvailable();
@@ -49,10 +54,35 @@ export default function NativeCalendarExportButton({
 
     const savedId = getSavedCalendarId(ownerKey);
     setSelectedCalendarId(savedId);
-    setIsExported(savedId ? hasExportedEvent(ownerKey, savedId, event.sourceKey) : false);
-  }, [event?.sourceKey, ownerKey]);
+    setExportState(savedId ? getExportedEventState(ownerKey, savedId, event) : "not_exported");
+    return subscribeToNativeCalendarSync(() => {
+      setExportState(
+        savedId ? getExportedEventState(ownerKey, savedId, event) : "not_exported",
+      );
+    });
+  }, [event, ownerKey]);
 
   if (!available || !event) return null;
+
+  const isExported = exportState === "exported" || exportState === "legacy";
+  const needsUpdate = exportState === "changed" || exportState === "stale";
+
+  const syncExistingEvent = async (calendarId: string) => {
+    const result = await syncNativeCalendarEvents(ownerKey, calendarId, [event]);
+    setExportState(getExportedEventState(ownerKey, calendarId, event));
+    if (result.updatedEvents.includes(event.sourceKey)) {
+      toast({
+        title: "Device calendar updated",
+        description: `${event.title} now matches the Roster schedule.`,
+      });
+    } else if (result.staleEvents.includes(event.sourceKey)) {
+      toast({
+        title: "Roster schedule changed",
+        description:
+          "This device calendar version cannot edit the existing event, so no duplicate was created. Use the Roster schedule as the source of truth.",
+      });
+    }
+  };
 
   const loadCalendars = async () => {
     setIsLoadingCalendars(true);
@@ -88,11 +118,19 @@ export default function NativeCalendarExportButton({
     setIsCreating(true);
     setErrorMessage(null);
     try {
-      await createDeviceCalendarEvent(event, calendarId);
+      const existingRecord = getExportedEventRecord(ownerKey, calendarId, event.sourceKey);
+      if (existingRecord) {
+        await syncExistingEvent(calendarId);
+        setSelectedCalendarId(calendarId);
+        setPickerOpen(false);
+        return;
+      }
+
+      const nativeResponse = await createDeviceCalendarEvent(event, calendarId);
       saveCalendarId(ownerKey, calendarId);
-      markEventExported(ownerKey, calendarId, event.sourceKey);
+      markEventExported(ownerKey, calendarId, event.sourceKey, event, nativeResponse);
       setSelectedCalendarId(calendarId);
-      setIsExported(true);
+      setExportState("exported");
       setPickerOpen(false);
       toast({
         title: "Added to device calendar",
@@ -116,6 +154,25 @@ export default function NativeCalendarExportButton({
 
   const handleAdd = async () => {
     if (isExported) return;
+    if (needsUpdate && selectedCalendarId) {
+      setIsCreating(true);
+      try {
+        await syncExistingEvent(selectedCalendarId);
+      } catch (error) {
+        const message =
+          error instanceof NativeCalendarError
+            ? error.message
+            : getCalendarErrorMessage((error as any)?.error);
+        toast({
+          title: "Could not sync event",
+          description: message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsCreating(false);
+      }
+      return;
+    }
     if (selectedCalendarId) {
       await createEvent(selectedCalendarId);
     } else {
@@ -137,21 +194,29 @@ export default function NativeCalendarExportButton({
           className="h-8 px-2.5 text-xs"
           onClick={handleAdd}
           disabled={isLoadingCalendars || isCreating || isExported}
-          aria-label={isExported ? "Added to device calendar" : "Add to device calendar"}
+          aria-label={
+            isExported
+              ? "Added to device calendar"
+              : needsUpdate
+                ? "Update device calendar event"
+                : "Add to device calendar"
+          }
           data-testid={`button-native-calendar-${event.sourceKey.replace(/:/g, "-")}`}
         >
           {isCreating || isLoadingCalendars ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : isExported ? (
             <Check className="h-3.5 w-3.5 mr-1" />
+          ) : needsUpdate ? (
+            <RefreshCw className="h-3.5 w-3.5 mr-1" />
           ) : (
             <CalendarPlus className="h-3.5 w-3.5 mr-1" />
           )}
           <span className="hidden sm:inline">
-            {isExported ? "Added" : "Add to calendar"}
+            {isExported ? "Added" : needsUpdate ? "Update" : "Add to calendar"}
           </span>
         </Button>
-        {isExported && (
+        {(isExported || needsUpdate) && (
           <Button
             type="button"
             variant="ghost"
@@ -172,7 +237,7 @@ export default function NativeCalendarExportButton({
           <DialogHeader>
             <DialogTitle>Choose a device calendar</DialogTitle>
             <DialogDescription>
-              Select where to add <strong>{event.title}</strong>.
+              Select where to add or update <strong>{event.title}</strong>.
             </DialogDescription>
           </DialogHeader>
 
@@ -219,7 +284,7 @@ export default function NativeCalendarExportButton({
               data-testid="button-confirm-native-calendar"
             >
               {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add event
+              {needsUpdate ? "Update event" : "Add event"}
             </Button>
           </div>
         </DialogContent>

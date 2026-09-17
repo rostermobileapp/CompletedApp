@@ -3,8 +3,10 @@ name: Native calendar export
 description: The Natively calendar integration is a one-way, device-local export layered on top of Roster’s internal schedule.
 ---
 
-Roster’s native calendar integration retrieves device calendars and creates events through Natively. It does not import, update, or delete device events because the available SDK surface only documents calendar retrieval and event creation. Export state is therefore local to the signed-in user on that device.
+Roster’s native calendar integration retrieves device calendars and creates events through Natively. Export state is local to the signed-in user on that device and is keyed by the stable Roster event source key. Each export also keeps a fingerprint of the schedule payload so reschedules and cancellations can be detected.
 
-**Why:** The SDK does not return an editable event identifier or expose update/delete methods, so pretending this is continuous two-way synchronization would create stale or duplicate device events.
+When a calendar provider exposes an editable event identifier plus update/delete operations, the integration can register that provider and reconcile changed or removed events. The current Natively SDK does not expose those operations, so the default remains one-way export. If mutation is unavailable or fails, retain the export record, never create a replacement duplicate, and show the Roster schedule as authoritative.
 
-**How to apply:** Keep the in-app schedule authoritative. Treat device-calendar export as an explicit user action, preserve local duplicate protection, and revisit persistent sync only if Natively adds event mutation APIs or a separate provider integration is introduced.
+**Why:** The SDK does not currently return a documented editable event identifier or expose update/delete methods. Treating one-way export as synchronization would create stale or duplicate device events; retaining source-key records makes the conflict explicit and allows a future provider to reconcile safely.
+
+**How to apply:** Keep the in-app schedule authoritative. Treat device-calendar export as an explicit user action, persist fingerprints and any provider event IDs locally, and only mutate events through a provider that owns the corresponding event ID. Cancellations without delete support remain visibly pending rather than being silently recreated.

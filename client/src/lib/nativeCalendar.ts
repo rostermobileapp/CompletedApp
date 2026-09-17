@@ -22,6 +22,41 @@ export type NativeCalendarEvent = {
   location?: string;
 };
 
+export type NativeCalendarEventRecord = {
+  sourceKey: string;
+  calendarId: string;
+  fingerprint?: string;
+  nativeEventId?: string;
+  legacy?: boolean;
+};
+
+export type NativeCalendarEventState =
+  | "not_exported"
+  | "exported"
+  | "legacy"
+  | "changed"
+  | "stale";
+
+export type NativeCalendarMutationProvider = {
+  updateEvent?: (
+    nativeEventId: string,
+    event: NativeCalendarEvent,
+    calendarId: string,
+  ) => Promise<unknown> | unknown;
+  deleteEvent?: (
+    nativeEventId: string,
+    calendarId: string,
+  ) => Promise<unknown> | unknown;
+};
+
+export type NativeCalendarSyncResult = {
+  status: "synced" | "changes_pending" | "nothing_to_do";
+  updatedEvents: string[];
+  removedEvents: string[];
+  staleEvents: string[];
+  failedEvents: string[];
+};
+
 export class NativeCalendarError extends Error {
   code: string;
 
@@ -33,6 +68,13 @@ export class NativeCalendarError extends Error {
 }
 
 const nativeCalendar = new NativelyCalendar();
+let registeredMutationProvider: NativeCalendarMutationProvider | null = null;
+
+declare global {
+  interface Window {
+    rosterNativeCalendarProvider?: NativeCalendarMutationProvider;
+  }
+}
 
 function isNativeShell(): boolean {
   if (typeof window === "undefined") return false;
@@ -114,6 +156,10 @@ export function getCalendarErrorMessage(error?: string): string {
       return "We could not retrieve your device calendars. Please try again.";
     case "add_calendar_event_failure":
       return "The event could not be added to your device calendar. Please try again.";
+    case "update_calendar_event_failure":
+      return "The device calendar event could not be updated. The Roster schedule remains the source of truth.";
+    case "delete_calendar_event_failure":
+      return "The cancelled device calendar event could not be removed. The Roster schedule remains the source of truth.";
     case "start_date_missing":
     case "end_date_missing":
     case "timezone_missing":
@@ -180,6 +226,36 @@ export async function createDeviceCalendarEvent(
   });
 
   return ensureSuccess(response);
+}
+
+/**
+ * An optional provider can be registered by a calendar integration that
+ * supports editable event identifiers. The current Natively SDK does not
+ * provide these methods, so the default path remains a safe one-way export.
+ */
+export function registerNativeCalendarMutationProvider(
+  provider: NativeCalendarMutationProvider | null,
+): void {
+  registeredMutationProvider = provider;
+}
+
+export function getNativeCalendarMutationProvider(): NativeCalendarMutationProvider | null {
+  if (registeredMutationProvider) return registeredMutationProvider;
+  if (typeof window !== "undefined" && window.rosterNativeCalendarProvider) {
+    return window.rosterNativeCalendarProvider;
+  }
+  return null;
+}
+
+export function getNativeCalendarCapabilities(): {
+  canUpdate: boolean;
+  canDelete: boolean;
+} {
+  const provider = getNativeCalendarMutationProvider();
+  return {
+    canUpdate: typeof provider?.updateEvent === "function",
+    canDelete: typeof provider?.deleteEvent === "function",
+  };
 }
 
 function parseWallClock(value: string | Date, timezone: string): Date {
@@ -262,6 +338,9 @@ export function toNativeCalendarEvent(event: any): NativeCalendarEvent | null {
 }
 
 const STORAGE_PREFIX = "roster-native-calendar";
+const SYNC_EVENT_NAME = "roster-native-calendar-sync";
+const memoryEventRecords = new Map<string, NativeCalendarEventRecord>();
+const syncLocks = new Map<string, Promise<NativeCalendarSyncResult>>();
 
 function storageKey(ownerKey: string | undefined, suffix: string): string {
   return `${STORAGE_PREFIX}:${ownerKey || "anonymous"}:${suffix}`;
@@ -287,18 +366,242 @@ export function getExportedEventKey(ownerKey: string | undefined, calendarId: st
   return storageKey(ownerKey, `exported:${calendarId}:${sourceKey}`);
 }
 
-export function hasExportedEvent(ownerKey: string | undefined, calendarId: string, sourceKey: string): boolean {
+function parseStoredEventRecord(
+  value: string | null,
+  sourceKey: string,
+  calendarId: string,
+): NativeCalendarEventRecord | null {
+  if (!value) return null;
+  if (value === "1") {
+    return { sourceKey, calendarId, legacy: true };
+  }
+
   try {
-    return localStorage.getItem(getExportedEventKey(ownerKey, calendarId, sourceKey)) === "1";
+    const record = JSON.parse(value);
+    if (!record || typeof record !== "object") return null;
+    return {
+      sourceKey,
+      calendarId,
+      fingerprint: typeof record.fingerprint === "string" ? record.fingerprint : undefined,
+      nativeEventId: typeof record.nativeEventId === "string" ? record.nativeEventId : undefined,
+      legacy: record.legacy === true,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function markEventExported(ownerKey: string | undefined, calendarId: string, sourceKey: string): void {
+export function getExportedEventRecord(
+  ownerKey: string | undefined,
+  calendarId: string,
+  sourceKey: string,
+): NativeCalendarEventRecord | null {
+  const key = getExportedEventKey(ownerKey, calendarId, sourceKey);
+  const memoryRecord = memoryEventRecords.get(key);
+  if (memoryRecord) return memoryRecord;
+
   try {
-    localStorage.setItem(getExportedEventKey(ownerKey, calendarId, sourceKey), "1");
+    return parseStoredEventRecord(
+      localStorage.getItem(key),
+      sourceKey,
+      calendarId,
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function getExportedEventFingerprint(event: NativeCalendarEvent): string {
+  return JSON.stringify([
+    event.sourceKey,
+    event.title,
+    event.start.toISOString(),
+    event.end.toISOString(),
+    event.timezone,
+    event.description || "",
+    event.location || "",
+  ]);
+}
+
+export function getExportedEventState(
+  ownerKey: string | undefined,
+  calendarId: string | null,
+  event: NativeCalendarEvent,
+): NativeCalendarEventState {
+  if (!calendarId) return "not_exported";
+  const record = getExportedEventRecord(ownerKey, calendarId, event.sourceKey);
+  if (!record) return "not_exported";
+  if (record.legacy || !record.fingerprint) return "legacy";
+  return record.fingerprint === getExportedEventFingerprint(event) ? "exported" : "changed";
+}
+
+export function hasExportedEvent(ownerKey: string | undefined, calendarId: string, sourceKey: string): boolean {
+  return getExportedEventRecord(ownerKey, calendarId, sourceKey) !== null;
+}
+
+function extractNativeEventId(data: unknown): string | undefined {
+  if (typeof data === "string" && data.length > 0) return data;
+  if (!data || typeof data !== "object") return undefined;
+  const value = data as Record<string, unknown>;
+  for (const key of ["nativeEventId", "eventId", "calendarEventId", "id"]) {
+    if (typeof value[key] === "string" && value[key]) return value[key] as string;
+  }
+  return undefined;
+}
+
+export function markEventExported(
+  ownerKey: string | undefined,
+  calendarId: string,
+  sourceKey: string,
+  event?: NativeCalendarEvent,
+  nativeResponse?: unknown,
+): void {
+  const record: NativeCalendarEventRecord = {
+    sourceKey,
+    calendarId,
+    fingerprint: event ? getExportedEventFingerprint(event) : undefined,
+    nativeEventId: extractNativeEventId(nativeResponse),
+    legacy: !event,
+  };
+  const key = getExportedEventKey(ownerKey, calendarId, sourceKey);
+  memoryEventRecords.set(key, record);
+  try {
+    localStorage.setItem(key, JSON.stringify(record));
   } catch {
     // A private browsing context may not allow localStorage. Export still works.
+  }
+}
+
+function removeEventRecord(
+  ownerKey: string | undefined,
+  calendarId: string,
+  sourceKey: string,
+): void {
+  memoryEventRecords.delete(getExportedEventKey(ownerKey, calendarId, sourceKey));
+  try {
+    localStorage.removeItem(getExportedEventKey(ownerKey, calendarId, sourceKey));
+  } catch {
+    // Best-effort cleanup; a private browsing context may not allow localStorage.
+  }
+}
+
+function getExportedEventRecords(
+  ownerKey: string | undefined,
+  calendarId: string,
+): NativeCalendarEventRecord[] {
+  const records: NativeCalendarEventRecord[] = [];
+  const prefix = storageKey(ownerKey, `exported:${calendarId}:`);
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith(prefix)) continue;
+      const sourceKey = key.slice(prefix.length);
+      const record = parseStoredEventRecord(localStorage.getItem(key), sourceKey, calendarId);
+      if (record) records.push(record);
+    }
+  } catch {
+    // Continue with the in-memory records below.
+  }
+
+  const knownKeys = new Set(records.map((record) => record.sourceKey));
+  for (const [key, record] of Array.from(memoryEventRecords.entries())) {
+    if (key.startsWith(prefix) && !knownKeys.has(record.sourceKey)) {
+      records.push(record);
+    }
+  }
+  return records;
+}
+
+
+function notifyCalendarSync(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
+  }
+}
+
+export function subscribeToNativeCalendarSync(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(SYNC_EVENT_NAME, listener);
+  return () => window.removeEventListener(SYNC_EVENT_NAME, listener);
+}
+
+async function syncNativeCalendarEventsInternal(
+  ownerKey: string | undefined,
+  calendarId: string,
+  currentEvents: NativeCalendarEvent[],
+): Promise<NativeCalendarSyncResult> {
+  const result: NativeCalendarSyncResult = {
+    status: "nothing_to_do",
+    updatedEvents: [],
+    removedEvents: [],
+    staleEvents: [],
+    failedEvents: [],
+  };
+  const provider = getNativeCalendarMutationProvider();
+  const currentBySourceKey = new Map(currentEvents.map((event) => [event.sourceKey, event]));
+
+  for (const record of getExportedEventRecords(ownerKey, calendarId)) {
+    const currentEvent = currentBySourceKey.get(record.sourceKey);
+    if (currentEvent) {
+      if (!record.fingerprint || record.fingerprint === getExportedEventFingerprint(currentEvent)) {
+        continue;
+      }
+
+      if (provider?.updateEvent && record.nativeEventId) {
+        try {
+          await provider.updateEvent(record.nativeEventId, currentEvent, calendarId);
+          markEventExported(ownerKey, calendarId, record.sourceKey, currentEvent, {
+            nativeEventId: record.nativeEventId,
+          });
+          result.updatedEvents.push(record.sourceKey);
+        } catch {
+          result.failedEvents.push(record.sourceKey);
+          result.staleEvents.push(record.sourceKey);
+        }
+      } else {
+        // Never create a second event when the native bridge cannot edit this one.
+        result.staleEvents.push(record.sourceKey);
+      }
+      continue;
+    }
+
+    if (provider?.deleteEvent && record.nativeEventId) {
+      try {
+        await provider.deleteEvent(record.nativeEventId, calendarId);
+        removeEventRecord(ownerKey, calendarId, record.sourceKey);
+        result.removedEvents.push(record.sourceKey);
+      } catch {
+        result.failedEvents.push(record.sourceKey);
+        result.staleEvents.push(record.sourceKey);
+      }
+    } else {
+      // A cancellation cannot be reflected without an editable event identifier.
+      // Keep the record so a later refresh still cannot create a duplicate.
+      result.staleEvents.push(record.sourceKey);
+    }
+  }
+
+  if (result.updatedEvents.length || result.removedEvents.length || result.staleEvents.length) {
+    result.status = result.staleEvents.length ? "changes_pending" : "synced";
+    notifyCalendarSync();
+  }
+  return result;
+}
+
+export async function syncNativeCalendarEvents(
+  ownerKey: string | undefined,
+  calendarId: string,
+  currentEvents: NativeCalendarEvent[],
+): Promise<NativeCalendarSyncResult> {
+  const lockKey = `${ownerKey || "anonymous"}:${calendarId}`;
+  const existingSync = syncLocks.get(lockKey);
+  if (existingSync) return existingSync;
+
+  const sync = syncNativeCalendarEventsInternal(ownerKey, calendarId, currentEvents);
+  syncLocks.set(lockKey, sync);
+  try {
+    return await sync;
+  } finally {
+    if (syncLocks.get(lockKey) === sync) syncLocks.delete(lockKey);
   }
 }

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { format, isBefore, isAfter, addHours } from "date-fns";
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { Trophy, ArrowLeft, Clock, Users, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { Trophy, ArrowLeft, Clock, Users, ChevronRight, Calendar as CalendarIcon, CalendarClock } from "lucide-react";
 import { RSVPDetailModal } from "@/components/RSVPDetailModal";
 import { SubstituteRequestModal } from "@/components/SubstituteRequestModal";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,13 @@ import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 import LocationLink from "@/components/LocationLink";
 import { parseScrimmageDateTime } from "@/lib/scrimmageDateTime";
 import NativeCalendarExportButton from "@/components/NativeCalendarExportButton";
-import { toNativeCalendarEvent } from "@/lib/nativeCalendar";
+import {
+  getSavedCalendarId,
+  isNativeCalendarAvailable,
+  NativeCalendarEvent,
+  syncNativeCalendarEvents,
+  toNativeCalendarEvent,
+} from "@/lib/nativeCalendar";
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -31,6 +37,7 @@ export default function Calendar() {
   const [selectedGameId, setSelectedGameId] = useState<string>("");
   const [selectedGameData, setSelectedGameData] = useState<any>(null);
   const [substituteRequestData, setSubstituteRequestData] = useState<{ playerId: string; playerName: string; teamId?: string } | null>(null);
+  const [nativeCalendarSyncMessage, setNativeCalendarSyncMessage] = useState<string | null>(null);
 
   // Handler functions for modal interactions
   const handleViewDetails = (game: any) => {
@@ -203,6 +210,57 @@ export default function Calendar() {
     return at(a) - at(b);
   });
 
+  // Reconcile previously exported device events whenever the authoritative
+  // Roster schedule changes. If the device bridge cannot mutate an event,
+  // syncNativeCalendarEvents prevents a duplicate and this page stays the
+  // source of truth.
+  useEffect(() => {
+    if (!user?.id || !isNativeCalendarAvailable()) {
+      setNativeCalendarSyncMessage(null);
+      return;
+    }
+
+    const calendarId = getSavedCalendarId(user.id);
+    if (!calendarId) {
+      setNativeCalendarSyncMessage(null);
+      return;
+    }
+
+    let cancelled = false;
+    const currentNativeEvents = allEvents
+      .map((event: any) =>
+        toNativeCalendarEvent({
+          ...event,
+          activeTeamId: activeTeam?.id,
+        }),
+      )
+      .filter((event): event is NativeCalendarEvent => event !== null);
+
+    syncNativeCalendarEvents(user.id, calendarId, currentNativeEvents)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.staleEvents.length > 0) {
+          const count = result.staleEvents.length;
+          setNativeCalendarSyncMessage(
+            `${count === 1 ? "A device calendar event has" : `${count} device calendar events have`} changed or been cancelled in Roster. This app version cannot safely edit or remove ${count === 1 ? "it" : "them"}, so no duplicate was created. Use this schedule as the source of truth.`,
+          );
+        } else {
+          setNativeCalendarSyncMessage(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNativeCalendarSyncMessage(
+            "The device calendar could not be checked. The Roster schedule remains the source of truth.",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [calendarData, selectedTeamId, activeTeam?.id, user?.id]);
+
   // Find the index to scroll to (between last event and next event)
   const currentTime = new Date();
   const nextEventIndex = allEvents.findIndex((event: any) => {
@@ -258,6 +316,16 @@ export default function Calendar() {
 
       {/* Games List */}
       <div className="px-6 py-6">
+        {nativeCalendarSyncMessage && (
+          <div
+            className="mb-4 flex items-start gap-3 rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
+            role="status"
+            data-testid="native-calendar-sync-notice"
+          >
+            <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{nativeCalendarSyncMessage}</span>
+          </div>
+        )}
         {gamesLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
