@@ -1,6 +1,7 @@
 import { fromZonedTime } from "date-fns-tz";
 import { NativelyCalendar } from "natively";
 import { parseScrimmageDateTime } from "./scrimmageDateTime";
+import { apiRequest } from "./queryClient";
 
 export type NativeCalendarResponse = {
   status?: string;
@@ -505,6 +506,22 @@ export async function loadSavedCalendarId(ownerKey?: string): Promise<string | n
   } catch {
     return localValue;
   }
+}
+
+export async function syncSavedNativeCalendarEvents(
+  ownerKey: string | undefined,
+): Promise<NativeCalendarSyncResult | null> {
+  if (!ownerKey || !isNativeCalendarAvailable()) return null;
+
+  const calendarId = await loadSavedCalendarId(ownerKey);
+  if (!calendarId) return null;
+
+  const response = await apiRequest("GET", "/api/user/calendar");
+  const calendarData = await response.json();
+  const currentEvents = toNativeCalendarEventsFromCalendarData(calendarData)
+    .filter((event) => event.start.getTime() > Date.now());
+
+  return syncNativeCalendarEvents(ownerKey, calendarId, currentEvents);
 }
 
 export function saveCalendarId(ownerKey: string | undefined, calendarId: string): void {

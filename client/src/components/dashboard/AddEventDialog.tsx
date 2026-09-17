@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { ImageIcon, X, Loader2 } from 'lucide-react';
 import { apiRequest, queryClient, getAuthHeaders } from '@/lib/queryClient';
+import { syncSavedNativeCalendarEvents } from '@/lib/nativeCalendar';
 import { useToast } from '@/hooks/use-toast';
 import type { User, League } from '@shared/schema';
 
@@ -350,6 +351,9 @@ export function AddEventDialog({ open, onOpenChange }: AddEventDialogProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user/personal-reminders'] });
       queryClient.invalidateQueries({ queryKey: ['/api/user/calendar'] });
+      void syncSavedNativeCalendarEvents(userProfile?.id).catch((error) => {
+        console.warn('[AddEventDialog] Native calendar sync after reminder failed:', error);
+      });
       toast({
         title: 'Reminder Created',
         description: 'Your personal reminder has been added to your calendar.',

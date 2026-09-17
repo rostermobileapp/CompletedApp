@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient, getImageUrl, getAuthHeaders } from '@/lib/queryClient';
+import { syncSavedNativeCalendarEvents } from '@/lib/nativeCalendar';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -1448,6 +1449,9 @@ function DashboardMobile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/personal-reminders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/calendar"] });
+      void syncSavedNativeCalendarEvents(userProfile?.id).catch((error) => {
+        console.warn("[Dashboard] Native calendar sync after reminder failed:", error);
+      });
       toast({
         title: "Reminder Created",
         description: "Your personal reminder has been added to your calendar.",
