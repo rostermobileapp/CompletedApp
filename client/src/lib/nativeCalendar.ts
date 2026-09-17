@@ -1,5 +1,6 @@
 import { fromZonedTime } from "date-fns-tz";
 import { NativelyCalendar } from "natively";
+import { parseScrimmageDateTime } from "./scrimmageDateTime";
 
 export type NativeCalendarResponse = {
   status?: string;
@@ -51,6 +52,7 @@ export type NativeCalendarMutationProvider = {
 
 export type NativeCalendarSyncResult = {
   status: "synced" | "changes_pending" | "nothing_to_do";
+  createdEvents: string[];
   updatedEvents: string[];
   removedEvents: string[];
   staleEvents: string[];
@@ -337,6 +339,72 @@ export function toNativeCalendarEvent(event: any): NativeCalendarEvent | null {
   };
 }
 
+/**
+ * Converts the consolidated /api/user/calendar response into the complete
+ * set of upcoming events that belong in the user's selected device calendar.
+ * This is shared by the Calendar page and the profile's initial sync action so
+ * selecting a calendar always exports the same event set.
+ */
+export function toNativeCalendarEventsFromCalendarData(data: any): NativeCalendarEvent[] {
+  const userTeams = Array.isArray(data?.userTeams) ? data.userTeams : [];
+  const userTeamIds = new Set(userTeams.map((team: any) => team?.id).filter(Boolean));
+  const allGames = Array.isArray(data?.allGames) ? data.allGames : [];
+  const createdScrimmages = Array.isArray(data?.createdScrimmages)
+    ? data.createdScrimmages
+    : [];
+  const scrimmageRequests = Array.isArray(data?.scrimmageRequests)
+    ? data.scrimmageRequests
+    : [];
+  const substitutions = Array.isArray(data?.mySubstitutions)
+    ? data.mySubstitutions
+    : [];
+  const personalReminders = Array.isArray(data?.personalReminders)
+    ? data.personalReminders
+    : [];
+  const teamEvents = Array.isArray(data?.teamEvents) ? data.teamEvents : [];
+
+  const scrimmages = [
+    ...createdScrimmages.map((scrimmage: any) => ({
+      ...scrimmage,
+      type: "scrimmage",
+      scheduledAt: parseScrimmageDateTime(scrimmage.dateTime),
+    })),
+    ...scrimmageRequests
+      .filter((request: any) => request?.status === "approved")
+      .map((request: any) => ({
+        ...request.scrimmage,
+        type: "scrimmage",
+        scheduledAt: parseScrimmageDateTime(request.scrimmage.dateTime),
+        teamAssignment: request.teamAssignment ?? null,
+      })),
+  ];
+
+  const events = [
+    ...allGames.map((game: any) => ({ ...game, type: "game" })),
+    ...scrimmages,
+    ...substitutions.map((substitution: any) => ({
+      ...substitution.game,
+      type: "substitute",
+      substituteForTeam: substitution.requestingTeam,
+      scheduledAt: substitution.game?.scheduledAt,
+    })),
+    ...personalReminders.map((reminder: any) => ({ ...reminder, type: "reminder" })),
+    ...teamEvents.map((event: any) => ({ ...event, type: "team-event" })),
+  ];
+
+  return events
+    .map((event: any) => {
+      const activeTeamId =
+        event.activeTeamId ||
+        event.substituteForTeam?.id ||
+        (userTeamIds.has(event.homeTeamId) ? event.homeTeamId : undefined) ||
+        (userTeamIds.has(event.awayTeamId) ? event.awayTeamId : undefined);
+
+      return toNativeCalendarEvent({ ...event, activeTeamId });
+    })
+    .filter((event): event is NativeCalendarEvent => event !== null);
+}
+
 const STORAGE_PREFIX = "roster-native-calendar";
 const SYNC_EVENT_NAME = "roster-native-calendar-sync";
 const memoryEventRecords = new Map<string, NativeCalendarEventRecord>();
@@ -532,6 +600,7 @@ async function syncNativeCalendarEventsInternal(
 ): Promise<NativeCalendarSyncResult> {
   const result: NativeCalendarSyncResult = {
     status: "nothing_to_do",
+    createdEvents: [],
     updatedEvents: [],
     removedEvents: [],
     staleEvents: [],
@@ -581,7 +650,30 @@ async function syncNativeCalendarEventsInternal(
     }
   }
 
-  if (result.updatedEvents.length || result.removedEvents.length || result.staleEvents.length) {
+  for (const currentEvent of currentEvents) {
+    if (getExportedEventRecord(ownerKey, calendarId, currentEvent.sourceKey)) continue;
+
+    try {
+      const nativeResponse = await createDeviceCalendarEvent(currentEvent, calendarId);
+      markEventExported(
+        ownerKey,
+        calendarId,
+        currentEvent.sourceKey,
+        currentEvent,
+        nativeResponse,
+      );
+      result.createdEvents.push(currentEvent.sourceKey);
+    } catch {
+      result.failedEvents.push(currentEvent.sourceKey);
+    }
+  }
+
+  if (
+    result.createdEvents.length ||
+    result.updatedEvents.length ||
+    result.removedEvents.length ||
+    result.staleEvents.length
+  ) {
     result.status = result.staleEvents.length ? "changes_pending" : "synced";
     notifyCalendarSync();
   }

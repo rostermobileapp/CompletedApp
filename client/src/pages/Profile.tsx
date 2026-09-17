@@ -22,7 +22,17 @@ import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HPIBBanner } from '@/components/HPIBBanner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { NativeCalendarInfo, NativeCalendarError, getCalendarErrorMessage, getSavedCalendarId, isNativeCalendarAvailable, retrieveDeviceCalendars, saveCalendarId } from '@/lib/nativeCalendar';
+import {
+  NativeCalendarInfo,
+  NativeCalendarError,
+  getCalendarErrorMessage,
+  getSavedCalendarId,
+  isNativeCalendarAvailable,
+  retrieveDeviceCalendars,
+  saveCalendarId,
+  syncNativeCalendarEvents,
+  toNativeCalendarEventsFromCalendarData,
+} from '@/lib/nativeCalendar';
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -88,6 +98,7 @@ export default function Profile() {
   const [selectedNativeCalendarId, setSelectedNativeCalendarId] = useState<string | null>(null);
   const [savedNativeCalendarId, setSavedNativeCalendarId] = useState<string | null>(null);
   const [isLoadingNativeCalendars, setIsLoadingNativeCalendars] = useState(false);
+  const [isSyncingNativeCalendar, setIsSyncingNativeCalendar] = useState(false);
   const [teamJerseyNumbers, setTeamJerseyNumbers] = useState<Record<string, string>>({});
   const isDesktopWeb = useIsDesktopWeb();
 
@@ -129,6 +140,42 @@ export default function Profile() {
       });
     } finally {
       setIsLoadingNativeCalendars(false);
+    }
+  };
+
+  const confirmAndSyncNativeCalendar = async () => {
+    const ownerKey = (user as any)?.id;
+    const calendarId = selectedNativeCalendarId;
+    if (!ownerKey || !calendarId) return;
+
+    setIsSyncingNativeCalendar(true);
+    try {
+      saveCalendarId(ownerKey, calendarId);
+      const response = await apiRequest('GET', '/api/user/calendar');
+      const calendarData = await response.json();
+      const currentEvents = toNativeCalendarEventsFromCalendarData(calendarData)
+        .filter((event) => event.start.getTime() > Date.now());
+      const result = await syncNativeCalendarEvents(ownerKey, calendarId, currentEvents);
+      setSavedNativeCalendarId(calendarId);
+
+      const addedCount = result.createdEvents.length;
+      toast({
+        title: 'Calendar synced',
+        description: addedCount > 0
+          ? `${addedCount} upcoming Roster ${addedCount === 1 ? 'event was' : 'events were'} added to your selected calendar.`
+          : 'Your selected calendar is up to date with the Roster schedule.',
+      });
+    } catch (error: any) {
+      const message = error instanceof NativeCalendarError
+        ? error.message
+        : getCalendarErrorMessage(error?.error);
+      toast({
+        title: 'Could not sync calendar',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncingNativeCalendar(false);
     }
   };
 
@@ -1238,7 +1285,7 @@ export default function Profile() {
                <DialogHeader>
                  <DialogTitle>Calendar Sync</DialogTitle>
                  <DialogDescription>
-                    Add Roster events to your device calendar. Roster remains the source of truth.
+                    Choose a device calendar, then confirm to add your upcoming Roster events. Roster remains the source of truth.
                  </DialogDescription>
                </DialogHeader>
 
@@ -1249,7 +1296,7 @@ export default function Profile() {
                      <div className="min-w-0">
                        <h3 className="font-semibold">Native device calendar</h3>
                        <p className="text-sm text-muted-foreground">
-                         Add individual Roster events to a calendar on this device. This is a one-way export; changes are managed in Roster.
+                          Confirming will add your upcoming Roster events to the selected calendar on this device.
                        </p>
                      </div>
                    </div>
@@ -1295,25 +1342,17 @@ export default function Profile() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (!selectedNativeCalendarId || !(user as any)?.id) return;
-                                saveCalendarId((user as any).id, selectedNativeCalendarId);
-                                setSavedNativeCalendarId(selectedNativeCalendarId);
-                                toast({
-                                  title: 'Device calendar selected',
-                                  description: 'Use Add to calendar on a Roster schedule event to export it here.',
-                                });
-                              }}
+                               onClick={confirmAndSyncNativeCalendar}
                               disabled={
                                 !selectedNativeCalendarId ||
-                                selectedNativeCalendarId === savedNativeCalendarId
+                                 !(user as any)?.id ||
+                                 isSyncingNativeCalendar
                               }
                               className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                              data-testid="button-use-profile-native-calendar"
+                               data-testid="button-confirm-sync-native-calendar"
                             >
-                              {selectedNativeCalendarId === savedNativeCalendarId
-                                ? 'Calendar selected'
-                                : 'Use this calendar'}
+                               {isSyncingNativeCalendar && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                               {isSyncingNativeCalendar ? 'Syncing calendar...' : 'Confirm & sync'}
                             </button>
                           </>
                        )}
