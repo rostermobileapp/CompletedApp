@@ -68,7 +68,7 @@ type PaymentMethodsForm = z.infer<typeof paymentMethodsSchema>;
 
 export default function Profile() {
   const { user: supabaseUser } = useAuth();
-  const { removeExternalId } = useNativelyNotifications();
+  const { removeExternalId, displayId: nativeDisplayId } = useNativelyNotifications();
   const { role, hasRole, canManageLeague, canAccessPremiumFeatures } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -477,7 +477,8 @@ export default function Profile() {
     }
   };
 
-  const canUseCalendarSync = (user as any)?.displayId === 'U00001';
+  const canUseCalendarSync =
+    (user as any)?.displayId === 'U00001' || nativeDisplayId === 'U00001';
 
   const settingsItems = [
     {
