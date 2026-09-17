@@ -1,5 +1,5 @@
 import { fromZonedTime } from "date-fns-tz";
-import { NativelyCalendar, NativelyStorage } from "natively";
+import { NativelyCalendar } from "natively";
 import { parseScrimmageDateTime } from "./scrimmageDateTime";
 
 export type NativeCalendarResponse = {
@@ -70,7 +70,6 @@ export class NativeCalendarError extends Error {
 }
 
 const nativeCalendar = new NativelyCalendar();
-const nativeStorage = new NativelyStorage();
 let registeredMutationProvider: NativeCalendarMutationProvider | null = null;
 
 declare global {
@@ -425,51 +424,82 @@ export function getSavedCalendarId(ownerKey?: string): string | null {
   }
 }
 
-function extractStoredString(value: unknown): string | null {
-  if (typeof value === "string") return value || null;
-  if (!value || typeof value !== "object") return null;
+const PERSISTENT_STORAGE_DB = "roster-native-calendar";
+const PERSISTENT_STORAGE_STORE = "values";
 
-  const response = value as Record<string, unknown>;
-  if (response.status && response.status !== "SUCCESS") return null;
-
-  for (const candidate of [response.value, response.data, response.storageValue]) {
-    if (typeof candidate === "string" && candidate) return candidate;
-    if (candidate && typeof candidate === "object") {
-      const nested = extractStoredString(candidate);
-      if (nested) return nested;
+function openPersistentStorage(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      reject(new Error("IndexedDB is unavailable"));
+      return;
     }
-  }
 
-  return null;
+    const request = window.indexedDB.open(PERSISTENT_STORAGE_DB, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(PERSISTENT_STORAGE_STORE)) {
+        request.result.createObjectStore(PERSISTENT_STORAGE_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Could not open persistent storage"));
+  });
+}
+
+async function readPersistentValue(key: string): Promise<string | null> {
+  const database = await openPersistentStorage();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(PERSISTENT_STORAGE_STORE, "readonly");
+    const request = transaction.objectStore(PERSISTENT_STORAGE_STORE).get(key);
+    request.onsuccess = () => {
+      database.close();
+      resolve(typeof request.result === "string" ? request.result : null);
+    };
+    request.onerror = () => {
+      database.close();
+      reject(request.error || new Error("Could not read persistent storage"));
+    };
+  });
+}
+
+async function writePersistentValue(key: string, value: string): Promise<void> {
+  const database = await openPersistentStorage();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(PERSISTENT_STORAGE_STORE, "readwrite");
+    transaction.objectStore(PERSISTENT_STORAGE_STORE).put(value, key);
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error || new Error("Could not write persistent storage"));
+    };
+  });
 }
 
 /**
- * Reads the selected calendar from native persistent storage, falling back to
- * localStorage for web builds and for migrating existing selections.
+ * Reads the selected calendar from persistent browser storage, falling back
+ * to localStorage for older builds and browsers without IndexedDB.
  */
 export async function loadSavedCalendarId(ownerKey?: string): Promise<string | null> {
   const localValue = getSavedCalendarId(ownerKey);
-  if (!isNativeCalendarAvailable()) return localValue;
 
   try {
-    const nativeValue = extractStoredString(
-      await withTimeout<unknown>((resolve) => {
-        nativeStorage.getStorageValue(storageKey(ownerKey, "selected"), resolve);
-      }, 5000),
-    );
-
-    if (nativeValue) {
+    const persistentValue = await readPersistentValue(storageKey(ownerKey, "selected"));
+    if (persistentValue) {
       try {
-        localStorage.setItem(storageKey(ownerKey, "selected"), nativeValue);
+        localStorage.setItem(storageKey(ownerKey, "selected"), persistentValue);
       } catch {
-        // Native storage remains the durable copy.
+        // IndexedDB remains the durable copy.
       }
-      return nativeValue;
+      return persistentValue;
     }
 
-    // Migrate a selection saved by an older webview-based build.
+    // Migrate a selection saved by an older localStorage-only build.
     if (localValue) {
-      nativeStorage.setStorageValue(storageKey(ownerKey, "selected"), localValue);
+      void writePersistentValue(storageKey(ownerKey, "selected"), localValue).catch(() => {
+        // localStorage remains the fallback copy.
+      });
     }
     return localValue;
   } catch {
@@ -481,16 +511,12 @@ export function saveCalendarId(ownerKey: string | undefined, calendarId: string)
   try {
     localStorage.setItem(storageKey(ownerKey, "selected"), calendarId);
   } catch {
-    // Native storage below remains the durable copy.
+    // IndexedDB below remains the durable copy.
   }
 
-  if (isNativeCalendarAvailable()) {
-    try {
-      nativeStorage.setStorageValue(storageKey(ownerKey, "selected"), calendarId);
-    } catch {
-      // The local copy still supports web and same-session use.
-    }
-  }
+  void writePersistentValue(storageKey(ownerKey, "selected"), calendarId).catch(() => {
+    // The local copy still supports web and same-session use.
+  });
 }
 
 export function getExportedEventKey(ownerKey: string | undefined, calendarId: string, sourceKey: string): string {
