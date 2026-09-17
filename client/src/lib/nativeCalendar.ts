@@ -511,7 +511,7 @@ function extractNativeEventId(data: unknown): string | undefined {
   if (typeof data === "string" && data.length > 0) return data;
   if (!data || typeof data !== "object") return undefined;
   const value = data as Record<string, unknown>;
-  for (const key of ["nativeEventId", "eventId", "calendarEventId", "id"]) {
+  for (const key of ["nativeEventId", "eventId", "calendarEventId"]) {
     if (typeof value[key] === "string" && value[key]) return value[key] as string;
   }
   return undefined;
