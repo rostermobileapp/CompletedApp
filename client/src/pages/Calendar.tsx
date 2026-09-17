@@ -14,6 +14,8 @@ import { Scrimmage, ScrimmageRequest, User } from "@shared/schema";
 import { useDashboardSelection } from "@/hooks/useDashboardSelection";
 import LocationLink from "@/components/LocationLink";
 import { parseScrimmageDateTime } from "@/lib/scrimmageDateTime";
+import NativeCalendarExportButton from "@/components/NativeCalendarExportButton";
+import { toNativeCalendarEvent } from "@/lib/nativeCalendar";
 
 export default function Calendar() {
   const { user } = useAuth();
@@ -132,6 +134,15 @@ export default function Calendar() {
 
   // Get active team's league (if a team is active)
   const activeTeamLeagueId = activeTeam?.leagueId;
+
+  const getNativeCalendarEvent = (event: any) => {
+    const calendarEvent = toNativeCalendarEvent({
+      ...event,
+      activeTeamId: activeTeam?.id,
+    });
+    if (!calendarEvent || calendarEvent.start.getTime() <= Date.now()) return null;
+    return calendarEvent;
+  };
 
   // Get user's relevant scrimmages (created + approved requests), filtered by selected team's league
   const userScrimmages = [
@@ -298,6 +309,10 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                      <NativeCalendarExportButton
+                        event={getNativeCalendarEvent(event)}
+                        ownerKey={user?.id}
+                      />
                       <ChevronRight 
                         className="w-8 h-8 text-primary"
                         data-testid={`icon-view-details-scrimmage-${event.id}`}
@@ -341,6 +356,10 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                      <NativeCalendarExportButton
+                        event={getNativeCalendarEvent(event)}
+                        ownerKey={user?.id}
+                      />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -392,6 +411,10 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                      <NativeCalendarExportButton
+                        event={getNativeCalendarEvent(event)}
+                        ownerKey={user?.id}
+                      />
                       <ChevronRight 
                         className="w-8 h-8 text-primary"
                         data-testid={`icon-view-details-substitute-${game.id}`}
@@ -435,6 +458,10 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                      <NativeCalendarExportButton
+                        event={getNativeCalendarEvent(event)}
+                        ownerKey={user?.id}
+                      />
                       <ChevronRight className="w-8 h-8 text-primary" />
                     </div>
                   </div>
@@ -510,6 +537,10 @@ export default function Calendar() {
                       </div>
                     )}
                   </div>
+                  <NativeCalendarExportButton
+                    event={getNativeCalendarEvent({ ...game, type: "game" })}
+                    ownerKey={user?.id}
+                  />
                   <ChevronRight 
                     className="w-8 h-8 text-primary"
                     data-testid={`icon-view-details-${game.id}`}

@@ -27,3 +27,4 @@
 - [Goalie stat fallback](goalie-stat-fallback.md) — completed games may lack game_goalies rows; calculate from scores and roster goalie assignments, including placeholder identities.
 - [Goalie stats trends](goalie-stats-trends.md) — league goalie views use the existing goals-against-per-game GAA convention and goalie game records.
 - [Team stats query isolation](team-stats-query-isolation.md) — team-specific stats queries need unique cache keys; league-wide and team-roster responses are not interchangeable.
+- [Native calendar export](native-calendar-export.md) — Natively supports explicit one-way event export, not editable two-way synchronization.
