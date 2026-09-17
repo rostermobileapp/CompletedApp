@@ -851,6 +851,20 @@ export const personalReminders = pgTable("personal_reminders", {
   index("idx_personal_reminders_scheduled_at").on(table.scheduledAt),
 ]);
 
+// A bearer token for a user's private calendar subscription feed. Store only
+// the hash so a database read cannot be used to reconstruct the subscription
+// URL. Regenerating a token revokes the previous one.
+export const calendarFeedTokens = pgTable("calendar_feed_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+}, (table) => [
+  index("idx_calendar_feed_tokens_user").on(table.userId),
+  index("idx_calendar_feed_tokens_hash").on(table.tokenHash),
+]);
+
 // Game score submissions table
 export const gameScoreSubmissions = pgTable("game_score_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

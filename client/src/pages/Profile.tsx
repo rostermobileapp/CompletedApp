@@ -15,12 +15,14 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { NotificationPreferencesModal } from '@/components/NotificationPreferencesModal';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Copy, Download, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HPIBBanner } from '@/components/HPIBBanner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { NativeCalendarInfo, NativeCalendarError, getCalendarErrorMessage, getSavedCalendarId, isNativeCalendarAvailable, retrieveDeviceCalendars, saveCalendarId } from '@/lib/nativeCalendar';
 
 const TIMEZONE_OPTIONS = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -80,6 +82,12 @@ export default function Profile() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>('');
   const [teamJoinLeagueMessage, setTeamJoinLeagueMessage] = useState('');
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
+  const [showCalendarSync, setShowCalendarSync] = useState(false);
+  const [calendarFeedUrl, setCalendarFeedUrl] = useState<string | null>(null);
+  const [nativeCalendarAvailable, setNativeCalendarAvailable] = useState(false);
+  const [nativeCalendars, setNativeCalendars] = useState<NativeCalendarInfo[]>([]);
+  const [selectedNativeCalendarId, setSelectedNativeCalendarId] = useState<string | null>(null);
+  const [isLoadingNativeCalendars, setIsLoadingNativeCalendars] = useState(false);
   const [teamJerseyNumbers, setTeamJerseyNumbers] = useState<Record<string, string>>({});
   const isDesktopWeb = useIsDesktopWeb();
 
@@ -92,6 +100,96 @@ export default function Profile() {
     queryKey: ['/api/user'],
     enabled: !!supabaseUser,
   });
+
+  const { data: calendarFeedSettings, isLoading: isLoadingCalendarFeed } = useQuery<{
+    active: boolean;
+    createdAt: string | null;
+  }>({
+    queryKey: ['/api/user/calendar-feed'],
+    enabled: !!supabaseUser,
+  });
+
+  const generateCalendarFeedMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/user/calendar-feed');
+      return response.json() as Promise<{ url: string }>;
+    },
+    onSuccess: ({ url }) => {
+      setCalendarFeedUrl(url);
+      queryClient.invalidateQueries({ queryKey: ['/api/user/calendar-feed'] });
+      toast({
+        title: 'Calendar link ready',
+        description: 'Use this private link to subscribe from a web calendar app.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not create calendar link',
+        description: error.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const revokeCalendarFeedMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', '/api/user/calendar-feed');
+    },
+    onSuccess: () => {
+      setCalendarFeedUrl(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/user/calendar-feed'] });
+      toast({ title: 'Calendar link revoked' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not revoke calendar link',
+        description: error.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!showCalendarSync) return;
+    const available = isNativeCalendarAvailable();
+    setNativeCalendarAvailable(available);
+    setSelectedNativeCalendarId(available && (user as any)?.id ? getSavedCalendarId((user as any).id) : null);
+  }, [showCalendarSync, (user as any)?.id]);
+
+  const loadNativeCalendars = async () => {
+    setIsLoadingNativeCalendars(true);
+    try {
+      const calendars = await retrieveDeviceCalendars();
+      setNativeCalendars(calendars);
+      const savedId = getSavedCalendarId((user as any)?.id);
+      setSelectedNativeCalendarId(savedId);
+    } catch (error: any) {
+      const message = error instanceof NativeCalendarError
+        ? error.message
+        : getCalendarErrorMessage(error?.error);
+      toast({
+        title: 'Device calendar unavailable',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingNativeCalendars(false);
+    }
+  };
+
+  const copyCalendarFeedUrl = async () => {
+    if (!calendarFeedUrl) return;
+    try {
+      await navigator.clipboard.writeText(calendarFeedUrl);
+      toast({ title: 'Calendar link copied' });
+    } catch {
+      toast({
+        title: 'Could not copy link',
+        description: 'Select and copy the link manually.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Fetch approved referral partners for the dropdown
   const { data: approvedPartners = [] } = useQuery<{ id: string; orgName: string; referralCode?: string }[]>({
@@ -443,6 +541,11 @@ export default function Profile() {
       icon: Bell,
       label: 'Notifications',
       action: () => setShowNotificationPreferences(true),
+    },
+    {
+      icon: Calendar,
+      label: 'Calendar Sync',
+      action: () => setShowCalendarSync(true),
     },
     {
       icon: Shield,
@@ -1182,8 +1285,165 @@ export default function Profile() {
               <div className="w-4 h-4 text-muted-foreground">→</div>
             </button>
           ))}
-          
-          {/* Delete Profile */}
+
+           <Dialog open={showCalendarSync} onOpenChange={setShowCalendarSync}>
+             <DialogContent className="w-[calc(100vw-2rem)] max-w-[520px]" data-testid="dialog-calendar-sync">
+               <DialogHeader>
+                 <DialogTitle>Calendar Sync</DialogTitle>
+                 <DialogDescription>
+                   Keep Roster events available on your device or in a web calendar. Roster remains the source of truth.
+                 </DialogDescription>
+               </DialogHeader>
+
+               <div className="space-y-5">
+                 <section className="rounded-lg border border-border p-4 space-y-3">
+                   <div className="flex items-start gap-3">
+                     <Smartphone className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                     <div className="min-w-0">
+                       <h3 className="font-semibold">Native device calendar</h3>
+                       <p className="text-sm text-muted-foreground">
+                         Add individual Roster events to a calendar on this device. This is a one-way export; changes are managed in Roster.
+                       </p>
+                     </div>
+                   </div>
+                   {nativeCalendarAvailable ? (
+                     <>
+                       <p className="text-sm">
+                         Selected calendar:{' '}
+                         <span className="font-medium">
+                           {nativeCalendars.find((calendar) => calendar.id === selectedNativeCalendarId)?.name ||
+                             (selectedNativeCalendarId ? 'Saved device calendar' : 'None selected')}
+                         </span>
+                       </p>
+                       <button
+                         type="button"
+                         onClick={loadNativeCalendars}
+                         disabled={isLoadingNativeCalendars}
+                         className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+                         data-testid="button-choose-native-calendar"
+                       >
+                         {isLoadingNativeCalendars && <Loader2 className="h-4 w-4 animate-spin" />}
+                         Choose device calendar
+                       </button>
+                       {nativeCalendars.length > 0 && (
+                         <div className="space-y-1" role="radiogroup" aria-label="Device calendars">
+                           {nativeCalendars.map((calendar) => (
+                             <button
+                               key={calendar.id}
+                               type="button"
+                               role="radio"
+                               aria-checked={selectedNativeCalendarId === calendar.id}
+                               onClick={() => {
+                                 setSelectedNativeCalendarId(calendar.id);
+                                 if ((user as any)?.id) saveCalendarId((user as any).id, calendar.id);
+                               }}
+                               className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                                 selectedNativeCalendarId === calendar.id
+                                   ? 'border-primary bg-primary/10'
+                                   : 'border-border hover:bg-muted'
+                               }`}
+                               data-testid={`button-select-profile-native-calendar-${calendar.id}`}
+                             >
+                               {calendar.name}
+                             </button>
+                           ))}
+                         </div>
+                       )}
+                     </>
+                   ) : (
+                     <p className="text-sm text-muted-foreground">
+                       Device calendar controls are available in the Roster mobile app. Use the web options below in a browser.
+                     </p>
+                   )}
+                 </section>
+
+                 <section className="rounded-lg border border-border p-4 space-y-3">
+                   <div className="flex items-start gap-3">
+                     <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                     <div className="min-w-0">
+                       <h3 className="font-semibold">Web calendar</h3>
+                       <p className="text-sm text-muted-foreground">
+                         Subscribe with a private link, or download an iCalendar file for a one-time import. The feed includes games, scrimmages, substitute games, reminders, and team events.
+                       </p>
+                     </div>
+                   </div>
+
+                   {calendarFeedUrl ? (
+                     <div className="space-y-2">
+                       <label htmlFor="calendar-feed-url" className="text-sm font-medium">Private subscription link</label>
+                       <div className="flex gap-2">
+                         <input
+                           id="calendar-feed-url"
+                           readOnly
+                           value={calendarFeedUrl}
+                           className="min-w-0 flex-1 rounded-md border border-border bg-muted px-3 py-2 text-xs"
+                           data-testid="input-calendar-feed-url"
+                         />
+                         <button
+                           type="button"
+                           onClick={copyCalendarFeedUrl}
+                           className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+                           data-testid="button-copy-calendar-feed"
+                         >
+                           <Copy className="h-4 w-4" />
+                           <span className="hidden sm:inline">Copy</span>
+                         </button>
+                       </div>
+                       <a
+                         href={`${calendarFeedUrl}?download=1`}
+                         className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                         data-testid="link-download-calendar-ics"
+                       >
+                         <Download className="h-4 w-4" />
+                         Download .ics file
+                       </a>
+                     </div>
+                   ) : (
+                     <p className="text-sm text-muted-foreground">
+                       {isLoadingCalendarFeed
+                         ? 'Checking your calendar link...'
+                         : calendarFeedSettings?.active
+                           ? 'A private link is active. Generate a new link to copy it here; the previous link will be revoked.'
+                           : 'No private calendar link is active yet.'}
+                     </p>
+                   )}
+
+                   <div className="flex flex-wrap gap-2">
+                     <button
+                       type="button"
+                       onClick={() => generateCalendarFeedMutation.mutate()}
+                       disabled={generateCalendarFeedMutation.isPending}
+                       className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                       data-testid="button-generate-calendar-feed"
+                     >
+                       {generateCalendarFeedMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                       {calendarFeedSettings?.active ? 'Regenerate private link' : 'Create private link'}
+                     </button>
+                     {calendarFeedSettings?.active && (
+                       <button
+                         type="button"
+                         onClick={() => {
+                           if (window.confirm('Revoke the private calendar link? Calendar apps using it will stop receiving updates.')) {
+                             revokeCalendarFeedMutation.mutate();
+                           }
+                         }}
+                         disabled={revokeCalendarFeedMutation.isPending}
+                         className="rounded-md border border-destructive px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                         data-testid="button-revoke-calendar-feed"
+                       >
+                         Revoke link
+                       </button>
+                     )}
+                   </div>
+                   <p className="text-xs text-muted-foreground">
+                     Treat the private link like a password. Anyone who has it can view your Roster schedule.
+                   </p>
+                 </section>
+               </div>
+             </DialogContent>
+           </Dialog>
+
+           {/* Delete Profile */}
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <AlertDialogTrigger asChild>
               <button

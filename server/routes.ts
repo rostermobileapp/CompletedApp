@@ -34,13 +34,14 @@ import {
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { gamePenalties } from "@shared/schema";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, ne, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 import { format, addDays, addWeeks } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, hasLeagueLocalDateTimeStarted, parseLeagueLocalDateTime } from "./dateUtils";
 import {
   insertLeagueSchema,
@@ -106,6 +107,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash, randomBytes } from 'crypto';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail, sendNewDirectMessageEmail } from "./emails";
@@ -570,6 +572,284 @@ function formatGameForResponse(game: any) {
   return game;
 }
 
+type CalendarFeedEvent = {
+  uid: string;
+  title: string;
+  start: string;
+  end: string;
+  timezone: string;
+  description?: string;
+  location?: string;
+  allDay?: boolean;
+};
+
+function calendarLocalDateTime(value: unknown, timezone: string): string | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(" ", "T");
+    if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) {
+      return normalized.slice(0, 19);
+    }
+  }
+
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return formatInTimeZone(date, timezone || "UTC", "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+function addCalendarHours(value: string, hours: number): string {
+  const date = new Date(`${value.slice(0, 19)}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Date(date.getTime() + hours * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19);
+}
+
+function calendarDateOnly(value: string): string {
+  return value.slice(0, 10);
+}
+
+function addCalendarDays(value: string, days: number): string {
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+async function getCalendarFeedEvents(userId: string): Promise<CalendarFeedEvent[]> {
+  const [
+    allGames,
+    createdScrimmages,
+    scrimmageRequests,
+    substituteRequests,
+    personalReminders,
+    directMemberships,
+    leagueAssignments,
+    user,
+  ] = await Promise.all([
+    storage.getAllUserGames(userId),
+    storage.getUserScrimmages(userId),
+    storage.getScrimmageRequestsByPlayer(userId),
+    storage.getSubstituteRequests({ status: "approved", userId }),
+    storage.getUserPersonalReminders(userId),
+    db.select({ teamId: teamMemberships.teamId })
+      .from(teamMemberships)
+      .where(and(eq(teamMemberships.userId, userId), eq(teamMemberships.status, "approved"))),
+    db.select({ teamId: leagueMemberships.assignedTeamId })
+      .from(leagueMemberships)
+      .where(and(
+        eq(leagueMemberships.userId, userId),
+        eq(leagueMemberships.status, "approved"),
+        isNotNull(leagueMemberships.assignedTeamId),
+      )),
+    storage.getUser(userId),
+  ]);
+
+  const userTimezone = user?.timezone || "America/New_York";
+  const leagueTimezoneCache = new Map<string, string>();
+  const getLeagueTimezone = async (leagueId?: string | null) => {
+    if (!leagueId) return userTimezone;
+    const cached = leagueTimezoneCache.get(leagueId);
+    if (cached) return cached;
+    const league = await storage.getLeague(leagueId);
+    const timezone = league?.timezone || userTimezone;
+    leagueTimezoneCache.set(leagueId, timezone);
+    return timezone;
+  };
+
+  const events: CalendarFeedEvent[] = [];
+  for (const rawGame of allGames) {
+    const game = formatGameForResponse(rawGame);
+    const timezone = await getLeagueTimezone(game.leagueId);
+    const start = calendarLocalDateTime(game.scheduledAt, timezone);
+    if (!start) continue;
+    const homeName = game.homeTeam?.name;
+    const awayName = game.awayTeam?.name || game.opponentName;
+    const matchup = homeName && awayName
+      ? `${homeName} vs ${awayName}`
+      : awayName || homeName || "Roster game";
+    events.push({
+      uid: `game:${game.id}@rosterhockey.com`,
+      title: game.isSubstitute ? `Subbing: ${matchup}` : `Game: ${matchup}`,
+      start,
+      end: addCalendarHours(start, 2),
+      timezone,
+      location: game.venue || undefined,
+      description: game.lockerRoom ? `Locker room: ${game.lockerRoom}` : undefined,
+    });
+  }
+
+  const scrimmages = new Map<string, any>();
+  for (const scrimmage of createdScrimmages) {
+    scrimmages.set(scrimmage.id, scrimmage);
+  }
+  for (const request of scrimmageRequests) {
+    if (request.status === "approved" && request.scrimmage) {
+      scrimmages.set(request.scrimmage.id, {
+        ...request.scrimmage,
+        teamAssignment: request.teamAssignment ?? null,
+      });
+    }
+  }
+  for (const scrimmage of scrimmages.values()) {
+    const timezone = scrimmage.timezone || await getLeagueTimezone(scrimmage.leagueId);
+    const start = calendarLocalDateTime(scrimmage.dateTime, timezone);
+    if (!start) continue;
+    const description = [
+      scrimmage.notes,
+      scrimmage.teamAssignment
+        ? `Assigned team: ${scrimmage.teamAssignment === "light" ? "Light" : "Dark"}`
+        : null,
+    ].filter(Boolean).join("\n") || undefined;
+    if (scrimmage.timeTbd) {
+      const date = calendarDateOnly(start);
+      events.push({
+        uid: `scrimmage:${scrimmage.id}@rosterhockey.com`,
+        title: scrimmage.title || "Roster scrimmage",
+        start: date,
+        end: addCalendarDays(date, 1),
+        timezone,
+        location: scrimmage.location || undefined,
+        description,
+        allDay: true,
+      });
+    } else {
+      events.push({
+        uid: `scrimmage:${scrimmage.id}@rosterhockey.com`,
+        title: scrimmage.title || "Roster scrimmage",
+        start,
+        end: addCalendarHours(start, 2),
+        timezone,
+        location: scrimmage.location || undefined,
+        description,
+      });
+    }
+  }
+
+  const substituteGameIds = new Set<string>();
+  for (const request of substituteRequests) {
+    if (request.substitutePlayerId !== userId || !request.game || substituteGameIds.has(request.game.id)) continue;
+    substituteGameIds.add(request.game.id);
+    const game = formatGameForResponse(request.game);
+    const timezone = await getLeagueTimezone(game.leagueId);
+    const start = calendarLocalDateTime(game.scheduledAt, timezone);
+    if (!start) continue;
+    const homeName = game.homeTeam?.name;
+    const awayName = game.awayTeam?.name || game.opponentName;
+    const matchup = homeName && awayName ? `${homeName} vs ${awayName}` : awayName || homeName || "Roster game";
+    events.push({
+      uid: `substitute:${game.id}@rosterhockey.com`,
+      title: `Subbing: ${matchup}`,
+      start,
+      end: addCalendarHours(start, 2),
+      timezone,
+      location: game.venue || undefined,
+    });
+  }
+
+  for (const reminder of personalReminders) {
+    const start = calendarLocalDateTime(reminder.scheduledAt, userTimezone);
+    if (!start) continue;
+    events.push({
+      uid: `reminder:${reminder.id}@rosterhockey.com`,
+      title: reminder.title,
+      start,
+      end: addCalendarHours(start, 1),
+      timezone: userTimezone,
+      description: reminder.description || undefined,
+    });
+  }
+
+  const memberTeamIds = Array.from(new Set([
+    ...directMemberships.map((membership: any) => membership.teamId),
+    ...leagueAssignments.map((membership: any) => membership.teamId).filter(Boolean),
+  ]));
+  if (memberTeamIds.length > 0) {
+    const teamEventsForUser = await db
+      .select({
+        id: teamEvents.id,
+        title: teamEvents.title,
+        description: teamEvents.description,
+        scheduledAt: teamEvents.scheduledAt,
+        endTime: teamEvents.endTime,
+        location: teamEvents.location,
+        opponentName: teamEvents.opponentName,
+        teamName: teams.name,
+      })
+      .from(teamEvents)
+      .innerJoin(teams, eq(teamEvents.teamId, teams.id))
+      .where(inArray(teamEvents.teamId, memberTeamIds));
+    for (const event of teamEventsForUser) {
+      const start = calendarLocalDateTime(event.scheduledAt, userTimezone);
+      if (!start) continue;
+      const end = event.endTime
+        ? calendarLocalDateTime(event.endTime, userTimezone) || addCalendarHours(start, 1)
+        : addCalendarHours(start, 1);
+      events.push({
+        uid: `team-event:${event.id}@rosterhockey.com`,
+        title: event.opponentName ? `${event.title} vs ${event.opponentName}` : event.title,
+        start,
+        end,
+        timezone: userTimezone,
+        location: event.location || undefined,
+        description: [event.teamName, event.description].filter(Boolean).join("\n") || undefined,
+      });
+    }
+  }
+
+  return events.sort((a, b) => a.start.localeCompare(b.start));
+}
+
+function escapeIcsText(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/([,;])/g, "\\$1").replace(/\r?\n/g, "\\n");
+}
+
+function icsDateTime(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 14);
+}
+
+function buildCalendarFeed(events: CalendarFeedEvent[]): string {
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Roster Hockey//Calendar Sync//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "X-WR-CALNAME:Roster Schedule",
+  ];
+  for (const event of events) {
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${event.uid}`);
+    lines.push(`DTSTAMP:${icsDateTime(new Date().toISOString())}Z`);
+    if (event.allDay) {
+      lines.push(`DTSTART;VALUE=DATE:${event.start.replace(/-/g, "")}`);
+      lines.push(`DTEND;VALUE=DATE:${event.end.replace(/-/g, "")}`);
+    } else {
+      const timezone = event.timezone.replace(/[^A-Za-z0-9_+./-]/g, "");
+      lines.push(`DTSTART;TZID=${timezone}:${icsDateTime(event.start)}`);
+      lines.push(`DTEND;TZID=${timezone}:${icsDateTime(event.end)}`);
+    }
+    lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
+    if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+    if (event.location) lines.push(`LOCATION:${escapeIcsText(event.location)}`);
+    lines.push("END:VEVENT");
+  }
+  lines.push("END:VCALENDAR");
+  return `${lines.join("\r\n")}\r\n`;
+}
+
+function calendarFeedBaseUrl(req: Request): string {
+  const configuredUrl = process.env.FRONTEND_URL?.split(",")[0]?.trim().replace(/\/+$/, "");
+  if (configuredUrl) return configuredUrl;
+  const protocol = req.get("x-forwarded-proto")?.split(",")[0]?.trim() || req.protocol;
+  return `${protocol}://${req.get("host")}`;
+}
+
+function hashCalendarFeedToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 // Helper function to check if user has scorekeeper permission
 async function checkScorekeeperPermission(userId: string, game: { leagueId?: string | null }): Promise<boolean> {
   // If no league, only the user's own stats can be managed
@@ -794,6 +1074,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[Init] game_attendance table ensured');
   } catch (err) {
     console.error('[Init] Failed to ensure game_attendance table:', err);
+    throw err;
+  }
+
+  // Private calendar subscription feeds store only a SHA-256 token hash. The
+  // runtime DDL keeps older deployments compatible with the Drizzle schema.
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS calendar_feed_tokens (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        token_hash varchar(64) NOT NULL UNIQUE,
+        created_at timestamp DEFAULT NOW() NOT NULL,
+        revoked_at timestamp
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_calendar_feed_tokens_user
+        ON calendar_feed_tokens(user_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_calendar_feed_tokens_hash
+        ON calendar_feed_tokens(token_hash)
+    `);
+    console.log('[Init] calendar_feed_tokens table ensured');
+  } catch (err) {
+    console.error('[Init] Failed to ensure calendar_feed_tokens table:', err);
     throw err;
   }
 
@@ -8419,6 +8725,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching all user games:", error);
       res.status(500).json({ message: "Failed to fetch all user games" });
+    }
+  });
+
+  // Public-by-token calendar feed. Calendar apps cannot send a Roster session
+  // cookie or Supabase bearer token, so the URL itself is the revocable
+  // credential. Only the token hash is stored.
+  app.get("/api/calendar-feed/:token", async (req, res) => {
+    try {
+      const token = String(req.params.token || "");
+      if (!/^[a-f0-9]{64}$/i.test(token)) {
+        return res.status(404).send("Calendar feed not found");
+      }
+
+      const [feedToken] = await db
+        .select({ userId: calendarFeedTokens.userId })
+        .from(calendarFeedTokens)
+        .where(and(
+          eq(calendarFeedTokens.tokenHash, hashCalendarFeedToken(token)),
+          isNull(calendarFeedTokens.revokedAt),
+        ))
+        .limit(1);
+      if (!feedToken) {
+        return res.status(404).send("Calendar feed not found");
+      }
+
+      const events = await getCalendarFeedEvents(feedToken.userId);
+      res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      if (req.query.download === "1") {
+        res.setHeader("Content-Disposition", 'attachment; filename="roster-calendar.ics"');
+      }
+      return res.send(buildCalendarFeed(events));
+    } catch (error) {
+      console.error("Error generating calendar feed:", error);
+      return res.status(500).send("Calendar feed unavailable");
+    }
+  });
+
+  app.get("/api/user/calendar-feed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [activeToken] = await db
+        .select({ createdAt: calendarFeedTokens.createdAt })
+        .from(calendarFeedTokens)
+        .where(and(
+          eq(calendarFeedTokens.userId, userId),
+          isNull(calendarFeedTokens.revokedAt),
+        ))
+        .limit(1);
+      return res.json({
+        active: !!activeToken,
+        createdAt: activeToken?.createdAt ?? null,
+      });
+    } catch (error) {
+      console.error("Error fetching calendar feed settings:", error);
+      return res.status(500).json({ message: "Failed to fetch calendar feed settings" });
+    }
+  });
+
+  app.post("/api/user/calendar-feed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rawToken = randomBytes(32).toString("hex");
+      const tokenHash = hashCalendarFeedToken(rawToken);
+
+      await db.transaction(async (tx) => {
+        const [existingToken] = await tx
+          .update(calendarFeedTokens)
+          .set({
+            tokenHash,
+            createdAt: new Date(),
+            revokedAt: null,
+          })
+          .where(eq(calendarFeedTokens.userId, userId))
+          .returning({ id: calendarFeedTokens.id });
+        if (!existingToken) {
+          await tx.insert(calendarFeedTokens).values({ userId, tokenHash });
+        }
+      });
+
+      return res.status(201).json({
+        url: `${calendarFeedBaseUrl(req)}/api/calendar-feed/${rawToken}`,
+      });
+    } catch (error) {
+      console.error("Error generating calendar feed token:", error);
+      return res.status(500).json({ message: "Failed to generate calendar feed link" });
+    }
+  });
+
+  app.delete("/api/user/calendar-feed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await db
+        .update(calendarFeedTokens)
+        .set({ revokedAt: new Date() })
+        .where(and(
+          eq(calendarFeedTokens.userId, userId),
+          isNull(calendarFeedTokens.revokedAt),
+        ));
+      return res.status(204).send();
+    } catch (error) {
+      console.error("Error revoking calendar feed token:", error);
+      return res.status(500).json({ message: "Failed to revoke calendar feed link" });
     }
   });
 
