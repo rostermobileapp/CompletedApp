@@ -1228,7 +1228,7 @@ export default function Profile() {
                <DialogHeader>
                  <DialogTitle>Calendar Sync</DialogTitle>
                  <DialogDescription>
-                   Keep Roster events available on your device or in a web calendar. Roster remains the source of truth.
+                    Add Roster events to your device calendar. Roster remains the source of truth.
                  </DialogDescription>
                </DialogHeader>
 
@@ -1289,7 +1289,7 @@ export default function Profile() {
                      </>
                    ) : (
                      <p className="text-sm text-muted-foreground">
-                       Device calendar controls are available in the Roster mobile app. Use the web options below in a browser.
+                        Device calendar controls are available in the Roster mobile app.
                      </p>
                    )}
                  </section>
