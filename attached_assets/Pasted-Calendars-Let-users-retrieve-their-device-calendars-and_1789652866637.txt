@@ -1,0 +1,173 @@
+Calendars
+Let users retrieve their device calendars and create new calendar events, directly from your app.
+
+What is Calendars?
+The Calendars feature gives your app access to the device's native calendars, letting users retrieve their existing calendars or create new events without leaving the app. This is useful for features like adding a booking confirmation, an appointment, or a reminder directly to the user's calendar.
+
+Accessing calendars requires the user to grant permission the first time the feature is used, on both iOS and Android.
+
+Prerequisites
+This feature requires any paid plan. See all plans
+
+Contacts feature is already enabled in the Natively Dashboard.
+
+Natively Dashboard Setup
+Make sure Contacts is already enabled; Calendars can't be enabled otherwise.
+
+Open your Natively app dashboard and navigate to Features > Calendars.
+
+Toggle the feature to Enabled.
+
+Enter the Permission Description.
+
+Click Save.
+
+Rebuild your app(s).
+
+The Permission Description is the text shown to users when the OS asks them to grant calendar access. Explain clearly why your app needs this permission - for example: "We use your calendar to let you save appointments directly to your device".
+
+You must rebuild your app for these changes to take effect.
+
+Implementation
+Choose your integration method below: Bubble.io Plugin (No-Code), JavaScript SDK (Code), or AI Agents (for AI-powered editors like Lovable, Base44, and Replit).
+
+Initialization
+
+Bubble.io Plugin
+
+JavaScript SDK
+
+Check SDK
+
+Before writing any logic, ensure the Natively SDK is correctly installed and up-to-date in your codebase.
+
+Open your project's main HTML file (or header settings) and look for the Natively script tag inside the <head> section.
+
+Install/Update: If missing or outdated, add the following code. You can specify the SDK version in the URL (e.g., @2.26.0).
+
+
+Copy
+<head>
+  <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/natively@2.26.0/natively-frontend.min.js"></script>
+</head>
+To ensure you are using the most up-to-date version, check the Natively GitHub releases page for the latest version number.
+
+Setup Logic
+
+Bubble.io Plugin
+
+JavaScript SDK
+
+
+Copy
+// ============================================================================
+// NATIVELY CALENDARS - DOCUMENTATION & EXAMPLES
+// ============================================================================
+
+const calendar = new NativelyCalendar();
+
+// ============================================================================
+// ALL AVAILABLE METHODS
+// ============================================================================
+// calendar.retrieveCalendars(callback)
+//   - Retrieves all calendars available on the device.
+//
+// calendar.createCalendarEvent(title, endDate, startDate, timezone, calendarId, description, callback)
+//   - Creates a new event in the specified calendar.
+//   - title: string
+//   - endDate: Date — a JavaScript Date object, not a string
+//   - startDate: Date — a JavaScript Date object, not a string
+//   - timezone: string
+//   - calendarId: string
+//   - description: string
+
+// ============================================================================
+// CALLBACK RESPONSE FIELDS - retrieveCalendars
+// ============================================================================
+// resp.status: string — "SUCCESS" or "FAILED"
+// resp.data: object — a map of calendar ID to calendar name,
+//            e.g. { "1": "My calendar", "42": "email@address.com" }
+// resp.error: string — error message, if any. Possible values:
+//   - "no_available_calendars" — the user has no available calendars
+//   - "cannot_retrieve_calendars" — something went wrong on the app side
+//   - "calendar_permission_missing" — permission not granted
+
+// ============================================================================
+// CALLBACK RESPONSE FIELDS - createCalendarEvent
+// ============================================================================
+// resp.status: string — "SUCCESS" or "FAILED"
+// resp.data.id: string — the calendar ID where the event was created
+// resp.data.title: string — the event title
+// resp.data.end: string — the event end date, in ISO 8601 format
+// resp.data.start: string — the event start date, in ISO 8601 format
+// resp.error: string — error message, if any. Possible values:
+//   - "add_calendar_event_failure" — something went wrong on the app side
+//   - "start_date_missing"
+//   - "end_date_missing"
+//   - "timezone_missing"
+//   - "calendar_permission_missing" — permission not granted
+
+// --- Calendars. Retrieve Calendars Example. Start ---
+
+const retrieve_calendars_callback = function (resp) {
+  if (resp.status === "FAILED") {
+    console.log("Error:", resp.error); // e.g. "no_available_calendars", "calendar_permission_missing"
+    return;
+  }
+
+  // resp.data is an object mapping calendar ID to calendar name
+  // e.g. { "1": "My calendar", "42": "email@address.com" }
+  for (const [calendarId, calendarName] of Object.entries(resp.data)) {
+    console.log(calendarId, calendarName);
+  }
+};
+
+calendar.retrieveCalendars(retrieve_calendars_callback);
+
+// --- Calendars. Retrieve Calendars Example. End ---
+
+
+// --- Calendars. Create Calendar Event Example. Start ---
+
+const title = "Team Meeting";
+const startDate = new Date("2025-07-10T14:00:00.000Z");
+const endDate = new Date("2025-07-10T15:00:00.000Z");
+const timezone = "Africa/Abidjan";
+const calendarId = "calendar_id";
+const description = "Event notes";
+
+const create_calendar_event_callback = function (resp) {
+  if (resp.status === "FAILED") {
+    console.log("Error:", resp.error); // e.g. "start_date_missing", "timezone_missing"
+    return;
+  }
+
+  console.log(resp.data.id);     // calendar ID
+  console.log(resp.data.title);  // event title
+  console.log(resp.data.end);    // event end date, ISO 8601
+  console.log(resp.data.start);  // event start date, ISO 8601
+};
+
+calendar.createCalendarEvent(
+  title,
+  endDate,
+  startDate,
+  timezone,
+  calendarId,
+  description,
+  create_calendar_event_callback
+);
+
+// --- Calendars. Create Calendar Event Example. End ---
+How to use
+Check resp.status before using the result
+Both retrieveCalendars and createCalendarEvent return a status field - always confirm it's "SUCCESS" before reading resp.data, and check resp.error when it's "FAILED" to handle the specific failure case.
+
+Let the user pick a calendar before creating an event
+Since a device may have multiple calendars, use retrieveCalendars first to show the user their available calendars (from the ID > name map), then pass the selected calendar's ID into createCalendarEvent.
+
+Always construct real Date objects
+endDate and startDate must be JavaScript Date instances, not date strings - pass a string and the method will throw. Use new Date(...) to construct them from your app's date data before calling createCalendarEvent.
+
+Use this to confirm bookings or appointments
+A common use case is adding a calendar event right after a booking or appointment is confirmed in your app, so the user doesn't have to manually add it themselves.
