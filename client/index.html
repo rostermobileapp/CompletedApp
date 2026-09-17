@@ -4,16 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     
-    <!-- Natively.io SDK - CDN provides window.natively bridge for native app -->
+    <!-- Natively SDK - CDN provides window.natively bridge for native app -->
     <script>
       window.nativelyLoaded = false;
       function nativelyOnLoad() {
         window.nativelyLoaded = true;
-        if (window.natively) window.natively.setDebug(true);
-        console.log('[Natively] CDN script loaded');
+        window.natively.setDebug(true);
+        console.log("✅ Natively SDK loaded successfully.");
       }
     </script>
-    <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/natively@3.1.3/natively-frontend.min.js"></script>
+    <script async onload="nativelyOnLoad()" src="https://cdn.jsdelivr.net/npm/natively@2.26.0/natively-frontend.min.js"></script>
     
     <!-- OneSignal Web SDK for Push Notifications (browser fallback) -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
