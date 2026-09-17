@@ -86,6 +86,7 @@ export default function Profile() {
   const [nativeCalendarAvailable, setNativeCalendarAvailable] = useState(false);
   const [nativeCalendars, setNativeCalendars] = useState<NativeCalendarInfo[]>([]);
   const [selectedNativeCalendarId, setSelectedNativeCalendarId] = useState<string | null>(null);
+  const [savedNativeCalendarId, setSavedNativeCalendarId] = useState<string | null>(null);
   const [isLoadingNativeCalendars, setIsLoadingNativeCalendars] = useState(false);
   const [teamJerseyNumbers, setTeamJerseyNumbers] = useState<Record<string, string>>({});
   const isDesktopWeb = useIsDesktopWeb();
@@ -104,7 +105,9 @@ export default function Profile() {
     if (!showCalendarSync) return;
     const available = isNativeCalendarAvailable();
     setNativeCalendarAvailable(available);
-    setSelectedNativeCalendarId(available && (user as any)?.id ? getSavedCalendarId((user as any).id) : null);
+    const savedId = available && (user as any)?.id ? getSavedCalendarId((user as any).id) : null;
+    setSelectedNativeCalendarId(savedId);
+    setSavedNativeCalendarId(savedId);
   }, [showCalendarSync, (user as any)?.id]);
 
   const loadNativeCalendars = async () => {
@@ -114,6 +117,7 @@ export default function Profile() {
       setNativeCalendars(calendars);
       const savedId = getSavedCalendarId((user as any)?.id);
       setSelectedNativeCalendarId(savedId);
+      setSavedNativeCalendarId(savedId);
     } catch (error: any) {
       const message = error instanceof NativeCalendarError
         ? error.message
@@ -1263,28 +1267,49 @@ export default function Profile() {
                          Choose device calendar
                        </button>
                        {nativeCalendars.length > 0 && (
-                         <div className="space-y-1" role="radiogroup" aria-label="Device calendars">
-                           {nativeCalendars.map((calendar) => (
-                             <button
-                               key={calendar.id}
-                               type="button"
-                               role="radio"
-                               aria-checked={selectedNativeCalendarId === calendar.id}
-                               onClick={() => {
-                                 setSelectedNativeCalendarId(calendar.id);
-                                 if ((user as any)?.id) saveCalendarId((user as any).id, calendar.id);
-                               }}
-                               className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
-                                 selectedNativeCalendarId === calendar.id
-                                   ? 'border-primary bg-primary/10'
-                                   : 'border-border hover:bg-muted'
-                               }`}
-                               data-testid={`button-select-profile-native-calendar-${calendar.id}`}
-                             >
-                               {calendar.name}
-                             </button>
-                           ))}
-                         </div>
+                          <>
+                            <div className="space-y-1" role="radiogroup" aria-label="Device calendars">
+                              {nativeCalendars.map((calendar) => (
+                                <button
+                                  key={calendar.id}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={selectedNativeCalendarId === calendar.id}
+                                  onClick={() => setSelectedNativeCalendarId(calendar.id)}
+                                  className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                                    selectedNativeCalendarId === calendar.id
+                                      ? 'border-primary bg-primary/10'
+                                      : 'border-border hover:bg-muted'
+                                  }`}
+                                  data-testid={`button-select-profile-native-calendar-${calendar.id}`}
+                                >
+                                  {calendar.name}
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedNativeCalendarId || !(user as any)?.id) return;
+                                saveCalendarId((user as any).id, selectedNativeCalendarId);
+                                setSavedNativeCalendarId(selectedNativeCalendarId);
+                                toast({
+                                  title: 'Device calendar selected',
+                                  description: 'Use Add to calendar on a Roster schedule event to export it here.',
+                                });
+                              }}
+                              disabled={
+                                !selectedNativeCalendarId ||
+                                selectedNativeCalendarId === savedNativeCalendarId
+                              }
+                              className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                              data-testid="button-use-profile-native-calendar"
+                            >
+                              {selectedNativeCalendarId === savedNativeCalendarId
+                                ? 'Calendar selected'
+                                : 'Use this calendar'}
+                            </button>
+                          </>
                        )}
                      </>
                    ) : (
