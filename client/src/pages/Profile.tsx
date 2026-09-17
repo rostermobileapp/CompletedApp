@@ -159,11 +159,16 @@ export default function Profile() {
       setSavedNativeCalendarId(calendarId);
 
       const addedCount = result.createdEvents.length;
+      const staleCount = result.staleEvents.length;
       toast({
-        title: 'Calendar synced',
-        description: addedCount > 0
-          ? `${addedCount} upcoming Roster ${addedCount === 1 ? 'event was' : 'events were'} added to your selected calendar.`
-          : 'Your selected calendar is up to date with the Roster schedule.',
+        title: staleCount > 0 ? 'Calendar filter updated' : 'Calendar synced',
+        description: staleCount > 0
+          ? `${addedCount > 0 ? `${addedCount} allowed ${addedCount === 1 ? 'event was' : 'events were'} added. ` : ''}${staleCount} previously exported ${staleCount === 1 ? 'event is' : 'events are'} no longer eligible. This SDK cannot remove existing device events, so delete those manually or choose a fresh calendar.`
+          : addedCount > 0
+            ? `${addedCount} upcoming Roster ${addedCount === 1 ? 'event was' : 'events were'} added to your selected calendar.`
+            : currentEvents.length === 0
+              ? 'No upcoming eligible Roster events were found.'
+              : 'Your selected calendar is up to date with the Roster schedule.',
       });
     } catch (error: any) {
       const message = error instanceof NativeCalendarError

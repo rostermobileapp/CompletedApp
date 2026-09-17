@@ -340,8 +340,12 @@ export function toNativeCalendarEvent(event: any): NativeCalendarEvent | null {
 }
 
 /**
- * Converts the consolidated /api/user/calendar response into the complete
- * set of upcoming events that belong in the user's selected device calendar.
+ * Converts the consolidated /api/user/calendar response into the events that
+ * belong in the user's selected device calendar:
+ * - games for teams where the user has an approved membership
+ * - team events for those same teams, regardless of RSVP state
+ * - scrimmages only when the user has an approved player request
+ * - personal reminders and approved substitute games owned by the user
  * This is shared by the Calendar page and the profile's initial sync action so
  * selecting a calendar always exports the same event set.
  */
@@ -349,9 +353,6 @@ export function toNativeCalendarEventsFromCalendarData(data: any): NativeCalenda
   const userTeams = Array.isArray(data?.userTeams) ? data.userTeams : [];
   const userTeamIds = new Set(userTeams.map((team: any) => team?.id).filter(Boolean));
   const allGames = Array.isArray(data?.allGames) ? data.allGames : [];
-  const createdScrimmages = Array.isArray(data?.createdScrimmages)
-    ? data.createdScrimmages
-    : [];
   const scrimmageRequests = Array.isArray(data?.scrimmageRequests)
     ? data.scrimmageRequests
     : [];
@@ -364,11 +365,6 @@ export function toNativeCalendarEventsFromCalendarData(data: any): NativeCalenda
   const teamEvents = Array.isArray(data?.teamEvents) ? data.teamEvents : [];
 
   const scrimmages = [
-    ...createdScrimmages.map((scrimmage: any) => ({
-      ...scrimmage,
-      type: "scrimmage",
-      scheduledAt: parseScrimmageDateTime(scrimmage.dateTime),
-    })),
     ...scrimmageRequests
       .filter((request: any) => request?.status === "approved")
       .map((request: any) => ({
@@ -380,7 +376,11 @@ export function toNativeCalendarEventsFromCalendarData(data: any): NativeCalenda
   ];
 
   const events = [
-    ...allGames.map((game: any) => ({ ...game, type: "game" })),
+    ...allGames
+      .filter((game: any) =>
+        userTeamIds.has(game.homeTeamId) || userTeamIds.has(game.awayTeamId),
+      )
+      .map((game: any) => ({ ...game, type: "game" })),
     ...scrimmages,
     ...substitutions.map((substitution: any) => ({
       ...substitution.game,
@@ -389,7 +389,9 @@ export function toNativeCalendarEventsFromCalendarData(data: any): NativeCalenda
       scheduledAt: substitution.game?.scheduledAt,
     })),
     ...personalReminders.map((reminder: any) => ({ ...reminder, type: "reminder" })),
-    ...teamEvents.map((event: any) => ({ ...event, type: "team-event" })),
+    ...teamEvents
+      .filter((event: any) => userTeamIds.has(event.teamId))
+      .map((event: any) => ({ ...event, type: "team-event" })),
   ];
 
   return events

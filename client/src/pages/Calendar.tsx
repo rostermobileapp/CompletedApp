@@ -18,9 +18,9 @@ import NativeCalendarExportButton from "@/components/NativeCalendarExportButton"
 import {
   getSavedCalendarId,
   isNativeCalendarAvailable,
-  NativeCalendarEvent,
   syncNativeCalendarEvents,
   toNativeCalendarEvent,
+  toNativeCalendarEventsFromCalendarData,
 } from "@/lib/nativeCalendar";
 
 export default function Calendar() {
@@ -211,9 +211,9 @@ export default function Calendar() {
   });
 
   // Reconcile previously exported device events whenever the authoritative
-  // Roster schedule changes. If the device bridge cannot mutate an event,
-  // syncNativeCalendarEvents prevents a duplicate and this page stays the
-  // source of truth.
+  // Roster schedule changes. Use the same membership/approval filtering as the
+  // profile's initial sync so viewing this page cannot export unrelated teams
+  // or unapproved scrimmages.
   useEffect(() => {
     if (!user?.id || !isNativeCalendarAvailable()) {
       setNativeCalendarSyncMessage(null);
@@ -227,14 +227,8 @@ export default function Calendar() {
     }
 
     let cancelled = false;
-    const currentNativeEvents = allEvents
-      .map((event: any) =>
-        toNativeCalendarEvent({
-          ...event,
-          activeTeamId: activeTeam?.id,
-        }),
-      )
-      .filter((event): event is NativeCalendarEvent => event !== null);
+    const currentNativeEvents = toNativeCalendarEventsFromCalendarData(calendarData)
+      .filter((event) => event.start.getTime() > Date.now());
 
     syncNativeCalendarEvents(user.id, calendarId, currentNativeEvents)
       .then((result) => {
