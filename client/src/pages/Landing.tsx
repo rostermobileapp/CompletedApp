@@ -195,7 +195,7 @@ export default function Landing() {
               className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight tracking-tight text-gray-900"
               data-testid="text-hero-title"
             >
-              less admin,
+              less admin
               <br />
               <span className="text-[#3c82f4]">more hockey</span>
             </h1>
