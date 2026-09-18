@@ -1,9 +1,9 @@
 import { db } from "./db";
-import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users, userNotifications } from "@shared/schema";
+import { scrimmages, scrimmageRequests, scrimmageRemindersSent, users, userNotifications, teamMemberships, teams } from "@shared/schema";
 import { and, eq, gt, lt, inArray, sql } from "drizzle-orm";
 import { storage } from "./storage";
 import { format } from "date-fns";
-import { sendScheduleReminderPushNotification, sendScrimmageInvitePushNotification } from "./oneSignalNotifications";
+import { sendScheduleReminderPushNotification, sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from "./oneSignalNotifications";
 import { formatDateInTimezone, parseLeagueLocalDateTime } from "./dateUtils";
 import { isDemoLeague } from "./demo";
 
@@ -48,6 +48,24 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
       const timezone = scrimmage.timezone || 'America/New_York';
       const scrimmageTime = parseLeagueLocalDateTime(scrimmage.dateTime, timezone);
       const hoursUntil = (scrimmageTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      let scrimmageTeamLogoUrl: string | undefined;
+      if (scrimmage.creatorId && scrimmage.leagueId) {
+        try {
+          const creatorTeamRows = await db
+            .select({ logoUrl: teams.logoUrl })
+            .from(teamMemberships)
+            .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
+            .where(and(
+              eq(teamMemberships.userId, scrimmage.creatorId),
+              eq(teams.leagueId, scrimmage.leagueId),
+              eq(teamMemberships.status, 'approved'),
+            ))
+            .limit(1);
+          scrimmageTeamLogoUrl = resolveTeamLogoUrl(creatorTeamRows[0]?.logoUrl);
+        } catch (error) {
+          console.warn(`[ScrimmageReminder] Could not resolve team logo for ${scrimmage.id}:`, error);
+        }
+      }
 
       // Send one push-only follow-up to registered invitees who still have no
       // RSVP row. Any request status represents a deliberate IN/OUT choice.
@@ -183,10 +201,12 @@ export async function checkAndSendScrimmageReminders(): Promise<void> {
             await sendScheduleReminderPushNotification(
               player.id,
               scrimmage.title,
-              timeLabel,
-              scrimmage.location || 'TBD',
+              scrimmageTime,
+              timezone,
               scrimmage.id,
-              'scrimmage'
+              'scrimmage',
+              undefined,
+              scrimmageTeamLogoUrl,
             );
             
             // Record that we sent this reminder

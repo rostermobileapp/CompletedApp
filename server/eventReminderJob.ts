@@ -35,6 +35,7 @@ interface EventInfo {
   title: string;
   location: string;
   eventTime: Date;
+  timezone: string;
   eventType: "game" | "scrimmage";
 }
 
@@ -206,16 +207,12 @@ async function sendEventReminder(
   }
   
   try {
-    const timeLabel = trigger === "2_hours" 
-      ? "2 hours" 
-      : "2 days";
-    
     // Send push notification only (no in-app alert)
     await sendScheduleReminderPushNotification(
       player.id,
       event.title,
-      timeLabel,
-      event.location || 'TBD',
+      event.eventTime,
+      event.timezone,
       event.id,
       event.eventType,
       dutyMessage,
@@ -654,6 +651,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
         title,
         location: game.venue || 'TBD',
         eventTime,
+        timezone,
         eventType: "game",
       };
       
@@ -716,6 +714,7 @@ export async function checkAndSendEventReminders(): Promise<void> {
         title: scrimmage.title || 'Scrimmage',
         location: scrimmage.location || 'TBD',
         eventTime,
+        timezone: scrimmageTimezone,
         eventType: "scrimmage",
       };
       

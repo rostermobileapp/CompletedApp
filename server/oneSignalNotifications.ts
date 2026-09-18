@@ -1,5 +1,6 @@
 import { storage } from './storage';
 import { lookupCityStateFromZip } from './zipLookup';
+import { formatDateInTimezone } from './dateUtils';
 
 // DisplayId of the sole admin who should receive real-time new-signup alerts.
 // Intentionally hardcoded (not a settings toggle) since this is an internal
@@ -366,8 +367,8 @@ export async function sendAddedToTeamPushNotification(
 export async function sendScheduleReminderPushNotification(
   recipientId: string,
   eventTitle: string,
-  timeLabel: string,
-  location: string,
+  eventTime: Date,
+  timezone: string,
   eventId: string,
   eventType: 'scrimmage' | 'game',
   dutyMessage?: string,
@@ -380,7 +381,7 @@ export async function sendScheduleReminderPushNotification(
     return false;
   }
   
-  let message = `Starting in ${timeLabel} at ${location}`;
+  let message = `${formatDateInTimezone(eventTime, 'EEEE', timezone)} at ${formatDateInTimezone(eventTime, 'h:mm a', timezone)}`;
   if (dutyMessage) {
     message += ` - ${dutyMessage}`;
   }
