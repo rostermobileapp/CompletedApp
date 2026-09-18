@@ -179,6 +179,7 @@ export async function sendMessagePushNotification(
   conversationId: string,
   messagePreview: string,
   conversationType?: string,
+  teamLogoUrl?: string,
 ): Promise<boolean> {
   // All recipients — including free-tier — always see the sender's name in
   // the push notification. Free-tier DM access restrictions are enforced at
@@ -196,6 +197,7 @@ export async function sendMessagePushNotification(
       conversationId,
       senderId,
     },
+    iconUrl: teamLogoUrl,
   });
 }
 

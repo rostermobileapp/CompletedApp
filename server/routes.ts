@@ -21587,6 +21587,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // direct-message previews for free-tier recipients.
             const conversationRecord = await messagingService.getConversation(conversationId);
             const conversationType = conversationRecord?.type;
+            let teamLogoUrl: string | undefined;
+            if (conversationRecord?.type === 'team_group' && conversationRecord.teamId) {
+              const team = await storage.getTeam(conversationRecord.teamId);
+              teamLogoUrl = resolveTeamLogoUrl(team?.logoUrl);
+            }
             const { sendMessagePushNotification } = await import('./oneSignalNotifications');
             let anyPushDelivered = false;
             for (const recipientId of recipientIds) {
@@ -21597,6 +21602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 conversationId,
                 content,
                 conversationType,
+                teamLogoUrl,
               );
               if (pushed) {
                 anyPushDelivered = true;
