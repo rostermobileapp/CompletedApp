@@ -313,7 +313,7 @@ function LeaderColumn({
             {getName(top)}
           </div>
           <div className="text-[11px] text-[#777]">
-            {[top.jerseyNumber ? `#${top.jerseyNumber}` : null, top.position]
+            {[top.jerseyNumber !== null && top.jerseyNumber !== undefined && top.jerseyNumber !== '' ? `#${top.jerseyNumber}` : null, top.position]
               .filter(Boolean)
               .join(' · ') || ' '}
           </div>

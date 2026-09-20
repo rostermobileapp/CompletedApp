@@ -3560,7 +3560,13 @@ export class DatabaseStorage implements IStorage {
         }
 
         const email = normalizeEmail((row.email || row.Email || row.EMAIL || '').toString());
-        const jerseyNumber = (row.jerseyNumber || row['Jersey Number'] || row.jersey_number || row['Jersey #'] || '').toString().trim() || null;
+        const rawJerseyNumber = [
+          row.jerseyNumber,
+          row['Jersey Number'],
+          row.jersey_number,
+          row['Jersey #'],
+        ].find((value) => value !== null && value !== undefined && value !== '');
+        const jerseyNumber = rawJerseyNumber?.toString().trim() || null;
         const position = (row.position || row.Position || '').toString().trim() || null;
 
         if (!firstName || !lastName) {
@@ -3580,7 +3586,7 @@ export class DatabaseStorage implements IStorage {
               userId: user.id,
               teamId,
               position: position || null,
-              jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
+              jerseyNumber: jerseyNumber !== null ? parseInt(jerseyNumber) : null,
               status: 'pending', // Requires team captain approval
             })
             .returning();
@@ -3597,7 +3603,7 @@ export class DatabaseStorage implements IStorage {
               lastName,
               email: email || null,
               position: position || null,
-              jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
+              jerseyNumber: jerseyNumber !== null ? parseInt(jerseyNumber) : null,
             });
           successCount++;
         }
@@ -12031,7 +12037,7 @@ export class DatabaseStorage implements IStorage {
             .update(teamMemberships)
             .set({
               position: existingTm.position || fromTm.position,
-              jerseyNumber: existingTm.jerseyNumber || fromTm.jerseyNumber,
+              jerseyNumber: existingTm.jerseyNumber ?? fromTm.jerseyNumber,
               skillLevel: existingTm.skillLevel || fromTm.skillLevel,
               status: existingTm.status !== 'pending' ? existingTm.status : fromTm.status,
               joinedAt: existingTm.joinedAt || fromTm.joinedAt,
@@ -12615,7 +12621,7 @@ export class DatabaseStorage implements IStorage {
         assignedTeamId: fromMembership.assignedTeamId || toMembership?.assignedTeamId,
         position: fromMembership.position || toMembership?.position,
         skillLevel: fromMembership.skillLevel || toMembership?.skillLevel,
-        jerseyNumber: fromMembership.jerseyNumber || toMembership?.jerseyNumber,
+        jerseyNumber: fromMembership.jerseyNumber ?? toMembership?.jerseyNumber,
         notes: fromMembership.notes || toMembership?.notes,
         isGoalie: fromMembership.isGoalie ?? toMembership?.isGoalie ?? false,
         isSkater: fromMembership.isSkater ?? toMembership?.isSkater ?? true,

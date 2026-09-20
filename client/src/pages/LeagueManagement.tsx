@@ -3930,7 +3930,7 @@ export default function LeagueManagement() {
                           {member.assignedTeamId && teams.find((team: Team) => team.id === member.assignedTeamId)?.captainId === member.userId && (
                             <span className="w-4 h-4 text-warning font-bold text-sm flex items-center justify-center">C</span>
                           )}
-                          {member.jerseyNumber && (
+                          {member.jerseyNumber !== null && member.jerseyNumber !== undefined && (
                             <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
                               #{member.jerseyNumber}
                             </span>
@@ -5299,7 +5299,7 @@ export default function LeagueManagement() {
                   <label className="block text-sm font-medium mb-2">Jersey Number</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     max="99"
                     value={playerEditForm.jerseyNumber}
                     onChange={(e) => setPlayerEditForm(prev => ({ ...prev, jerseyNumber: e.target.value }))}
@@ -5382,7 +5382,7 @@ export default function LeagueManagement() {
                         assignedTeamId: playerEditForm.assignedTeamId || null,
                         position: playerEditForm.position,
                         skillLevel: playerEditForm.skillLevel?.trim() || null,
-                        jerseyNumber: playerEditForm.jerseyNumber ? parseInt(playerEditForm.jerseyNumber) : null,
+                        jerseyNumber: playerEditForm.jerseyNumber.trim() !== '' ? parseInt(playerEditForm.jerseyNumber) : null,
                         notes: playerEditForm.notes,
                         isGoalie: playerEditForm.isGoalie,
                         isSkater: playerEditForm.isSkater,
@@ -7763,7 +7763,7 @@ export default function LeagueManagement() {
                             {team && (
                               <p className="text-xs text-muted-foreground">Team: {team.name}</p>
                             )}
-                            {placeholder.jerseyNumber && (
+                            {placeholder.jerseyNumber !== null && placeholder.jerseyNumber !== undefined && (
                               <p className="text-xs text-muted-foreground">#{placeholder.jerseyNumber}</p>
                             )}
                           </div>

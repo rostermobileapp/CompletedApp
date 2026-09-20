@@ -169,7 +169,7 @@ export default function TournamentMatchScoreModal({
           )}
           <div className="flex flex-col">
             <span className="text-sm font-medium">{displayName}</span>
-            {player.jerseyNumber && (
+            {player.jerseyNumber !== null && player.jerseyNumber !== undefined && (
               <span className="text-xs text-muted-foreground">#{player.jerseyNumber}</span>
             )}
           </div>

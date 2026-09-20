@@ -610,7 +610,7 @@ export default function Stats() {
                                 </div>
                                 {membership && (
                                   <div className="text-gray-600 dark:text-gray-400 text-xs">
-                                    {teamMap.get(membership.assignedTeamId) || 'N/A'} • #{membership.jerseyNumber || 'N/A'}
+                                    {teamMap.get(membership.assignedTeamId) || 'N/A'} • #{membership.jerseyNumber ?? 'N/A'}
                                   </div>
                                 )}
                               </div>
@@ -873,7 +873,7 @@ function StatSection({
               const membership = membershipMap.get(players[0].userId);
               return (
                 <div className="text-gray-400 text-sm" data-testid="text-player-team">
-                  {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber || 'N/A'}
+                  {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber ?? 'N/A'}
                 </div>
               );
             })()}

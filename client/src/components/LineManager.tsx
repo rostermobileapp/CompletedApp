@@ -779,7 +779,7 @@ export function LineManager({ teamId, isTeamCaptain, teamMembers, leagueId, seas
 
                     const nameContent = (
                       <div className="flex items-center gap-2 min-w-0">
-                        {memberJerseyNumber && (
+                        {memberJerseyNumber !== null && memberJerseyNumber !== undefined && (
                           <span className="text-xs font-bold text-muted-foreground shrink-0">
                             #{memberJerseyNumber}
                           </span>

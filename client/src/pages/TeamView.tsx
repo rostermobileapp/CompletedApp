@@ -472,7 +472,7 @@ export default function TeamView() {
                             {streak === 'HOT' && <Flame className="w-3.5 h-3.5 text-orange-500 shrink-0" />}
                             {streak === 'COLD' && <Snowflake className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
                           </div>
-                          {member.jerseyNumber && (
+                          {member.jerseyNumber !== null && member.jerseyNumber !== undefined && (
                             <p className="text-sm text-muted-foreground">
                               #{member.jerseyNumber} {member.position && `• ${member.position}`}
                             </p>

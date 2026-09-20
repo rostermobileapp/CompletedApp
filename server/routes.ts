@@ -13807,8 +13807,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Parse jersey number
         let jerseyNumber = null;
-        if (row.jerseyNumber) {
-          const parsed = parseInt(row.jerseyNumber.toString().trim());
+        const rawJerseyNumber = row.jerseyNumber?.toString().trim();
+        if (rawJerseyNumber) {
+          const parsed = parseInt(rawJerseyNumber);
           if (!isNaN(parsed)) {
             jerseyNumber = parsed;
           }
@@ -28764,8 +28765,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Parse jersey number
         let jerseyNumber = null;
-        if (row.jerseyNumber) {
-          const parsed = parseInt(row.jerseyNumber.toString().trim());
+        const rawJerseyNumber = row.jerseyNumber?.toString().trim();
+        if (rawJerseyNumber) {
+          const parsed = parseInt(rawJerseyNumber);
           if (!isNaN(parsed)) {
             jerseyNumber = parsed;
           }

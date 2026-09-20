@@ -2510,7 +2510,7 @@ export default function Messages() {
                             {contact.position && (
                               <p className="text-xs text-muted-foreground" data-testid={`text-contact-position-${contact.id}`}>
                                 {contact.position}
-                                {contact.jerseyNumber && ` #${contact.jerseyNumber}`}
+                                {contact.jerseyNumber !== null && contact.jerseyNumber !== undefined && ` #${contact.jerseyNumber}`}
                               </p>
                             )}
                           </div>
