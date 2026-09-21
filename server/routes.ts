@@ -10142,7 +10142,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leagues/:leagueId/star-leaderboard", async (req: any, res) => {
     try {
       const { leagueId } = req.params;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const requestedLimit = typeof req.query.limit === "string" ? req.query.limit : undefined;
+      const parsedLimit = requestedLimit ? Number.parseInt(requestedLimit, 10) : NaN;
+      const limit = requestedLimit === "all"
+        ? null
+        : Number.isFinite(parsedLimit) && parsedLimit >= 0
+          ? parsedLimit
+          : 10;
+      const seasonId = typeof req.query.seasonId === "string" ? req.query.seasonId : undefined;
 
       // Verify league exists
       const league = await storage.getLeague(leagueId);
@@ -10150,7 +10157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
 
-      const leaderboard = await storage.getLeagueStarLeaderboard(leagueId, limit);
+      const leaderboard = await storage.getLeagueStarLeaderboard(leagueId, limit, seasonId);
       res.json(leaderboard);
     } catch (error) {
       console.error("Error fetching star leaderboard:", error);

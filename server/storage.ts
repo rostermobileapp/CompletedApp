@@ -470,7 +470,7 @@ export interface IStorage {
   // Game stars operations
   submitGameStars(stars: InsertGameStar): Promise<GameStar>;
   getGameStars(gameId: string): Promise<(GameStar & { firstStar: User; secondStar: User; thirdStar: User; awarder: User }) | undefined>;
-  getLeagueStarLeaderboard(leagueId: string, limit?: number): Promise<{ user: User; starPoints: number; firstStars: number; secondStars: number; thirdStars: number }[]>;
+  getLeagueStarLeaderboard(leagueId: string, limit?: number | null, seasonId?: string): Promise<{ user: User; starPoints: number; firstStars: number; secondStars: number; thirdStars: number }[]>;
   
   // Personal Reminders
   getUserPersonalReminders(userId: string): Promise<PersonalReminder[]>;
@@ -7164,11 +7164,14 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getLeagueStarLeaderboard(leagueId: string, limit: number = 10): Promise<{ user: User; starPoints: number; firstStars: number; secondStars: number; thirdStars: number }[]> {
+  async getLeagueStarLeaderboard(leagueId: string, limit: number | null = 10, seasonId?: string): Promise<{ user: User; starPoints: number; firstStars: number; secondStars: number; thirdStars: number }[]> {
     const allGames = await db
       .select()
       .from(games)
-      .where(eq(games.leagueId, leagueId));
+      .where(and(
+        eq(games.leagueId, leagueId),
+        seasonId ? eq(games.seasonId, seasonId) : undefined,
+      ));
     
     const gameIds = allGames.map(g => g.id);
     
@@ -7220,7 +7223,7 @@ export class DatabaseStorage implements IStorage {
 
     leaderboard.sort((a, b) => b.starPoints - a.starPoints);
 
-    return leaderboard.slice(0, limit);
+    return limit === null ? leaderboard : leaderboard.slice(0, limit);
   }
 
   // Personal Reminders operations

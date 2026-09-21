@@ -15,6 +15,19 @@ import { PlayerStatsUnion, GoalieStats, SkaterStats } from '@shared/schema';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { ProfilePhotoPreview } from '@/components/ProfilePhotoPreview';
 
+type StarLeaderboardEntry = {
+  user: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImageUrl?: string | null;
+  };
+  starPoints: number;
+  firstStars: number;
+  secondStars: number;
+  thirdStars: number;
+};
+
 export default function Stats() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, canEditStats } = usePermissions();
@@ -65,7 +78,7 @@ export default function Stats() {
   }
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
-  const [viewMode, setViewMode] = useState<'summary' | 'table'>('summary');
+  const [viewMode, setViewMode] = useState<'summary' | 'table' | 'stars'>('summary');
   const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
   const [actionSheetPlayer, setActionSheetPlayer] = useState<{
     userId: string;
@@ -187,9 +200,27 @@ export default function Stats() {
   const playerStats = isTournamentContext ? tournamentPlayerStats : leaguePlayerStats;
   const isLoading = isTournamentContext ? tournamentStatsLoading : leagueStatsLoading;
 
-  // Fetch star leaderboard (only for leagues)
-  const { data: starLeaderboard } = useQuery({
-    queryKey: [`/api/leagues/${leagueId}/star-leaderboard`],
+  // Fetch the complete star leaderboard (only for leagues)
+  const {
+    data: starLeaderboard,
+    isLoading: starLeaderboardLoading,
+    isError: starLeaderboardError,
+  } = useQuery<StarLeaderboardEntry[]>({
+    queryKey: [`/api/leagues/${leagueId}/star-leaderboard`, { seasonId: selectedSeason }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: 'all' });
+      if (selectedSeason && selectedSeason !== 'all') {
+        params.set('seasonId', selectedSeason);
+      }
+      const response = await apiRequest(
+        'GET',
+        `/api/leagues/${leagueId}/star-leaderboard?${params.toString()}`,
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch star leaderboard');
+      }
+      return response.json();
+    },
     enabled: !!leagueId && !isTournamentContext,
     staleTime: 5 * 60 * 1000,
   });
