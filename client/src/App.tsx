@@ -98,6 +98,7 @@ import ReferralAdminPartnerDetail from "@/pages/ReferralAdminPartnerDetail";
 import AdminMetrics from "@/pages/AdminMetrics";
 import HPIBDownload from "@/pages/HPIBDownload";
 import Demo from "@/pages/Demo";
+import GerryHomePreview from "@/pages/GerryHomePreview";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -202,6 +203,12 @@ function Router() {
   // This intentionally works without a session because the preview is visual-only.
   if (import.meta.env.DEV && location === '/onboarding-preview') {
     return <Onboarding />;
+  }
+
+  // Development-only visual preview for the confirmed Gerry Zadnik home state.
+  // This never performs API calls or changes live account data.
+  if (import.meta.env.DEV && location === '/gerry-home-preview') {
+    return <GerryHomePreview />;
   }
 
   if (!isAuthenticated) {
