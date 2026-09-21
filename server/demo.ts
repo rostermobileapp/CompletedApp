@@ -506,7 +506,11 @@ export async function demoResourcesAreIsolated(context: NonNullable<Request["dem
   collect(input);
   // Route :id is a resource even where a legacy route does not name it.
   const conversationMatch = path.match(/\/conversations\/([^/]+)/);
-  const gameMatch = path.match(/\/games\/([^/]+)/);
+  // Only treat canonical single-game routes as carrying a game resource ID.
+  // User collection routes such as /api/user/games/upcoming and
+  // /api/user/games/all contain "/games/<word>" too, but "upcoming" and
+  // "all" are route names rather than game IDs.
+  const gameMatch = path.match(/^\/api\/games\/([^/]+)/);
   const scrimmageMatch = path.match(/\/scrimmages\/([^/]+)/);
   if (conversationMatch) ids.conversation.push(conversationMatch[1]);
   if (gameMatch) ids.game.push(gameMatch[1]);
