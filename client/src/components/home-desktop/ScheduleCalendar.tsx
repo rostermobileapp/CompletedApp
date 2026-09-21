@@ -100,6 +100,8 @@ export function ScheduleCalendar({
   const { data: rawGames } = useQuery<any[]>({
     queryKey: ['/api/user/games/upcoming'],
     staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: rawTeamEvents } = useQuery<any[]>({

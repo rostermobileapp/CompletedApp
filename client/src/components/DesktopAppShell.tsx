@@ -77,16 +77,25 @@ export function DesktopAppShell({ children }: DesktopAppShellProps) {
   const { data: userTeams } = useQuery<any[]>({
     queryKey: ['/api/user/teams'],
     enabled: !!isAuthenticated,
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: userLeagueMemberships } = useQuery<any[]>({
     queryKey: ['/api/user/league-memberships'],
     enabled: !!isAuthenticated,
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: userLeagues } = useQuery<any[]>({
     queryKey: ['/api/user/leagues'],
     enabled: !!isAuthenticated,
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Tournaments where the user is a creator/commissioner or an approved

@@ -49,12 +49,16 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
 
   const { data: userTeams } = useQuery<UserTeam[]>({
     queryKey: ['/api/user/teams'],
-    staleTime: 60_000,
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: userLeagues } = useQuery<any[]>({
     queryKey: ['/api/user/leagues'],
-    staleTime: 60_000,
+    staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Effective league id: explicit league selection, else selected team's league,

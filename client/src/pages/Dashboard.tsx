@@ -1659,6 +1659,8 @@ function DashboardMobile() {
   const { data: rawUpcomingGames, isLoading: gamesLoading } = useQuery({
     queryKey: ['/api/user/games/upcoming'],
     staleTime: 30000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: scrimmageInvites, isLoading: invitesLoading } = useQuery({
@@ -1734,6 +1736,9 @@ function DashboardMobile() {
 
   const { data: userTeams } = useQuery({
     queryKey: ['/api/user/teams'],
+    staleTime: 30000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     select: (teams) => {
       if (!Array.isArray(teams)) return teams;
       
@@ -1758,7 +1763,10 @@ function DashboardMobile() {
   
   // Get all user teams (unfiltered) for captain checks across all leagues
   const { data: userTeamsAll } = useQuery({
-    queryKey: ['/api/user/teams']
+    queryKey: ['/api/user/teams'],
+    staleTime: 30000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
   
   // User's approved tournament participations — drives "always include
@@ -1851,10 +1859,16 @@ function DashboardMobile() {
 
   const { data: userLeagueMemberships } = useQuery({
     queryKey: ['/api/user/league-memberships'],
+    staleTime: 30000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
   
   const { data: userLeagues } = useQuery({
     queryKey: ['/api/user/leagues'],
+    staleTime: 30000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
   
   // Fetch visible tournaments for all user leagues

@@ -56,6 +56,8 @@ export function UpNextCard({
   const { data: upcoming, isLoading: upcomingLoading } = useQuery<UpcomingItem[]>({
     queryKey: ['/api/user/games/upcoming'],
     staleTime: 30_000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // When a league is selected, also fetch ALL league games so commissioners
