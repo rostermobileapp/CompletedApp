@@ -416,6 +416,15 @@ export default function Stats() {
     return 'Unknown Player';
   };
 
+  const formatStarPlayerName = (leader: StarLeaderboardEntry) => {
+    const membership = membershipMap.get(leader.user.id);
+    const firstName = membership?.displayFirstName || leader.user.firstName;
+    const lastName = membership?.displayLastName || leader.user.lastName;
+
+    if (firstName && lastName) return `${firstName} ${lastName}`;
+    return firstName || lastName || 'Unknown Player';
+  };
+
   // Show error state only if neither league nor tournament is available
   if (!leagueId && !tournamentId) {
     return (
@@ -516,42 +525,140 @@ export default function Stats() {
         </div>
 
         {/* Star Leaders Section - only for leagues */}
-        {!isTournamentContext && Array.isArray(starLeaderboard) && starLeaderboard.length > 0 && (
+        {!isTournamentContext &&
+          viewMode !== 'stars' &&
+          (starLeaderboardLoading ||
+            starLeaderboardError ||
+            (Array.isArray(starLeaderboard) && starLeaderboard.length > 0)) && (
           <div className="px-4 py-4 pt-[4px] pb-[4px]">
-            <h2 className="text-lg font-bold text-[#212121] dark:text-white mb-4 flex items-center gap-2" data-testid="text-star-leaders-title">
-              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-              3 Stars of the League
-            </h2>
-            <div className="grid grid-cols-3 gap-3">
-              {starLeaderboard.slice(0, 3).map((leader: any, index: number) => (
-                <div 
-                  key={leader.user.id} 
-                  className="bg-[#e2e2e2] dark:bg-[#212121] hairline elev-rest rounded-lg p-3 flex items-start gap-2 text-[12px] pt-[4px] pb-[4px] pl-[0px] pr-[0px]"
-                  data-testid={`row-star-leader-${index}`}
-                >
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={getImageUrl(leader.user?.profileImageUrl) || undefined} />
-                    <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
-                      {getInitials(leader.user?.firstName, leader.user?.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <div className="text-[#212121] dark:text-white font-medium text-[12px]" data-testid={`text-star-leader-name-${index}`}>
-                      {leader.user.lastName}
-                    </div>
-                    <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
-                      {leader.starPoints}
-                    </div>
-                  </div>
+            {starLeaderboardLoading ? (
+              <div className="h-20 rounded-lg bg-gray-200 dark:bg-gray-900 animate-pulse" data-testid="loading-star-leaders" />
+            ) : starLeaderboardError ? (
+              <p className="text-sm text-gray-600 dark:text-gray-400" data-testid="error-star-leaders">
+                Star leaderboard unavailable right now.
+              </p>
+            ) : Array.isArray(starLeaderboard) && starLeaderboard.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-[#212121] dark:text-white flex items-center gap-2" data-testid="text-star-leaders-title">
+                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                    3 Stars of the League
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('stars')}
+                    className="text-sm font-medium text-[#00A9FF] hover:text-[#008dcc] transition-colors"
+                    data-testid="button-view-all-stars"
+                  >
+                    View all
+                  </button>
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {starLeaderboard.slice(0, 3).map((leader, index) => (
+                    <div
+                      key={leader.user.id}
+                      className="bg-[#e2e2e2] dark:bg-[#212121] hairline elev-rest rounded-lg p-3 flex items-start gap-2 text-[12px] pt-[4px] pb-[4px] pl-[0px] pr-[0px]"
+                      data-testid={`row-star-leader-${index}`}
+                    >
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={getImageUrl(leader.user?.profileImageUrl) || undefined} />
+                        <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
+                          {getInitials(leader.user?.firstName, leader.user?.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <div className="text-[#212121] dark:text-white font-medium text-[12px]" data-testid={`text-star-leader-name-${index}`}>
+                          {leader.user.lastName}
+                        </div>
+                        <div className="text-xl font-bold text-yellow-500" data-testid={`text-star-points-${index}`}>
+                          {leader.starPoints}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
         )}
 
         {/* Content */}
         <div className="px-4 py-6 pt-[4px] pb-[4px]">
-          {isLoading ? (
+          {viewMode === 'stars' ? (
+            <div className="space-y-4" data-testid="stars-ranking-view">
+              <div className="flex items-center gap-3 mb-6">
+                <button
+                  type="button"
+                  onClick={handleBackToSummary}
+                  className="text-gray-600 dark:text-gray-400 hover:text-[#212121] dark:hover:text-white transition-colors"
+                  data-testid="button-back-from-stars"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <h2 className="text-xl font-bold text-[#212121] dark:text-white">
+                  Stars of the League
+                </h2>
+              </div>
+              {starLeaderboardLoading ? (
+                <div className="space-y-3" data-testid="loading-stars-ranking">
+                  {[...Array(5)].map((_, index) => (
+                    <div key={index} className="h-16 rounded-lg bg-gray-200 dark:bg-gray-900 animate-pulse" />
+                  ))}
+                </div>
+              ) : starLeaderboardError ? (
+                <p className="text-center py-8 text-gray-600 dark:text-gray-400" data-testid="error-stars-ranking">
+                  Star leaderboard unavailable right now.
+                </p>
+              ) : !starLeaderboard?.length ? (
+                <p className="text-center py-8 text-gray-600 dark:text-gray-400" data-testid="empty-stars-ranking">
+                  No league stars have been awarded yet.
+                </p>
+              ) : (
+                <div className="overflow-auto border border-gray-800 rounded-lg">
+                  <table className="w-full min-w-[460px]" data-testid="table-stars-ranking">
+                    <thead className="bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+                      <tr>
+                        <th className="text-left px-2 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 w-8">#</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
+                        <th className="text-center px-4 py-3 text-sm font-medium text-yellow-500">PTS</th>
+                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">1st</th>
+                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">2nd</th>
+                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">3rd</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {starLeaderboard.map((leader, index) => (
+                        <tr
+                          key={leader.user.id}
+                          className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-900/50"
+                          data-testid={`row-all-star-${index}`}
+                        >
+                          <td className="px-2 py-3 text-gray-600 dark:text-gray-400 text-sm">{index + 1}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-8 h-8">
+                                <AvatarImage src={getImageUrl(leader.user?.profileImageUrl) || undefined} />
+                                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-xs">
+                                  {getInitials(leader.user?.firstName, leader.user?.lastName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-[#212121] dark:text-white text-sm font-medium">
+                                {formatStarPlayerName(leader)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="text-center px-4 py-3 text-yellow-500 text-sm font-bold">{leader.starPoints}</td>
+                          <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{leader.firstStars}</td>
+                          <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{leader.secondStars}</td>
+                          <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{leader.thirdStars}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : isLoading ? (
             <div className="space-y-6" data-testid="loading-stats">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse">
