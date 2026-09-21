@@ -41,7 +41,10 @@ export function DemoBanner() {
           </span>
           <span className="text-xs mr-1 text-[#3c83f6] font-bold shrink-0">Select</span>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent
+          className="z-[110] max-h-[calc(100dvh-96px)]"
+          data-testid="demo-pov-options"
+        >
           {users.map((user) => <SelectItem key={user.id} value={user.id}>{displayName(user)}</SelectItem>)}
         </SelectContent>
       </Select>
