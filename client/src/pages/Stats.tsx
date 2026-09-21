@@ -614,16 +614,16 @@ export default function Stats() {
                   No league stars have been awarded yet.
                 </p>
               ) : (
-                <div className="overflow-auto border border-gray-800 rounded-lg">
-                  <table className="w-full min-w-[460px]" data-testid="table-stars-ranking">
+                <div className="overflow-hidden border border-gray-800 rounded-lg">
+                  <table className="w-full table-fixed" data-testid="table-stars-ranking">
                     <thead className="bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                       <tr>
-                        <th className="text-left px-2 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 w-8">#</th>
-                        <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
-                        <th className="text-center px-4 py-3 text-sm font-medium text-yellow-500">PTS</th>
-                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">1st</th>
-                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">2nd</th>
-                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">3rd</th>
+                        <th className="w-7 text-left px-1 py-3 text-xs font-medium text-gray-600 dark:text-gray-400">#</th>
+                        <th className="text-left px-2 py-3 text-xs font-medium text-gray-600 dark:text-gray-400">Player</th>
+                        <th className="w-9 text-center px-1 py-3 text-xs font-medium text-yellow-500">PTS</th>
+                        <th className="w-9 text-center px-1 py-3 text-xs font-medium text-gray-600 dark:text-gray-400">1st</th>
+                        <th className="w-9 text-center px-1 py-3 text-xs font-medium text-gray-600 dark:text-gray-400">2nd</th>
+                        <th className="w-9 text-center px-1 py-3 text-xs font-medium text-gray-600 dark:text-gray-400">3rd</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -633,24 +633,24 @@ export default function Stats() {
                           className="border-b border-gray-200 dark:border-gray-800 hover:bg-gray-900/50"
                           data-testid={`row-all-star-${index}`}
                         >
-                          <td className="px-2 py-3 text-gray-600 dark:text-gray-400 text-sm">{index + 1}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-8 h-8">
+                          <td className="px-1 py-3 text-gray-600 dark:text-gray-400 text-xs">{index + 1}</td>
+                          <td className="px-2 py-3 overflow-hidden">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar className="w-7 h-7 shrink-0">
                                 <AvatarImage src={getImageUrl(leader.user?.profileImageUrl) || undefined} />
-                                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-xs">
+                                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-[10px]">
                                   {getInitials(leader.user?.firstName, leader.user?.lastName)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-[#212121] dark:text-white text-sm font-medium">
+                              <span className="truncate text-[#212121] dark:text-white text-xs font-medium">
                                 {formatStarPlayerName(leader)}
                               </span>
                             </div>
                           </td>
-                          <td className="text-center px-4 py-3 text-yellow-500 text-sm font-bold">{leader.starPoints}</td>
-                          <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{leader.firstStars}</td>
-                          <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{leader.secondStars}</td>
-                          <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{leader.thirdStars}</td>
+                          <td className="text-center px-1 py-3 text-yellow-500 text-xs font-bold">{leader.starPoints}</td>
+                          <td className="text-center px-1 py-3 text-[#212121] dark:text-white text-xs">{leader.firstStars}</td>
+                          <td className="text-center px-1 py-3 text-[#212121] dark:text-white text-xs">{leader.secondStars}</td>
+                          <td className="text-center px-1 py-3 text-[#212121] dark:text-white text-xs">{leader.thirdStars}</td>
                         </tr>
                       ))}
                     </tbody>
