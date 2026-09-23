@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Archive, Edit3, ImagePlus, Plus, Send, X } from "lucide-react";
 
 type CatalogBadge = any;
@@ -66,9 +67,45 @@ export default function BadgeCatalogAdmin() {
           <div className="mb-5 flex items-center justify-between"><h2 className="font-semibold">{editingId ? "Edit badge definition" : "New badge definition"}</h2>{editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }} className="text-[#8096aa]"><X size={18} /></button>}</div>
           <div className="grid gap-4 md:grid-cols-2">
             {(["name", "description", "lockedHint", "triggerKey"] as const).map((key) => <label key={key} className="text-xs uppercase tracking-wider text-[#8096aa]">{key === "lockedHint" ? "Locked hint" : key.replace(/[A-Z]/g, (letter) => ` ${letter}`)}<input value={form[key]} onChange={(event) => setField(key, event.target.value)} className="mt-1 w-full rounded-lg border border-[#29425b] bg-[#101f2e] px-3 py-2 text-sm text-white outline-none focus:border-[#c9a84c]" required={key === "name" || key === "description"} /></label>)}
-            <label className="text-xs uppercase tracking-wider text-[#8096aa]">Category<select value={form.category} onChange={(event) => setField("category", event.target.value)} className="mt-1 w-full rounded-lg border border-[#29425b] bg-[#101f2e] px-3 py-2 text-sm text-white"><option value="nhl_trophy">League Awards</option><option value="team_badge">Team Awards</option><option value="achievement">Achievements</option></select></label>
-            <label className="text-xs uppercase tracking-wider text-[#8096aa]">Achievement type<select value={form.achievementType} onChange={(event) => setField("achievementType", event.target.value)} disabled={form.category !== "achievement"} className="mt-1 w-full rounded-lg border border-[#29425b] bg-[#101f2e] px-3 py-2 text-sm text-white"><option value="tiered">Tiered</option><option value="multiplier">Multiplier</option><option value="onetime">One-time</option></select></label>
-            <label className="text-xs uppercase tracking-wider text-[#8096aa]">Trigger type<select value={form.triggerType} onChange={(event) => setField("triggerType", event.target.value)} className="mt-1 w-full rounded-lg border border-[#29425b] bg-[#101f2e] px-3 py-2 text-sm text-white"><option value="metric">Metric</option><option value="event">Event</option><option value="manual">Manual</option></select></label>
+             <label className="text-xs uppercase tracking-wider text-[#8096aa]">
+               Category
+               <Select value={form.category} onValueChange={(value) => setField("category", value)}>
+                 <SelectTrigger className="mt-1 w-full border-[#29425b] bg-[#101f2e] text-sm text-white">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent className="border-[#29425b] bg-[#101f2e] text-white">
+                   <SelectItem value="nhl_trophy" className="focus:bg-[#263c52] focus:text-white">League Awards</SelectItem>
+                   <SelectItem value="team_badge" className="focus:bg-[#263c52] focus:text-white">Team Awards</SelectItem>
+                   <SelectItem value="achievement" className="focus:bg-[#263c52] focus:text-white">Achievements</SelectItem>
+                 </SelectContent>
+               </Select>
+             </label>
+             <label className="text-xs uppercase tracking-wider text-[#8096aa]">
+               Achievement type
+               <Select value={form.achievementType} onValueChange={(value) => setField("achievementType", value)} disabled={form.category !== "achievement"}>
+                 <SelectTrigger className="mt-1 w-full border-[#29425b] bg-[#101f2e] text-sm text-white">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent className="border-[#29425b] bg-[#101f2e] text-white">
+                   <SelectItem value="tiered" className="focus:bg-[#263c52] focus:text-white">Tiered</SelectItem>
+                   <SelectItem value="multiplier" className="focus:bg-[#263c52] focus:text-white">Multiplier</SelectItem>
+                   <SelectItem value="onetime" className="focus:bg-[#263c52] focus:text-white">One-time</SelectItem>
+                 </SelectContent>
+               </Select>
+             </label>
+             <label className="text-xs uppercase tracking-wider text-[#8096aa]">
+               Trigger type
+               <Select value={form.triggerType} onValueChange={(value) => setField("triggerType", value)}>
+                 <SelectTrigger className="mt-1 w-full border-[#29425b] bg-[#101f2e] text-sm text-white">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent className="border-[#29425b] bg-[#101f2e] text-white">
+                   <SelectItem value="metric" className="focus:bg-[#263c52] focus:text-white">Metric</SelectItem>
+                   <SelectItem value="event" className="focus:bg-[#263c52] focus:text-white">Event</SelectItem>
+                   <SelectItem value="manual" className="focus:bg-[#263c52] focus:text-white">Manual</SelectItem>
+                 </SelectContent>
+               </Select>
+             </label>
             <label className="text-xs uppercase tracking-wider text-[#8096aa]">Trigger configuration JSON<input value={form.triggerConfig} onChange={(event) => setField("triggerConfig", event.target.value)} className="mt-1 w-full rounded-lg border border-[#29425b] bg-[#101f2e] px-3 py-2 font-mono text-sm text-white" placeholder='{"threshold": 3}' /></label>
           </div>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
