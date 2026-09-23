@@ -35,16 +35,24 @@ function BadgeArtwork({ badge, large = false }: { badge: Badge; large?: boolean 
 }
 
 function Progress({ badge }: { badge: Badge }) {
-  if (badge.achievementType !== "tiered" || !badge.nextThreshold) return null;
-  const currentTier = badge.tiers.find((tier) => tier.tier === (badge.earnedTiers.at(-1) || badge.tiers[0]?.tier));
+  const hasProgress = badge.achievementType === "tiered" && Boolean(badge.nextThreshold);
+  const currentTier = hasProgress
+    ? badge.tiers.find((tier) => tier.tier === (badge.earnedTiers.at(-1) || badge.tiers[0]?.tier))
+    : undefined;
   const previous = currentTier?.threshold ?? 0;
-  const ratio = Math.min(1, Math.max(0, (badge.currentProgress - previous) / Math.max(1, badge.nextThreshold - previous)));
+  const ratio = hasProgress
+    ? Math.min(1, Math.max(0, (badge.currentProgress - previous) / Math.max(1, badge.nextThreshold! - previous)))
+    : 0;
   return (
-    <div className="mt-2 w-full">
-      <div className="h-1.5 overflow-hidden rounded-full bg-[#1a2a3a]">
-        <div className="h-full rounded-full bg-[#c9a84c] transition-all duration-700" style={{ width: `${ratio * 100}%` }} />
-      </div>
-      <div className="mt-1 text-center text-[9px] text-[#6c8298]">{badge.currentProgress} / {badge.nextThreshold}</div>
+    <div className="mt-2 h-7 w-full" aria-hidden={!hasProgress}>
+      {hasProgress && (
+        <>
+          <div className="h-1.5 overflow-hidden rounded-full bg-[#1a2a3a]">
+            <div className="h-full rounded-full bg-[#c9a84c] transition-all duration-700" style={{ width: `${ratio * 100}%` }} />
+          </div>
+          <div className="mt-1 text-center text-[9px] text-[#6c8298]">{badge.currentProgress} / {badge.nextThreshold}</div>
+        </>
+      )}
     </div>
   );
 }
