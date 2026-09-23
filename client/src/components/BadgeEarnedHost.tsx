@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/context/WebSocketContext";
 
 type EarnedEvent = {
@@ -62,7 +62,7 @@ export function BadgeEarnedHost() {
         <button onClick={dismiss} className="absolute right-4 top-4 text-[#8096aa]"><X size={20} /></button>
         <p className="text-xs font-semibold uppercase tracking-[.24em] text-[#c9a84c]">{tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
         <div className="mx-auto mt-6 flex h-48 w-48 items-center justify-center rounded-full border-2 border-[#c9a84c] bg-[#c9a84c] p-2 animate-[badge-reveal_.4s_ease-out]">
-          {badge.imagePath ? <img src={badge.imagePath} alt="" className="h-full w-full rounded-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#0a1520]">{badge.name || "Badge"}</span>}
+          {badge.imagePath ? <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full rounded-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#0a1520]">{badge.name || "Badge"}</span>}
         </div>
         <h2 className="mt-6 text-3xl font-bold text-white">{badge.name || "New badge"}</h2>
         <p className="mt-2 text-sm text-[#a6b5c2]">{badge.description || "You earned a new badge."}</p>
