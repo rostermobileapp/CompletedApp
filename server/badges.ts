@@ -21,7 +21,7 @@ import { db } from "./db";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
-export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "legend";
+export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "legend" | "god_mode";
 
 export type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
 
@@ -80,6 +80,7 @@ const TIER_COLORS: Record<BadgeTierName, string> = {
   gold: "#C9A84C",
   platinum: "#4a6a8a",
   legend: "#1a0a1a",
+  god_mode: "#F97316",
 };
 
 const defaultTier = (tier: BadgeTierName, threshold: number) => ({
@@ -152,7 +153,7 @@ DEFAULT_BADGES.push(
     defaultTier("bronze", 1), defaultTier("silver", 3), defaultTier("gold", 10), defaultTier("platinum", 25),
   ]),
   achievement("beer_me", "Beer Me", "Post-game dedication.", "tiered", "metric", "season_beers", {}, [
-    defaultTier("bronze", 1), defaultTier("silver", 10), defaultTier("gold", 25), defaultTier("platinum", 50), defaultTier("legend", 100),
+    defaultTier("bronze", 1), defaultTier("silver", 10), defaultTier("gold", 25), defaultTier("platinum", 50), defaultTier("legend", 100), defaultTier("god_mode", 250),
   ]),
   achievement("on_fire", "On Fire", "Multi-game scoring streaks.", "tiered", "metric", "scoring_streak_games", {}, [
     defaultTier("bronze", 3), defaultTier("silver", 5), defaultTier("gold", 10), defaultTier("platinum", 20),

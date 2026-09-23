@@ -4371,6 +4371,7 @@ export const badgeTierEnum = pgEnum("badge_tier", [
   "gold",
   "platinum",
   "legend",
+  "god_mode",
 ]);
 
 export const badgeTriggerTypeEnum = pgEnum("badge_trigger_type", [

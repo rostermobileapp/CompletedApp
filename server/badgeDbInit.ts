@@ -16,6 +16,9 @@ export async function ensureBadgeTables() {
       CREATE TYPE badge_tier AS ENUM ('bronze', 'silver', 'gold', 'platinum', 'legend');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     DO $$ BEGIN
+      ALTER TYPE badge_tier ADD VALUE IF NOT EXISTS 'god_mode';
+    EXCEPTION WHEN undefined_object THEN NULL; END $$;
+    DO $$ BEGIN
       CREATE TYPE badge_trigger_type AS ENUM ('manual', 'metric', 'event');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     DO $$ BEGIN
