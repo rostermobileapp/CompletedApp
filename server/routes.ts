@@ -1071,6 +1071,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/trophy-case', isAuthenticated, async (req: any, res) => {
     try {
       const viewer = await storage.getUser(currentUserId(req));
+      if (viewer?.displayId !== "U00001") {
+        return res.status(403).json({
+          code: "TROPHY_CASE_IN_TESTING",
+          message: "In Testing",
+        });
+      }
       const access = getTrophyCaseAccess(viewer?.dateOfBirth);
       if (access !== "eligible") {
         return res.status(403).json({

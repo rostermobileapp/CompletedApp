@@ -11,7 +11,7 @@ type Badge = {
   earnedTiers: string[]; earnedAt?: string | null; lockedHint?: string | null; tiers: Tier[];
 };
 type Section = { category: string; label: string; badges: Badge[] };
-type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
+type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21" | "testing";
 
 function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new Date()): TrophyCaseAccess {
   if (!dateOfBirth) return "missing_dob";
@@ -90,8 +90,12 @@ export default function TrophyCase() {
   const [open, setOpen] = useState<Record<string, boolean>>({ nhl_trophy: true, team_badge: true, achievement: true });
   const [selected, setSelected] = useState<Badge | null>(null);
   const [revealingId, setRevealingId] = useState<string | null>(null);
-  const { data: user, isLoading: isUserLoading } = useQuery<{ dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
-  const ageAccess = isUserLoading ? "loading" : getTrophyCaseAccess(user?.dateOfBirth);
+  const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
+  const ageAccess = isUserLoading
+    ? "loading"
+    : user?.displayId !== "U00001"
+      ? "testing"
+      : getTrophyCaseAccess(user?.dateOfBirth);
   const { data, isLoading, isError } = useQuery<{ sections: Section[] }>({
     queryKey: ["/api/trophy-case"],
     enabled: ageAccess === "eligible",
@@ -121,18 +125,27 @@ export default function TrophyCase() {
         {ageAccess !== "loading" && ageAccess !== "eligible" && (
           <div className="mx-auto max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-8 text-center">
             <Lock className="mx-auto text-[#c9a84c]" size={28} />
-            <h2 className="mt-4 text-xl font-bold text-[#e8e4dc]">Age verification required</h2>
-            <p className="mt-2 text-sm text-[#a6b5c2]">
-              {ageAccess === "under_21"
-                ? "The Trophy Case is available only to users who are 21 or older."
-                : "Enter your date of birth in your profile so we can verify that you are 21 or older."}
-            </p>
-            <button
-              onClick={() => navigate("/profile")}
-              className="mt-6 rounded-xl border border-[#c9a84c] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10"
-            >
-              Go to Profile
-            </button>
+            {ageAccess === "testing" ? (
+              <>
+                <h2 className="mt-4 text-xl font-bold text-[#e8e4dc]">In Testing</h2>
+                <p className="mt-2 text-sm text-[#a6b5c2]">The Trophy Case is currently available only to User U00001.</p>
+              </>
+            ) : (
+              <>
+                <h2 className="mt-4 text-xl font-bold text-[#e8e4dc]">Age verification required</h2>
+                <p className="mt-2 text-sm text-[#a6b5c2]">
+                  {ageAccess === "under_21"
+                    ? "The Trophy Case is available only to users who are 21 or older."
+                    : "Enter your date of birth in your profile so we can verify that you are 21 or older."}
+                </p>
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="mt-6 rounded-xl border border-[#c9a84c] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10"
+                >
+                  Go to Profile
+                </button>
+              </>
+            )}
           </div>
         )}
         {ageAccess === "eligible" && (
