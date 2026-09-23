@@ -69,18 +69,17 @@ function BadgeArtwork({
   large?: boolean;
 }) {
   const imagePath = tier?.imagePath || badge.imagePath;
-  const size = large ? "h-56 w-56" : "h-20 w-20";
+  const size = large ? "aspect-square h-auto w-[95%] max-w-[26rem] sm:w-[88%]" : "h-20 w-20";
   return (
     <div className={`${size} relative flex items-center justify-center overflow-hidden rounded-full border-2 ${earned ? "border-[#c9a84c]" : "border-[#263c52]"}`}
       style={{ background: earned ? (tier?.color || badge.placeholderColor || "#c9a84c") : "#111d29" }}>
-      {imagePath ? (
+      {earned && imagePath ? (
         <img src={imagePath} alt={`${badge.name}${tier ? ` ${formatTier(tier.tier)}` : ""}`} className={`h-full w-full object-contain ${earned ? "" : "grayscale brightness-[.22]"}`} />
-      ) : (
+      ) : earned ? (
         <span className={`px-2 text-center text-[10px] font-bold uppercase tracking-wider ${earned ? "text-[#0a1520]" : "text-[#3a5a7a]"}`}>
-          {earned ? badge.name : "?"}
+          {badge.name}
         </span>
-      )}
-      {!earned && <span className="absolute text-2xl font-bold text-[#c9a84c]">?</span>}
+      ) : null}
       {!tier && badge.achievementType === "multiplier" && badge.count > 0 && (
         <span className="absolute right-0 top-0 rounded-full bg-[#c9a84c] px-1.5 py-0.5 text-[10px] font-bold text-[#0a1520]">×{badge.count}</span>
       )}
