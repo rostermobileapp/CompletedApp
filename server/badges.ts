@@ -23,6 +23,35 @@ export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
 export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "legend";
 
+export type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
+
+export function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new Date()): TrophyCaseAccess {
+  if (!dateOfBirth) return "missing_dob";
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+  if (!match) return "invalid_dob";
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+    || parsed > today
+  ) {
+    return "invalid_dob";
+  }
+
+  let age = today.getFullYear() - year;
+  const birthdayHasPassed = today.getMonth() > month - 1
+    || (today.getMonth() === month - 1 && today.getDate() >= day);
+  if (!birthdayHasPassed) age -= 1;
+
+  return age >= 21 ? "eligible" : "under_21";
+}
+
 export type BadgeCatalogInput = {
   slug?: string;
   name: string;

@@ -126,6 +126,7 @@ import {
   evaluateBadgesForUser,
   getBadgeCatalog,
   getPendingBadgeEvents,
+  getTrophyCaseAccess,
   getTrophyCase,
 } from "./badges";
 import { ensureBadgeTables } from "./badgeDbInit";
@@ -1069,6 +1070,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/trophy-case', isAuthenticated, async (req: any, res) => {
     try {
+      const viewer = await storage.getUser(currentUserId(req));
+      const access = getTrophyCaseAccess(viewer?.dateOfBirth);
+      if (access !== "eligible") {
+        return res.status(403).json({
+          code: "TROPHY_CASE_AGE_REQUIRED",
+          reason: access,
+          message: access === "under_21"
+            ? "The Trophy Case is available only to users age 21 and older."
+            : "Enter your date of birth in your profile to verify that you are age 21 or older.",
+        });
+      }
       const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : currentUserId(req);
       res.json({ sections: await getTrophyCase(requestedUserId) });
     } catch (error) {

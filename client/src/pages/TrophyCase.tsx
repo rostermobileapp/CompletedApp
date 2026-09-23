@@ -11,6 +11,34 @@ type Badge = {
   earnedTiers: string[]; earnedAt?: string | null; lockedHint?: string | null; tiers: Tier[];
 };
 type Section = { category: string; label: string; badges: Badge[] };
+type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
+
+function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new Date()): TrophyCaseAccess {
+  if (!dateOfBirth) return "missing_dob";
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+  if (!match) return "invalid_dob";
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+    || parsed > today
+  ) {
+    return "invalid_dob";
+  }
+
+  let age = today.getFullYear() - year;
+  const birthdayHasPassed = today.getMonth() > month - 1
+    || (today.getMonth() === month - 1 && today.getDate() >= day);
+  if (!birthdayHasPassed) age -= 1;
+
+  return age >= 21 ? "eligible" : "under_21";
+}
 
 function BadgeArtwork({ badge, large = false }: { badge: Badge; large?: boolean }) {
   const tier = badge.tiers.find((item) => badge.earnedTiers.includes(item.tier)) ?? badge.tiers.at(-1);
@@ -62,7 +90,12 @@ export default function TrophyCase() {
   const [open, setOpen] = useState<Record<string, boolean>>({ nhl_trophy: true, team_badge: true, achievement: true });
   const [selected, setSelected] = useState<Badge | null>(null);
   const [revealingId, setRevealingId] = useState<string | null>(null);
-  const { data, isLoading, isError } = useQuery<{ sections: Section[] }>({ queryKey: ["/api/trophy-case"] });
+  const { data: user, isLoading: isUserLoading } = useQuery<{ dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
+  const ageAccess = isUserLoading ? "loading" : getTrophyCaseAccess(user?.dateOfBirth);
+  const { data, isLoading, isError } = useQuery<{ sections: Section[] }>({
+    queryKey: ["/api/trophy-case"],
+    enabled: ageAccess === "eligible",
+  });
   const selectBadge = (badge: Badge) => {
     setSelected(badge);
     setRevealingId(badge.id);
@@ -82,33 +115,57 @@ export default function TrophyCase() {
           <h1 className="mt-2 text-3xl font-bold tracking-tight">Trophy Case</h1>
           <p className="mt-2 max-w-xl text-sm text-[#8096aa]">Your league awards, team badges, and career achievements.</p>
         </div>
-        {isLoading && <div className="rounded-2xl border border-[#20374c] p-8 text-center text-[#8096aa]">Loading your trophy case…</div>}
-        {isError && <div className="rounded-2xl border border-red-900/60 bg-red-950/20 p-8 text-center text-red-200">Could not load your trophy case.</div>}
-        <div className="space-y-8">
-          {data?.sections.map((section) => (
-            <section key={section.category}>
-              <button className="flex w-full items-center gap-3 text-left" onClick={() => setOpen((value) => ({ ...value, [section.category]: !value[section.category] }))}>
-                <span className="h-px flex-1 bg-[#29425b]" />
-                <span className="text-xs font-semibold uppercase tracking-[.22em] text-[#3a5a7a]">{section.label}</span>
-                {open[section.category] ? <ChevronUp size={15} className="text-[#3a5a7a]" /> : <ChevronDown size={15} className="text-[#3a5a7a]" />}
-                <span className="h-px flex-1 bg-[#29425b]" />
-              </button>
-              {open[section.category] && (
-                <div className="mt-5 grid grid-cols-4 gap-3 sm:grid-cols-5 sm:gap-5">
-                  {section.badges.map((badge) => (
-                    <button key={badge.id} onClick={() => selectBadge(badge)} className="group min-w-0 text-center">
-                      <div className={`relative mx-auto w-fit transition-transform group-hover:-translate-y-1 ${revealingId === badge.id ? "badge-click-pop" : ""}`}><BadgeArtwork badge={badge} /></div>
-                      <div className={`mt-2 truncate text-[10px] font-semibold uppercase tracking-wider ${badge.isEarned ? "text-[#c9a84c]" : "text-[#3a5a7a]"}`}>
-                        {badge.isEarned ? badge.name : "???"}
-                      </div>
-                      <Progress badge={badge} />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
-        </div>
+        {ageAccess === "loading" && (
+          <div className="rounded-2xl border border-[#20374c] p-8 text-center text-[#8096aa]">Verifying your age…</div>
+        )}
+        {ageAccess !== "loading" && ageAccess !== "eligible" && (
+          <div className="mx-auto max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-8 text-center">
+            <Lock className="mx-auto text-[#c9a84c]" size={28} />
+            <h2 className="mt-4 text-xl font-bold text-[#e8e4dc]">Age verification required</h2>
+            <p className="mt-2 text-sm text-[#a6b5c2]">
+              {ageAccess === "under_21"
+                ? "The Trophy Case is available only to users who are 21 or older."
+                : "Enter your date of birth in your profile so we can verify that you are 21 or older."}
+            </p>
+            <button
+              onClick={() => navigate("/profile")}
+              className="mt-6 rounded-xl border border-[#c9a84c] px-5 py-3 text-xs font-bold uppercase tracking-wider text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10"
+            >
+              Go to Profile
+            </button>
+          </div>
+        )}
+        {ageAccess === "eligible" && (
+          <>
+            {isLoading && <div className="rounded-2xl border border-[#20374c] p-8 text-center text-[#8096aa]">Loading your trophy case…</div>}
+            {isError && <div className="rounded-2xl border border-red-900/60 bg-red-950/20 p-8 text-center text-red-200">Could not load your trophy case.</div>}
+            <div className="space-y-8">
+              {data?.sections.map((section) => (
+                <section key={section.category}>
+                  <button className="flex w-full items-center gap-3 text-left" onClick={() => setOpen((value) => ({ ...value, [section.category]: !value[section.category] }))}>
+                    <span className="h-px flex-1 bg-[#29425b]" />
+                    <span className="text-xs font-semibold uppercase tracking-[.22em] text-[#3a5a7a]">{section.label}</span>
+                    {open[section.category] ? <ChevronUp size={15} className="text-[#3a5a7a]" /> : <ChevronDown size={15} className="text-[#3a5a7a]" />}
+                    <span className="h-px flex-1 bg-[#29425b]" />
+                  </button>
+                  {open[section.category] && (
+                    <div className="mt-5 grid grid-cols-4 gap-3 sm:grid-cols-5 sm:gap-5">
+                      {section.badges.map((badge) => (
+                        <button key={badge.id} onClick={() => selectBadge(badge)} className="group min-w-0 text-center">
+                          <div className={`relative mx-auto w-fit transition-transform group-hover:-translate-y-1 ${revealingId === badge.id ? "badge-click-pop" : ""}`}><BadgeArtwork badge={badge} /></div>
+                          <div className={`mt-2 truncate text-[10px] font-semibold uppercase tracking-wider ${badge.isEarned ? "text-[#c9a84c]" : "text-[#3a5a7a]"}`}>
+                            {badge.isEarned ? badge.name : "???"}
+                          </div>
+                          <Progress badge={badge} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={closeBadge}>
