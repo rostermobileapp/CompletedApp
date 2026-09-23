@@ -1088,7 +1088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : currentUserId(req);
-      res.json({ sections: await getTrophyCase(requestedUserId) });
+      res.json(await getTrophyCase(requestedUserId));
     } catch (error) {
       console.error('[Badges] Failed to load trophy case:', error);
       res.status(500).json({ message: 'Failed to load trophy case' });

@@ -422,9 +422,16 @@ export async function awardManualBadge(input: {
 
 export async function getTrophyCase(userId: string) {
   const definitions = await definitionsWithTiers();
-  const [awards, progress] = await Promise.all([
+  const [awards, progress, goalieMembership, goalieAppearance] = await Promise.all([
     db.select().from(badgeAwards).where(eq(badgeAwards.userId, userId)).orderBy(desc(badgeAwards.awardedAt)),
     db.select().from(badgeProgress).where(eq(badgeProgress.userId, userId)),
+    db.select({ id: leagueMemberships.id }).from(leagueMemberships).where(and(
+      eq(leagueMemberships.userId, userId),
+      eq(leagueMemberships.isGoalie, true),
+      eq(leagueMemberships.status, "approved"),
+    )).limit(1),
+    db.select({ gameId: gameGoalies.gameId }).from(gameGoalies)
+      .where(eq(gameGoalies.goalieUserId, userId)).limit(1),
   ]);
   const awardsByDefinition = new Map<string, typeof awards>();
   for (const award of awards) awardsByDefinition.set(award.badgeDefinitionId, [...(awardsByDefinition.get(award.badgeDefinitionId) ?? []), award]);
@@ -449,11 +456,14 @@ export async function getTrophyCase(userId: string) {
       awards: definitionAwards,
     };
   });
-  return (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
-    category,
-    label: CATEGORY_LABELS[category],
-    badges: badges.filter((badge) => badge.category === category),
-  }));
+  return {
+    isGoalie: goalieMembership.length > 0 || goalieAppearance.length > 0,
+    sections: (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
+      category,
+      label: CATEGORY_LABELS[category],
+      badges: badges.filter((badge) => badge.category === category),
+    })),
+  };
 }
 
 export async function getPendingBadgeEvents(userId: string) {
