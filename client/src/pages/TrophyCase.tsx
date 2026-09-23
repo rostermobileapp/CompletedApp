@@ -69,7 +69,7 @@ function BadgeArtwork({
   large?: boolean;
 }) {
   const imagePath = tier?.imagePath || badge.imagePath;
-  const size = large ? "h-44 w-44" : "h-20 w-20";
+  const size = large ? "h-56 w-56" : "h-20 w-20";
   return (
     <div className={`${size} relative flex items-center justify-center overflow-hidden rounded-full border-2 ${earned ? "border-[#c9a84c]" : "border-[#263c52]"}`}
       style={{ background: earned ? (tier?.color || badge.placeholderColor || "#c9a84c") : "#111d29" }}>
@@ -270,7 +270,7 @@ export default function TrophyCase() {
       </div>
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={closeBadge}>
-          <div className="w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6" onClick={(event) => event.stopPropagation()}>
+          <div className={`badge-detail-card w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex justify-end"><button onClick={closeBadge} className="text-[#8096aa]"><X size={20} /></button></div>
             <div className={`flex flex-col items-center text-center ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-reveal" : ""}`}><BadgeArtwork badge={selected.badge} tier={selected.tier} earned={selected.tier ? selected.badge.earnedTiers.includes(selected.tier.tier) || selected.badge.currentProgress >= selected.tier.threshold : selected.badge.isEarned} large /></div>
             <h2 className={`mt-5 text-center text-2xl font-bold ${selected.badge.isEarned ? "text-[#c9a84c]" : "text-[#8096aa]"}`}>{selected.badge.isEarned ? selected.badge.name : "???"}</h2>

@@ -109,6 +109,33 @@
   100% { opacity: 1; transform: scale(1) rotate(0deg); filter: brightness(1); }
 }
 
+@keyframes badge-card-twist-in {
+  0% {
+    opacity: 0;
+    transform: translateY(34px) scale(.62) rotateX(18deg) rotateY(-28deg) rotateZ(-4deg);
+  }
+  38% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.035) rotateX(-3deg) rotateY(9deg) rotateZ(1deg);
+  }
+  70% {
+    transform: translateY(1px) scale(.99) rotateX(1deg) rotateY(-3deg) rotateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0) rotateY(0) rotateZ(0);
+  }
+}
+
+.badge-detail-card {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.badge-detail-card-active {
+  animation: badge-card-twist-in .72s cubic-bezier(.2,.8,.2,1) both;
+}
+
 .badge-click-pop {
   animation: badge-click-pop .55s cubic-bezier(.2,.8,.2,1) both;
 }
@@ -142,7 +169,8 @@
   .badge-click-pop,
   .badge-click-pop::before,
   .badge-click-pop::after,
-  .badge-detail-reveal {
+  .badge-detail-reveal,
+  .badge-detail-card-active {
     animation: none;
   }
 }
