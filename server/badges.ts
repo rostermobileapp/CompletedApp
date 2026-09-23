@@ -270,11 +270,6 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
       `);
       return Number((result.rows?.[0] as any)?.count ?? 0);
     }
-    case "consecutive_games_played":
-    case "consecutive_games_out":
-    case "scoring_streak_games":
-      return Number((await db.select({ value: playerStats.gamesPlayed }).from(playerStats)
-        .where(eq(playerStats.userId, userId)).orderBy(desc(playerStats.updatedAt)).limit(1))[0]?.value ?? 0);
     case "career_shutouts":
       return Number((await db.select({ count: sql<number>`count(*)::int` })
         .from(gameGoalies).innerJoin(games, eq(gameGoalies.gameId, games.id))

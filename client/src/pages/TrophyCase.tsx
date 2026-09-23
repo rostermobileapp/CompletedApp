@@ -93,8 +93,8 @@ export default function TrophyCase() {
         </div>
       </div>
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-6" onClick={() => setSelected(null)}>
-          <div className="w-full max-w-lg rounded-t-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6 sm:rounded-3xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={() => setSelected(null)}>
+          <div className="w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6" onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex justify-end"><button onClick={() => setSelected(null)} className="text-[#8096aa]"><X size={20} /></button></div>
             <div className="flex flex-col items-center text-center"><BadgeArtwork badge={selected} large /></div>
             <h2 className={`mt-5 text-center text-2xl font-bold ${selected.isEarned ? "text-[#c9a84c]" : "text-[#8096aa]"}`}>{selected.isEarned ? selected.name : "???"}</h2>
