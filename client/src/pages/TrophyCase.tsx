@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Lock, X } from "lucide-react";
+import { getImageUrl } from "@/lib/queryClient";
 
 type Tier = { tier: string; threshold: number; imagePath?: string | null; color?: string | null };
 type Badge = {
@@ -74,7 +75,7 @@ function BadgeArtwork({
     <div className={`${size} relative flex items-center justify-center overflow-hidden rounded-full border-2 ${earned ? "border-[#c9a84c]" : "border-[#263c52]"}`}
       style={{ background: earned ? (tier?.color || badge.placeholderColor || "#c9a84c") : "#111d29" }}>
       {earned && imagePath ? (
-        <img src={imagePath} alt={`${badge.name}${tier ? ` ${formatTier(tier.tier)}` : ""}`} className={`h-full w-full object-contain ${earned ? "" : "grayscale brightness-[.22]"}`} />
+        <img src={getImageUrl(imagePath) ?? undefined} alt={`${badge.name}${tier ? ` ${formatTier(tier.tier)}` : ""}`} className={`h-full w-full object-contain ${earned ? "" : "grayscale brightness-[.22]"}`} />
       ) : earned ? (
         <span className={`px-2 text-center text-[10px] font-bold uppercase tracking-wider ${earned ? "text-[#0a1520]" : "text-[#3a5a7a]"}`}>
           {badge.name}
