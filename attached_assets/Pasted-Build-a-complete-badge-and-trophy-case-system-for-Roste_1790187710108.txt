@@ -1,0 +1,608 @@
+Build a complete badge and trophy case system for Roster Hockey, a hockey team and league management iOS/Android app built in React Native. This document is the full specification. Build exactly what is described here — do not simplify, do not make assumptions, do not substitute libraries without noting it.
+
+SYSTEM OVERVIEW
+
+Players earn badges across three categories. Badges live in a Trophy Case on their profile. When a badge is earned, a modal interrupts the current screen to present it. All badges are hidden until earned — shown as a silhouette with a ?. Progress bars appear under unearned tiered badges so players know they are making progress even though the badge is locked.
+
+The system is fully data-driven. Adding a new badge, a new tier, or a new category requires zero changes to component code — only config file edits.
+
+BADGE CATEGORIES & TYPES
+
+Category 1 — NHL Trophy Patches
+League-wide awards identical to real NHL awards (Hart, Vezina, Norris, Art Ross, Maurice Richard, Lady Byng, Selke, Conn Smythe, William Jennings, Jack Adams). Awarded manually by league admins. One-time. No progress bar.
+
+Category 2 — Team Badges
+Awarded by team captains to individual players. One-time per season. No progress bar. Default badges: The Bender, The Architect, The Brick Wall, The Enforcer, The Sniper, The Houseplant, The Iron Man. Captains can also create custom badges.
+
+Category 3 — Achievements
+Three sub-types:
+
+Multiplier — earned repeatedly, counter increments. Badges: RSVP King, Team Player.
+Tiered — four tiers (Bronze → Silver → Gold → Platinum). Beer Me has five tiers (Bronze → Silver → Gold → Platinum → Legend). Badges: Hat Trick, Iron Man, Century Club, Broom, Beer Me, On Fire, 3 Stars.
+One-time — unlocks once permanently. Badges: Rookie Card, Sub, League Hopper, Early Bird, Ghost, Sub Magnet.
+DATA SCHEMA
+typescript
+type BadgeCategory = 'nhl_trophy' | 'team_badge' | 'achievement';
+type AchievementType = 'multiplier' | 'tiered' | 'onetime';
+type Tier = 'bronze' | 'silver' | 'gold' | 'platinum' | 'legend';
+
+interface BadgeDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: BadgeCategory;
+  achievementType?: AchievementType;
+  imageAsset?: string;
+  tiers?: {
+    tier: Tier;
+    threshold: number;
+    imageAsset: string;
+  }[];
+}
+
+interface PlayerBadgeState {
+  badgeId: string;
+  isEarned: boolean;
+  earnedAt?: Date;
+  count?: number;              // multiplier badges
+  earnedTiers?: Tier[];        // tiered badges
+  currentProgress?: number;   // toward next tier
+}
+
+interface PlayerStats {
+  playerId: string;
+  career_games_played: number;
+  career_hat_tricks: number;
+  career_shutouts: number;
+  career_three_stars: number;
+  career_sub_appearances: number;
+  career_leagues_played: number;
+  consecutive_games_played: number;
+  consecutive_games_out: number;
+  scoring_streak_games: number;
+  season_beers: number;
+  season_first_rsvp_streak: boolean;
+  season_most_subs: number;
+  season_most_subs_winner: boolean;
+  season_48hr_rsvp_perfect: boolean;
+  first_game_logged: boolean;
+  first_sub_appearance: boolean;
+}
+CONFIG FILES
+
+All badge logic lives in config files. Components never contain badge-specific logic.
+
+/config/badges.ts
+typescript
+export const BADGE_REGISTRY: BadgeDefinition[] = [
+  {
+    id: 'hat_trick',
+    name: 'Hat Trick',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Score 3 goals in a single game.',
+    tiers: [
+      { tier: 'bronze',   threshold: 1,  imageAsset: 'achievement_hat_trick_bronze.png' },
+      { tier: 'silver',   threshold: 3,  imageAsset: 'achievement_hat_trick_silver.png' },
+      { tier: 'gold',     threshold: 5,  imageAsset: 'achievement_hat_trick_gold.png' },
+      { tier: 'platinum', threshold: 10, imageAsset: 'achievement_hat_trick_platinum.png' },
+    ],
+  },
+  {
+    id: 'iron_man',
+    name: 'Iron Man',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Play consecutive games without missing one.',
+    tiers: [
+      { tier: 'bronze',   threshold: 5,  imageAsset: 'achievement_iron_man_bronze.png' },
+      { tier: 'silver',   threshold: 10, imageAsset: 'achievement_iron_man_silver.png' },
+      { tier: 'gold',     threshold: 15, imageAsset: 'achievement_iron_man_gold.png' },
+      { tier: 'platinum', threshold: 25, imageAsset: 'achievement_iron_man_platinum.png' },
+    ],
+  },
+  {
+    id: 'century_club',
+    name: 'Century Club',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Total games played.',
+    tiers: [
+      { tier: 'bronze',   threshold: 25,  imageAsset: 'achievement_century_club_bronze.png' },
+      { tier: 'silver',   threshold: 50,  imageAsset: 'achievement_century_club_silver.png' },
+      { tier: 'gold',     threshold: 100, imageAsset: 'achievement_century_club_gold.png' },
+      { tier: 'platinum', threshold: 250, imageAsset: 'achievement_century_club_platinum.png' },
+    ],
+  },
+  {
+    id: 'broom',
+    name: 'Broom',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Career shutouts as a goalie.',
+    tiers: [
+      { tier: 'bronze',   threshold: 1,  imageAsset: 'achievement_broom_bronze.png' },
+      { tier: 'silver',   threshold: 3,  imageAsset: 'achievement_broom_silver.png' },
+      { tier: 'gold',     threshold: 10, imageAsset: 'achievement_broom_gold.png' },
+      { tier: 'platinum', threshold: 25, imageAsset: 'achievement_broom_platinum.png' },
+    ],
+  },
+  {
+    id: 'beer_me',
+    name: 'Beer Me',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Post-game dedication.',
+    tiers: [
+      { tier: 'bronze',   threshold: 1,   imageAsset: 'achievement_beer_me_bronze.png' },
+      { tier: 'silver',   threshold: 10,  imageAsset: 'achievement_beer_me_silver.png' },
+      { tier: 'gold',     threshold: 25,  imageAsset: 'achievement_beer_me_gold.png' },
+      { tier: 'platinum', threshold: 50,  imageAsset: 'achievement_beer_me_platinum.png' },
+      { tier: 'legend',   threshold: 100, imageAsset: 'achievement_beer_me_legend.png' },
+    ],
+  },
+  {
+    id: 'on_fire',
+    name: 'On Fire',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Multi-game scoring streaks.',
+    tiers: [
+      { tier: 'bronze',   threshold: 3,  imageAsset: 'achievement_on_fire_bronze.png' },
+      { tier: 'silver',   threshold: 5,  imageAsset: 'achievement_on_fire_silver.png' },
+      { tier: 'gold',     threshold: 10, imageAsset: 'achievement_on_fire_gold.png' },
+      { tier: 'platinum', threshold: 20, imageAsset: 'achievement_on_fire_platinum.png' },
+    ],
+  },
+  {
+    id: 'three_stars',
+    name: '3 Stars',
+    category: 'achievement',
+    achievementType: 'tiered',
+    description: 'Named one of the 3 stars of the game.',
+    tiers: [
+      { tier: 'bronze',   threshold: 5,  imageAsset: 'achievement_three_stars_bronze.png' },
+      { tier: 'silver',   threshold: 10, imageAsset: 'achievement_three_stars_silver.png' },
+      { tier: 'gold',     threshold: 15, imageAsset: 'achievement_three_stars_gold.png' },
+      { tier: 'platinum', threshold: 25, imageAsset: 'achievement_three_stars_platinum.png' },
+    ],
+  },
+  {
+    id: 'rsvp_king',
+    name: 'RSVP King',
+    category: 'achievement',
+    achievementType: 'multiplier',
+    description: 'First to respond to every game invite in a season.',
+    imageAsset: 'achievement_rsvp_king_multiplier.png',
+  },
+  {
+    id: 'team_player',
+    name: 'Team Player',
+    category: 'achievement',
+    achievementType: 'multiplier',
+    description: 'Filled a sub spot for another team.',
+    imageAsset: 'achievement_team_player_multiplier.png',
+  },
+  {
+    id: 'rookie_card',
+    name: 'Rookie Card',
+    category: 'achievement',
+    achievementType: 'onetime',
+    description: 'Your first game ever logged on Roster.',
+    imageAsset: 'achievement_rookie_card_onetime.png',
+  },
+  {
+    id: 'sub',
+    name: 'Sub',
+    category: 'achievement',
+    achievementType: 'onetime',
+    description: 'First time subbing in for another player.',
+    imageAsset: 'achievement_sub_onetime.png',
+  },
+  {
+    id: 'league_hopper',
+    name: 'League Hopper',
+    category: 'achievement',
+    achievementType: 'onetime',
+    description: 'Played in 3 or more different leagues.',
+    imageAsset: 'achievement_league_hopper_onetime.png',
+  },
+  {
+    id: 'early_bird',
+    name: 'Early Bird',
+    category: 'achievement',
+    achievementType: 'onetime',
+    description: "RSVP'd Yes more than 48 hours before every game in a season.",
+    imageAsset: 'achievement_early_bird_onetime.png',
+  },
+  {
+    id: 'ghost',
+    name: 'Ghost',
+    category: 'achievement',
+    achievementType: 'onetime',
+    description: 'Marked Out for 3 or more games in a row.',
+    imageAsset: 'achievement_ghost_onetime.png',
+  },
+  {
+    id: 'sub_magnet',
+    name: 'Sub Magnet',
+    category: 'achievement',
+    achievementType: 'onetime',
+    description: 'Had the most subs fill in for you across a season.',
+    imageAsset: 'achievement_sub_magnet_onetime.png',
+  },
+  // NHL Trophies
+  { id: 'hart_trophy',      name: 'Hart Trophy',            category: 'nhl_trophy', description: 'Most Valuable Player.',        imageAsset: 'trophy_hart.png' },
+  { id: 'vezina_trophy',    name: 'Vezina Trophy',          category: 'nhl_trophy', description: 'Best Goaltender.',             imageAsset: 'trophy_vezina.png' },
+  { id: 'norris_trophy',    name: 'Norris Trophy',          category: 'nhl_trophy', description: 'Best Defenseman.',             imageAsset: 'trophy_norris.png' },
+  { id: 'art_ross_trophy',  name: 'Art Ross Trophy',        category: 'nhl_trophy', description: 'Points Leader.',               imageAsset: 'trophy_art_ross.png' },
+  { id: 'richard_trophy',   name: 'Maurice Richard Trophy', category: 'nhl_trophy', description: 'Goals Leader.',                imageAsset: 'trophy_richard.png' },
+  { id: 'lady_byng_trophy', name: 'Lady Byng Trophy',       category: 'nhl_trophy', description: 'Sportsmanship.',               imageAsset: 'trophy_lady_byng.png' },
+  { id: 'selke_trophy',     name: 'Selke Trophy',           category: 'nhl_trophy', description: 'Best Defensive Forward.',      imageAsset: 'trophy_selke.png' },
+  { id: 'conn_smythe',      name: 'Conn Smythe Trophy',     category: 'nhl_trophy', description: 'Playoff MVP.',                 imageAsset: 'trophy_conn_smythe.png' },
+  { id: 'jennings_trophy',  name: 'William Jennings Trophy',category: 'nhl_trophy', description: 'Fewest Goals Against.',        imageAsset: 'trophy_jennings.png' },
+  { id: 'jack_adams',       name: 'Jack Adams Award',       category: 'nhl_trophy', description: 'Coach of the Year.',           imageAsset: 'trophy_jack_adams.png' },
+  // Team Badges
+  { id: 'the_bender',      name: 'The Bender',      category: 'team_badge', description: 'Should not have laced up... but did anyway.', imageAsset: 'badge_bender.png' },
+  { id: 'the_architect',   name: 'The Architect',   category: 'team_badge', description: 'Most assists on the season.',                  imageAsset: 'badge_architect.png' },
+  { id: 'the_brick_wall',  name: 'The Brick Wall',  category: 'team_badge', description: 'Fewest goals allowed.',                        imageAsset: 'badge_brick_wall.png' },
+  { id: 'the_enforcer',    name: 'The Enforcer',    category: 'team_badge', description: 'Most penalty minutes.',                        imageAsset: 'badge_enforcer.png' },
+  { id: 'the_sniper',      name: 'The Sniper',      category: 'team_badge', description: 'Led the team in goals.',                       imageAsset: 'badge_sniper.png' },
+  { id: 'the_houseplant',  name: 'The Houseplant',  category: 'team_badge', description: 'Most games played, fewest points.',             imageAsset: 'badge_houseplant.png' },
+  { id: 'the_iron_man',    name: 'The Iron Man',    category: 'team_badge', description: 'Played every single game.',                    imageAsset: 'badge_iron_man.png' },
+];
+/config/tiers.ts
+typescript
+export const TIER_CONFIG: Record<string, TierConfig> = {
+  bronze:   { label: 'Bronze',   color: '#8B5A1A', ringColor: '#8B5A1A' },
+  silver:   { label: 'Silver',   color: '#909090', ringColor: '#C0C0C0' },
+  gold:     { label: 'Gold',     color: '#C9A84C', ringColor: '#E8C96A' },
+  platinum: { label: 'Platinum', color: '#4a6a8a', ringColor: '#B0C4DE' },
+  legend:   { label: 'Legend',   color: '#1a0a1a', ringColor: '#E8E4DC' },
+};
+/config/categories.ts
+typescript
+export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
+  nhl_trophy: { label: 'LEAGUE AWARDS', sectionOrder: 1 },
+  team_badge:  { label: 'TEAM AWARDS',  sectionOrder: 2 },
+  achievement: { label: 'ACHIEVEMENTS', sectionOrder: 3 },
+};
+/config/triggers.ts
+typescript
+export const BADGE_TRIGGERS: Record<string, BadgeTrigger> = {
+  hat_trick:     { stat: 'career_hat_tricks',          type: 'tiered' },
+  iron_man:      { stat: 'consecutive_games_played',   type: 'tiered' },
+  century_club:  { stat: 'career_games_played',        type: 'tiered' },
+  broom:         { stat: 'career_shutouts',            type: 'tiered' },
+  beer_me:       { stat: 'season_beers',               type: 'tiered' },
+  on_fire:       { stat: 'scoring_streak_games',       type: 'tiered' },
+  three_stars:   { stat: 'career_three_stars',         type: 'tiered' },
+  rsvp_king:     { stat: 'season_first_rsvp_streak',   type: 'multiplier' },
+  team_player:   { stat: 'career_sub_appearances',     type: 'multiplier' },
+  rookie_card:   { event: 'first_game_logged',         type: 'onetime' },
+  sub:           { event: 'first_sub_appearance',      type: 'onetime' },
+  league_hopper: { stat: 'career_leagues_played',      type: 'onetime', threshold: 3 },
+  early_bird:    { event: 'season_48hr_rsvp_perfect',  type: 'onetime' },
+  ghost:         { stat: 'consecutive_games_out',      type: 'onetime', threshold: 3 },
+  sub_magnet:    { event: 'season_most_subs_winner',   type: 'onetime' },
+};
+TRIGGER ARCHITECTURE
+Core principle
+User action → StatService.update() → BadgeEvaluator.evaluate() → Award if threshold met → BadgeEventBus.emit() → Modal fires
+
+No feature ever calls awardBadge() directly. Features update stats. The evaluator handles everything else.
+
+StatService
+typescript
+// /services/StatService.ts
+
+class StatService {
+  async update(playerId: string, updates: Partial<PlayerStats>): Promise<void> {
+    const updatedStats = await StatRepository.update(playerId, updates);
+    await BadgeEvaluator.evaluate(playerId, updatedStats);
+  }
+
+  async recordGame(playerId: string, didPlay: boolean) {
+    if (didPlay) {
+      await this.update(playerId, {
+        career_games_played: increment(1),
+        consecutive_games_played: increment(1),
+        consecutive_games_out: 0,
+      });
+    } else {
+      await this.update(playerId, {
+        consecutive_games_out: increment(1),
+        consecutive_games_played: 0,
+        scoring_streak_games: 0,
+      });
+    }
+  }
+
+  async recordHatTrick(playerId: string) {
+    await this.update(playerId, { career_hat_tricks: increment(1) });
+  }
+
+  async recordPoint(playerId: string) {
+    await this.update(playerId, { scoring_streak_games: increment(1) });
+  }
+
+  async recordNoPoint(playerId: string) {
+    await this.update(playerId, { scoring_streak_games: 0 });
+  }
+
+  async recordShutout(playerId: string) {
+    await this.update(playerId, { career_shutouts: increment(1) });
+  }
+
+  async recordThreeStars(playerId: string) {
+    await this.update(playerId, { career_three_stars: increment(1) });
+  }
+
+  async recordSubAppearance(playerId: string) {
+    await this.update(playerId, {
+      career_sub_appearances: increment(1),
+      first_sub_appearance: true,
+    });
+  }
+
+  async recordLeagueJoined(playerId: string) {
+    await this.update(playerId, { career_leagues_played: increment(1) });
+  }
+
+  async recordFirstGame(playerId: string) {
+    await this.update(playerId, {
+      career_games_played: increment(1),
+      first_game_logged: true,
+    });
+  }
+
+  async recordBeer(playerId: string) {
+    await this.update(playerId, { season_beers: increment(1) });
+  }
+
+  async recordRsvp(playerId: string, hoursBeforeGame: number) {
+    if (hoursBeforeGame >= 48) {
+      await this.update(playerId, { season_first_rsvp_streak: true });
+    } else {
+      await this.update(playerId, { season_first_rsvp_streak: false });
+    }
+  }
+}
+BadgeEvaluator
+typescript
+// /services/BadgeEvaluator.ts
+
+class BadgeEvaluator {
+  async evaluate(playerId: string, stats: PlayerStats): Promise<void> {
+    const playerBadges = await BadgeRepository.getPlayerBadges(playerId);
+
+    for (const [badgeId, trigger] of Object.entries(BADGE_TRIGGERS)) {
+      const definition = BADGE_REGISTRY.find(b => b.id === badgeId);
+      if (!definition) continue;
+
+      switch (trigger.type) {
+        case 'tiered':
+          await this.evaluateTiered(playerId, badgeId, definition, trigger, stats, playerBadges);
+          break;
+        case 'multiplier':
+          await this.evaluateMultiplier(playerId, badgeId, trigger, stats, playerBadges);
+          break;
+        case 'onetime':
+          await this.evaluateOnetime(playerId, badgeId, trigger, stats, playerBadges);
+          break;
+      }
+    }
+  }
+
+  private async evaluateTiered(playerId, badgeId, definition, trigger, stats, playerBadges) {
+    const currentValue = stats[trigger.stat];
+    const earnedTiers = playerBadges[badgeId]?.earnedTiers ?? [];
+
+    for (const tierDef of definition.tiers) {
+      if (earnedTiers.includes(tierDef.tier)) continue;
+      if (currentValue >= tierDef.threshold) {
+        await this.award(playerId, badgeId, tierDef.tier);
+      }
+    }
+  }
+
+  private async evaluateMultiplier(playerId, badgeId, trigger, stats, playerBadges) {
+    const currentValue = stats[trigger.stat];
+    const lastCount = playerBadges[badgeId]?.count ?? 0;
+    if (currentValue > lastCount) {
+      await this.award(playerId, badgeId, null, currentValue);
+    }
+  }
+
+  private async evaluateOnetime(playerId, badgeId, trigger, stats, playerBadges) {
+    if (playerBadges[badgeId]?.isEarned) return;
+    const condition = trigger.stat
+      ? stats[trigger.stat] >= (trigger.threshold ?? 1)
+      : stats[trigger.event] === true;
+    if (condition) {
+      await this.award(playerId, badgeId);
+    }
+  }
+
+  private async award(playerId, badgeId, tier?, count?) {
+    await BadgeRepository.recordAward(playerId, badgeId, tier, count);
+    BadgeEventBus.emit('badge_earned', { playerId, badgeId, tier, count });
+  }
+}
+Stat update event map
+User action	StatService call	Badges that may fire
+Game completed, player attended	recordGame(id, true)	Century Club, Iron Man
+Game completed, player absent	recordGame(id, false)	Ghost
+Hat trick scored	recordHatTrick(id)	Hat Trick
+Point scored this game	recordPoint(id)	On Fire
+No point scored this game	recordNoPoint(id)	—
+Shutout recorded	recordShutout(id)	Broom
+Named 3 stars	recordThreeStars(id)	3 Stars
+Subbed for another team	recordSubAppearance(id)	Sub, Team Player
+Joined a new league	recordLeagueJoined(id)	League Hopper
+First game ever	recordFirstGame(id)	Rookie Card
+Beer logged	recordBeer(id)	Beer Me
+RSVP submitted	recordRsvp(id, hoursAhead)	RSVP King, Early Bird
+Season ends (scheduled job)	runEndOfSeasonJob(seasonId)	Sub Magnet, RSVP King
+End-of-season job
+typescript
+// /jobs/EndOfSeasonJob.ts
+
+async function runEndOfSeasonJob(seasonId: string) {
+  // Award RSVP King to players with perfect 48hr streak all season
+  const rsvpKingPlayers = await getPlayersWithPerfectRsvpStreak(seasonId);
+  for (const playerId of rsvpKingPlayers) {
+    await StatService.update(playerId, { season_first_rsvp_streak: true });
+  }
+
+  // Award Sub Magnet to the player with the most subs filled in for them
+  const subMagnetWinner = await getPlayerWithMostSubs(seasonId);
+  await StatService.update(subMagnetWinner.id, { season_most_subs_winner: true });
+
+  // Reset all season-scoped stats
+  await StatRepository.resetSeasonStats(seasonId);
+}
+BadgeEventBus
+typescript
+// /services/BadgeEventBus.ts
+
+// Backend emits:
+BadgeEventBus.emit('badge_earned', {
+  playerId: 'abc123',
+  badgeId: 'hat_trick',
+  tier: 'silver',
+  count: null,
+});
+
+// Frontend global provider listens:
+BadgeEventBus.on('badge_earned', (payload) => {
+  if (payload.playerId === currentUser.id) {
+    dispatch(showBadgeModal(payload));
+  }
+});
+
+Use WebSockets or your existing real-time layer (Supabase Realtime, Firebase, Pusher) to push events to the active client. If the player is offline, queue the event and show the modal on next app open.
+
+PART 1: TROPHY CASE SCREEN
+Layout
+Full-screen scrollable view, background 
+#0a1520
+Three collapsible sections in order: League Awards, Team Awards, Achievements
+Section headers: uppercase, letter-spaced, color 
+#3a5a7a, thin horizontal rules either side, chevron to collapse/expand
+Badge grid
+4 columns on phone, 5 on tablet
+Square cells, badge image centered, small uppercase label below
+Earned badges
+Full color at 100% opacity
+Label in 
+#C9A84C
+Multiplier: gold counter bubble top-right (e.g. ×4)
+Tiered: show current tier's image, tier label below in tier color, progress bar toward next tier showing current / next threshold
+Unearned badges
+Silhouette: desaturated, darkened to near-black, gold ? centered over shape. Apply via tintColor in code — do not ship separate silhouette assets
+Label replaced with ??? in 
+#3a5a7a
+Tiered only: progress bar still visible in 
+#3a5a7a so player knows they are making progress
+Multiplier and one-time: no progress bar
+Badge detail bottom sheet
+
+Tapping any badge opens a @gorhom/bottom-sheet slide-up:
+
+Large badge image (earned: full color / unearned: silhouette + ?)
+Name (earned: gold / unearned: ???)
+Description (earned: full / unearned: vague hint)
+Tiered badges: horizontal row of all tiers — earned full color, unearned silhouetted. Tap a tier to see its threshold
+Multiplier badges: count history
+"Earned [date]" for earned badges
+PART 2: BADGE EARNED MODAL
+Behavior
+Full-screen dim overlay rgba(0,0,0,0.85) interrupts current screen
+Modal card springs up from bottom, settles center-screen (react-native-reanimated spring)
+Confetti fires on entry — gold 
+#C9A84C, cream 
+#E8E4DC, navy 
+#1A3A5C — bursting from top of card (react-native-confetti-cannon)
+Badge image animates in: scale 0.4 → 1.0, 400ms ease-out, fade-in simultaneous
+Haptic on reveal: iOS UINotificationFeedbackGenerator success / Android VibrationEffect.createOneShot
+Card contents
+Background 
+#0D1B2A, 24px rounded corners, gold border 
+#C9A84C at 30% opacity
+Small caps label: ACHIEVEMENT UNLOCKED in 
+#C9A84C
+Badge image: 200 × 200px
+Badge name: large, bold, white, condensed font
+Description: 1–2 lines, gray
+Tier pill (tiered badges): tier label in tier color
+Progress bar (tiered badges): progress toward next tier
+Multiplier count (multiplier badges): counter animates old → new number
+CTA: VIEW IN TROPHY CASE — outlined gold button, navigates to trophy case on tap
+Dismiss: tap outside or swipe down
+Modal variants
+One-time badge: Full confetti, longer hold before auto-dismiss appears
+Tier upgrade: Previous tier grayed left → arrow → new tier full color right. "UPGRADED TO GOLD" messaging
+Multiplier increment: Smaller modal, lighter confetti, counter animation is the hero moment
+PART 3: PROGRESS BAR COMPONENT
+typescript
+interface BadgeProgressBarProps {
+  current: number;
+  target: number;
+  tier?: Tier;
+  showLabel?: boolean; // shows "7 / 10"
+  compact?: boolean;   // 4px height vs 6px
+}
+Track background: 
+#1a2a3a
+Rounded ends, animated fill on mount (left to right, 600ms ease-out)
+If all tiers earned: hide bar, show gold ★
+Tier fill colors from TIER_CONFIG — never hardcoded in the component
+EXTENSIBILITY RULES
+
+These rules must be followed throughout the implementation:
+
+BADGE_REGISTRY is the single source of truth. Components read from it exclusively — no badge IDs or names hardcoded anywhere in component code
+TIER_CONFIG is the single source of truth for tier colors — no tier colors hardcoded in components
+CATEGORY_CONFIG drives trophy case sections — adding a new entry automatically creates a new section
+BADGE_TRIGGERS drives all evaluation logic — adding a new trigger entry is all that's needed to wire up a new badge
+StatService.update() is the only entry point for stat changes
+BadgeEvaluator.evaluate() is called exclusively by StatService
+The BadgeEarnedModal accepts badge data as props — it has zero knowledge of specific badge IDs
+No switch statements or if/else chains on badge type in components — behavior is inferred from the shape of the BadgeDefinition object (presence of tiers array = tiered, presence of count = multiplier)
+
+To add a new badge: drop PNG in /assets/badges/, add entry to BADGE_REGISTRY, add trigger to BADGE_TRIGGERS, ensure relevant stat exists in PlayerStats. Zero component changes.
+
+To add a new tier to an existing badge: drop PNG in /assets/badges/, add tier object to that badge's tiers array. Everything else is automatic.
+
+To add a new tier type: add entry to TIER_CONFIG. Done.
+
+To add a new badge category: add entry to CATEGORY_CONFIG. A new section appears in the trophy case automatically.
+
+LIBRARIES
+Animations: react-native-reanimated
+Bottom sheet: @gorhom/bottom-sheet
+Confetti: react-native-confetti-cannon
+State: Redux Toolkit or Zustand
+All colors in /config/theme.ts — never hardcoded
+SAMPLE SEED DATA
+
+Seed the UI with:
+
+3 earned NHL trophies, 7 unearned
+2 earned team badges (one with captain name shown), 5 unearned
+1 earned multiplier badge (count: 4), 1 unearned
+Tiered badges: one at Platinum (all tiers earned), one at Silver mid-progress toward Gold, one Bronze only, one fully unearned with partial Bronze progress
+2 earned one-time badges, 4 unearned
+BUILD ORDER
+Config files and data schema
+StatService and BadgeEvaluator
+BadgeEventBus
+BadgeProgressBar component
+Trophy Case screen with grid, sections, and silhouette logic
+Badge detail bottom sheet
+BadgeEarnedModal with all three variants
+End-of-season job
+Wire seed data and verify all badge states render correctly
+
+Use placeholder colored circles with badge names as stand-in images until real PNG assets are dropped into /assets/badges/.
