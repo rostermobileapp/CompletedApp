@@ -12551,6 +12551,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { gameId } = req.params;
       const userId = req.user.claims.sub;
+      const [badgeGame] = await db.select({ leagueId: games.leagueId, seasonId: games.seasonId })
+        .from(games).where(eq(games.id, gameId)).limit(1);
+      if (!badgeGame) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
       const result = await db.execute(sql`
         INSERT INTO game_beer_counts (user_id, game_id, count, updated_at)
         VALUES (${userId}, ${gameId}, 1, NOW())
