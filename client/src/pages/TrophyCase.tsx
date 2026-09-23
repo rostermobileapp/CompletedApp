@@ -41,7 +41,7 @@ function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new
 }
 
 function BadgeArtwork({ badge, large = false }: { badge: Badge; large?: boolean }) {
-  const tier = badge.tiers.find((item) => badge.earnedTiers.includes(item.tier)) ?? badge.tiers.at(-1);
+  const tier = [...badge.tiers].reverse().find((item) => badge.earnedTiers.includes(item.tier)) ?? badge.tiers.at(-1);
   const imagePath = tier?.imagePath || badge.imagePath;
   const size = large ? "h-44 w-44" : "h-20 w-20";
   return (
