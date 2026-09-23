@@ -12564,12 +12564,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING count
       `);
       const count = result.rows?.[0]?.count ?? 1;
-      void evaluateBadgesForUser(userId, {
-        leagueId: badgeGame?.leagueId,
-        seasonId: badgeGame?.seasonId,
-      }).catch((error) =>
-        console.error('[Badges] Beer evaluation failed:', error),
-      );
+      try {
+        await evaluateBadgesForUser(userId, {
+          leagueId: badgeGame.leagueId,
+          seasonId: badgeGame.seasonId,
+        });
+      } catch (error) {
+        console.error('[Badges] Beer evaluation failed:', error);
+      }
       return res.json({ count: Number(count) });
     } catch (err) {
       console.error('[Beers] POST error:', err);
