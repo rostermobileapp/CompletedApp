@@ -22,6 +22,7 @@ import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
 import { useIsDesktopWeb } from "@/hooks/useIsDesktopWeb";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import { NativeCalendarAutoSync } from "@/components/NativeCalendarAutoSync";
+import { BadgeEarnedHost } from "@/components/BadgeEarnedHost";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
@@ -99,6 +100,8 @@ import AdminMetrics from "@/pages/AdminMetrics";
 import HPIBDownload from "@/pages/HPIBDownload";
 import Demo from "@/pages/Demo";
 import GerryHomePreview from "@/pages/GerryHomePreview";
+import TrophyCase from "@/pages/TrophyCase";
+import BadgeCatalogAdmin from "@/pages/BadgeCatalogAdmin";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
 function RedirectToLogin() {
@@ -282,6 +285,8 @@ function Router() {
               <Route path="/team-search" component={TeamSearch} />
               <Route path="/messages/:conversationId" component={Messages} />
               <Route path="/user/:userId" component={UserProfile} />
+              <Route path="/trophy-case" component={TrophyCase} />
+              <Route path="/admin/badges" component={BadgeCatalogAdmin} />
               <Route path="/subscription" component={Subscription} />
               <Route path="/roster" component={Roster} />
               <Route path="/create-league" component={CreateLeague} />
@@ -392,6 +397,7 @@ function App() {
               <MotionConfig reducedMotion="user">
                 <Toaster />
                 <NativeCalendarAutoSync />
+                <BadgeEarnedHost />
                 <ErrorBoundary>
                   <DemoContextProvider>
                     <Router />

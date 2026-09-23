@@ -4350,3 +4350,148 @@ export const leagueInvitesSent = pgTable("league_invites_sent", {
 ]);
 
 export type LeagueInviteSent = typeof leagueInvitesSent.$inferSelect;
+
+// ─── Badge and Trophy Case ──────────────────────────────────────────────────
+
+export const badgeCategoryEnum = pgEnum("badge_category", [
+  "nhl_trophy",
+  "team_badge",
+  "achievement",
+]);
+
+export const badgeAchievementTypeEnum = pgEnum("badge_achievement_type", [
+  "multiplier",
+  "tiered",
+  "onetime",
+]);
+
+export const badgeTierEnum = pgEnum("badge_tier", [
+  "bronze",
+  "silver",
+  "gold",
+  "platinum",
+  "legend",
+]);
+
+export const badgeTriggerTypeEnum = pgEnum("badge_trigger_type", [
+  "manual",
+  "metric",
+  "event",
+]);
+
+export const badgeStatusEnum = pgEnum("badge_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+
+// Definitions are intentionally data-driven. A definition may be global
+// (built-in) or owned by a team/season for a captain-created team badge.
+export const badgeDefinitions = pgTable("badge_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description").notNull(),
+  lockedHint: text("locked_hint"),
+  category: badgeCategoryEnum("category").notNull(),
+  achievementType: badgeAchievementTypeEnum("achievement_type"),
+  triggerType: badgeTriggerTypeEnum("trigger_type").default("manual").notNull(),
+  triggerKey: varchar("trigger_key", { length: 100 }),
+  triggerConfig: jsonb("trigger_config").default({}).notNull(),
+  imagePath: text("image_path"),
+  placeholderColor: varchar("placeholder_color", { length: 20 }).default("#C9A84C").notNull(),
+  ownerTeamId: varchar("owner_team_id").references(() => teams.id, { onDelete: "cascade" }),
+  ownerSeasonId: varchar("owner_season_id").references(() => seasons.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  status: badgeStatusEnum("status").default("draft").notNull(),
+  publishedAt: timestamp("published_at"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_badge_definitions_category_status").on(table.category, table.status),
+  index("idx_badge_definitions_owner_team").on(table.ownerTeamId),
+  index("idx_badge_definitions_owner_season").on(table.ownerSeasonId),
+]);
+
+export const badgeTiers = pgTable("badge_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeDefinitionId: varchar("badge_definition_id").references(() => badgeDefinitions.id, { onDelete: "cascade" }).notNull(),
+  tier: badgeTierEnum("tier").notNull(),
+  threshold: integer("threshold").notNull(),
+  imagePath: text("image_path"),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  unique("uq_badge_tiers_definition_tier").on(table.badgeDefinitionId, table.tier),
+  index("idx_badge_tiers_definition").on(table.badgeDefinitionId),
+]);
+
+// scopeKey is a normalized value such as global, league:<id>:season:<id>, or
+// team:<id>:season:<id>. It makes idempotency explicit even with nullable FK
+// columns and prevents duplicate awards in the applicable scope.
+export const badgeAwards = pgTable("badge_awards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeDefinitionId: varchar("badge_definition_id").references(() => badgeDefinitions.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  leagueId: varchar("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+  seasonId: varchar("season_id").references(() => seasons.id, { onDelete: "cascade" }),
+  teamId: varchar("team_id").references(() => teams.id, { onDelete: "cascade" }),
+  scopeKey: varchar("scope_key", { length: 220 }).notNull(),
+  tier: badgeTierEnum("tier"),
+  count: integer("count").default(1).notNull(),
+  awardedBy: varchar("awarded_by").references(() => users.id, { onDelete: "set null" }),
+  source: varchar("source", { length: 40 }).default("evaluator").notNull(),
+  metadata: jsonb("metadata").default({}).notNull(),
+  awardedAt: timestamp("awarded_at").defaultNow().notNull(),
+}, (table) => [
+  unique("uq_badge_awards_definition_user_scope").on(table.badgeDefinitionId, table.userId, table.scopeKey),
+  index("idx_badge_awards_user").on(table.userId),
+  index("idx_badge_awards_scope").on(table.scopeKey),
+  index("idx_badge_awards_league_season").on(table.leagueId, table.seasonId),
+  index("idx_badge_awards_team_season").on(table.teamId, table.seasonId),
+]);
+
+export const badgeProgress = pgTable("badge_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeDefinitionId: varchar("badge_definition_id").references(() => badgeDefinitions.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  scopeKey: varchar("scope_key", { length: 220 }).notNull(),
+  progress: integer("progress").default(0).notNull(),
+  count: integer("count").default(0).notNull(),
+  earnedTiers: badgeTierEnum("earned_tiers").array().default([]).notNull(),
+  currentTier: badgeTierEnum("current_tier"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("uq_badge_progress_definition_user_scope").on(table.badgeDefinitionId, table.userId, table.scopeKey),
+  index("idx_badge_progress_user").on(table.userId),
+]);
+
+export const badgeEarnedEvents = pgTable("badge_earned_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  badgeAwardId: varchar("badge_award_id").references(() => badgeAwards.id, { onDelete: "cascade" }).notNull(),
+  badgeDefinitionId: varchar("badge_definition_id").references(() => badgeDefinitions.id, { onDelete: "cascade" }).notNull(),
+  eventType: varchar("event_type", { length: 40 }).notNull(),
+  payload: jsonb("payload").default({}).notNull(),
+  deliveredAt: timestamp("delivered_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_badge_events_user_pending").on(table.userId, table.acknowledgedAt),
+  index("idx_badge_events_created").on(table.createdAt),
+]);
+
+export const insertBadgeDefinitionSchema = createInsertSchema(badgeDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  publishedAt: true,
+  archivedAt: true,
+});
+export type BadgeDefinition = typeof badgeDefinitions.$inferSelect;
+export type InsertBadgeDefinition = z.infer<typeof insertBadgeDefinitionSchema>;
+export type BadgeTier = typeof badgeTiers.$inferSelect;
+export type BadgeAward = typeof badgeAwards.$inferSelect;
+export type BadgeProgress = typeof badgeProgress.$inferSelect;
+export type BadgeEarnedEvent = typeof badgeEarnedEvents.$inferSelect;

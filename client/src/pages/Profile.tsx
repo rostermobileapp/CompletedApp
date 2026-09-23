@@ -666,6 +666,13 @@ export default function Profile() {
               </div>
             </div>
             {/* Upgrade button removed as everyone is commissioner now */}
+            <button
+              onClick={() => navigate('/trophy-case')}
+              className="absolute bottom-2 right-3 rounded-lg border border-[#c9a84c]/50 px-3 py-1.5 text-xs font-semibold text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10"
+              data-testid="button-trophy-case"
+            >
+              Trophy Case
+            </button>
           </div>
         </div>
         {/* HPIB Banner for paid users - below profile info */}

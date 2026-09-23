@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Response } from "express";
 import { randomUUID } from "crypto";
+import WebSocket from "ws";
 
 export class SupabaseStorageNotFoundError extends Error {
   constructor() {
@@ -27,6 +28,9 @@ export class SupabaseStorageService {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
+      },
+      realtime: {
+        transport: WebSocket as any,
       },
     });
   }
@@ -592,6 +596,27 @@ export class SupabaseStorageService {
       console.error("Error deleting league photo:", error);
       throw new Error("Failed to delete photo");
     }
+  }
+
+  // Badge artwork is private catalog media. The normalized path is stored in
+  // the database and served through the authenticated app proxy.
+  async getBadgeAssetUploadURL(): Promise<{ uploadURL: string; path: string }> {
+    const objectId = randomUUID();
+    const filePath = `badge-assets/${objectId}`;
+    const { data, error } = await this.supabase.storage.from("private").createSignedUploadUrl(filePath);
+    if (error) {
+      console.error("Error creating badge asset upload URL:", error);
+      throw new Error("Failed to create badge asset upload URL");
+    }
+    return { uploadURL: data.signedUrl, path: `/badge-assets/${objectId}` };
+  }
+
+  async getBadgeAssetFile(assetPath: string): Promise<{ data: Blob; contentType: string }> {
+    if (!assetPath.startsWith("/badge-assets/")) throw new SupabaseStorageNotFoundError();
+    const objectId = assetPath.slice("/badge-assets/".length);
+    const { data, error } = await this.supabase.storage.from("private").download(`badge-assets/${objectId}`);
+    if (error || !data) throw new SupabaseStorageNotFoundError();
+    return { data, contentType: data.type || "application/octet-stream" };
   }
 
   // Helper method to stream blob data to Express response

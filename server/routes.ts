@@ -34,7 +34,7 @@ import {
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { gamePenalties } from "@shared/schema";
-import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens } from "@shared/schema";
+import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
@@ -119,6 +119,16 @@ import { sendTeamEventPushNotification, resolveTeamLogoUrl } from "./oneSignalNo
 import { registerDraftRoutes, canViewDraft, canChatInDraft } from "./draftRoutes";
 import { setNotificationBroadcaster } from "./notificationBroadcast";
 import { registerReferralRoutes } from "./referralRoutes";
+import {
+  acknowledgeBadgeEvent,
+  awardManualBadge,
+  ensureDefaultBadges,
+  evaluateBadgesForUser,
+  getBadgeCatalog,
+  getPendingBadgeEvents,
+  getTrophyCase,
+} from "./badges";
+import { ensureBadgeTables } from "./badgeDbInit";
 import {
   canAcceptFreshScrimmageRequest,
   resetsPendingRequestsOnFinalize,
@@ -1010,6 +1020,8 @@ async function applyAdditionalTeamPaymentFromSession(
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  await ensureBadgeTables();
+  console.log("[Init] badge catalog tables ensured");
   // Demo tables are startup-safe for deployments that use runtime migrations.
   await ensureDemoTables();
   registerDemoRoutes(app, isAuthenticated);
@@ -1039,6 +1051,194 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure payment request link-override columns:', err);
     throw err;
   }
+
+  // ─── Badge catalog, trophy case, and scoped award APIs ───────────────────
+  const badgeAdmin = requireSpecialPermission('admin');
+  const currentUserId = (req: any) => req.user?.claims?.sub as string;
+  const canAwardInScope = async (actorId: string, category: string, scope: any) => {
+    const actor = await storage.getUser(actorId);
+    if (actor?.isPrimaryCommissioner || actor?.specialPermissions?.includes('admin')) return true;
+    if (category === 'nhl_trophy' && scope.leagueId) {
+      const permissions = await storage.getUserLeaguePermissions(actorId, scope.leagueId);
+      return permissions?.leagueRole === 'commissioner' || permissions?.leagueRole === 'secondary_commissioner'
+        || permissions?.leagueSpecialPermissions?.includes('admin') === true;
+    }
+    if (category === 'team_badge' && scope.teamId) return storage.isTeamCaptain(scope.teamId, actorId);
+    return false;
+  };
+
+  app.get('/api/trophy-case', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : currentUserId(req);
+      res.json({ sections: await getTrophyCase(requestedUserId) });
+    } catch (error) {
+      console.error('[Badges] Failed to load trophy case:', error);
+      res.status(500).json({ message: 'Failed to load trophy case' });
+    }
+  });
+
+  app.post('/api/badges/evaluate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = currentUserId(req);
+      res.json({ earned: await evaluateBadgesForUser(userId, req.body?.context ?? {}) });
+    } catch (error) {
+      console.error('[Badges] Failed to evaluate badges:', error);
+      res.status(500).json({ message: 'Failed to evaluate badges' });
+    }
+  });
+
+  app.get('/api/badges/events/pending', isAuthenticated, async (req: any, res) => {
+    try {
+      res.json(await getPendingBadgeEvents(currentUserId(req)));
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to load badge events' });
+    }
+  });
+
+  app.post('/api/badges/events/:eventId/acknowledge', isAuthenticated, async (req: any, res) => {
+    try {
+      res.json({ acknowledged: (await acknowledgeBadgeEvent(currentUserId(req), req.params.eventId)).length > 0 });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to acknowledge badge event' });
+    }
+  });
+
+  app.get('/api/admin/badges/catalog', isAuthenticated, badgeAdmin, async (_req: any, res) => {
+    try {
+      res.json(await getBadgeCatalog(true));
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to load badge catalog' });
+    }
+  });
+
+  app.post('/api/admin/badges/artwork/upload', isAuthenticated, badgeAdmin, async (_req: any, res) => {
+    try {
+      const { SupabaseStorageService } = await import('./supabaseStorage');
+      res.json(await new SupabaseStorageService().getBadgeAssetUploadURL());
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to create badge artwork upload URL' });
+    }
+  });
+
+  app.get('/badge-assets/:objectPath(*)', async (req, res) => {
+    try {
+      const { SupabaseStorageService, SupabaseStorageNotFoundError } = await import('./supabaseStorage');
+      const storage = new SupabaseStorageService();
+      const file = await storage.getBadgeAssetFile(`/badge-assets/${req.params.objectPath}`);
+      await storage.streamToResponse(file, res, 86400);
+    } catch (error) {
+      if (error instanceof (await import('./supabaseStorage')).SupabaseStorageNotFoundError || (error as any)?.name === 'SupabaseStorageNotFoundError') {
+        return res.status(404).end();
+      }
+      console.error('[Badges] Failed to serve artwork:', error);
+      res.status(500).end();
+    }
+  });
+
+  app.post('/api/admin/badges/catalog', isAuthenticated, badgeAdmin, async (req: any, res) => {
+    try {
+      const body = req.body ?? {};
+      if (!body.name || !body.description || !['nhl_trophy', 'team_badge', 'achievement'].includes(body.category)) {
+        return res.status(400).json({ message: 'Name, description, and a valid category are required' });
+      }
+      const slug = String(body.slug || body.name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      const [created] = await db.insert(badgeDefinitions).values({
+        slug: `${slug}_${Date.now().toString(36)}`,
+        name: body.name,
+        description: body.description,
+        lockedHint: body.lockedHint ?? null,
+        category: body.category,
+        achievementType: body.achievementType ?? null,
+        triggerType: body.triggerType ?? 'manual',
+        triggerKey: body.triggerKey ?? null,
+        triggerConfig: body.triggerConfig ?? {},
+        imagePath: body.imagePath ?? null,
+        placeholderColor: body.placeholderColor ?? '#C9A84C',
+        ownerTeamId: body.ownerTeamId ?? null,
+        ownerSeasonId: body.ownerSeasonId ?? null,
+        createdBy: currentUserId(req),
+        status: 'draft',
+      } as any).returning();
+      if (Array.isArray(body.tiers) && body.tiers.length) {
+        await db.insert(badgeTiers).values(body.tiers.map((tier: any) => ({
+          badgeDefinitionId: created.id,
+          tier: tier.tier,
+          threshold: Number(tier.threshold),
+          imagePath: tier.imagePath ?? null,
+          color: tier.color ?? null,
+        })) as any);
+      }
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || 'Failed to create badge definition' });
+    }
+  });
+
+  app.patch('/api/admin/badges/catalog/:badgeId', isAuthenticated, badgeAdmin, async (req: any, res) => {
+    try {
+      const body = req.body ?? {};
+      const updates: any = {};
+      for (const key of ['name', 'description', 'lockedHint', 'category', 'achievementType', 'triggerType', 'triggerKey', 'triggerConfig', 'imagePath', 'placeholderColor']) {
+        if (body[key] !== undefined) updates[key] = body[key];
+      }
+      updates.updatedAt = new Date();
+      const [updated] = await db.update(badgeDefinitions).set(updates).where(eq(badgeDefinitions.id, req.params.badgeId)).returning();
+      if (!updated) return res.status(404).json({ message: 'Badge definition not found' });
+      if (Array.isArray(body.tiers)) {
+        await db.delete(badgeTiers).where(eq(badgeTiers.badgeDefinitionId, updated.id));
+        if (body.tiers.length) {
+          await db.insert(badgeTiers).values(body.tiers.map((tier: any) => ({
+            badgeDefinitionId: updated.id,
+            tier: tier.tier,
+            threshold: Number(tier.threshold),
+            imagePath: tier.imagePath ?? null,
+            color: tier.color ?? null,
+          })) as any);
+        }
+      }
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || 'Failed to update badge definition' });
+    }
+  });
+
+  app.post('/api/admin/badges/catalog/:badgeId/:action', isAuthenticated, badgeAdmin, async (req: any, res) => {
+    if (!['publish', 'archive'].includes(req.params.action)) return res.status(404).json({ message: 'Unknown badge action' });
+    const status = req.params.action === 'publish' ? 'published' : 'archived';
+    const [updated] = await db.update(badgeDefinitions).set({
+      status,
+      publishedAt: status === 'published' ? new Date() : undefined,
+      archivedAt: status === 'archived' ? new Date() : undefined,
+      updatedAt: new Date(),
+    } as any).where(eq(badgeDefinitions.id, req.params.badgeId)).returning();
+    if (!updated) return res.status(404).json({ message: 'Badge definition not found' });
+    res.json(updated);
+  });
+
+  app.post('/api/badges/:badgeId/award', isAuthenticated, async (req: any, res) => {
+    try {
+      const [definition] = await db.select().from(badgeDefinitions).where(eq(badgeDefinitions.id, req.params.badgeId)).limit(1);
+      if (!definition) return res.status(404).json({ message: 'Badge definition not found' });
+      const context = {
+        leagueId: req.body?.leagueId ?? null,
+        seasonId: req.body?.seasonId ?? null,
+        teamId: req.body?.teamId ?? null,
+      };
+      if (!(await canAwardInScope(currentUserId(req), definition.category, context))) {
+        return res.status(403).json({ message: 'You do not have permission to award this badge in that scope' });
+      }
+      if (!req.body?.userId) return res.status(400).json({ message: 'userId is required' });
+      res.status(201).json(await awardManualBadge({
+        badgeDefinitionId: definition.id,
+        userId: req.body.userId,
+        awardedBy: currentUserId(req),
+        ...context,
+        metadata: req.body.metadata,
+      }));
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || 'Failed to award badge' });
+    }
+  });
 
   // Scorekeeper-confirmed attendance is separate from player RSVP. The
   // startup-safe DDL keeps existing deployments compatible until the next
@@ -10105,6 +10305,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         thirdStarUserId,
         awardedBy: userId,
       });
+      for (const starUserId of [firstStarUserId, secondStarUserId, thirdStarUserId]) {
+        void evaluateBadgesForUser(starUserId, {
+          leagueId: game.leagueId,
+          seasonId: game.seasonId,
+        }).catch((error) => console.error('[Badges] Star evaluation failed:', error));
+      }
 
       res.json({ 
         stars,
@@ -12309,6 +12515,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { gameId } = req.params;
       const userId = req.user.claims.sub;
+      const [badgeGame] = await db.select({ leagueId: games.leagueId, seasonId: games.seasonId })
+        .from(games).where(eq(games.id, gameId)).limit(1);
       const result = await db.execute(sql`
         SELECT count FROM game_beer_counts
         WHERE user_id = ${userId} AND game_id = ${gameId}
@@ -12333,6 +12541,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING count
       `);
       const count = result.rows?.[0]?.count ?? 1;
+      void evaluateBadgesForUser(userId, {
+        leagueId: badgeGame?.leagueId,
+        seasonId: badgeGame?.seasonId,
+      }).catch((error) =>
+        console.error('[Badges] Beer evaluation failed:', error),
+      );
       return res.json({ count: Number(count) });
     } catch (err) {
       console.error('[Beers] POST error:', err);
@@ -12359,6 +12573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const attendanceProvided = Array.isArray(req.body?.attendees);
+      let rosterUserIds: string[] = [];
       const normalizedAttendance: Array<{
         gameId: string;
         teamId: string;
@@ -12382,6 +12597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const member of [...homeMembers, ...awayMembers]) {
           rosterUsers.set(member.userId, member.teamId);
         }
+        rosterUserIds = Array.from(rosterUsers.keys());
         const rosterPlaceholders = new Map<string, string>();
         for (const placeholder of placeholders) {
           if (placeholder.teamId) rosterPlaceholders.set(placeholder.id, placeholder.teamId);
@@ -12583,6 +12799,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
+      if (rosterUserIds.length === 0) {
+        const [homeMembers, awayMembers] = await Promise.all([
+          storage.getTeamMembers(game.homeTeamId),
+          game.awayTeamId ? storage.getTeamMembers(game.awayTeamId) : Promise.resolve([]),
+        ]);
+        rosterUserIds = Array.from(new Set([...homeMembers, ...awayMembers].map((member) => member.userId)));
+      }
+      const evaluatedUserIds = Array.from(new Set([
+        ...rosterUserIds,
+        ...normalizedAttendance.flatMap((attendee) => attendee.userId ? [attendee.userId] : []),
+      ]));
+      for (const evaluatedUserId of evaluatedUserIds) {
+        void evaluateBadgesForUser(evaluatedUserId, {
+          leagueId: result.game.leagueId,
+          seasonId: result.game.seasonId,
+        }).catch((error) => console.error('[Badges] Finalization evaluation failed:', error));
+      }
       res.json({ 
         message: 'Game finalized successfully', 
         game: result.game,
