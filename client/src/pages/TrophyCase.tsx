@@ -53,7 +53,17 @@ export default function TrophyCase() {
   const [, navigate] = useLocation();
   const [open, setOpen] = useState<Record<string, boolean>>({ nhl_trophy: true, team_badge: true, achievement: true });
   const [selected, setSelected] = useState<Badge | null>(null);
+  const [revealingId, setRevealingId] = useState<string | null>(null);
   const { data, isLoading, isError } = useQuery<{ sections: Section[] }>({ queryKey: ["/api/trophy-case"] });
+  const selectBadge = (badge: Badge) => {
+    setSelected(badge);
+    setRevealingId(badge.id);
+    window.setTimeout(() => setRevealingId((current) => current === badge.id ? null : current), 650);
+  };
+  const closeBadge = () => {
+    setSelected(null);
+    setRevealingId(null);
+  };
 
   return (
     <div className="min-h-screen bg-[#0a1520] px-4 pb-24 pt-6 text-[#e8e4dc] sm:px-8">
@@ -78,8 +88,8 @@ export default function TrophyCase() {
               {open[section.category] && (
                 <div className="mt-5 grid grid-cols-4 gap-3 sm:grid-cols-5 sm:gap-5">
                   {section.badges.map((badge) => (
-                    <button key={badge.id} onClick={() => setSelected(badge)} className="group min-w-0 text-center">
-                      <div className="relative mx-auto w-fit transition-transform group-hover:-translate-y-1"><BadgeArtwork badge={badge} /></div>
+                    <button key={badge.id} onClick={() => selectBadge(badge)} className="group min-w-0 text-center">
+                      <div className={`relative mx-auto w-fit transition-transform group-hover:-translate-y-1 ${revealingId === badge.id ? "badge-click-pop" : ""}`}><BadgeArtwork badge={badge} /></div>
                       <div className={`mt-2 truncate text-[10px] font-semibold uppercase tracking-wider ${badge.isEarned ? "text-[#c9a84c]" : "text-[#3a5a7a]"}`}>
                         {badge.isEarned ? badge.name : "???"}
                       </div>
@@ -93,10 +103,10 @@ export default function TrophyCase() {
         </div>
       </div>
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={closeBadge}>
           <div className="w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-4 flex justify-end"><button onClick={() => setSelected(null)} className="text-[#8096aa]"><X size={20} /></button></div>
-            <div className="flex flex-col items-center text-center"><BadgeArtwork badge={selected} large /></div>
+            <div className="mb-4 flex justify-end"><button onClick={closeBadge} className="text-[#8096aa]"><X size={20} /></button></div>
+            <div className={`flex flex-col items-center text-center ${revealingId === selected.id ? "badge-detail-reveal" : ""}`}><BadgeArtwork badge={selected} large /></div>
             <h2 className={`mt-5 text-center text-2xl font-bold ${selected.isEarned ? "text-[#c9a84c]" : "text-[#8096aa]"}`}>{selected.isEarned ? selected.name : "???"}</h2>
             <p className="mt-2 text-center text-sm text-[#a6b5c2]">{selected.isEarned ? selected.description : (selected.lockedHint || "Keep playing to discover this badge.")}</p>
             {selected.isEarned && selected.earnedAt && <p className="mt-3 text-center text-xs text-[#8096aa]">Earned {new Date(selected.earnedAt).toLocaleDateString()}</p>}
