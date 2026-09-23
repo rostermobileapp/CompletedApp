@@ -127,8 +127,11 @@
   }
 }
 
-.badge-detail-card {
+.badge-detail-stage {
   perspective: 1200px;
+}
+
+.badge-detail-card {
   transform-style: preserve-3d;
 }
 
