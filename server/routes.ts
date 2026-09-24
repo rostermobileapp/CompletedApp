@@ -130,6 +130,7 @@ import {
   getTrophyCase,
 } from "./badges";
 import { ensureBadgeTables } from "./badgeDbInit";
+import { ensureBeerBadgeEvaluationQueue } from "./beerBadgeEvaluationQueue";
 import {
   canAcceptFreshScrimmageRequest,
   resetsPendingRequestsOnFinalize,
@@ -1644,6 +1645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } catch (err) {
     console.error('[Init] Failed to ensure game_beer_counts table:', err);
   }
+  await ensureBeerBadgeEvaluationQueue();
 
   // Lightweight endpoint for the client-side ErrorBoundary to report rendering
   // crashes so we can debug what's failing in production / on user devices.
