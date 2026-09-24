@@ -268,7 +268,7 @@ export default function TrophyCase() {
             </div>
           </div>
           <button
-            className="inline-flex items-center gap-2 rounded-full border border-[#9d815d]/25 bg-[#f7f0e2]/65 px-3.5 py-2 text-xs font-semibold text-[#6a715f] transition hover:bg-[#fffaf0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b713f]"
+            className="inline-flex items-center rounded-full border border-[#9d815d]/25 bg-[#f7f0e2]/65 px-3.5 py-2 font-semibold transition hover:bg-[#fffaf0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b713f] text-[16px] gap-[12px] pl-[8px] pr-[8px] text-[#000000] rounded-tl-[8px] rounded-tr-[8px] rounded-br-[8px] rounded-bl-[8px]"
             onClick={() => navigate("/profile")}
           >
             <ArrowLeft size={15} /> Profile
