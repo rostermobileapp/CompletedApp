@@ -314,7 +314,7 @@ export default function TrophyCase() {
             {isError && <div className="rounded-2xl border border-[#a34f3d]/50 bg-[#f5e6dc] p-8 text-center text-[#8b4333]">Could not load your trophy case.</div>}
             {data && (
               <div
-                className="relative mx-auto max-w-5xl rounded-[2rem] border-[7px] border-[#5b3925] p-2 shadow-[0_30px_70px_#55452a40,0_8px_18px_#57432d35,inset_0_0_0_2px_#d1a06a] sm:rounded-[2.5rem] sm:border-[12px] sm:p-3"
+                className="relative mx-auto max-w-5xl rounded-[2rem] border-[7px] border-[#5b3925] p-2 shadow-[0_30px_70px_#55452a40,0_8px_18px_#57432d35,inset_0_0_0_2px_#d1a06a] sm:rounded-[2.5rem] sm:border-[12px] sm:p-3 pl-[0px] pt-[0px] pr-[0px] pb-[0px] border-t-[#000000] border-r-[#000000] border-b-[#000000] border-l-[#000000]"
                 style={{
                   background: "repeating-linear-gradient(90deg,#754b2d 0,#754b2d 8px,#835637 10px,#6b4127 18px,#815333 29px)",
                   boxShadow: "0 30px 70px #55452a40, 0 8px 18px #57432d35, inset 0 0 0 2px #d1a06a",
