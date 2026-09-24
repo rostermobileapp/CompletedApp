@@ -1071,6 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/trophy-case', isAuthenticated, async (req: any, res) => {
     try {
+      res.setHeader('Cache-Control', 'no-store');
       const viewer = await storage.getUser(currentUserId(req));
       if (viewer?.displayId !== "U00001") {
         return res.status(403).json({

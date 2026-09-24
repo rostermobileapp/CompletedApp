@@ -138,27 +138,18 @@ export function BadgeEarnedHost() {
   const current = queue[0];
   const { data: pending } = useQuery<EarnedEvent[]>({
     queryKey: ["/api/badges/events/pending"],
+    staleTime: 0,
     refetchOnWindowFocus: true,
+    refetchInterval: queue.length ? 5_000 : false,
   });
 
   useEffect(() => {
-    if (pending?.length) {
-      setQueue((existing) => {
-        const pendingById = new Map(
-          pending.map((event) => [event.id || event.eventId, event]),
-        );
-        const refreshed = existing.map((event) => {
-          const eventId = event.id || event.eventId;
-          return (eventId && pendingById.get(eventId)) || event;
-        });
-        const seen = new Set(refreshed.map((event) => event.id || event.eventId));
-        return [...refreshed, ...pending.filter((event) => !seen.has(event.id || event.eventId))];
-      });
-    }
+    if (pending) setQueue(pending);
   }, [pending]);
 
-  useEffect(() => subscribe("badge_earned", (event) => {
-    setQueue((existing) => existing.some((item) => (item.id || item.eventId) === (event.eventId || event.id)) ? existing : [...existing, event]);
+  useEffect(() => subscribe("badge_earned", () => {
+    // The server validates current thresholds before returning an event.
+    queryClient.invalidateQueries({ queryKey: ["/api/badges/events/pending"] });
     queryClient.invalidateQueries({ queryKey: ["/api/trophy-case"] });
   }), [subscribe, queryClient]);
 

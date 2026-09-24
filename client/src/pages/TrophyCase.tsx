@@ -118,7 +118,13 @@ export default function TrophyCase() {
   const [announcementCycle, setAnnouncementCycle] = useState(0);
   const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
   const ageAccess = isUserLoading ? "loading" : user?.displayId !== "U00001" ? "testing" : getTrophyCaseAccess(user?.dateOfBirth);
-  const { data, isLoading, isError } = useQuery<TrophyCaseData>({ queryKey: ["/api/trophy-case"], enabled: ageAccess === "eligible" });
+  const { data, isLoading, isError } = useQuery<TrophyCaseData>({
+    queryKey: ["/api/trophy-case"],
+    enabled: ageAccess === "eligible",
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  });
   const selectBadge = (badge: Badge, tier?: Tier) => {
     const revealId = `${badge.id}:${tier?.tier ?? "badge"}`; setSelected({ badge, tier }); setRevealingId(revealId);
     window.setTimeout(() => setRevealingId((current) => current === revealId ? null : current), 650);
