@@ -23,7 +23,7 @@ import { newlyReachedTiers, reachedTiers } from "./badgeTierEligibility";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
-export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "legend" | "god_mode";
+export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legend" | "god_mode";
 
 export type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
 
@@ -81,6 +81,7 @@ const TIER_COLORS: Record<BadgeTierName, string> = {
   silver: "#909090",
   gold: "#C9A84C",
   platinum: "#4a6a8a",
+  diamond: "#b9d4de",
   legend: "#1a0a1a",
   god_mode: "#F97316",
 };
@@ -161,7 +162,11 @@ DEFAULT_BADGES.push(
     defaultTier("bronze", 3), defaultTier("silver", 5), defaultTier("gold", 10), defaultTier("platinum", 20),
   ]),
   achievement("three_stars", "3 Stars", "Named one of the 3 stars of the game.", "tiered", "metric", "career_three_stars", {}, [
-    defaultTier("bronze", 5), defaultTier("silver", 10), defaultTier("gold", 15), defaultTier("platinum", 25),
+    { ...defaultTier("bronze", 5), imagePath: "/badges/three-stars/tier-1.webp" },
+    { ...defaultTier("silver", 10), imagePath: "/badges/three-stars/tier-2.webp" },
+    { ...defaultTier("gold", 15), imagePath: "/badges/three-stars/tier-3.webp" },
+    { ...defaultTier("platinum", 25), imagePath: "/badges/three-stars/tier-4.webp" },
+    { ...defaultTier("diamond", 50), imagePath: "/badges/three-stars/tier-5.webp" },
   ]),
   achievement("rsvp_king", "RSVP King", "First to respond to every game invite in a season.", "multiplier", "metric", "season_first_rsvp_streak"),
   achievement("team_player", "Team Player", "Filled a sub spot for another team.", "multiplier", "metric", "career_sub_appearances"),
@@ -186,7 +191,29 @@ export async function ensureDefaultBadges() {
       .from(badgeDefinitions)
       .where(eq(badgeDefinitions.slug, badge.slug))
       .limit(1);
-    if (existing) continue;
+    if (existing) {
+      if (badge.slug === "three_stars" && badge.tiers?.length) {
+        // Reconcile the existing four-tier catalog as well as new installations.
+        // The supplied 3 Stars artwork is canonical for each tier.
+        for (const tier of badge.tiers) {
+          await db.insert(badgeTiers).values({
+            badgeDefinitionId: existing.id,
+            tier: tier.tier,
+            threshold: tier.threshold,
+            imagePath: tier.imagePath ?? null,
+            color: tier.color ?? TIER_COLORS[tier.tier],
+          }).onConflictDoUpdate({
+            target: [badgeTiers.badgeDefinitionId, badgeTiers.tier],
+            set: {
+              threshold: tier.threshold,
+              imagePath: tier.imagePath ?? null,
+              color: tier.color ?? TIER_COLORS[tier.tier],
+            },
+          });
+        }
+      }
+      continue;
+    }
     const [created] = await db.insert(badgeDefinitions).values({
       slug: badge.slug,
       name: badge.name,
@@ -614,8 +641,8 @@ export async function getPendingBadgeEvents(userId: string) {
     const payload = event.payload as Record<string, unknown>;
     if (typeof payload.tier !== "string") return event;
     const existingImagePath = typeof payload.imagePath === "string" ? payload.imagePath : null;
-    const imagePath = existingImagePath
-      ?? tiersByEventKey.get(`${event.definition.id}:${payload.tier}`)?.imagePath
+    const imagePath = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`)?.imagePath
+      ?? existingImagePath
       ?? null;
     return imagePath ? { ...event, payload: { ...payload, imagePath } } : event;
   });
