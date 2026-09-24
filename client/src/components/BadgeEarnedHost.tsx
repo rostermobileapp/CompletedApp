@@ -61,7 +61,7 @@ export function BadgeEarnedHost() {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_center,_rgba(201,168,76,.25),_transparent_65%)]" />
         <button onClick={dismiss} className="absolute right-4 top-4 text-[#8096aa]"><X size={20} /></button>
         <p className="text-xs font-semibold uppercase tracking-[.24em] text-[#c9a84c]">{tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
-        <div className="mx-auto mt-6 flex h-48 w-48 items-center justify-center rounded-full border-2 border-[#c9a84c] bg-[#c9a84c] p-2 animate-[badge-reveal_.4s_ease-out]">
+        <div className="mx-auto mt-6 flex h-48 w-48 items-center justify-center rounded-full border-2 border-[#c9a84c] bg-[#0d1b2a] p-2 animate-[badge-reveal_.4s_ease-out]">
           {badge.imagePath ? <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full rounded-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#0a1520]">{badge.name || "Badge"}</span>}
         </div>
         <h2 className="mt-6 text-3xl font-bold text-white">{badge.name || "New badge"}</h2>

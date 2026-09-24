@@ -73,7 +73,7 @@ function BadgeArtwork({
   const size = large ? "aspect-square h-auto w-[95%] max-w-[26rem] sm:w-[88%]" : "h-20 w-20";
   return (
     <div className={`${size} relative flex items-center justify-center overflow-hidden rounded-full border-2 ${earned ? "border-[#c9a84c]" : "border-[#263c52]"}`}
-      style={{ background: earned ? (tier?.color || badge.placeholderColor || "#c9a84c") : "#111d29" }}>
+      style={{ background: earned && imagePath ? "transparent" : earned ? (tier?.color || badge.placeholderColor || "#c9a84c") : "#111d29" }}>
       {earned && imagePath ? (
         <img src={getImageUrl(imagePath) ?? undefined} alt={`${badge.name}${tier ? ` ${formatTier(tier.tier)}` : ""}`} className={`h-full w-full object-contain ${earned ? "" : "grayscale brightness-[.22]"}`} />
       ) : earned ? (
