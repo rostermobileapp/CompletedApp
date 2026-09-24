@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Lock, X } from "lucide-react";
+import { Lock, RotateCcw, X } from "lucide-react";
 import { getImageUrl } from "@/lib/queryClient";
 
 type Tier = { tier: string; threshold: number; imagePath?: string | null; color?: string | null };
@@ -178,6 +178,8 @@ export default function TrophyCase() {
   const [, navigate] = useLocation();
   const [selected, setSelected] = useState<SelectedBadge | null>(null);
   const [revealingId, setRevealingId] = useState<string | null>(null);
+  const [revealCycle, setRevealCycle] = useState(0);
+  const revealTimer = useRef<number | null>(null);
   const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
   const ageAccess = isUserLoading
     ? "loading"
@@ -188,15 +190,31 @@ export default function TrophyCase() {
     queryKey: ["/api/trophy-case"],
     enabled: ageAccess === "eligible",
   });
-  const selectBadge = (badge: Badge, tier?: Tier) => {
+  const triggerReveal = (badge: Badge, tier?: Tier) => {
+    const revealId = `${badge.id}:${tier?.tier ?? "badge"}`;
     setSelected({ badge, tier });
-    setRevealingId(`${badge.id}:${tier?.tier ?? "badge"}`);
-    window.setTimeout(() => setRevealingId((current) => current === `${badge.id}:${tier?.tier ?? "badge"}` ? null : current), 650);
+    setRevealCycle((current) => current + 1);
+    setRevealingId(revealId);
+    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
+    revealTimer.current = window.setTimeout(() => {
+      setRevealingId((current) => current === revealId ? null : current);
+      revealTimer.current = null;
+    }, 720);
+  };
+  const selectBadge = (badge: Badge, tier?: Tier) => {
+    triggerReveal(badge, tier);
+  };
+  const replayBadge = () => {
+    if (selected) triggerReveal(selected.badge, selected.tier);
   };
   const closeBadge = () => {
+    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
     setSelected(null);
     setRevealingId(null);
   };
+  useEffect(() => () => {
+    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a1520] px-4 pb-24 pt-6 text-[#e8e4dc] sm:px-8">
@@ -270,8 +288,14 @@ export default function TrophyCase() {
       </div>
       {selected && (
         <div className="badge-detail-stage fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={closeBadge}>
-          <div className={`badge-detail-card w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}>
-            <div className="mb-4 flex justify-end"><button onClick={closeBadge} className="text-[#8096aa]"><X size={20} /></button></div>
+          <div key={`${selected.badge.id}:${selected.tier?.tier ?? "badge"}:${revealCycle}`} className={`badge-detail-card w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <button onClick={replayBadge} className="inline-flex items-center gap-2 rounded-lg border border-[#c9a84c]/50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10" aria-label="Replay achievement animation">
+                <RotateCcw size={14} />
+                Replay
+              </button>
+              <button onClick={closeBadge} className="text-[#8096aa]" aria-label="Close badge details"><X size={20} /></button>
+            </div>
             <div className={`flex flex-col items-center text-center ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-reveal" : ""}`}><BadgeArtwork badge={selected.badge} tier={selected.tier} earned={selected.tier ? selected.badge.earnedTiers.includes(selected.tier.tier) || selected.badge.currentProgress >= selected.tier.threshold : selected.badge.isEarned} large /></div>
             <h2 className={`mt-5 text-center text-2xl font-bold ${selected.badge.isEarned ? "text-[#c9a84c]" : "text-[#8096aa]"}`}>{selected.badge.isEarned ? selected.badge.name : "???"}</h2>
             {selected.tier && <p className="mt-1 text-center text-xs font-semibold uppercase tracking-wider text-[#c9a84c]">{formatTier(selected.tier.tier)} · target {selected.tier.threshold}</p>}
