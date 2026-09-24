@@ -100,7 +100,7 @@ import AdminMetrics from "@/pages/AdminMetrics";
 import HPIBDownload from "@/pages/HPIBDownload";
 import Demo from "@/pages/Demo";
 import GerryHomePreview from "@/pages/GerryHomePreview";
-import TrophyCase from "@/pages/TrophyCase";
+import TrophyCase, { ThreeStarsPreview } from "@/pages/TrophyCase";
 import BadgeCatalogAdmin from "@/pages/BadgeCatalogAdmin";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
@@ -196,6 +196,10 @@ function Router() {
 
   if (location === '/hpib') {
     return <HPIBDownload />;
+  }
+
+  if (import.meta.env.DEV && location === '/three-stars-preview') {
+    return <ThreeStarsPreview />;
   }
 
   if (authLoading) {

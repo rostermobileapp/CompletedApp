@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { newlyReachedTiers, reachedTiers } from "./badgeTierEligibility";
+import { THREE_STARS_TIERS } from "@shared/threeStarsTiers";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
@@ -162,11 +163,10 @@ DEFAULT_BADGES.push(
     defaultTier("bronze", 3), defaultTier("silver", 5), defaultTier("gold", 10), defaultTier("platinum", 20),
   ]),
   achievement("three_stars", "3 Stars", "Named one of the 3 stars of the game.", "tiered", "metric", "career_three_stars", {}, [
-    { ...defaultTier("bronze", 5), imagePath: "/badges/three-stars/tier-1.webp" },
-    { ...defaultTier("silver", 10), imagePath: "/badges/three-stars/tier-2.webp" },
-    { ...defaultTier("gold", 15), imagePath: "/badges/three-stars/tier-3.webp" },
-    { ...defaultTier("platinum", 25), imagePath: "/badges/three-stars/tier-4.webp" },
-    { ...defaultTier("diamond", 50), imagePath: "/badges/three-stars/tier-5.webp" },
+    ...THREE_STARS_TIERS.map(({ tier, threshold, imagePath }) => ({
+      ...defaultTier(tier, threshold),
+      imagePath,
+    })),
   ]),
   achievement("rsvp_king", "RSVP King", "First to respond to every game invite in a season.", "multiplier", "metric", "season_first_rsvp_streak"),
   achievement("team_player", "Team Player", "Filled a sub spot for another team.", "multiplier", "metric", "career_sub_appearances"),

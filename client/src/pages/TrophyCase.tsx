@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, ChevronRight, Lock, Sparkles, Trophy, X } from "lucide-react";
 import { BadgeEarnedAnnouncement } from "@/components/BadgeEarnedHost";
 import { getImageUrl } from "@/lib/queryClient";
+import { THREE_STARS_TIERS } from "@shared/threeStarsTiers";
 import iceBackground from "@/assets/trophy-case-ice.png";
 import "./TrophyCase.css";
 
@@ -107,7 +108,37 @@ function SectionHeading({ label, description, count }: { label: string; descript
 function AchievementSection({ label, description, badges, onSelect }: { label: string; description: string; badges: Badge[]; onSelect: (badge: Badge, tier?: Tier) => void }) {
   const isTiered = badges.some((badge) => badge.achievementType === "tiered");
   const spotCount = isTiered ? badges.reduce((total, badge) => total + (badge.achievementType === "tiered" ? badge.tiers.length : 1), 0) : badges.length;
-  return <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5"><SectionHeading label={label} description={description} count={spotCount} /><div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{badges.flatMap((badge) => badge.achievementType === "tiered" ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} onClick={() => onSelect(badge, tier)} />) : [<BadgeSpot key={badge.id} badge={badge} onClick={() => onSelect(badge)} />])}</div></section>;
+  const fiveStars = badges.length === 1 && badges[0].slug === "three_stars";
+  return <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5"><SectionHeading label={label} description={description} count={spotCount} /><div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>{badges.flatMap((badge) => badge.achievementType === "tiered" ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} onClick={() => onSelect(badge, tier)} />) : [<BadgeSpot key={badge.id} badge={badge} onClick={() => onSelect(badge)} />])}</div></section>;
+}
+
+// Visual-only development page. It uses the Trophy Case's actual spot renderer
+// but never reads or changes the signed-in player's awards.
+export function ThreeStarsPreview() {
+  const badge: Badge = {
+    id: "three-stars-preview",
+    slug: "three_stars",
+    name: "3 Stars",
+    description: "Named one of the three stars of the game.",
+    category: "achievement",
+    achievementType: "tiered",
+    isEarned: true,
+    count: 50,
+    currentProgress: 50,
+    earnedTiers: THREE_STARS_TIERS.map(({ tier }) => tier),
+    tiers: THREE_STARS_TIERS.map(({ tier, threshold, imagePath }) => ({ tier, threshold, imagePath })),
+  };
+  return (
+    <div className="trophy-case relative min-h-[100dvh] bg-[#dce5f3] px-3 py-8 text-[#1e3345] sm:px-6 sm:py-12">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${iceBackground})` }} />
+      <main className="trophy-depth-main relative mx-auto max-w-6xl rounded-[1.5rem] p-4 sm:p-7">
+        <p className="text-[10px] font-bold uppercase tracking-[.24em] text-[#d52d3b]">Artwork preview · no awards changed</p>
+        <h1 className="mb-2 mt-2 text-3xl font-bold text-[#173d5b] sm:text-4xl">3 Stars · All five tiers</h1>
+        <p className="mb-6 text-sm text-[#597087]">All five are shown unlocked here for visual review. Your Trophy Case still uses your actual earned count.</p>
+        <AchievementSection label="3 Stars" description="Named one of the three stars of the game." badges={[badge]} onSelect={() => {}} />
+      </main>
+    </div>
+  );
 }
 
 export default function TrophyCase() {
