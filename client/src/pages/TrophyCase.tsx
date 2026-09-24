@@ -267,7 +267,6 @@ export default function TrophyCase() {
         </button>
         <header className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-end">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[.3em] text-[#987040]">Roster Hockey · Player honors</p>
             <h1 className="mt-2 font-['Georgia'] text-4xl font-bold tracking-tight text-[#344238] sm:text-5xl">Trophy Case</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367]">League honors, team keepsakes, and the milestones that made your game.</p>
           </div>
