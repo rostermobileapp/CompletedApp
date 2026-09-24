@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Lock, RotateCcw, X } from "lucide-react";
+import { Lock, Sparkles, X } from "lucide-react";
+import { BadgeEarnedAnnouncement } from "@/components/BadgeEarnedHost";
 import { getImageUrl } from "@/lib/queryClient";
 
 type Tier = { tier: string; threshold: number; imagePath?: string | null; color?: string | null };
@@ -178,8 +179,8 @@ export default function TrophyCase() {
   const [, navigate] = useLocation();
   const [selected, setSelected] = useState<SelectedBadge | null>(null);
   const [revealingId, setRevealingId] = useState<string | null>(null);
-  const [revealCycle, setRevealCycle] = useState(0);
-  const revealTimer = useRef<number | null>(null);
+  const [announcementPreview, setAnnouncementPreview] = useState<SelectedBadge | null>(null);
+  const [announcementCycle, setAnnouncementCycle] = useState(0);
   const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
   const ageAccess = isUserLoading
     ? "loading"
@@ -190,31 +191,21 @@ export default function TrophyCase() {
     queryKey: ["/api/trophy-case"],
     enabled: ageAccess === "eligible",
   });
-  const triggerReveal = (badge: Badge, tier?: Tier) => {
+  const selectBadge = (badge: Badge, tier?: Tier) => {
     const revealId = `${badge.id}:${tier?.tier ?? "badge"}`;
     setSelected({ badge, tier });
-    setRevealCycle((current) => current + 1);
     setRevealingId(revealId);
-    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
-    revealTimer.current = window.setTimeout(() => {
-      setRevealingId((current) => current === revealId ? null : current);
-      revealTimer.current = null;
-    }, 720);
+    window.setTimeout(() => setRevealingId((current) => current === revealId ? null : current), 650);
   };
-  const selectBadge = (badge: Badge, tier?: Tier) => {
-    triggerReveal(badge, tier);
-  };
-  const replayBadge = () => {
-    if (selected) triggerReveal(selected.badge, selected.tier);
+  const previewAnnouncement = () => {
+    if (!selected) return;
+    setAnnouncementPreview(selected);
+    setAnnouncementCycle((current) => current + 1);
   };
   const closeBadge = () => {
-    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
     setSelected(null);
     setRevealingId(null);
   };
-  useEffect(() => () => {
-    if (revealTimer.current !== null) window.clearTimeout(revealTimer.current);
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a1520] px-4 pb-24 pt-6 text-[#e8e4dc] sm:px-8">
@@ -288,11 +279,11 @@ export default function TrophyCase() {
       </div>
       {selected && (
         <div className="badge-detail-stage fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5 sm:p-6" onClick={closeBadge}>
-          <div key={`${selected.badge.id}:${selected.tier?.tier ?? "badge"}:${revealCycle}`} className={`badge-detail-card w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}>
+          <div className={`badge-detail-card w-full max-w-lg rounded-3xl border border-[#c9a84c]/30 bg-[#0d1b2a] p-6 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between gap-3">
-              <button onClick={replayBadge} className="inline-flex items-center gap-2 rounded-lg border border-[#c9a84c]/50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10" aria-label="Replay achievement animation">
-                <RotateCcw size={14} />
-                Replay
+              <button onClick={previewAnnouncement} className="inline-flex items-center gap-2 rounded-lg border border-[#c9a84c]/50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#c9a84c] transition-colors hover:bg-[#c9a84c]/10" aria-label="Preview achievement announcement">
+                <Sparkles size={14} />
+                Preview announcement
               </button>
               <button onClick={closeBadge} className="text-[#8096aa]" aria-label="Close badge details"><X size={20} /></button>
             </div>
@@ -305,6 +296,19 @@ export default function TrophyCase() {
             {selected.badge.achievementType === "multiplier" && <p className="mt-5 text-center text-xl font-bold text-[#c9a84c]">×{selected.badge.count}</p>}
             {!selected.badge.isEarned && <Lock className="mx-auto mt-5 text-[#3a5a7a]" size={18} />}
           </div>
+        </div>
+      )}
+      {announcementPreview && (
+        <div key={announcementCycle}>
+          <BadgeEarnedAnnouncement
+            badge={{
+              ...announcementPreview.badge,
+              imagePath: announcementPreview.tier?.imagePath || announcementPreview.badge.imagePath,
+            }}
+            payload={{ tier: announcementPreview.tier?.tier }}
+            onDismiss={() => setAnnouncementPreview(null)}
+            onViewTrophyCase={() => setAnnouncementPreview(null)}
+          />
         </div>
       )}
     </div>

@@ -13,6 +13,38 @@ type EarnedEvent = {
   definition?: any;
 };
 
+export function BadgeEarnedAnnouncement({
+  badge,
+  payload = {},
+  onDismiss,
+  onViewTrophyCase,
+}: {
+  badge: any;
+  payload?: any;
+  onDismiss: () => void | Promise<void>;
+  onViewTrophyCase?: () => void | Promise<void>;
+}) {
+  const tier = payload.tier;
+  const isMultiplier = badge.achievementType === "multiplier" && payload.count;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5" onClick={() => { void onDismiss(); }}>
+      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[#c9a84c]/40 bg-[#0d1b2a] p-7 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_center,_rgba(201,168,76,.25),_transparent_65%)]" />
+        <button onClick={() => { void onDismiss(); }} className="absolute right-4 top-4 text-[#8096aa]" aria-label="Close achievement announcement"><X size={20} /></button>
+        <p className="text-xs font-semibold uppercase tracking-[.24em] text-[#c9a84c]">{tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
+        <div className="badge-click-pop relative mx-auto mt-6 flex h-48 w-48 items-center justify-center rounded-full bg-[#0d1b2a] p-2">
+          {badge.imagePath ? <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full rounded-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#0a1520]">{badge.name || "Badge"}</span>}
+        </div>
+        <h2 className="mt-6 text-3xl font-bold text-white">{badge.name || "New badge"}</h2>
+        <p className="mt-2 text-sm text-[#a6b5c2]">{badge.description || "You earned a new badge."}</p>
+        {isMultiplier && <p className="mt-4 text-2xl font-bold text-[#c9a84c]">×{payload.count}</p>}
+        {onViewTrophyCase && <button onClick={() => { void onViewTrophyCase(); }} className="mt-7 w-full rounded-xl border border-[#c9a84c] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#c9a84c] hover:bg-[#c9a84c]/10">View in Trophy Case</button>}
+      </div>
+    </div>
+  );
+}
+
 export function BadgeEarnedHost() {
   const { subscribe, onConnected } = useWebSocket();
   const [, navigate] = useLocation();
@@ -45,8 +77,6 @@ export function BadgeEarnedHost() {
   if (!current) return null;
   const badge = current.badge || current.definition || {};
   const payload = current.payload || current.badge || {};
-  const tier = payload.tier;
-  const isMultiplier = badge.achievementType === "multiplier" && payload.count;
   const eventId = current.id || current.eventId;
 
   const dismiss = async () => {
@@ -56,19 +86,11 @@ export function BadgeEarnedHost() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5" onClick={dismiss}>
-      <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-[#c9a84c]/40 bg-[#0d1b2a] p-7 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_center,_rgba(201,168,76,.25),_transparent_65%)]" />
-        <button onClick={dismiss} className="absolute right-4 top-4 text-[#8096aa]"><X size={20} /></button>
-        <p className="text-xs font-semibold uppercase tracking-[.24em] text-[#c9a84c]">{tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
-        <div className="mx-auto mt-6 flex h-48 w-48 items-center justify-center rounded-full bg-[#0d1b2a] p-2 animate-[badge-reveal_.4s_ease-out]">
-          {badge.imagePath ? <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full rounded-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#0a1520]">{badge.name || "Badge"}</span>}
-        </div>
-        <h2 className="mt-6 text-3xl font-bold text-white">{badge.name || "New badge"}</h2>
-        <p className="mt-2 text-sm text-[#a6b5c2]">{badge.description || "You earned a new badge."}</p>
-        {isMultiplier && <p className="mt-4 text-2xl font-bold text-[#c9a84c]">×{payload.count}</p>}
-        <button onClick={() => { void dismiss(); navigate("/trophy-case"); }} className="mt-7 w-full rounded-xl border border-[#c9a84c] px-4 py-3 text-xs font-bold uppercase tracking-wider text-[#c9a84c] hover:bg-[#c9a84c]/10">View in Trophy Case</button>
-      </div>
-    </div>
+    <BadgeEarnedAnnouncement
+      badge={badge}
+      payload={payload}
+      onDismiss={dismiss}
+      onViewTrophyCase={async () => { await dismiss(); navigate("/trophy-case"); }}
+    />
   );
 }
