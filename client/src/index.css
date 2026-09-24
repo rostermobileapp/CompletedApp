@@ -92,17 +92,6 @@
   100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
 }
 
-@keyframes badge-burst {
-  0% { opacity: .9; transform: scale(.72) rotate(0deg); }
-  100% { opacity: 0; transform: scale(1.65) rotate(90deg); }
-}
-
-@keyframes badge-sparkle {
-  0%, 100% { opacity: 0; transform: scale(.4) rotate(0deg); }
-  35% { opacity: 1; transform: scale(1) rotate(35deg); }
-  75% { opacity: .8; transform: scale(.7) rotate(70deg); }
-}
-
 @keyframes badge-detail-reveal {
   0% { opacity: 0; transform: scale(.55) rotate(-12deg); filter: brightness(1.8); }
   60% { opacity: 1; transform: scale(1.08) rotate(3deg); filter: brightness(1.25); }
@@ -143,35 +132,12 @@
   animation: badge-click-pop .55s cubic-bezier(.2,.8,.2,1) both;
 }
 
-.badge-click-pop::before {
-  content: "";
-  position: absolute;
-  inset: -12px;
-  border: 1px dashed rgba(201, 168, 76, .85);
-  border-radius: 9999px;
-  pointer-events: none;
-  animation: badge-burst .55s ease-out both;
-}
-
-.badge-click-pop::after {
-  content: "✦  ·  ✧  ·  ✦";
-  position: absolute;
-  inset: -22px -34px;
-  color: #c9a84c;
-  font-size: 13px;
-  letter-spacing: 12px;
-  pointer-events: none;
-  animation: badge-sparkle .55s ease-out both;
-}
-
 .badge-detail-reveal {
   animation: badge-detail-reveal .6s cubic-bezier(.2,.8,.2,1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .badge-click-pop,
-  .badge-click-pop::before,
-  .badge-click-pop::after,
   .badge-detail-reveal,
   .badge-detail-card-active {
     animation: none;
