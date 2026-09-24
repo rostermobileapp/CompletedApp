@@ -354,7 +354,12 @@ export async function evaluateBadgesForUser(userId: string, context?: { leagueId
         }).onConflictDoNothing().returning();
         if (award) {
           earnedTiers.add(tier.tier);
-          earned.push(await emitEarnedEvent(userId, award.id, definition, { tier: tier.tier, count: currentValue, awardId: award.id }));
+          earned.push(await emitEarnedEvent(userId, award.id, definition, {
+            tier: tier.tier,
+            count: currentValue,
+            awardId: award.id,
+            imagePath: tier.imagePath ?? definition.imagePath ?? null,
+          }));
         }
       }
       const currentTier = (definition.tiers ?? []).filter((tier) => currentValue >= tier.threshold).at(-1)?.tier ?? null;
@@ -467,7 +472,7 @@ export async function getTrophyCase(userId: string) {
 }
 
 export async function getPendingBadgeEvents(userId: string) {
-  return db.select({
+  const events = await db.select({
     id: badgeEarnedEvents.id,
     eventType: badgeEarnedEvents.eventType,
     payload: badgeEarnedEvents.payload,
@@ -477,6 +482,27 @@ export async function getPendingBadgeEvents(userId: string) {
     .innerJoin(badgeDefinitions, eq(badgeEarnedEvents.badgeDefinitionId, badgeDefinitions.id))
     .where(and(eq(badgeEarnedEvents.userId, userId), sql`${badgeEarnedEvents.acknowledgedAt} IS NULL`))
     .orderBy(asc(badgeEarnedEvents.createdAt));
+
+  const tieredEvents = events.filter((event) => typeof (event.payload as Record<string, unknown>)?.tier === "string");
+  if (!tieredEvents.length) return events;
+
+  const definitionIds = Array.from(new Set(tieredEvents.map((event) => event.definition.id)));
+  const tiers = await db.select({
+    badgeDefinitionId: badgeTiers.badgeDefinitionId,
+    tier: badgeTiers.tier,
+    imagePath: badgeTiers.imagePath,
+  }).from(badgeTiers).where(inArray(badgeTiers.badgeDefinitionId, definitionIds));
+  const tierImagePaths = new Map(tiers.map((tier) => [`${tier.badgeDefinitionId}:${tier.tier}`, tier.imagePath]));
+
+  return events.map((event) => {
+    const payload = event.payload as Record<string, unknown>;
+    if (typeof payload.tier !== "string") return event;
+    const existingImagePath = typeof payload.imagePath === "string" ? payload.imagePath : null;
+    const imagePath = existingImagePath
+      ?? tierImagePaths.get(`${event.definition.id}:${payload.tier}`)
+      ?? null;
+    return imagePath ? { ...event, payload: { ...payload, imagePath } } : event;
+  });
 }
 
 export async function acknowledgeBadgeEvent(userId: string, eventId: string) {

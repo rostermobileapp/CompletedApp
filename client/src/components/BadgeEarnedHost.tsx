@@ -160,8 +160,11 @@ export function BadgeEarnedHost() {
   }), [onConnected, queryClient]);
 
   if (!current) return null;
-  const badge = current.badge || current.definition || {};
   const payload = current.payload || current.badge || {};
+  const badgeDefinition = current.badge || current.definition || {};
+  const badge = payload.imagePath
+    ? { ...badgeDefinition, imagePath: payload.imagePath }
+    : badgeDefinition;
   const eventId = current.id || current.eventId;
 
   const dismiss = async () => {
