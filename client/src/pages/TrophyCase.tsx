@@ -46,8 +46,9 @@ function formatTier(tier: string) { return tier.replace("_", " "); }
 
 function BadgeArtwork({ badge, tier, earned = badge.isEarned, large = false }: { badge: Badge; tier?: Tier; earned?: boolean; large?: boolean }) {
   const imagePath = tier?.imagePath || badge.imagePath;
+  const hasArtwork = earned && !!imagePath;
   return (
-    <div className={`${large ? "h-52 w-52 sm:h-64 sm:w-64" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"} trophy-depth-medallion relative flex items-center justify-center overflow-hidden rounded-full border-2 ${earned ? "border-[#d9363e] bg-[#edf5fb]" : "border-[#aebfce] bg-[#e8eef3]"}`}>
+    <div className={`${large ? "h-52 w-52 sm:h-64 sm:w-64" : "h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]"} relative flex items-center justify-center ${hasArtwork ? "bg-transparent" : `trophy-depth-medallion overflow-hidden rounded-full border-2 ${earned ? "border-[#b7c9d7] bg-[#edf5fb]" : "border-[#aebfce] bg-[#e8eef3]"}`}`}>
       {earned && imagePath ? <img src={getImageUrl(imagePath) ?? undefined} alt={`${badge.name}${tier ? ` ${formatTier(tier.tier)}` : ""}`} className="h-full w-full object-contain" /> : earned ? (
         <span className="px-2 text-center text-[9px] font-extrabold uppercase leading-tight tracking-[.08em] text-[#b52732]">{badge.name}</span>
       ) : <Lock size={17} className="text-[#728699]" />}
