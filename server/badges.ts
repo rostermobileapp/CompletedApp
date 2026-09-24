@@ -599,6 +599,40 @@ export async function getTrophyCase(userId: string) {
   };
 }
 
+// Catalog-only preview; never reads or writes a player's awards.
+export async function getTrophyCasePreview() {
+  const definitions = await definitionsWithTiers();
+  const badges = definitions.map((definition) => ({
+    id: definition.id,
+    slug: definition.slug,
+    name: definition.name,
+    description: definition.description,
+    category: definition.category,
+    achievementType: definition.achievementType,
+    imagePath: definition.imagePath,
+    placeholderColor: definition.placeholderColor,
+    lockedHint: definition.lockedHint,
+    tiers: definition.tiers.map(({ tier, threshold, imagePath, color }) => ({ tier, threshold, imagePath, color })),
+    isEarned: true,
+    earnedAt: null,
+    count: definition.achievementType === "tiered"
+      ? Math.max(0, ...definition.tiers.map((tier) => tier.threshold))
+      : 1,
+    earnedTiers: definition.tiers.map((tier) => tier.tier),
+    currentProgress: Math.max(0, ...definition.tiers.map((tier) => tier.threshold)),
+    nextThreshold: null,
+    awards: [],
+  }));
+  return {
+    isGoalie: true,
+    sections: (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
+      category,
+      label: CATEGORY_LABELS[category],
+      badges: badges.filter((badge) => badge.category === category),
+    })),
+  };
+}
+
 export async function getPendingBadgeEvents(userId: string) {
   const events = await db.select({
     id: badgeEarnedEvents.id,

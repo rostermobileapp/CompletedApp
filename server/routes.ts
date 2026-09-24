@@ -128,6 +128,7 @@ import {
   getPendingBadgeEvents,
   getTrophyCaseAccess,
   getTrophyCase,
+  getTrophyCasePreview,
 } from "./badges";
 import { ensureBadgeTables } from "./badgeDbInit";
 import { ensureBeerBadgeEvaluationQueue } from "./beerBadgeEvaluationQueue";
@@ -1096,6 +1097,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to load trophy case' });
     }
   });
+
+  if (process.env.NODE_ENV === 'development') {
+    app.get('/api/dev/trophy-case-preview', async (_req, res) => {
+      try {
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(await getTrophyCasePreview());
+      } catch (error) {
+        console.error('[Badges] Failed to load trophy case preview:', error);
+        res.status(500).json({ message: 'Failed to load trophy case preview' });
+      }
+    });
+  }
 
   app.post('/api/badges/evaluate', isAuthenticated, async (req: any, res) => {
     try {
