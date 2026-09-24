@@ -237,6 +237,7 @@ export default function GameDetails() {
     onSuccess: (data: any) => {
       queryClient.setQueryData([`/api/games/${gameId}/beers`], data);
       queryClient.invalidateQueries({ queryKey: ["/api/trophy-case"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/badges/events/pending"] });
     },
   });
 

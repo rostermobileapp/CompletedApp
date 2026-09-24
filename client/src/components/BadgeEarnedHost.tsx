@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/context/WebSocketContext";
-import iceBackground from "@/assets/trophy-case-ice.png";
 
 type EarnedEvent = {
   id?: string;
@@ -28,10 +27,15 @@ export function BadgeEarnedAnnouncement({
   const tier = payload.tier;
   const isMultiplier = badge.achievementType === "multiplier" && payload.count;
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-cover bg-center p-4 sm:p-5"
-      style={{ backgroundImage: `linear-gradient(rgba(23, 61, 91, .22), rgba(23, 61, 91, .22)), url(${iceBackground})` }}
+      className="fixed inset-0 z-[10001] flex items-center justify-center overflow-y-auto bg-white/15 p-4 backdrop-blur-[24px] sm:p-5"
       onClick={() => { void onDismiss(); }}
     >
       <div
