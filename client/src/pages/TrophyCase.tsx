@@ -69,23 +69,27 @@ function TierProgress({ badge, tier }: { badge: Badge; tier: Tier }) {
 function TierSpot({ badge, tier, onClick }: { badge: Badge; tier: Tier; onClick: () => void }) {
   const earned = badge.earnedTiers.includes(tier.tier) || badge.currentProgress >= tier.threshold;
   return (
-    <button onClick={onClick} className="trophy-depth-slot group min-w-0 rounded-xl p-3 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]" aria-label={`${badge.name} ${formatTier(tier.tier)}: ${Math.min(badge.currentProgress, tier.threshold)} of ${tier.threshold}`}>
-      <div className="mx-auto w-fit transition-transform group-hover:scale-[1.04]"><BadgeArtwork badge={badge} tier={tier} earned={earned} /></div>
-      <div className={`mt-2 text-[10px] font-bold uppercase tracking-[.1em] ${earned ? "text-[#164a73]" : "text-[#597087]"}`}>Tier {badge.tiers.findIndex((item) => item.tier === tier.tier) + 1}</div>
-      <div className="mt-1 truncate text-[10px] uppercase tracking-wider text-[#6f8192]">{formatTier(tier.tier)}</div>
-      <div className={`mt-1 text-[9px] font-semibold uppercase tracking-[.12em] ${earned ? "text-[#d52d3b]" : "text-[#718394]"}`}>{earned ? "Earned" : "In progress"}</div>
-      <TierProgress badge={badge} tier={tier} />
+    <button onClick={onClick} className="trophy-depth-slot group min-w-0 rounded-xl text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]" aria-label={`${badge.name} ${formatTier(tier.tier)}: ${Math.min(badge.currentProgress, tier.threshold)} of ${tier.threshold}`}>
+      <div className="trophy-slot-well">
+        <div className="mx-auto w-fit transition-transform group-hover:scale-[1.04]"><BadgeArtwork badge={badge} tier={tier} earned={earned} /></div>
+        <div className={`mt-2 text-[10px] font-bold uppercase tracking-[.1em] ${earned ? "text-[#164a73]" : "text-[#597087]"}`}>Tier {badge.tiers.findIndex((item) => item.tier === tier.tier) + 1}</div>
+        <div className="mt-1 text-[10px] uppercase tracking-wider text-[#566e82]">{formatTier(tier.tier)}</div>
+        <div className={`mt-1 text-[9px] font-semibold uppercase tracking-[.12em] ${earned ? "text-[#d52d3b]" : "text-[#50687b]"}`}>{earned ? "Earned" : "In progress"}</div>
+        <TierProgress badge={badge} tier={tier} />
+      </div>
     </button>
   );
 }
 
 function BadgeSpot({ badge, onClick }: { badge: Badge; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="trophy-depth-slot group min-w-0 rounded-xl p-3 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">
-      <div className="mx-auto w-fit transition-transform group-hover:scale-[1.04]"><BadgeArtwork badge={badge} /></div>
-      <div className={`mt-2 truncate text-[10px] font-bold uppercase tracking-[.09em] ${badge.isEarned ? "text-[#164a73]" : "text-[#718394]"}`}>{badge.isEarned ? badge.name : "???"}</div>
-      <div className={`mt-1 text-[9px] font-semibold uppercase tracking-[.12em] ${badge.isEarned ? "text-[#d52d3b]" : "text-[#718394]"}`}>{badge.isEarned ? "Earned" : "Locked"}</div>
-      {badge.achievementType === "multiplier" && <div className="mt-1 text-[9px] text-[#718394]">{badge.count} earned</div>}
+    <button onClick={onClick} className="trophy-depth-slot group min-w-0 rounded-xl text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">
+      <div className="trophy-slot-well">
+        <div className="mx-auto w-fit transition-transform group-hover:scale-[1.04]"><BadgeArtwork badge={badge} /></div>
+        <div className={`mt-2 max-w-full truncate text-[10px] font-bold uppercase tracking-[.09em] ${badge.isEarned ? "text-[#164a73]" : "text-[#50687b]"}`}>{badge.isEarned ? badge.name : "???"}</div>
+        <div className={`mt-1 text-[9px] font-semibold uppercase tracking-[.12em] ${badge.isEarned ? "text-[#d52d3b]" : "text-[#50687b]"}`}>{badge.isEarned ? "Earned" : "Locked"}</div>
+        {badge.achievementType === "multiplier" && <div className="mt-1 text-[9px] text-[#50687b]">{badge.count} earned</div>}
+      </div>
     </button>
   );
 }

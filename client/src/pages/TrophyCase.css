@@ -1,60 +1,104 @@
+/* A single light source from the upper left makes the edges read as a stack,
+   rather than as unrelated drop shadows on flat rectangles. */
 .trophy-case .trophy-depth-main {
-  background: rgba(249, 252, 255, 0.89);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    0 22px 54px rgba(20, 47, 75, 0.23),
-    0 3px 10px rgba(20, 47, 75, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(237, 245, 251, 0.94));
+  border: 2px solid;
+  border-color: #fff #c7d8e5 #a9bfd0 #fff;
+  box-shadow: 0 28px 56px rgba(28, 56, 84, 0.2), 0 6px 14px rgba(28, 56, 84, 0.15);
+}
+
+.trophy-case .trophy-depth-main::before,
+.trophy-case .trophy-depth-panel::before,
+.trophy-case .trophy-depth-section::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: calc(1rem - 4px);
+  pointer-events: none;
+}
+
+.trophy-case .trophy-depth-main::before {
+  border-radius: calc(1.5rem - 4px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
 }
 
 .trophy-case .trophy-depth-panel {
-  background: #eaf3f9;
-  border: 1px solid #b9cddd;
-  box-shadow:
-    inset 0 5px 11px rgba(30, 64, 97, 0.19),
-    inset 0 1px 3px rgba(30, 64, 97, 0.12),
-    inset 0 -2px 3px rgba(255, 255, 255, 0.9),
-    0 1px 0 rgba(255, 255, 255, 0.8);
+  position: relative;
+  background: linear-gradient(145deg, #e0ebf3, #f1f7fb 70%);
+  border: 3px solid;
+  border-color: #a9bfd0 #fafdff #fff #a9bfd0;
+  box-shadow: 0 1px 0 #fff, inset 3px 4px 10px rgba(37, 70, 101, 0.13);
+}
+
+.trophy-case .trophy-depth-panel::before {
+  border-top: 1px solid rgba(59, 98, 128, 0.28);
+  border-left: 1px solid rgba(59, 98, 128, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+  border-right: 1px solid rgba(255, 255, 255, 0.9);
 }
 
 .trophy-case .trophy-depth-section {
-  background: #e3eef6;
-  border: 1px solid #afc5d6;
-  box-shadow:
-    inset 0 7px 14px rgba(29, 63, 95, 0.2),
-    inset 0 2px 4px rgba(29, 63, 95, 0.11),
-    inset 0 -2px 3px rgba(255, 255, 255, 0.85);
+  position: relative;
+  background: linear-gradient(145deg, #d5e3ee, #eaf3f8 72%);
+  border: 3px solid;
+  border-color: #96afc2 #f9fcff #fff #96afc2;
+  box-shadow: inset 4px 5px 12px rgba(31, 63, 93, 0.18);
+}
+
+.trophy-case .trophy-depth-section::before {
+  border-top: 1px solid rgba(46, 82, 112, 0.35);
+  border-left: 1px solid rgba(46, 82, 112, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+  border-right: 1px solid rgba(255, 255, 255, 0.85);
 }
 
 .trophy-case .trophy-depth-slot {
-  background: #dceaf4;
-  border: 1px solid #9fb9cc;
-  box-shadow:
-    inset 0 8px 14px rgba(27, 59, 91, 0.22),
-    inset 0 2px 4px rgba(27, 59, 91, 0.12),
-    inset 0 -2px 3px rgba(255, 255, 255, 0.9);
-  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  background: linear-gradient(145deg, #f9fcff 0%, #c0d3e1 100%);
+  border: 1px solid;
+  border-color: #fff #a5bbcb #8da9bd #fff;
+  box-shadow: 0 1px 2px rgba(27, 59, 91, 0.15);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
-.trophy-case .trophy-depth-slot:hover {
-  background: #edf6fb;
-  border-color: #d52d3b;
-  box-shadow:
-    inset 0 4px 8px rgba(27, 59, 91, 0.14),
-    inset 0 -2px 3px rgba(255, 255, 255, 0.9),
-    0 7px 15px rgba(27, 59, 91, 0.16);
+.trophy-case .trophy-slot-well {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  border: 1px solid;
+  border-color: #8da9bd #f8fcff #fff #8da9bd;
+  border-radius: 0.6rem;
+  background: linear-gradient(155deg, #cfdfeb 0%, #e3eef5 45%, #eef5f9 100%);
+  box-shadow: inset 3px 5px 8px rgba(27, 59, 91, 0.17);
+}
+
+.trophy-case .trophy-depth-slot:is(:hover, :focus-visible) {
   transform: translateY(-2px);
+  border-color: #fff #d52d3b #b82532 #fff;
+  box-shadow: 0 7px 13px rgba(27, 59, 91, 0.18);
 }
 
 .trophy-case .trophy-depth-medallion {
   box-shadow:
-    inset 0 3px 7px rgba(26, 55, 83, 0.18),
-    inset 0 -2px 2px rgba(255, 255, 255, 0.88),
-    0 1px 2px rgba(26, 55, 83, 0.13);
+    0 0 0 3px rgba(250, 253, 255, 0.88),
+    0 4px 8px rgba(26, 55, 83, 0.26),
+    inset 0 2px 5px rgba(26, 55, 83, 0.13);
 }
 
 .trophy-case .trophy-depth-track {
   box-shadow: inset 0 2px 4px rgba(26, 55, 83, 0.25);
+}
+
+@media (max-width: 639px) {
+  .trophy-case .trophy-slot-well {
+    padding: 10px 5px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
