@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/context/WebSocketContext";
+import confettiVideo from "@/assets/badge-confetti.webm";
 
 type EarnedEvent = {
   id?: string;
@@ -12,6 +13,74 @@ type EarnedEvent = {
   payload?: any;
   definition?: any;
 };
+
+function hasTransparentVideoFrame(video: HTMLVideoElement): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context || !video.videoWidth || !video.videoHeight) return false;
+
+    // Some browsers decode VP9 but ignore its alpha channel. Never show their black frame.
+    for (const [x, y] of [[0, 0], [video.videoWidth - 1, 0], [0, video.videoHeight - 1]]) {
+      context.clearRect(0, 0, 1, 1);
+      context.drawImage(video, x, y, 1, 1, 0, 0, 1, 1);
+      if (context.getImageData(0, 0, 1, 1).data[3] < 32) return true;
+    }
+  } catch {
+    // Canvas inspection can fail on unsupported decoders; the card still works without video.
+  }
+  return false;
+}
+
+function BadgeConfettiOverlay() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [reducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (reducedMotion || !video) return;
+
+    let active = true;
+    let elapsed = false;
+    const timeout = window.setTimeout(() => {
+      elapsed = true;
+      video.pause();
+      setVisible(false);
+    }, 3000);
+
+    // This asset has already been sped up 2.66x and cut to three seconds.
+    video.play().then(() => {
+      if (active && !elapsed && hasTransparentVideoFrame(video)) setVisible(true);
+      else video.pause();
+    }).catch(() => {
+      if (active) setVisible(false);
+    });
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      video.pause();
+    };
+  }, [reducedMotion]);
+
+  if (reducedMotion) return null;
+
+  return (
+    <video
+      ref={videoRef}
+      src={confettiVideo}
+      muted
+      playsInline
+      preload="auto"
+      aria-hidden="true"
+      onEnded={() => setVisible(false)}
+      onError={() => setVisible(false)}
+      className={`pointer-events-none absolute inset-0 z-10 h-full w-full object-fill sm:object-cover ${visible ? "opacity-100" : "opacity-0"}`}
+    />
+  );
+}
 
 export function BadgeEarnedAnnouncement({
   badge,
@@ -35,7 +104,7 @@ export function BadgeEarnedAnnouncement({
 
   return (
     <div
-      className="fixed inset-0 z-[10001] flex items-center justify-center overflow-y-auto bg-white/15 p-4 backdrop-blur-[24px] sm:p-5"
+      className="fixed inset-0 z-[10001] isolate flex items-center justify-center overflow-y-auto bg-white/15 p-4 backdrop-blur-[24px] sm:p-5"
       onClick={() => { void onDismiss(); }}
     >
       <div
@@ -56,6 +125,7 @@ export function BadgeEarnedAnnouncement({
         {isMultiplier && <p className="mt-4 text-2xl font-bold text-[#d52d3b]">×{payload.count}</p>}
         {onViewTrophyCase && <button onClick={() => { void onViewTrophyCase(); }} className="mt-6 w-full rounded-lg bg-[#164a73] px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">View in Trophy Case</button>}
       </div>
+      <BadgeConfettiOverlay />
     </div>
   );
 }
@@ -102,6 +172,7 @@ export function BadgeEarnedHost() {
 
   return (
     <BadgeEarnedAnnouncement
+      key={eventId}
       badge={badge}
       payload={payload}
       onDismiss={dismiss}

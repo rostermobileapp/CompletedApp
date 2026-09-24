@@ -32,3 +32,4 @@
 - [Mockup sandbox plugin isolation](mockup-sandbox-isolation.md) — keep app-specific Vite plugins out of the isolated preview server to avoid importing workspace-only config.
 - [Trophy Case depth direction](trophy-case-depth-direction.md) — inset shadows alone were rejected as low-quality; use nested rims, distinct surface planes, and consistent lighting for depth.
 - [Badge announcement presentation](badge-announcement-presentation.md) — earned-badge modal belongs above the current screen with strong transparent blur, never a replacement ice-photo backdrop.
+- [Confetti video transparency](badge-confetti-transparency.md) — black-background video needs real alpha; screen blending over a blurred modal can darken the whole screen.
