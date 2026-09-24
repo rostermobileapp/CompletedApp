@@ -268,7 +268,7 @@ export default function TrophyCase() {
         <header className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-end">
           <div>
             <h1 className="mt-2 font-['Georgia'] text-4xl font-bold tracking-tight text-[#344238] sm:text-5xl">Trophy Case</h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367]">League honors, team keepsakes, and the milestones that made your game.</p>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367]">League honors, team keepsakes, and milestones.</p>
           </div>
           <div className="flex w-fit items-center gap-3 rounded-2xl border border-[#b49365]/35 bg-[#f6efdf]/75 px-4 py-3 shadow-[0_4px_14px_#73664a12]">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#c39153]/50 bg-[#e9d3aa] text-[#8b6034]"><Trophy size={18} /></span>
