@@ -29,3 +29,4 @@
 - [Team stats query isolation](team-stats-query-isolation.md) — team-specific stats queries need unique cache keys; league-wide and team-roster responses are not interchangeable.
 - [Native calendar export](native-calendar-export.md) — export is one-way by default; optional providers reconcile by stable source key, fingerprint, and editable event ID.
 - [Private calendar feeds](private-calendar-feeds.md) — web subscriptions use a revocable bearer URL; store only its hash and keep one active token per user.
+- [Mockup sandbox plugin isolation](mockup-sandbox-isolation.md) — keep app-specific Vite plugins out of the isolated preview server to avoid importing workspace-only config.
