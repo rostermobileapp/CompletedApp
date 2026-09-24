@@ -20,7 +20,7 @@ type SelectedBadge = { badge: Badge; tier?: Tier };
 type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21" | "testing";
 
 const ACHIEVEMENT_SECTIONS = [
-  { key: "three_stars", label: "3 Stars", description: "Named one of the three stars of the game.", slug: "three_stars" },
+  { key: "three_stars", label: "3 Stars", description: "First star: 3 points · second: 2 · third: 1. Every point counts toward your tiers.", slug: "three_stars" },
   { key: "beer_me", label: "Beer Me", description: "Post-game dedication.", slug: "beer_me" },
   { key: "century_club", label: "Century Club", description: "Total games played.", slug: "century_club" },
   { key: "hat_trick", label: "Hat Trick", description: "Score three goals in a single game.", slug: "hat_trick" },

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.js';
 import { storage } from '../storage.js';
+import { getCareerThreeStarPoints, getTrophyCase } from '../badges.js';
 
 const run = randomUUID().replace(/-/g, '');
 const commissionerId = `test_${run}_commissioner`;
@@ -117,6 +118,20 @@ test('star leaderboards stay season-scoped and preserve capped and full-list req
     const fullLeaderboard = await storage.getLeagueStarLeaderboard(leagueId, null);
     assert.equal(fullLeaderboard.length, currentPlayerIds.length + 1);
     assert.ok(fullLeaderboard.some(entry => entry.user.id === previousPlayerId));
+    assert.equal(
+      currentSeasonLeaderboard.find(entry => entry.user.id === currentPlayerIds[0])?.starPoints,
+      6,
+    );
+    assert.equal(await getCareerThreeStarPoints(currentPlayerIds[0]), 8);
+    assert.equal(await getCareerThreeStarPoints(previousPlayerId), 3);
+
+    const caseData = await getTrophyCase(currentPlayerIds[0]);
+    const threeStars = caseData.sections.flatMap(section => section.badges)
+      .find(badge => badge.slug === 'three_stars');
+    assert.equal(threeStars?.currentProgress, 8);
+    assert.equal(threeStars?.isEarned, true);
+    assert.ok(threeStars?.earnedTiers.includes('bronze'));
+    assert.ok(!threeStars?.earnedTiers.includes('silver'));
 
     const defaultLeaderboard = await storage.getLeagueStarLeaderboard(leagueId);
     assert.equal(defaultLeaderboard.length, 10);

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { ensureDefaultBadges } from "./badges";
+import { ensureDefaultBadges, reconcileHistoricalThreeStarPoints } from "./badges";
 
 // Runtime-safe DDL keeps older deployments compatible. The Drizzle schema
 // remains the source of truth and drizzle-kit can still generate a migration.
@@ -121,4 +121,5 @@ export async function ensureBadgeTables() {
     CREATE INDEX IF NOT EXISTS idx_badge_events_created ON badge_earned_events(created_at);
   `);
   await ensureDefaultBadges();
+  await reconcileHistoricalThreeStarPoints();
 }

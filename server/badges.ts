@@ -162,7 +162,7 @@ DEFAULT_BADGES.push(
   achievement("on_fire", "On Fire", "Multi-game scoring streaks.", "tiered", "metric", "scoring_streak_games", {}, [
     defaultTier("bronze", 3), defaultTier("silver", 5), defaultTier("gold", 10), defaultTier("platinum", 20),
   ]),
-  achievement("three_stars", "3 Stars", "Named one of the 3 stars of the game.", "tiered", "metric", "career_three_stars", {}, [
+  achievement("three_stars", "3 Stars", "Earn 3 Stars points: 3 for first star, 2 for second, and 1 for third.", "tiered", "metric", "career_three_stars", {}, [
     ...THREE_STARS_TIERS.map(({ tier, threshold, imagePath }) => ({
       ...defaultTier(tier, threshold),
       imagePath,
@@ -193,6 +193,11 @@ export async function ensureDefaultBadges() {
       .limit(1);
     if (existing) {
       if (badge.slug === "three_stars" && badge.tiers?.length) {
+        await db.update(badgeDefinitions).set({ description: badge.description })
+          .where(and(
+            eq(badgeDefinitions.id, existing.id),
+            eq(badgeDefinitions.description, "Named one of the 3 stars of the game."),
+          ));
         // Reconcile the existing four-tier catalog as well as new installations.
         // The supplied 3 Stars artwork is canonical for each tier.
         for (const tier of badge.tiers) {
@@ -237,6 +242,63 @@ export async function ensureDefaultBadges() {
         color: tier.color ?? TIER_COLORS[tier.tier],
       })));
     }
+  }
+}
+
+export async function getCareerThreeStarPoints(userId: string): Promise<number> {
+  const rows = await db.select({
+    points: sql<number>`COALESCE(SUM(
+      (CASE WHEN ${gameStars.firstStarUserId} = ${userId} THEN 3 ELSE 0 END) +
+      (CASE WHEN ${gameStars.secondStarUserId} = ${userId} THEN 2 ELSE 0 END) +
+      (CASE WHEN ${gameStars.thirdStarUserId} = ${userId} THEN 1 ELSE 0 END)
+    ), 0)::int`,
+  }).from(gameStars).where(sql`
+    ${gameStars.firstStarUserId} = ${userId} OR
+    ${gameStars.secondStarUserId} = ${userId} OR
+    ${gameStars.thirdStarUserId} = ${userId}
+  `);
+  return Number(rows[0]?.points ?? 0);
+}
+
+// Reconcile awards earned before 3 Stars switched from nomination count to points.
+// Historical crossings get award records, but no delayed announcement events.
+export async function reconcileHistoricalThreeStarPoints() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "three_stars"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  const tiers = await db.select().from(badgeTiers)
+    .where(eq(badgeTiers.badgeDefinitionId, definition.id)).orderBy(asc(badgeTiers.threshold));
+  const totals = await db.execute(sql`
+    SELECT user_id, SUM(points)::int AS points FROM (
+      SELECT first_star_user_id AS user_id, 3 AS points FROM game_stars
+      UNION ALL SELECT second_star_user_id, 2 FROM game_stars
+      UNION ALL SELECT third_star_user_id, 1 FROM game_stars
+    ) scored GROUP BY user_id
+  `);
+  for (const row of totals.rows) {
+    const userId = String(row.user_id);
+    const points = Number(row.points);
+    const reached = reachedTiers(tiers, points);
+    await db.transaction(async (tx) => {
+      for (const tier of reached) {
+        await tx.insert(badgeAwards).values({
+          badgeDefinitionId: definition.id, userId, scopeKey: `global:tier:${tier.tier}`,
+          tier: tier.tier, count: 1, source: "evaluator", metadata: { value: points },
+        }).onConflictDoNothing();
+      }
+      await tx.insert(badgeProgress).values({
+        badgeDefinitionId: definition.id, userId, scopeKey: "global",
+        progress: points, count: points,
+        earnedTiers: reached.map((tier) => tier.tier), currentTier: reached.at(-1)?.tier ?? null,
+      }).onConflictDoUpdate({
+        target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+        set: {
+          progress: points, count: points,
+          earnedTiers: reached.map((tier) => tier.tier), currentTier: reached.at(-1)?.tier ?? null,
+          updatedAt: new Date(),
+        },
+      });
+    });
   }
 }
 
@@ -310,9 +372,7 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
       return Number((rows.rows?.[0] as any)?.count ?? 0);
     }
     case "career_three_stars": {
-      const rows = await db.select({ count: sql<number>`count(*)::int` }).from(gameStars)
-        .where(sql`${gameStars.firstStarUserId} = ${userId} OR ${gameStars.secondStarUserId} = ${userId} OR ${gameStars.thirdStarUserId} = ${userId}`);
-      return Number(rows[0]?.count ?? 0);
+      return getCareerThreeStarPoints(userId);
     }
     case "career_sub_appearances": {
       const rows = await db.select({ count: sql<number>`count(*)::int` }).from(substituteRequests)
@@ -547,7 +607,7 @@ export async function awardManualBadge(input: {
 
 export async function getTrophyCase(userId: string) {
   const definitions = await definitionsWithTiers();
-  const [awards, progress, goalieMembership, goalieAppearance, beerCount] = await Promise.all([
+  const [awards, progress, goalieMembership, goalieAppearance, beerCount, threeStarPoints] = await Promise.all([
     db.select().from(badgeAwards).where(eq(badgeAwards.userId, userId)).orderBy(desc(badgeAwards.awardedAt)),
     db.select().from(badgeProgress).where(eq(badgeProgress.userId, userId)),
     db.select({ id: leagueMemberships.id }).from(leagueMemberships).where(and(
@@ -558,6 +618,7 @@ export async function getTrophyCase(userId: string) {
     db.select({ gameId: gameGoalies.gameId }).from(gameGoalies)
       .where(eq(gameGoalies.goalieUserId, userId)).limit(1),
     getMetricValue(userId, "season_beers"),
+    getCareerThreeStarPoints(userId),
   ]);
   const awardsByDefinition = new Map<string, typeof awards>();
   for (const award of awards) awardsByDefinition.set(award.badgeDefinitionId, [...(awardsByDefinition.get(award.badgeDefinitionId) ?? []), award]);
@@ -566,13 +627,15 @@ export async function getTrophyCase(userId: string) {
     const definitionAwards = awardsByDefinition.get(definition.id) ?? [];
     const currentProgress = progressByDefinition.get(definition.id);
     const isBeerBadge = definition.triggerKey === "season_beers";
-    const earnedTiers = isBeerBadge
-      ? reachedTiers(definition.tiers, beerCount).map((tier) => tier.tier)
+    const liveTierValue = isBeerBadge ? beerCount
+      : definition.triggerKey === "career_three_stars" ? threeStarPoints : null;
+    const earnedTiers = liveTierValue !== null
+      ? reachedTiers(definition.tiers, liveTierValue).map((tier) => tier.tier)
       : currentProgress?.earnedTiers ?? definitionAwards.filter((award) => award.tier).map((award) => award.tier);
-    const visibleAwards = isBeerBadge
+    const visibleAwards = liveTierValue !== null
       ? definitionAwards.filter((award) => award.tier && earnedTiers.includes(award.tier))
       : definitionAwards;
-    const isEarned = isBeerBadge ? earnedTiers.length > 0 : definition.category === "achievement"
+    const isEarned = liveTierValue !== null ? earnedTiers.length > 0 : definition.category === "achievement"
       ? definition.achievementType === "tiered"
         ? (currentProgress?.earnedTiers?.length ?? 0) > 0
         : (currentProgress?.count ?? 0) > 0 || definitionAwards.length > 0
@@ -582,9 +645,9 @@ export async function getTrophyCase(userId: string) {
       ...definition,
       isEarned,
       earnedAt: visibleAwards[0]?.awardedAt ?? null,
-      count: isBeerBadge ? beerCount : currentProgress?.count ?? definitionAwards[0]?.count ?? 0,
+      count: liveTierValue ?? currentProgress?.count ?? definitionAwards[0]?.count ?? 0,
       earnedTiers,
-      currentProgress: isBeerBadge ? beerCount : currentProgress?.progress ?? 0,
+      currentProgress: liveTierValue ?? currentProgress?.progress ?? 0,
       nextThreshold: nextTier?.threshold ?? null,
       awards: visibleAwards,
     };
