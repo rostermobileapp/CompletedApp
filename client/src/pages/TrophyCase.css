@@ -1,0 +1,64 @@
+.trophy-case .trophy-depth-main {
+  background: rgba(249, 252, 255, 0.89);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 22px 54px rgba(20, 47, 75, 0.23),
+    0 3px 10px rgba(20, 47, 75, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.trophy-case .trophy-depth-panel {
+  background: #eaf3f9;
+  border: 1px solid #b9cddd;
+  box-shadow:
+    inset 0 5px 11px rgba(30, 64, 97, 0.19),
+    inset 0 1px 3px rgba(30, 64, 97, 0.12),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.trophy-case .trophy-depth-section {
+  background: #e3eef6;
+  border: 1px solid #afc5d6;
+  box-shadow:
+    inset 0 7px 14px rgba(29, 63, 95, 0.2),
+    inset 0 2px 4px rgba(29, 63, 95, 0.11),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.85);
+}
+
+.trophy-case .trophy-depth-slot {
+  background: #dceaf4;
+  border: 1px solid #9fb9cc;
+  box-shadow:
+    inset 0 8px 14px rgba(27, 59, 91, 0.22),
+    inset 0 2px 4px rgba(27, 59, 91, 0.12),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.9);
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.trophy-case .trophy-depth-slot:hover {
+  background: #edf6fb;
+  border-color: #d52d3b;
+  box-shadow:
+    inset 0 4px 8px rgba(27, 59, 91, 0.14),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.9),
+    0 7px 15px rgba(27, 59, 91, 0.16);
+  transform: translateY(-2px);
+}
+
+.trophy-case .trophy-depth-medallion {
+  box-shadow:
+    inset 0 3px 7px rgba(26, 55, 83, 0.18),
+    inset 0 -2px 2px rgba(255, 255, 255, 0.88),
+    0 1px 2px rgba(26, 55, 83, 0.13);
+}
+
+.trophy-case .trophy-depth-track {
+  box-shadow: inset 0 2px 4px rgba(26, 55, 83, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trophy-case .trophy-depth-slot {
+    transition: none;
+  }
+}
