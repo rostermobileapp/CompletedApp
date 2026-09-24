@@ -264,7 +264,7 @@ export default function TrophyCase() {
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#c39153]/50 bg-[#e9d3aa] text-[#8b6034]"><Trophy size={16} /></span>
             <div>
               <div className="font-mono text-lg font-bold leading-none text-[#5e4b31]">{earnedCount}</div>
-              <div className="mt-1 text-[9px] font-bold uppercase tracking-[.16em] text-[#82745e]">Career honors</div>
+              <div className="mt-1 text-[9px] font-bold uppercase tracking-[.16em] text-[#82745e]">Badge(s)</div>
             </div>
           </div>
           <button
