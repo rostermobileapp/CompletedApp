@@ -262,9 +262,9 @@ export default function TrophyCase() {
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex w-fit items-center gap-3 rounded-2xl border border-[#b49365]/35 bg-[#f6efdf]/75 px-4 py-2 shadow-[0_4px_14px_#73664a12]">
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#c39153]/50 bg-[#e9d3aa] text-[#8b6034]"><Trophy size={16} /></span>
-            <div>
+            <div className="flex items-baseline gap-2">
               <div className="font-mono text-lg font-bold leading-none text-[#5e4b31]">{earnedCount}</div>
-              <div className="mt-1 text-[9px] font-bold uppercase tracking-[.16em] text-[#82745e]">Badge(s)</div>
+              <div className="text-[9px] font-bold uppercase tracking-[.16em] text-[#82745e]">Badge(s)</div>
             </div>
           </div>
           <button
