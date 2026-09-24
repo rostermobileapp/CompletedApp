@@ -77,7 +77,7 @@ function BadgeConfettiOverlay() {
       aria-hidden="true"
       onEnded={() => setVisible(false)}
       onError={() => setVisible(false)}
-      className={`pointer-events-none absolute inset-0 z-10 h-full w-full object-fill sm:object-cover ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`pointer-events-none absolute inset-0 z-10 h-full w-full object-contain object-center ${visible ? "opacity-100" : "opacity-0"}`}
     />
   );
 }
