@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, ChevronRight, Lock, Sparkles, Trophy, X } from "lucide-react";
 import { BadgeEarnedAnnouncement } from "@/components/BadgeEarnedHost";
 import { getImageUrl } from "@/lib/queryClient";
+import iceBackground from "@/assets/trophy-case-ice.png";
 
 type Tier = { tier: string; threshold: number; imagePath?: string | null; color?: string | null };
 type Badge = {
@@ -116,8 +117,12 @@ export default function TrophyCase() {
   const earnedCount = data?.sections.reduce((total, section) => total + section.badges.reduce((sectionTotal, badge) => section.category === "achievement" && badge.achievementType === "tiered" ? sectionTotal + badge.tiers.filter((tier) => badge.earnedTiers.includes(tier.tier) || badge.currentProgress >= tier.threshold).length : sectionTotal + Number(badge.isEarned), 0), 0) ?? 0;
 
   return (
-    <div className="min-h-[100dvh] bg-[#f5f9fc] px-3 pb-24 pt-5 text-[#1e3345] sm:px-6 sm:pt-8">
-      <div className="pointer-events-none fixed inset-0 opacity-60" style={{ background: "radial-gradient(ellipse at 50% -15%, #ffffff 0%, transparent 58%), linear-gradient(115deg, #edf5fa 0%, #f8fbfd 48%, #eaf3f8 100%)" }} />
+    <div className="min-h-[100dvh] bg-[#dce5f3] px-3 pb-24 pt-5 text-[#1e3345] sm:px-6 sm:pt-8">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${iceBackground})` }}
+      />
       <div className="relative mx-auto max-w-6xl">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 rounded-xl border border-[#d7e2eb] bg-white/85 px-2.5 py-1.5 shadow-[0_3px_12px_#23415d12]"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#d52d3b] text-white"><Trophy size={16} /></span><div className="flex items-baseline gap-1.5"><strong className="font-mono text-lg leading-none text-[#173d5b]">{earnedCount}</strong><span className="text-[10px] font-bold uppercase tracking-[.12em] text-[#597087]">Badges</span></div></div>
