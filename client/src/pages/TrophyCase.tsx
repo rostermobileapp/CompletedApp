@@ -259,24 +259,24 @@ export default function TrophyCase() {
       }}
     >
       <div className="mx-auto max-w-6xl">
-        <button
-          className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#9d815d]/25 bg-[#f7f0e2]/65 px-3.5 py-2 text-xs font-semibold text-[#6a715f] transition hover:bg-[#fffaf0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b713f]"
-          onClick={() => navigate("/profile")}
-        >
-          <ArrowLeft size={15} /> Profile
-        </button>
-        <header className="mb-6 flex flex-col gap-4 sm:mb-8">
-          <div className="flex w-fit self-end items-center gap-3 rounded-2xl border border-[#b49365]/35 bg-[#f6efdf]/75 px-4 py-3 shadow-[0_4px_14px_#73664a12]">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <button
+            className="inline-flex items-center gap-2 rounded-full border border-[#9d815d]/25 bg-[#f7f0e2]/65 px-3.5 py-2 text-xs font-semibold text-[#6a715f] transition hover:bg-[#fffaf0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9b713f]"
+            onClick={() => navigate("/profile")}
+          >
+            <ArrowLeft size={15} /> Profile
+          </button>
+          <div className="flex w-fit items-center gap-3 rounded-2xl border border-[#b49365]/35 bg-[#f6efdf]/75 px-4 py-3 shadow-[0_4px_14px_#73664a12]">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#c39153]/50 bg-[#e9d3aa] text-[#8b6034]"><Trophy size={18} /></span>
             <div>
               <div className="font-mono text-lg font-bold leading-none text-[#5e4b31]">{earnedCount}</div>
               <div className="mt-1 text-[9px] font-bold uppercase tracking-[.16em] text-[#82745e]">Career honors</div>
             </div>
           </div>
-          <div className="w-full">
-            <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#344238] sm:text-5xl text-center">Trophy Case</h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367] text-center">League honors, team keepsakes, and milestones.</p>
-          </div>
+        </div>
+        <header className="mb-6 sm:mb-8">
+          <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#344238] sm:text-5xl text-center">Trophy Case</h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367] text-center">League honors, team keepsakes, and milestones.</p>
         </header>
         {ageAccess === "loading" && (
           <div className="rounded-2xl border border-[#b49365]/40 bg-[#f6efdf]/60 p-8 text-center text-[#687367]">Verifying your age…</div>
