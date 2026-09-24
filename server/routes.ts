@@ -1108,6 +1108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/badges/events/pending', isAuthenticated, async (req: any, res) => {
     try {
+      res.setHeader('Cache-Control', 'no-store');
       res.json(await getPendingBadgeEvents(currentUserId(req)));
     } catch (error) {
       res.status(500).json({ message: 'Failed to load badge events' });

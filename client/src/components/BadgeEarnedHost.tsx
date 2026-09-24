@@ -144,8 +144,15 @@ export function BadgeEarnedHost() {
   useEffect(() => {
     if (pending?.length) {
       setQueue((existing) => {
-        const seen = new Set(existing.map((event) => event.id || event.eventId));
-        return [...existing, ...pending.filter((event) => !seen.has(event.id || event.eventId))];
+        const pendingById = new Map(
+          pending.map((event) => [event.id || event.eventId, event]),
+        );
+        const refreshed = existing.map((event) => {
+          const eventId = event.id || event.eventId;
+          return (eventId && pendingById.get(eventId)) || event;
+        });
+        const seen = new Set(refreshed.map((event) => event.id || event.eventId));
+        return [...refreshed, ...pending.filter((event) => !seen.has(event.id || event.eventId))];
       });
     }
   }, [pending]);

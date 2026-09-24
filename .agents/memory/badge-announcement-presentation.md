@@ -9,4 +9,4 @@ For tiered awards, carry the awarded tier's image path in both live and persiste
 
 **Why:** The user wants the moment of achievement to appear immediately over the screen where it was triggered (for example, logging a milestone beer), with that same screen still visible but heavily blurred; each tier must also show its own artwork.
 
-**How to apply:** Keep the host at app level; avoid route-specific announcement backgrounds. Preserve real-time earned-event delivery, reconcile pending events, and resolve legacy tier events to their tier-specific image.
+**How to apply:** Keep the host at app level; avoid route-specific announcement backgrounds. Preserve real-time earned-event delivery, reconcile pending events, and resolve legacy tier events to their tier-specific image. When pending data refreshes, replace queued events with matching IDs instead of treating them only as duplicates, because corrected payloads must reach cards already in memory.
