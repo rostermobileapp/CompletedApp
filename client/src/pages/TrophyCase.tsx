@@ -265,17 +265,17 @@ export default function TrophyCase() {
         >
           <ArrowLeft size={15} /> Profile
         </button>
-        <header className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-start">
-          <div>
-            <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#344238] sm:text-5xl text-center">Trophy Case</h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367] text-center">League honors, team keepsakes, and milestones.</p>
-          </div>
+        <header className="mb-6 flex flex-col gap-4 sm:mb-8">
           <div className="flex w-fit self-end items-center gap-3 rounded-2xl border border-[#b49365]/35 bg-[#f6efdf]/75 px-4 py-3 shadow-[0_4px_14px_#73664a12]">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#c39153]/50 bg-[#e9d3aa] text-[#8b6034]"><Trophy size={18} /></span>
             <div>
               <div className="font-mono text-lg font-bold leading-none text-[#5e4b31]">{earnedCount}</div>
               <div className="mt-1 text-[9px] font-bold uppercase tracking-[.16em] text-[#82745e]">Career honors</div>
             </div>
+          </div>
+          <div className="w-full">
+            <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#344238] sm:text-5xl text-center">Trophy Case</h1>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#687367] text-center">League honors, team keepsakes, and milestones.</p>
           </div>
         </header>
         {ageAccess === "loading" && (
