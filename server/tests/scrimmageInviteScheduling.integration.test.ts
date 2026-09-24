@@ -15,6 +15,7 @@ import {
   generateAndPersistRecurringOccurrences,
   getScrimmageInviteSendAt,
 } from '../scrimmageInviteJob.js';
+import { addCalendarDaysInTimezone, formatDateInTimezone } from '../dateUtils.js';
 
 const RUN = randomUUID().replaceAll('-', '').slice(0, 10);
 const CREATOR_ID = `sched_creator_${RUN}`;
@@ -319,7 +320,7 @@ describe('scheduled occurrence selection and claims', () => {
     await storage.releaseScrimmageInviteDelivery(QUEUED_ID, replacementClaimId);
   });
 
-  test('new recurring children never share the parent occurrence announcement', async () => {
+  test('new recurring children keep the parent time but not its announcement', async () => {
     await db.execute(sql`
       INSERT INTO announcements (id, content, league_id, author_id, is_pinned, created_at, updated_at)
       VALUES (
@@ -337,8 +338,56 @@ describe('scheduled occurrence selection and claims', () => {
       '2026-12-20T20:00:00',
     );
     assert.equal(child.announcementId, null);
-    assert.equal(child.timeTbd, true);
+    assert.equal(child.timeTbd, false);
+    assert.equal(child.dateTime.replace(' ', 'T'), '2026-12-20T20:00:00');
   });
+});
+
+test('daily recurring children retain 6 PM in the creator timezone', async () => {
+  const startDay = formatDateInTimezone(
+    addCalendarDaysInTimezone(new Date(), 2, 'America/New_York'),
+    'yyyy-MM-dd',
+    'America/New_York',
+  );
+  const parent = await storage.createScrimmage({
+    leagueId: LEAGUE_ID,
+    creatorId: CREATOR_ID,
+    title: 'Ten daily evenings',
+    dateTime: `${startDay}T18:00:00`,
+    timezone: 'America/New_York',
+    location: 'Test Rink',
+    maxPlayers: 20,
+    isRecurring: true,
+    recurrenceType: 'daily',
+    recurrenceCount: 10,
+    recurrenceTimesIndependent: true, // Legacy flag must not erase the time.
+    timeTbd: false,
+    inviteUserIds: [PLAYER_ID],
+    hasDeferredInvites: true,
+  });
+  const children = await generateAndPersistRecurringOccurrences(parent, 12);
+  assert.equal(children.length, 9);
+  for (let index = 0; index < children.length; index++) {
+    const day = formatDateInTimezone(
+      addCalendarDaysInTimezone(`${startDay}T18:00:00`, index + 1, 'America/New_York'),
+      'yyyy-MM-dd',
+      'America/New_York',
+    );
+    assert.equal(children[index].dateTime.replace(' ', 'T'), `${day}T18:00:00`);
+    assert.equal(children[index].timeTbd, false);
+    assert.equal(children[index].inviteSentAt, null);
+  }
+});
+
+test('calendar day increments retain 6 PM across spring and fall DST', () => {
+  assert.equal(
+    formatDateInTimezone(addCalendarDaysInTimezone('2027-03-13T18:00:00', 1, 'America/New_York'), "yyyy-MM-dd'T'HH:mm:ss", 'America/New_York'),
+    '2027-03-14T18:00:00',
+  );
+  assert.equal(
+    formatDateInTimezone(addCalendarDaysInTimezone('2027-11-06T18:00:00', 1, 'America/New_York'), "yyyy-MM-dd'T'HH:mm:ss", 'America/New_York'),
+    '2027-11-07T18:00:00',
+  );
 });
 
 test('scheduled send time preserves league-local calendar days across DST', () => {

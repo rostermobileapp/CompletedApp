@@ -81,6 +81,21 @@ export function getStoredDateOnlyKey(dateTime: Date | string): string {
   return parsed.toISOString().slice(0, 10);
 }
 
+/** Advance a local calendar date without shifting its clock time across DST. */
+export function addCalendarDaysInTimezone(
+  dateTime: Date | string,
+  dayOffset: number,
+  timezone: string | null | undefined,
+): Date {
+  const tz = timezone || DEFAULT_TIMEZONE;
+  const instant = typeof dateTime === 'string' ? parseLeagueLocalDateTime(dateTime, tz) : dateTime;
+  const dateKey = formatInTimeZone(instant, tz, 'yyyy-MM-dd');
+  const time = formatInTimeZone(instant, tz, 'HH:mm:ss');
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const target = new Date(Date.UTC(year, month - 1, day + dayOffset));
+  return fromZonedTime(`${target.toISOString().slice(0, 10)}T${time}`, tz);
+}
+
 /**
  * Advance from the original league-local wall-clock value by whole calendar
  * months. The original day remains the anchor: a 31st occurrence clamps to

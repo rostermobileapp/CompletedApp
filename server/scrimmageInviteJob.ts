@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { addDays, isBefore, isAfter, format } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 import { sendScrimmageInvitePushNotification, resolveTeamLogoUrl } from './oneSignalNotifications';
-import { addCalendarMonthsInTimezone, formatDateInTimezone, formatScrimmageDateTime, formatDayAndTime, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from './dateUtils';
+import { addCalendarDaysInTimezone, addCalendarMonthsInTimezone, formatDateInTimezone, formatScrimmageDateTime, formatDayAndTime, getLeagueLocalDateKey, getStoredDateOnlyKey, parseLeagueLocalDateTime } from './dateUtils';
 import { sendBulkScrimmageInvites } from './emails';
 import { isDemoLeague } from './demo';
 import { broadcastNotificationUpdate } from './notificationBroadcast';
@@ -440,7 +440,7 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
 
   // For weekly recurrence
   if (parentScrimmage.recurrenceType === 'weekly') {
-    let currentDate = addDays(startDate, 7); // Start from next week
+    let currentDate = addCalendarDaysInTimezone(startDate, 7, timezone); // Start from next week
     let count = 1;
     const maxCount = parentScrimmage.recurrenceCount || Infinity;
     
@@ -466,14 +466,14 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
         console.log(`📅 Created recurring occurrence for ${effectiveParent.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
       }
       
-      currentDate = addDays(currentDate, 7);
+      currentDate = addCalendarDaysInTimezone(currentDate, 7, timezone);
       count++;
     }
   }
 
   // For daily recurrence
   if (parentScrimmage.recurrenceType === 'daily') {
-    let currentDate = addDays(startDate, 1);
+    let currentDate = addCalendarDaysInTimezone(startDate, 1, timezone);
     let count = 1;
     const maxCount = parentScrimmage.recurrenceCount || Infinity;
     
@@ -497,7 +497,7 @@ export async function generateAndPersistRecurringOccurrences(parentScrimmage: an
         console.log(`📅 Created recurring occurrence for ${parentScrimmage.title} on ${format(currentDate, 'yyyy-MM-dd')}`);
       }
       
-      currentDate = addDays(currentDate, 1);
+      currentDate = addCalendarDaysInTimezone(currentDate, 1, timezone);
       count++;
     }
   }

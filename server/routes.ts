@@ -40,9 +40,9 @@ import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } fr
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, ne, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
-import { format, addDays, addWeeks } from "date-fns";
+import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, hasLeagueLocalDateTimeStarted, parseLeagueLocalDateTime } from "./dateUtils";
+import { addCalendarDaysInTimezone, formatDateInTimezone, formatScrimmageDateTime, formatFullDateTime, formatDayAndTime, formatShortDayAndTime, generateMonthlyRecurrenceDates, getLeagueLocalDateKey, getStoredDateOnlyKey, hasLeagueLocalDateTimeStarted, parseLeagueLocalDateTime } from "./dateUtils";
 import {
   insertLeagueSchema,
   insertTeamSchema,
@@ -18217,15 +18217,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           while (dates.length < maxOccurrences) {
             if (isAfterRecurrenceEnd(currentDate)) break;
             dates.push(new Date(currentDate));
-            currentDate = addDays(currentDate, 1);
+            currentDate = addCalendarDaysInTimezone(currentDate, 1, scrimmageTimezone);
           }
         } else if (scrimmageData.recurrenceType === 'weekly') {
           // Weekly recurrence: iterate through weeks and selected days
           if (scrimmageData.recurrenceDays && scrimmageData.recurrenceDays.length > 0) {
             const sortedDays = [...scrimmageData.recurrenceDays].sort((a, b) => a - b);
-            const startDay = startDate.getDay();
-            const startHour = startDate.getHours();
-            const startMinute = startDate.getMinutes();
+            const [year, month, day] = getLeagueLocalDateKey(startDate, scrimmageTimezone).split('-').map(Number);
+            const startDay = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
             
             let weekOffset = 0;
             while (dates.length < maxOccurrences) {
@@ -18234,9 +18233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Calculate the date for this day in this week
                 // Start from the beginning of the start week, then add week offset
                 const daysFromStart = (day - startDay + (weekOffset * 7));
-                const occurrenceDate = new Date(startDate);
-                occurrenceDate.setDate(startDate.getDate() + daysFromStart);
-                occurrenceDate.setHours(startHour, startMinute, 0, 0);
+                const occurrenceDate = addCalendarDaysInTimezone(startDate, daysFromStart, scrimmageTimezone);
                 
                 // Only include dates that are >= start date
                 if (occurrenceDate >= startDate) {
@@ -18248,7 +18245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               weekOffset++;
               // Check if we should continue to next week
               if (recurrenceEndDateKey) {
-                const nextWeekStart = addWeeks(startDate, weekOffset);
+                const nextWeekStart = addCalendarDaysInTimezone(startDate, weekOffset * 7, scrimmageTimezone);
                 if (isAfterRecurrenceEnd(nextWeekStart)) break;
               }
             }
@@ -18258,7 +18255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             while (dates.length < maxOccurrences) {
               if (isAfterRecurrenceEnd(currentDate)) break;
               dates.push(new Date(currentDate));
-              currentDate = addWeeks(currentDate, 1);
+              currentDate = addCalendarDaysInTimezone(currentDate, 7, scrimmageTimezone);
             }
           }
         } else if (scrimmageData.recurrenceType === 'monthly') {
@@ -18289,7 +18286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inviteSentAt: null,
           inviteDeliveryClaimedAt: null,
           inviteDeliveryClaimId: null,
-          recurrenceTimesIndependent: true,
+          recurrenceTimesIndependent: false,
         });
 
         // Creator must explicitly RSVP to join their own scrimmage
@@ -18363,10 +18360,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             recurrenceEndDate: scrimmageData.recurrenceEndDate
               ? new Date(scrimmageData.recurrenceEndDate)
               : null,
-            // Future occurrences deliberately start as Time TBD. A time set on
-            // the first occurrence must never become the series-wide default.
-            dateTime: `${formatDateInTimezone(dates[i], 'yyyy-MM-dd', scrimmageTimezone)}T00:00:00`,
-            timeTbd: true,
+            // Persist the same creator-local clock time on every occurrence.
+            dateTime: formatDateInTimezone(dates[i], "yyyy-MM-dd'T'HH:mm:ss", scrimmageTimezone),
+            timeTbd: scrimmageData.timeTbd,
             parentScrimmageId: parentScrimmage.id,
             announcementId: null, // Only first scrimmage has announcement
             inviteUserIds: requestedInviteUserIds,
@@ -18375,7 +18371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             inviteSentAt: null,
             inviteDeliveryClaimedAt: null,
             inviteDeliveryClaimId: null,
-            recurrenceTimesIndependent: true,
+            recurrenceTimesIndependent: false,
           });
 
           // Creator must explicitly RSVP to join each recurring child scrimmage

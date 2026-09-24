@@ -11138,19 +11138,15 @@ export class DatabaseStorage implements IStorage {
 
   async createRecurringScrimmageOccurrence(parentScrimmage: Scrimmage, dateTime: string): Promise<Scrimmage> {
     const { id, createdAt, updatedAt, parentScrimmageId: _, ...parentData } = parentScrimmage;
-    const occurrenceHasIndependentTime = parentScrimmage.recurrenceTimesIndependent;
-    const occurrenceDateTime = occurrenceHasIndependentTime
-      ? `${dateTime.slice(0, 10)}T00:00:00`
-      : dateTime;
     
     const occurrenceData: InsertScrimmage = {
       ...parentData,
-      dateTime: occurrenceDateTime,
+      dateTime,
       parentScrimmageId: parentScrimmage.id,
       isRecurring: false,
       announcementId: null,
-      timeTbd: occurrenceHasIndependentTime ? true : parentScrimmage.timeTbd,
-      hasDeferredInvites: occurrenceHasIndependentTime || parentScrimmage.hasDeferredInvites,
+      timeTbd: parentScrimmage.timeTbd,
+      hasDeferredInvites: parentScrimmage.hasDeferredInvites,
       inviteSentAt: null,
       inviteDeliveryClaimedAt: null,
       inviteDeliveryClaimId: null,
