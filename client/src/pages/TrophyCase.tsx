@@ -250,14 +250,18 @@ export default function TrophyCase() {
             {isLoading && <div className="rounded-2xl border border-[#20374c] p-8 text-center text-[#8096aa]">Loading your trophy case…</div>}
             {isError && <div className="rounded-2xl border border-red-900/60 bg-red-950/20 p-8 text-center text-red-200">Could not load your trophy case.</div>}
             <div className="space-y-8">
-              {data?.sections.filter((section) => section.category !== "achievement").map((section) => (
-                <section key={section.category} className="rounded-2xl border border-[#20374c] bg-[#0d1b2a]/45 p-4 sm:p-5">
-                  <SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={section.badges.length} />
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {section.badges.map((badge) => <BadgeSpot key={badge.id} badge={badge} onClick={() => selectBadge(badge)} />)}
-                  </div>
-                </section>
-              ))}
+              {data?.sections.filter((section) => section.category !== "achievement").map((section) => {
+                const earnedBadges = section.badges.filter((badge) => badge.isEarned);
+                if (earnedBadges.length === 0) return null;
+                return (
+                  <section key={section.category} className="rounded-2xl border border-[#20374c] bg-[#0d1b2a]/45 p-4 sm:p-5">
+                    <SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={earnedBadges.length} />
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {earnedBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} onClick={() => selectBadge(badge)} />)}
+                    </div>
+                  </section>
+                );
+              })}
               <section className="rounded-2xl border border-[#29425b] bg-[#0d1b2a]/35 p-4 sm:p-5">
                 <div className="mb-6">
                   <h2 className="text-lg font-bold uppercase tracking-[.24em] text-[#e8e4dc]">Achievements</h2>
