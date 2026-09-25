@@ -192,7 +192,7 @@ DEFAULT_BADGES.push(
   achievement("rookie_card", "Rookie Card", "Your first game ever logged on Roster.", "onetime", "event", "first_game_logged"),
   achievement("sub", "Sub", "First time subbing in for another player.", "onetime", "event", "first_sub_appearance"),
   achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }),
-  achievement("early_bird", "Early Bird", "RSVP'd Yes more than 48 hours before every game in a season.", "onetime", "event", "season_48hr_rsvp_perfect"),
+  { ...achievement("early_bird", "Early Bird", "RSVP Yes at least 48 hours before every eligible game in a completed season. Resets each season.", "onetime", "metric", "season_48hr_rsvp_perfect"), imagePath: "/badges/early-bird/patch.webp" },
   achievement("ghost", "Ghost", "Marked Out for 3 or more games in a row.", "onetime", "metric", "consecutive_games_out", { threshold: 3 }),
   achievement("sub_magnet", "Sub Magnet", "Had the most subs fill in for you across a season.", "onetime", "event", "season_most_subs_winner"),
 );
@@ -297,6 +297,12 @@ export async function ensureDefaultBadges() {
             },
           });
         }
+      }
+      if (badge.slug === "early_bird") {
+        await db.update(badgeDefinitions).set({
+          description: badge.description, triggerType: "metric",
+          triggerKey: badge.triggerKey, imagePath: badge.imagePath,
+        }).where(eq(badgeDefinitions.id, existing.id));
       }
       continue;
     }
@@ -434,6 +440,111 @@ export async function getSeasonHatTrickCount(userId: string, seasonId: string): 
     ) qualifying_games
   `);
   return Number(result.rows[0]?.count ?? 0);
+}
+
+// An RSVP row alone does not define the schedule: rostered games with no
+// response must also count against the "every game" requirement. Explicit
+// RSVPs include substitutes whose roster membership may not exist.
+export async function getSeasonEarlyBirdStatus(userId: string, seasonId: string) {
+  const result = await db.execute(sql`
+    WITH eligible_games AS (
+      SELECT DISTINCT g.id, g.home_team_id, g.away_team_id, g.is_completed,
+        ((g.scheduled_at AT TIME ZONE COALESCE(l.timezone, 'America/New_York'))
+          AT TIME ZONE 'UTC') - INTERVAL '48 hours' AS cutoff_utc
+      FROM games g LEFT JOIN leagues l ON l.id = g.league_id
+      WHERE g.season_id = ${seasonId} AND g.is_scrimmage = false
+        AND (
+          EXISTS (SELECT 1 FROM team_memberships tm
+            WHERE tm.user_id = ${userId} AND tm.status = 'approved'
+              AND tm.team_id IN (g.home_team_id, g.away_team_id)
+              AND tm.joined_at <= g.scheduled_at)
+          OR EXISTS (SELECT 1 FROM league_memberships lm
+            WHERE lm.user_id = ${userId} AND lm.status = 'approved'
+              AND lm.assigned_team_id IN (g.home_team_id, g.away_team_id)
+              AND lm.requested_at <= g.scheduled_at)
+          OR EXISTS (SELECT 1 FROM game_rsvps r
+            WHERE r.user_id = ${userId} AND r.game_id = g.id
+              AND r.team_id IN (g.home_team_id, g.away_team_id))
+        )
+    )
+    SELECT count(*)::int AS total,
+      count(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM game_rsvps r
+        WHERE r.game_id = eg.id AND r.user_id = ${userId}
+          AND r.team_id IN (eg.home_team_id, eg.away_team_id)
+          AND r.status = 'attending'
+          AND r.updated_at <= eg.cutoff_utc
+      ))::int AS early,
+      count(*) FILTER (WHERE NOT eg.is_completed)::int AS unfinished
+    FROM eligible_games eg
+  `);
+  const [season] = await db.execute(sql`
+    SELECT (NOT is_active OR (end_date IS NOT NULL AND end_date <= NOW())) AS ended
+    FROM seasons WHERE id = ${seasonId}
+  `).then((response) => response.rows);
+  const total = Number(result.rows[0]?.total ?? 0);
+  const early = Number(result.rows[0]?.early ?? 0);
+  return { total, early, qualified: season?.ended === true && total > 0
+    && total === early && Number(result.rows[0]?.unfinished ?? 0) === 0 };
+}
+
+export async function evaluateSeasonEarlyBirdBadgeForUser(userId: string, definition: DefinitionWithTiers, seasonId: string) {
+  const status = await getSeasonEarlyBirdStatus(userId, seasonId);
+  const scopeKey = `season:${seasonId}`;
+  const [award] = status.qualified ? await db.insert(badgeAwards).values({
+    badgeDefinitionId: definition.id, userId, seasonId, scopeKey,
+    count: 1, source: "evaluator", metadata: { early: status.early, total: status.total },
+  }).onConflictDoNothing().returning() : [];
+  await db.insert(badgeProgress).values({
+    badgeDefinitionId: definition.id, userId, scopeKey,
+    progress: status.early, count: status.qualified ? 1 : 0,
+    earnedTiers: [],
+  }).onConflictDoUpdate({
+    target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+    set: { progress: status.early, count: status.qualified ? 1 : 0, updatedAt: new Date() },
+  });
+  if (!award) return [];
+  return [await emitEarnedEvent(userId, award.id, definition, {
+    count: 1, awardId: award.id, seasonId, imagePath: definition.imagePath,
+  })];
+}
+
+// Historical seasons are seeded silently: launching this badge should not
+// announce years of old RSVPs to players on their next visit.
+export async function reconcileSeasonEarlyBird() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "early_bird"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  const candidates = await db.execute(sql`
+    SELECT DISTINCT r.user_id, g.season_id
+    FROM game_rsvps r JOIN games g ON g.id = r.game_id
+      JOIN seasons s ON s.id = g.season_id
+      JOIN users u ON u.id = r.user_id
+      LEFT JOIN leagues l ON l.id = g.league_id
+    WHERE r.status = 'attending' AND g.is_scrimmage = false
+      AND r.updated_at <=
+        ((g.scheduled_at AT TIME ZONE COALESCE(l.timezone, 'America/New_York'))
+          AT TIME ZONE 'UTC') - INTERVAL '48 hours'
+      AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
+  `);
+  for (const row of candidates.rows) {
+    const userId = String(row.user_id);
+    const seasonId = String(row.season_id);
+    const status = await getSeasonEarlyBirdStatus(userId, seasonId);
+    if (!status.qualified) continue;
+    await db.insert(badgeAwards).values({
+      badgeDefinitionId: definition.id, userId, seasonId,
+      scopeKey: `season:${seasonId}`, count: 1, source: "evaluator",
+      metadata: { early: status.early, total: status.total },
+    }).onConflictDoNothing();
+    await db.insert(badgeProgress).values({
+      badgeDefinitionId: definition.id, userId, scopeKey: `season:${seasonId}`,
+      progress: status.early, count: 1, earnedTiers: [],
+    }).onConflictDoUpdate({
+      target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+      set: { progress: status.early, count: 1, updatedAt: new Date() },
+    });
+  }
 }
 
 export async function isCareerGoalie(userId: string): Promise<boolean> {
@@ -1213,6 +1324,10 @@ export async function evaluateBadgesForUser(
       if (context?.seasonId) earned.push(...await evaluateSeasonOnFireBadgeForUser(userId, definition, context.seasonId));
       continue;
     }
+    if (definition.triggerKey === "season_48hr_rsvp_perfect") {
+      if (context?.seasonId) earned.push(...await evaluateSeasonEarlyBirdBadgeForUser(userId, definition, context.seasonId));
+      continue;
+    }
     if (definition.triggerKey === "career_shutouts" && !(await isCareerGoalie(userId))) continue;
     const centuryYear = definition.triggerKey === "calendar_year_appearances" ? currentCenturyClubYear() : null;
     const scopeKey = centuryYear === null ? "global" : `year:${centuryYear}`;
@@ -1344,7 +1459,10 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
         UNION
          SELECT ba.season_id FROM badge_awards ba
           JOIN badge_definitions bd ON bd.id = ba.badge_definition_id
-           WHERE ba.user_id = ${userId} AND bd.slug IN ('hat_trick', 'on_fire') AND ba.season_id IS NOT NULL
+           WHERE ba.user_id = ${userId} AND bd.slug IN ('hat_trick', 'on_fire', 'early_bird') AND ba.season_id IS NOT NULL
+        UNION
+        SELECT g.season_id FROM game_rsvps r
+          JOIN games g ON g.id = r.game_id WHERE r.user_id = ${userId}
       )
       ORDER BY s.is_active DESC, s.start_date DESC NULLS LAST, s.created_at DESC
     `),
@@ -1357,6 +1475,9 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
   const selectedHatTrickSeasonId = requestedHatTrickSeasonId ?? hatTrickSeasons[0]?.id ?? null;
   const hatTrickCount = selectedHatTrickSeasonId ? await getSeasonHatTrickCount(userId, selectedHatTrickSeasonId) : 0;
   const onFireCount = selectedHatTrickSeasonId ? await getSeasonOnFireStreak(userId, selectedHatTrickSeasonId) : 0;
+  const earlyBirdStatus = selectedHatTrickSeasonId
+    ? await getSeasonEarlyBirdStatus(userId, selectedHatTrickSeasonId)
+    : { qualified: false, early: 0, total: 0 };
   const awardsByDefinition = new Map<string, typeof awards>();
   for (const award of awards) awardsByDefinition.set(award.badgeDefinitionId, [...(awardsByDefinition.get(award.badgeDefinitionId) ?? []), award]);
   const progressByScope = new Map(progress.map((item) => [`${item.badgeDefinitionId}:${item.scopeKey}`, item]));
@@ -1365,11 +1486,12 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     const isBeerBadge = definition.triggerKey === "calendar_year_beers";
     const isHatTrickBadge = definition.triggerKey === "season_hat_tricks";
     const isOnFireBadge = definition.triggerKey === "season_scoring_streak";
+    const isEarlyBirdBadge = definition.triggerKey === "season_48hr_rsvp_perfect";
     const isIronManBadge = definition.triggerKey === "consecutive_games_played";
     const isShutoutBadge = definition.triggerKey === "career_shutouts";
-    const isSeasonBadge = isHatTrickBadge || isOnFireBadge;
+    const isSeasonBadge = isHatTrickBadge || isOnFireBadge || isEarlyBirdBadge;
     const allDefinitionAwards = awardsByDefinition.get(definition.id) ?? [];
-    const legacyAwards = isSeasonBadge || isBeerBadge
+    const legacyAwards = (isSeasonBadge && !isEarlyBirdBadge) || isBeerBadge
       ? allDefinitionAwards.filter((award) => isBeerBadge
         ? !award.scopeKey.startsWith(`year:${centuryYear}:tier:`)
         : award.scopeKey.startsWith("global:tier:"))
@@ -1377,13 +1499,16 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     const definitionAwards = allDefinitionAwards.filter((award) =>
       (!isCenturyBadge || award.scopeKey.startsWith(`year:${centuryYear}:tier:`))
       && (!isBeerBadge || award.scopeKey.startsWith(`year:${centuryYear}:tier:`))
-      && (!isSeasonBadge || (selectedHatTrickSeasonId !== null && award.scopeKey.startsWith(`season:${selectedHatTrickSeasonId}:tier:`))));
+      && (!isSeasonBadge || (selectedHatTrickSeasonId !== null && (isEarlyBirdBadge
+        ? award.scopeKey === `season:${selectedHatTrickSeasonId}`
+        : award.scopeKey.startsWith(`season:${selectedHatTrickSeasonId}:tier:`)))));
     const currentProgress = progressByScope.get(`${definition.id}:${isSeasonBadge
       ? `season:${selectedHatTrickSeasonId}` : isCenturyBadge || isBeerBadge ? `year:${centuryYear}` : "global"}`);
     const liveTierValue = isBeerBadge ? beerCount
       : definition.triggerKey === "career_three_stars" ? threeStarPoints
       : isCenturyBadge ? centuryCount : isHatTrickBadge ? hatTrickCount : isOnFireBadge ? onFireCount
-      : isIronManBadge ? ironManCount : isShutoutBadge ? shutoutCount : null;
+      : isIronManBadge ? ironManCount : isShutoutBadge ? shutoutCount
+      : isEarlyBirdBadge ? Number(earlyBirdStatus.qualified) : null;
     // Iron Man tiers, once earned, stay earned when a missed game resets the
     // live counter. Other live badges use only their current scoped value.
     const earnedTiers = isIronManBadge
@@ -1394,10 +1519,13 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
       : liveTierValue !== null
       ? reachedTiers(definition.tiers, liveTierValue).map((tier) => tier.tier)
       : currentProgress?.earnedTiers ?? definitionAwards.filter((award) => award.tier).map((award) => award.tier);
-    const visibleAwards = liveTierValue !== null && !isIronManBadge
+    const visibleAwards = isEarlyBirdBadge
+      ? (earlyBirdStatus.qualified ? definitionAwards : [])
+      : liveTierValue !== null && !isIronManBadge
       ? definitionAwards.filter((award) => award.tier && earnedTiers.includes(award.tier))
       : definitionAwards;
-    const isEarned = liveTierValue !== null ? earnedTiers.length > 0 : definition.category === "achievement"
+    const isEarned = isEarlyBirdBadge ? earlyBirdStatus.qualified
+      : liveTierValue !== null ? earnedTiers.length > 0 : definition.category === "achievement"
       ? definition.achievementType === "tiered"
         ? (currentProgress?.earnedTiers?.length ?? 0) > 0
         : (currentProgress?.count ?? 0) > 0 || definitionAwards.length > 0
@@ -1409,7 +1537,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
       earnedAt: visibleAwards[0]?.awardedAt ?? null,
       count: liveTierValue ?? currentProgress?.count ?? definitionAwards[0]?.count ?? 0,
       earnedTiers,
-      currentProgress: liveTierValue ?? currentProgress?.progress ?? 0,
+      currentProgress: isEarlyBirdBadge ? earlyBirdStatus.early : liveTierValue ?? currentProgress?.progress ?? 0,
       nextThreshold: nextTier?.threshold ?? null,
       awards: visibleAwards,
       legacyAwards,
@@ -1466,6 +1594,18 @@ export async function getPendingBadgeEvents(userId: string) {
   // is approved. Evaluate on the normal announcement poll so it can award the
   // newly reached tier even without a subsequent game-finalization event.
   await evaluateBadgesForUser(userId, undefined, "calendar_year_appearances");
+  // An inactive or ended season may not have any further game finalizations.
+  // Evaluate when the player next polls, without needing a manual admin action.
+  const endedEarlyBirdSeasons = await db.execute(sql`
+    SELECT DISTINCT g.season_id FROM game_rsvps r
+      JOIN games g ON g.id = r.game_id JOIN seasons s ON s.id = g.season_id
+    WHERE r.user_id = ${userId} AND g.season_id IS NOT NULL
+      AND r.status = 'attending'
+      AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
+  `);
+  for (const row of endedEarlyBirdSeasons.rows) {
+    await evaluateBadgesForUser(userId, { seasonId: String(row.season_id) }, "season_48hr_rsvp_perfect");
+  }
   const events = await db.select({
     id: badgeEarnedEvents.id,
     eventType: badgeEarnedEvents.eventType,
@@ -1485,8 +1625,18 @@ export async function getPendingBadgeEvents(userId: string) {
     && ((event.definition.triggerKey !== "calendar_year_appearances"
       && event.definition.triggerKey !== "calendar_year_beers")
     || (event.payload as Record<string, unknown>)?.year === centuryYear));
-  const tieredEvents = currentEvents.filter((event) => typeof (event.payload as Record<string, unknown>)?.tier === "string");
-  if (!tieredEvents.length) return currentEvents;
+  const earlyBirdSeasonIds = Array.from(new Set(currentEvents
+    .filter((event) => event.definition.triggerKey === "season_48hr_rsvp_perfect")
+    .map((event) => (event.payload as Record<string, unknown>).seasonId)
+    .filter((seasonId): seasonId is string => typeof seasonId === "string")));
+  const earlyBirdStatuses = new Map(await Promise.all(earlyBirdSeasonIds.map(async (seasonId) => [
+    seasonId, (await getSeasonEarlyBirdStatus(userId, seasonId)).qualified,
+  ] as const)));
+  const validEvents = currentEvents.filter((event) =>
+    event.definition.triggerKey !== "season_48hr_rsvp_perfect"
+    || earlyBirdStatuses.get((event.payload as Record<string, unknown>).seasonId as string) === true);
+  const tieredEvents = validEvents.filter((event) => typeof (event.payload as Record<string, unknown>)?.tier === "string");
+  if (!tieredEvents.length) return validEvents;
 
   const definitionIds = Array.from(new Set(tieredEvents.map((event) => event.definition.id)));
   const tiers = await db.select({
@@ -1517,7 +1667,7 @@ export async function getPendingBadgeEvents(userId: string) {
   const shutoutCount = tieredEvents.some((event) => event.definition.triggerKey === "career_shutouts")
     && goalieEligible ? await getCareerShutoutCount(userId) : 0;
 
-  return currentEvents.filter((event) => {
+  return validEvents.filter((event) => {
     const payload = event.payload as Record<string, unknown>;
     if (event.definition.triggerKey === "career_shutouts") {
       const tier = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`);
