@@ -22,7 +22,7 @@ type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21" 
 const ACHIEVEMENT_SECTIONS = [
   { key: "three_stars", label: "3 Stars", description: "First star: 3 points · second: 2 · third: 1. Every point counts toward your tiers.", slug: "three_stars" },
   { key: "beer_me", label: "Beer Me", description: "Post-game dedication.", slug: "beer_me" },
-  { key: "century_club", label: "Century Club", description: "Total games played.", slug: "century_club" },
+  { key: "century_club", label: "Century Club", description: "Games and scrimmages played this calendar year. Resets January 1.", slug: "century_club" },
   { key: "hat_trick", label: "Hat Trick", description: "Score three goals in a single game.", slug: "hat_trick" },
   { key: "on_fire", label: "Hot Streak", description: "Build a multi-game scoring streak.", slug: "on_fire" },
   { key: "iron_man", label: "Iron Man", description: "Play consecutive games without missing one.", slug: "iron_man" },
@@ -107,7 +107,7 @@ function SectionHeading({ label, description, count }: { label: string; descript
 function AchievementSection({ label, description, badges, onSelect, preview = false }: { label: string; description: string; badges: Badge[]; onSelect: (badge: Badge, tier?: Tier) => void; preview?: boolean }) {
   const isTiered = badges.some((badge) => badge.achievementType === "tiered");
   const spotCount = isTiered ? badges.reduce((total, badge) => total + (badge.achievementType === "tiered" ? badge.tiers.length : 1), 0) : badges.length;
-  const fiveStars = badges.length === 1 && badges[0].slug === "three_stars";
+  const fiveStars = badges.length === 1 && (badges[0].slug === "three_stars" || badges[0].slug === "century_club");
   return <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5"><SectionHeading label={label} description={description} count={spotCount} /><div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>{badges.flatMap((badge) => badge.achievementType === "tiered" ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} preview={preview} onClick={() => onSelect(badge, tier)} />) : [<BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />])}</div></section>;
 }
 

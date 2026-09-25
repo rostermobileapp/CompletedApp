@@ -36,3 +36,4 @@
 - [Direct SQL badge updates](beer-count-badge-queue.md) — capture direct beer-count edits in a transactional queue; app workers run the existing evaluator and announcement flow.
 - [Beer badge threshold eligibility](beer-badge-threshold-eligibility.md) — Beer Me tiers follow the current seasonal count, not stale award history; corrected counts can re-arm a tier.
 - [3 Stars badge points](three-stars-badge-points.md) — career badge tiers use weighted leaderboard points, not nomination count; backfill old eligibility without replaying announcements.
+- [Century Club calendar-year attendance](century-club-calendar-year.md) — count confirmed games and past approved scrimmages by event year; reset tiers annually, not by season.
