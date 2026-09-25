@@ -45,13 +45,15 @@ interface SendPushNotificationOptions {
   title: string;
   message: string;
   data?: Record<string, string>;
+  /** Stable OneSignal key for retryable, once-per-occurrence sends. */
+  idempotencyKey?: string;
   /** Optional override for the large icon shown in the notification card.
    *  Falls back to the default Roster logo when omitted. */
   iconUrl?: string;
 }
 
 export async function sendPushNotificationToUser(options: SendPushNotificationOptions): Promise<boolean> {
-  const { userId, title, message, data, iconUrl } = options;
+  const { userId, title, message, data, iconUrl, idempotencyKey } = options;
   const largeIcon = iconUrl ?? NOTIFICATION_ICON_URL;
   
   const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
@@ -64,6 +66,7 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
   
   try {
     const preferences = await storage.getNotificationPreferences(userId);
+    if (preferences?.pushEnabled === false) return false;
     
     if (!preferences?.oneSignalPlayerId && !preferences?.oneSignalExternalId) {
       console.log(`[OneSignal] No subscription found for user ${userId}`);
@@ -86,6 +89,7 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
       },
       body: JSON.stringify({
         app_id: oneSignalAppId,
+        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
         ...targetFilter,
         // Required when using include_external_user_ids to specify push channel
         ...(preferences.oneSignalExternalId ? { channel_for_external_user_ids: 'push' } : {}),

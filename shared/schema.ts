@@ -10,6 +10,7 @@ import {
   boolean,
   pgEnum,
   decimal,
+  date,
   unique,
   check,
   primaryKey,
@@ -299,6 +300,18 @@ export const users = pgTable("users", {
   // Fee bypass for founder/demo accounts — skips all payment gates (tournament fees, league premium)
   feeExempt: boolean("fee_exempt").default(false).notNull(),
 });
+
+// Popup dismissal and push delivery have separate lifecycles. One row per
+// user and local birthday also protects against duplicate sends on restarts.
+export const birthdayGreetings = pgTable("birthday_greetings", {
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  birthdayDate: date("birthday_date", { mode: "string" }).notNull(),
+  popupDismissedAt: timestamp("popup_dismissed_at", { withTimezone: true }),
+  pushClaimedAt: timestamp("push_claimed_at", { withTimezone: true }),
+  pushSentAt: timestamp("push_sent_at", { withTimezone: true }),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.birthdayDate] }),
+]);
 
 // User notifications table
 export const userNotifications = pgTable("user_notifications", {

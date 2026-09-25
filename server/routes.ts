@@ -131,6 +131,7 @@ import {
   getTrophyCasePreview,
 } from "./badges";
 import { ensureBadgeTables } from "./badgeDbInit";
+import { ensureBirthdayTable, getBirthdayStatus, dismissBirthday, startBirthdayPushJob } from "./birthday";
 import { ensureBeerBadgeEvaluationQueue } from "./beerBadgeEvaluationQueue";
 import {
   canAcceptFreshScrimmageRequest,
@@ -1024,6 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
   await ensureBadgeTables();
+  await ensureBirthdayTable();
   console.log("[Init] badge catalog tables ensured");
   // Demo tables are startup-safe for deployments that use runtime migrations.
   await ensureDemoTables();
@@ -1960,6 +1962,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get('/api/birthday/status', isAuthenticated, async (req: any, res) => {
+    try {
+      res.json(await getBirthdayStatus(req.user.claims.sub));
+    } catch (error) {
+      console.error("[Birthday] Status failed:", error);
+      res.status(500).json({ message: "Failed to check birthday greeting" });
+    }
+  });
+
+  app.post('/api/birthday/dismiss', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!await dismissBirthday(req.user.claims.sub)) {
+        return res.status(409).json({ message: "No birthday greeting is available today" });
+      }
+      res.json({ dismissed: true });
+    } catch (error) {
+      console.error("[Birthday] Dismiss failed:", error);
+      res.status(500).json({ message: "Failed to dismiss birthday greeting" });
     }
   });
 
@@ -30017,6 +30040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Start the unified event reminder job (games and scrimmages)
   startEventReminderJob();
+  startBirthdayPushJob();
   
   // Start the scrimmage invitation job (for recurring scrimmage invites)
   startScrimmageInviteJob();

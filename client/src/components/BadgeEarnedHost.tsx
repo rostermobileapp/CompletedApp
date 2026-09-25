@@ -33,7 +33,7 @@ function hasTransparentVideoFrame(video: HTMLVideoElement): boolean {
   return false;
 }
 
-function BadgeConfettiOverlay() {
+export function BadgeConfettiOverlay() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [visible, setVisible] = useState(false);
   const [reducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);

@@ -23,6 +23,7 @@ import { useIsDesktopWeb } from "@/hooks/useIsDesktopWeb";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import { NativeCalendarAutoSync } from "@/components/NativeCalendarAutoSync";
 import { BadgeEarnedHost } from "@/components/BadgeEarnedHost";
+import { BirthdayHost } from "@/components/BirthdayHost";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
@@ -404,6 +405,7 @@ function App() {
                 <BadgeEarnedHost />
                 <ErrorBoundary>
                   <DemoContextProvider>
+                    <BirthdayHost />
                     <Router />
                   </DemoContextProvider>
                 </ErrorBoundary>
