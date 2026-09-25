@@ -36,7 +36,7 @@ const ACHIEVEMENT_SECTIONS = [
   { key: "shutouts", label: "Locked In", description: "Goalie-only lifetime shutouts. Progress never resets by season or year.", slug: "broom", goalieOnly: true },
 ] as const;
 
-function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new Date()): TrophyCaseAccess {
+export function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new Date()): TrophyCaseAccess {
   if (!dateOfBirth) return "missing_dob";
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
   if (!match) return "invalid_dob";
@@ -147,7 +147,6 @@ export function TrophyCasePreview() {
 
 export default function TrophyCase({ preview = false }: { preview?: boolean } = {}) {
   const [, navigate] = useLocation();
-  const [hatTrickSeasonId, setHatTrickSeasonId] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedBadge | null>(null);
   const [revealingId, setRevealingId] = useState<string | null>(null);
   const [announcementPreview, setAnnouncementPreview] = useState<SelectedBadge | null>(null);
@@ -155,9 +154,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"], enabled: !preview });
   const ageAccess = preview ? "eligible" : isUserLoading ? "loading" : user?.displayId !== "U00001" ? "testing" : getTrophyCaseAccess(user?.dateOfBirth);
   const { data, isLoading, isError } = useQuery<TrophyCaseData>({
-    queryKey: [preview
-      ? "/api/dev/trophy-case-preview"
-      : `/api/trophy-case${hatTrickSeasonId ? `?seasonId=${encodeURIComponent(hatTrickSeasonId)}` : ""}`],
+    queryKey: [preview ? "/api/dev/trophy-case-preview" : "/api/trophy-case"],
     enabled: ageAccess === "eligible",
     staleTime: 0,
     refetchOnMount: "always",
@@ -171,9 +168,6 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const canPreviewAnnouncement = !!selected && isBadgeOrTierEarned(selected);
   const previewAnnouncement = () => { if (!selected || !isBadgeOrTierEarned(selected)) return; setAnnouncementPreview(selected); setAnnouncementCycle((current) => current + 1); };
   const earnedCount = data?.sections.reduce((total, section) => total + section.badges.reduce((sectionTotal, badge) => section.category === "achievement" && badge.achievementType === "tiered" ? sectionTotal + badge.tiers.filter((tier) => badge.earnedTiers.includes(tier.tier) || (badge.slug !== "iron_man" && badge.currentProgress >= tier.threshold)).length : sectionTotal + Number(badge.isEarned), 0), 0) ?? 0;
-  const selectedHatTrickSeason = (data?.hatTrickSeasons ?? []).find((season) =>
-    season.id === (hatTrickSeasonId ?? data?.selectedHatTrickSeasonId),
-  );
 
   return (
     <div className="trophy-case min-h-[100dvh] bg-[#dce5f3] px-3 pb-24 pt-5 text-[#1e3345] sm:px-6 sm:pt-8">
@@ -200,19 +194,9 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
                 <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">Achievements</h2>
                 <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-[#718394] sm:text-xs">Every tier has its own spot and progress bar. Progress is capped at that tier’s target.</p>
               </div>
-              <span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span>
+              {preview ? <span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span> : <button onClick={() => navigate("/trophy-case/earned-patches")} className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg bg-[#164a73] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">View All Patches <ChevronRight size={15} /></button>}
             </div>
             <div className="space-y-5">
-              {!preview && data.hatTrickSeasons.length > 0 && (
-                <div className="flex flex-col gap-1.5 sm:max-w-sm">
-                  <label htmlFor="achievement-season" className="text-[10px] font-bold uppercase tracking-[.12em] text-[#597087]">Achievement season</label>
-                  <select id="achievement-season" value={selectedHatTrickSeason?.id ?? ""} onChange={(event) => setHatTrickSeasonId(event.target.value || null)} className="rounded-lg border border-[#cddbe5] bg-white px-3 py-2 text-sm text-[#173d5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#164a73]">
-                    <option value="">Most recent season</option>
-                    {data.hatTrickSeasons.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}
-                  </select>
-                  {selectedHatTrickSeason && <p className="text-xs text-[#718394]">Showing Hat Trick, On Fire, and Early Bird for {selectedHatTrickSeason.name}.</p>}
-                </div>
-              )}
               {ACHIEVEMENT_SECTIONS.filter((group) => !("goalieOnly" in group) || !group.goalieOnly || data.isGoalie).map((group) => {
                 const achievementBadges = data.sections.find((section) => section.category === "achievement")?.badges ?? [];
                 const badges = "slug" in group ? achievementBadges.filter((badge) => badge.slug === group.slug) : achievementBadges.filter((badge) => group.types.includes(badge.achievementType as typeof group.types[number]));

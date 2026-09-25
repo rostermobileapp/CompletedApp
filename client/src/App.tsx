@@ -102,6 +102,7 @@ import HPIBDownload from "@/pages/HPIBDownload";
 import Demo from "@/pages/Demo";
 import GerryHomePreview from "@/pages/GerryHomePreview";
 import TrophyCase, { TrophyCasePreview } from "@/pages/TrophyCase";
+import EarnedPatches from "@/pages/EarnedPatches";
 import BadgeCatalogAdmin from "@/pages/BadgeCatalogAdmin";
 import rosterLogo from "@assets/Home_Logo_1768857215157.png";
 
@@ -290,6 +291,7 @@ function Router() {
               <Route path="/team-search" component={TeamSearch} />
               <Route path="/messages/:conversationId" component={Messages} />
               <Route path="/user/:userId" component={UserProfile} />
+              <Route path="/trophy-case/earned-patches" component={EarnedPatches} />
               <Route path="/trophy-case" component={TrophyCase} />
               <Route path="/admin/badges" component={BadgeCatalogAdmin} />
               <Route path="/subscription" component={Subscription} />

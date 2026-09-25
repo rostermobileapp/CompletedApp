@@ -131,6 +131,7 @@ import {
   reconcileSeasonRsvpKing,
   getTrophyCaseAccess,
   getTrophyCase,
+  getEarnedPatches,
   getTrophyCasePreview,
 } from "./badges";
 import { ensureBadgeTables } from "./badgeDbInit";
@@ -1074,6 +1075,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (category === 'team_badge' && scope.teamId) return storage.isTeamCaptain(scope.teamId, actorId);
     return false;
   };
+
+  app.get('/api/trophy-case/earned-patches', isAuthenticated, async (req: any, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      const userId = currentUserId(req);
+      const viewer = await storage.getUser(userId);
+      if (viewer?.displayId !== "U00001") {
+        return res.status(403).json({ code: "TROPHY_CASE_IN_TESTING", message: "In Testing" });
+      }
+      const access = getTrophyCaseAccess(viewer.dateOfBirth);
+      if (access !== "eligible") {
+        return res.status(403).json({
+          code: "TROPHY_CASE_AGE_REQUIRED",
+          reason: access,
+          message: access === "under_21"
+            ? "The Trophy Case is available only to users age 21 and older."
+            : "Enter your date of birth in your profile to verify that you are age 21 or older.",
+        });
+      }
+      res.json(await getEarnedPatches(userId));
+    } catch (error) {
+      console.error('[Badges] Failed to load earned patches:', error);
+      res.status(500).json({ message: 'Failed to load earned patches' });
+    }
+  });
 
   app.get('/api/trophy-case', isAuthenticated, async (req: any, res) => {
     try {

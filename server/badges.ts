@@ -13,13 +13,17 @@ import {
   gameRsvps,
   games,
   leagueMemberships,
+  leagues,
   playerStats,
   substituteRequests,
+  seasons,
+  teams,
   teamMemberships,
   type BadgeDefinition,
   type BadgeEarnedEvent,
 } from "@shared/schema";
 import { db } from "./db";
+import { collectEarnedPatches } from "./earnedPatches";
 import { newlyReachedTiers, reachedTiers } from "./badgeTierEligibility";
 import { THREE_STARS_TIERS } from "@shared/threeStarsTiers";
 import { CENTURY_CLUB_TIERS } from "@shared/centuryClubTiers";
@@ -1652,6 +1656,25 @@ export async function awardManualBadge(input: {
   if (!award) return { duplicate: true, award: null, event: null };
   const event = await emitEarnedEvent(input.userId, award.id, definition, { awardId: award.id, count: 1 });
   return { duplicate: false, award, event };
+}
+
+export async function getEarnedPatches(userId: string) {
+  const [definitions, awardRows] = await Promise.all([
+    definitionsWithTiers(true),
+    db.select({
+      award: badgeAwards,
+      leagueName: leagues.name,
+      seasonName: seasons.name,
+      teamName: teams.name,
+    }).from(badgeAwards)
+      .leftJoin(leagues, eq(badgeAwards.leagueId, leagues.id))
+      .leftJoin(seasons, eq(badgeAwards.seasonId, seasons.id))
+      .leftJoin(teams, eq(badgeAwards.teamId, teams.id))
+      .where(eq(badgeAwards.userId, userId)),
+  ]);
+  return collectEarnedPatches(definitions, awardRows.map(({ award, leagueName, seasonName, teamName }) => ({
+    ...award, leagueName, seasonName, teamName,
+  })));
 }
 
 export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: string) {
