@@ -40,3 +40,4 @@
 - [Birthday push idempotency](birthday-push-idempotency.md) — OneSignal retains retry keys for only 30 days; annual once-only delivery also requires persistent per-user birthday state.
 - [Birthday overlay delivery](birthday-overlay-delivery.md) — push and in-app greeting are independent; refresh on native resume and avoid video-only birthday animation.
 - [Hat Trick season history](hat-trick-season-history.md) — qualify 3+-goal games once per season; old career awards remain history, never season progress.
+- [On Fire season streak](on-fire-season-streak.md) — longest goal-scoring run resets by season; attributed goals count when historical attendance is missing.
