@@ -23,6 +23,7 @@ import { newlyReachedTiers, reachedTiers } from "./badgeTierEligibility";
 import { THREE_STARS_TIERS } from "@shared/threeStarsTiers";
 import { CENTURY_CLUB_TIERS } from "@shared/centuryClubTiers";
 import { HAT_TRICK_TIERS } from "@shared/hatTrickTiers";
+import { BEER_ME_TIERS } from "@shared/beerMeTiers";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
@@ -163,7 +164,9 @@ DEFAULT_BADGES.push(
     defaultTier("bronze", 1), defaultTier("silver", 3), defaultTier("gold", 10), defaultTier("platinum", 25),
   ]),
   achievement("beer_me", "Beer Me", "Post-game beers counted by calendar year. Progress resets January 1.", "tiered", "metric", "calendar_year_beers", {}, [
-    defaultTier("bronze", 1), defaultTier("silver", 10), defaultTier("gold", 25), defaultTier("platinum", 50), defaultTier("legend", 100), defaultTier("god_mode", 250),
+    ...BEER_ME_TIERS.map(({ tier, threshold, imagePath }) => ({
+      ...defaultTier(tier, threshold), imagePath,
+    })),
   ]),
   achievement("on_fire", "On Fire", "Multi-game scoring streaks.", "tiered", "metric", "scoring_streak_games", {}, [
     defaultTier("bronze", 3), defaultTier("silver", 5), defaultTier("gold", 10), defaultTier("platinum", 20),

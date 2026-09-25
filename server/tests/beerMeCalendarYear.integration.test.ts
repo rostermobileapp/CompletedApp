@@ -9,6 +9,7 @@ import {
   reconcileCalendarYearBeerMe,
 } from "../badges.js";
 import { ensureBeerBadgeEvaluationQueue, processPendingBeerBadgeEvaluations } from "../beerBadgeEvaluationQueue.js";
+import { BEER_ME_TIERS } from "../../shared/beerMeTiers.js";
 
 test("Beer Me combines seasons within a calendar year and resets on January 1", async () => {
   const run = randomUUID().replace(/-/g, "");
@@ -140,6 +141,21 @@ test("Beer Me combines seasons within a calendar year and resets on January 1", 
     `);
     await flushQueuedChanges();
     assert.equal(await savedProgress(), 7);
+    await db.execute(sql`
+      UPDATE game_beer_counts SET count = 250 WHERE game_id = ${newA}
+    `);
+    await evaluateBadgesForUser(userId, { year }, "calendar_year_beers");
+    const finalBadge = (await getTrophyCase(userId)).sections.flatMap((section) => section.badges)
+      .find((badge) => badge.slug === "beer_me");
+    assert.deepEqual(finalBadge?.tiers.map((tier) => ({
+      tier: tier.tier, threshold: tier.threshold, imagePath: tier.imagePath,
+    })), BEER_ME_TIERS.map((tier) => ({ ...tier })));
+    const announcements = (await getPendingBadgeEvents(userId))
+      .filter((event) => event.definition.slug === "beer_me");
+    for (const tier of BEER_ME_TIERS) {
+      assert.ok(announcements.some((event) => event.payload.tier === tier.tier
+        && event.payload.imagePath === tier.imagePath), `${tier.tier} announcement must use its own patch`);
+    }
   } finally {
     await db.execute(sql`DELETE FROM game_beer_counts WHERE user_id = ${userId}`);
     await db.execute(sql`DELETE FROM games WHERE league_id = ${leagueId}`);

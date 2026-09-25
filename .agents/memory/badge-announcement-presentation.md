@@ -7,6 +7,8 @@ Earned-badge announcements are global, full-screen overlays: center the announce
 
 For tiered awards, carry the awarded tier's image path in both live and persisted events. The badge definition image can be Bronze artwork, so using it without the tier override makes higher-tier announcements display the wrong medal.
 
-**Why:** The user wants the moment of achievement to appear immediately over the screen where it was triggered (for example, logging a milestone beer), with that same screen still visible but heavily blurred; each tier must also show its own artwork.
+When reconciling catalog definitions, provide an explicit image path for each shipped tier before upserting tier rows; a default tier with a null image path can erase previously assigned artwork. Treat user-supplied patches as canonical for both the Trophy Case and announcements.
 
-**How to apply:** Keep the host at app level; avoid route-specific announcement backgrounds. Preserve real-time earned-event delivery, reconcile pending events, and resolve legacy tier events to their tier-specific image. When pending data refreshes, replace queued events with matching IDs instead of treating them only as duplicates, because corrected payloads must reach cards already in memory.
+**Why:** The user wants the moment of achievement to appear immediately over the screen where it was triggered (for example, logging a milestone beer), with that same screen still visible but heavily blurred; each tier must also show its own artwork. A catalog change that only intended to update the Beer Me reset rules cleared tier artwork because the default paths were null.
+
+**How to apply:** Keep the host at app level; avoid route-specific announcement backgrounds. Preserve real-time earned-event delivery, reconcile pending events, and resolve legacy tier events to their tier-specific image. When pending data refreshes, replace queued events with matching IDs instead of treating them only as duplicates, because corrected payloads must reach cards already in memory. Validate image paths during catalog updates as well as when rendering.
