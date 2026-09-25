@@ -191,7 +191,7 @@ DEFAULT_BADGES.push(
   { ...achievement("rsvp_king", "RSVP King", "RSVP Yes or No to every eligible league game in a season. Scrimmages do not count. Earn a patch for each perfect season.", "multiplier", "metric", "season_rsvp_perfect"), imagePath: "/badges/rsvp-king/patch.webp" },
   achievement("team_player", "Team Player", "Filled a sub spot for another team.", "multiplier", "metric", "career_sub_appearances"),
   { ...achievement("rookie_card", "Rookie Card", "Your first game ever logged on Roster.", "onetime", "event", "first_game_logged"), imagePath: "/badges/rookie-card/patch.webp" },
-  achievement("sub", "Sub", "First time subbing in for another player.", "onetime", "event", "first_sub_appearance"),
+  { ...achievement("sub", "Sub", "First time approved to sub in for another player in a game.", "onetime", "metric", "first_sub_appearance"), imagePath: "/badges/sub/patch.webp" },
   { ...achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }), imagePath: "/badges/league-hopper/patch.webp" },
   { ...achievement("early_bird", "Early Bird", "RSVP Yes at least 48 hours before every eligible game in a completed season. Resets each season.", "onetime", "metric", "season_48hr_rsvp_perfect"), imagePath: "/badges/early-bird/patch.webp" },
   { ...achievement("ghost", "Ghost", "Marked Out for 3 or more games in a row.", "onetime", "metric", "consecutive_games_out", { threshold: 3 }), imagePath: "/badges/ghost/patch.webp" },
@@ -309,6 +309,12 @@ export async function ensureDefaultBadges() {
         await db.update(badgeDefinitions).set({
           description: badge.description, achievementType: badge.achievementType,
           triggerType: badge.triggerType, triggerKey: badge.triggerKey, imagePath: badge.imagePath,
+        }).where(eq(badgeDefinitions.id, existing.id));
+      }
+      if (badge.slug === "sub") {
+        await db.update(badgeDefinitions).set({
+          description: badge.description, triggerType: badge.triggerType,
+          triggerKey: badge.triggerKey, imagePath: badge.imagePath,
         }).where(eq(badgeDefinitions.id, existing.id));
       }
       if (badge.slug === "sub_magnet") {
@@ -1195,6 +1201,16 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
         .where(and(eq(substituteRequests.substitutePlayerId, userId), eq(substituteRequests.status, "approved")));
       return Number(rows[0]?.count ?? 0);
     }
+    case "first_sub_appearance": {
+      const [request] = await db.select({ id: substituteRequests.id }).from(substituteRequests)
+        .where(and(
+          eq(substituteRequests.substitutePlayerId, userId),
+          eq(substituteRequests.status, "approved"),
+          sql`${substituteRequests.gameId} IS NOT NULL`,
+          sql`${substituteRequests.originalPlayerId} <> ${userId}`,
+        )).limit(1);
+      return request ? 1 : 0;
+    }
     case "career_leagues_played": {
       const rows = await db.select({ count: sql<number>`count(distinct ${leagueMemberships.leagueId})::int` })
         .from(leagueMemberships).where(and(eq(leagueMemberships.userId, userId), eq(leagueMemberships.status, "approved")));
@@ -1553,6 +1569,22 @@ export async function reconcileRookieCard() {
   `);
 }
 
+// Backfill previously approved player-for-player game substitutions without
+// replaying old badge announcements.
+export async function reconcileFirstSubBadge() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "sub"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  await db.execute(sql`
+    INSERT INTO badge_awards (badge_definition_id, user_id, scope_key, count, source)
+    SELECT DISTINCT ${definition.id}, sr.substitute_player_id, 'global', 1, 'evaluator'
+    FROM substitute_requests sr JOIN users u ON u.id = sr.substitute_player_id
+    WHERE sr.status = 'approved' AND sr.game_id IS NOT NULL
+      AND sr.original_player_id <> sr.substitute_player_id
+    ON CONFLICT (badge_definition_id, user_id, scope_key) DO NOTHING
+  `);
+}
+
 // Count each user's final "No" RSVP once per league game (even if they had
 // RSVPs for both teams). A season must be over and have at least one "No";
 // all players tied for the highest count receive a season-scoped award.
@@ -1797,6 +1829,9 @@ export async function getPendingBadgeEvents(userId: string) {
   // is approved. Evaluate on the normal announcement poll so it can award the
   // newly reached tier even without a subsequent game-finalization event.
   await evaluateBadgesForUser(userId, undefined, "calendar_year_appearances");
+  // Recover an approved substitution if its post-approval badge evaluation
+  // could not complete; backfilled awards never create announcements.
+  await evaluateBadgesForUser(userId, undefined, "first_sub_appearance");
   // An inactive or ended season may not have any further game finalizations.
   // Evaluate when the player next polls, without needing a manual admin action.
   const endedEarlyBirdSeasons = await db.execute(sql`

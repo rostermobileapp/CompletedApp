@@ -46,4 +46,6 @@
 - [Early Bird season eligibility](early-bird-season-eligibility.md) — award after the season ends, using the full eligible game schedule and league-local 48-hour deadlines; past awards do not unlock a new season.
 - [Sub Magnet season winners](sub-magnet-season-winners.md) — finalize No-RSVP leaders only after season end; ties share the award and historical winners are seeded silently.
 - [RSVP King season completeness](rsvp-king-season-completeness.md) — require Yes or No for every eligible league game after season end; game completion is not required.
+- [Sub badge eligibility](sub-badge-eligibility.md) — award the first approved player-for-player game replacement, not merely a pending request or attendance without a replacement.
+- [Uploaded asset availability](uploaded-asset-availability.md) — tracked uploaded images can go missing independently of code edits, causing Vite preview import failures.
 - [Badge integration test isolation](badge-integration-test-isolation.md) — run database-backed badge integration tests serially when startup reconcilers scan all users.

@@ -13765,6 +13765,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status,
         comments
       );
+      if (result.updatedRequest.status === 'approved' && result.updatedRequest.substitutePlayerId) {
+        try {
+          await evaluateBadgesForUser(result.updatedRequest.substitutePlayerId, undefined, "first_sub_appearance");
+        } catch (error) {
+          // Approval has already committed. The next badge poll will retry.
+          console.error('[Badges] Could not award Sub after substitute approval:', error);
+        }
+      }
       
       res.json(result);
     } catch (error) {
