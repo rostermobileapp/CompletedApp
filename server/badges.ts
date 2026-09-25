@@ -195,7 +195,7 @@ DEFAULT_BADGES.push(
   { ...achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }), imagePath: "/badges/league-hopper/patch.webp" },
   { ...achievement("early_bird", "Early Bird", "RSVP Yes at least 48 hours before every eligible game in a completed season. Resets each season.", "onetime", "metric", "season_48hr_rsvp_perfect"), imagePath: "/badges/early-bird/patch.webp" },
   { ...achievement("ghost", "Ghost", "Marked Out for 3 or more games in a row.", "onetime", "metric", "consecutive_games_out", { threshold: 3 }), imagePath: "/badges/ghost/patch.webp" },
-  achievement("sub_magnet", "Sub Magnet", "Had the most subs fill in for you across a season.", "onetime", "event", "season_most_subs_winner"),
+  { ...achievement("sub_magnet", "Sub Magnet", "Had the most subs fill in for you across a season.", "onetime", "event", "season_most_subs_winner"), imagePath: "/badges/sub-magnet/patch.webp" },
 );
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {
@@ -305,7 +305,7 @@ export async function ensureDefaultBadges() {
           triggerKey: badge.triggerKey, imagePath: badge.imagePath,
         }).where(eq(badgeDefinitions.id, existing.id));
       }
-      if (badge.slug === "ghost" || badge.slug === "league_hopper" || badge.slug === "rookie_card") {
+      if (badge.slug === "ghost" || badge.slug === "league_hopper" || badge.slug === "rookie_card" || badge.slug === "sub_magnet") {
         await db.update(badgeDefinitions).set({ imagePath: badge.imagePath })
           .where(eq(badgeDefinitions.id, existing.id));
       }
