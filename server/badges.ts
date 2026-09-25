@@ -25,6 +25,7 @@ import { CENTURY_CLUB_TIERS } from "@shared/centuryClubTiers";
 import { HAT_TRICK_TIERS } from "@shared/hatTrickTiers";
 import { BEER_ME_TIERS } from "@shared/beerMeTiers";
 import { ON_FIRE_TIERS } from "@shared/onFireTiers";
+import { IRON_MAN_TIERS } from "@shared/ironManTiers";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
@@ -153,8 +154,10 @@ DEFAULT_BADGES.push(
       ...defaultTier(tier, threshold), imagePath,
     })),
   ]),
-  achievement("iron_man", "Iron Man", "Play consecutive games without missing one.", "tiered", "metric", "consecutive_games_played", {}, [
-    defaultTier("bronze", 5), defaultTier("silver", 10), defaultTier("gold", 15), defaultTier("platinum", 25),
+  achievement("iron_man", "Iron Man", "Current streak of consecutive games played. Missing a game resets progress; seasons and years do not.", "tiered", "metric", "consecutive_games_played", {}, [
+    ...IRON_MAN_TIERS.map(({ tier, threshold, imagePath }) => ({
+      ...defaultTier(tier, threshold), imagePath,
+    })),
   ]),
   achievement("century_club", "Century Club", "Games and scrimmages played this calendar year. Resets January 1.", "tiered", "metric", "calendar_year_appearances", {}, [
     ...CENTURY_CLUB_TIERS.map(({ tier, threshold, imagePath }) => ({
@@ -204,8 +207,8 @@ export async function ensureDefaultBadges() {
       .where(eq(badgeDefinitions.slug, badge.slug))
       .limit(1);
     if (existing) {
-      if ((badge.slug === "three_stars" || badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire") && badge.tiers?.length) {
-        if (badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire") {
+      if ((badge.slug === "three_stars" || badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire" || badge.slug === "iron_man") && badge.tiers?.length) {
+        if (badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire" || badge.slug === "iron_man") {
           await db.update(badgeDefinitions).set({
             triggerKey: badge.triggerKey,
             description: badge.description,
@@ -401,6 +404,143 @@ function longestScoringRun(rows: Array<Record<string, unknown>>) {
 export async function getSeasonOnFireStreak(userId: string, seasonId: string): Promise<number> {
   const result = await db.execute(seasonScoringGamesQuery(userId, seasonId));
   return longestScoringRun(result.rows);
+}
+
+// Only games the player was eligible for count. Team membership begins at
+// joined_at; an explicit RSVP or recorded participation covers older imports
+// and substitutes. Attendance, not an RSVP marked Yes, proves participation.
+function ironManGamesQuery(userId: string) {
+  return sql`
+    SELECT g.id, (
+      EXISTS (SELECT 1 FROM game_attendance ga WHERE ga.game_id = g.id AND ga.user_id = ${userId})
+      OR EXISTS (SELECT 1 FROM game_goals gg WHERE gg.game_id = g.id
+        AND (gg.scorer_id = ${userId} OR gg.primary_assist_id = ${userId} OR gg.secondary_assist_id = ${userId}))
+      OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.game_id = g.id AND goalie.goalie_user_id = ${userId})
+      OR EXISTS (SELECT 1 FROM game_penalties penalty WHERE penalty.game_id = g.id AND penalty.player_id = ${userId})
+    ) AS played
+    FROM games g
+    WHERE g.is_completed = true AND g.is_scrimmage = false
+      AND (
+        EXISTS (SELECT 1 FROM team_memberships tm
+          WHERE tm.user_id = ${userId} AND tm.status = 'approved'
+            AND tm.team_id IN (g.home_team_id, g.away_team_id)
+            AND tm.joined_at <= g.scheduled_at)
+        OR EXISTS (SELECT 1 FROM league_memberships lm
+          WHERE lm.user_id = ${userId} AND lm.status = 'approved'
+            AND lm.assigned_team_id IN (g.home_team_id, g.away_team_id)
+            AND lm.requested_at <= g.scheduled_at)
+        OR EXISTS (SELECT 1 FROM game_rsvps r WHERE r.game_id = g.id AND r.user_id = ${userId})
+        OR EXISTS (SELECT 1 FROM game_attendance ga WHERE ga.game_id = g.id AND ga.user_id = ${userId})
+        OR EXISTS (SELECT 1 FROM game_goals gg WHERE gg.game_id = g.id
+          AND (gg.scorer_id = ${userId} OR gg.primary_assist_id = ${userId} OR gg.secondary_assist_id = ${userId}))
+        OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.game_id = g.id AND goalie.goalie_user_id = ${userId})
+        OR EXISTS (SELECT 1 FROM game_penalties penalty WHERE penalty.game_id = g.id AND penalty.player_id = ${userId})
+      )
+    ORDER BY g.scheduled_at DESC, g.id DESC
+  `;
+}
+
+async function getIronManRuns(userId: string) {
+  const result = await db.execute(ironManGamesQuery(userId));
+  let current = 0;
+  let longest = 0;
+  let atLatest = true;
+  for (const game of result.rows) {
+    if (game.played === true) {
+      current++;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+      atLatest = false;
+    }
+  }
+  // The first missed game ends the active streak, but historical runs still
+  // qualify for permanent tiers.
+  let active = 0;
+  if (atLatest) active = current;
+  else {
+    for (const game of result.rows) {
+      if (game.played !== true) break;
+      active++;
+    }
+  }
+  return { current: active, longest };
+}
+
+export async function getCurrentIronManStreak(userId: string): Promise<number> {
+  return (await getIronManRuns(userId)).current;
+}
+
+// Seed historic milestones silently. Do not confuse the all-time best run
+// (permanent earned tiers) with the active streak shown as progress.
+export async function reconcileIronMan() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "iron_man"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  const tiers = await db.select().from(badgeTiers)
+    .where(eq(badgeTiers.badgeDefinitionId, definition.id)).orderBy(asc(badgeTiers.threshold));
+  const usersResult = await db.execute(sql`
+    SELECT DISTINCT eligible.user_id FROM (
+      SELECT tm.user_id FROM team_memberships tm JOIN games g
+        ON tm.team_id IN (g.home_team_id, g.away_team_id)
+        AND tm.joined_at <= g.scheduled_at
+        WHERE tm.status = 'approved' AND g.is_completed = true AND g.is_scrimmage = false
+      UNION SELECT lm.user_id FROM league_memberships lm JOIN games g
+        ON lm.assigned_team_id IN (g.home_team_id, g.away_team_id)
+        AND lm.requested_at <= g.scheduled_at
+        WHERE lm.status = 'approved' AND g.is_completed = true AND g.is_scrimmage = false
+      UNION SELECT r.user_id FROM game_rsvps r JOIN games g ON g.id = r.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false
+      UNION SELECT ga.user_id FROM game_attendance ga JOIN games g ON g.id = ga.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false AND ga.user_id IS NOT NULL
+      UNION SELECT gg.scorer_id FROM game_goals gg JOIN games g ON g.id = gg.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false AND gg.scorer_id IS NOT NULL
+      UNION SELECT gg.primary_assist_id FROM game_goals gg JOIN games g ON g.id = gg.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false AND gg.primary_assist_id IS NOT NULL
+      UNION SELECT gg.secondary_assist_id FROM game_goals gg JOIN games g ON g.id = gg.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false AND gg.secondary_assist_id IS NOT NULL
+      UNION SELECT goalie.goalie_user_id FROM game_goalies goalie JOIN games g ON g.id = goalie.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false AND goalie.goalie_user_id IS NOT NULL
+      UNION SELECT penalty.player_id FROM game_penalties penalty JOIN games g ON g.id = penalty.game_id
+        WHERE g.is_completed = true AND g.is_scrimmage = false
+    ) eligible JOIN users u ON u.id = eligible.user_id
+  `);
+  for (const row of usersResult.rows) {
+    const userId = String(row.user_id);
+    const { current, longest } = await getIronManRuns(userId);
+    await db.transaction(async (tx) => {
+      const [previous] = await tx.select().from(badgeProgress).where(and(
+        eq(badgeProgress.badgeDefinitionId, definition.id),
+        eq(badgeProgress.userId, userId),
+        eq(badgeProgress.scopeKey, "global"),
+      )).limit(1);
+      const earned = new Set(previous?.earnedTiers ?? []);
+      for (const tier of reachedTiers(tiers, longest)) {
+        earned.add(tier.tier);
+        await tx.insert(badgeAwards).values({
+          badgeDefinitionId: definition.id, userId,
+          scopeKey: `global:tier:${tier.tier}`, tier: tier.tier,
+          source: "evaluator", metadata: { value: tier.threshold },
+        }).onConflictDoNothing();
+      }
+      // Existing awards also remain earned even if old progress is missing.
+      const awarded = await tx.select({ tier: badgeAwards.tier }).from(badgeAwards).where(and(
+        eq(badgeAwards.badgeDefinitionId, definition.id),
+        eq(badgeAwards.userId, userId),
+      ));
+      for (const award of awarded) if (award.tier) earned.add(award.tier);
+      const earnedTiers = tiers.filter((tier) => earned.has(tier.tier)).map((tier) => tier.tier);
+      await tx.insert(badgeProgress).values({
+        badgeDefinitionId: definition.id, userId, scopeKey: "global",
+        progress: current, count: current, earnedTiers,
+        currentTier: earnedTiers.at(-1) ?? null,
+      }).onConflictDoUpdate({
+        target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+        set: { progress: current, count: current, earnedTiers,
+          currentTier: earnedTiers.at(-1) ?? null, updatedAt: new Date() },
+      });
+    });
+  }
 }
 
 // Seed past seasons without announcing tiers earned before season-scoped tracking.
@@ -676,11 +816,7 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
         .from(gameGoalies).innerJoin(games, eq(gameGoalies.gameId, games.id))
         .where(and(eq(gameGoalies.goalieUserId, userId), eq(games.isCompleted, true), eq(gameGoalies.goalsAgainst, 0))))[0]?.count ?? 0);
     case "consecutive_games_played": {
-      const attended = await db.select({ gameId: gameAttendance.gameId, scheduledAt: games.scheduledAt })
-        .from(gameAttendance).innerJoin(games, eq(gameAttendance.gameId, games.id))
-        .where(and(eq(gameAttendance.userId, userId), eq(games.isCompleted, true)))
-        .orderBy(asc(games.scheduledAt));
-      return attended.length;
+      return getCurrentIronManStreak(userId);
     }
     case "consecutive_games_out": {
       const rsvps = await db.select({ status: gameRsvps.status, scheduledAt: games.scheduledAt })
@@ -1020,7 +1156,7 @@ export async function awardManualBadge(input: {
 export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: string) {
   const definitions = await definitionsWithTiers();
   const centuryYear = currentCenturyClubYear();
-  const [awards, progress, goalieMembership, goalieAppearance, beerCount, threeStarPoints, centuryCount, hatTrickSeasonsResult] = await Promise.all([
+  const [awards, progress, goalieMembership, goalieAppearance, beerCount, threeStarPoints, centuryCount, ironManCount, hatTrickSeasonsResult] = await Promise.all([
     db.select().from(badgeAwards).where(eq(badgeAwards.userId, userId)).orderBy(desc(badgeAwards.awardedAt)),
     db.select().from(badgeProgress).where(eq(badgeProgress.userId, userId)),
     db.select({ id: leagueMemberships.id }).from(leagueMemberships).where(and(
@@ -1033,6 +1169,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     getCalendarYearBeerCount(userId, centuryYear),
     getCareerThreeStarPoints(userId),
     getCalendarYearAppearances(userId, centuryYear),
+    getCurrentIronManStreak(userId),
     db.execute(sql`
       SELECT s.id, s.name FROM seasons s
       WHERE s.id IN (
@@ -1067,6 +1204,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     const isBeerBadge = definition.triggerKey === "calendar_year_beers";
     const isHatTrickBadge = definition.triggerKey === "season_hat_tricks";
     const isOnFireBadge = definition.triggerKey === "season_scoring_streak";
+    const isIronManBadge = definition.triggerKey === "consecutive_games_played";
     const isSeasonBadge = isHatTrickBadge || isOnFireBadge;
     const allDefinitionAwards = awardsByDefinition.get(definition.id) ?? [];
     const legacyAwards = isSeasonBadge || isBeerBadge
@@ -1082,11 +1220,19 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
       ? `season:${selectedHatTrickSeasonId}` : isCenturyBadge || isBeerBadge ? `year:${centuryYear}` : "global"}`);
     const liveTierValue = isBeerBadge ? beerCount
       : definition.triggerKey === "career_three_stars" ? threeStarPoints
-      : isCenturyBadge ? centuryCount : isHatTrickBadge ? hatTrickCount : isOnFireBadge ? onFireCount : null;
-    const earnedTiers = liveTierValue !== null
+      : isCenturyBadge ? centuryCount : isHatTrickBadge ? hatTrickCount : isOnFireBadge ? onFireCount
+      : isIronManBadge ? ironManCount : null;
+    // Iron Man tiers, once earned, stay earned when a missed game resets the
+    // live counter. Other live badges use only their current scoped value.
+    const earnedTiers = isIronManBadge
+      ? Array.from(new Set([
+          ...(currentProgress?.earnedTiers ?? []),
+          ...definitionAwards.filter((award) => award.tier).map((award) => award.tier!),
+        ]))
+      : liveTierValue !== null
       ? reachedTiers(definition.tiers, liveTierValue).map((tier) => tier.tier)
       : currentProgress?.earnedTiers ?? definitionAwards.filter((award) => award.tier).map((award) => award.tier);
-    const visibleAwards = liveTierValue !== null
+    const visibleAwards = liveTierValue !== null && !isIronManBadge
       ? definitionAwards.filter((award) => award.tier && earnedTiers.includes(award.tier))
       : definitionAwards;
     const isEarned = liveTierValue !== null ? earnedTiers.length > 0 : definition.category === "achievement"

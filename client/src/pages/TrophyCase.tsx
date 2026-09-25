@@ -31,7 +31,7 @@ const ACHIEVEMENT_SECTIONS = [
   { key: "century_club", label: "Century Club", description: "Games and scrimmages played this calendar year. Resets January 1.", slug: "century_club" },
   { key: "hat_trick", label: "Hat Trick", description: "One game with 3 or more goals counts as one hat trick. Progress resets each season.", slug: "hat_trick" },
   { key: "on_fire", label: "On Fire", description: "Longest goal-scoring streak this season. Progress resets each season.", slug: "on_fire" },
-  { key: "iron_man", label: "Iron Man", description: "Play consecutive games without missing one.", slug: "iron_man" },
+  { key: "iron_man", label: "Iron Man", description: "Games only. Miss one and your current streak resets; seasons and years do not reset it. Earned tiers stay earned.", slug: "iron_man" },
   { key: "one_time", label: "One Time Badges", description: "Permanent and repeatable achievements.", types: ["onetime", "multiplier"] },
   { key: "shutouts", label: "Shutouts", description: "Career shutouts recorded as a goalie.", slug: "broom", goalieOnly: true },
 ] as const;
@@ -52,7 +52,7 @@ function formatTier(tier: string) { return tier.replace("_", " "); }
 
 function isBadgeOrTierEarned({ badge, tier }: SelectedBadge) {
   if (!tier) return badge.isEarned;
-  return badge.earnedTiers.includes(tier.tier) || badge.currentProgress >= tier.threshold;
+  return badge.earnedTiers.includes(tier.tier) || (badge.slug !== "iron_man" && badge.currentProgress >= tier.threshold);
 }
 
 function BadgeArtwork({ badge, tier, earned = badge.isEarned, large = false }: { badge: Badge; tier?: Tier; earned?: boolean; large?: boolean }) {
@@ -79,7 +79,7 @@ function TierProgress({ badge, tier }: { badge: Badge; tier: Tier }) {
 }
 
 function TierSpot({ badge, tier, onClick, preview = false }: { badge: Badge; tier: Tier; onClick: () => void; preview?: boolean }) {
-  const earned = badge.earnedTiers.includes(tier.tier) || badge.currentProgress >= tier.threshold;
+  const earned = badge.earnedTiers.includes(tier.tier) || (badge.slug !== "iron_man" && badge.currentProgress >= tier.threshold);
   return (
     <button onClick={onClick} className="trophy-depth-slot group min-w-0 rounded-xl text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]" aria-label={`${badge.name} ${formatTier(tier.tier)}: ${Math.min(badge.currentProgress, tier.threshold)} of ${tier.threshold}`}>
       <div className="trophy-slot-well">
@@ -170,7 +170,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const closeBadge = () => { setSelected(null); setRevealingId(null); };
   const canPreviewAnnouncement = !!selected && isBadgeOrTierEarned(selected);
   const previewAnnouncement = () => { if (!selected || !isBadgeOrTierEarned(selected)) return; setAnnouncementPreview(selected); setAnnouncementCycle((current) => current + 1); };
-  const earnedCount = data?.sections.reduce((total, section) => total + section.badges.reduce((sectionTotal, badge) => section.category === "achievement" && badge.achievementType === "tiered" ? sectionTotal + badge.tiers.filter((tier) => badge.earnedTiers.includes(tier.tier) || badge.currentProgress >= tier.threshold).length : sectionTotal + Number(badge.isEarned), 0), 0) ?? 0;
+  const earnedCount = data?.sections.reduce((total, section) => total + section.badges.reduce((sectionTotal, badge) => section.category === "achievement" && badge.achievementType === "tiered" ? sectionTotal + badge.tiers.filter((tier) => badge.earnedTiers.includes(tier.tier) || (badge.slug !== "iron_man" && badge.currentProgress >= tier.threshold)).length : sectionTotal + Number(badge.isEarned), 0), 0) ?? 0;
   const selectedHatTrickSeason = (data?.hatTrickSeasons ?? []).find((season) =>
     season.id === (hatTrickSeasonId ?? data?.selectedHatTrickSeasonId),
   );

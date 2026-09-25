@@ -41,3 +41,4 @@
 - [Birthday overlay delivery](birthday-overlay-delivery.md) — push and in-app greeting are independent; refresh on native resume and avoid video-only birthday animation.
 - [Hat Trick season history](hat-trick-season-history.md) — qualify 3+-goal games once per season; old career awards remain history, never season progress.
 - [On Fire season streak](on-fire-season-streak.md) — longest goal-scoring run resets by season; attributed goals count when historical attendance is missing.
+- [Iron Man game streak](iron-man-game-streak.md) — current consecutive played games cross season/year boundaries; a missed game resets progress, not earned tiers.

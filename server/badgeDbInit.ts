@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileHistoricalThreeStarPoints, reconcileSeasonHatTricks, reconcileSeasonOnFire } from "./badges";
+import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileHistoricalThreeStarPoints, reconcileIronMan, reconcileSeasonHatTricks, reconcileSeasonOnFire } from "./badges";
 
 // Runtime-safe DDL keeps older deployments compatible. The Drizzle schema
 // remains the source of truth and drizzle-kit can still generate a migration.
@@ -125,4 +125,5 @@ export async function ensureBadgeTables() {
   await reconcileCalendarYearCenturyClub();
   await reconcileSeasonHatTricks();
   await reconcileSeasonOnFire();
+  await reconcileIronMan();
 }
