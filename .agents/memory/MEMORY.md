@@ -38,3 +38,4 @@
 - [3 Stars badge points](three-stars-badge-points.md) — career badge tiers use weighted leaderboard points, not nomination count; backfill old eligibility without replaying announcements.
 - [Century Club calendar-year attendance](century-club-calendar-year.md) — count confirmed games and past approved scrimmages by event year; reset tiers annually, not by season.
 - [Birthday push idempotency](birthday-push-idempotency.md) — OneSignal retains retry keys for only 30 days; annual once-only delivery also requires persistent per-user birthday state.
+- [Hat Trick season history](hat-trick-season-history.md) — qualify 3+-goal games once per season; old career awards remain history, never season progress.

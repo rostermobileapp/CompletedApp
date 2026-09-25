@@ -13,9 +13,15 @@ type Badge = {
   achievementType?: string | null; imagePath?: string | null; placeholderColor?: string;
   isEarned: boolean; count: number; currentProgress: number; nextThreshold?: number | null;
   earnedTiers: string[]; earnedAt?: string | null; lockedHint?: string | null; tiers: Tier[];
+  legacyAwards?: Array<{ tier: string | null; awardedAt: string | null }>;
 };
 type Section = { category: string; label: string; badges: Badge[] };
-type TrophyCaseData = { sections: Section[]; isGoalie: boolean };
+type TrophyCaseData = {
+  sections: Section[];
+  isGoalie: boolean;
+  hatTrickSeasons: Array<{ id: string; name: string }>;
+  selectedHatTrickSeasonId: string | null;
+};
 type SelectedBadge = { badge: Badge; tier?: Tier };
 type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21" | "testing";
 
@@ -23,7 +29,7 @@ const ACHIEVEMENT_SECTIONS = [
   { key: "three_stars", label: "3 Stars", description: "First star: 3 points · second: 2 · third: 1. Every point counts toward your tiers.", slug: "three_stars" },
   { key: "beer_me", label: "Beer Me", description: "Post-game dedication.", slug: "beer_me" },
   { key: "century_club", label: "Century Club", description: "Games and scrimmages played this calendar year. Resets January 1.", slug: "century_club" },
-  { key: "hat_trick", label: "Hat Trick", description: "Score three goals in a single game.", slug: "hat_trick" },
+  { key: "hat_trick", label: "Hat Trick", description: "One game with 3 or more goals counts as one hat trick. Progress resets each season.", slug: "hat_trick" },
   { key: "on_fire", label: "Hot Streak", description: "Build a multi-game scoring streak.", slug: "on_fire" },
   { key: "iron_man", label: "Iron Man", description: "Play consecutive games without missing one.", slug: "iron_man" },
   { key: "one_time", label: "One Time Badges", description: "Permanent and repeatable achievements.", types: ["onetime", "multiplier"] },
@@ -108,7 +114,23 @@ function AchievementSection({ label, description, badges, onSelect, preview = fa
   const isTiered = badges.some((badge) => badge.achievementType === "tiered");
   const spotCount = isTiered ? badges.reduce((total, badge) => total + (badge.achievementType === "tiered" ? badge.tiers.length : 1), 0) : badges.length;
   const fiveStars = badges.length === 1 && (badges[0].slug === "three_stars" || badges[0].slug === "century_club");
-  return <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5"><SectionHeading label={label} description={description} count={spotCount} /><div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>{badges.flatMap((badge) => badge.achievementType === "tiered" ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} preview={preview} onClick={() => onSelect(badge, tier)} />) : [<BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />])}</div></section>;
+  const legacyAwards = badges.find((badge) => badge.slug === "hat_trick")?.legacyAwards ?? [];
+  return (
+    <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5">
+      <SectionHeading label={label} description={description} count={spotCount} />
+      <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+        {badges.flatMap((badge) => badge.achievementType === "tiered"
+          ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} preview={preview} onClick={() => onSelect(badge, tier)} />)
+          : [<BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />])}
+      </div>
+      {legacyAwards.length > 0 && (
+        <p className="mt-3 text-xs text-[#597087]">
+          Earlier career Hat Trick awards: {legacyAwards.map((award) => award.tier ? formatTier(award.tier) : "Badge").join(", ")}.
+          These remain in your history but do not count toward a season’s progress.
+        </p>
+      )}
+    </section>
+  );
 }
 
 function otherAchievements(badges: Badge[]) {
@@ -123,6 +145,7 @@ export function TrophyCasePreview() {
 
 export default function TrophyCase({ preview = false }: { preview?: boolean } = {}) {
   const [, navigate] = useLocation();
+  const [hatTrickSeasonId, setHatTrickSeasonId] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedBadge | null>(null);
   const [revealingId, setRevealingId] = useState<string | null>(null);
   const [announcementPreview, setAnnouncementPreview] = useState<SelectedBadge | null>(null);
@@ -130,7 +153,9 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"], enabled: !preview });
   const ageAccess = preview ? "eligible" : isUserLoading ? "loading" : user?.displayId !== "U00001" ? "testing" : getTrophyCaseAccess(user?.dateOfBirth);
   const { data, isLoading, isError } = useQuery<TrophyCaseData>({
-    queryKey: [preview ? "/api/dev/trophy-case-preview" : "/api/trophy-case"],
+    queryKey: [preview
+      ? "/api/dev/trophy-case-preview"
+      : `/api/trophy-case${hatTrickSeasonId ? `?seasonId=${encodeURIComponent(hatTrickSeasonId)}` : ""}`],
     enabled: ageAccess === "eligible",
     staleTime: 0,
     refetchOnMount: "always",
@@ -144,6 +169,9 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const canPreviewAnnouncement = !!selected && isBadgeOrTierEarned(selected);
   const previewAnnouncement = () => { if (!selected || !isBadgeOrTierEarned(selected)) return; setAnnouncementPreview(selected); setAnnouncementCycle((current) => current + 1); };
   const earnedCount = data?.sections.reduce((total, section) => total + section.badges.reduce((sectionTotal, badge) => section.category === "achievement" && badge.achievementType === "tiered" ? sectionTotal + badge.tiers.filter((tier) => badge.earnedTiers.includes(tier.tier) || badge.currentProgress >= tier.threshold).length : sectionTotal + Number(badge.isEarned), 0), 0) ?? 0;
+  const selectedHatTrickSeason = (data?.hatTrickSeasons ?? []).find((season) =>
+    season.id === (hatTrickSeasonId ?? data?.selectedHatTrickSeasonId),
+  );
 
   return (
     <div className="trophy-case min-h-[100dvh] bg-[#dce5f3] px-3 pb-24 pt-5 text-[#1e3345] sm:px-6 sm:pt-8">
@@ -163,7 +191,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
         {ageAccess === "eligible" && <>{isLoading && <div className="rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center text-[#718394]">Loading {preview ? "the badge preview" : "your trophy case"}…</div>}{isError && <div className="rounded-2xl border border-[#edc6ca] bg-[#fff5f5] p-8 text-center text-[#b52732]">Could not load {preview ? "the badge preview" : "your trophy case"}.</div>}{data && <main className="trophy-depth-main mx-auto max-w-5xl rounded-[1.5rem] p-3 sm:p-6">
           <section className="trophy-depth-panel mb-5 rounded-2xl p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">{preview ? "Catalog preview" : "The collection of"}</p><h2 className="mt-1 text-xl font-bold tracking-tight text-[#173d5b] sm:text-2xl">{preview ? "Every badge, on display" : "Your career, on display"}</h2></div><div className="rounded-lg border border-[#c8dbe8] bg-white/75 px-2.5 py-1.5 text-center"><div className="font-mono text-[9px] font-bold tracking-[.15em] text-[#164a73]">ROSTER HOCKEY</div><div className="mt-0.5 text-[7px] uppercase tracking-[.15em] text-[#718394]">Player honors</div></div></div></section>
           <div className="space-y-5">{data.sections.filter((section) => section.category !== "achievement").map((section) => { const visibleBadges = preview ? section.badges : section.badges.filter((badge) => badge.isEarned); if (!visibleBadges.length) return null; return <section key={section.category} className="trophy-depth-panel rounded-2xl p-3.5 sm:p-5"><SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={visibleBadges.length} /><div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{visibleBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => selectBadge(badge)} />)}</div></section>; })}</div>
-          <section className="trophy-depth-panel mt-5 rounded-2xl p-3.5 sm:p-5"><div className="mb-5 flex flex-col gap-3 border-b border-[#d7e2eb] pb-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">Milestones &amp; records</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">Achievements</h2><p className="mt-1 max-w-xl text-[11px] leading-relaxed text-[#718394] sm:text-xs">Every tier has its own spot and progress bar. Progress is capped at that tier’s target.</p></div><span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span></div><div className="space-y-5">{ACHIEVEMENT_SECTIONS.filter((group) => !("goalieOnly" in group) || !group.goalieOnly || data.isGoalie).map((group) => { const achievementBadges = data.sections.find((section) => section.category === "achievement")?.badges ?? []; const badges = "slug" in group ? achievementBadges.filter((badge) => badge.slug === group.slug) : achievementBadges.filter((badge) => group.types.includes(badge.achievementType as typeof group.types[number])); return <AchievementSection key={group.key} label={group.label} description={group.description} badges={badges} onSelect={selectBadge} preview={preview} />; })}{preview && (() => { const extra = otherAchievements(data.sections.find((section) => section.category === "achievement")?.badges ?? []); return extra.length ? <AchievementSection label="Other Achievements" description="Additional published achievements." badges={extra} onSelect={selectBadge} preview /> : null; })()}</div></section>
+          <section className="trophy-depth-panel mt-5 rounded-2xl p-3.5 sm:p-5"><div className="mb-5 flex flex-col gap-3 border-b border-[#d7e2eb] pb-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">Milestones &amp; records</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">Achievements</h2><p className="mt-1 max-w-xl text-[11px] leading-relaxed text-[#718394] sm:text-xs">Every tier has its own spot and progress bar. Progress is capped at that tier’s target.</p></div><span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span></div><div className="space-y-5">{ACHIEVEMENT_SECTIONS.filter((group) => !("goalieOnly" in group) || !group.goalieOnly || data.isGoalie).map((group) => { const achievementBadges = data.sections.find((section) => section.category === "achievement")?.badges ?? []; const badges = "slug" in group ? achievementBadges.filter((badge) => badge.slug === group.slug) : achievementBadges.filter((badge) => group.types.includes(badge.achievementType as typeof group.types[number])); return <div key={group.key}>{group.key === "hat_trick" && !preview && data.hatTrickSeasons.length > 0 && <div className="mb-3 flex flex-col gap-1.5 sm:max-w-sm"><label htmlFor="hat-trick-season" className="text-[10px] font-bold uppercase tracking-[.12em] text-[#597087]">Hat Trick season</label><select id="hat-trick-season" value={selectedHatTrickSeason?.id ?? ""} onChange={(event) => setHatTrickSeasonId(event.target.value || null)} className="rounded-lg border border-[#cddbe5] bg-white px-3 py-2 text-sm text-[#173d5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#164a73]"><option value="">Most recent season</option>{data.hatTrickSeasons.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>{selectedHatTrickSeason && <p className="text-xs text-[#718394]">Showing tier progress for {selectedHatTrickSeason.name}.</p>}</div>}<AchievementSection label={group.label} description={group.description} badges={badges} onSelect={selectBadge} preview={preview} /></div>; })}{preview && (() => { const extra = otherAchievements(data.sections.find((section) => section.category === "achievement")?.badges ?? []); return extra.length ? <AchievementSection label="Other Achievements" description="Additional published achievements." badges={extra} onSelect={selectBadge} preview /> : null; })()}</div></section>
         </main>}</>}
       </div>
       {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#173d5b]/55 p-4 backdrop-blur-sm" onClick={closeBadge}><div className={`w-full max-w-lg rounded-2xl border border-[#cfdee8] bg-white p-5 text-[#1e3345] shadow-[0_24px_80px_#173d5b55] sm:p-7 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center gap-3">{canPreviewAnnouncement && <button onClick={previewAnnouncement} className="inline-flex items-center gap-2 rounded-lg bg-[#e8f0f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#164a73] transition hover:bg-[#d8e7f0]"><Sparkles size={14} /> Preview announcement</button>}<button onClick={closeBadge} className="ml-auto rounded-full p-1 text-[#718394] transition hover:bg-[#edf3f7]" aria-label="Close badge details"><X size={20} /></button></div><div className="flex flex-col items-center text-center"><BadgeArtwork badge={selected.badge} tier={selected.tier} earned={isBadgeOrTierEarned(selected)} large /></div><h2 className={`mt-5 text-center text-2xl font-bold ${selected.badge.isEarned ? "text-[#164a73]" : "text-[#718394]"}`}>{selected.badge.isEarned ? selected.badge.name : "???"}</h2>{selected.tier && <p className="mt-1 text-center text-xs font-semibold uppercase tracking-wider text-[#d52d3b]">{formatTier(selected.tier.tier)} · target {selected.tier.threshold}</p>}<p className="mt-2 text-center text-sm text-[#718394]">{selected.badge.isEarned ? selected.badge.description : (selected.badge.lockedHint || "Keep playing to discover this badge.")}</p>{selected.badge.isEarned && selected.badge.earnedAt && <p className="mt-3 text-center text-xs text-[#8a9aaa]">Earned {new Date(selected.badge.earnedAt).toLocaleDateString()}</p>}{selected.tier ? <TierProgress badge={selected.badge} tier={selected.tier} /> : selected.badge.tiers.length > 0 && <div className="mt-6 flex flex-wrap justify-center gap-2">{selected.badge.tiers.map((tier) => <span key={tier.tier} className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase ${selected.badge.earnedTiers.includes(tier.tier) ? "border-[#d52d3b] bg-[#fff0f1] text-[#b52732]" : "border-[#d7e2eb] text-[#718394]"}`}>{formatTier(tier.tier)} · {tier.threshold}</span>)}</div>}{selected.badge.achievementType === "multiplier" && <p className="mt-5 text-center text-xl font-bold text-[#d52d3b]">×{selected.badge.count}</p>}{!selected.badge.isEarned && <Lock className="mx-auto mt-5 text-[#718394]" size={18} />}</div></div>}

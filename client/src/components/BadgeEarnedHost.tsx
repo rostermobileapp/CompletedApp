@@ -150,11 +150,16 @@ export function BadgeEarnedHost() {
   useEffect(() => subscribe("badge_earned", () => {
     // The server validates current thresholds before returning an event.
     queryClient.invalidateQueries({ queryKey: ["/api/badges/events/pending"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/trophy-case"] });
+    queryClient.invalidateQueries({
+      predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/trophy-case"),
+    });
   }), [subscribe, queryClient]);
 
   useEffect(() => onConnected(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/badges/events/pending"] });
+    queryClient.invalidateQueries({
+      predicate: (query) => typeof query.queryKey[0] === "string" && query.queryKey[0].startsWith("/api/trophy-case"),
+    });
   }), [onConnected, queryClient]);
 
   if (!current) return null;

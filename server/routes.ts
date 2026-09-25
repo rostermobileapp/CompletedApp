@@ -1093,9 +1093,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       const requestedUserId = typeof req.query.userId === 'string' ? req.query.userId : currentUserId(req);
-      res.json(await getTrophyCase(requestedUserId));
+      const seasonId = typeof req.query.seasonId === 'string' ? req.query.seasonId : undefined;
+      res.json(await getTrophyCase(requestedUserId, seasonId));
     } catch (error) {
       console.error('[Badges] Failed to load trophy case:', error);
+      if (error instanceof Error && error.message === "Hat Trick season not available for this player") {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: 'Failed to load trophy case' });
     }
   });
@@ -12280,6 +12284,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Scorekeeper Dashboard Routes - Game Goals
+  const reevaluateHatTricks = (game: { isCompleted: boolean; seasonId: string | null; leagueId: string | null }, scorerIds: Array<string | null | undefined>) => {
+    if (!game.isCompleted || !game.seasonId) return;
+    for (const scorerId of Array.from(new Set(scorerIds.filter((id): id is string => !!id)))) {
+      void evaluateBadgesForUser(scorerId, { seasonId: game.seasonId, leagueId: game.leagueId }, "season_hat_tricks")
+        .catch((error) => console.error("[Badges] Hat Trick goal correction evaluation failed:", error));
+    }
+  };
   app.get('/api/games/:gameId/goals', isAuthenticated, async (req: any, res) => {
     try {
       const { gameId } = req.params;
@@ -12328,6 +12339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: timestamp || null,
       });
 
+      reevaluateHatTricks(game, [goal.scorerId]);
       res.json(goal);
     } catch (error) {
       console.error('Error creating game goal:', error);
@@ -12409,6 +12421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return updated;
       });
 
+      reevaluateHatTricks(game, [currentGoal.scorerId, updatedGoal.scorerId]);
       res.json(updatedGoal);
     } catch (error) {
       console.error('Error updating game goal:', error);
@@ -12453,6 +12466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .delete(gameGoals)
           .where(and(eq(gameGoals.id, goalId), eq(gameGoals.gameId, gameId)));
       });
+      reevaluateHatTricks(game, [currentGoal.scorerId]);
       res.json({ message: 'Goal deleted successfully' });
     } catch (error) {
       console.error('Error deleting game goal:', error);
@@ -12861,6 +12875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           game: updatedGame,
           goalsCount: goals.length,
           penaltiesCount: penalties.length,
+          scorerIds: goals.flatMap((goal) => goal.scorerId ? [goal.scorerId] : []),
         };
       });
       
@@ -12874,6 +12889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const evaluatedUserIds = Array.from(new Set([
         ...rosterUserIds,
         ...normalizedAttendance.flatMap((attendee) => attendee.userId ? [attendee.userId] : []),
+        ...result.scorerIds,
       ]));
       for (const evaluatedUserId of evaluatedUserIds) {
         void evaluateBadgesForUser(evaluatedUserId, {

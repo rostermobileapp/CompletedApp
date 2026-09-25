@@ -22,6 +22,7 @@ import { db } from "./db";
 import { newlyReachedTiers, reachedTiers } from "./badgeTierEligibility";
 import { THREE_STARS_TIERS } from "@shared/threeStarsTiers";
 import { CENTURY_CLUB_TIERS } from "@shared/centuryClubTiers";
+import { HAT_TRICK_TIERS } from "@shared/hatTrickTiers";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
@@ -145,8 +146,10 @@ const achievement = (
 });
 
 DEFAULT_BADGES.push(
-  achievement("hat_trick", "Hat Trick", "Score 3 goals in a single game.", "tiered", "metric", "career_hat_tricks", {}, [
-    defaultTier("bronze", 1), defaultTier("silver", 3), defaultTier("gold", 5), defaultTier("platinum", 10),
+  achievement("hat_trick", "Hat Trick", "Games with 3 or more goals in one season. Each qualifying game counts once.", "tiered", "metric", "season_hat_tricks", {}, [
+    ...HAT_TRICK_TIERS.map(({ tier, threshold, imagePath }) => ({
+      ...defaultTier(tier, threshold), imagePath,
+    })),
   ]),
   achievement("iron_man", "Iron Man", "Play consecutive games without missing one.", "tiered", "metric", "consecutive_games_played", {}, [
     defaultTier("bronze", 5), defaultTier("silver", 10), defaultTier("gold", 15), defaultTier("platinum", 25),
@@ -195,8 +198,8 @@ export async function ensureDefaultBadges() {
       .where(eq(badgeDefinitions.slug, badge.slug))
       .limit(1);
     if (existing) {
-      if ((badge.slug === "three_stars" || badge.slug === "century_club") && badge.tiers?.length) {
-        if (badge.slug === "century_club") {
+      if ((badge.slug === "three_stars" || badge.slug === "century_club" || badge.slug === "hat_trick") && badge.tiers?.length) {
+        if (badge.slug === "century_club" || badge.slug === "hat_trick") {
           await db.update(badgeDefinitions).set({
             triggerKey: badge.triggerKey,
             description: badge.description,
@@ -208,8 +211,7 @@ export async function ensureDefaultBadges() {
             eq(badgeDefinitions.description, "Named one of the 3 stars of the game."),
           ));
         }
-        // Reconcile the existing four-tier catalog as well as new installations.
-        // The supplied 3 Stars artwork is canonical for each tier.
+        // Keep shipped tier art and thresholds in sync on existing installations.
         for (const tier of badge.tiers) {
           await db.insert(badgeTiers).values({
             badgeDefinitionId: existing.id,
@@ -295,6 +297,66 @@ export async function getCalendarYearAppearances(userId: string, year = currentC
     )::int AS count
   `);
   return Number(result.rows[0]?.count ?? 0);
+}
+
+export async function getSeasonHatTrickCount(userId: string, seasonId: string): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS count FROM (
+      SELECT gg.game_id FROM game_goals gg
+      JOIN games g ON g.id = gg.game_id
+      WHERE gg.scorer_id = ${userId} AND g.season_id = ${seasonId}
+        AND g.is_completed = true
+      GROUP BY gg.game_id HAVING COUNT(*) >= 3
+    ) qualifying_games
+  `);
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+// Backfill previously completed seasons without replaying old milestone popups.
+// Legacy global awards remain in history but cannot count toward a season's tiers.
+export async function reconcileSeasonHatTricks() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "hat_trick"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  const tiers = await db.select().from(badgeTiers)
+    .where(eq(badgeTiers.badgeDefinitionId, definition.id)).orderBy(asc(badgeTiers.threshold));
+  const result = await db.execute(sql`
+    SELECT scorer_id AS user_id, season_id, COUNT(*)::int AS count FROM (
+      SELECT gg.scorer_id, g.season_id, gg.game_id
+      FROM game_goals gg JOIN games g ON g.id = gg.game_id
+      WHERE gg.scorer_id IS NOT NULL AND g.season_id IS NOT NULL AND g.is_completed = true
+      GROUP BY gg.scorer_id, g.season_id, gg.game_id HAVING COUNT(*) >= 3
+    ) qualifying_games
+    GROUP BY scorer_id, season_id
+  `);
+  for (const row of result.rows) {
+    const userId = String(row.user_id);
+    const seasonId = String(row.season_id);
+    const count = Number(row.count);
+    const reached = reachedTiers(tiers, count);
+    await db.transaction(async (tx) => {
+      for (const tier of reached) {
+        await tx.insert(badgeAwards).values({
+          badgeDefinitionId: definition.id, userId, seasonId,
+          scopeKey: `season:${seasonId}:tier:${tier.tier}`, tier: tier.tier,
+          source: "evaluator", metadata: { value: count },
+        }).onConflictDoNothing();
+      }
+      await tx.insert(badgeProgress).values({
+        badgeDefinitionId: definition.id, userId, scopeKey: `season:${seasonId}`,
+        progress: count, count, earnedTiers: reached.map((tier) => tier.tier),
+        currentTier: reached.at(-1)?.tier ?? null,
+      }).onConflictDoUpdate({
+        target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+        set: {
+          progress: count, count,
+          earnedTiers: reached.map((tier) => tier.tier),
+          currentTier: reached.at(-1)?.tier ?? null,
+          updatedAt: new Date(),
+        },
+      });
+    });
+  }
 }
 
 // Preserve old career awards as history, but seed current-year tiers without
@@ -454,17 +516,8 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
     }
     case "calendar_year_appearances":
       return getCalendarYearAppearances(userId);
-    case "career_hat_tricks": {
-      const rows = await db.execute(sql`
-        SELECT COUNT(*)::int AS count FROM (
-          SELECT gg.game_id FROM game_goals gg
-          JOIN games g ON g.id = gg.game_id
-          WHERE gg.scorer_id = ${userId} AND g.is_completed = true
-          GROUP BY gg.game_id HAVING COUNT(*) >= 3
-        ) hat_tricks
-      `);
-      return Number((rows.rows?.[0] as any)?.count ?? 0);
-    }
+    case "season_hat_tricks":
+      return context?.seasonId ? getSeasonHatTrickCount(userId, context.seasonId) : 0;
     case "career_three_stars": {
       return getCareerThreeStarPoints(userId);
     }
@@ -599,6 +652,75 @@ export async function evaluateSeasonBeerBadgeForUser(userId: string, definition:
   return emitted.map(({ event }) => event);
 }
 
+export async function evaluateSeasonHatTrickBadgeForUser(userId: string, definition: DefinitionWithTiers, seasonId: string) {
+  const emitted = await db.transaction(async (tx) => {
+    // Serialize evaluations for the same player and season, including corrected
+    // goals committed immediately after another evaluation started.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`hat_trick:${userId}:${seasonId}`}))`);
+    const scopeKey = `season:${seasonId}`;
+    const [previous] = await tx.select().from(badgeProgress).where(and(
+      eq(badgeProgress.badgeDefinitionId, definition.id),
+      eq(badgeProgress.userId, userId),
+      eq(badgeProgress.scopeKey, scopeKey),
+    )).for("update").limit(1);
+    const result = await tx.execute(sql`
+      SELECT COUNT(*)::int AS count FROM (
+        SELECT gg.game_id FROM game_goals gg JOIN games g ON g.id = gg.game_id
+        WHERE gg.scorer_id = ${userId} AND g.season_id = ${seasonId} AND g.is_completed = true
+        GROUP BY gg.game_id HAVING COUNT(*) >= 3
+      ) qualifying_games
+    `);
+    const count = Number(result.rows[0]?.count ?? 0);
+    const reached = reachedTiers(definition.tiers, count);
+    const events: Array<{ event: BadgeEarnedEvent; payload: Record<string, unknown> }> = [];
+    for (const tier of newlyReachedTiers(definition.tiers, previous?.progress ?? 0, count)) {
+      const awardScopeKey = `${scopeKey}:tier:${tier.tier}`;
+      const [inserted] = await tx.insert(badgeAwards).values({
+        badgeDefinitionId: definition.id, userId, seasonId,
+        scopeKey: awardScopeKey, tier: tier.tier, source: "evaluator",
+        metadata: { value: count },
+      }).onConflictDoNothing().returning();
+      const [historical] = inserted ? [] : await tx.select({ id: badgeAwards.id }).from(badgeAwards).where(and(
+        eq(badgeAwards.badgeDefinitionId, definition.id),
+        eq(badgeAwards.userId, userId),
+        eq(badgeAwards.scopeKey, awardScopeKey),
+      )).limit(1);
+      // Don't replay old milestones when only backfilling a missing progress row.
+      const awardId = inserted?.id ?? (previous ? historical?.id : null);
+      if (!awardId) continue;
+      const payload = { tier: tier.tier, count, awardId, seasonId, imagePath: tier.imagePath ?? definition.imagePath ?? null };
+      const [event] = await tx.insert(badgeEarnedEvents).values({
+        userId, badgeAwardId: awardId, badgeDefinitionId: definition.id,
+        eventType: "badge_earned", payload,
+      }).returning();
+      events.push({ event, payload });
+    }
+    for (const tier of definition.tiers.filter((item) => count < item.threshold)) {
+      await tx.update(badgeEarnedEvents).set({ acknowledgedAt: new Date() }).where(and(
+        eq(badgeEarnedEvents.userId, userId),
+        eq(badgeEarnedEvents.badgeDefinitionId, definition.id),
+        sql`${badgeEarnedEvents.acknowledgedAt} IS NULL`,
+        sql`${badgeEarnedEvents.payload}->>'seasonId' = ${seasonId}`,
+        sql`${badgeEarnedEvents.payload}->>'tier' = ${tier.tier}`,
+      ));
+    }
+    await tx.insert(badgeProgress).values({
+      badgeDefinitionId: definition.id, userId, scopeKey,
+      progress: count, count, earnedTiers: reached.map((tier) => tier.tier),
+      currentTier: reached.at(-1)?.tier ?? null,
+    }).onConflictDoUpdate({
+      target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+      set: {
+        progress: count, count, earnedTiers: reached.map((tier) => tier.tier),
+        currentTier: reached.at(-1)?.tier ?? null, updatedAt: new Date(),
+      },
+    });
+    return events;
+  });
+  for (const { event, payload } of emitted) await broadcastEarnedEvent(userId, event, definition, payload);
+  return emitted.map(({ event }) => event);
+}
+
 export async function evaluateBadgesForUser(
   userId: string,
   context?: { leagueId?: string | null; seasonId?: string | null; teamId?: string | null },
@@ -611,6 +733,10 @@ export async function evaluateBadgesForUser(
     if (definition.triggerKey === "season_beers") {
       // Never evaluate a season badge from a combined cross-season total.
       if (context?.seasonId) earned.push(...await evaluateSeasonBeerBadgeForUser(userId, definition, context.seasonId));
+      continue;
+    }
+    if (definition.triggerKey === "season_hat_tricks") {
+      if (context?.seasonId) earned.push(...await evaluateSeasonHatTrickBadgeForUser(userId, definition, context.seasonId));
       continue;
     }
     const centuryYear = definition.triggerKey === "calendar_year_appearances" ? currentCenturyClubYear() : null;
@@ -706,10 +832,10 @@ export async function awardManualBadge(input: {
   return { duplicate: false, award, event };
 }
 
-export async function getTrophyCase(userId: string) {
+export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: string) {
   const definitions = await definitionsWithTiers();
   const centuryYear = currentCenturyClubYear();
-  const [awards, progress, goalieMembership, goalieAppearance, beerCount, threeStarPoints, centuryCount] = await Promise.all([
+  const [awards, progress, goalieMembership, goalieAppearance, beerCount, threeStarPoints, centuryCount, hatTrickSeasonsResult] = await Promise.all([
     db.select().from(badgeAwards).where(eq(badgeAwards.userId, userId)).orderBy(desc(badgeAwards.awardedAt)),
     db.select().from(badgeProgress).where(eq(badgeProgress.userId, userId)),
     db.select({ id: leagueMemberships.id }).from(leagueMemberships).where(and(
@@ -722,19 +848,50 @@ export async function getTrophyCase(userId: string) {
     getMetricValue(userId, "season_beers"),
     getCareerThreeStarPoints(userId),
     getCalendarYearAppearances(userId, centuryYear),
+    db.execute(sql`
+      SELECT s.id, s.name FROM seasons s
+      WHERE s.id IN (
+        SELECT t.season_id FROM team_memberships tm
+          JOIN teams t ON t.id = tm.team_id WHERE tm.user_id = ${userId}
+        UNION
+        SELECT g.season_id FROM game_attendance ga
+          JOIN games g ON g.id = ga.game_id WHERE ga.user_id = ${userId}
+        UNION
+        SELECT g.season_id FROM game_goals gg
+          JOIN games g ON g.id = gg.game_id WHERE gg.scorer_id = ${userId}
+        UNION
+        SELECT ba.season_id FROM badge_awards ba
+          JOIN badge_definitions bd ON bd.id = ba.badge_definition_id
+          WHERE ba.user_id = ${userId} AND bd.slug = 'hat_trick' AND ba.season_id IS NOT NULL
+      )
+      ORDER BY s.is_active DESC, s.start_date DESC NULLS LAST, s.created_at DESC
+    `),
   ]);
+  const hatTrickSeasons = hatTrickSeasonsResult.rows.map((row) => ({ id: String(row.id), name: String(row.name) }));
+  if (requestedHatTrickSeasonId && !hatTrickSeasons.some((season) => season.id === requestedHatTrickSeasonId)) {
+    throw new Error("Hat Trick season not available for this player");
+  }
+  const selectedHatTrickSeasonId = requestedHatTrickSeasonId ?? hatTrickSeasons[0]?.id ?? null;
+  const hatTrickCount = selectedHatTrickSeasonId ? await getSeasonHatTrickCount(userId, selectedHatTrickSeasonId) : 0;
   const awardsByDefinition = new Map<string, typeof awards>();
   for (const award of awards) awardsByDefinition.set(award.badgeDefinitionId, [...(awardsByDefinition.get(award.badgeDefinitionId) ?? []), award]);
   const progressByScope = new Map(progress.map((item) => [`${item.badgeDefinitionId}:${item.scopeKey}`, item]));
   const badges = definitions.map((definition) => {
     const isCenturyBadge = definition.triggerKey === "calendar_year_appearances";
-    const definitionAwards = (awardsByDefinition.get(definition.id) ?? []).filter((award) =>
-      !isCenturyBadge || award.scopeKey.startsWith(`year:${centuryYear}:tier:`));
-    const currentProgress = progressByScope.get(`${definition.id}:${isCenturyBadge ? `year:${centuryYear}` : "global"}`);
+    const isHatTrickBadge = definition.triggerKey === "season_hat_tricks";
+    const allDefinitionAwards = awardsByDefinition.get(definition.id) ?? [];
+    const legacyAwards = isHatTrickBadge
+      ? allDefinitionAwards.filter((award) => award.scopeKey.startsWith("global:tier:"))
+      : [];
+    const definitionAwards = allDefinitionAwards.filter((award) =>
+      (!isCenturyBadge || award.scopeKey.startsWith(`year:${centuryYear}:tier:`))
+      && (!isHatTrickBadge || (selectedHatTrickSeasonId !== null && award.scopeKey.startsWith(`season:${selectedHatTrickSeasonId}:tier:`))));
+    const currentProgress = progressByScope.get(`${definition.id}:${isHatTrickBadge
+      ? `season:${selectedHatTrickSeasonId}` : isCenturyBadge ? `year:${centuryYear}` : "global"}`);
     const isBeerBadge = definition.triggerKey === "season_beers";
     const liveTierValue = isBeerBadge ? beerCount
       : definition.triggerKey === "career_three_stars" ? threeStarPoints
-      : isCenturyBadge ? centuryCount : null;
+      : isCenturyBadge ? centuryCount : isHatTrickBadge ? hatTrickCount : null;
     const earnedTiers = liveTierValue !== null
       ? reachedTiers(definition.tiers, liveTierValue).map((tier) => tier.tier)
       : currentProgress?.earnedTiers ?? definitionAwards.filter((award) => award.tier).map((award) => award.tier);
@@ -756,10 +913,13 @@ export async function getTrophyCase(userId: string) {
       currentProgress: liveTierValue ?? currentProgress?.progress ?? 0,
       nextThreshold: nextTier?.threshold ?? null,
       awards: visibleAwards,
+      legacyAwards,
     };
   });
   return {
     isGoalie: goalieMembership.length > 0 || goalieAppearance.length > 0,
+    hatTrickSeasons,
+    selectedHatTrickSeasonId,
     sections: (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
       category,
       label: CATEGORY_LABELS[category],
@@ -840,6 +1000,13 @@ export async function getPendingBadgeEvents(userId: string) {
   const beerCounts = new Map(await Promise.all(seasonIds.map(async (seasonId) => [
     seasonId, await getMetricValue(userId, "season_beers", seasonId ? { seasonId } : undefined),
   ] as const)));
+  const hatTrickSeasonIds = Array.from(new Set(tieredEvents
+    .filter((event) => event.definition.triggerKey === "season_hat_tricks")
+    .map((event) => (event.payload as Record<string, unknown>).seasonId)
+    .filter((seasonId): seasonId is string => typeof seasonId === "string" && seasonId.length > 0)));
+  const hatTrickCounts = new Map(await Promise.all(hatTrickSeasonIds.map(async (seasonId) => [
+    seasonId, await getSeasonHatTrickCount(userId, seasonId),
+  ] as const)));
   const centuryCount = tieredEvents.some((event) => event.definition.triggerKey === "calendar_year_appearances")
     ? await getCalendarYearAppearances(userId, centuryYear) : 0;
 
@@ -848,6 +1015,11 @@ export async function getPendingBadgeEvents(userId: string) {
     if (event.definition.triggerKey === "calendar_year_appearances") {
       const tier = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`);
       return !!tier && centuryCount >= tier.threshold;
+    }
+    if (event.definition.triggerKey === "season_hat_tricks") {
+      const tier = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`);
+      return !!tier && typeof payload.seasonId === "string"
+        && (hatTrickCounts.get(payload.seasonId) ?? 0) >= tier.threshold;
     }
     if (event.definition.triggerKey !== "season_beers") return true;
     const tier = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`);
