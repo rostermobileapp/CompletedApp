@@ -128,6 +128,7 @@ import {
   getPendingBadgeEvents,
   reconcileCalendarYearBeerMe,
   reconcileSeasonSubMagnet,
+  reconcileSeasonRsvpKing,
   getTrophyCaseAccess,
   getTrophyCase,
   getTrophyCasePreview,
@@ -7189,6 +7190,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           // The season transition has committed; the periodic job will retry.
           console.error("[Badges] Could not award Sub Magnet after season close:", error);
+        }
+        try {
+          await reconcileSeasonRsvpKing(true, closeCurrentSeasonId);
+        } catch (error) {
+          console.error("[Badges] Could not award RSVP King after season close:", error);
         }
       }
       res.json({ season: newSeason });

@@ -188,7 +188,7 @@ DEFAULT_BADGES.push(
       imagePath,
     })),
   ]),
-  achievement("rsvp_king", "RSVP King", "First to respond to every game invite in a season.", "multiplier", "metric", "season_first_rsvp_streak"),
+  { ...achievement("rsvp_king", "RSVP King", "RSVP Yes or No to every eligible league game in a season. Scrimmages do not count. Earn a patch for each perfect season.", "multiplier", "metric", "season_rsvp_perfect"), imagePath: "/badges/rsvp-king/patch.webp" },
   achievement("team_player", "Team Player", "Filled a sub spot for another team.", "multiplier", "metric", "career_sub_appearances"),
   { ...achievement("rookie_card", "Rookie Card", "Your first game ever logged on Roster.", "onetime", "event", "first_game_logged"), imagePath: "/badges/rookie-card/patch.webp" },
   achievement("sub", "Sub", "First time subbing in for another player.", "onetime", "event", "first_sub_appearance"),
@@ -303,6 +303,12 @@ export async function ensureDefaultBadges() {
         await db.update(badgeDefinitions).set({
           description: badge.description, triggerType: "metric",
           triggerKey: badge.triggerKey, imagePath: badge.imagePath,
+        }).where(eq(badgeDefinitions.id, existing.id));
+      }
+      if (badge.slug === "rsvp_king") {
+        await db.update(badgeDefinitions).set({
+          description: badge.description, achievementType: badge.achievementType,
+          triggerType: badge.triggerType, triggerKey: badge.triggerKey, imagePath: badge.imagePath,
         }).where(eq(badgeDefinitions.id, existing.id));
       }
       if (badge.slug === "sub_magnet") {
@@ -555,6 +561,101 @@ export async function reconcileSeasonEarlyBird() {
       set: { progress: status.early, count: 1, updatedAt: new Date() },
     });
   }
+}
+
+// A perfect RSVP season includes every rostered league game, not just the
+// games that already have an RSVP row. Explicit substitutes also qualify.
+export async function getSeasonRsvpKingStatus(userId: string, seasonId: string) {
+  const result = await db.execute(sql`
+    WITH eligible_games AS (
+      SELECT DISTINCT g.id, g.home_team_id, g.away_team_id
+      FROM games g JOIN seasons s ON s.id = g.season_id AND s.league_id = g.league_id
+      WHERE g.season_id = ${seasonId} AND g.is_scrimmage = false
+        AND (
+          EXISTS (SELECT 1 FROM team_memberships tm
+            WHERE tm.user_id = ${userId} AND tm.status = 'approved'
+              AND tm.team_id IN (g.home_team_id, g.away_team_id)
+              AND tm.joined_at <= g.scheduled_at)
+          OR EXISTS (SELECT 1 FROM league_memberships lm
+            WHERE lm.user_id = ${userId} AND lm.status = 'approved'
+              AND lm.assigned_team_id IN (g.home_team_id, g.away_team_id)
+              AND lm.requested_at <= g.scheduled_at)
+          OR EXISTS (SELECT 1 FROM game_rsvps r
+            WHERE r.user_id = ${userId} AND r.game_id = g.id
+              AND r.team_id IN (g.home_team_id, g.away_team_id))
+        )
+    )
+    SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM game_rsvps r
+        WHERE r.game_id = eg.id AND r.user_id = ${userId}
+          AND r.team_id IN (eg.home_team_id, eg.away_team_id)
+          AND r.status IN ('attending', 'not_attending')
+      ))::int AS responded
+    FROM eligible_games eg
+  `);
+  const [season] = (await db.execute(sql`
+    SELECT (NOT is_active OR (end_date IS NOT NULL AND end_date <= NOW())) AS ended
+    FROM seasons WHERE id = ${seasonId}
+  `)).rows;
+  const total = Number(result.rows[0]?.total ?? 0);
+  const responded = Number(result.rows[0]?.responded ?? 0);
+  return { total, responded, qualified: season?.ended === true && total > 0 && responded === total };
+}
+
+export async function evaluateSeasonRsvpKingForUser(
+  userId: string, definition: DefinitionWithTiers, seasonId: string,
+  status?: Awaited<ReturnType<typeof getSeasonRsvpKingStatus>>,
+) {
+  status ??= await getSeasonRsvpKingStatus(userId, seasonId);
+  if (!status.qualified) return [];
+  const [award] = await db.insert(badgeAwards).values({
+    badgeDefinitionId: definition.id, userId, seasonId,
+    scopeKey: `season:${seasonId}`, count: 1, source: "evaluator",
+    metadata: { responded: status.responded, total: status.total },
+  }).onConflictDoNothing().returning();
+  if (!award) return [];
+  return [await emitEarnedEvent(userId, award.id, definition, {
+    awardId: award.id, seasonId, count: 1, imagePath: definition.imagePath,
+  })];
+}
+
+// Backfill older perfect seasons without surfacing retroactive announcements.
+// A completed season has at least one Yes/No RSVP for any possible winner.
+export async function reconcileSeasonRsvpKing(announce = false, seasonId?: string) {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "rsvp_king"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return 0;
+  const candidates = await db.execute(sql`
+    SELECT DISTINCT r.user_id, s.id AS season_id
+    FROM game_rsvps r JOIN games g ON g.id = r.game_id
+      JOIN seasons s ON s.id = g.season_id AND s.league_id = g.league_id
+      JOIN users u ON u.id = r.user_id
+    WHERE r.status IN ('attending', 'not_attending') AND g.is_scrimmage = false
+      AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
+      ${seasonId ? sql`AND s.id = ${seasonId}` : sql``}
+      AND NOT EXISTS (SELECT 1 FROM badge_awards a
+        WHERE a.badge_definition_id = ${definition.id} AND a.user_id = r.user_id
+          AND a.scope_key = 'season:' || s.id)
+  `);
+  let awarded = 0;
+  for (const row of candidates.rows) {
+    const userId = String(row.user_id);
+    const candidateSeasonId = String(row.season_id);
+    const status = await getSeasonRsvpKingStatus(userId, candidateSeasonId);
+    if (!status.qualified) continue;
+    if (announce) {
+      awarded += (await evaluateSeasonRsvpKingForUser(userId, definition, candidateSeasonId, status)).length;
+    } else {
+      const [award] = await db.insert(badgeAwards).values({
+        badgeDefinitionId: definition.id, userId, seasonId: candidateSeasonId,
+        scopeKey: `season:${candidateSeasonId}`, count: 1, source: "evaluator",
+        metadata: { responded: status.responded, total: status.total },
+      }).onConflictDoNothing().returning();
+      if (award) awarded++;
+    }
+  }
+  return awarded;
 }
 
 export async function isCareerGoalie(userId: string): Promise<boolean> {
@@ -1113,7 +1214,6 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
         .orderBy(asc(games.scheduledAt));
       return longestRun(rsvps.map((rsvp) => rsvp.status === "not_attending"));
     }
-    case "season_first_rsvp_streak":
     default:
       return 0;
   }
@@ -1352,6 +1452,10 @@ export async function evaluateBadgesForUser(
       if (context?.seasonId) earned.push(...await evaluateSeasonEarlyBirdBadgeForUser(userId, definition, context.seasonId));
       continue;
     }
+    if (definition.triggerKey === "season_rsvp_perfect") {
+      if (context?.seasonId) earned.push(...await evaluateSeasonRsvpKingForUser(userId, definition, context.seasonId));
+      continue;
+    }
     if (definition.triggerKey === "career_shutouts" && !(await isCareerGoalie(userId))) continue;
     const centuryYear = definition.triggerKey === "calendar_year_appearances" ? currentCenturyClubYear() : null;
     const scopeKey = centuryYear === null ? "global" : `year:${centuryYear}`;
@@ -1555,7 +1659,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
         UNION
          SELECT ba.season_id FROM badge_awards ba
           JOIN badge_definitions bd ON bd.id = ba.badge_definition_id
-           WHERE ba.user_id = ${userId} AND bd.slug IN ('hat_trick', 'on_fire', 'early_bird') AND ba.season_id IS NOT NULL
+           WHERE ba.user_id = ${userId} AND bd.slug IN ('hat_trick', 'on_fire', 'early_bird', 'rsvp_king') AND ba.season_id IS NOT NULL
         UNION
         SELECT g.season_id FROM game_rsvps r
           JOIN games g ON g.id = r.game_id WHERE r.user_id = ${userId}
@@ -1583,6 +1687,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     const isHatTrickBadge = definition.triggerKey === "season_hat_tricks";
     const isOnFireBadge = definition.triggerKey === "season_scoring_streak";
     const isEarlyBirdBadge = definition.triggerKey === "season_48hr_rsvp_perfect";
+    const isRsvpKingBadge = definition.triggerKey === "season_rsvp_perfect";
     const isIronManBadge = definition.triggerKey === "consecutive_games_played";
     const isShutoutBadge = definition.triggerKey === "career_shutouts";
     const isSeasonBadge = isHatTrickBadge || isOnFireBadge || isEarlyBirdBadge;
@@ -1621,6 +1726,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
       ? definitionAwards.filter((award) => award.tier && earnedTiers.includes(award.tier))
       : definitionAwards;
     const isEarned = isEarlyBirdBadge ? earlyBirdStatus.qualified
+      : isRsvpKingBadge ? definitionAwards.length > 0
       : liveTierValue !== null ? earnedTiers.length > 0 : definition.category === "achievement"
       ? definition.achievementType === "tiered"
         ? (currentProgress?.earnedTiers?.length ?? 0) > 0
@@ -1631,7 +1737,8 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
       ...definition,
       isEarned,
       earnedAt: visibleAwards[0]?.awardedAt ?? null,
-      count: liveTierValue ?? currentProgress?.count ?? definitionAwards[0]?.count ?? 0,
+      count: isRsvpKingBadge ? definitionAwards.length
+        : liveTierValue ?? currentProgress?.count ?? definitionAwards[0]?.count ?? 0,
       earnedTiers,
       currentProgress: isEarlyBirdBadge ? earlyBirdStatus.early : liveTierValue ?? currentProgress?.progress ?? 0,
       nextThreshold: nextTier?.threshold ?? null,
@@ -1701,6 +1808,17 @@ export async function getPendingBadgeEvents(userId: string) {
   `);
   for (const row of endedEarlyBirdSeasons.rows) {
     await evaluateBadgesForUser(userId, { seasonId: String(row.season_id) }, "season_48hr_rsvp_perfect");
+  }
+  const endedRsvpKingSeasons = await db.execute(sql`
+    SELECT DISTINCT s.id AS season_id FROM game_rsvps r
+      JOIN games g ON g.id = r.game_id
+      JOIN seasons s ON s.id = g.season_id AND s.league_id = g.league_id
+    WHERE r.user_id = ${userId} AND r.status IN ('attending', 'not_attending')
+      AND g.is_scrimmage = false
+      AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
+  `);
+  for (const row of endedRsvpKingSeasons.rows) {
+    await evaluateBadgesForUser(userId, { seasonId: String(row.season_id) }, "season_rsvp_perfect");
   }
   const events = await db.select({
     id: badgeEarnedEvents.id,
