@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileHistoricalThreeStarPoints, reconcileIronMan, reconcileSeasonHatTricks, reconcileSeasonOnFire } from "./badges";
+import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileCareerShutouts, reconcileHistoricalThreeStarPoints, reconcileIronMan, reconcileSeasonHatTricks, reconcileSeasonOnFire } from "./badges";
 
 // Runtime-safe DDL keeps older deployments compatible. The Drizzle schema
 // remains the source of truth and drizzle-kit can still generate a migration.
@@ -28,6 +28,8 @@ export async function ensureBadgeTables() {
       CREATE TYPE badge_status AS ENUM ('draft', 'published', 'archived');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
   `);
+  // A new enum label must be committed before it can be used in tier rows.
+  await db.execute(sql`ALTER TYPE badge_tier ADD VALUE IF NOT EXISTS 'emerald'`);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS badge_definitions (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -126,4 +128,5 @@ export async function ensureBadgeTables() {
   await reconcileSeasonHatTricks();
   await reconcileSeasonOnFire();
   await reconcileIronMan();
+  await reconcileCareerShutouts();
 }

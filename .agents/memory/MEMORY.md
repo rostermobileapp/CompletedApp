@@ -42,3 +42,4 @@
 - [Hat Trick season history](hat-trick-season-history.md) — qualify 3+-goal games once per season; old career awards remain history, never season progress.
 - [On Fire season streak](on-fire-season-streak.md) — longest goal-scoring run resets by season; attributed goals count when historical attendance is missing.
 - [Iron Man game streak](iron-man-game-streak.md) — current consecutive played games cross season/year boundaries; a missed game resets progress, not earned tiers.
+- [Locked In goalie shutouts](locked-in-goalie-shutouts.md) — goalie-only lifetime shutouts use final game scores; patch labels Platinum at 10 and Emerald at 25 override older tier names.

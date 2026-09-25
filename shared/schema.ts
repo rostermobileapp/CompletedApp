@@ -4383,6 +4383,7 @@ export const badgeTierEnum = pgEnum("badge_tier", [
   "silver",
   "gold",
   "platinum",
+  "emerald",
   "diamond",
   "legend",
   "god_mode",

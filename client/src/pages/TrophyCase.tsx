@@ -33,7 +33,7 @@ const ACHIEVEMENT_SECTIONS = [
   { key: "on_fire", label: "On Fire", description: "Longest goal-scoring streak this season. Progress resets each season.", slug: "on_fire" },
   { key: "iron_man", label: "Iron Man", description: "Games only. Miss one and your current streak resets; seasons and years do not reset it. Earned tiers stay earned.", slug: "iron_man" },
   { key: "one_time", label: "One Time Badges", description: "Permanent and repeatable achievements.", types: ["onetime", "multiplier"] },
-  { key: "shutouts", label: "Shutouts", description: "Career shutouts recorded as a goalie.", slug: "broom", goalieOnly: true },
+  { key: "shutouts", label: "Locked In", description: "Goalie-only lifetime shutouts. Progress never resets by season or year.", slug: "broom", goalieOnly: true },
 ] as const;
 
 function getTrophyCaseAccess(dateOfBirth: string | null | undefined, today = new Date()): TrophyCaseAccess {

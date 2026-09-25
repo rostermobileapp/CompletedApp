@@ -26,10 +26,11 @@ import { HAT_TRICK_TIERS } from "@shared/hatTrickTiers";
 import { BEER_ME_TIERS } from "@shared/beerMeTiers";
 import { ON_FIRE_TIERS } from "@shared/onFireTiers";
 import { IRON_MAN_TIERS } from "@shared/ironManTiers";
+import { LOCKED_IN_TIERS } from "@shared/lockedInTiers";
 
 export type BadgeCategory = "nhl_trophy" | "team_badge" | "achievement";
 export type BadgeAchievementType = "multiplier" | "tiered" | "onetime";
-export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legend" | "god_mode";
+export type BadgeTierName = "bronze" | "silver" | "gold" | "platinum" | "emerald" | "diamond" | "legend" | "god_mode";
 
 export type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
 
@@ -87,6 +88,7 @@ const TIER_COLORS: Record<BadgeTierName, string> = {
   silver: "#909090",
   gold: "#C9A84C",
   platinum: "#4a6a8a",
+  emerald: "#188668",
   diamond: "#b9d4de",
   legend: "#1a0a1a",
   god_mode: "#F97316",
@@ -164,8 +166,10 @@ DEFAULT_BADGES.push(
       ...defaultTier(tier, threshold), imagePath,
     })),
   ]),
-  achievement("broom", "Broom", "Career shutouts as a goalie.", "tiered", "metric", "career_shutouts", {}, [
-    defaultTier("bronze", 1), defaultTier("silver", 3), defaultTier("gold", 10), defaultTier("platinum", 25),
+  achievement("broom", "Locked In", "Lifetime shutouts in completed games played as a goalie. Never resets.", "tiered", "metric", "career_shutouts", {}, [
+    ...LOCKED_IN_TIERS.map(({ tier, threshold, imagePath }) => ({
+      ...defaultTier(tier, threshold), imagePath,
+    })),
   ]),
   achievement("beer_me", "Beer Me", "Post-game beers counted by calendar year. Progress resets January 1.", "tiered", "metric", "calendar_year_beers", {}, [
     ...BEER_ME_TIERS.map(({ tier, threshold, imagePath }) => ({
@@ -199,7 +203,62 @@ export const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   achievement: "Achievements",
 };
 
+// Older Broom awards used Gold at 10 and Platinum at 25. Rename those
+// milestones in place so existing award history and event IDs stay intact.
+async function migrateLockedInTiers() {
+  const [oldGold] = await db.select({ id: badgeTiers.id }).from(badgeTiers)
+    .innerJoin(badgeDefinitions, eq(badgeTiers.badgeDefinitionId, badgeDefinitions.id))
+    .where(and(eq(badgeDefinitions.slug, "broom"), eq(badgeTiers.tier, "gold"), eq(badgeTiers.threshold, 10))).limit(1);
+  if (!oldGold) return;
+  await db.transaction(async (tx) => {
+    const [definition] = await tx.select({ id: badgeDefinitions.id }).from(badgeDefinitions)
+      .where(eq(badgeDefinitions.slug, "broom")).limit(1);
+    if (!definition) return;
+    await tx.execute(sql`SELECT id FROM badge_definitions WHERE id = ${definition.id} FOR UPDATE`);
+    // Check again after acquiring the lock, so simultaneous startup jobs do
+    // not run this migration twice.
+    const [stillOld] = await tx.select({ id: badgeTiers.id }).from(badgeTiers)
+      .where(and(eq(badgeTiers.badgeDefinitionId, definition.id),
+        eq(badgeTiers.tier, "gold"), eq(badgeTiers.threshold, 10))).limit(1);
+    if (!stillOld) return;
+    await tx.execute(sql`
+      UPDATE badge_awards SET tier = 'emerald'::badge_tier,
+        scope_key = replace(scope_key, ':tier:platinum', ':tier:emerald')
+      WHERE badge_definition_id = ${definition.id} AND tier = 'platinum'::badge_tier
+        AND scope_key LIKE '%:tier:platinum'
+    `);
+    await tx.execute(sql`
+      UPDATE badge_awards SET tier = 'platinum'::badge_tier,
+        scope_key = replace(scope_key, ':tier:gold', ':tier:platinum')
+      WHERE badge_definition_id = ${definition.id} AND tier = 'gold'::badge_tier
+        AND scope_key LIKE '%:tier:gold'
+    `);
+    await tx.execute(sql`
+      UPDATE badge_progress SET
+        earned_tiers = array_replace(
+          array_replace(earned_tiers, 'platinum'::badge_tier, 'emerald'::badge_tier),
+          'gold'::badge_tier, 'platinum'::badge_tier),
+        current_tier = CASE WHEN current_tier = 'platinum'::badge_tier THEN 'emerald'::badge_tier
+          WHEN current_tier = 'gold'::badge_tier THEN 'platinum'::badge_tier ELSE current_tier END
+      WHERE badge_definition_id = ${definition.id}
+    `);
+    await tx.execute(sql`
+      UPDATE badge_earned_events SET payload =
+        jsonb_set(jsonb_set(payload, '{tier}',
+          to_jsonb(CASE WHEN payload->>'tier' = 'platinum' THEN 'emerald' ELSE 'platinum' END)),
+          '{imagePath}',
+          to_jsonb(CASE WHEN payload->>'tier' = 'platinum'
+            THEN ${LOCKED_IN_TIERS[3].imagePath}::text
+            ELSE ${LOCKED_IN_TIERS[2].imagePath}::text END))
+      WHERE badge_definition_id = ${definition.id}
+        AND payload->>'tier' IN ('gold', 'platinum')
+    `);
+    await tx.delete(badgeTiers).where(eq(badgeTiers.id, stillOld.id));
+  });
+}
+
 export async function ensureDefaultBadges() {
+  await migrateLockedInTiers();
   for (const badge of DEFAULT_BADGES) {
     if (!badge.slug) continue;
     const [existing] = await db.select({ id: badgeDefinitions.id })
@@ -207,11 +266,12 @@ export async function ensureDefaultBadges() {
       .where(eq(badgeDefinitions.slug, badge.slug))
       .limit(1);
     if (existing) {
-      if ((badge.slug === "three_stars" || badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire" || badge.slug === "iron_man") && badge.tiers?.length) {
-        if (badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire" || badge.slug === "iron_man") {
+      if ((badge.slug === "three_stars" || badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire" || badge.slug === "iron_man" || badge.slug === "broom") && badge.tiers?.length) {
+        if (badge.slug === "century_club" || badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire" || badge.slug === "iron_man" || badge.slug === "broom") {
           await db.update(badgeDefinitions).set({
             triggerKey: badge.triggerKey,
             description: badge.description,
+            ...(badge.slug === "broom" ? { name: badge.name } : {}),
           }).where(eq(badgeDefinitions.id, existing.id));
         } else {
           await db.update(badgeDefinitions).set({ description: badge.description })
@@ -374,6 +434,101 @@ export async function getSeasonHatTrickCount(userId: string, seasonId: string): 
     ) qualifying_games
   `);
   return Number(result.rows[0]?.count ?? 0);
+}
+
+export async function isCareerGoalie(userId: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT (
+      EXISTS (SELECT 1 FROM league_memberships lm WHERE lm.user_id = ${userId}
+        AND lm.status = 'approved' AND lm.is_goalie = true)
+      OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id = ${userId}
+        AND tm.status = 'approved' AND tm.position ~* 'goalie|goaltender|goalkeeper')
+      OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.goalie_user_id = ${userId})
+    ) AS eligible
+  `);
+  return result.rows[0]?.eligible === true;
+}
+
+// A shutout is credited to the assigned goalie of record when both final
+// scores are present and the opposing team scored zero. Older games missing
+// goalie-of-record rows can qualify only with confirmed goalie attendance.
+export async function getCareerShutoutCount(userId: string): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(DISTINCT shutouts.game_id)::int AS count FROM (
+      SELECT g.id AS game_id
+      FROM game_goalies goalie JOIN games g ON g.id = goalie.game_id
+      WHERE goalie.goalie_user_id = ${userId}
+        AND goalie.team_id IN (g.home_team_id, g.away_team_id)
+        AND g.is_completed = true AND g.is_scrimmage = false
+        AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+        AND ((goalie.team_id = g.home_team_id AND g.away_score = 0)
+          OR (goalie.team_id = g.away_team_id AND g.home_score = 0))
+      UNION
+      SELECT g.id AS game_id
+      FROM game_attendance ga JOIN games g ON g.id = ga.game_id
+      WHERE ga.user_id = ${userId}
+        AND ga.team_id IN (g.home_team_id, g.away_team_id)
+        AND g.is_completed = true AND g.is_scrimmage = false
+        AND g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+        AND ((ga.team_id = g.home_team_id AND g.away_score = 0)
+          OR (ga.team_id = g.away_team_id AND g.home_score = 0))
+        AND NOT EXISTS (SELECT 1 FROM game_goalies other
+          WHERE other.game_id = g.id AND other.team_id = ga.team_id)
+        AND (
+          EXISTS (SELECT 1 FROM league_memberships lm
+            WHERE lm.user_id = ${userId} AND lm.assigned_team_id = ga.team_id
+              AND lm.is_goalie = true AND lm.status = 'approved')
+          OR EXISTS (SELECT 1 FROM team_memberships tm
+            WHERE tm.user_id = ${userId} AND tm.team_id = ga.team_id
+              AND tm.status = 'approved' AND tm.position ~* 'goalie|goaltender|goalkeeper')
+        )
+    ) shutouts
+  `);
+  return Number(result.rows[0]?.count ?? 0);
+}
+
+// Backfill existing goalie milestones without announcing historic games.
+export async function reconcileCareerShutouts() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "broom"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  const tiers = await db.select().from(badgeTiers)
+    .where(eq(badgeTiers.badgeDefinitionId, definition.id)).orderBy(asc(badgeTiers.threshold));
+  const candidates = await db.execute(sql`
+    SELECT DISTINCT eligible.user_id FROM (
+      SELECT goalie_user_id AS user_id FROM game_goalies
+      UNION SELECT user_id FROM league_memberships WHERE is_goalie = true AND status = 'approved'
+      UNION SELECT user_id FROM team_memberships
+        WHERE status = 'approved' AND position ~* 'goalie|goaltender|goalkeeper'
+    ) eligible JOIN users u ON u.id = eligible.user_id
+  `);
+  for (const candidate of candidates.rows) {
+    const userId = String(candidate.user_id);
+    const count = await getCareerShutoutCount(userId);
+    const reached = reachedTiers(tiers, count);
+    await db.transaction(async (tx) => {
+      for (const tier of reached) {
+        await tx.insert(badgeAwards).values({
+          badgeDefinitionId: definition.id, userId,
+          scopeKey: `global:tier:${tier.tier}`, tier: tier.tier,
+          source: "evaluator", metadata: { value: count },
+        }).onConflictDoNothing();
+      }
+      const awarded = await tx.select({ tier: badgeAwards.tier }).from(badgeAwards).where(and(
+        eq(badgeAwards.badgeDefinitionId, definition.id), eq(badgeAwards.userId, userId),
+      ));
+      const earned = new Set(awarded.map((award) => award.tier));
+      const earnedTiers = tiers.filter((tier) => earned.has(tier.tier)).map((tier) => tier.tier);
+      await tx.insert(badgeProgress).values({
+        badgeDefinitionId: definition.id, userId, scopeKey: "global",
+        progress: count, count, earnedTiers, currentTier: earnedTiers.at(-1) ?? null,
+      }).onConflictDoUpdate({
+        target: [badgeProgress.badgeDefinitionId, badgeProgress.userId, badgeProgress.scopeKey],
+        set: { progress: count, count, earnedTiers,
+          currentTier: earnedTiers.at(-1) ?? null, updatedAt: new Date() },
+      });
+    });
+  }
 }
 
 function seasonScoringGamesQuery(userId: string, seasonId: string) {
@@ -812,9 +967,7 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
     case "calendar_year_beers":
       return getCalendarYearBeerCount(userId, context?.year);
     case "career_shutouts":
-      return Number((await db.select({ count: sql<number>`count(*)::int` })
-        .from(gameGoalies).innerJoin(games, eq(gameGoalies.gameId, games.id))
-        .where(and(eq(gameGoalies.goalieUserId, userId), eq(games.isCompleted, true), eq(gameGoalies.goalsAgainst, 0))))[0]?.count ?? 0);
+      return getCareerShutoutCount(userId);
     case "consecutive_games_played": {
       return getCurrentIronManStreak(userId);
     }
@@ -1060,6 +1213,7 @@ export async function evaluateBadgesForUser(
       if (context?.seasonId) earned.push(...await evaluateSeasonOnFireBadgeForUser(userId, definition, context.seasonId));
       continue;
     }
+    if (definition.triggerKey === "career_shutouts" && !(await isCareerGoalie(userId))) continue;
     const centuryYear = definition.triggerKey === "calendar_year_appearances" ? currentCenturyClubYear() : null;
     const scopeKey = centuryYear === null ? "global" : `year:${centuryYear}`;
     const currentValue = await getMetricValue(userId, definition.triggerKey ?? "", context);
@@ -1156,7 +1310,7 @@ export async function awardManualBadge(input: {
 export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: string) {
   const definitions = await definitionsWithTiers();
   const centuryYear = currentCenturyClubYear();
-  const [awards, progress, goalieMembership, goalieAppearance, beerCount, threeStarPoints, centuryCount, ironManCount, hatTrickSeasonsResult] = await Promise.all([
+  const [awards, progress, goalieMembership, goalieAppearance, goalieTeamMembership, beerCount, threeStarPoints, centuryCount, ironManCount, shutoutCount, hatTrickSeasonsResult] = await Promise.all([
     db.select().from(badgeAwards).where(eq(badgeAwards.userId, userId)).orderBy(desc(badgeAwards.awardedAt)),
     db.select().from(badgeProgress).where(eq(badgeProgress.userId, userId)),
     db.select({ id: leagueMemberships.id }).from(leagueMemberships).where(and(
@@ -1166,10 +1320,16 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     )).limit(1),
     db.select({ gameId: gameGoalies.gameId }).from(gameGoalies)
       .where(eq(gameGoalies.goalieUserId, userId)).limit(1),
+    db.select({ id: teamMemberships.id }).from(teamMemberships).where(and(
+      eq(teamMemberships.userId, userId),
+      eq(teamMemberships.status, "approved"),
+      sql`${teamMemberships.position} ~* 'goalie|goaltender|goalkeeper'`,
+    )).limit(1),
     getCalendarYearBeerCount(userId, centuryYear),
     getCareerThreeStarPoints(userId),
     getCalendarYearAppearances(userId, centuryYear),
     getCurrentIronManStreak(userId),
+    getCareerShutoutCount(userId),
     db.execute(sql`
       SELECT s.id, s.name FROM seasons s
       WHERE s.id IN (
@@ -1190,6 +1350,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     `),
   ]);
   const hatTrickSeasons = hatTrickSeasonsResult.rows.map((row) => ({ id: String(row.id), name: String(row.name) }));
+  const isGoalie = goalieMembership.length > 0 || goalieAppearance.length > 0 || goalieTeamMembership.length > 0;
   if (requestedHatTrickSeasonId && !hatTrickSeasons.some((season) => season.id === requestedHatTrickSeasonId)) {
     throw new Error("Achievement season not available for this player");
   }
@@ -1205,6 +1366,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     const isHatTrickBadge = definition.triggerKey === "season_hat_tricks";
     const isOnFireBadge = definition.triggerKey === "season_scoring_streak";
     const isIronManBadge = definition.triggerKey === "consecutive_games_played";
+    const isShutoutBadge = definition.triggerKey === "career_shutouts";
     const isSeasonBadge = isHatTrickBadge || isOnFireBadge;
     const allDefinitionAwards = awardsByDefinition.get(definition.id) ?? [];
     const legacyAwards = isSeasonBadge || isBeerBadge
@@ -1221,7 +1383,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     const liveTierValue = isBeerBadge ? beerCount
       : definition.triggerKey === "career_three_stars" ? threeStarPoints
       : isCenturyBadge ? centuryCount : isHatTrickBadge ? hatTrickCount : isOnFireBadge ? onFireCount
-      : isIronManBadge ? ironManCount : null;
+      : isIronManBadge ? ironManCount : isShutoutBadge ? shutoutCount : null;
     // Iron Man tiers, once earned, stay earned when a missed game resets the
     // live counter. Other live badges use only their current scoped value.
     const earnedTiers = isIronManBadge
@@ -1254,13 +1416,13 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
     };
   });
   return {
-    isGoalie: goalieMembership.length > 0 || goalieAppearance.length > 0,
+    isGoalie,
     hatTrickSeasons,
     selectedHatTrickSeasonId,
     sections: (["nhl_trophy", "team_badge", "achievement"] as BadgeCategory[]).map((category) => ({
       category,
       label: CATEGORY_LABELS[category],
-      badges: badges.filter((badge) => badge.category === category),
+      badges: badges.filter((badge) => badge.category === category && (badge.slug !== "broom" || isGoalie)),
     })),
   };
 }
@@ -1316,10 +1478,13 @@ export async function getPendingBadgeEvents(userId: string) {
     .orderBy(asc(badgeEarnedEvents.createdAt));
 
   const centuryYear = currentCenturyClubYear();
+  const goalieEligible = events.some((event) => event.definition.triggerKey === "career_shutouts")
+    ? await isCareerGoalie(userId) : false;
   const currentEvents = events.filter((event) =>
-    (event.definition.triggerKey !== "calendar_year_appearances"
+    (event.definition.triggerKey !== "career_shutouts" || goalieEligible)
+    && ((event.definition.triggerKey !== "calendar_year_appearances"
       && event.definition.triggerKey !== "calendar_year_beers")
-    || (event.payload as Record<string, unknown>)?.year === centuryYear);
+    || (event.payload as Record<string, unknown>)?.year === centuryYear));
   const tieredEvents = currentEvents.filter((event) => typeof (event.payload as Record<string, unknown>)?.tier === "string");
   if (!tieredEvents.length) return currentEvents;
 
@@ -1349,9 +1514,15 @@ export async function getPendingBadgeEvents(userId: string) {
   ] as const)));
   const centuryCount = tieredEvents.some((event) => event.definition.triggerKey === "calendar_year_appearances")
     ? await getCalendarYearAppearances(userId, centuryYear) : 0;
+  const shutoutCount = tieredEvents.some((event) => event.definition.triggerKey === "career_shutouts")
+    && goalieEligible ? await getCareerShutoutCount(userId) : 0;
 
   return currentEvents.filter((event) => {
     const payload = event.payload as Record<string, unknown>;
+    if (event.definition.triggerKey === "career_shutouts") {
+      const tier = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`);
+      return !!tier && shutoutCount >= tier.threshold;
+    }
     if (event.definition.triggerKey === "calendar_year_appearances") {
       const tier = tiersByEventKey.get(`${event.definition.id}:${payload.tier}`);
       return !!tier && centuryCount >= tier.threshold;
