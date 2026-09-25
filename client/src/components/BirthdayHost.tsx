@@ -5,9 +5,8 @@ import { X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useDemo } from "@/context/DemoContext";
-import { BadgeConfettiOverlay } from "./BadgeEarnedHost";
-
-type BirthdayStatus = { eligible: boolean; birthdayDate?: string; expiresAt?: string };
+import { BirthdayConfettiOverlay } from "./BirthdayConfettiOverlay";
+import { shouldShowBirthdayGreeting, type BirthdayStatus } from "./birthdayVisibility";
 
 export function BirthdayHost() {
   const { user } = useAuth();
@@ -34,21 +33,34 @@ export function BirthdayHost() {
   });
 
   useEffect(() => {
-    const refreshClock = () => setNow(Date.now());
-    window.addEventListener("focus", refreshClock);
-    document.addEventListener("visibilitychange", refreshClock);
-    const remaining = status?.expiresAt ? Date.parse(status.expiresAt) - Date.now() : 0;
-    const timer = remaining > 0 ? window.setTimeout(refreshClock, remaining + 10) : null;
+    if (!user || demoActive) return;
+    const refreshStatus = () => {
+      setNow(Date.now());
+      void queryClient.invalidateQueries({ queryKey: ["/api/birthday/status", user.id], exact: true });
+    };
+    const refreshOnVisible = () => {
+      if (!document.hidden) refreshStatus();
+    };
+    window.addEventListener("focus", refreshStatus);
+    window.addEventListener("pageshow", refreshStatus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
     return () => {
-      window.removeEventListener("focus", refreshClock);
-      document.removeEventListener("visibilitychange", refreshClock);
+      window.removeEventListener("focus", refreshStatus);
+      window.removeEventListener("pageshow", refreshStatus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+    };
+  }, [user?.id, demoActive, queryClient]);
+
+  useEffect(() => {
+    const remaining = status?.expiresAt ? Date.parse(status.expiresAt) - Date.now() : 0;
+    const timer = remaining > 0 ? window.setTimeout(() => setNow(Date.now()), remaining + 10) : null;
+    return () => {
       if (timer !== null) window.clearTimeout(timer);
     };
   }, [status?.expiresAt]);
 
-  const open = !!user && !demoActive && !!status?.eligible
-    && !!status.expiresAt && now < Date.parse(status.expiresAt)
-    && (pendingBadges?.length === 0 || badgeCheckFailed);
+  const open = !!user && !demoActive
+    && shouldShowBirthdayGreeting(status, now, badgeCheckFailed ? [] : pendingBadges);
   async function dismiss() {
     if (dismissing) return;
     setDismissing(true);
@@ -97,7 +109,7 @@ export function BirthdayHost() {
           >Thank you!</button>
           {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
         </Dialog.Content>
-        {open && <div className="pointer-events-none fixed inset-0 z-[10003]" aria-hidden="true"><BadgeConfettiOverlay /></div>}
+        {open && <BirthdayConfettiOverlay />}
       </Dialog.Portal>
     </Dialog.Root>
   );
