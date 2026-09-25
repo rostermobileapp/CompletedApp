@@ -111,7 +111,6 @@ export function Current() {
               aria-label="Close birthday greeting"
               className="absolute right-3 top-3 rounded-full p-2 text-[#597087] hover:bg-[#e8f0f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#164a73]"
             ><X size={20} /></button>
-            <p className="mt-5 text-xs font-bold uppercase tracking-[.24em] text-[#d52d3b]">From Roster Hockey</p>
             <Dialog.Title className="mt-5 text-3xl font-bold tracking-tight text-[#173d5b] sm:text-4xl">
               Happy Birthday!
             </Dialog.Title>
