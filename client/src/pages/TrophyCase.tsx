@@ -32,8 +32,7 @@ const ACHIEVEMENT_SECTIONS = [
   { key: "hat_trick", label: "Hat Trick", description: "One game with 3 or more goals counts as one hat trick. Progress resets each season.", slug: "hat_trick" },
   { key: "on_fire", label: "On Fire", description: "Longest goal-scoring streak this season. Progress resets each season.", slug: "on_fire" },
   { key: "iron_man", label: "Iron Man", description: "Games only. Miss one and your current streak resets; seasons and years do not reset it. Earned tiers stay earned.", slug: "iron_man" },
-  { key: "early_bird", label: "Early Bird", description: "RSVP Yes at least 48 hours before every eligible game. A new season starts fresh.", slug: "early_bird" },
-  { key: "one_time", label: "One Time Badges", description: "Permanent and repeatable achievements.", types: ["onetime", "multiplier"] },
+  { key: "one_time", label: "Unique Badges", description: "Individual achievements, including season-specific awards.", types: ["onetime", "multiplier"] },
   { key: "shutouts", label: "Locked In", description: "Goalie-only lifetime shutouts. Progress never resets by season or year.", slug: "broom", goalieOnly: true },
 ] as const;
 
@@ -216,7 +215,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
               )}
               {ACHIEVEMENT_SECTIONS.filter((group) => !("goalieOnly" in group) || !group.goalieOnly || data.isGoalie).map((group) => {
                 const achievementBadges = data.sections.find((section) => section.category === "achievement")?.badges ?? [];
-                const badges = "slug" in group ? achievementBadges.filter((badge) => badge.slug === group.slug) : achievementBadges.filter((badge) => badge.slug !== "early_bird" && group.types.includes(badge.achievementType as typeof group.types[number]));
+                const badges = "slug" in group ? achievementBadges.filter((badge) => badge.slug === group.slug) : achievementBadges.filter((badge) => group.types.includes(badge.achievementType as typeof group.types[number]));
                 return <AchievementSection key={group.key} label={group.label} description={group.description} badges={badges} onSelect={selectBadge} preview={preview} />;
               })}
               {preview && (() => {
