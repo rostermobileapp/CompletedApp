@@ -8,6 +8,7 @@ import {
   gameAttendance,
   gameGoals,
   gameGoalies,
+  gamePenalties,
   gameStars,
   gameRsvps,
   games,
@@ -1056,6 +1057,20 @@ async function getMetricValue(userId: string, triggerKey: string, context?: { se
     { current: 0, longest: 0 },
   ).longest;
   switch (triggerKey) {
+    case "first_game_logged": {
+      const result = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT 1 FROM games g WHERE g.is_completed = true AND (
+            EXISTS (SELECT 1 FROM game_attendance ga WHERE ga.game_id = g.id AND ga.user_id = ${userId})
+            OR EXISTS (SELECT 1 FROM game_goalies goalie WHERE goalie.game_id = g.id AND goalie.goalie_user_id = ${userId})
+            OR EXISTS (SELECT 1 FROM game_goals goal WHERE goal.game_id = g.id AND
+              (goal.scorer_id = ${userId} OR goal.primary_assist_id = ${userId} OR goal.secondary_assist_id = ${userId}))
+            OR EXISTS (SELECT 1 FROM game_penalties penalty WHERE penalty.game_id = g.id AND penalty.player_id = ${userId})
+          )
+        ) AS played
+      `);
+      return result.rows[0]?.played === true ? 1 : 0;
+    }
     case "career_games_played": {
       const rows = await db.select({ count: sql<number>`count(*)::int` })
         .from(gameAttendance).innerJoin(games, eq(gameAttendance.gameId, games.id))
@@ -1392,12 +1407,41 @@ export async function evaluateBadgesForUser(
       if (!existing.length) {
         const [award] = await db.insert(badgeAwards).values({
           badgeDefinitionId: definition.id, userId, scopeKey, count: 1, source: "evaluator",
-        }).returning();
-        earned.push(await emitEarnedEvent(userId, award.id, definition, { count: 1, awardId: award.id }));
+        }).onConflictDoNothing().returning();
+        if (award) earned.push(await emitEarnedEvent(userId, award.id, definition, {
+          count: 1, awardId: award.id, imagePath: definition.imagePath,
+        }));
       }
     }
   }
   return earned;
+}
+
+// Historical participants receive their one-time award without an old game
+// triggering a new earned announcement at startup.
+export async function reconcileRookieCard() {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "rookie_card"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return;
+  await db.execute(sql`
+    INSERT INTO badge_awards (badge_definition_id, user_id, scope_key, count, source)
+    SELECT ${definition.id}, participant.user_id, 'global', 1, 'evaluator'
+    FROM (
+      SELECT ga.user_id FROM game_attendance ga JOIN games g ON g.id = ga.game_id
+        WHERE g.is_completed = true AND ga.user_id IS NOT NULL
+      UNION SELECT goalie.goalie_user_id FROM game_goalies goalie JOIN games g ON g.id = goalie.game_id
+        WHERE g.is_completed = true AND goalie.goalie_user_id IS NOT NULL
+      UNION SELECT goal.scorer_id FROM game_goals goal JOIN games g ON g.id = goal.game_id
+        WHERE g.is_completed = true AND goal.scorer_id IS NOT NULL
+      UNION SELECT goal.primary_assist_id FROM game_goals goal JOIN games g ON g.id = goal.game_id
+        WHERE g.is_completed = true AND goal.primary_assist_id IS NOT NULL
+      UNION SELECT goal.secondary_assist_id FROM game_goals goal JOIN games g ON g.id = goal.game_id
+        WHERE g.is_completed = true AND goal.secondary_assist_id IS NOT NULL
+      UNION SELECT penalty.player_id FROM game_penalties penalty JOIN games g ON g.id = penalty.game_id
+        WHERE g.is_completed = true AND penalty.player_id IS NOT NULL
+    ) participant JOIN users u ON u.id = participant.user_id
+    ON CONFLICT (badge_definition_id, user_id, scope_key) DO NOTHING
+  `);
 }
 
 export async function awardManualBadge(input: {

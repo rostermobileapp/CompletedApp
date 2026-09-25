@@ -12891,10 +12891,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ]);
         rosterUserIds = Array.from(new Set([...homeMembers, ...awayMembers].map((member) => member.userId)));
       }
+      // Attendance may already be stored when finalization omits attendees;
+      // goalies and event-only players may not be on the current roster.
+      const participants = await db.execute(sql`
+        SELECT user_id FROM game_attendance WHERE game_id = ${gameId} AND user_id IS NOT NULL
+        UNION SELECT goalie_user_id FROM game_goalies WHERE game_id = ${gameId}
+        UNION SELECT scorer_id FROM game_goals WHERE game_id = ${gameId} AND scorer_id IS NOT NULL
+        UNION SELECT primary_assist_id FROM game_goals WHERE game_id = ${gameId} AND primary_assist_id IS NOT NULL
+        UNION SELECT secondary_assist_id FROM game_goals WHERE game_id = ${gameId} AND secondary_assist_id IS NOT NULL
+        UNION SELECT player_id FROM game_penalties WHERE game_id = ${gameId} AND player_id IS NOT NULL
+      `);
       const evaluatedUserIds = Array.from(new Set([
         ...rosterUserIds,
-        ...normalizedAttendance.flatMap((attendee) => attendee.userId ? [attendee.userId] : []),
-        ...result.scorerIds,
+        ...participants.rows.map((row) => String(row.user_id)),
       ]));
       for (const evaluatedUserId of evaluatedUserIds) {
         void evaluateBadgesForUser(evaluatedUserId, {
