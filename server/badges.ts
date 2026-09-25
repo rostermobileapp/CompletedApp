@@ -195,7 +195,7 @@ DEFAULT_BADGES.push(
   { ...achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }), imagePath: "/badges/league-hopper/patch.webp" },
   { ...achievement("early_bird", "Early Bird", "RSVP Yes at least 48 hours before every eligible game in a completed season. Resets each season.", "onetime", "metric", "season_48hr_rsvp_perfect"), imagePath: "/badges/early-bird/patch.webp" },
   { ...achievement("ghost", "Ghost", "Marked Out for 3 or more games in a row.", "onetime", "metric", "consecutive_games_out", { threshold: 3 }), imagePath: "/badges/ghost/patch.webp" },
-  { ...achievement("sub_magnet", "Sub Magnet", "Had the most subs fill in for you across a season.", "onetime", "event", "season_most_subs_winner"), imagePath: "/badges/sub-magnet/patch.webp" },
+  { ...achievement("sub_magnet", "Sub Magnet", "The most No RSVPs in a league season. Tied players all earn the patch.", "onetime", "event", "season_most_no_rsvps_winner"), imagePath: "/badges/sub-magnet/patch.webp" },
 );
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {
@@ -305,7 +305,12 @@ export async function ensureDefaultBadges() {
           triggerKey: badge.triggerKey, imagePath: badge.imagePath,
         }).where(eq(badgeDefinitions.id, existing.id));
       }
-      if (badge.slug === "ghost" || badge.slug === "league_hopper" || badge.slug === "rookie_card" || badge.slug === "sub_magnet") {
+      if (badge.slug === "sub_magnet") {
+        await db.update(badgeDefinitions).set({
+          description: badge.description, triggerKey: badge.triggerKey, imagePath: badge.imagePath,
+        }).where(eq(badgeDefinitions.id, existing.id));
+      }
+      if (badge.slug === "ghost" || badge.slug === "league_hopper" || badge.slug === "rookie_card") {
         await db.update(badgeDefinitions).set({ imagePath: badge.imagePath })
           .where(eq(badgeDefinitions.id, existing.id));
       }
@@ -1442,6 +1447,49 @@ export async function reconcileRookieCard() {
     ) participant JOIN users u ON u.id = participant.user_id
     ON CONFLICT (badge_definition_id, user_id, scope_key) DO NOTHING
   `);
+}
+
+// Count each user's final "No" RSVP once per league game (even if they had
+// RSVPs for both teams). A season must be over and have at least one "No";
+// all players tied for the highest count receive a season-scoped award.
+// Startup backfills old seasons silently; live runs announce new winners.
+export async function reconcileSeasonSubMagnet(announce = false, seasonId?: string) {
+  const [definition] = await db.select().from(badgeDefinitions)
+    .where(and(eq(badgeDefinitions.slug, "sub_magnet"), eq(badgeDefinitions.status, "published"))).limit(1);
+  if (!definition) return 0;
+  const inserted = await db.execute(sql`
+    WITH counts AS (
+      SELECT s.id AS season_id, s.league_id, r.user_id,
+        COUNT(DISTINCT g.id)::int AS no_count
+      FROM seasons s JOIN leagues l ON l.id = s.league_id
+        JOIN games g ON g.season_id = s.id AND g.league_id = s.league_id
+        JOIN game_rsvps r ON r.game_id = g.id
+        JOIN users u ON u.id = r.user_id
+      WHERE r.status = 'not_attending' AND g.is_scrimmage = false
+        AND g.scheduled_at <= (NOW() AT TIME ZONE COALESCE(l.timezone, 'America/New_York'))
+        AND (s.is_active = false OR (s.end_date IS NOT NULL AND s.end_date <= NOW()))
+        ${seasonId ? sql`AND s.id = ${seasonId}` : sql``}
+      GROUP BY s.id, s.league_id, r.user_id
+    ), ranked AS (
+      SELECT *, MAX(no_count) OVER (PARTITION BY season_id) AS top_count FROM counts
+    )
+    INSERT INTO badge_awards (badge_definition_id, user_id, league_id, season_id, scope_key, count, source, metadata)
+    SELECT ${definition.id}, user_id, league_id, season_id,
+      'season:' || season_id, 1, 'evaluator', jsonb_build_object('noRsvps', no_count)
+    FROM ranked WHERE no_count = top_count AND no_count > 0
+    ON CONFLICT (badge_definition_id, user_id, scope_key) DO NOTHING
+    RETURNING id, user_id, season_id, metadata
+  `);
+  if (announce) {
+    for (const row of inserted.rows) {
+      await emitEarnedEvent(String(row.user_id), String(row.id), definition, {
+        awardId: String(row.id), seasonId: String(row.season_id),
+        count: Number((row.metadata as { noRsvps?: number })?.noRsvps ?? 0),
+        imagePath: definition.imagePath,
+      });
+    }
+  }
+  return inserted.rows.length;
 }
 
 export async function awardManualBadge(input: {

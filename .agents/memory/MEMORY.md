@@ -44,4 +44,5 @@
 - [Iron Man game streak](iron-man-game-streak.md) — current consecutive played games cross season/year boundaries; a missed game resets progress, not earned tiers.
 - [Locked In goalie shutouts](locked-in-goalie-shutouts.md) — goalie-only lifetime shutouts use final game scores; patch labels Platinum at 10 and Emerald at 25 override older tier names.
 - [Early Bird season eligibility](early-bird-season-eligibility.md) — award after the season ends, using the full eligible game schedule and league-local 48-hour deadlines; past awards do not unlock a new season.
+- [Sub Magnet season winners](sub-magnet-season-winners.md) — finalize No-RSVP leaders only after season end; ties share the award and historical winners are seeded silently.
 - [Badge integration test isolation](badge-integration-test-isolation.md) — run database-backed badge integration tests serially when startup reconcilers scan all users.

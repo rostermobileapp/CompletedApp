@@ -127,6 +127,7 @@ import {
   getBadgeCatalog,
   getPendingBadgeEvents,
   reconcileCalendarYearBeerMe,
+  reconcileSeasonSubMagnet,
   getTrophyCaseAccess,
   getTrophyCase,
   getTrophyCasePreview,
@@ -7182,6 +7183,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return created;
       });
 
+      if (closeCurrentSeasonId) {
+        try {
+          await reconcileSeasonSubMagnet(true, closeCurrentSeasonId);
+        } catch (error) {
+          // The season transition has committed; the periodic job will retry.
+          console.error("[Badges] Could not award Sub Magnet after season close:", error);
+        }
+      }
       res.json({ season: newSeason });
     } catch (error) {
       console.error("Error transitioning season:", error);

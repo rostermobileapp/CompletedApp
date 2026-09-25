@@ -8,6 +8,7 @@ import { initReferralDb } from "./referralDbInit";
 import { initDraftDb } from "./draftDbInit";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
+import { reconcileSeasonSubMagnet } from "./badges";
 
 const app = express();
 
@@ -85,6 +86,11 @@ app.use((req, res, next) => {
 
   const server = await registerRoutes(app);
   startBeerBadgeEvaluationWorker();
+  // An end date can pass without a commissioner explicitly closing the season.
+  setInterval(() => {
+    reconcileSeasonSubMagnet(true).catch((error) =>
+      console.error("[Badges] Sub Magnet season reconciliation failed:", error));
+  }, 60 * 60 * 1000).unref();
 
   // Pre-warm the city geo cache from existing DB records so the first heatmap
   // request after a cold restart requires no external geocoding API calls.
