@@ -118,11 +118,13 @@ export function Current() {
             <Dialog.Description className="mt-4 text-base text-[#597087]">
               Roster Hockey wishes you a fantastic day.
             </Dialog.Description>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="mt-8 w-full rounded-lg bg-[#164a73] px-4 py-3 text-sm font-bold text-white hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]"
-            >Thank you!</button>
+            <div className="mt-8 flex items-center justify-center" aria-label="Roster Hockey">
+              <img
+                src="/__mockup/images/birthday-popup-roster-logo.png"
+                alt="Roster Hockey"
+                className="h-auto w-[12.5rem] max-w-[78%] object-contain"
+              />
+            </div>
           </Dialog.Content>
           {open && <div key={playCount} className="pointer-events-none fixed inset-0 z-[10003]" aria-hidden="true"><BadgeConfettiOverlay /></div>}
         </Dialog.Portal>
