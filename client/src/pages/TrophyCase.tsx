@@ -27,7 +27,7 @@ type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21" 
 
 const ACHIEVEMENT_SECTIONS = [
   { key: "three_stars", label: "3 Stars", description: "First star: 3 points · second: 2 · third: 1. Every point counts toward your tiers.", slug: "three_stars" },
-  { key: "beer_me", label: "Beer Me", description: "Post-game dedication.", slug: "beer_me" },
+  { key: "beer_me", label: "Beer Me", description: "Beer count and tier progress reset every January 1.", slug: "beer_me" },
   { key: "century_club", label: "Century Club", description: "Games and scrimmages played this calendar year. Resets January 1.", slug: "century_club" },
   { key: "hat_trick", label: "Hat Trick", description: "One game with 3 or more goals counts as one hat trick. Progress resets each season.", slug: "hat_trick" },
   { key: "on_fire", label: "Hot Streak", description: "Build a multi-game scoring streak.", slug: "on_fire" },
@@ -114,7 +114,9 @@ function AchievementSection({ label, description, badges, onSelect, preview = fa
   const isTiered = badges.some((badge) => badge.achievementType === "tiered");
   const spotCount = isTiered ? badges.reduce((total, badge) => total + (badge.achievementType === "tiered" ? badge.tiers.length : 1), 0) : badges.length;
   const fiveStars = badges.length === 1 && (badges[0].slug === "three_stars" || badges[0].slug === "century_club");
-  const legacyAwards = badges.find((badge) => badge.slug === "hat_trick")?.legacyAwards ?? [];
+  const legacyBadge = badges.find((badge) =>
+    (badge.slug === "hat_trick" || badge.slug === "beer_me") && badge.legacyAwards?.length);
+  const legacyAwards = legacyBadge?.legacyAwards ?? [];
   return (
     <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5">
       <SectionHeading label={label} description={description} count={spotCount} />
@@ -125,8 +127,8 @@ function AchievementSection({ label, description, badges, onSelect, preview = fa
       </div>
       {legacyAwards.length > 0 && (
         <p className="mt-3 text-xs text-[#597087]">
-          Earlier career Hat Trick awards: {legacyAwards.map((award) => award.tier ? formatTier(award.tier) : "Badge").join(", ")}.
-          These remain in your history but do not count toward a season’s progress.
+          Earlier {legacyBadge?.name} awards: {legacyAwards.map((award) => award.tier ? formatTier(award.tier) : "Badge").join(", ")}.
+          These remain in your history but do not count toward {legacyBadge?.slug === "beer_me" ? "this year’s" : "the selected season’s"} progress.
         </p>
       )}
     </section>

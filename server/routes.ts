@@ -126,6 +126,7 @@ import {
   evaluateBadgesForUser,
   getBadgeCatalog,
   getPendingBadgeEvents,
+  reconcileCalendarYearBeerMe,
   getTrophyCaseAccess,
   getTrophyCase,
   getTrophyCasePreview,
@@ -1667,6 +1668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Init] Failed to ensure game_beer_counts table:', err);
   }
   await ensureBeerBadgeEvaluationQueue();
+  await reconcileCalendarYearBeerMe();
 
   // Lightweight endpoint for the client-side ErrorBoundary to report rendering
   // crashes so we can debug what's failing in production / on user devices.
@@ -12605,7 +12607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { gameId } = req.params;
       const userId = req.user.claims.sub;
-      const [badgeGame] = await db.select({ leagueId: games.leagueId, seasonId: games.seasonId })
+      const [badgeGame] = await db.select({ leagueId: games.leagueId, seasonId: games.seasonId, scheduledAt: games.scheduledAt })
         .from(games).where(eq(games.id, gameId)).limit(1);
       if (!badgeGame) {
         return res.status(404).json({ message: 'Game not found' });
@@ -12622,6 +12624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await evaluateBadgesForUser(userId, {
           leagueId: badgeGame.leagueId,
           seasonId: badgeGame.seasonId,
+          year: Number(badgeGame.scheduledAt.slice(0, 4)),
         });
       } catch (error) {
         console.error('[Badges] Beer evaluation failed:', error);
@@ -12895,6 +12898,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         void evaluateBadgesForUser(evaluatedUserId, {
           leagueId: result.game.leagueId,
           seasonId: result.game.seasonId,
+          year: Number(result.game.scheduledAt.slice(0, 4)),
         }).catch((error) => console.error('[Badges] Finalization evaluation failed:', error));
       }
       res.json({ 

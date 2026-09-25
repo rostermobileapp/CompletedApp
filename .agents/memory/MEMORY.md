@@ -33,8 +33,8 @@
 - [Trophy Case depth direction](trophy-case-depth-direction.md) — inset shadows alone were rejected as low-quality; use nested rims, distinct surface planes, and consistent lighting for depth.
 - [Badge announcement presentation](badge-announcement-presentation.md) — keep the modal over the current screen and carry each earned tier’s own artwork through live and pending events.
 - [Confetti video transparency](badge-confetti-transparency.md) — black-background video needs real alpha; screen blending over a blurred modal can darken the whole screen.
-- [Direct SQL badge updates](beer-count-badge-queue.md) — capture direct beer-count edits in a transactional queue; app workers run the existing evaluator and announcement flow.
-- [Beer badge threshold eligibility](beer-badge-threshold-eligibility.md) — Beer Me tiers follow the current seasonal count, not stale award history; corrected counts can re-arm a tier.
+- [Direct SQL badge updates](beer-count-badge-queue.md) — capture direct beer-count edits in a transactional queue by game year; app workers run the evaluator.
+- [Beer badge threshold eligibility](beer-badge-threshold-eligibility.md) — Beer Me resets January 1; tiers follow the current year's count, not stale award history.
 - [3 Stars badge points](three-stars-badge-points.md) — career badge tiers use weighted leaderboard points, not nomination count; backfill old eligibility without replaying announcements.
 - [Century Club calendar-year attendance](century-club-calendar-year.md) — count confirmed games and past approved scrimmages by event year; reset tiers annually, not by season.
 - [Birthday push idempotency](birthday-push-idempotency.md) — OneSignal retains retry keys for only 30 days; annual once-only delivery also requires persistent per-user birthday state.

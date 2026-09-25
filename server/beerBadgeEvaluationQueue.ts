@@ -26,19 +26,32 @@ export async function ensureBeerBadgeEvaluationQueue() {
     ON beer_badge_evaluation_queue(available_at, requested_at)
   `);
   await db.execute(sql`
-    CREATE OR REPLACE FUNCTION enqueue_beer_badge_evaluation(p_user_id varchar, p_game_id varchar)
+    CREATE OR REPLACE FUNCTION enqueue_beer_badge_evaluation_year(p_user_id varchar, p_year integer)
     RETURNS void
     LANGUAGE plpgsql
     AS $$
     BEGIN
       INSERT INTO beer_badge_evaluation_queue (user_id, season_id)
-      SELECT p_user_id, COALESCE(g.season_id, '')
-      FROM games g
-      WHERE g.id = p_game_id
+      VALUES (p_user_id, 'year:' || p_year::text)
       ON CONFLICT (user_id, season_id) DO UPDATE
       SET version = beer_badge_evaluation_queue.version + 1,
           requested_at = NOW(),
           available_at = NOW();
+    END;
+    $$
+  `);
+  await db.execute(sql`
+    CREATE OR REPLACE FUNCTION enqueue_beer_badge_evaluation(p_user_id varchar, p_game_id varchar)
+    RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE game_year integer;
+    BEGIN
+      SELECT EXTRACT(YEAR FROM g.scheduled_at)::int INTO game_year
+      FROM games g WHERE g.id = p_game_id;
+      IF game_year IS NOT NULL THEN
+        PERFORM enqueue_beer_badge_evaluation_year(p_user_id, game_year);
+      END IF;
     END;
     $$
   `);
@@ -79,10 +92,44 @@ export async function ensureBeerBadgeEvaluationQueue() {
     FOR EACH ROW
     EXECUTE FUNCTION queue_beer_badge_evaluation_for_count_change()
   `);
+  await db.execute(sql`
+    CREATE OR REPLACE FUNCTION queue_beer_badge_evaluation_for_game_change()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE affected_user record;
+    BEGIN
+      IF TG_OP = 'UPDATE'
+        AND EXTRACT(YEAR FROM OLD.scheduled_at) = EXTRACT(YEAR FROM NEW.scheduled_at) THEN
+        RETURN NEW;
+      END IF;
+      -- BEFORE DELETE retains the game and its beer rows, even if the
+      -- game_beer_counts rows subsequently disappear through cascade.
+      FOR affected_user IN
+        SELECT DISTINCT user_id FROM game_beer_counts WHERE game_id = OLD.id
+      LOOP
+        PERFORM enqueue_beer_badge_evaluation_year(
+          affected_user.user_id, EXTRACT(YEAR FROM OLD.scheduled_at)::int);
+        IF TG_OP = 'UPDATE' THEN
+          PERFORM enqueue_beer_badge_evaluation_year(
+            affected_user.user_id, EXTRACT(YEAR FROM NEW.scheduled_at)::int);
+        END IF;
+      END LOOP;
+      IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+      RETURN NEW;
+    END;
+    $$
+  `);
+  await db.execute(sql`DROP TRIGGER IF EXISTS games_beer_badge_evaluation ON games`);
+  await db.execute(sql`
+    CREATE TRIGGER games_beer_badge_evaluation
+    BEFORE UPDATE OF scheduled_at OR DELETE ON games
+    FOR EACH ROW EXECUTE FUNCTION queue_beer_badge_evaluation_for_game_change()
+  `);
   console.log("[Badges] Beer count changes now queue badge evaluation");
 }
 
-async function processPendingEvaluations() {
+export async function processPendingBeerBadgeEvaluations(forUserId?: string) {
   if (processing) return;
   processing = true;
 
@@ -92,8 +139,9 @@ async function processPendingEvaluations() {
         SELECT user_id, season_id, version
         FROM beer_badge_evaluation_queue
         WHERE version > processed_version
-          AND requested_at <= NOW() - INTERVAL '1 second'
-          AND available_at <= NOW()
+          ${forUserId ? sql`AND user_id = ${forUserId}` : sql``}
+          ${forUserId ? sql`` : sql`AND requested_at <= NOW() - INTERVAL '1 second'
+          AND available_at <= NOW()`}
           AND (claimed_at IS NULL OR claimed_at < NOW() - INTERVAL '2 minutes')
         ORDER BY requested_at
         FOR UPDATE SKIP LOCKED
@@ -118,7 +166,17 @@ async function processPendingEvaluations() {
     for (const job of jobs) {
       const version = Number(job.claimed_version);
       try {
-        await evaluateBadgesForUser(job.user_id, { seasonId: job.season_id || null });
+        const annualKey = /^year:(\d{4})$/.exec(job.season_id);
+        const years = annualKey
+          ? [Number(annualKey[1])]
+          : (await db.execute(sql`
+              SELECT DISTINCT EXTRACT(YEAR FROM scheduled_at)::int AS year
+              FROM games
+              WHERE ${job.season_id === "" ? sql`season_id IS NULL` : sql`season_id = ${job.season_id}`}
+            `)).rows.map((row) => Number(row.year));
+        for (const year of years) {
+          await evaluateBadgesForUser(job.user_id, { year }, "calendar_year_beers");
+        }
         await db.execute(sql`
           UPDATE beer_badge_evaluation_queue
           SET processed_version = GREATEST(processed_version, ${version}),
@@ -152,7 +210,7 @@ async function processPendingEvaluations() {
 export function startBeerBadgeEvaluationWorker() {
   if (pollTimer) return;
   pollTimer = setInterval(() => {
-    void processPendingEvaluations();
+    void processPendingBeerBadgeEvaluations();
   }, POLL_INTERVAL_MS);
-  void processPendingEvaluations();
+  void processPendingBeerBadgeEvaluations();
 }
