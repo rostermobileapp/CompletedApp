@@ -191,7 +191,7 @@ DEFAULT_BADGES.push(
   achievement("team_player", "Team Player", "Filled a sub spot for another team.", "multiplier", "metric", "career_sub_appearances"),
   achievement("rookie_card", "Rookie Card", "Your first game ever logged on Roster.", "onetime", "event", "first_game_logged"),
   achievement("sub", "Sub", "First time subbing in for another player.", "onetime", "event", "first_sub_appearance"),
-  achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }),
+  { ...achievement("league_hopper", "League Hopper", "Played in 3 or more different leagues.", "onetime", "metric", "career_leagues_played", { threshold: 3 }), imagePath: "/badges/league-hopper/patch.webp" },
   { ...achievement("early_bird", "Early Bird", "RSVP Yes at least 48 hours before every eligible game in a completed season. Resets each season.", "onetime", "metric", "season_48hr_rsvp_perfect"), imagePath: "/badges/early-bird/patch.webp" },
   { ...achievement("ghost", "Ghost", "Marked Out for 3 or more games in a row.", "onetime", "metric", "consecutive_games_out", { threshold: 3 }), imagePath: "/badges/ghost/patch.webp" },
   achievement("sub_magnet", "Sub Magnet", "Had the most subs fill in for you across a season.", "onetime", "event", "season_most_subs_winner"),
@@ -304,7 +304,7 @@ export async function ensureDefaultBadges() {
           triggerKey: badge.triggerKey, imagePath: badge.imagePath,
         }).where(eq(badgeDefinitions.id, existing.id));
       }
-      if (badge.slug === "ghost") {
+      if (badge.slug === "ghost" || badge.slug === "league_hopper") {
         await db.update(badgeDefinitions).set({ imagePath: badge.imagePath })
           .where(eq(badgeDefinitions.id, existing.id));
       }
