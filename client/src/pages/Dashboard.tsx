@@ -3051,7 +3051,7 @@ function DashboardMobile() {
               <div className="min-w-0 min-h-[72px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-0.5">
-                    <Bell className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 text-[#212121] dark:text-white" />
+                    <Bell className="w-[35px] h-[35px] sm:w-[38px] sm:h-[38px] shrink-0 text-[#212121] dark:text-white" />
                     <div className="flex items-center justify-center gap-1">
                       <span className="font-medium text-xs sm:text-sm text-[#212121] dark:text-white">Alerts</span>
                       <div className="w-5 h-5 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
@@ -3064,7 +3064,7 @@ function DashboardMobile() {
                     className="w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     data-testid="button-needs-attention-permanent"
                   >
-                    <Bell className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 text-[#212121] dark:text-white" />
+                    <Bell className="w-[35px] h-[35px] sm:w-[38px] sm:h-[38px] shrink-0 text-[#212121] dark:text-white" />
                     <span className="flex items-center justify-center gap-1">
                       <span className="font-medium text-xs sm:text-sm text-[#212121] dark:text-white">Alerts</span>
                       <span className="min-w-5 h-5 px-1 bg-red-500 rounded-full flex items-center justify-center">
