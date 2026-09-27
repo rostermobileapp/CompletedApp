@@ -362,12 +362,9 @@
   body {
     margin: 0;
     padding: 0;
-    /* Mirror touch-action so the scroll-hit-test reaches the compositor
-       layer, bypassing the main thread entirely during a pan gesture. */
+    /* Leave vertical pans to native scrolling without promoting the entire
+       document to a persistent compositor layer. */
     touch-action: pan-y;
-    /* Hint to the browser that the body contents will be scrolled.
-       Promotes the layer stack to GPU compositing up-front. */
-    will-change: scroll-position;
   }
 
   html::-webkit-scrollbar,
@@ -388,17 +385,36 @@
     scrollbar-width: none;
   }
 
-  /* Native-feel vertical scroll for explicitly vertical-only scroll containers.
-     Scoped to overflow-y-auto only — overflow-auto and overflow-scroll can scroll
-     in both axes and must not have pan-y forced on them (breaks horizontal scroll).
-     - touch-action: pan-y          → browser handles vertical touch without waiting for JS
-     - overscroll-behavior-y: contain → prevents scroll chaining to the window
-     - will-change: scroll-position  → compositor hint; promotes to GPU layer so the
-                                       scroll happens off the main thread at full frame rate */
+  /* Native vertical scroll for vertical-only containers. Do not promote every
+     scroll area to its own layer; that exhausts the mobile compositing budget. */
   .overflow-y-auto {
     touch-action: pan-y;
     overscroll-behavior-y: contain;
-    will-change: scroll-position;
+  }
+
+  /* Only the two screens involved in a tab change animate. Inactive screens
+     stay mounted with their scroll geometry intact, but do not paint. */
+  @keyframes main-screen-enter-forward {
+    from { transform: translate3d(100%, 0, 0); }
+    to { transform: translate3d(0, 0, 0); }
+  }
+  @keyframes main-screen-exit-forward {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(-100%, 0, 0); }
+  }
+  @keyframes main-screen-enter-backward {
+    from { transform: translate3d(-100%, 0, 0); }
+    to { transform: translate3d(0, 0, 0); }
+  }
+  @keyframes main-screen-exit-backward {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(100%, 0, 0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .swipeable-screen {
+      animation-duration: 0.01ms !important;
+    }
   }
 
   .overflow-y-auto::-webkit-scrollbar,
@@ -593,16 +609,9 @@
    in the cascade when needed. */
 .elev-rest {
   box-shadow: var(--elev-rest);
-  /* Promote to own GPU compositor layer so box-shadow doesn't trigger a
-     full repaint of the parent layer as the user scrolls past these cards.
-     backface-visibility: hidden is a complementary hint for WebKit. */
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 .elev-lift {
   box-shadow: var(--elev-lift);
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 .elev-inset {
   box-shadow: var(--elev-inset);

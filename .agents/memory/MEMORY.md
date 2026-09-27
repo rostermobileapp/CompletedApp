@@ -16,7 +16,8 @@
 - [Scrimmage invite delivery leases](scrimmage-invite-delivery-leases.md) — mark sent only after full delivery; use owner-token heartbeats and revalidate before every side effect.
 - [Scrimmage change recipients](scrimmage-change-recipients.md) — notify delivered invitees plus approved players; persisted invite notifications preserve group recipients.
 - [Scrimmage backup promotion](scrimmage-backup-promotion.md) — all join modes use ranked backups; vacancies atomically promote position 1 without another acceptance.
-- [Card dropdown stacking](card-dropdown-stacking.md) — elevated cards use transforms that isolate z-index; menus overlapping sibling cards must render through a body portal.
+- [Card dropdown stacking](card-dropdown-stacking.md) — ancestor stacking contexts can cover local menus; use a body portal for menus that overlap sibling cards.
+- [Mobile scroll layer budget](mobile-scroll-layer-budget.md) — keep inactive tab scroll geometry intact and animate only the two visible endpoints; avoid blanket layer promotion.
 - [Scrimmage co-host authority](scrimmage-cohost-authority.md) — co-host status grants full detail editing; granular flags govern player, reminder, and payment operations.
 - [Stats game context](mobile-game-selector.md) — Stats Management must expose league/season selectors and query games by explicit season assignment.
 - [Completed-game stat backfill](completed-game-stat-backfill.md) — preserve recorded scores while adding missing goal details; only newly submitted events may increment player totals.

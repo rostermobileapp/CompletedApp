@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, memo, useMemo, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -11,14 +11,6 @@ import Profile from '@/pages/Profile';
 type ScreenId = 'teams' | 'messages' | 'home' | 'payments' | 'profile';
 
 const SCREEN_ORDER: ScreenId[] = ['teams', 'messages', 'home', 'payments', 'profile'];
-
-const SCREEN_ROUTES: Record<ScreenId, string> = {
-  teams: '/teams',
-  messages: '/messages',
-  home: '/',
-  payments: '/payment-requests',
-  profile: '/profile',
-};
 
 function getScreenFromPath(path: string): ScreenId | null {
   if (path === '/') return 'home';
@@ -35,46 +27,59 @@ interface SwipeableMainScreensProps {
 }
 
 function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
-  const [location, navigate] = useLocation();
+  const [location] = useLocation();
   const { user } = useAuth();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isFirstRender = useRef(true);
   
   const currentScreen = getScreenFromPath(location);
   const isMainScreen = currentScreen !== null;
+  const wasMainScreen = useRef(isMainScreen);
   
   const [activeIndex, setActiveIndex] = useState(() => 
     currentScreen ? SCREEN_ORDER.indexOf(currentScreen) : 2
   );
-  
-  const [shouldAnimate, setShouldAnimate] = useState(false);
-  
-  const bottomPadding = currentScreen === 'messages' ? 0 : (user?.role === 'free_tier' ? 132 : 82);
+  const [transition, setTransition] = useState<{
+    from: number;
+    to: number;
+    direction: 'forward' | 'backward';
+  } | null>(null);
+  const bottomPadding = user?.role === 'free_tier' ? 132 : 82;
 
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
+  const finishTransition = useCallback(() => {
+    setTransition(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!currentScreen) {
+      wasMainScreen.current = false;
+      finishTransition();
       return;
     }
-    
-    if (currentScreen) {
-      const newIndex = SCREEN_ORDER.indexOf(currentScreen);
-      setActiveIndex((prev) => {
-        if (prev !== newIndex) {
-          setShouldAnimate(true);
-          return newIndex;
-        }
-        return prev;
-      });
-    }
-  }, [currentScreen]);
 
-  const navigateToIndex = useCallback((index: number) => {
-    if (index < 0 || index >= SCREEN_ORDER.length) return;
-    
-    const screenId = SCREEN_ORDER[index];
-    navigate(SCREEN_ROUTES[screenId]);
-  }, [navigate]);
+    const nextIndex = SCREEN_ORDER.indexOf(currentScreen);
+    if (!wasMainScreen.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setActiveIndex(nextIndex);
+      finishTransition();
+    } else if (nextIndex !== activeIndex) {
+      // Only animate the two endpoints, even for nonadjacent tabs. If the
+      // previous animation is interrupted, snap to the newest destination
+      // rather than briefly painting three full pages at once.
+      setTransition(transition ? null : {
+        from: activeIndex,
+        to: nextIndex,
+        direction: nextIndex > activeIndex ? 'forward' : 'backward',
+      });
+      setActiveIndex(nextIndex);
+    }
+    wasMainScreen.current = true;
+  }, [currentScreen, activeIndex, transition, finishTransition]);
+
+  // An interrupted transition (or a browser that omits transitionend) must
+  // not leave the outgoing screen painted indefinitely.
+  useEffect(() => {
+    if (!transition) return;
+    const timeout = window.setTimeout(finishTransition, 450);
+    return () => window.clearTimeout(timeout);
+  }, [transition, finishTransition]);
 
 
   const screens = useMemo(() => [
@@ -89,39 +94,48 @@ function SwipeableMainScreensInner({ children }: SwipeableMainScreensProps) {
     return <>{children}</>;
   }
 
-  const translateX = -(activeIndex * 100 / screens.length);
-
   return (
-    <div 
-      ref={containerRef}
+    <div
       className="fixed inset-0 overflow-hidden bg-background"
-      style={{ paddingBottom: `${bottomPadding}px` }}
       data-testid="swipeable-container"
     >
-      <div
-        className="flex h-full"
-        style={{ 
-          transform: `translate3d(${translateX}%, 0, 0)`,
-          transition: shouldAnimate ? 'transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)' : 'none',
-          width: `${screens.length * 100}%`,
-          willChange: 'transform',
-        }}
-        onTransitionEnd={() => setShouldAnimate(false)}
-      >
-        {screens.map((screen) => (
+      {screens.map((screen, index) => {
+        const direction = transition?.direction;
+        const entering = transition?.to === index;
+        const exiting = transition?.from === index;
+        const visible = index === activeIndex || exiting;
+        const animation = direction
+          ? entering
+            ? `main-screen-enter-${direction} 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) both`
+            : exiting
+              ? `main-screen-exit-${direction} 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) both`
+              : undefined
+          : undefined;
+        return (
           <div
             key={screen.id}
-            className="relative h-full flex flex-col bg-background overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y"
-            style={{ 
-              width: `${100 / screens.length}%`,
-              flexShrink: 0,
+            className="absolute inset-0 flex flex-col bg-background overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y swipeable-screen"
+            style={{
+              paddingBottom: screen.id === 'messages' ? 0 : bottomPadding,
+              visibility: visible ? 'visible' : 'hidden',
+              pointerEvents: index === activeIndex ? 'auto' : 'none',
+              animation,
+              willChange: animation ? 'transform' : undefined,
+              zIndex: entering ? 2 : exiting ? 1 : 0,
             }}
+            aria-hidden={index !== activeIndex}
             data-testid={`screen-${screen.id}`}
+            onAnimationEnd={(event) => {
+              if (entering && direction && event.target === event.currentTarget &&
+                  event.animationName === `main-screen-enter-${direction}`) {
+                finishTransition();
+              }
+            }}
           >
             {screen.component}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }

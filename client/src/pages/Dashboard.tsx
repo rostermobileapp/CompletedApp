@@ -3044,7 +3044,7 @@ function DashboardMobile() {
               data-testid="button-patches-home"
             >
               <img src="/patches-home-icon.png?v=20260927" alt="" aria-hidden="true" className="w-[3.3rem] h-[3.3rem] sm:w-[3.6rem] sm:h-[3.6rem] shrink-0 object-contain" />
-              <span>Patches</span>
+              <span>Achievements</span>
             </button>
 
             {effectiveLeagueId && (
