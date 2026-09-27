@@ -156,3 +156,9 @@ Key behaviors:
 -   **React Query (TanStack Query)**: Server state management.
 -   **Wouter**: Lightweight client-side routing.
 -   **Drizzle ORM**: Type-safe database operations.
+
+## Live database safety
+
+The workspace's external PostgreSQL connection can see live league data. Treat `DATABASE_URL` as live: do not run mutating integration tests, fixture cleanup, trial writes, or bulk backfills against it. Database-backed tests must use a verified separate `TEST_DATABASE_URL`; `server/db.ts` refuses to use `DATABASE_URL` when invoked by a test process and rejects an identical database endpoint. Do not bypass this guard by using a direct SQL client in tests. Until a separate test database is configured, use pure unit tests and read-only queries only.
+
+For future code fixes, never directly insert, update, delete, truncate, or migrate live `teams`, `users`, `games`, `league_memberships`, `team_memberships`, or related game/roster tables without the owner's explicit authorization for the specific data change. Read-only investigation and code changes are allowed; this rule does not prohibit normal, authenticated app operations. Before any authorized live-data repair, confirm the target and affected IDs with read-only queries, take an appropriate backup for risky changes, use a guarded transaction, and verify the outcome. Do not change live database roles, grants, or constraints without checking all existing references and planning for app operations that legitimately write to those tables.

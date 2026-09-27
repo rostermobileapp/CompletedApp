@@ -1,7 +1,7 @@
 /**
  * Integration tests for the backup-accept race-condition guard.
  *
- * These tests hit the real database (same DATABASE_URL used by the app) and
+ * These tests require a separate TEST_DATABASE_URL (never the app's DATABASE_URL) and
  * verify that the production storage methods — acceptBackupAtomically,
  * promoteNextBackupAtomically, resolveBackupResponse, and
  * claimAndNotifyNextBackup — behave correctly under concurrent load and edge

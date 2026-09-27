@@ -52,4 +52,3 @@
 - [Uploaded asset availability](uploaded-asset-availability.md) — tracked uploaded images can go missing independently of code edits, causing Vite preview import failures.
 - [Badge integration test isolation](badge-integration-test-isolation.md) — run database-backed badge integration tests serially when startup reconcilers scan all users.
 - [Badge backfill orphan safety](badge-backfill-orphan-safety.md) — historical game records may refer to removed users; filter startup award candidates through existing users before inserting.
-- [Shared external database test safety](shared-db-test-safety.md) — the workspace connection sees live league records; never run mutating integration tests without proving isolation.
