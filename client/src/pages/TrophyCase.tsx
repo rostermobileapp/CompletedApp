@@ -3,7 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ArrowLeft, ChevronRight, Lock, Sparkles, Trophy, X } from "lucide-react";
 import { BadgeEarnedAnnouncement } from "@/components/BadgeEarnedHost";
+import { FeatureLockOverlay } from "@/components/FeatureLockOverlay";
+import { usePermissions } from "@/context/SubscriptionContext";
 import { getImageUrl } from "@/lib/queryClient";
+import { hasPaidTrophyCaseAccess } from "@shared/trophyCaseAccess";
 import iceBackground from "@/assets/trophy-case-ice.png";
 import "./TrophyCase.css";
 
@@ -23,7 +26,7 @@ type TrophyCaseData = {
   selectedHatTrickSeasonId: string | null;
 };
 type SelectedBadge = { badge: Badge; tier?: Tier };
-type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21" | "testing";
+type TrophyCaseAccess = "eligible" | "missing_dob" | "invalid_dob" | "under_21";
 
 const ACHIEVEMENT_SECTIONS = [
   { key: "three_stars", label: "3 Stars", description: "First star: 3 points · second: 2 · third: 1. Every point counts toward your tiers.", slug: "three_stars" },
@@ -151,11 +154,12 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const [revealingId, setRevealingId] = useState<string | null>(null);
   const [announcementPreview, setAnnouncementPreview] = useState<SelectedBadge | null>(null);
   const [announcementCycle, setAnnouncementCycle] = useState(0);
-  const { data: user, isLoading: isUserLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"], enabled: !preview });
-  const ageAccess = preview ? "eligible" : isUserLoading ? "loading" : user?.displayId !== "U00001" ? "testing" : getTrophyCaseAccess(user?.dateOfBirth);
+  const { user, isLoading: isPermissionsLoading } = usePermissions();
+  const hasPaidAccess = preview || hasPaidTrophyCaseAccess(user);
+  const ageAccess = preview ? "eligible" : isPermissionsLoading ? "loading" : getTrophyCaseAccess(user?.dateOfBirth);
   const { data, isLoading, isError } = useQuery<TrophyCaseData>({
     queryKey: [preview ? "/api/dev/trophy-case-preview" : "/api/trophy-case"],
-    enabled: ageAccess === "eligible",
+    enabled: hasPaidAccess && ageAccess === "eligible",
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
@@ -170,6 +174,10 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
   const earnedCount = data?.sections.reduce((total, section) => total + section.badges.reduce((sectionTotal, badge) => section.category === "achievement" && badge.achievementType === "tiered" ? sectionTotal + badge.tiers.filter((tier) => badge.earnedTiers.includes(tier.tier) || (badge.slug !== "iron_man" && badge.currentProgress >= tier.threshold)).length : sectionTotal + Number(badge.isEarned), 0), 0) ?? 0;
 
   return (
+    <FeatureLockOverlay
+      isLocked={!preview && !isPermissionsLoading && !hasPaidAccess}
+      className="min-h-[100dvh]"
+    >
     <div className="trophy-case min-h-[100dvh] bg-[#dce5f3] px-3 pb-24 pt-5 text-[#1e3345] sm:px-6 sm:pt-8">
       <div
         aria-hidden="true"
@@ -183,7 +191,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
         </div>
         <header className="mb-7 text-center sm:mb-9"><h1 className="text-4xl font-bold tracking-[-.04em] text-[#173d5b] sm:text-5xl">{preview ? "Trophy Case Preview" : "Trophy Case"}</h1><p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-[#718394]">{preview ? "All published badges are shown for review. This preview does not change your earned badges." : "League honors, team keepsakes, and milestones."}</p></header>
         {ageAccess === "loading" && <div className="rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center text-[#718394]">Verifying your age…</div>}
-        {ageAccess !== "loading" && ageAccess !== "eligible" && <div className="mx-auto max-w-lg rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center shadow-[0_16px_35px_#23415d12]"><Lock className="mx-auto text-[#164a73]" size={28} /><h2 className="mt-4 text-xl font-bold text-[#173d5b]">{ageAccess === "testing" ? "In Testing" : "Age verification required"}</h2><p className="mt-2 text-sm text-[#718394]">{ageAccess === "testing" ? "The Trophy Case is currently available only to users in the test group." : ageAccess === "under_21" ? "The Trophy Case is available only to users who are 21 or older." : "Enter your date of birth in your profile so we can verify that you are 21 or older."}</p>{ageAccess !== "testing" && <button onClick={() => navigate("/profile")} className="mt-6 rounded-lg bg-[#164a73] px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#103a5b]">Go to Profile <ChevronRight className="ml-1 inline" size={14} /></button>}</div>}
+        {ageAccess !== "loading" && ageAccess !== "eligible" && <div className="mx-auto max-w-lg rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center shadow-[0_16px_35px_#23415d12]"><Lock className="mx-auto text-[#164a73]" size={28} /><h2 className="mt-4 text-xl font-bold text-[#173d5b]">Age verification required</h2><p className="mt-2 text-sm text-[#718394]">{ageAccess === "under_21" ? "The Trophy Case is available only to users who are 21 or older." : "Enter your date of birth in your profile so we can verify that you are 21 or older."}</p><button onClick={() => navigate("/profile")} className="mt-6 rounded-lg bg-[#164a73] px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#103a5b]">Go to Profile <ChevronRight className="ml-1 inline" size={14} /></button></div>}
         {ageAccess === "eligible" && <>{isLoading && <div className="rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center text-[#718394]">Loading {preview ? "the badge preview" : "your trophy case"}…</div>}{isError && <div className="rounded-2xl border border-[#edc6ca] bg-[#fff5f5] p-8 text-center text-[#b52732]">Could not load {preview ? "the badge preview" : "your trophy case"}.</div>}{data && <main className="trophy-depth-main mx-auto max-w-5xl rounded-[1.5rem] p-3 sm:p-6">
           <section className="trophy-depth-panel mb-5 rounded-2xl p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">{preview ? "Catalog preview" : "The collection of"}</p><h2 className="mt-1 text-xl font-bold tracking-tight text-[#173d5b] sm:text-2xl">{preview ? "Every badge, on display" : "Your career, on display"}</h2></div><div className="rounded-lg border border-[#c8dbe8] bg-white/75 px-2.5 py-1.5 text-center"><div className="font-mono text-[9px] font-bold tracking-[.15em] text-[#164a73]">ROSTER HOCKEY</div><div className="mt-0.5 text-[7px] uppercase tracking-[.15em] text-[#718394]">Player honors</div></div></div></section>
           <div className="space-y-5">{data.sections.filter((section) => section.category !== "achievement").map((section) => { const visibleBadges = preview ? section.badges : section.badges.filter((badge) => badge.isEarned); if (!visibleBadges.length) return null; return <section key={section.category} className="trophy-depth-panel rounded-2xl p-3.5 sm:p-5"><SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={visibleBadges.length} /><div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{visibleBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => selectBadge(badge)} />)}</div></section>; })}</div>
@@ -194,7 +202,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
                 <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">Achievements</h2>
                 <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-[#718394] sm:text-xs">Every tier has its own spot and progress bar. Progress is capped at that tier’s target.</p>
               </div>
-              {preview ? <span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span> : <button onClick={() => navigate("/trophy-case/earned-patches")} className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg bg-[#164a73] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">View All Patches <ChevronRight size={15} /></button>}
+              {preview ? <span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span> : user?.displayId === "U00001" ? <button onClick={() => navigate("/trophy-case/earned-patches")} className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg bg-[#164a73] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">View All Patches <ChevronRight size={15} /></button> : null}
             </div>
             <div className="space-y-5">
               {ACHIEVEMENT_SECTIONS.filter((group) => !("goalieOnly" in group) || !group.goalieOnly || data.isGoalie).map((group) => {
@@ -213,5 +221,6 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
       {selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#173d5b]/55 p-4 backdrop-blur-sm" onClick={closeBadge}><div className={`w-full max-w-lg rounded-2xl border border-[#cfdee8] bg-white p-5 text-[#1e3345] shadow-[0_24px_80px_#173d5b55] sm:p-7 ${revealingId === `${selected.badge.id}:${selected.tier?.tier ?? "badge"}` ? "badge-detail-card-active" : ""}`} onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center gap-3">{canPreviewAnnouncement && <button onClick={previewAnnouncement} className="inline-flex items-center gap-2 rounded-lg bg-[#e8f0f6] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#164a73] transition hover:bg-[#d8e7f0]"><Sparkles size={14} /> Preview announcement</button>}<button onClick={closeBadge} className="ml-auto rounded-full p-1 text-[#718394] transition hover:bg-[#edf3f7]" aria-label="Close badge details"><X size={20} /></button></div><div className="flex flex-col items-center text-center"><BadgeArtwork badge={selected.badge} tier={selected.tier} earned={isBadgeOrTierEarned(selected)} large /></div><h2 className={`mt-5 text-center text-2xl font-bold ${selected.badge.isEarned ? "text-[#164a73]" : "text-[#718394]"}`}>{selected.badge.isEarned ? selected.badge.name : "???"}</h2>{selected.tier && <p className="mt-1 text-center text-xs font-semibold uppercase tracking-wider text-[#d52d3b]">{formatTier(selected.tier.tier)} · target {selected.tier.threshold}</p>}<p className="mt-2 text-center text-sm text-[#718394]">{selected.badge.isEarned ? selected.badge.description : (selected.badge.lockedHint || "Keep playing to discover this badge.")}</p>{selected.badge.isEarned && selected.badge.earnedAt && <p className="mt-3 text-center text-xs text-[#8a9aaa]">Earned {new Date(selected.badge.earnedAt).toLocaleDateString()}</p>}{selected.tier ? <TierProgress badge={selected.badge} tier={selected.tier} /> : selected.badge.tiers.length > 0 && <div className="mt-6 flex flex-wrap justify-center gap-2">{selected.badge.tiers.map((tier) => <span key={tier.tier} className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase ${selected.badge.earnedTiers.includes(tier.tier) ? "border-[#d52d3b] bg-[#fff0f1] text-[#b52732]" : "border-[#d7e2eb] text-[#718394]"}`}>{formatTier(tier.tier)} · {tier.threshold}</span>)}</div>}{selected.badge.achievementType === "multiplier" && <p className="mt-5 text-center text-xl font-bold text-[#d52d3b]">×{selected.badge.count}</p>}{!selected.badge.isEarned && <Lock className="mx-auto mt-5 text-[#718394]" size={18} />}</div></div>}
       {announcementPreview && <div key={announcementCycle}><BadgeEarnedAnnouncement badge={{ ...announcementPreview.badge, imagePath: announcementPreview.tier?.imagePath || announcementPreview.badge.imagePath }} payload={{ tier: announcementPreview.tier?.tier }} onDismiss={() => setAnnouncementPreview(null)} onViewTrophyCase={() => setAnnouncementPreview(null)} /></div>}
     </div>
+    </FeatureLockOverlay>
   );
 }

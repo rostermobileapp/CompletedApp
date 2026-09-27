@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { hasPaidTrophyCaseAccess } from "../shared/trophyCaseAccess";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -1082,8 +1083,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'no-store');
       const userId = currentUserId(req);
       const viewer = await storage.getUser(userId);
-      if (viewer?.displayId !== "U00001") {
-        return res.status(403).json({ code: "TROPHY_CASE_IN_TESTING", message: "In Testing" });
+      if (!hasPaidTrophyCaseAccess(viewer)) {
+        return res.status(403).json({
+          code: "TROPHY_CASE_PREMIUM_REQUIRED",
+          message: "Trophy Case access requires Player Pro or Commissioner access.",
+        });
       }
       const access = getTrophyCaseAccess(viewer.dateOfBirth);
       if (access !== "eligible") {
@@ -1106,10 +1110,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       res.setHeader('Cache-Control', 'no-store');
       const viewer = await storage.getUser(currentUserId(req));
-      if (viewer?.displayId !== "U00001") {
+      if (!hasPaidTrophyCaseAccess(viewer)) {
         return res.status(403).json({
-          code: "TROPHY_CASE_IN_TESTING",
-          message: "In Testing",
+          code: "TROPHY_CASE_PREMIUM_REQUIRED",
+          message: "Trophy Case access requires Player Pro or Commissioner access.",
         });
       }
       const access = getTrophyCaseAccess(viewer?.dateOfBirth);

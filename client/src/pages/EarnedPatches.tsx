@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ArrowLeft, ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { FeatureLockOverlay } from "@/components/FeatureLockOverlay";
+import { usePermissions } from "@/context/SubscriptionContext";
 import { getImageUrl } from "@/lib/queryClient";
+import { hasPaidTrophyCaseAccess } from "@shared/trophyCaseAccess";
 import { getTrophyCaseAccess } from "./TrophyCase";
 import iceBackground from "@/assets/trophy-case-ice.png";
 import "./EarnedPatches.css";
@@ -23,11 +26,12 @@ export default function EarnedPatches() {
   const [, navigate] = useLocation();
   const [active, setActive] = useState(0);
   const rail = useRef<HTMLDivElement>(null);
-  const { data: user, isLoading: userLoading } = useQuery<{ displayId?: string | null; dateOfBirth?: string | null }>({ queryKey: ["/api/user"] });
-  const access = userLoading ? "loading" : user?.displayId !== "U00001" ? "testing" : getTrophyCaseAccess(user?.dateOfBirth);
+  const { user, isLoading: isPermissionsLoading } = usePermissions();
+  const hasPaidAccess = hasPaidTrophyCaseAccess(user);
+  const access = isPermissionsLoading ? "loading" : getTrophyCaseAccess(user?.dateOfBirth);
   const { data: patches, isLoading, isError, refetch } = useQuery<Patch[]>({
     queryKey: ["/api/trophy-case/earned-patches"],
-    enabled: access === "eligible",
+    enabled: hasPaidAccess && access === "eligible",
     staleTime: 0,
     refetchOnMount: "always",
   });
@@ -48,6 +52,10 @@ export default function EarnedPatches() {
   };
 
   return (
+    <FeatureLockOverlay
+      isLocked={!isPermissionsLoading && !hasPaidAccess}
+      className="min-h-[100dvh]"
+    >
     <div className="patch-collection min-h-[100dvh] bg-[#dce5f3] px-3 pb-20 pt-5 text-[#173d5b] sm:px-6 sm:pt-8">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${iceBackground})` }} />
       <main className="relative mx-auto max-w-6xl">
@@ -59,7 +67,7 @@ export default function EarnedPatches() {
         </header>
         {access === "loading" && <div className="patch-message">Verifying your age…</div>}
         {access !== "loading" && access !== "eligible" && (
-          <div className="patch-message mx-auto max-w-lg"><Lock className="mx-auto mb-3" size={25} /><h2 className="font-bold">{access === "testing" ? "In Testing" : "Age verification required"}</h2><p className="mt-2 text-sm text-[#597087]">{access === "testing" ? "The Trophy Case is currently available only to users in the test group." : access === "under_21" ? "The Trophy Case is available only to users who are 21 or older." : "Enter your date of birth in your profile to verify that you are 21 or older."}</p>{access !== "testing" && <button onClick={() => navigate("/profile")} className="mt-4 rounded-lg bg-[#164a73] px-4 py-2 text-xs font-bold text-white">Go to Profile</button>}</div>
+          <div className="patch-message mx-auto max-w-lg"><Lock className="mx-auto mb-3" size={25} /><h2 className="font-bold">Age verification required</h2><p className="mt-2 text-sm text-[#597087]">{access === "under_21" ? "The Trophy Case is available only to users who are 21 or older." : "Enter your date of birth in your profile to verify that you are 21 or older."}</p><button onClick={() => navigate("/profile")} className="mt-4 rounded-lg bg-[#164a73] px-4 py-2 text-xs font-bold text-white">Go to Profile</button></div>
         )}
         {access === "eligible" && isLoading && <div className="patch-message">Loading your patches…</div>}
         {access === "eligible" && isError && <div className="patch-message">Could not load your patches. <button onClick={() => refetch()} className="ml-2 font-bold underline">Try again</button></div>}
@@ -116,5 +124,6 @@ export default function EarnedPatches() {
         )}
       </main>
     </div>
+    </FeatureLockOverlay>
   );
 }
