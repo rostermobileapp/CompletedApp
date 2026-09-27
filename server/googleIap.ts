@@ -86,6 +86,28 @@ async function authedFetch(path: string, init?: RequestInit): Promise<Response> 
   return fetch(`${PLAY_API_BASE}${path}`, { ...init, headers });
 }
 
+/** Read-only catalog probe used to diagnose Play Console access and SKU setup. */
+export async function getGooglePlaySubscriptionCatalog(packageName: string): Promise<{
+  status: number;
+  products: Array<{ productId: string; basePlans: Array<{ id: string; state: string }> }>;
+}> {
+  const response = await authedFetch(
+    `/applications/${encodeURIComponent(packageName)}/subscriptions?pageSize=100`,
+  );
+  if (!response.ok) return { status: response.status, products: [] };
+  const data: any = await response.json();
+  return {
+    status: response.status,
+    products: (Array.isArray(data.subscriptions) ? data.subscriptions : []).map((item: any) => ({
+      productId: String(item.productId ?? ''),
+      basePlans: (Array.isArray(item.basePlans) ? item.basePlans : []).map((plan: any) => ({
+        id: String(plan.basePlanId ?? ''),
+        state: String(plan.state ?? ''),
+      })),
+    })),
+  };
+}
+
 /**
  * Subset of fields returned by purchases.subscriptionsv2.get that we care about.
  * https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptionsv2/get

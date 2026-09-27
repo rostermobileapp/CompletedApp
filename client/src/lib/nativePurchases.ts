@@ -99,8 +99,11 @@ export function canPurchaseAndroidProduct(
   prices: Record<string, string>,
   productId: string,
   verificationAvailable: boolean | undefined,
+  activeProductIds: string[] | undefined,
 ): boolean {
-  return Boolean(prices[productId]) && verificationAvailable === true;
+  return Boolean(prices[productId]) &&
+    verificationAvailable === true &&
+    Boolean(activeProductIds?.includes(productId));
 }
 
 /**

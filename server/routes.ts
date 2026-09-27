@@ -5297,11 +5297,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const GOOGLE_PLAY_PACKAGE_NAME =
     process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.aFFhvtIzJvyF.natively';
 
-  // Do not offer a purchase that this server cannot verify and activate.
+  let googleCatalogCache: { checkedAt: number; productIds: string[] } | null = null;
+  // Do not offer a purchase unless the server can authenticate with Play and
+  // the selected product has an active base plan in this application's catalog.
   app.get('/api/iap/google-availability', isAuthenticated, async (_req: any, res) => {
-    const { isGoogleIapConfigured } = await import('./googleIap');
     res.set('Cache-Control', 'no-store');
-    res.json({ available: isGoogleIapConfigured() });
+    try {
+      const { isGoogleIapConfigured, getGooglePlaySubscriptionCatalog } = await import('./googleIap');
+      if (!isGoogleIapConfigured()) return res.json({ available: false, productIds: [] });
+      if (!googleCatalogCache || Date.now() - googleCatalogCache.checkedAt > 60_000) {
+        const catalog = await getGooglePlaySubscriptionCatalog(GOOGLE_PLAY_PACKAGE_NAME);
+        const productIds = catalog.status === 200
+          ? catalog.products
+            .filter((product) =>
+              product.basePlans.some((plan) => plan.state === 'ACTIVE') &&
+              Object.prototype.hasOwnProperty.call(GOOGLE_PLAY_PRODUCT_ROLES, product.productId))
+            .map((product) => product.productId)
+          : [];
+        if (catalog.status !== 200) {
+          console.warn('[GoogleIAP] Catalog availability check failed with status', catalog.status);
+        }
+        googleCatalogCache = { checkedAt: Date.now(), productIds };
+      }
+      res.json({ available: googleCatalogCache.productIds.length > 0, productIds: googleCatalogCache.productIds });
+    } catch (error) {
+      console.warn('[GoogleIAP] Catalog availability check failed:', error instanceof Error ? error.name : 'unknown error');
+      res.json({ available: false, productIds: [] });
+    }
   });
 
   // ─── POST /api/iap/verify-google ──────────────────────────────────────────

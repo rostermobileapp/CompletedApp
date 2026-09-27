@@ -42,8 +42,10 @@ test('Android billing waits for a bridge injected after the page loads', async (
 });
 
 test('Android billing reports an unsupported bridge after waiting', async (t) => {
-  mockAndroid(t);
+  const window = mockAndroid(t);
   assert.equal(await isAndroidBillingSupported(15), false);
+  window.$agent = {};
+  assert.equal(await isAndroidBillingSupported(15), true);
 });
 
 test('native Android variants are detected before bridge injection but a browser is not', (t) => {
@@ -85,10 +87,11 @@ test('product lookup publishes successful products independently of failed produ
   const products = await pending;
   assert.deepEqual(products.map((p) => p.identifier), [PRODUCT_PLAYER_PRO, PRODUCT_PLAYER_PRO_YEARLY]);
   assert.deepEqual(published, [PRODUCT_PLAYER_PRO_YEARLY, PRODUCT_PLAYER_PRO]);
-  assert.equal(canPurchaseAndroidProduct(Object.fromEntries(products.map((p) => [p.identifier, p.priceString])), PRODUCT_COMMISSIONER, true), false);
-  assert.equal(canPurchaseAndroidProduct(Object.fromEntries(products.map((p) => [p.identifier, p.priceString])), PRODUCT_PLAYER_PRO, true), true);
-  assert.equal(canPurchaseAndroidProduct({ [PRODUCT_PLAYER_PRO]: '$4.99' }, PRODUCT_PLAYER_PRO, false), false);
-  assert.equal(canPurchaseAndroidProduct({ [PRODUCT_PLAYER_PRO]: '$4.99' }, PRODUCT_PLAYER_PRO, undefined), false);
+  assert.equal(canPurchaseAndroidProduct(Object.fromEntries(products.map((p) => [p.identifier, p.priceString])), PRODUCT_COMMISSIONER, true, [PRODUCT_PLAYER_PRO]), false);
+  assert.equal(canPurchaseAndroidProduct(Object.fromEntries(products.map((p) => [p.identifier, p.priceString])), PRODUCT_PLAYER_PRO, true, [PRODUCT_PLAYER_PRO]), true);
+  assert.equal(canPurchaseAndroidProduct({ [PRODUCT_PLAYER_PRO]: '$4.99' }, PRODUCT_PLAYER_PRO, true, [PRODUCT_COMMISSIONER]), false);
+  assert.equal(canPurchaseAndroidProduct({ [PRODUCT_PLAYER_PRO]: '$4.99' }, PRODUCT_PLAYER_PRO, false, [PRODUCT_PLAYER_PRO]), false);
+  assert.equal(canPurchaseAndroidProduct({ [PRODUCT_PLAYER_PRO]: '$4.99' }, PRODUCT_PLAYER_PRO, undefined, undefined), false);
 });
 
 test('empty and failed product callbacks cannot enable checkout', async (t) => {
@@ -100,5 +103,5 @@ test('empty and failed product callbacks cannot enable checkout', async (t) => {
     } },
   });
   assert.deepEqual(await getAndroidProducts(), []);
-  assert.equal(canPurchaseAndroidProduct({}, PRODUCT_PLAYER_PRO, true), false);
+  assert.equal(canPurchaseAndroidProduct({}, PRODUCT_PLAYER_PRO, true, [PRODUCT_PLAYER_PRO]), false);
 });

@@ -80,7 +80,7 @@ export default function Subscription() {
     isLoading: googleBillingAvailabilityLoading,
     isError: googleBillingAvailabilityError,
     refetch: refetchGoogleBillingAvailability,
-  } = useQuery<{ available: boolean }>({
+  } = useQuery<{ available: boolean; productIds: string[] }>({
     queryKey: ['/api/iap/google-availability'],
     enabled: isAndroid,
     staleTime: 0,
@@ -144,6 +144,23 @@ export default function Subscription() {
     })();
     return () => { active = false; };
   }, [platformReady, isAndroid, androidLookupAttempt]);
+
+  // A bridge that appears after the initial timeout should recover without
+  // requiring the buyer to notice and press Retry.
+  useEffect(() => {
+    if (!isAndroid || androidLookupState !== 'unsupported') return;
+    const retryWhenReady = () => {
+      if (typeof (window as any).$agent !== 'undefined') {
+        setAndroidLookupAttempt((attempt) => attempt + 1);
+      }
+    };
+    window.addEventListener('nativelyReady', retryWhenReady);
+    const interval = window.setInterval(retryWhenReady, 1000);
+    return () => {
+      window.removeEventListener('nativelyReady', retryWhenReady);
+      window.clearInterval(interval);
+    };
+  }, [isAndroid, androidLookupState]);
 
   // Silently check for pending purchases (e.g. promo code redeemed in the
   // Play Store outside the app) as soon as the billing bridge is confirmed
@@ -549,7 +566,7 @@ export default function Subscription() {
     const productId = billingPeriod === 'yearly'
       ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
       : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
-    if (!canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available)) {
+    if (!canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available, googleBillingAvailability?.productIds)) {
       toast({ title: 'Google Play unavailable', description: 'This plan cannot be purchased right now. Please retry loading plans or contact support.', variant: 'destructive' });
       return;
     }
@@ -1095,13 +1112,15 @@ export default function Subscription() {
                   const statusId = `status-google-${plan.tier}-${index}`;
                   const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
                   const checking = androidLookupState === 'checking' || androidLookupState === 'loading' || googleBillingAvailabilityLoading;
-                  const canPurchase = canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available);
-                  const statusMessage = googleBillingAvailability?.available === false
-                    ? 'Google Play purchases cannot be activated right now. Please contact support before attempting payment.'
+                  const canPurchase = canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available, googleBillingAvailability?.productIds);
+                  const statusMessage = androidLookupState === 'unsupported'
+                    ? 'The Google Play billing connection is not available in this app build. Update the app or contact support.'
+                    : googleBillingAvailability?.available === false
+                      ? 'Google Play purchases cannot be activated right now. Please contact support before attempting payment.'
                     : googleBillingAvailabilityError
                       ? 'Could not check payment availability. Check your connection and try again.'
-                      : androidLookupState === 'unsupported'
-                        ? 'The Google Play billing connection is not available in this app build. Update the app or contact support.'
+                      : googleBillingAvailability?.available && !googleBillingAvailability.productIds.includes(productId)
+                        ? 'This plan is not currently active in Google Play. Try another plan or contact support.'
                         : !playPrice && !checking
                           ? androidLookupState === 'ready'
                             ? 'This plan is not available from Google Play right now. Try another billing period or contact support.'
