@@ -38,6 +38,7 @@ interface HomeDesktopProps {
  *            Row 3 = Team Leaders + Standings (1.4fr/1fr)
  */
 export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
+  const [, navigate] = useLocation();
   const {
     selectedType,
     selectedId,
@@ -160,24 +161,35 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
       data-testid="home-desktop"
     >
       <div className="mx-auto w-full max-w-[1280px] px-6 py-6 flex flex-col gap-4">
-        {/* Shared season selector — shown above all cards when the league has
-            multiple seasons (league and tournament scopes both supported) */}
-        {Array.isArray(seasons) && seasons.length > 1 && seasonLeagueId && (
-          <div className="flex items-center justify-end gap-2" data-testid="shared-season-selector-row">
-            <span className="text-[13px] text-[#666]">Season</span>
-            <select
-              value={selectedSeasonId ?? ''}
-              onChange={(e) => setSelectedSeasonId(e.target.value || null)}
-              className="text-[13px] text-[#444] bg-white border border-[rgba(0,0,0,0.12)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] cursor-pointer shadow-sm"
-              data-testid="season-selector"
-              aria-label="Select season"
-            >
-              {seasons.map((s: any) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {/* Shared season selector — shown above all cards when the league has
+              multiple seasons (league and tournament scopes both supported) */}
+          {Array.isArray(seasons) && seasons.length > 1 && seasonLeagueId && (
+            <div className="flex items-center gap-2" data-testid="shared-season-selector-row">
+              <span className="text-[13px] text-[#666]">Season</span>
+              <select
+                value={selectedSeasonId ?? ''}
+                onChange={(e) => setSelectedSeasonId(e.target.value || null)}
+                className="text-[13px] text-[#444] bg-white border border-[rgba(0,0,0,0.12)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] cursor-pointer shadow-sm"
+                data-testid="season-selector"
+                aria-label="Select season"
+              >
+                {seasons.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate('/trophy-case')}
+            className={`${cardClass} elev-rest px-5 py-2 text-sm font-medium hover:bg-[#f2f2f2] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
+            style={cardStyle}
+            data-testid="button-patches-home-desktop"
+          >
+            Patches
+          </button>
+        </div>
 
         {isTournamentScope ? (
           <>

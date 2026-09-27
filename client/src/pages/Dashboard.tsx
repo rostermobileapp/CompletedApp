@@ -2989,88 +2989,99 @@ function DashboardMobile() {
             )}
           </div>
         )}
-        {/* Quick Stats — left: Games Left (team) or Scorekeeper (stat manager); right: Alerts */}
-        {(primaryTeam || hasStatManagerAccess()) && (
-          <div className="px-6 mb-2">
-            <div className="grid grid-cols-2 gap-4">
-              {/* Left column */}
-              {primaryTeam ? (
-                <div className="rounded-xl hairline elev-rest p-4 pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${primaryTeam?.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
-                      {primaryTeam?.logoUrl ? (
-                        <img 
-                          src={getImageUrl(primaryTeam.logoUrl) || ''} 
-                          alt={`${primaryTeam.name} logo`}
-                          className="w-full h-full rounded-lg object-cover bg-transparent"
-                          data-testid="img-team-logo"
-                        />
-                      ) : (
-                        <Trophy className="w-5 h-5 text-primary-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold" data-testid="text-games-remaining">
-                        {(teamRecord as any)?.gamesRemaining ?? 0}
-                      </p>
-                      <p className="text-muted-foreground text-[16px]">Games Left</p>
-                    </div>
+        {/* Quick Stats — Games Left (or Scorekeeper), Patches, Alerts */}
+        <div className="px-6 mb-2">
+          <div className={`grid gap-2 sm:gap-4 ${
+            (primaryTeam || hasStatManagerAccess()) && effectiveLeagueId
+              ? 'grid-cols-3'
+              : (primaryTeam || hasStatManagerAccess() || effectiveLeagueId)
+                ? 'grid-cols-2'
+                : 'grid-cols-1'
+          }`}>
+            {primaryTeam ? (
+              <div className="min-w-0 min-h-[76px] rounded-xl hairline elev-rest px-1 py-1 sm:px-2 bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
+                <div className="flex h-full flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-3">
+                  <div className={`w-6 h-6 sm:w-10 sm:h-10 shrink-0 rounded-lg flex items-center justify-center ${primaryTeam.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+                    {primaryTeam.logoUrl ? (
+                      <img
+                        src={getImageUrl(primaryTeam.logoUrl) || ''}
+                        alt={`${primaryTeam.name} logo`}
+                        className="w-full h-full rounded-lg object-cover bg-transparent"
+                        data-testid="img-team-logo"
+                      />
+                    ) : (
+                      <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
+                    )}
+                  </div>
+                  <div className="min-w-0 text-center sm:text-left">
+                    <p className="text-lg sm:text-2xl font-bold leading-tight" data-testid="text-games-remaining">
+                      {(teamRecord as any)?.gamesRemaining ?? 0}
+                    </p>
+                    <p className="text-muted-foreground text-[11px] sm:text-base leading-tight whitespace-nowrap">Games Left</p>
                   </div>
                 </div>
-              ) : (
-                <div className="rounded-xl hairline elev-rest pt-[2px] pb-[2px] pl-[10px] pr-[10px] bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
-                  <button
-                    onClick={() => navigate('/scorekeeper')}
-                    className="w-full h-full flex items-center gap-3 rounded-xl"
-                    data-testid="button-scorekeeper-link"
-                  >
-                    <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Clipboard className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[#212121] text-[12px] font-medium">Scorekeeper</p>
-                    </div>
-                  </button>
-                </div>
-              )}
+              </div>
+            ) : hasStatManagerAccess() ? (
+              <div className="min-w-0 min-h-[76px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
+                <button
+                  type="button"
+                  onClick={() => navigate('/scorekeeper')}
+                  className="w-full h-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3 rounded-xl px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  data-testid="button-scorekeeper-link"
+                >
+                  <div className="w-6 h-6 sm:w-10 sm:h-10 bg-red-500 rounded-lg flex items-center justify-center shrink-0">
+                    <Clipboard className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  </div>
+                  <span className="text-[#212121] dark:text-white text-xs font-medium">Scorekeeper</span>
+                </button>
+              </div>
+            ) : null}
 
-              {/* Right column — Alerts, always visible */}
-              {effectiveLeagueId && (
-                <div className="rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
-                  {isLoadingNeedsAttention ? (
-                    <div className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2">
-                      <div className="flex items-center gap-3">
-                        <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
-                        <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
-                        <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
-                      </div>
+            <button
+              type="button"
+              onClick={() => navigate('/trophy-case')}
+              className="min-w-0 min-h-[76px] w-full rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              data-testid="button-patches-home"
+            >
+              Patches
+            </button>
+
+            {effectiveLeagueId && (
+              <div className="min-w-0 min-h-[76px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
+                {isLoadingNeedsAttention ? (
+                  <div className="w-full h-full flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 rounded-xl px-1 py-1 sm:px-3 sm:py-2">
+                    <div className="flex items-center gap-1 sm:gap-3">
+                      <Bell className="w-4 h-4 shrink-0 text-[#212121] dark:text-white" />
+                      <span className="font-medium text-xs sm:text-sm text-[#212121] dark:text-white">Alerts</span>
                     </div>
-                  ) : needsAttentionData ? (
-                    <button
-                      onClick={() => setShowNeedsAttentionModal(true)}
-                      className="w-full h-full flex items-center justify-between rounded-xl px-3 py-2"
-                      data-testid="button-needs-attention-permanent"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Bell className="w-4 h-4 text-[#212121] dark:text-white" />
-                        <span className="font-medium text-sm text-[#212121] dark:text-white">Alerts</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
-                        </div>
-                        <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
-                      </div>
-                    </button>
-                  ) : null}
-                </div>
-              )}
-            </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
+                    </div>
+                  </div>
+                ) : needsAttentionData ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowNeedsAttentionModal(true)}
+                    className="w-full h-full flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 rounded-xl px-1 py-1 sm:px-3 sm:py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    data-testid="button-needs-attention-permanent"
+                  >
+                    <span className="flex items-center gap-1 sm:gap-3">
+                      <Bell className="w-4 h-4 shrink-0 text-[#212121] dark:text-white" />
+                      <span className="font-medium text-xs sm:text-sm text-[#212121] dark:text-white">Alerts</span>
+                    </span>
+                    <span className="flex items-center gap-1 sm:gap-2">
+                      <span className="min-w-5 h-5 sm:min-w-6 sm:h-6 px-1 bg-red-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+            )}
           </div>
-        )}
+        </div>
         {/* Needs Attention Section - Show for leagues and league teams */}
         {effectiveLeagueId && (
           <NeedsAttentionTasks 
