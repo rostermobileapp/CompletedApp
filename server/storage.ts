@@ -724,7 +724,7 @@ export interface IStorage {
   ): Promise<PaymentRequest>;
   getUnpaidPaymentRequestCount(userId: string): Promise<number>;
   getInvoiceablePlayersForLeague(leagueId: string): Promise<InvoiceablePlayer[]>;
-  transferInvoicesFromPlaceholderToUser(placeholderPlayerId: string, userId: string): Promise<number>;
+  transferInvoicesFromPlaceholderToUser(placeholderPlayerId: string, userId: string, transaction?: Parameters<Parameters<typeof db.transaction>[0]>[0]): Promise<number>;
   
   // User payment methods
   updateUserPaymentMethods(userId: string, paymentMethods: { venmoUsername?: string; cashappUsername?: string }): Promise<User>;
@@ -3779,31 +3779,35 @@ export class DatabaseStorage implements IStorage {
   // them into real memberships. Called from upsertUser whenever a brand-new
   // authenticated user is created. Idempotent: safe to call repeatedly.
   async claimPlaceholdersForUser(userId: string): Promise<{ claimedCount: number; teamIds: string[]; leagueIds: string[] }> {
-    const user = await this.getUser(userId);
-    if (!user || !user.email) return { claimedCount: 0, teamIds: [], leagueIds: [] };
-    // Only auto-claim by email match — the strongest identifier we have. Name
-    // matching alone is too risky (two "John Smith"s on the same league).
-    const matches = await db
-      .select()
-      .from(placeholderPlayers)
-      .where(sql`LOWER(${placeholderPlayers.email}) = LOWER(${user.email})`);
-    if (matches.length === 0) return { claimedCount: 0, teamIds: [], leagueIds: [] };
+    return db.transaction(async (tx) => {
+      // Concurrent auth reconciliations can all see the same placeholders before
+      // any of them are retired. Lock the user before reading, inserting, or
+      // transferring invoices so only one claim runs at a time across instances.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`claim-placeholders:${userId}`}))`);
+      const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || !user.email) return { claimedCount: 0, teamIds: [], leagueIds: [] };
+      // Only auto-claim by email match — the strongest identifier we have. Name
+      // matching alone is too risky (two "John Smith"s on the same league).
+      const matches = await tx
+        .select()
+        .from(placeholderPlayers)
+        .where(sql`LOWER(${placeholderPlayers.email}) = LOWER(${user.email})`);
+      if (matches.length === 0) return { claimedCount: 0, teamIds: [], leagueIds: [] };
 
-    const teamIds = new Set<string>();
-    const leagueIds = new Set<string>();
-    let claimedCount = 0;
+      const teamIds = new Set<string>();
+      const leagueIds = new Set<string>();
+      let claimedCount = 0;
 
-    for (const ph of matches) {
-      try {
+      for (const ph of matches) {
         // Materialize a team membership if the placeholder was scoped to a team
         if (ph.teamId) {
-          const existing = await db
+          const existing = await tx
             .select()
             .from(teamMemberships)
             .where(and(eq(teamMemberships.userId, userId), eq(teamMemberships.teamId, ph.teamId)))
             .limit(1);
           if (existing.length === 0) {
-            await db.insert(teamMemberships).values({
+            await tx.insert(teamMemberships).values({
               userId,
               teamId: ph.teamId,
               position: ph.position || null,
@@ -3818,11 +3822,11 @@ export class DatabaseStorage implements IStorage {
         // via the team's league.
         let leagueIdToMaterialize: string | null = ph.leagueId ?? null;
         if (!leagueIdToMaterialize && ph.teamId) {
-          const [team] = await db.select().from(teams).where(eq(teams.id, ph.teamId)).limit(1);
+          const [team] = await tx.select().from(teams).where(eq(teams.id, ph.teamId)).limit(1);
           leagueIdToMaterialize = team?.leagueId ?? null;
         }
         if (leagueIdToMaterialize) {
-          const existing = await db
+          const existing = await tx
             .select()
             .from(leagueMemberships)
             .where(and(
@@ -3831,7 +3835,7 @@ export class DatabaseStorage implements IStorage {
             ))
             .limit(1);
           if (existing.length === 0) {
-            await db.insert(leagueMemberships).values({
+            await tx.insert(leagueMemberships).values({
               userId,
               leagueId: leagueIdToMaterialize,
               status: 'approved',
@@ -3848,19 +3852,17 @@ export class DatabaseStorage implements IStorage {
         }
 
         // Move outstanding invoices from the placeholder to the real user.
-        await this.transferInvoicesFromPlaceholderToUser(ph.id, userId);
+        await this.transferInvoicesFromPlaceholderToUser(ph.id, userId, tx);
         // Retire the placeholder row.
-        await db.delete(placeholderPlayers).where(eq(placeholderPlayers.id, ph.id));
+        await tx.delete(placeholderPlayers).where(eq(placeholderPlayers.id, ph.id));
         claimedCount++;
-      } catch (err) {
-        console.error('[claimPlaceholdersForUser] failed for placeholder', ph.id, err);
       }
-    }
 
-    if (claimedCount > 0) {
-      console.log(`[claimPlaceholdersForUser] user=${userId} claimed=${claimedCount} teams=${teamIds.size} leagues=${leagueIds.size}`);
-    }
-    return { claimedCount, teamIds: Array.from(teamIds), leagueIds: Array.from(leagueIds) };
+      if (claimedCount > 0) {
+        console.log(`[claimPlaceholdersForUser] user=${userId} claimed=${claimedCount} teams=${teamIds.size} leagues=${leagueIds.size}`);
+      }
+      return { claimedCount, teamIds: Array.from(teamIds), leagueIds: Array.from(leagueIds) };
+    });
   }
 
   // Placeholder players that belong to this league: either scoped directly
@@ -13828,8 +13830,11 @@ export class DatabaseStorage implements IStorage {
   // recipient (e.g. they were invoiced both as a placeholder and personally),
   // delete the placeholder row instead of duplicating. Returns the number of
   // rows transferred.
-  async transferInvoicesFromPlaceholderToUser(placeholderPlayerId: string, userId: string): Promise<number> {
-    return await db.transaction(async (tx) => {
+  async transferInvoicesFromPlaceholderToUser(
+    placeholderPlayerId: string, userId: string,
+    transaction?: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  ): Promise<number> {
+    const transfer = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
       const placeholderRows = await tx
         .select()
         .from(paymentRequestRecipients)
@@ -13871,7 +13876,8 @@ export class DatabaseStorage implements IStorage {
       }
 
       return transferableIds.length;
-    });
+    };
+    return transaction ? transfer(transaction) : db.transaction(transfer);
   }
 
   // User payment methods

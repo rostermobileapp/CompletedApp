@@ -87,6 +87,13 @@ type LeagueProPreviewResponse = {
   discountPercent: number;
   perPlayerEffectiveMonthlyCents: number;
 };
+type LeagueInviteCandidate = {
+  id: string;
+  name: string;
+  email: string;
+  teamName: string | null;
+  invited: boolean;
+};
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -622,6 +629,8 @@ export default function LeagueManagement() {
   const [activeTab, setActiveTab] = useState<'players' | 'teams' | 'games'>('games');
   const [gamesViewMode, setGamesViewMode] = useState<'calendar' | 'list'>('calendar');
   const [showSendInvitesConfirm, setShowSendInvitesConfirm] = useState(false);
+  const [pendingInviteEmails, setPendingInviteEmails] = useState<string[]>([]);
+  const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([]);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -1910,11 +1919,15 @@ export default function LeagueManagement() {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, playerData) => {
       toast({
         title: 'Player Added',
-        description: `${manualPlayerForm.firstName} ${manualPlayerForm.lastName} has been added to the league. You can send a welcome email from the batch email feature.`,
+        description: `${playerData.firstName} ${playerData.lastName} has been added. Use Send Invites when you're ready to invite them.`,
       });
+      if (playerData.email.trim()) {
+        setPendingInviteEmails((current) => Array.from(new Set([...current, playerData.email.trim().toLowerCase()])));
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'invite-candidates'] });
       
       // Reset form
       setManualPlayerForm({
@@ -2125,10 +2138,29 @@ export default function LeagueManagement() {
     },
   });
 
-  // ─── Send welcome emails ───────────────────────────────────────────────
+  // ─── Send explicitly selected league invites ───────────────────────────
+  const { data: inviteCandidates = [], isLoading: inviteCandidatesLoading, isError: inviteCandidatesError } = useQuery<LeagueInviteCandidate[]>({
+    queryKey: ['/api/leagues', leagueId, 'invite-candidates'],
+    queryFn: async () => (await apiRequest('GET', `/api/leagues/${leagueId}/invite-candidates`)).json(),
+    enabled: !!leagueId && showSendInvitesConfirm,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+  const openInvitePicker = async () => {
+    setShowSendInvitesConfirm(true);
+    setSelectedInviteIds([]);
+    try {
+      const response = await apiRequest('GET', `/api/leagues/${leagueId}/invite-candidates`);
+      const candidates: LeagueInviteCandidate[] = await response.json();
+      setSelectedInviteIds(candidates.filter((candidate) => !candidate.invited && pendingInviteEmails.includes(candidate.email)).map((candidate) => candidate.id));
+      queryClient.setQueryData(['/api/leagues', leagueId, 'invite-candidates'], candidates);
+    } catch {
+      toast({ title: 'Could not load invite recipients', variant: 'destructive' });
+    }
+  };
   const sendWelcomeEmailsMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/leagues/${leagueId}/send-welcome-emails`, {});
+    mutationFn: async (recipientIds: string[]) => {
+      const response = await apiRequest('POST', `/api/leagues/${leagueId}/send-welcome-emails`, { recipientIds });
       return response.json() as Promise<{ pushed: number; emailed: number; skipped: number; failed: number }>;
     },
     onSuccess: (data: { pushed: number; emailed: number; skipped: number; failed: number }) => {
@@ -2143,6 +2175,12 @@ export default function LeagueManagement() {
         title: 'Invites sent',
         description: `${summary}${skippedNote}${failedNote}.`,
       });
+      setShowSendInvitesConfirm(false);
+      if (data.failed === 0) {
+        setPendingInviteEmails((current) => current.filter((email) => !inviteCandidates.some((candidate) => selectedInviteIds.includes(candidate.id) && candidate.email === email)));
+      }
+      setSelectedInviteIds([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/leagues', leagueId, 'invite-candidates'] });
     },
     onError: (err: any) => {
       const detail = err?.message ? ` (${err.message})` : '';
@@ -3015,7 +3053,7 @@ export default function LeagueManagement() {
           {isCommissioner && (
             <>
               <button
-                onClick={() => setShowSendInvitesConfirm(true)}
+                onClick={openInvitePicker}
                 disabled={sendWelcomeEmailsMutation.isPending}
                 className="flex items-center gap-1.5 px-3 py-1.5 font-medium text-[14px] text-[#ffffff] bg-[#3c83f6] rounded disabled:opacity-50"
                 data-testid="button-send-welcome-emails"
@@ -3026,10 +3064,21 @@ export default function LeagueManagement() {
               {showSendInvitesConfirm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6">
                   <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Send Invites?</h3>
-                    <p className="text-sm text-gray-600 mb-6">
-                      New members will receive a push notification or welcome email. Anyone already invited will be skipped automatically.
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Choose invite recipients</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Only checked players will receive an invite. Players added here in this session are preselected; everyone else stays unchecked.
                     </p>
+                    {inviteCandidatesLoading && <p className="text-sm text-gray-600 mb-3">Loading players…</p>}
+                    {inviteCandidatesError && <p className="text-sm text-red-600 mb-3">Could not load players. Close and try again.</p>}
+                    <div className="max-h-64 overflow-y-auto space-y-2 mb-5" aria-label="Invite recipients">
+                      {inviteCandidates.filter((candidate) => !candidate.invited).map((candidate) => (
+                        <label key={candidate.id} className="flex items-start gap-2 rounded-lg border border-gray-200 p-2 text-sm text-gray-900 cursor-pointer">
+                          <input type="checkbox" className="mt-1" checked={selectedInviteIds.includes(candidate.id)} onChange={(event) => setSelectedInviteIds((current) => event.target.checked ? [...current, candidate.id] : current.filter((id) => id !== candidate.id))} />
+                          <span><strong>{candidate.name}</strong>{candidate.teamName && <span className="text-gray-500"> · {candidate.teamName}</span>}<span className="block text-xs text-gray-500">{candidate.email}</span></span>
+                        </label>
+                      ))}
+                      {!inviteCandidatesLoading && !inviteCandidatesError && inviteCandidates.every((candidate) => candidate.invited) && <p className="text-sm text-gray-600">No players are awaiting an invite.</p>}
+                    </div>
                     <div className="flex gap-3">
                       <button
                         onClick={() => setShowSendInvitesConfirm(false)}
@@ -3039,12 +3088,12 @@ export default function LeagueManagement() {
                       </button>
                       <button
                         onClick={() => {
-                          setShowSendInvitesConfirm(false);
-                          sendWelcomeEmailsMutation.mutate();
+                          sendWelcomeEmailsMutation.mutate(selectedInviteIds);
                         }}
-                        className="flex-1 py-2.5 rounded-xl bg-[#3c83f6] text-white font-semibold text-sm"
+                        disabled={selectedInviteIds.length === 0 || inviteCandidatesLoading || inviteCandidatesError || sendWelcomeEmailsMutation.isPending}
+                        className="flex-1 py-2.5 rounded-xl bg-[#3c83f6] text-white font-semibold text-sm disabled:opacity-50"
                       >
-                        Send
+                        Send to {selectedInviteIds.length}
                       </button>
                     </div>
                   </div>

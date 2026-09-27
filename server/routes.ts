@@ -137,6 +137,7 @@ import {
 import { ensureBadgeTables } from "./badgeDbInit";
 import { ensureBirthdayTable, getBirthdayStatus, dismissBirthday, startBirthdayPushJob } from "./birthday";
 import { ensureBeerBadgeEvaluationQueue } from "./beerBadgeEvaluationQueue";
+import { getLeagueInviteCandidates, selectInviteRecipients } from "./leagueInviteRecipients";
 import {
   canAcceptFreshScrimmageRequest,
   resetsPendingRequestsOnFinalize,
@@ -14634,19 +14635,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         const approvedMembership = await storage.approveLeagueMembership(newMembership.id, userId);
 
-        if (email) {
-          try {
-            const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
-            await sendWelcomeEmail(email, {
-              playerName: `${firstName} ${lastName}`,
-              leagueName: league.name,
-              teamName,
-            });
-          } catch (emailError) {
-            console.error(`[ManualAdd] welcome email failed:`, emailError);
-          }
-        }
-
         return res.status(201).json({
           id: approvedMembership.id,
           userId: existingLocalUser.id,
@@ -14671,20 +14659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phoneNumber: phoneNumber || null,
         addedBy: userId,
       });
-
-      // Send a "claim your spot" invite when we have an email.
-      if (email) {
-        try {
-          const teamName = assignedTeamId ? (await storage.getTeam(assignedTeamId))?.name : undefined;
-          await sendWelcomeEmail(email, {
-            playerName: `${firstName} ${lastName}`,
-            leagueName: league.name,
-            teamName,
-          });
-        } catch (emailError) {
-          console.error(`[ManualAdd] claim invite email failed:`, emailError);
-        }
-      }
 
       return res.status(201).json({
         id: `placeholder:${placeholder.id}`,
@@ -14739,7 +14713,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send welcome emails to all league members with real emails on file
+  app.get('/api/leagues/:leagueId/invite-candidates', isAuthenticated, async (req: any, res) => {
+    try {
+      const league = await storage.getLeague(req.params.leagueId);
+      if (!league) return res.status(404).json({ message: 'League not found' });
+      if (league.commissionerId !== req.user.claims.sub) return res.status(403).json({ message: 'Access denied' });
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(await getLeagueInviteCandidates(league.id));
+    } catch (error) {
+      console.error('[WelcomeEmails] Failed to list invite candidates:', error);
+      res.status(500).json({ message: 'Failed to list invite candidates' });
+    }
+  });
+
+  // Only explicitly selected recipients can receive an invite.
   app.post('/api/leagues/:leagueId/send-welcome-emails', isAuthenticated, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
@@ -14750,167 +14737,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!league) return res.status(404).json({ message: 'League not found' });
       if (league.commissionerId !== userId) return res.status(403).json({ message: 'Access denied' });
 
-      // Fetch all league members with their user records
-      const memberships = await db
-        .select({
-          userId: leagueMemberships.userId,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
-        })
-        .from(leagueMemberships)
-        .innerJoin(users, eq(users.id, leagueMemberships.userId))
-        .where(eq(leagueMemberships.leagueId, leagueId));
-
-      // Gather team names in one pass for members who are on a team
-      const teamCache = new Map<string, string>();
-      const memberTeamRows = await db
-        .select({ userId: teamMemberships.userId, teamId: teamMemberships.teamId })
-        .from(teamMemberships)
-        .innerJoin(teams, eq(teams.id, teamMemberships.teamId))
-        .where(eq(teams.leagueId, leagueId));
-
-      const userTeamMap = new Map<string, string>();
-      for (const tm of memberTeamRows) {
-        userTeamMap.set(tm.userId, tm.teamId);
+      const candidates = await getLeagueInviteCandidates(leagueId);
+      let selected;
+      try {
+        selected = selectInviteRecipients(candidates, req.body?.recipientIds);
+      } catch (error) {
+        return res.status(400).json({ message: (error as Error).message });
       }
-
       const { sendPushNotificationToUser } = await import('./oneSignalNotifications');
-
-      // Load the set of users who have already received an invite for this league.
-      // user_id stores either a real user UUID or an email address (for imported players
-      // who haven't created an account yet).
-      const alreadyInvitedRows = await db
-        .select({ userId: leagueInvitesSent.userId })
-        .from(leagueInvitesSent)
-        .where(eq(leagueInvitesSent.leagueId, leagueId));
-      const alreadyInvited = new Set(alreadyInvitedRows.map(r => r.userId));
 
       let pushed = 0;
       let emailed = 0;
       let skipped = 0;
       let failed = 0;
 
-      // ── Pass 1: existing registered members ────────────────────────────
-      for (const member of memberships) {
-        // Skip placeholder emails
-        if (!member.email || member.email.includes('@placeholder.roster')) continue;
-
-        // Skip anyone who has already been invited
-        if (alreadyInvited.has(member.userId)) {
+      for (const member of selected) {
+        if (member.invited) {
           skipped++;
           continue;
         }
-
-        let teamName: string | undefined;
-        const teamId = userTeamMap.get(member.userId);
-        if (teamId) {
-          if (!teamCache.has(teamId)) {
-            const team = await storage.getTeam(teamId);
-            teamCache.set(teamId, team?.name ?? '');
-          }
-          teamName = teamCache.get(teamId) || undefined;
-        }
-
-        const playerName = `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || member.email;
-        const teamSuffix = teamName ? ` — ${teamName}` : '';
-
         try {
-          // Try push first — if the user has the app installed they'll have a
-          // OneSignal subscription on file. Skip the email if push succeeds.
-          const pushSent = await sendPushNotificationToUser({
+          const pushSent = member.userId ? await sendPushNotificationToUser({
             userId: member.userId,
             title: `You're in ${league.name}!`,
-            message: `You've been added to ${league.name}${teamSuffix}. Tap to view your roster.`,
+            message: `You've been added to ${league.name}${member.teamName ? ` — ${member.teamName}` : ''}. Tap to view your roster.`,
             data: { type: 'league_invite', leagueId },
-          });
+          }) : false;
 
           const method = pushSent ? 'push' : 'email';
 
           if (!pushSent) {
             // No push subscription — fall back to welcome email
             await sendWelcomeEmail(member.email, {
-              playerName,
+              playerName: member.name,
               leagueName: league.name,
-              teamName,
+              teamName: member.teamName || undefined,
             });
           }
 
           // Record this invite so future sends skip this member
           await db.insert(leagueInvitesSent).values({
             leagueId,
-            userId: member.userId,
+            userId: member.userId ?? member.email,
             method,
           }).onConflictDoNothing();
 
           if (pushSent) pushed++; else emailed++;
         } catch (err) {
           console.error(`[WelcomeEmails] Failed for ${member.email}:`, err);
-          failed++;
-        }
-      }
-
-      // ── Pass 2: imported players with emails who haven't signed up yet ─
-      // Build a set of emails already covered by registered members so we
-      // don't double-send.
-      const registeredEmails = new Set(memberships.map(m => m.email?.toLowerCase()).filter(Boolean));
-
-      const unregisteredImports = await db
-        .select({
-          id: importedPlayers.id,
-          firstName: importedPlayers.firstName,
-          lastName: importedPlayers.lastName,
-          email: importedPlayers.email,
-          teamId: importedPlayers.teamId,
-          mergedWithUserId: importedPlayers.mergedWithUserId,
-        })
-        .from(importedPlayers)
-        .where(
-          and(
-            eq(importedPlayers.leagueId, leagueId),
-            isNotNull(importedPlayers.email),
-            isNull(importedPlayers.mergedWithUserId),
-          )
-        );
-
-      for (const imp of unregisteredImports) {
-        const email = imp.email!;
-        if (!email || email.includes('@placeholder.roster')) continue;
-        if (registeredEmails.has(email.toLowerCase())) continue; // handled in pass 1
-        // Dedup key for imported players is their email address
-        if (alreadyInvited.has(email.toLowerCase())) {
-          skipped++;
-          continue;
-        }
-
-        let teamName: string | undefined;
-        if (imp.teamId) {
-          if (!teamCache.has(imp.teamId)) {
-            const team = await storage.getTeam(imp.teamId);
-            teamCache.set(imp.teamId, team?.name ?? '');
-          }
-          teamName = teamCache.get(imp.teamId) || undefined;
-        }
-
-        const playerName = `${imp.firstName ?? ''} ${imp.lastName ?? ''}`.trim() || email;
-
-        try {
-          await sendWelcomeEmail(email, {
-            playerName,
-            leagueName: league.name,
-            teamName,
-          });
-
-          // Track by email so repeat presses skip this person
-          await db.insert(leagueInvitesSent).values({
-            leagueId,
-            userId: email.toLowerCase(),
-            method: 'email',
-          }).onConflictDoNothing();
-
-          emailed++;
-        } catch (err) {
-          console.error(`[WelcomeEmails] Failed for imported player ${email}:`, err);
           failed++;
         }
       }
