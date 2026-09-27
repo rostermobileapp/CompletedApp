@@ -2999,9 +2999,9 @@ function DashboardMobile() {
                 : 'grid-cols-1'
           }`}>
             {primaryTeam ? (
-              <div className="min-w-0 min-h-[60px] rounded-xl hairline elev-rest px-1 py-0.5 sm:px-2 bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
-                <div className="flex h-full flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-3">
-                  <div className={`w-6 h-6 sm:w-10 sm:h-10 shrink-0 rounded-lg flex items-center justify-center ${primaryTeam.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
+              <div className="min-w-0 min-h-[88px] rounded-xl hairline elev-rest px-1 py-1 sm:px-2 bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
+                <div className="flex h-full flex-col items-center justify-center gap-1">
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-lg flex items-center justify-center ${primaryTeam.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                     {primaryTeam.logoUrl ? (
                       <img
                         src={getImageUrl(primaryTeam.logoUrl) || ''}
@@ -3010,11 +3010,11 @@ function DashboardMobile() {
                         data-testid="img-team-logo"
                       />
                     ) : (
-                      <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
+                      <Trophy className="w-6 h-6 text-primary-foreground" />
                     )}
                   </div>
-                  <div className="min-w-0 flex items-baseline justify-center gap-1 sm:justify-start">
-                    <p className="text-base sm:text-2xl font-bold leading-none" data-testid="text-games-remaining">
+                  <div className="min-w-0 flex items-baseline justify-center gap-1">
+                    <p className="text-base sm:text-lg font-bold leading-none" data-testid="text-games-remaining">
                       {(teamRecord as any)?.gamesRemaining ?? 0}
                     </p>
                     <p className="text-muted-foreground text-[11px] sm:text-base leading-none whitespace-nowrap">Games Left</p>
@@ -3022,7 +3022,7 @@ function DashboardMobile() {
                 </div>
               </div>
             ) : hasStatManagerAccess() ? (
-              <div className="min-w-0 min-h-[60px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
+              <div className="min-w-0 min-h-[88px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
                 <button
                   type="button"
                   onClick={() => navigate('/scorekeeper')}
@@ -3040,15 +3040,15 @@ function DashboardMobile() {
             <button
               type="button"
               onClick={() => navigate('/trophy-case')}
-              className="min-w-0 min-h-[60px] w-full inline-flex items-center justify-center gap-2 rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="min-w-0 min-h-[88px] w-full inline-flex flex-col items-center justify-center gap-1 rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               data-testid="button-patches-home"
             >
-              <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-6 h-6 shrink-0 object-contain" />
+              <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 object-contain" />
               <span>Patches</span>
             </button>
 
             {effectiveLeagueId && (
-              <div className="min-w-0 min-h-[60px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
+              <div className="min-w-0 min-h-[88px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 rounded-xl px-1 py-1 sm:px-3 sm:py-2">
                     <div className="flex items-center gap-1 sm:gap-3">
