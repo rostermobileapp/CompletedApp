@@ -3013,7 +3013,7 @@ function DashboardMobile() {
                       <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
                     )}
                   </div>
-                  <div className="min-w-0 text-center sm:text-left">
+                  <div className="min-w-0 flex items-baseline justify-center gap-1 sm:justify-start">
                     <p className="text-base sm:text-2xl font-bold leading-none" data-testid="text-games-remaining">
                       {(teamRecord as any)?.gamesRemaining ?? 0}
                     </p>
