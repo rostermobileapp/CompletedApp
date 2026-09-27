@@ -2999,8 +2999,8 @@ function DashboardMobile() {
                 : 'grid-cols-1'
           }`}>
             {primaryTeam ? (
-              <div className="min-w-0 min-h-[88px] rounded-xl hairline elev-rest px-1 py-1 sm:px-2 bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
-                <div className="flex h-full flex-col items-center justify-center gap-1">
+              <div className="min-w-0 min-h-[72px] rounded-xl hairline elev-rest px-1 py-0.5 sm:px-2 bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-games-stat">
+                <div className="flex h-full flex-col items-center justify-center gap-0.5">
                   <div className={`w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-lg flex items-center justify-center ${primaryTeam.logoUrl ? 'bg-transparent' : 'bg-primary'}`}>
                     {primaryTeam.logoUrl ? (
                       <img
@@ -3022,7 +3022,7 @@ function DashboardMobile() {
                 </div>
               </div>
             ) : hasStatManagerAccess() ? (
-              <div className="min-w-0 min-h-[88px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
+              <div className="min-w-0 min-h-[72px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]" data-testid="card-scorekeeper-stat">
                 <button
                   type="button"
                   onClick={() => navigate('/scorekeeper')}
@@ -3040,7 +3040,7 @@ function DashboardMobile() {
             <button
               type="button"
               onClick={() => navigate('/trophy-case')}
-              className="min-w-0 min-h-[88px] w-full inline-flex flex-col items-center justify-center gap-1 rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="min-w-0 min-h-[72px] w-full inline-flex flex-col items-center justify-center gap-0.5 rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               data-testid="button-patches-home"
             >
               <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 object-contain" />
@@ -3048,7 +3048,7 @@ function DashboardMobile() {
             </button>
 
             {effectiveLeagueId && (
-              <div className="min-w-0 min-h-[88px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
+              <div className="min-w-0 min-h-[72px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
                 {isLoadingNeedsAttention ? (
                   <div className="w-full h-full flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 rounded-xl px-1 py-1 sm:px-3 sm:py-2">
                     <div className="flex items-center gap-1 sm:gap-3">
