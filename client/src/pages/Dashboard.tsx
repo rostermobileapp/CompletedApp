@@ -3040,10 +3040,11 @@ function DashboardMobile() {
             <button
               type="button"
               onClick={() => navigate('/trophy-case')}
-              className="min-w-0 min-h-[60px] w-full rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="min-w-0 min-h-[60px] w-full inline-flex items-center justify-center gap-2 rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               data-testid="button-patches-home"
             >
-              Patches
+              <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-6 h-6 shrink-0 object-contain" />
+              <span>Patches</span>
             </button>
 
             {effectiveLeagueId && (

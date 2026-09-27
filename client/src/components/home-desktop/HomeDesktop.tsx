@@ -183,11 +183,12 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
           <button
             type="button"
             onClick={() => navigate('/trophy-case')}
-            className={`${cardClass} elev-rest px-5 py-2 text-sm font-medium hover:bg-[#f2f2f2] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
+            className={`${cardClass} elev-rest inline-flex items-center justify-center gap-2 px-5 py-2 text-sm font-medium hover:bg-[#f2f2f2] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
             style={cardStyle}
             data-testid="button-patches-home-desktop"
           >
-            Patches
+            <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-6 h-6 shrink-0 object-contain" />
+            <span>Patches</span>
           </button>
         </div>
 
