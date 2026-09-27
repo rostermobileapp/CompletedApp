@@ -3050,32 +3050,26 @@ function DashboardMobile() {
             {effectiveLeagueId && (
               <div className="min-w-0 min-h-[72px] rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121]">
                 {isLoadingNeedsAttention ? (
-                  <div className="w-full h-full flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 rounded-xl px-1 py-1 sm:px-3 sm:py-2">
-                    <div className="flex items-center gap-1 sm:gap-3">
-                      <Bell className="w-4 h-4 shrink-0 text-[#212121] dark:text-white" />
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-0.5">
+                    <Bell className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 text-[#212121] dark:text-white" />
+                    <div className="flex items-center justify-center gap-1">
                       <span className="font-medium text-xs sm:text-sm text-[#212121] dark:text-white">Alerts</span>
-                    </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <div className="w-5 h-5 sm:w-6 sm:h-6 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
-                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
+                      <div className="w-5 h-5 bg-gray-400 dark:bg-gray-700 rounded-full animate-pulse"></div>
                     </div>
                   </div>
                 ) : needsAttentionData ? (
                   <button
                     type="button"
                     onClick={() => setShowNeedsAttentionModal(true)}
-                    className="w-full h-full flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 rounded-xl px-1 py-1 sm:px-3 sm:py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    className="w-full h-full flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     data-testid="button-needs-attention-permanent"
                   >
-                    <span className="flex items-center gap-1 sm:gap-3">
-                      <Bell className="w-4 h-4 shrink-0 text-[#212121] dark:text-white" />
+                    <Bell className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 text-[#212121] dark:text-white" />
+                    <span className="flex items-center justify-center gap-1">
                       <span className="font-medium text-xs sm:text-sm text-[#212121] dark:text-white">Alerts</span>
-                    </span>
-                    <span className="flex items-center gap-1 sm:gap-2">
-                      <span className="min-w-5 h-5 sm:min-w-6 sm:h-6 px-1 bg-red-500 rounded-full flex items-center justify-center">
+                      <span className="min-w-5 h-5 px-1 bg-red-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs font-bold">{needsAttentionData.total}</span>
                       </span>
-                      <ChevronDown className="w-4 h-4 text-[#212121] dark:text-white" />
                     </span>
                   </button>
                 ) : null}
