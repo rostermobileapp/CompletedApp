@@ -46,9 +46,9 @@ function isNativelyIosApp(): boolean {
  * the iOS $agent fallback check can safely call isNativelyAndroidApp() to
  * exclude Android devices.
  */
-function isNativelyAndroidApp(): boolean {
+export function isNativelyAndroidApp(): boolean {
   const ua = navigator.userAgent;
-  if (ua.includes('Natively/Android')) return true;
+  if (/Natively(?:\/|\s*)Android/i.test(ua)) return true;
   // Belt-and-suspenders: any Android UA + $agent bridge injected = Natively Android
   if (
     ua.toLowerCase().includes('android') &&
@@ -148,6 +148,26 @@ export function useIosPlatform(): IosPlatformInfo {
 
     return { isIos, isAndroid, isUsRegion, isReady: true };
   });
+
+  // Some Android shells inject $agent after the first React render. Do not
+  // permanently classify those builds as web when their UA lacks the standard
+  // Natively/Android token. Generic Android browsers still require $agent.
+  useEffect(() => {
+    if (info.isAndroid || info.isIos || !navigator.userAgent.toLowerCase().includes('android')) return;
+    const refresh = () => {
+      if (isNativelyAndroidApp()) {
+        setInfo((current) => ({ ...current, isAndroid: true }));
+      }
+    };
+    window.addEventListener('nativelyReady', refresh);
+    // Keep a low-frequency check for shells that inject the bridge late without
+    // dispatching the event; only unresolved Android UAs run this interval.
+    const interval = window.setInterval(refresh, 1000);
+    return () => {
+      window.removeEventListener('nativelyReady', refresh);
+      window.clearInterval(interval);
+    };
+  }, [info.isAndroid, info.isIos]);
 
   // Log on mount so developers can see what was detected (useful for debugging on device)
   useEffect(() => {

@@ -64,12 +64,30 @@ export async function isBillingSupported(): Promise<boolean> {
  * whose UA token differs slightly (e.g. "NativelyAndroid", space instead of
  * slash, or no Natively token at all but $agent still injected on Android).
  */
-export async function isAndroidBillingSupported(): Promise<boolean> {
-  const ua = navigator.userAgent;
-  const hasAgent = typeof (window as any).$agent !== 'undefined';
-  if (ua.includes('Natively/Android') && hasAgent) return true;
-  if (ua.toLowerCase().includes('android') && hasAgent) return true;
-  return false;
+export async function isAndroidBillingSupported(waitMs = 5000): Promise<boolean> {
+  if (!navigator.userAgent.toLowerCase().includes('android')) return false;
+  if (typeof (window as any).$agent !== 'undefined') return true;
+
+  // The UA is available before the native bridge is injected. A one-time
+  // synchronous check can permanently disable billing on a cold app launch.
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (supported: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+      window.removeEventListener('nativelyReady', check);
+      resolve(supported);
+    };
+    const check = () => {
+      if (typeof (window as any).$agent !== 'undefined') finish(true);
+    };
+    const interval = window.setInterval(check, 200);
+    const timeout = window.setTimeout(() => finish(false), waitMs);
+    window.addEventListener('nativelyReady', check);
+    check();
+  });
 }
 
 export interface NativelyProductPrice {
@@ -77,22 +95,41 @@ export interface NativelyProductPrice {
   priceString: string;
 }
 
+export function canPurchaseAndroidProduct(
+  prices: Record<string, string>,
+  productId: string,
+  verificationAvailable: boolean | undefined,
+): boolean {
+  return Boolean(prices[productId]) && verificationAvailable === true;
+}
+
 /**
  * Convert a raw Natively price payload to a clean display string.
  * Natively returns price as a float (e.g. 124.990000000000001), so we
  * round to 2 decimal places and prepend the currency symbol if needed.
  */
-function formatPrice(data: any): string {
+function formatPrice(data: any, requireCurrency = false): string {
   // Prefer a pre-formatted string from the bridge
-  if (data?.priceString && typeof data.priceString === 'string' && data.priceString.trim()) {
-    return data.priceString.trim();
+  for (const candidate of [data?.priceString, data?.formattedPrice, data?.localizedPrice]) {
+    if (typeof candidate === 'string' && candidate.trim() && !/^\d+(?:\.\d+)?$/.test(candidate.trim())) {
+      return candidate.trim();
+    }
   }
   const raw = data?.price;
   if (raw == null) return '';
-  if (typeof raw === 'number') {
-    return `$${raw.toFixed(2)}`;
+  if (typeof raw === 'string' && !/^\d+(?:\.\d+)?$/.test(raw.trim())) return raw.trim();
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount < 0) return '';
+  const currency = data?.currencyCode ?? data?.currency ?? data?.priceCurrencyCode;
+  if (typeof currency === 'string' && /^[A-Z]{3}$/i.test(currency)) {
+    return new Intl.NumberFormat(navigator.language, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount);
   }
-  return String(raw).trim();
+  // An amount alone has no trustworthy currency. Android must not show a
+  // guessed dollar price beside a real Google Play payment.
+  return requireCurrency ? '' : `$${amount.toFixed(2)}`;
 }
 
 /**
@@ -135,7 +172,9 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
  * routes to RevenueCat → Google Play Billing and returns the localised
  * Play price. We use the same per-call instance pattern as iOS.
  */
-export async function getAndroidProducts(): Promise<NativelyProductPrice[]> {
+export async function getAndroidProducts(
+  onProduct?: (product: NativelyProductPrice) => void,
+): Promise<NativelyProductPrice[]> {
   const ids = [
     PRODUCT_PLAYER_PRO,
     PRODUCT_COMMISSIONER,
@@ -143,22 +182,31 @@ export async function getAndroidProducts(): Promise<NativelyProductPrice[]> {
     PRODUCT_COMMISSIONER_YEARLY,
   ];
 
-  const results: NativelyProductPrice[] = [];
-
-  for (const id of ids) {
+  // Each call has its own bridge instance/ID. Query together so one missing
+  // SKU cannot hold the other three prices behind four serial 10s timeouts.
+  const results = await Promise.all(ids.map(async (id): Promise<NativelyProductPrice | null> => {
     try {
       const instance = new NativelyPurchases();
       const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
-      const priceString = formatPrice(data);
+      if (data?.status === 'FAILED') {
+        console.warn(`[IAP/Android] packagePrice(${id}) returned FAILED:`, String(data.error ?? 'unknown error').slice(0, 120));
+        return null;
+      }
+      const priceString = formatPrice(data, true);
       if (priceString) {
-        results.push({ identifier: id, priceString });
+        const product = { identifier: id, priceString };
+        onProduct?.(product);
+        return product;
+      } else {
+        console.warn(`[IAP/Android] packagePrice(${id}) returned no price (status=${String(data?.status ?? 'unknown')})`);
       }
     } catch (err: any) {
       console.warn(`[IAP/Android] packagePrice(${id}) failed:`, err?.message ?? err);
     }
-  }
+    return null;
+  }));
 
-  return results;
+  return results.filter((product): product is NativelyProductPrice => product !== null);
 }
 
 export interface NativelyTransaction {
@@ -349,7 +397,7 @@ export async function purchaseProductAndroid(
     60_000,
   );
 
-  console.log('[IAP/Android] purchasePackage() callback fired with:', data);
+  console.log('[IAP/Android] purchasePackage() callback received', { status: data?.status });
 
   if (!data) {
     throw new Error('No response from Google Play. Please try again.');

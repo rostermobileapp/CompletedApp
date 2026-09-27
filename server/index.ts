@@ -6,6 +6,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { warmCityGeoCache } from "./storage";
 import { initReferralDb } from "./referralDbInit";
 import { initDraftDb } from "./draftDbInit";
+import { initGoogleIapClaimsDb } from "./googleIapClaimsInit";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
@@ -84,6 +85,7 @@ app.use((req, res, next) => {
   // Initialize referral program tables before registering routes.
   await initReferralDb();
   await initDraftDb();
+  await initGoogleIapClaimsDb();
 
   const server = await registerRoutes(app);
   startBeerBadgeEvaluationWorker();

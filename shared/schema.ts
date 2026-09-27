@@ -301,6 +301,14 @@ export const users = pgTable("users", {
   feeExempt: boolean("fee_exempt").default(false).notNull(),
 });
 
+// Permanent, unique ownership of a Play token. The token itself is not stored
+// here; a user may upgrade and acquire a second token without releasing the old one.
+export const googleIapClaims = pgTable("google_iap_claims", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  userId: varchar("user_id").notNull(),
+  claimedAt: timestamp("claimed_at").defaultNow().notNull(),
+});
+
 // Popup dismissal and push delivery have separate lifecycles. One row per
 // user and local birthday also protects against duplicate sends on restarts.
 export const birthdayGreetings = pgTable("birthday_greetings", {

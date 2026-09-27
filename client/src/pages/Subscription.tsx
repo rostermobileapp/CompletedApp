@@ -14,6 +14,7 @@ import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
   isBillingSupported,
   isAndroidBillingSupported,
+  canPurchaseAndroidProduct,
   getIosProducts,
   getAndroidProducts,
   purchaseProduct,
@@ -37,6 +38,8 @@ export default function Subscription() {
   const [iapReady, setIapReady] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   const [iosProductPrices, setIosProductPrices] = useState<Record<string, string>>({});
+  const [androidLookupState, setAndroidLookupState] = useState<'checking' | 'loading' | 'ready' | 'unsupported' | 'unavailable'>('checking');
+  const [androidLookupAttempt, setAndroidLookupAttempt] = useState(0);
 
   // In-app embedded Stripe checkout for subscription upgrades — replaces the
   // hosted-checkout redirect we previously used. The server creates a Checkout
@@ -72,6 +75,17 @@ export default function Subscription() {
   const [showRedirectConfirmation, setShowRedirectConfirmation] = useState(false);
 
   const { isIos, isAndroid, isUsRegion, isReady: platformReady } = useIosPlatform();
+  const {
+    data: googleBillingAvailability,
+    isLoading: googleBillingAvailabilityLoading,
+    isError: googleBillingAvailabilityError,
+    refetch: refetchGoogleBillingAvailability,
+  } = useQuery<{ available: boolean }>({
+    queryKey: ['/api/iap/google-availability'],
+    enabled: isAndroid,
+    staleTime: 0,
+    retry: 1,
+  });
 
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
@@ -94,29 +108,42 @@ export default function Subscription() {
     });
   }, [platformReady, isIos]);
 
-  // Initialize IAP on Android — deferred setIapReady until at least one
-  // product price comes back so the button only enables if RevenueCat is
-  // configured and live (avoids a silent 60-second spin if the API key is
-  // missing or the toggle is off in BuildNatively).
+  // The native bridge can arrive after the UA and first render. Publish prices
+  // as each product resolves instead of labelling a 4-product lookup "unavailable".
   useEffect(() => {
     if (!platformReady || !isAndroid) return;
-    isAndroidBillingSupported().then(async (supported) => {
-      if (!supported) return;
-      const products = await getAndroidProducts();
-      if (products.length === 0) {
-        console.warn('[Subscription] Android: 0 products — RevenueCat Android key may not be set in BuildNatively.');
-        return;
+    let active = true;
+    setAndroidLookupState('checking');
+    setIosProductPrices({});
+    setIapReady(false);
+    (async () => {
+      try {
+        const supported = await isAndroidBillingSupported();
+        if (!active) return;
+        if (!supported) {
+          setAndroidLookupState('unsupported');
+          return;
+        }
+        setAndroidLookupState('loading');
+        const products = await getAndroidProducts((product) => {
+          if (active) setIosProductPrices((prev) => ({ ...prev, [product.identifier]: product.priceString }));
+        });
+        if (!active) return;
+        if (products.length === 0) {
+          console.warn('[Subscription] Android: no Google Play products returned by native bridge.');
+          setAndroidLookupState('unavailable');
+          return;
+        }
+        setAndroidLookupState('ready');
+        setIapReady(true);
+      } catch (err) {
+        if (!active) return;
+        console.warn('[Subscription] Android IAP init error:', err);
+        setAndroidLookupState('unavailable');
       }
-      const priceMap: Record<string, string> = {};
-      for (const p of products) {
-        priceMap[p.identifier] = p.priceString;
-      }
-      setIosProductPrices((prev) => ({ ...prev, ...priceMap }));
-      setIapReady(true);
-    }).catch((err) => {
-      console.warn('[Subscription] Android IAP init error:', err);
-    });
-  }, [platformReady, isAndroid]);
+    })();
+    return () => { active = false; };
+  }, [platformReady, isAndroid, androidLookupAttempt]);
 
   // Silently check for pending purchases (e.g. promo code redeemed in the
   // Play Store outside the app) as soon as the billing bridge is confirmed
@@ -124,7 +151,7 @@ export default function Subscription() {
   // found" — only surfaces a toast if an unacknowledged subscription is
   // discovered and activated.
   useEffect(() => {
-    if (!isAndroid || !iapReady) return;
+    if (!isAndroid || androidLookupState !== 'ready' || !googleBillingAvailability?.available) return;
     (async () => {
       try {
         const purchases = await restorePurchasesAndroid();
@@ -153,7 +180,7 @@ export default function Subscription() {
         // silent — don't surface auto-check errors to the user
       }
     })();
-  }, [isAndroid, iapReady]);
+  }, [isAndroid, androidLookupState, googleBillingAvailability?.available]);
 
   // Auto-sync subscription status on page load
   useEffect(() => {
@@ -519,10 +546,16 @@ export default function Subscription() {
   // bridge to Google Play Billing and verifies the resulting purchase token
   // against /api/iap/verify-google. No Stripe involvement on Android.
   const handleAndroidPurchase = async (tier: 'player_pro' | 'commissioner') => {
+    const productId = billingPeriod === 'yearly'
+      ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
+      : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
+    if (!canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available)) {
+      toast({ title: 'Google Play unavailable', description: 'This plan cannot be purchased right now. Please retry loading plans or contact support.', variant: 'destructive' });
+      return;
+    }
     setIsLoading(true);
     console.log(`Step 1: handleAndroidPurchase called with tier=${tier}`, {
       billingPeriod,
-      iapReady,
       isAndroid,
       isIos,
       iosProductPricesKeys: Object.keys(iosProductPrices),
@@ -530,18 +563,9 @@ export default function Subscription() {
       hasAgent: typeof (window as any).$agent !== 'undefined',
     });
     try {
-      const productId = billingPeriod === 'yearly'
-        ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
-        : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
-
       console.log(`Step 2: Calling Natively Google Play purchase method for productId=${productId}`);
       const purchase = await purchaseProductAndroid(productId);
-      console.log(`Step 3: Natively responded: ${JSON.stringify(purchase)}`);
-
-      console.log(`Step 4: Sending receipt to /api/iap/verify-google`, {
-        purchaseToken: purchase.purchaseToken?.slice(0, 20) + '…',
-        productId: purchase.productIdentifier || productId,
-      });
+      console.log('Step 3: Natively purchase callback received; requesting server verification');
       const response = await apiRequest('POST', '/api/iap/verify-google', {
         purchaseToken: purchase.purchaseToken,
         productId: purchase.productIdentifier || productId,
@@ -1061,36 +1085,46 @@ export default function Subscription() {
                   ) : null}Manage Subscription
                                     </button>))
               ) : isAndroid ? (
-                /* Android: Roster (Stripe) primary + Google Play secondary.
-                   Google Play button only enables once RevenueCat responds. */
+                /* Android: only Google Play Billing inside the native app. */
                 (() => {
-                  const stripePriceStr = billingPeriod === 'yearly'
-                    ? (plan.tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay)
-                    : (plan.tier === 'player_pro' ? proMonthlyDisplay : commMonthlyDisplay);
-                  const playPrice = iosProductPrices[
-                    billingPeriod === 'yearly'
-                      ? (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
-                      : (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER)
-                  ];
-                  const stripePriceId = `price-android-stripe-${plan.tier}-${index}`;
+                  const productId = billingPeriod === 'yearly'
+                    ? (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
+                    : (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
+                  const playPrice = iosProductPrices[productId];
                   const playPriceId = `price-google-${plan.tier}-${index}`;
+                  const statusId = `status-google-${plan.tier}-${index}`;
                   const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
+                  const checking = androidLookupState === 'checking' || androidLookupState === 'loading' || googleBillingAvailabilityLoading;
+                  const canPurchase = canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available);
+                  const statusMessage = googleBillingAvailability?.available === false
+                    ? 'Google Play purchases cannot be activated right now. Please contact support before attempting payment.'
+                    : googleBillingAvailabilityError
+                      ? 'Could not check payment availability. Check your connection and try again.'
+                      : androidLookupState === 'unsupported'
+                        ? 'The Google Play billing connection is not available in this app build. Update the app or contact support.'
+                        : !playPrice && !checking
+                          ? androidLookupState === 'ready'
+                            ? 'This plan is not available from Google Play right now. Try another billing period or contact support.'
+                            : 'Google Play plans did not load. Check your connection and Play Store account, then try again.'
+                          : null;
                   return (
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                          disabled={isLoading || !iapReady}
-                          aria-describedby={playPrice ? playPriceId : undefined}
+                          disabled={isLoading || !canPurchase}
+                          aria-describedby={[playPrice ? playPriceId : '', statusMessage ? statusId : ''].filter(Boolean).join(' ') || undefined}
                           className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
                           data-testid={`button-iap-android-${plan.tier}`}
                         >
                           {isLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : !iapReady ? (
-                            'Google Play unavailable'
-                          ) : (
+                          ) : canPurchase ? (
                             'Subscribe via Google Play'
+                          ) : checking && !statusMessage ? (
+                            'Checking Google Play...'
+                          ) : (
+                            'Google Play unavailable'
                           )}
                         </button>
                         {playPrice && (
@@ -1104,6 +1138,24 @@ export default function Subscription() {
                           </span>
                         )}
                       </div>
+                      {statusMessage && (
+                        <p id={statusId} role="status" className="text-xs text-muted-foreground" data-testid={`status-google-${plan.tier}`}>
+                          {statusMessage}
+                        </p>
+                      )}
+                      {!canPurchase && (!checking || statusMessage) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAndroidLookupAttempt((attempt) => attempt + 1);
+                            void refetchGoogleBillingAvailability();
+                          }}
+                          className="text-xs text-primary underline text-left"
+                          data-testid={`retry-google-${plan.tier}`}
+                        >
+                          Retry Google Play
+                        </button>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         Manage via <strong>Play Store → Profile → Payments &amp; subscriptions</strong>
                       </p>

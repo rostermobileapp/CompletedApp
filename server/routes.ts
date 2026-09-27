@@ -35,6 +35,8 @@ import {
 } from "./permissionMiddleware";
 import { db } from "./db";
 import { gamePenalties } from "@shared/schema";
+import { googleIapClaims } from "@shared/schema";
+import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
@@ -5030,6 +5032,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Update the user's role in the DB and sync to Supabase.
    * Also stores the IAP originalTransactionId for webhook lookups.
    */
+  const syncIapRoleMetadata = async (userId: string, newRole: 'commissioner' | 'player_pro') => {
+    try {
+      await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: { subscription_tier: newRole },
+      });
+    } catch (supabaseErr) {
+      console.warn('[IAP] Failed to sync Supabase metadata:', supabaseErr);
+    }
+  };
   const applyIapRole = async (
     userId: string,
     newRole: 'commissioner' | 'player_pro',
@@ -5044,14 +5055,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(originalTransactionId ? { iapOriginalTransactionId: originalTransactionId } : {}),
       })
       .where(eq(users.id, userId));
+    await syncIapRoleMetadata(userId, newRole);
+  };
 
-    try {
-      await supabase.auth.admin.updateUserById(userId, {
-        user_metadata: { subscription_tier: newRole },
-      });
-    } catch (supabaseErr) {
-      console.warn('[IAP] Failed to sync Supabase metadata:', supabaseErr);
-    }
+  // Serialize claims for the same token so two accounts cannot race to reuse
+  // a verified purchase. Do not acknowledge a token before ownership is checked.
+  const claimGoogleIapRole = async (
+    userId: string,
+    newRole: 'commissioner' | 'player_pro',
+    purchaseToken: string,
+  ) => {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${purchaseToken}))`);
+      const legacyOwners = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.iapOriginalTransactionId, purchaseToken));
+      if (legacyOwners.some((owner) => owner.id !== userId)) {
+        throw Object.assign(new Error('This Google Play subscription is already linked to another account'), { status: 409 });
+      }
+      const tokenHash = hashGoogleIapToken(purchaseToken);
+      await tx.insert(googleIapClaims).values({ tokenHash, userId }).onConflictDoNothing();
+      const [claim] = await tx
+        .select({ userId: googleIapClaims.userId })
+        .from(googleIapClaims)
+        .where(eq(googleIapClaims.tokenHash, tokenHash))
+        .limit(1);
+      if (!claim || claim.userId !== userId) {
+        throw Object.assign(new Error('This Google Play subscription is already linked to another account'), { status: 409 });
+      }
+      await tx.update(users).set({
+        role: newRole,
+        iapOriginalTransactionId: purchaseToken,
+        lastUpdated: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
+    });
+    await syncIapRoleMetadata(userId, newRole);
   };
 
   // ─── POST /api/iap/verify ──────────────────────────────────────────────────
@@ -5257,6 +5297,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const GOOGLE_PLAY_PACKAGE_NAME =
     process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.aFFhvtIzJvyF.natively';
 
+  // Do not offer a purchase that this server cannot verify and activate.
+  app.get('/api/iap/google-availability', isAuthenticated, async (_req: any, res) => {
+    const { isGoogleIapConfigured } = await import('./googleIap');
+    res.set('Cache-Control', 'no-store');
+    res.json({ available: isGoogleIapConfigured() });
+  });
+
   // ─── POST /api/iap/verify-google ──────────────────────────────────────────
   // Called by the Android client after a successful Google Play Billing
   // purchase. Mirrors /api/iap/verify (Apple) but uses the Play Developer
@@ -5328,23 +5375,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      await claimGoogleIapRole(userId, newRole, purchaseToken.trim());
+
       // Acknowledge the purchase if Google hasn't seen us do so yet. Required
       // within 3 days of purchase or Google auto-refunds. Idempotent and
       // non-fatal — failure is logged but does not block role assignment.
       if (purchase.acknowledgementState !== 'ACKNOWLEDGED') {
-        await acknowledgeSubscriptionPurchase(
-          GOOGLE_PLAY_PACKAGE_NAME,
-          purchase.productId,
-          purchaseToken.trim(),
-        );
+        try {
+          await acknowledgeSubscriptionPurchase(
+            GOOGLE_PLAY_PACKAGE_NAME,
+            purchase.productId,
+            purchaseToken.trim(),
+          );
+        } catch (error) {
+          console.error('[GoogleIAP] Purchase acknowledgement failed; restore must retry:', error);
+        }
       }
 
-      // Reuse the same role-application path as Apple. We store the Google
-      // Play purchase token in the same `iapOriginalTransactionId` column so
+      // We store the Google Play purchase token in the existing
+      // `iapOriginalTransactionId` column so
       // the future RTDN handler (see TODO in server/googleIap.ts) can look
       // up the user from a Pub/Sub notification payload.
-      await applyIapRole(userId, newRole, purchaseToken.trim());
-
       console.log(
         `[GoogleIAP] Verified for user ${userId}: role → ${newRole} (${purchase.productId}, ${purchase.subscriptionState})`,
       );
