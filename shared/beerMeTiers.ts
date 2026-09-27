@@ -1,5 +1,5 @@
 export const BEER_ME_TIERS = [
-  { tier: "bronze", threshold: 1, imagePath: "/badges/beer-me/tier-1.webp" },
+  { tier: "bronze", threshold: 1, imagePath: "/badges/beer-me/tier-1.webp?v=20260927" },
   { tier: "silver", threshold: 10, imagePath: "/badges/beer-me/tier-2.webp" },
   { tier: "gold", threshold: 25, imagePath: "/badges/beer-me/tier-3.webp" },
   { tier: "platinum", threshold: 50, imagePath: "/badges/beer-me/tier-4.webp" },
