@@ -425,6 +425,7 @@ export async function reconcileCalendarYearBeerMe() {
   const result = await db.execute(sql`
     SELECT gbc.user_id, SUM(gbc.count)::int AS count
     FROM game_beer_counts gbc JOIN games g ON g.id = gbc.game_id
+      JOIN users u ON u.id = gbc.user_id
     WHERE g.scheduled_at >= ${`${year}-01-01 00:00:00`}::timestamp
       AND g.scheduled_at < ${`${year + 1}-01-01 00:00:00`}::timestamp
     GROUP BY gbc.user_id
@@ -986,13 +987,14 @@ export async function reconcileSeasonHatTricks() {
   const tiers = await db.select().from(badgeTiers)
     .where(eq(badgeTiers.badgeDefinitionId, definition.id)).orderBy(asc(badgeTiers.threshold));
   const result = await db.execute(sql`
-    SELECT scorer_id AS user_id, season_id, COUNT(*)::int AS count FROM (
+    SELECT qualifying_games.scorer_id AS user_id, qualifying_games.season_id, COUNT(*)::int AS count FROM (
       SELECT gg.scorer_id, g.season_id, gg.game_id
       FROM game_goals gg JOIN games g ON g.id = gg.game_id
       WHERE gg.scorer_id IS NOT NULL AND g.season_id IS NOT NULL AND g.is_completed = true
       GROUP BY gg.scorer_id, g.season_id, gg.game_id HAVING COUNT(*) >= 3
     ) qualifying_games
-    GROUP BY scorer_id, season_id
+    JOIN users u ON u.id = qualifying_games.scorer_id
+    GROUP BY qualifying_games.scorer_id, qualifying_games.season_id
   `);
   for (const row of result.rows) {
     const userId = String(row.user_id);
@@ -1045,7 +1047,8 @@ export async function reconcileCalendarYearCenturyClub() {
       WHERE sr.status = 'approved' AND s.status <> 'cancelled' AND s.time_tbd = false
         AND s.date_time < (NOW() AT TIME ZONE s.timezone)
         AND s.date_time >= ${start}::timestamp AND s.date_time < ${end}::timestamp
-    ) participants GROUP BY user_id
+    ) participants JOIN users u ON u.id = participants.user_id
+    GROUP BY participants.user_id
   `);
   if (!candidates.rows.length) return;
   const progressRows: (typeof badgeProgress.$inferInsert)[] = [];
@@ -1092,7 +1095,8 @@ export async function reconcileHistoricalThreeStarPoints() {
       SELECT first_star_user_id AS user_id, 3 AS points FROM game_stars
       UNION ALL SELECT second_star_user_id, 2 FROM game_stars
       UNION ALL SELECT third_star_user_id, 1 FROM game_stars
-    ) scored GROUP BY user_id
+    ) scored JOIN users u ON u.id = scored.user_id
+    GROUP BY scored.user_id
   `);
   for (const row of totals.rows) {
     const userId = String(row.user_id);

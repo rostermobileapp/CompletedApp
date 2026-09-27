@@ -1,0 +1,72 @@
+
+t,u):new D.DatabaseError(u,t,i);return c.severity=s.S,c.code=s.C,c.detail=s.D,c.
+     ^
+error: insert or update on table "badge_awards" violates foreign key constraint "badge_awards_user_id_fkey"
+    at cn.parseErrorMessage (file:///app/node_modules/@neondatabase/serverless/index.mjs:1182:6)
+    at cn.handlePacket (file:///app/node_modules/@neondatabase/serverless/index.mjs:1143:13)
+    at cn.parse (file:///app/node_modules/@neondatabase/serverless/index.mjs:1127:36)
+    at v.<anonymous> (file:///app/node_modules/@neondatabase/serverless/index.mjs:1190:16)
+    at v.emit (file:///app/node_modules/@neondatabase/serverless/index.mjs:397:12)
+    at WebSocket.<anonymous> (file:///app/node_modules/@neondatabase/serverless/index.mjs:987:80)
+    at callListener (/app/node_modules/ws/lib/event-target.js:290:14)
+    at WebSocket.onMessage (/app/node_modules/ws/lib/event-target.js:209:9)
+    at WebSocket.emit (node:events:519:28)
+    at Receiver.receiverOnMessage (/app/node_modules/ws/lib/websocket.js:1253:20) {
+  length: 305,
+  severity: 'ERROR',
+  code: '23503',
+  detail: 'Key (user_id)=(61a7df33-a0a1-450a-b012-51773ff70a8c) is not present in table "users".',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'badge_awards',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'badge_awards_user_id_fkey',
+  file: 'ri_triggers.c',
+  line: '2599',
+  routine: 'ri_ReportViolation'
+}
+Node.js v22.23.2
+npm warn config production Use `--omit=dev` instead.
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.js
+[Init] Referral program tables ensured
+[Draft] Auto-pick schedule columns ensured
+  length: 305,
+    at cn.parseErrorMessage (file:///app/node_modules/@neondatabase/serverless/index.mjs:1182:6)
+  severity: 'ERROR',
+  code: '23503',
+    at cn.handlePacket (file:///app/node_modules/@neondatabase/serverless/index.mjs:1143:13)
+  detail: 'Key (user_id)=(61a7df33-a0a1-450a-b012-51773ff70a8c) is not present in table "users".',
+    at cn.parse (file:///app/node_modules/@neondatabase/serverless/index.mjs:1127:36)
+    at v.<anonymous> (file:///app/node_modules/@neondatabase/serverless/index.mjs:1190:16)
+    at v.emit (file:///app/node_modules/@neondatabase/serverless/index.mjs:397:12)
+    at WebSocket.<anonymous> (file:///app/node_modules/@neondatabase/serverless/index.mjs:987:80)
+    at callListener (/app/node_modules/ws/lib/event-target.js:290:14)
+    at WebSocket.onMessage (/app/node_modules/ws/lib/event-target.js:209:9)
+file:///app/node_modules/@neondatabase/serverless/index.mjs:1182
+t,u):new D.DatabaseError(u,t,i);return c.severity=s.S,c.code=s.C,c.detail=s.D,c.
+    at WebSocket.emit (node:events:519:28)
+    at Receiver.receiverOnMessage (/app/node_modules/ws/lib/websocket.js:1253:20) {
+     ^
+error: insert or update on table "badge_awards" violates foreign key constraint "badge_awards_user_id_fkey"
+  routine: 'ri_ReportViolation'
+}
+Node.js v22.23.2
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'badge_awards',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'badge_awards_user_id_fkey',
+  file: 'ri_triggers.c',
+  line: '2599',
+Stopping Container
