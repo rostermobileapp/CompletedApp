@@ -187,7 +187,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
             style={cardStyle}
             data-testid="button-patches-home-desktop"
           >
-            <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 object-contain" />
+            <img src="/patches-home-icon.png?v=20260927" alt="" aria-hidden="true" className="w-[3.3rem] h-[3.3rem] sm:w-[3.6rem] sm:h-[3.6rem] shrink-0 object-contain" />
             <span>Patches</span>
           </button>
         </div>

@@ -3043,7 +3043,7 @@ function DashboardMobile() {
               className="min-w-0 min-h-[72px] w-full inline-flex flex-col items-center justify-center gap-0.5 rounded-xl hairline elev-rest bg-[#e2e2e2] dark:bg-[#212121] text-[#212121] dark:text-white text-sm font-medium hover:bg-muted/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               data-testid="button-patches-home"
             >
-              <img src="/patches-home-icon.png" alt="" aria-hidden="true" className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 object-contain" />
+              <img src="/patches-home-icon.png?v=20260927" alt="" aria-hidden="true" className="w-[3.3rem] h-[3.3rem] sm:w-[3.6rem] sm:h-[3.6rem] shrink-0 object-contain" />
               <span>Patches</span>
             </button>
 
