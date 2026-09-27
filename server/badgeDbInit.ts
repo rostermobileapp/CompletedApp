@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { ensureDefaultBadges, reconcileCalendarYearCenturyClub, reconcileCareerShutouts, reconcileFirstSubBadge, reconcileHistoricalThreeStarPoints, reconcileIronMan, reconcileRookieCard, reconcileSeasonEarlyBird, reconcileSeasonHatTricks, reconcileSeasonOnFire, reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
+import { runBadgeBackfillJobs } from "./badgeBackfillRunner";
 
 // Runtime-safe DDL keeps older deployments compatible. The Drizzle schema
 // remains the source of truth and drizzle-kit can still generate a migration.
@@ -123,15 +124,20 @@ export async function ensureBadgeTables() {
     CREATE INDEX IF NOT EXISTS idx_badge_events_created ON badge_earned_events(created_at);
   `);
   await ensureDefaultBadges();
-  await reconcileHistoricalThreeStarPoints();
-  await reconcileRookieCard();
-  await reconcileFirstSubBadge();
-  await reconcileSeasonSubMagnet();
-  await reconcileCalendarYearCenturyClub();
-  await reconcileSeasonHatTricks();
-  await reconcileSeasonOnFire();
-  await reconcileIronMan();
-  await reconcileCareerShutouts();
-  await reconcileSeasonEarlyBird();
-  await reconcileSeasonRsvpKing();
+}
+
+export async function runHistoricalBadgeBackfills(): Promise<void> {
+  await runBadgeBackfillJobs([
+    { name: "Three Stars", run: reconcileHistoricalThreeStarPoints },
+    { name: "Rookie Card", run: reconcileRookieCard },
+    { name: "Sub", run: reconcileFirstSubBadge },
+    { name: "Sub Magnet", run: reconcileSeasonSubMagnet },
+    { name: "Century Club", run: reconcileCalendarYearCenturyClub },
+    { name: "Hat Trick", run: reconcileSeasonHatTricks },
+    { name: "On Fire", run: reconcileSeasonOnFire },
+    { name: "Iron Man", run: reconcileIronMan },
+    { name: "Locked In", run: reconcileCareerShutouts },
+    { name: "Early Bird", run: reconcileSeasonEarlyBird },
+    { name: "RSVP King", run: reconcileSeasonRsvpKing },
+  ]);
 }

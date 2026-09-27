@@ -143,3 +143,57 @@ test("Hat Trick counts qualifying games separately per season, not goals or cale
     await db.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   }
 });
+
+test("historical Hat Trick backfill ignores a deleted scorer without hiding other players", async () => {
+  const run = randomUUID().replace(/-/g, "");
+  const existing = `test_${run}_existing`;
+  const removed = `test_${run}_removed`;
+  const league = `test_${run}_league`;
+  const season = `test_${run}_season`;
+  const team = `test_${run}_team`;
+  const game = `test_${run}_game`;
+  try {
+    await ensureDefaultBadges();
+    await db.execute(sql`
+      INSERT INTO users (id, email, first_name, last_name, role, onboarding_completed,
+        last_updated, created_at, updated_at, fee_exempt)
+      VALUES (${existing}, ${`hat_orphan_${run}@example.com`}, 'Existing', 'Player',
+        'free_tier', false, NOW(), NOW(), NOW(), false)
+    `);
+    await db.execute(sql`
+      INSERT INTO leagues (id, name, unique_league_id, sport, commissioner_id, is_active,
+        playoff_started, sub_approval_workflow, created_at, updated_at)
+      VALUES (${league}, 'Orphan Backfill Test', ${`O${run.slice(0, 5)}`.toUpperCase()},
+        'hockey', ${existing}, true, false, 'captain_and_commissioner', NOW(), NOW())
+    `);
+    await db.execute(sql`INSERT INTO seasons (id, name, league_id, is_active, created_at, updated_at)
+      VALUES (${season}, 'Season', ${league}, true, NOW(), NOW())`);
+    await db.execute(sql`INSERT INTO teams (id, name, league_id, season_id, created_at, updated_at)
+      VALUES (${team}, 'Team', ${league}, ${season}, NOW(), NOW())`);
+    await db.execute(sql`
+      INSERT INTO games (id, league_id, season_id, home_team_id, scheduled_at, is_completed)
+      VALUES (${game}, ${league}, ${season}, ${team}, '2026-01-02 12:00:00', true)
+    `);
+    for (const scorer of [existing, removed]) {
+      for (let goal = 1; goal <= 3; goal++) {
+        await db.execute(sql`INSERT INTO game_goals (game_id, team_id, scorer_id, goal_number)
+          VALUES (${game}, ${team}, ${scorer}, ${scorer === removed ? goal + 3 : goal})`);
+      }
+    }
+
+    await reconcileSeasonHatTricks();
+    const awards = (await db.execute(sql`
+      SELECT user_id FROM badge_awards a JOIN badge_definitions d ON d.id = a.badge_definition_id
+      WHERE d.slug = 'hat_trick' AND a.user_id IN (${existing}, ${removed})
+    `)).rows;
+    assert.deepEqual(awards.map((award) => award.user_id), [existing]);
+    assert.equal((await db.execute(sql`SELECT COUNT(*)::int AS count FROM game_goals WHERE scorer_id = ${removed}`)).rows[0].count, 3);
+  } finally {
+    await db.execute(sql`DELETE FROM game_goals WHERE game_id = ${game}`);
+    await db.execute(sql`DELETE FROM games WHERE id = ${game}`);
+    await db.execute(sql`DELETE FROM teams WHERE id = ${team}`);
+    await db.execute(sql`DELETE FROM seasons WHERE id = ${season}`);
+    await db.execute(sql`DELETE FROM leagues WHERE id = ${league}`);
+    await db.execute(sql`DELETE FROM users WHERE id = ${existing}`);
+  }
+});
