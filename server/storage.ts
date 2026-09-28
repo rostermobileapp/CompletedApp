@@ -1,4 +1,5 @@
 import { hasOneGoalMargin } from "@shared/gameResultType";
+import { resolveTeamJerseyNumber } from "./teamJerseyNumber";
 import {
   users,
   leagues,
@@ -3053,6 +3054,16 @@ export class DatabaseStorage implements IStorage {
   // Add a captain to a team (multi-captain support)
   async addTeamCaptain(teamId: string, userId: string): Promise<boolean> {
     try {
+      const [assignedMember] = await db
+        .select({ jerseyNumber: leagueMemberships.jerseyNumber })
+        .from(leagueMemberships)
+        .where(and(
+          eq(leagueMemberships.userId, userId),
+          eq(leagueMemberships.assignedTeamId, teamId),
+          eq(leagueMemberships.status, 'approved'),
+        ))
+        .limit(1);
+
       // Check if user already has a membership
       const [membership] = await db
         .select()
@@ -3066,7 +3077,10 @@ export class DatabaseStorage implements IStorage {
         // Update existing membership
         await db
           .update(teamMemberships)
-          .set({ isCaptain: true })
+          .set({
+            isCaptain: true,
+            ...(assignedMember?.jerseyNumber != null ? { jerseyNumber: assignedMember.jerseyNumber } : {}),
+          })
           .where(and(
             eq(teamMemberships.teamId, teamId),
             eq(teamMemberships.userId, userId)
@@ -3080,6 +3094,7 @@ export class DatabaseStorage implements IStorage {
           userId,
           isCaptain: true,
           status: 'approved',
+          jerseyNumber: assignedMember?.jerseyNumber ?? null,
         });
       }
       
@@ -3314,19 +3329,10 @@ export class DatabaseStorage implements IStorage {
       teamIdToMembershipLeagueId.set(teamId, leagueId);
     }
 
-    // Direct memberships have the same precedence used by getTeamMembers when
-    // both direct and league-assigned rows exist.
-    const jerseyNumberByTeamId = new Map<string, number | null>();
-    for (const row of teamMembershipResult) {
-      if (!jerseyNumberByTeamId.has(row.team.id)) {
-        jerseyNumberByTeamId.set(row.team.id, row.jerseyNumber ?? null);
-      }
-    }
-    for (const row of leagueMembershipResult) {
-      if (!jerseyNumberByTeamId.has(row.team.id)) {
-        jerseyNumberByTeamId.set(row.team.id, row.jerseyNumber ?? null);
-      }
-    }
+    // Prefer the assigned league number; captain assignment can create a
+    // direct team row with a blank number.
+    const directJerseys = new Map(teamMembershipResult.map(row => [row.team.id, row.jerseyNumber]));
+    const assignedJerseys = new Map(leagueMembershipResult.map(row => [row.team.id, row.jerseyNumber]));
 
     // Keep the profile from presenting a jersey number tied to a finished
     // tournament. This flag is additive so other consumers can continue to
@@ -3361,7 +3367,11 @@ export class DatabaseStorage implements IStorage {
         // The league the user is actually a member of for this team.
         // Preferred over team.leagueId on the frontend for display purposes.
         membershipLeagueId: teamIdToMembershipLeagueId.get(team.id) ?? null,
-        jerseyNumber: jerseyNumberByTeamId.get(team.id) ?? null,
+        jerseyNumber: resolveTeamJerseyNumber(
+          directJerseys.get(team.id),
+          assignedJerseys.get(team.id),
+          assignedJerseys.has(team.id),
+        ),
         isInCompletedTournament: completedTournamentTeamIds.has(team.id),
       };
     });
@@ -4955,12 +4965,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateLeagueMember(membershipId: string, updates: Partial<LeagueMembership>): Promise<LeagueMembership> {
-    const [membership] = await db
-      .update(leagueMemberships)
-      .set(updates)
-      .where(eq(leagueMemberships.id, membershipId))
-      .returning();
-    return membership;
+    return db.transaction(async (tx) => {
+      const [membership] = await tx
+        .update(leagueMemberships)
+        .set(updates)
+        .where(eq(leagueMemberships.id, membershipId))
+        .returning();
+
+      if (membership && 'jerseyNumber' in updates && membership.assignedTeamId && membership.status === 'approved') {
+        await tx.update(teamMemberships)
+          .set({ jerseyNumber: membership.jerseyNumber })
+          .where(and(
+            eq(teamMemberships.userId, membership.userId),
+            eq(teamMemberships.teamId, membership.assignedTeamId),
+            eq(teamMemberships.status, 'approved'),
+          ));
+      }
+      return membership;
+    });
   }
 
   async getLeagueMembership(membershipId: string): Promise<LeagueMembership | undefined> {
@@ -5059,10 +5081,21 @@ export class DatabaseStorage implements IStorage {
       ...leagueMembershipResults.map(r => ({ ...r.team_memberships, user: r.users }))
     ];
 
-    // Remove duplicates based on userId
-    const uniqueMembers = allMembers.filter((member, index, arr) => 
-      arr.findIndex(m => m.userId === member.userId) === index
+    // Keep direct membership metadata (including captain status), but prefer
+    // the league-assigned jersey when both approved sources have a number.
+    const leagueJerseys = new Map(
+      leagueMembershipResults.map(({ team_memberships: member }) => [member.userId, member.jerseyNumber]),
     );
+    const uniqueMembers = allMembers
+      .filter((member, index, arr) => arr.findIndex(m => m.userId === member.userId) === index)
+      .map((member) => ({
+        ...member,
+        jerseyNumber: resolveTeamJerseyNumber(
+          member.jerseyNumber,
+          leagueJerseys.get(member.userId),
+          leagueJerseys.has(member.userId),
+        ),
+      }));
 
     return uniqueMembers;
   }
