@@ -5159,6 +5159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     expiryTimeMs: number,
   ) => {
     const appliedRole = await db.transaction(async (tx) => {
+      // Claims for distinct tokens on the same Roster account must also be
+      // serialized so a lower-tier restore cannot race a higher-tier one.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${purchaseToken}))`);
       const legacyOwners = await tx
         .select({ id: users.id })
@@ -5183,15 +5186,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).where(eq(googleIapClaims.tokenHash, tokenHash));
       const linkedApple = await tx.execute(sql`
         SELECT original_transaction_id FROM apple_purchase_links
-        WHERE user_id = ${userId} AND expires_at > NOW() LIMIT 1
+        WHERE user_id = ${userId} AND expires_at > NOW()
+          AND revoked_by_apple = FALSE LIMIT 1
       `);
       const appleOriginal = linkedApple.rows[0]?.original_transaction_id as string | undefined;
       const [user] = await tx.select({
         role: users.role, stripeSubscriptionId: users.stripeSubscriptionId,
       }).from(users).where(eq(users.id, userId)).for('update');
       if (!user) throw new Error('Roster user not found');
-      const role = newRole === 'player_pro' && user.role === 'commissioner' && user.stripeSubscriptionId
-          ? 'commissioner' : newRole;
+      const activeClaims = await tx.execute(sql`
+        SELECT
+          EXISTS(SELECT 1 FROM google_iap_claims
+            WHERE user_id = ${userId} AND expires_at > NOW()
+              AND product_id IN ('commissioner_monthly', 'commissioner_yearly')) AS google_commissioner,
+          EXISTS(SELECT 1 FROM google_iap_claims
+            WHERE user_id = ${userId} AND expires_at > NOW()
+              AND product_id IN ('player_pro_monthly', 'player_pro_yearly')) AS google_pro
+      `);
+      const { resolveLinkedPurchaseRole } = await import('./linkedPurchaseRole');
+      const requestedRole = newRole === 'player_pro' && user.role === 'commissioner' && user.stripeSubscriptionId
+        ? 'commissioner' : newRole;
+      const role = resolveLinkedPurchaseRole(requestedRole, {
+        appleActive: Boolean(appleOriginal),
+        googleCommissioner: activeClaims.rows[0]?.google_commissioner === true,
+        googlePro: activeClaims.rows[0]?.google_pro === true,
+      });
       await tx.update(users).set({
         role,
         // Keep Apple's webhook lookup intact when both stores have an active

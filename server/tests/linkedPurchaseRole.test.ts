@@ -4,6 +4,8 @@ import { resolveLinkedPurchaseRole } from '../linkedPurchaseRole';
 
 test('verified Google Play Commissioner is not lowered by a Stripe Player Pro refresh', () => {
   assert.equal(resolveLinkedPurchaseRole('player_pro', { googleCommissioner: true }), 'commissioner');
+  // Restoring a second, lower-tier Play token must not erase the first claim.
+  assert.equal(resolveLinkedPurchaseRole('player_pro', { googleCommissioner: true, googlePro: true }), 'commissioner');
 });
 
 test('verified Google Play Player Pro remains after Stripe billing ends', () => {

@@ -1,10 +1,10 @@
 type BillingRole = 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
 
 /** Highest active, verified entitlement wins; a store-only UI hint never counts. */
-export function resolveLinkedPurchaseRole(
-  requested: BillingRole,
+export function resolveLinkedPurchaseRole<T extends BillingRole>(
+  requested: T,
   entitlements: { appleActive?: boolean; googleCommissioner?: boolean; googlePro?: boolean },
-): BillingRole {
+): T | 'commissioner' | 'player_pro' {
   if (entitlements.googleCommissioner && (requested === 'free_tier' || requested === 'player_pro')) {
     return 'commissioner';
   }

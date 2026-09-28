@@ -722,9 +722,9 @@ export default function Subscription() {
         return;
       }
 
-      // Try each restored purchase token until one verifies as active. Most
-      // users only have one active sub, but multi-product accounts (e.g. an
-      // upgrade from Player Pro → Commissioner) can have several.
+      // Verify every restored token. An account may have both Pro and
+      // Commissioner purchases; stopping after the first would miss the
+      // higher tier and might leave the role too low.
       let verifiedRole: string | null = null;
       let lastError: string | null = null;
       for (const p of purchases) {
@@ -736,7 +736,7 @@ export default function Subscription() {
           const data = await response.json() as { role?: string; message?: string };
           if (response.ok && data.role && data.role !== 'free_tier') {
             verifiedRole = data.role;
-            break;
+            continue;
           }
           lastError = data.message ?? null;
         } catch (err: any) {
@@ -748,7 +748,7 @@ export default function Subscription() {
         toast({
           title: 'Google Play purchase verified',
           description: verifiedRole === 'commissioner'
-            ? 'Your Roster-billed Commissioner plan is still active. Manage that subscription to switch to Player Pro.'
+            ? 'Commissioner is still your highest verified tier. Check each billing source before changing plans.'
             : 'Your Player Pro subscription is now linked to your Roster account.',
         });
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
@@ -771,10 +771,10 @@ export default function Subscription() {
     setIsLoading(true);
     try {
       const response = await apiRequest('POST', '/api/stripe/sync-subscription');
-      const data = await response.json() as { message: string; tier: string };
+      const data = await response.json() as { message: string; tier: string; actualRole?: string };
       toast({
         title: 'Success',
-        description: `Your subscription has been synced! You are now on the ${data.tier === 'commissioner' ? 'Commissioner' : 'Player Pro'} tier.`,
+        description: `Your subscription has been synced. Your current tier is ${data.actualRole === 'commissioner' ? 'Commissioner' : 'Player Pro'}.`,
       });
       window.location.reload();
     } catch (error: any) {
@@ -841,7 +841,7 @@ export default function Subscription() {
             {isAndroid && (
               <div className="rounded-lg border p-3">
                 <p className="font-medium">Google Play</p>
-                <p className="text-muted-foreground mt-1">If Play Store lists a Roster subscription, open Play Store → Profile → Payments &amp; subscriptions → Subscriptions → Roster → Cancel subscription. Use the Google account that bought it. Your paid access usually continues until its expiry.</p>
+                    <p className="text-muted-foreground mt-1">If Play Store lists a Roster subscription, open Play Store → Profile → Payments &amp; subscriptions → Subscriptions → Roster → Cancel subscription. Use the Google account that bought it. Your paid access usually continues until its expiry.</p>
                 <button type="button"
                   onClick={() => window.open('https://play.google.com/store/account/subscriptions', '_system')}
                   className="inline-block text-primary underline mt-2" data-testid="link-free-manage-play">
@@ -852,7 +852,7 @@ export default function Subscription() {
             {isIos && (
               <p>For an App Store subscription, open Settings → your name → Subscriptions → Roster → Cancel Subscription. Access usually continues until its expiry.</p>
             )}
-            <p className="text-muted-foreground">If you have more than one paid subscription, cancel each one separately. Roster will update your access after the remaining paid entitlement ends.</p>
+            <p className="text-muted-foreground">If you have more than one paid subscription, cancel each one separately. If your Roster tier still appears paid after all billing ends, contact support—some access may be assigned separately from billing.</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -1193,7 +1193,7 @@ export default function Subscription() {
                   <p className="text-muted-foreground">
                     {hasStripePlan
                       ? 'Your Commissioner plan is billed through Roster. If Google Play already has Player Pro, restore it below; then manage your Roster-billed plan to switch. Do not buy Player Pro again.'
-                      : 'Your Commissioner plan is active. Change or cancel it in Google Play before starting Player Pro; a second purchase is not a downgrade.'}
+                      : 'Your Roster account currently has Commissioner access, but its billing source is not confirmed here. If Google Play shows Player Pro, do not buy it again. Restore it below; if Play returns no purchase proof, contact support. Do not cancel a subscription just to change the displayed tier.'}
                   </p>
                   <button type="button" onClick={handleAndroidRestore} disabled={isLoading}
                     className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground disabled:opacity-50"
@@ -1208,7 +1208,7 @@ export default function Subscription() {
                   ) : (
                     <button type="button"
                       onClick={() => window.open('https://play.google.com/store/account/subscriptions', '_system')}
-                      className="block text-primary underline">Manage Google Play subscription</button>
+                      className="block text-primary underline">View Google Play subscriptions</button>
                   )}
                 </div>
               ) : isAndroid ? (
