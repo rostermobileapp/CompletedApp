@@ -55,3 +55,4 @@
 - [Badge backfill orphan safety](badge-backfill-orphan-safety.md) — historical game records may refer to removed users; filter startup award candidates through existing users before inserting.
 - [Badge artwork cache busting](badge-artwork-cache-busting.md) — when replacing a badge image at the same public path, version its catalog URL so mobile webviews request the new art.
 - [Google Play billing readiness](google-play-billing-readiness.md) — native product visibility and server purchase verification are separate prerequisites; test both before enabling payment.
+- [Natively RevenueCat proof gap](natively-revenuecat-proof.md) — purchase/restore callbacks do not supply Apple transaction proof; verify entitlements server-side before granting access.
