@@ -4994,6 +4994,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // independently of the database and Apple JWS signing stack.
   const { IAP_PRODUCT_ROLES, resolveNotificationAction } = await import('./appleNotificationHandler');
 
+  // Non-granting RevenueCat diagnostics. In particular, an anonymous customer
+  // ID is NOT proof of ownership of a Roster account.
+  app.get('/api/admin/iap/revenuecat/availability', isAuthenticated, loadUserPermissions, requireSpecialPermission('admin'), async (_req, res) => {
+    const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+    res.json({ configured: isRevenueCatApiConfigured() });
+  });
+
+  app.post('/api/admin/iap/revenuecat/check', isAuthenticated, loadUserPermissions, requireSpecialPermission('admin'), async (req: any, res) => {
+    const { customerId, rosterUserId } = req.body ?? {};
+    if (typeof customerId !== 'string' || !customerId.trim() || customerId.length > 1500 ||
+        typeof rosterUserId !== 'string' || !rosterUserId.trim()) {
+      return res.status(400).json({ message: 'A customer ID and Roster user ID are required' });
+    }
+    try {
+      const user = await storage.getUser(rosterUserId);
+      if (!user) return res.status(404).json({ message: 'Roster user not found' });
+      const { getRevenueCatAppleSubscriptions } = await import('./revenueCatApi');
+      const subscriptions = await getRevenueCatAppleSubscriptions(customerId);
+      return res.json({
+        rosterUserId: user.id,
+        currentRole: user.role,
+        alreadyLinkedToIap: Boolean(user.iapOriginalTransactionId),
+        activeAppleSubscriptions: subscriptions,
+        // This lookup does NOT establish account ownership; only the signed-in
+        // user flow or an approved, uniquely claimed repair can do that.
+        accountOwnershipVerified: false,
+        roleChanged: false,
+      });
+    } catch (error) {
+      console.error('[IAP/RevenueCat] Read-only diagnostic failed:', error instanceof Error ? error.message : 'unknown error');
+      return res.status(502).json({ message: 'Could not check RevenueCat. Confirm the API key and try again.' });
+    }
+  });
+
   // Stable namespace used to derive deterministic appAccountTokens from userIds
   const IAP_APP_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
