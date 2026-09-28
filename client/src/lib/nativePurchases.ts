@@ -1,5 +1,8 @@
 import { NativelyPurchases } from 'natively';
 import { v5 as uuidv5 } from 'uuid';
+import { extractProductId, extractPurchaseToken, isAlreadyOwnedPurchaseError, parseAndroidPurchaseStatus } from './androidPurchaseStatus';
+import type { AndroidPurchaseResult, AndroidPurchaseStatus } from './androidPurchaseStatus';
+export { isAlreadyOwnedPurchaseError } from './androidPurchaseStatus';
 
 // RevenueCat package identifiers (used by NativelyPurchases bridge)
 export const PRODUCT_PLAYER_PRO = 'player_pro_monthly';
@@ -324,54 +327,6 @@ export async function purchaseProduct(
   };
 }
 
-export interface AndroidPurchaseResult {
-  /** Google Play SKU (e.g. "player_pro_monthly") */
-  productIdentifier: string;
-  /** Google Play purchase token — the only field needed for server verification */
-  purchaseToken: string;
-  /** Raw callback payload — logged for debugging */
-  raw?: any;
-}
-
-/**
- * Extract the Google Play purchase token from a Natively/RevenueCat callback
- * payload. Different bridge versions surface this under different keys, so we
- * check the common ones.
- */
-function extractPurchaseToken(data: any): string | undefined {
-  if (!data || typeof data !== 'object') return undefined;
-  const candidates = [
-    data.purchaseToken,
-    data.googlePurchaseToken,
-    data.purchase_token,
-    data.token,
-    data.transactionId, // RevenueCat sometimes returns the purchase token as transactionId on Android
-    data.transaction_id,
-    data.originalPurchaseToken,
-  ];
-  for (const c of candidates) {
-    if (typeof c === 'string' && c.trim().length > 0) return c.trim();
-  }
-  // Some bridges nest the token under a productInfo / transaction object
-  if (data.transaction) {
-    const nested = extractPurchaseToken(data.transaction);
-    if (nested) return nested;
-  }
-  return undefined;
-}
-
-function extractProductId(data: any, fallback?: string): string {
-  if (!data || typeof data !== 'object') return fallback ?? '';
-  return (
-    data.productIdentifier ??
-    data.product_id ??
-    data.productId ??
-    data.sku ??
-    fallback ??
-    ''
-  );
-}
-
 /**
  * Purchase a subscription via the Natively Google Play Billing bridge (Android).
  *
@@ -419,6 +374,11 @@ export async function purchaseProductAndroid(
         'Google Play Billing is unavailable on this device. Make sure your Google account is signed in and the Play Store is up to date.',
       );
     }
+    if (isAlreadyOwnedPurchaseError(errorMsg)) {
+      const err: any = new Error('This subscription is already on your Google Play account. Do not buy it again; use Restore Purchases.');
+      err.code = 'PURCHASE_ALREADY_OWNED';
+      throw err;
+    }
     if (lowered.includes('item_unavailable') || lowered.includes('item_not_owned')) {
       throw new Error(
         "This subscription isn't available right now. New products can take a few hours to propagate from Play Console — please try again shortly.",
@@ -448,41 +408,19 @@ export async function purchaseProductAndroid(
  * it isn't, the caller should fall back to a generic "Restore initiated"
  * message and let the user contact support if the entitlement doesn't apply.
  */
-export async function restorePurchasesAndroid(): Promise<AndroidPurchaseResult[]> {
+export async function inspectAndroidPurchases(): Promise<AndroidPurchaseStatus> {
   const data = await toPromise<any>((cb) => np.restore(cb));
-
   if (data == null) {
     throw new Error('Google Play restore returned no data. Please try again.');
   }
-
   if (data.status === 'FAILED') {
     throw new Error(data.error ?? 'Restore failed. Please try again.');
   }
+  return parseAndroidPurchaseStatus(data);
+}
 
-  const items: any[] = Array.isArray(data)
-    ? data
-    : data.purchases ?? data.transactions ?? data.activeSubscriptions ?? [];
-
-  const results: AndroidPurchaseResult[] = [];
-  for (const item of items) {
-    const purchaseToken = extractPurchaseToken(item);
-    const productIdentifier = extractProductId(item);
-    if (purchaseToken) {
-      results.push({ productIdentifier, purchaseToken, raw: item });
-    }
-  }
-
-  // If the wrapper response itself carries a token (common when there's only
-  // one active sub), include it as a single result.
-  if (results.length === 0) {
-    const purchaseToken = extractPurchaseToken(data);
-    const productIdentifier = extractProductId(data);
-    if (purchaseToken) {
-      results.push({ productIdentifier, purchaseToken, raw: data });
-    }
-  }
-
-  return results;
+export async function restorePurchasesAndroid(): Promise<AndroidPurchaseResult[]> {
+  return (await inspectAndroidPurchases()).purchases;
 }
 
 /**

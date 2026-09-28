@@ -1,5 +1,6 @@
 import { db } from './db';
 import { sql } from 'drizzle-orm';
+import { resolveLinkedPurchaseRole } from './linkedPurchaseRole';
 
 /** Preserve an independently verified Apple Player Pro purchase when another
  * payment source changes the account role. Higher commissioner roles win. */
@@ -20,11 +21,9 @@ export async function preserveLinkedAppleRole(
           AND product_id IN ('player_pro_monthly', 'player_pro_yearly')) AS google_pro
   `);
   const entitlements = result.rows[0];
-  if (entitlements?.google_commissioner && (requested === 'free_tier' || requested === 'player_pro')) {
-    return 'commissioner';
-  }
-  if ((entitlements?.apple_active || entitlements?.google_pro) && requested === 'free_tier') {
-    return 'player_pro';
-  }
-  return requested;
+  return resolveLinkedPurchaseRole(requested, {
+    appleActive: entitlements?.apple_active === true,
+    googleCommissioner: entitlements?.google_commissioner === true,
+    googlePro: entitlements?.google_pro === true,
+  });
 }

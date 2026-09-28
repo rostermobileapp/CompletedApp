@@ -3962,15 +3962,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create billing portal session
       let portalSession;
+      const appUrl = process.env.FRONTEND_URL ||
+        (process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '');
+      if (!appUrl || (process.env.NODE_ENV === 'production' && !appUrl.startsWith('https://'))) {
+        throw new Error('Billing return URL is not configured');
+      }
+      const returnUrl = new URL('/subscription', appUrl).toString();
       try {
-        // Use REPLIT_DOMAINS for the return URL (not REPL_HOME which is a file path)
-        const appUrl = process.env.REPLIT_DOMAINS 
-          ? `https://${process.env.REPLIT_DOMAINS}` 
-          : 'http://localhost:5000';
-        
         portalSession = await stripe.billingPortal.sessions.create({
           customer: customerId,
-          return_url: `${appUrl}/subscription`,
+          return_url: returnUrl,
         });
       } catch (error: any) {
         // If customer doesn't exist in Stripe, create a new one
@@ -3989,13 +3990,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateUserStripeInfo(userId, customerId, user.stripeSubscriptionId || '');
           
           // Retry creating portal session with new customer
-          const appUrl = process.env.REPLIT_DOMAINS 
-            ? `https://${process.env.REPLIT_DOMAINS}` 
-            : 'http://localhost:5000';
-          
           portalSession = await stripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: `${appUrl}/subscription`,
+            return_url: returnUrl,
           });
         } else {
           throw error;
@@ -4949,22 +4946,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's subscription info and role
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, subscription.id);
+      // Stripe is only one payment source. A verified, still-active Play or
+      // App Store claim may entitle this account to a higher tier.
+      const { preserveLinkedAppleRole } = await import('./appleClaimRole');
+      const effectiveTier = await preserveLinkedAppleRole(userId, tier);
       
-      // WORKAROUND: Use raw SQL to update role column to bypass Drizzle column confusion
-      // The users table has TWO role columns (Supabase auth.users + app schema)
-      // Drizzle was updating the correct enum column but selecting the wrong VARCHAR column
-      await db.execute(sql.raw(`
-        UPDATE users 
-        SET role = '${tier}'::user_role,
+      // Keep the explicit enum update used by this sync path, but parameterize
+      // it and write the effective tier instead of blindly writing Stripe's.
+      await db.execute(sql`
+        UPDATE users
+        SET role = CAST(${effectiveTier} AS user_role),
             last_updated = NOW(),
             updated_at = NOW()
-        WHERE id = '${userId}'
-      `));
+        WHERE id = ${userId}
+      `);
       
       // Also sync role to Supabase user metadata for tracking
       try {
         const { error: supabaseError } = await supabase.auth.admin.updateUserById(userId, {
-          user_metadata: { subscription_tier: tier }
+          user_metadata: { subscription_tier: effectiveTier }
         });
         if (supabaseError) {
           console.warn('[Sync] Failed to update Supabase metadata:', supabaseError.message);
@@ -4980,7 +4980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: 'Subscription synced successfully', 
         tier,
         subscriptionId: subscription.id,
-        actualRole: verifyUser?.role // Add this to see what's actually in DB
+        actualRole: verifyUser?.role
       });
     } catch (error: any) {
       console.error('[Sync] Error syncing subscription:', error);
@@ -5158,7 +5158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     productId: string,
     expiryTimeMs: number,
   ) => {
-    await db.transaction(async (tx) => {
+    const appliedRole = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${purchaseToken}))`);
       const legacyOwners = await tx
         .select({ id: users.id })
@@ -5190,17 +5190,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: users.role, stripeSubscriptionId: users.stripeSubscriptionId,
       }).from(users).where(eq(users.id, userId)).for('update');
       if (!user) throw new Error('Roster user not found');
+      const role = newRole === 'player_pro' && user.role === 'commissioner' && user.stripeSubscriptionId
+          ? 'commissioner' : newRole;
       await tx.update(users).set({
-        role: newRole === 'player_pro' && user.role === 'commissioner' && user.stripeSubscriptionId
-          ? 'commissioner' : newRole,
+        role,
         // Keep Apple's webhook lookup intact when both stores have an active
         // claim. Google's independent ownership is in google_iap_claims.
         iapOriginalTransactionId: appleOriginal || purchaseToken,
         lastUpdated: new Date(),
         updatedAt: new Date(),
       }).where(eq(users.id, userId));
+      return role;
     });
-    await syncIapRoleMetadata(userId, newRole);
+    await syncIapRoleMetadata(userId, appliedRole);
+    return appliedRole;
   };
 
   // ─── POST /api/iap/verify ──────────────────────────────────────────────────
@@ -5610,7 +5613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isFinite(purchase.expiryTimeMs)) {
         return res.status(402).json({ message: 'Google Play did not provide a valid subscription expiration' });
       }
-      await claimGoogleIapRole(userId, newRole, purchaseToken.trim(), purchase.productId, purchase.expiryTimeMs!);
+      const appliedRole = await claimGoogleIapRole(userId, newRole, purchaseToken.trim(), purchase.productId, purchase.expiryTimeMs!);
 
       // Acknowledge the purchase if Google hasn't seen us do so yet. Required
       // within 3 days of purchase or Google auto-refunds. Idempotent and
@@ -5632,9 +5635,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // the future RTDN handler (see TODO in server/googleIap.ts) can look
       // up the user from a Pub/Sub notification payload.
       console.log(
-        `[GoogleIAP] Verified for user ${userId}: role → ${newRole} (${purchase.productId}, ${purchase.subscriptionState})`,
+        `[GoogleIAP] Verified for user ${userId}: role → ${appliedRole} (${purchase.productId}, ${purchase.subscriptionState})`,
       );
-      return res.json({ message: 'IAP verified and role updated', role: newRole });
+      return res.json({ message: 'IAP verified and role updated', role: appliedRole });
     } catch (error: any) {
       console.error('[GoogleIAP] Verification error:', error);
       const status = typeof error.status === 'number' ? error.status : 500;

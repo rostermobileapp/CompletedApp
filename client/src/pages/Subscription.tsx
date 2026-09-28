@@ -14,11 +14,13 @@ import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
   isBillingSupported,
   isAndroidBillingSupported,
+  isAlreadyOwnedPurchaseError,
   canPurchaseAndroidProduct,
   getIosProducts,
   getAndroidProducts,
   purchaseProduct,
   purchaseProductAndroid,
+  inspectAndroidPurchases,
   restorePurchases,
   restorePurchasesAndroid,
   PRODUCT_PLAYER_PRO,
@@ -40,6 +42,8 @@ export default function Subscription() {
   const [iosProductPrices, setIosProductPrices] = useState<Record<string, string>>({});
   const [androidLookupState, setAndroidLookupState] = useState<'checking' | 'loading' | 'ready' | 'unsupported' | 'unavailable'>('checking');
   const [androidLookupAttempt, setAndroidLookupAttempt] = useState(0);
+  const [androidOwnedProducts, setAndroidOwnedProducts] = useState<string[]>([]);
+  const [showFreeHelp, setShowFreeHelp] = useState(false);
 
   // In-app embedded Stripe checkout for subscription upgrades — replaces the
   // hosted-checkout redirect we previously used. The server creates a Checkout
@@ -90,6 +94,7 @@ export default function Subscription() {
   const isCommissioner = role === 'commissioner';
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
+  const hasStripePlan = Boolean(user?.stripeSubscriptionId);
 
   // Initialize IAP on iOS — check billing support then fetch real App Store prices
   useEffect(() => {
@@ -171,7 +176,8 @@ export default function Subscription() {
     if (!isAndroid || androidLookupState !== 'ready' || !googleBillingAvailability?.available) return;
     (async () => {
       try {
-        const purchases = await restorePurchasesAndroid();
+        const { purchases, activeProductIds } = await inspectAndroidPurchases();
+        setAndroidOwnedProducts(activeProductIds);
         if (!purchases.length) return;
         let verified = false;
         for (const p of purchases) {
@@ -190,7 +196,6 @@ export default function Subscription() {
           }
         }
         if (verified) {
-          toast({ title: 'Subscription activated!', description: 'Your subscription has been applied to your account.' });
           queryClient.invalidateQueries({ queryKey: ['/api/user'] });
         }
       } catch {
@@ -568,6 +573,15 @@ export default function Subscription() {
   // bridge to Google Play Billing and verifies the resulting purchase token
   // against /api/iap/verify-google. No Stripe involvement on Android.
   const handleAndroidPurchase = async (tier: 'player_pro' | 'commissioner') => {
+    if (isCommissioner && tier === 'player_pro') {
+      toast({
+        title: 'Change your existing plan first',
+        description: hasStripePlan
+          ? 'Your Commissioner plan is billed by Roster. Restore your existing Google Play purchase, then manage the Roster subscription before switching plans.'
+          : 'Manage your Commissioner subscription in Google Play before switching to Player Pro. Do not start a second subscription.',
+      });
+      return;
+    }
     const productId = billingPeriod === 'yearly'
       ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
       : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
@@ -658,6 +672,17 @@ export default function Subscription() {
       window.location.reload();
     } catch (error: any) {
       console.error('[Subscription/Android] Purchase error:', error?.message, error?.stack);
+      const duplicate = error?.code === 'PURCHASE_ALREADY_OWNED' ||
+        isAlreadyOwnedPurchaseError(error?.message ?? '');
+      if (duplicate) {
+        setAndroidOwnedProducts((previous) => Array.from(new Set([...previous, productId])));
+        toast({
+          title: 'Already subscribed in Google Play',
+          description: 'Google Play says this plan is already owned. Do not buy it again. Tap Restore Purchases to link it to your Roster account.',
+        });
+        setIsLoading(false);
+        return;
+      }
       if (
         error?.code === 'PURCHASE_CANCELLED' ||
         error?.message?.toLowerCase().includes('cancel') ||
@@ -683,10 +708,16 @@ export default function Subscription() {
   const handleAndroidRestore = async () => {
     setIsLoading(true);
     try {
-      const purchases = await restorePurchasesAndroid();
+      const { purchases, activeProductIds } = await inspectAndroidPurchases();
+      setAndroidOwnedProducts(activeProductIds);
 
       if (!purchases.length) {
-        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        toast({
+          title: activeProductIds.length ? 'Purchase needs verification' : 'No verifiable purchase found',
+          description: activeProductIds.length
+            ? 'Google Play reports an active plan, but did not give Roster the purchase proof needed to link it. Do not buy it again; contact support.'
+            : 'No Google Play purchase proof was returned. If Play Store shows an active Roster plan, do not buy it again; contact support.',
+        });
         setIsLoading(false);
         return;
       }
@@ -694,7 +725,7 @@ export default function Subscription() {
       // Try each restored purchase token until one verifies as active. Most
       // users only have one active sub, but multi-product accounts (e.g. an
       // upgrade from Player Pro → Commissioner) can have several.
-      let verified = false;
+      let verifiedRole: string | null = null;
       let lastError: string | null = null;
       for (const p of purchases) {
         try {
@@ -704,7 +735,7 @@ export default function Subscription() {
           });
           const data = await response.json() as { role?: string; message?: string };
           if (response.ok && data.role && data.role !== 'free_tier') {
-            verified = true;
+            verifiedRole = data.role;
             break;
           }
           lastError = data.message ?? null;
@@ -713,8 +744,13 @@ export default function Subscription() {
         }
       }
 
-      if (verified) {
-        toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
+      if (verifiedRole) {
+        toast({
+          title: 'Google Play purchase verified',
+          description: verifiedRole === 'commissioner'
+            ? 'Your Roster-billed Commissioner plan is still active. Manage that subscription to switch to Player Pro.'
+            : 'Your Player Pro subscription is now linked to your Roster account.',
+        });
         queryClient.invalidateQueries({ queryKey: ['/api/user'] });
         window.location.reload();
       } else {
@@ -783,6 +819,43 @@ export default function Subscription() {
         successHeadline="Subscription active"
         successMessage="Updating your account…"
       />
+      <Dialog open={showFreeHelp} onOpenChange={setShowFreeHelp}>
+        <DialogContent className="max-w-md" data-testid="dialog-switch-to-free">
+          <DialogHeader>
+            <DialogTitle>How to switch to Free</DialogTitle>
+            <DialogDescription>
+              Free starts after your paid subscriptions end. Cancel each subscription where it is billed; changing your Roster plan does not cancel a store charge.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            {hasStripePlan && (
+              <div className="rounded-lg border p-3">
+                <p className="font-medium">Roster billing (Stripe)</p>
+                <p className="text-muted-foreground mt-1">Your current plan is linked to Roster billing. Open billing management and cancel it there.</p>
+                <button type="button" onClick={() => { setShowFreeHelp(false); void handleManageSubscription(); }}
+                  className="text-primary underline mt-2" data-testid="button-free-manage-roster">
+                  Manage Roster billing
+                </button>
+              </div>
+            )}
+            {isAndroid && (
+              <div className="rounded-lg border p-3">
+                <p className="font-medium">Google Play</p>
+                <p className="text-muted-foreground mt-1">If Play Store lists a Roster subscription, open Play Store → Profile → Payments &amp; subscriptions → Subscriptions → Roster → Cancel subscription. Use the Google account that bought it. Your paid access usually continues until its expiry.</p>
+                <button type="button"
+                  onClick={() => window.open('https://play.google.com/store/account/subscriptions', '_system')}
+                  className="inline-block text-primary underline mt-2" data-testid="link-free-manage-play">
+                  Open Google Play subscriptions
+                </button>
+              </div>
+            )}
+            {isIos && (
+              <p>For an App Store subscription, open Settings → your name → Subscriptions → Roster → Cancel Subscription. Access usually continues until its expiry.</p>
+            )}
+            <p className="text-muted-foreground">If you have more than one paid subscription, cancel each one separately. Roster will update your access after the remaining paid entitlement ends.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmation shown after a redirect-based Stripe success returns to
          this page (billing-portal upgrade or 3DS fallback). Visually mirrors
@@ -871,10 +944,10 @@ export default function Subscription() {
                 {isCommissioner ? 'Commissioner' : isPlayerPlus ? 'Player Pro' : 'Free Tier'}
               </p>
               <p className="text-sm text-muted-foreground" data-testid="text-current-plan-price">
-                {isCommissioner
-                  ? `${isIos ? (iosProductPrices[PRODUCT_COMMISSIONER] ?? commMonthlyDisplay) : commMonthlyDisplay}/month`
+                  {isCommissioner
+                  ? `${isIos || (isAndroid && !hasStripePlan) ? (iosProductPrices[PRODUCT_COMMISSIONER] ?? commMonthlyDisplay) : commMonthlyDisplay}/month`
                   : isPlayerPlus
-                  ? `${isIos ? (iosProductPrices[PRODUCT_PLAYER_PRO] ?? proMonthlyDisplay) : proMonthlyDisplay}/month`
+                  ? `${isIos || (isAndroid && !hasStripePlan) ? (iosProductPrices[PRODUCT_PLAYER_PRO] ?? proMonthlyDisplay) : proMonthlyDisplay}/month`
                   : 'Free forever'}
               </p>
             </div>
@@ -897,10 +970,19 @@ export default function Subscription() {
                   <strong>Settings → Apple ID → Subscriptions</strong>.
                 </p>
               ) : isAndroid ? (
-                <p className="text-sm text-muted-foreground mt-4 text-center">
-                  Manage or cancel your Google Play subscription in{' '}
-                  <strong>Play Store → Profile → Payments &amp; subscriptions → Subscriptions</strong>.
-                </p>
+                <div className="mt-4 text-sm text-muted-foreground text-center space-y-2">
+                  {hasStripePlan && (
+                    <>
+                      <p>Your current plan is billed through Roster (Stripe), not Google Play. Cancel it separately if you want to change plans.</p>
+                      <button onClick={handleManageSubscription} disabled={isLoading}
+                        className="w-full rounded-lg bg-primary text-primary-foreground py-3 font-semibold disabled:opacity-50"
+                        data-testid="button-manage-roster-android">
+                        {isLoading ? 'Opening billing…' : 'Manage Roster billing'}
+                      </button>
+                    </>
+                  )}
+                  <p>For a Google Play subscription, open Play Store → Profile → Payments &amp; subscriptions → Subscriptions. A Play purchase is billed separately from Roster billing.</p>
+                </div>
               ) : (
                 <button
                   onClick={handleManageSubscription}
@@ -1093,19 +1175,42 @@ export default function Subscription() {
                   Current Plan
                 </button>
               ) : plan.tier === 'free_tier' ? (
-                /* Paid user viewing Free Tier card — only web shows a Manage button.
-                   On iOS/Android, downgrading is done via the store (already
-                   communicated in the footer), so the card has no CTA here. */
-                (isIos || isAndroid ? null : (<button
-                  onClick={handleManageSubscription}
+                (isIos || isAndroid ? (<button
+                  onClick={() => setShowFreeHelp(true)}
                   disabled={isLoading}
                   className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
                   data-testid={`button-${plan.tier}`}
                 >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : null}Manage Subscription
-                                    </button>))
+                  How to switch to Free
+                </button>) : (<button
+                  onClick={handleManageSubscription}
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                  data-testid={`button-${plan.tier}`}
+                >Manage Subscription</button>))
+              ) : isAndroid && isCommissioner && plan.tier === 'player_pro' ? (
+                <div className="space-y-2 text-sm">
+                  <p className="text-muted-foreground">
+                    {hasStripePlan
+                      ? 'Your Commissioner plan is billed through Roster. If Google Play already has Player Pro, restore it below; then manage your Roster-billed plan to switch. Do not buy Player Pro again.'
+                      : 'Your Commissioner plan is active. Change or cancel it in Google Play before starting Player Pro; a second purchase is not a downgrade.'}
+                  </p>
+                  <button type="button" onClick={handleAndroidRestore} disabled={isLoading}
+                    className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground disabled:opacity-50"
+                    data-testid="button-restore-existing-google">
+                    {isLoading ? 'Checking Google Play…' : 'Restore existing Google Play purchase'}
+                  </button>
+                  {hasStripePlan ? (
+                    <button type="button" onClick={handleManageSubscription} disabled={isLoading}
+                      className="text-primary underline" data-testid="button-change-roster-plan">
+                      Manage Roster-billed Commissioner plan
+                    </button>
+                  ) : (
+                    <button type="button"
+                      onClick={() => window.open('https://play.google.com/store/account/subscriptions', '_system')}
+                      className="block text-primary underline">Manage Google Play subscription</button>
+                  )}
+                </div>
               ) : isAndroid ? (
                 /* Android: only Google Play Billing inside the native app. */
                 (() => {
@@ -1118,6 +1223,7 @@ export default function Subscription() {
                   const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
                   const checking = androidLookupState === 'checking' || androidLookupState === 'loading' || googleBillingAvailabilityLoading;
                   const canPurchase = canPurchaseAndroidProduct(iosProductPrices, productId, googleBillingAvailability?.available, googleBillingAvailability?.productIds);
+                  const alreadyOwned = androidOwnedProducts.includes(productId);
                   const statusMessage = androidLookupState === 'unsupported'
                     ? 'The Google Play billing connection is not available in this app build. Update the app or contact support.'
                     : googleBillingAvailability?.available === false
@@ -1135,14 +1241,16 @@ export default function Subscription() {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
-                          disabled={isLoading || !canPurchase}
+                          onClick={() => alreadyOwned ? handleAndroidRestore() : handleAndroidPurchase(plan.tier as 'player_pro' | 'commissioner')}
+                          disabled={isLoading || (!canPurchase && !alreadyOwned)}
                           aria-describedby={[playPrice ? playPriceId : '', statusMessage ? statusId : ''].filter(Boolean).join(' ') || undefined}
                           className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center"
                           data-testid={`button-iap-android-${plan.tier}`}
                         >
                           {isLoading ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : alreadyOwned ? (
+                            'Restore Google Play subscription'
                           ) : canPurchase ? (
                             'Subscribe via Google Play'
                           ) : checking && !statusMessage ? (
@@ -1162,12 +1270,17 @@ export default function Subscription() {
                           </span>
                         )}
                       </div>
+                      {alreadyOwned && (
+                        <p role="status" className="text-xs text-muted-foreground">
+                          Google Play reports this plan already active. Do not purchase it again; restore it to verify your Roster access.
+                        </p>
+                      )}
                       {statusMessage && (
                         <p id={statusId} role="status" className="text-xs text-muted-foreground" data-testid={`status-google-${plan.tier}`}>
                           {statusMessage}
                         </p>
                       )}
-                      {!canPurchase && (!checking || statusMessage) && (
+                      {!alreadyOwned && !canPurchase && (!checking || statusMessage) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1290,7 +1403,9 @@ export default function Subscription() {
           {isIos
             ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
             : isAndroid
-            ? 'Google Play subscriptions auto-renew until cancelled. Cancel anytime via Play Store → Profile → Payments & subscriptions → Subscriptions.'
+            ? hasStripePlan
+              ? 'Your Roster-billed plan is managed through Roster billing. Google Play subscriptions, if any, must be cancelled separately in Play Store.'
+              : 'Google Play subscriptions auto-renew until cancelled. Cancel via Play Store → Profile → Payments & subscriptions → Subscriptions.'
             : billingPeriod === 'yearly'
             ? 'Subscriptions are billed annually. Cancel anytime through your account settings.'
             : 'Subscriptions are billed monthly. Cancel anytime through your account settings.'}
