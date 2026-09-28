@@ -1,4 +1,5 @@
 import { JWT } from 'google-auth-library';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 /**
  * Google Play Developer API verification for in-app subscriptions.
@@ -106,6 +107,46 @@ export async function getGooglePlaySubscriptionCatalog(packageName: string): Pro
       })),
     })),
   };
+}
+
+/**
+ * Orders API is read-only. Never use an order ID alone as purchase proof:
+ * the returned token must still be verified and tied to a device identity.
+ */
+export async function getGooglePlayOrderToken(
+  packageName: string, orderId: string,
+): Promise<{ purchaseToken: string; state: string; productIds: string[] }> {
+  const response = await authedFetch(
+    `/applications/${encodeURIComponent(packageName)}/orders/${encodeURIComponent(orderId)}`,
+  );
+  if (!response.ok) {
+    throw Object.assign(new Error(
+      response.status === 404 ? 'Google Play could not find this Roster order' : 'Google Play order lookup failed',
+    ), { status: response.status === 404 ? 404 : 502 });
+  }
+  const order: any = await response.json();
+  if (order.orderId !== orderId || typeof order.purchaseToken !== 'string' || !order.purchaseToken) {
+    throw Object.assign(new Error('Google Play returned incomplete order details'), { status: 402 });
+  }
+  return {
+    purchaseToken: order.purchaseToken,
+    state: String(order.state ?? ''),
+    productIds: (Array.isArray(order.lineItems) ? order.lineItems : []).map((item: any) => String(item.productId ?? '')),
+  };
+}
+
+/** The native RevenueCat customer ID is a second, independent possession
+ * factor. Google stores its SHA-256 digest in base64 at purchase time.
+ * Neither a GPA number nor a client-supplied product label can replace it.
+ */
+export function matchesGooglePlayCustomer(
+  customerId: string, obfuscatedExternalAccountId: string | undefined,
+): boolean {
+  if (!/^\$RCAnonymousID:[A-Za-z0-9_-]{20,128}$/.test(customerId) ||
+      !obfuscatedExternalAccountId) return false;
+  const expected = createHash('sha256').update(customerId).digest();
+  const received = Buffer.from(obfuscatedExternalAccountId, 'base64');
+  return received.length === expected.length && timingSafeEqual(received, expected);
 }
 
 /**

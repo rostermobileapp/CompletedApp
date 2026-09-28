@@ -21,6 +21,7 @@ import {
   purchaseProduct,
   purchaseProductAndroid,
   inspectAndroidPurchases,
+  getAndroidPurchaseCustomerId,
   restorePurchases,
   restorePurchasesAndroid,
   PRODUCT_PLAYER_PRO,
@@ -44,6 +45,8 @@ export default function Subscription() {
   const [androidLookupAttempt, setAndroidLookupAttempt] = useState(0);
   const [androidOwnedProducts, setAndroidOwnedProducts] = useState<string[]>([]);
   const [showFreeHelp, setShowFreeHelp] = useState(false);
+  const [showGoogleOrderRecovery, setShowGoogleOrderRecovery] = useState(false);
+  const [googleOrderId, setGoogleOrderId] = useState('');
 
   // In-app embedded Stripe checkout for subscription upgrades — replaces the
   // hosted-checkout redirect we previously used. The server creates a Checkout
@@ -712,13 +715,7 @@ export default function Subscription() {
       setAndroidOwnedProducts(activeProductIds);
 
       if (!purchases.length) {
-        toast({
-          title: activeProductIds.length ? 'Purchase needs verification' : 'No verifiable purchase found',
-          description: activeProductIds.length
-            ? 'Google Play reports an active plan, but did not give Roster the purchase proof needed to link it. Do not buy it again; contact support.'
-            : 'No Google Play purchase proof was returned. If Play Store shows an active Roster plan, do not buy it again; contact support.',
-        });
-        setIsLoading(false);
+        setShowGoogleOrderRecovery(true);
         return;
       }
 
@@ -761,6 +758,35 @@ export default function Subscription() {
       }
     } catch (error: any) {
       toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleOrderRecovery = async () => {
+    setIsLoading(true);
+    try {
+      // The native bridge supplies the original anonymous RevenueCat identity.
+      // Google must independently confirm that this identity belongs to the
+      // order. A receipt number by itself never grants access.
+      const customerId = await getAndroidPurchaseCustomerId();
+      const response = await apiRequest('POST', '/api/iap/restore-google-order', {
+        orderId: googleOrderId.trim(),
+        customerId,
+      });
+      const data = await response.json() as { role?: string; message?: string };
+      if (!response.ok || !data.role) throw new Error(data.message || 'Google Play could not verify this purchase.');
+      setShowGoogleOrderRecovery(false);
+      toast({
+        title: 'Google Play purchase linked',
+        description: data.role === 'commissioner'
+          ? 'Commissioner remains your highest verified tier.'
+          : 'Your Player Pro purchase is now linked to your Roster account.',
+      });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      window.location.reload();
+    } catch (error: any) {
+      toast({ title: 'Could not link purchase', description: error.message || 'Please contact support.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -819,6 +845,35 @@ export default function Subscription() {
         successHeadline="Subscription active"
         successMessage="Updating your account…"
       />
+      <Dialog open={showGoogleOrderRecovery} onOpenChange={setShowGoogleOrderRecovery}>
+        <DialogContent className="max-w-md" data-testid="dialog-google-order-recovery">
+          <DialogHeader>
+            <DialogTitle>Recover your Google Play purchase</DialogTitle>
+            <DialogDescription>
+              The Android app did not return a purchase token. Enter the GPA order ID from your Google Play receipt. Roster will link it only if Google confirms both an active subscription and a match to this app's purchase identity. This does not charge you.
+            </DialogDescription>
+          </DialogHeader>
+          <label htmlFor="google-order-id" className="text-sm font-medium">Google Play order ID</label>
+          <input
+            id="google-order-id"
+            value={googleOrderId}
+            onChange={(event) => setGoogleOrderId(event.target.value)}
+            placeholder="GPA.0000-0000-0000-00000"
+            autoComplete="off"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
+            data-testid="input-google-order-id"
+          />
+          <button type="button" onClick={handleGoogleOrderRecovery}
+            disabled={isLoading || !/^GPA\.\d{4}-\d{4}-\d{4}-\d{5}(?:\.\.\d+)?$/.test(googleOrderId.trim())}
+            className="rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50"
+            data-testid="button-verify-google-order">
+            {isLoading ? 'Verifying with Google Play…' : 'Verify existing purchase'}
+          </button>
+          <p className="text-xs text-muted-foreground">
+            If the purchase identity does not match, no access will change. Do not buy the plan again; contact support for account recovery.
+          </p>
+        </DialogContent>
+      </Dialog>
       <Dialog open={showFreeHelp} onOpenChange={setShowFreeHelp}>
         <DialogContent className="max-w-md" data-testid="dialog-switch-to-free">
           <DialogHeader>

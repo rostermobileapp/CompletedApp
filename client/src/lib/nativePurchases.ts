@@ -423,6 +423,22 @@ export async function restorePurchasesAndroid(): Promise<AndroidPurchaseResult[]
   return (await inspectAndroidPurchases()).purchases;
 }
 
+/** Read the native RevenueCat identity before any login/logout operation.
+ * It is used only alongside a verified Google order's account binding.
+ */
+export async function getAndroidPurchaseCustomerId(): Promise<string> {
+  if (!await isAndroidBillingSupported()) {
+    throw new Error('Open Roster in the Android app to recover a Google Play purchase.');
+  }
+  const data = await toPromise<any>((cb) => np.customerId(cb));
+  if (data?.status === 'FAILED') throw new Error(data.error || 'Could not read the Android purchase identity.');
+  const id = data?.customerId;
+  if (typeof id !== 'string' || !id.trim()) {
+    throw new Error('The Android app did not provide its purchase identity. Contact support.');
+  }
+  return id.trim();
+}
+
 /**
  * Restore previous purchases via the Natively StoreKit bridge.
  */
