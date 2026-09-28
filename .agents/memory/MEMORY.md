@@ -56,3 +56,4 @@
 - [Badge artwork cache busting](badge-artwork-cache-busting.md) — when replacing a badge image at the same public path, version its catalog URL so mobile webviews request the new art.
 - [Google Play billing readiness](google-play-billing-readiness.md) — native product visibility and server purchase verification are separate prerequisites; test both before enabling payment.
 - [Natively RevenueCat proof gap](natively-revenuecat-proof.md) — purchase/restore callbacks do not supply Apple transaction proof; verify entitlements server-side before granting access.
+- [Google Play order recovery](google-play-order-recovery.md) — orders.get can reveal a token and RevenueCat anonymous owner; a GPA number alone does not establish the Roster account to link.
