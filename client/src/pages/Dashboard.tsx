@@ -3088,8 +3088,9 @@ function DashboardMobile() {
             is active so the player only sees the timer above. */}
         {!isTournamentCountdownActive && (
         <div className="px-6 mt-0 mb-[8px]">
-          {/* Row 1: title + add button */}
-          <div className="flex gap-2 items-center mb-2">
+          {/* Keep the same header area, but center the title and view controls
+              together on one line between the quick cards and schedule list. */}
+          <div className="flex min-h-[58px] items-center justify-center gap-1 mb-[4px] whitespace-nowrap">
             <h2 className="text-sm font-semibold" data-testid="text-schedule-title">Schedule</h2>
             <Button
               onClick={() => setShowAddEventDialog(true)}
@@ -3098,50 +3099,45 @@ function DashboardMobile() {
             >
               <Plus className="w-[12.8px] h-[12.8px]" />
             </Button>
-          </div>
-          {/* Row 2: list/calendar toggle + view all */}
-          <div className="flex items-center justify-end gap-2 mb-[4px]">
-            <div className="flex items-center gap-2">
-              <div
-                className="grid grid-cols-2 items-center rounded-md p-0.5 bg-muted text-xs w-[140px]"
-                role="tablist"
-                aria-label="Schedule view"
-              >
-                <button
-                  type="button"
-                  onClick={() => setScheduleView('list')}
-                  className={`px-2 py-0.5 rounded transition-colors text-center ${
-                    scheduleView === 'list'
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-muted-foreground'
-                  }`}
-                  aria-pressed={scheduleView === 'list'}
-                  data-testid="mobile-schedule-toggle-list"
-                >
-                  List
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScheduleView('calendar')}
-                  className={`px-2 py-0.5 rounded transition-colors text-center ${
-                    scheduleView === 'calendar'
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-muted-foreground'
-                  }`}
-                  aria-pressed={scheduleView === 'calendar'}
-                  data-testid="mobile-schedule-toggle-calendar"
-                >
-                  Calendar
-                </button>
-              </div>
+            <div
+              className="grid w-[106px] shrink-0 grid-cols-2 items-center rounded-md p-0.5 bg-muted text-[11px] sm:w-[140px] sm:text-xs"
+              role="tablist"
+              aria-label="Schedule view"
+            >
               <button
-                onClick={() => navigate('/calendar')}
-                className="text-primary text-sm"
-                data-testid="button-view-all-games"
+                type="button"
+                onClick={() => setScheduleView('list')}
+                className={`px-1 py-0.5 rounded transition-colors text-center ${
+                  scheduleView === 'list'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+                aria-pressed={scheduleView === 'list'}
+                data-testid="mobile-schedule-toggle-list"
               >
-                View All
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleView('calendar')}
+                className={`px-1 py-0.5 rounded transition-colors text-center ${
+                  scheduleView === 'calendar'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-muted-foreground'
+                }`}
+                aria-pressed={scheduleView === 'calendar'}
+                data-testid="mobile-schedule-toggle-calendar"
+              >
+                Calendar
               </button>
             </div>
+            <button
+              onClick={() => navigate('/calendar')}
+              className="text-primary text-xs sm:text-sm"
+              data-testid="button-view-all-games"
+            >
+              View All
+            </button>
           </div>
           
           {gamesLoading || invitesLoading || requestsLoading || remindersLoading || visibleTournamentsLoading ? (
