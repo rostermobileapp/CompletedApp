@@ -307,6 +307,24 @@ export const googleIapClaims = pgTable("google_iap_claims", {
   tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
   userId: varchar("user_id").notNull(),
   claimedAt: timestamp("claimed_at").defaultNow().notNull(),
+  productId: varchar("product_id"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+});
+
+// Operator-attested binding; RevenueCat remains the subscription source of truth.
+export const applePurchaseLinks = pgTable("apple_purchase_links", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").notNull().unique(),
+  originalTransactionId: varchar("original_transaction_id").notNull().unique(),
+  productId: varchar("product_id").notNull(),
+  originalPurchasedAt: timestamp("original_purchased_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  revokedByApple: boolean("revoked_by_apple").default(false).notNull(),
+  appleRevocationReason: varchar("apple_revocation_reason"),
+  revokedPeriodExpiresAt: timestamp("revoked_period_expires_at", { withTimezone: true }),
+  lastAppleSignedAt: timestamp("last_apple_signed_at", { withTimezone: true }),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  attestedAt: timestamp("attested_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Popup dismissal and push delivery have separate lifecycles. One row per

@@ -5068,7 +5068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Update the user's role in the DB and sync to Supabase.
    * Also stores the IAP originalTransactionId for webhook lookups.
    */
-  const syncIapRoleMetadata = async (userId: string, newRole: 'commissioner' | 'player_pro') => {
+  const syncIapRoleMetadata = async (userId: string, newRole: 'commissioner' | 'player_pro' | 'free_tier') => {
     try {
       await supabase.auth.admin.updateUserById(userId, {
         user_metadata: { subscription_tier: newRole },
@@ -5082,16 +5082,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     newRole: 'commissioner' | 'player_pro',
     originalTransactionId?: string,
   ) => {
-    await db
-      .update(users)
-      .set({
-        role: newRole,
+    const grantedRole = await db.transaction(async (tx) => {
+      let linkedOwner: string | undefined;
+      if (originalTransactionId) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${originalTransactionId}))`);
+        const claim = await tx.execute(sql`
+          SELECT user_id, revoked_by_apple FROM apple_purchase_links
+          WHERE original_transaction_id = ${originalTransactionId} LIMIT 1 FOR UPDATE
+        `);
+        linkedOwner = claim.rows[0]?.user_id as string | undefined;
+        if (linkedOwner === userId) {
+          throw Object.assign(new Error('Linked Apple purchases are verified by the subscription reconciler'), { status: 409 });
+        }
+        if (linkedOwner === userId && claim.rows[0]?.revoked_by_apple) {
+          throw Object.assign(new Error('Apple has revoked this purchase'), { status: 402 });
+        }
+        const owner = await tx.execute(sql`
+          SELECT id FROM users WHERE iap_original_transaction_id = ${originalTransactionId} LIMIT 1
+        `);
+        if ((claim.rows[0] && claim.rows[0].user_id !== userId) ||
+            (owner.rows[0] && owner.rows[0].id !== userId)) {
+          throw Object.assign(new Error('This Apple purchase is linked to another account'), { status: 409 });
+        }
+      }
+      const [user] = await tx.select({
+        role: users.role, iapOriginalTransactionId: users.iapOriginalTransactionId,
+        stripeSubscriptionId: users.stripeSubscriptionId,
+      }).from(users).where(eq(users.id, userId)).for('update');
+      if (!user) throw new Error('Roster user not found');
+      if (originalTransactionId && user.iapOriginalTransactionId &&
+          user.iapOriginalTransactionId !== originalTransactionId && linkedOwner !== userId) {
+        throw Object.assign(new Error('Account already has another IAP purchase'), { status: 409 });
+      }
+      const googleCommissioner = await tx.execute(sql`
+        SELECT 1 FROM google_iap_claims WHERE user_id = ${userId}
+          AND product_id IN ('commissioner_monthly', 'commissioner_yearly')
+          AND expires_at > NOW() LIMIT 1
+      `);
+      const role = user.role === 'commissioner' && newRole === 'player_pro' &&
+        (user.stripeSubscriptionId || googleCommissioner.rows.length)
+        ? 'commissioner' : newRole;
+      await tx.update(users).set({
+        role,
         lastUpdated: new Date(),
         updatedAt: new Date(),
         ...(originalTransactionId ? { iapOriginalTransactionId: originalTransactionId } : {}),
-      })
-      .where(eq(users.id, userId));
-    await syncIapRoleMetadata(userId, newRole);
+      }).where(eq(users.id, userId));
+      return role;
+    });
+    await syncIapRoleMetadata(userId, grantedRole);
+  };
+
+  const verifyLinkedApplePurchase = async (userId: string, originalId: string) => {
+    const result = await db.execute(sql`
+      SELECT user_id FROM apple_purchase_links
+       WHERE original_transaction_id = ${originalId} LIMIT 1
+    `);
+    if (!result.rows.length) return null;
+    if (result.rows[0].user_id !== userId) {
+      throw Object.assign(new Error('This Apple purchase is linked to another account'), { status: 409 });
+    }
+    const { reconcileApplePurchaseLinks } = await import('./applePurchaseLinks');
+    await reconcileApplePurchaseLinks();
+    const current = await storage.getUser(userId);
+    return { message: 'Apple purchase checked against current subscription status',
+      role: current?.role ?? 'free_tier' };
   };
 
   // Serialize claims for the same token so two accounts cannot race to reuse
@@ -5100,6 +5155,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     userId: string,
     newRole: 'commissioner' | 'player_pro',
     purchaseToken: string,
+    productId: string,
+    expiryTimeMs: number,
   ) => {
     await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${purchaseToken}))`);
@@ -5120,9 +5177,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!claim || claim.userId !== userId) {
         throw Object.assign(new Error('This Google Play subscription is already linked to another account'), { status: 409 });
       }
+      await tx.update(googleIapClaims).set({
+        productId,
+        expiresAt: new Date(expiryTimeMs),
+      }).where(eq(googleIapClaims.tokenHash, tokenHash));
+      const linkedApple = await tx.execute(sql`
+        SELECT original_transaction_id FROM apple_purchase_links
+        WHERE user_id = ${userId} AND expires_at > NOW() LIMIT 1
+      `);
+      const appleOriginal = linkedApple.rows[0]?.original_transaction_id as string | undefined;
+      const [user] = await tx.select({
+        role: users.role, stripeSubscriptionId: users.stripeSubscriptionId,
+      }).from(users).where(eq(users.id, userId)).for('update');
+      if (!user) throw new Error('Roster user not found');
       await tx.update(users).set({
-        role: newRole,
-        iapOriginalTransactionId: purchaseToken,
+        role: newRole === 'player_pro' && user.role === 'commissioner' && user.stripeSubscriptionId
+          ? 'commissioner' : newRole,
+        // Keep Apple's webhook lookup intact when both stores have an active
+        // claim. Google's independent ownership is in google_iap_claims.
+        iapOriginalTransactionId: appleOriginal || purchaseToken,
         lastUpdated: new Date(),
         updatedAt: new Date(),
       }).where(eq(users.id, userId));
@@ -5160,6 +5233,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: `Unrecognised product: ${tx.productId}` });
         }
 
+        const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
+        if (linked) return res.json(linked);
         await applyIapRole(userId, newRole, tx.originalTransactionId);
         console.log(`[IAP] JWS verified for user ${userId}: role → ${newRole} (${tx.environment})`);
         return res.json({ message: 'IAP verified and role updated', role: newRole });
@@ -5202,6 +5277,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: `Unrecognised product: ${tx.productId}` });
         }
 
+        const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
+        if (linked) return res.json(linked);
         await applyIapRole(userId, newRole, tx.originalTransactionId);
         console.log(`[IAP] Transaction ID verified for user ${userId}: role → ${newRole}`);
         return res.json({ message: 'IAP verified and role updated', role: newRole });
@@ -5237,6 +5314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The outer envelope does not carry a bundleId field, so skipBundleCheck=true.
       const notifRaw = await decodeAppleJWSPayload(signedPayload, true);
       const notificationType = notifRaw.notificationType as string;
+      const signedAtMs = notifRaw.signedDate as number | undefined;
       const subtype = notifRaw.subtype as string | undefined;
       const data = notifRaw.data as {
         environment: string;
@@ -5266,6 +5344,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(users.iapOriginalTransactionId, originalTransactionId))
           .limit(1);
         notifUserId = rows[0]?.id ?? null;
+        if (!notifUserId) {
+          const linked = await db.execute(sql`
+            SELECT user_id FROM apple_purchase_links
+             WHERE original_transaction_id = ${originalTransactionId} LIMIT 1
+          `);
+          notifUserId = (linked.rows[0]?.user_id as string) ?? null;
+        }
       }
 
       if (!notifUserId) {
@@ -5277,26 +5362,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delegate the role-mapping decision to the pure function in appleNotificationHandler.ts
       // (same module used by the unit tests, so logic is always in sync).
       const decision = resolveNotificationAction(notificationType, productId, expiresDate, Date.now());
+      if (decision.action !== 'ignore' && originalTransactionId) {
+        const link = await db.execute(sql`
+          SELECT user_id FROM apple_purchase_links
+          WHERE original_transaction_id = ${originalTransactionId} LIMIT 1
+        `);
+        if (link.rows.length) {
+          if (!Number.isFinite(signedAtMs)) {
+            return res.status(200).json({ message: 'Notification ignored (missing signed date)' });
+          }
+          if (decision.action === 'grant') {
+            // RevenueCat's lineage-anchored check grants access. A notification
+            // alone never clears a refund or grants a linked account.
+            await db.execute(sql`
+              UPDATE apple_purchase_links
+                 SET last_apple_signed_at = to_timestamp(${signedAtMs!} / 1000.0),
+                     revoked_by_apple = CASE
+                       WHEN apple_revocation_reason IN ('EXPIRED', 'GRACE_PERIOD_EXPIRED')
+                         THEN FALSE ELSE revoked_by_apple END,
+                     apple_revocation_reason = CASE
+                       WHEN apple_revocation_reason IN ('EXPIRED', 'GRACE_PERIOD_EXPIRED')
+                         THEN NULL ELSE apple_revocation_reason END
+               WHERE original_transaction_id = ${originalTransactionId}
+                 AND (last_apple_signed_at IS NULL
+                   OR last_apple_signed_at < to_timestamp(${signedAtMs!} / 1000.0))
+            `);
+            return res.status(200).json({ message: 'Apple renewal queued for verification' });
+          }
+          const changedRole = await db.transaction(async (tx) => {
+            const locked = await tx.execute(sql`
+              SELECT last_apple_signed_at, expires_at FROM apple_purchase_links
+               WHERE original_transaction_id = ${originalTransactionId}
+               FOR UPDATE
+            `);
+            if (!locked.rows.length ||
+                (locked.rows[0].last_apple_signed_at &&
+                 +new Date(locked.rows[0].last_apple_signed_at as string) > signedAtMs!)) return false;
+            // Refunding a previous billing period must not revoke a newer,
+            // already verified renewal from the same original purchase.
+            const { isOlderPeriodRevocation } = await import('./applePurchaseMatch');
+            if (isOlderPeriodRevocation(expiresDate,
+              locked.rows[0].expires_at ? new Date(locked.rows[0].expires_at as string) : null)) {
+              await tx.execute(sql`
+                UPDATE apple_purchase_links
+                   SET last_apple_signed_at = to_timestamp(${signedAtMs!} / 1000.0)
+                 WHERE original_transaction_id = ${originalTransactionId}
+              `);
+              return false;
+            }
+            await tx.execute(sql`
+              UPDATE apple_purchase_links
+                 SET expires_at = NULL, revoked_by_apple = TRUE,
+                     apple_revocation_reason = ${notificationType},
+                     revoked_period_expires_at = ${Number.isFinite(expiresDate) ? new Date(expiresDate!) : null},
+                     last_checked_at = NOW(),
+                     last_apple_signed_at = to_timestamp(${signedAtMs!} / 1000.0)
+               WHERE original_transaction_id = ${originalTransactionId}
+            `);
+            const user = await tx.execute(sql`
+              SELECT role, stripe_subscription_id, iap_original_transaction_id
+                FROM users WHERE id = ${notifUserId} FOR UPDATE
+            `);
+            const row = user.rows[0];
+            if (!row || row.role !== 'player_pro' || row.stripe_subscription_id ||
+                row.iap_original_transaction_id !== originalTransactionId) return false;
+            const google = await tx.execute(sql`
+              SELECT 1 FROM google_iap_claims WHERE user_id = ${notifUserId}
+                AND expires_at > NOW() LIMIT 1
+            `);
+            if (google.rows.length) return false;
+            await tx.execute(sql`
+              UPDATE users SET role = 'free_tier', iap_original_transaction_id = NULL,
+                  last_updated = NOW(), updated_at = NOW() WHERE id = ${notifUserId}
+            `);
+            return true;
+          });
+          if (changedRole) await syncIapRoleMetadata(notifUserId, 'free_tier');
+          return res.status(200).json({ message: 'Linked Apple purchase revoked' });
+        }
+      }
 
       if (decision.action === 'grant') {
         await applyIapRole(notifUserId, decision.role, originalTransactionId);
         console.log(`[IAP/Notify] ${notificationType} → role set to ${decision.role} for user ${notifUserId}`);
 
       } else if (decision.action === 'revoke') {
-        // Subscription ended — downgrade to free_tier
-        await db
+        // Legacy, unlinked Apple purchases still require source-aware downgrade.
+        const { preserveLinkedAppleRole } = await import('./appleClaimRole');
+        const remainingRole = await preserveLinkedAppleRole(notifUserId, 'free_tier');
+        const downgraded = await db
           .update(users)
-          .set({ role: 'free_tier', lastUpdated: new Date(), updatedAt: new Date() })
-          .where(eq(users.id, notifUserId));
+          .set({
+            role: remainingRole,
+            ...(remainingRole === 'free_tier' ? { iapOriginalTransactionId: null } : {}),
+            lastUpdated: new Date(), updatedAt: new Date(),
+          })
+          .where(and(eq(users.id, notifUserId), eq(users.iapOriginalTransactionId, originalTransactionId ?? ''),
+            eq(users.role, 'player_pro'), isNull(users.stripeSubscriptionId)))
+          .returning({ id: users.id });
 
         try {
-          await supabase.auth.admin.updateUserById(notifUserId, {
-            user_metadata: { subscription_tier: 'free_tier' },
-          });
+          if (downgraded.length) {
+            await supabase.auth.admin.updateUserById(notifUserId, {
+              user_metadata: { subscription_tier: remainingRole },
+            });
+          }
         } catch (e) {
           console.warn('[IAP/Notify] Supabase metadata sync failed on revoke:', e);
         }
-        console.log(`[IAP/Notify] ${notificationType} → role reset to free_tier for user ${notifUserId}`);
+        console.log(`[IAP/Notify] ${notificationType} → Apple source revoked for user ${notifUserId}`);
 
       } else {
         console.log(`[IAP/Notify] ${decision.reason} — acknowledged, no role change`);
@@ -5433,7 +5607,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      await claimGoogleIapRole(userId, newRole, purchaseToken.trim());
+      if (!Number.isFinite(purchase.expiryTimeMs)) {
+        return res.status(402).json({ message: 'Google Play did not provide a valid subscription expiration' });
+      }
+      await claimGoogleIapRole(userId, newRole, purchaseToken.trim(), purchase.productId, purchase.expiryTimeMs!);
 
       // Acknowledge the purchase if Google hasn't seen us do so yet. Required
       // within 3 days of purchase or Google auto-refunds. Idempotent and

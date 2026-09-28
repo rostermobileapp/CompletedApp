@@ -5,6 +5,7 @@ type AppleRole = 'player_pro' | 'commissioner';
 interface RevenueCatSubscription {
   store?: string;
   expires_date?: string | null;
+  original_purchase_date?: string | null;
   refunded_at?: string | null;
   ownership_type?: string | null;
 }
@@ -19,6 +20,7 @@ export interface VerifiedAppleSubscription {
   productId: string;
   role: AppleRole;
   expiresAt: string;
+  originalPurchasedAt: string;
 }
 
 /** This is a project app API key used only by the server; never expose it in responses. */
@@ -40,8 +42,10 @@ export function getActiveAppleSubscriptions(
     if (!role || !sub || sub.store !== 'app_store' ||
         sub.refunded_at || sub.ownership_type !== 'PURCHASED') return [];
     const expiry = Date.parse(sub.expires_date ?? '');
-    if (!Number.isFinite(expiry) || expiry <= now) return [];
-    return [{ productId, role, expiresAt: new Date(expiry).toISOString() }];
+    const original = Date.parse(sub.original_purchase_date ?? '');
+    if (!Number.isFinite(expiry) || expiry <= now || !Number.isFinite(original)) return [];
+    return [{ productId, role, expiresAt: new Date(expiry).toISOString(),
+      originalPurchasedAt: new Date(original).toISOString() }];
   }).sort((a, b) => b.expiresAt.localeCompare(a.expiresAt));
 }
 

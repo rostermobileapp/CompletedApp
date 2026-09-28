@@ -7,6 +7,7 @@ import { warmCityGeoCache } from "./storage";
 import { initReferralDb } from "./referralDbInit";
 import { initDraftDb } from "./draftDbInit";
 import { initGoogleIapClaimsDb } from "./googleIapClaimsInit";
+import { initApplePurchaseLinks, reconcileApplePurchaseLinks, startApplePurchaseLinkJob } from "./applePurchaseLinks";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
@@ -86,8 +87,11 @@ app.use((req, res, next) => {
   await initReferralDb();
   await initDraftDb();
   await initGoogleIapClaimsDb();
+  await initApplePurchaseLinks();
 
   const server = await registerRoutes(app);
+  await reconcileApplePurchaseLinks();
+  startApplePurchaseLinkJob();
   startBeerBadgeEvaluationWorker();
   // An end date can pass without a commissioner explicitly closing the season.
   setInterval(() => {

@@ -18,3 +18,9 @@ RevenueCat v2's `store_subscription_identifier` may be the **latest renewal** tr
 **Why:** A known active Apple monthly subscriber's current identifier differed from its earliest transaction, and the other anonymous subscribers had no account-identifying attributes. A support repair based on the current identifier or matching dates could grant the wrong account and miss later revocations.
 
 **How to apply:** Keep diagnostic lookups read-only until an independently attested account-to-purchase binding and source-aware renewal/refund handling are in place. Do not stage a production role change merely because an anonymous customer's subscription resembles a user's plan.
+
+For an anonymous Apple subscriber with no account alias, explicit project-owner attribution can authorize an operator-assisted repair when the operator separately verifies the distinct original Apple transaction and RevenueCat lineage. This is an **attested** account association, not provider-proven Roster identity; never describe it as cryptographic ownership proof. A linked account remains pending until the deployed server independently confirms an active subscription against the attested purchase history.
+
+**Why:** Anonymous RevenueCat customers lacked Roster identifiers, while the owner could identify the affected accounts and their distinct Apple plans/renewal dates. Claiming stronger identity evidence would be misleading; granting before the deployed provider check would be unsafe.
+
+**How to apply:** Keep real customer/transaction IDs out of source control and logs. Treat payment-provider outages as unknown, preserve access only through a previously verified expiry, and keep other payment sources independent when a refunded or expired Apple period is reconciled.

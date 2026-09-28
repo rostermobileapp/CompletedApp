@@ -17,6 +17,8 @@ export async function initGoogleIapClaimsDb(): Promise<void> {
     )
   `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_google_iap_claims_user_id ON google_iap_claims (user_id)`);
+  await db.execute(sql`ALTER TABLE google_iap_claims ADD COLUMN IF NOT EXISTS product_id VARCHAR`);
+  await db.execute(sql`ALTER TABLE google_iap_claims ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
 
   const legacy = await db.select({
     userId: users.id,

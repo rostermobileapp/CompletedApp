@@ -1480,6 +1480,8 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User> {
     console.log('[updateUserRole] Updating user:', id, 'to role:', role);
+    const { preserveLinkedAppleRole } = await import('./appleClaimRole');
+    role = await preserveLinkedAppleRole(id, role);
     
     // First verify the current value
     const [beforeUser] = await db.select().from(users).where(eq(users.id, id));

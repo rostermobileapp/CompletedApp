@@ -5,6 +5,7 @@ import { getActiveAppleSubscriptions, getRevenueCatAppleSubscriptions } from '..
 const purchased = {
   store: 'app_store',
   expires_date: '2026-10-26T14:48:13Z',
+  original_purchase_date: '2026-08-26T14:48:13Z',
   refunded_at: null,
   ownership_type: 'PURCHASED',
 };
@@ -24,6 +25,7 @@ test('subscriber lookup queries the selected customer and never exposes the API 
     productId: 'com.rosterapp.player_pro_monthly',
     role: 'player_pro',
     expiresAt: '2026-10-26T14:48:13.000Z',
+    originalPurchasedAt: '2026-08-26T14:48:13.000Z',
   }]);
 });
 
@@ -37,6 +39,7 @@ test('only current, purchased, non-refunded Apple products are reported', () => 
   for (const override of [
     { expires_date: '2026-09-01T00:00:00Z' },
     { expires_date: null },
+    { original_purchase_date: null },
     { store: 'play_store' },
     { refunded_at: '2026-09-20T00:00:00Z' },
     { ownership_type: null },
