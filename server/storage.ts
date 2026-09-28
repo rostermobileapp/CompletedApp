@@ -1,3 +1,4 @@
+import { hasOneGoalMargin } from "@shared/gameResultType";
 import {
   users,
   leagues,
@@ -12997,6 +12998,8 @@ export class DatabaseStorage implements IStorage {
       .set({ 
         homeScore, 
         awayScore,
+        // A score edit can invalidate an existing OT or shootout result.
+        ...(!hasOneGoalMargin(homeScore, awayScore) ? { resultType: 'regulation' as const } : {}),
       })
       .where(eq(games.id, gameId))
       .returning();

@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { hasPaidTrophyCaseAccess } from "../shared/trophyCaseAccess";
+import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -13139,6 +13140,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
       }
 
+      const requestedResultType = req.body?.resultType;
+      if (requestedResultType !== undefined && !['regulation', 'overtime', 'shootout'].includes(requestedResultType)) {
+        return res.status(400).json({ message: 'Invalid game result type' });
+      }
+
       const attendanceProvided = Array.isArray(req.body?.attendees);
       let rosterUserIds: string[] = [];
       const normalizedAttendance: Array<{
@@ -13204,6 +13210,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const [lockedGame] = await tx.select().from(games).where(eq(games.id, gameId));
         if (!lockedGame) throw new Error('Game disappeared during finalization');
+
+        const hasOvertimeMargin = hasOneGoalMargin(lockedGame.homeScore, lockedGame.awayScore);
+        if (requestedResultType === 'overtime' && !hasOvertimeMargin) {
+          throw Object.assign(new Error('Overtime requires a final score difference of exactly one goal'), { status: 400 });
+        }
+        const resultType = hasOvertimeMargin
+          ? (requestedResultType ?? lockedGame.resultType ?? 'regulation')
+          : 'regulation';
 
         const goals = await tx.select().from(gameGoals).where(eq(gameGoals.gameId, gameId));
         const penalties = await tx.select().from(gamePenalties).where(eq(gamePenalties.gameId, gameId));
@@ -13322,7 +13336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .set({ isSubmitted: true })
           .where(eq(gamePenalties.gameId, gameId));
         const [updatedGame] = await tx.update(games)
-          .set({ isCompleted: true })
+          .set({ isCompleted: true, resultType })
           .where(eq(games.id, gameId))
           .returning();
 
@@ -13403,6 +13417,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Error finalizing game:', error);
+      if ((error as { status?: number }).status === 400) {
+        return res.status(400).json({ message: (error as Error).message });
+      }
       res.status(500).json({ message: 'Failed to finalize game' });
     }
   });
@@ -13424,6 +13441,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasPermission = await checkScorekeeperPermission(userId, game);
       if (!hasPermission) {
         return res.status(403).json({ message: 'Access denied. You must be a commissioner or have stat_manager permission.' });
+      }
+
+      if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+        return res.status(400).json({ message: 'Scores must be non-negative whole numbers' });
       }
 
       const updatedGame = await storage.updateGameScores(gameId, homeScore, awayScore);

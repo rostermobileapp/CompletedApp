@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
+import { hasOneGoalMargin } from '@shared/gameResultType';
 
 interface Game {
   id: string;
@@ -35,6 +36,7 @@ interface Game {
   awayTeam: { id: string; name: string };
   homeScore: number | null;
   awayScore: number | null;
+  resultType?: 'regulation' | 'overtime' | 'shootout' | null;
   status: string | null;
   isCompleted?: boolean;
   leagueId: string | null;
@@ -120,6 +122,7 @@ export default function ScorekeeperDashboard() {
   const scoringContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState('schedule');
   const [showPenalties, setShowPenalties] = useState(false);
+  const [isOvertime, setIsOvertime] = useState(false);
   const [selectedAttendanceIds, setSelectedAttendanceIds] = useState<Set<string>>(new Set());
   const [attendanceInitializedGameId, setAttendanceInitializedGameId] = useState<string | null>(null);
 
@@ -293,8 +296,8 @@ export default function ScorekeeperDashboard() {
   });
 
   const finalizeGameMutation = useMutation({
-    mutationFn: async (data: { gameId: string; attendees: { playerId: string; teamId: string }[] }) => {
-      return apiRequest('POST', `/api/games/${data.gameId}/finalize`, { attendees: data.attendees });
+    mutationFn: async (data: { gameId: string; attendees: { playerId: string; teamId: string }[]; resultType: 'regulation' | 'overtime' }) => {
+      return apiRequest('POST', `/api/games/${data.gameId}/finalize`, { attendees: data.attendees, resultType: data.resultType });
     },
     onSuccess: (_result, variables) => {
       // Keep the exact attendance selection available when a completed game is
@@ -361,6 +364,15 @@ export default function ScorekeeperDashboard() {
     (homeScore < recordedHomeScore || awayScore < recordedAwayScore);
   const displayedHomeScore = isBackfillingCompletedGame ? recordedHomeScore : homeScore;
   const displayedAwayScore = isBackfillingCompletedGame ? recordedAwayScore : awayScore;
+  const canMarkOvertime = !selectedGame?.tournamentId && hasOneGoalMargin(displayedHomeScore, displayedAwayScore);
+
+  useEffect(() => {
+    setIsOvertime(selectedGame?.resultType === 'overtime');
+  }, [selectedGame?.id, selectedGame?.resultType]);
+
+  useEffect(() => {
+    if (!canMarkOvertime) setIsOvertime(false);
+  }, [canMarkOvertime, selectedGame?.id]);
 
   useEffect(() => {
     if (
@@ -975,7 +987,7 @@ export default function ScorekeeperDashboard() {
           </div>
 
           {/* Score + Action Buttons (second row in portrait, right side in landscape) */}
-          <div className="flex items-center justify-between landscape:gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 landscape:gap-4">
             {/* Score Display */}
             <div className="flex items-center gap-4">
               <span className="text-3xl font-bold text-blue-500">{displayedAwayScore}</span>
@@ -988,6 +1000,18 @@ export default function ScorekeeperDashboard() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {canMarkOvertime && (
+                <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={isOvertime}
+                    onChange={(event) => setIsOvertime(event.target.checked)}
+                    className="h-4 w-4 accent-blue-500"
+                    data-testid="overtime-checkbox"
+                  />
+                  Overtime
+                </label>
+              )}
               <Button 
                 variant={showPenalties ? "default" : "outline"}
                 size="sm"
@@ -999,9 +1023,11 @@ export default function ScorekeeperDashboard() {
               <Button 
                 size="sm"
                 onClick={() => {
-                  if (window.confirm(`${selectedGameIsCompleted ? 'Save added game details?' : 'Finalize game?'}\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}\n\nThis will update player stats for newly entered details.`)) {
+                  const resultType = canMarkOvertime && isOvertime ? 'overtime' : 'regulation';
+                  if (window.confirm(`${selectedGameIsCompleted ? 'Save added game details?' : 'Finalize game?'}\n\n${selectedGame.awayTeam?.name}: ${displayedAwayScore}\n${selectedGame.homeTeam?.name}: ${displayedHomeScore}${resultType === 'overtime' ? ' (OT)' : ''}\n\nThis will update player stats for newly entered details.`)) {
                     finalizeGameMutation.mutate({
                       gameId: selectedGame.id,
+                      resultType,
                       attendees: Array.from(selectedAttendanceIds)
                         .filter((key) => currentGameRosterKeys.has(key))
                         .map((key) => {
@@ -1014,7 +1040,7 @@ export default function ScorekeeperDashboard() {
                     });
                   }
                 }}
-                disabled={finalizeGameMutation.isPending || rostersLoading}
+                disabled={finalizeGameMutation.isPending || updateScoresMutation.isPending || rostersLoading}
                 data-testid="finalize-game"
               >
                 <Check className="mr-1 h-4 w-4" />
@@ -1243,6 +1269,9 @@ export default function ScorekeeperDashboard() {
                           <div className="ml-2 flex items-center gap-2">
                             <div className="font-bold text-sm whitespace-nowrap">
                               {game.awayScore ?? 0} - {game.homeScore ?? 0}
+                              {game.resultType === 'overtime' && hasOneGoalMargin(game.homeScore, game.awayScore) && (
+                                <span className="ml-1 text-xs font-semibold text-blue-500">OT</span>
+                              )}
                             </div>
                             <Button
                               size="sm"
