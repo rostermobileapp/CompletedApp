@@ -9,7 +9,7 @@ const DESKTOP_BREAKPOINT = 1024;
  *
  * Mirrors the detection used in `useIsMobile` and `useIosPlatform`.
  */
-function isInsideNativeWrapper(): boolean {
+export function isInsideNativeWrapper(): boolean {
   if (typeof window === 'undefined') return false;
 
   const ua = navigator.userAgent;

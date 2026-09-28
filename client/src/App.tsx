@@ -1,5 +1,5 @@
 import { Switch, Route, useLocation } from "wouter";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { MotionConfig } from "framer-motion";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PermissionProvider } from "@/context/SubscriptionContext";
 import { DemoContextProvider } from "@/context/DemoContext";
+import { useDemo } from "@/context/DemoContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { HPIBBanner } from "@/components/HPIBBanner";
@@ -19,7 +20,8 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { SlideUpOverlayProvider } from "@/components/SlideUpOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppDataPrefetch } from "@/hooks/useAppDataPrefetch";
-import { useIsDesktopWeb } from "@/hooks/useIsDesktopWeb";
+import { useIsDesktopWeb, isInsideNativeWrapper } from "@/hooks/useIsDesktopWeb";
+import { forgetMobileScreen, resolveLaunchScreen, rememberMobileScreen, shouldRestoreOnLaunch } from "@/lib/mobileScreenResume";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import { NativeCalendarAutoSync } from "@/components/NativeCalendarAutoSync";
 import { BadgeEarnedHost } from "@/components/BadgeEarnedHost";
@@ -141,11 +143,12 @@ function LoadingScreen() {
 }
 
 function Router() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [location] = useLocation();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isActive: isDemoActive } = useDemo();
+  const [location, setLocation] = useLocation();
 
   const isDesktopWeb = useIsDesktopWeb();
-  const { isLoading: dataLoading } = useAppDataPrefetch(isAuthenticated && !authLoading);
+  useAppDataPrefetch(isAuthenticated && !authLoading);
   const { data: userData, isError: userDataError } = useQuery<any>({
     queryKey: ['/api/user'],
     enabled: isAuthenticated && !authLoading,
@@ -153,39 +156,66 @@ function Router() {
     retry: 3,
   });
   
-  // Minimum 3-second display time for the loading screen
-  const [minDelayElapsed, setMinDelayElapsed] = useState(false);
-  // Maximum 10-second timeout to prevent infinite loading
+  // This is only a safety timeout for slow data, not a mandatory splash delay.
   const [maxTimeoutReached, setMaxTimeoutReached] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const maxTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const timersStartedRef = useRef(false);
-  
+  const [resumeReady, setResumeReady] = useState(false);
+  const launchIsRoot = useRef(shouldRestoreOnLaunch(
+    isInsideNativeWrapper(), window.location.pathname, window.location.search, window.location.hash,
+  ));
+  const lastUserId = useRef<string | null>(null);
+  const restoringPath = useRef<string | null>(null);
+
   useEffect(() => {
-    // Start timers only ONCE when authenticated and auth loading is complete
-    if (isAuthenticated && !authLoading && !timersStartedRef.current) {
-      timersStartedRef.current = true;
-      
-      timerRef.current = setTimeout(() => {
-        setMinDelayElapsed(true);
-      }, 3000);
-      
-      // Safety timeout - don't let loading screen stay forever
-      maxTimerRef.current = setTimeout(() => {
-        setMaxTimeoutReached(true);
-      }, 10000);
+    if (authLoading || !isAuthenticated || userData) return;
+    const timer = window.setTimeout(() => setMaxTimeoutReached(true), 10000);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, authLoading, userData]);
+
+  useLayoutEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      forgetMobileScreen(localStorage);
+      if (lastUserId.current) queryClient.clear();
+      lastUserId.current = null;
+      restoringPath.current = null;
+      setResumeReady(true);
+      return;
     }
-    
-    // Cleanup only on unmount
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
+    if (lastUserId.current && lastUserId.current !== user.id) {
+      forgetMobileScreen(localStorage);
+      // The shared query cache is not keyed by account. Never show data left
+      // behind by the previous session while the new account is loading.
+      queryClient.clear();
+      lastUserId.current = user.id;
+      restoringPath.current = null;
+      setResumeReady(true);
+      return;
+    }
+    lastUserId.current = user.id;
+    if (!userData?.onboardingCompleted) return;
+
+    if (!resumeReady) {
+      // A link that arrived while auth was loading supersedes the saved screen.
+      const savedPath = resolveLaunchScreen(
+        localStorage, user.id, launchIsRoot.current, location,
+        window.location.search, window.location.hash, isDemoActive,
+      );
+      if (savedPath) {
+        restoringPath.current = savedPath;
+        setLocation(savedPath, { replace: true });
+        setResumeReady(true);
+        return;
       }
-      if (maxTimerRef.current) {
-        clearTimeout(maxTimerRef.current);
-      }
-    };
-  }, [isAuthenticated, authLoading]);
+      setResumeReady(true);
+    }
+    // Wouter can notify its listeners on the next render; do not overwrite
+    // the saved destination with the launch root in that narrow interval.
+    if (restoringPath.current && (location === '/' || location === '/app')) return;
+    restoringPath.current = null;
+    if (resumeReady && !isDemoActive && isInsideNativeWrapper()) {
+      rememberMobileScreen(localStorage, user.id, location);
+    }
+  }, [authLoading, user, userData, isDemoActive, location, resumeReady, setLocation]);
 
   // Always render standalone pages regardless of auth state
   if (location === '/reset-password') {
@@ -259,24 +289,25 @@ function Router() {
     );
   }
 
-  // Wait for BOTH: minimum 3 seconds AND data to be loaded before showing the app
-  // OR if max timeout is reached, proceed anyway to prevent infinite loading
-  if ((!minDelayElapsed || dataLoading) && !maxTimeoutReached) {
+  if (!userData && !userDataError && !maxTimeoutReached) {
     return <LoadingScreen />;
   }
 
-  // If the user data query failed entirely and we have no cached data, keep showing
-  // the loading screen rather than pushing completed users into onboarding during
-  // a transient backend outage. The query will auto-retry (retry: 3 above).
-  if (userDataError && !userData) {
-    return <LoadingScreen />;
+  // Never send a returning user to onboarding when the account API fails.
+  if (!userData) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <p>We couldn't load your account. Please check your connection and try again.</p>
+        <button className="rounded bg-primary px-4 py-2 text-primary-foreground" onClick={() => window.location.reload()}>Try again</button>
+      </div>
+    );
   }
 
-  // Default to showing onboarding when userData is absent or onboarding incomplete.
-  // This ensures new users are never silently routed to the Dashboard.
-  if (!userData || !userData.onboardingCompleted) {
+  if (!userData.onboardingCompleted) {
     return <Onboarding />;
   }
+
+  if (isInsideNativeWrapper() && !resumeReady) return <LoadingScreen />;
 
   // Render get-started questionnaire without the app shell (no nav bar, no slide menus)
   if (location === '/get-started') {

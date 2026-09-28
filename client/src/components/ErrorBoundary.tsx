@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { forgetMobileScreen } from "@/lib/mobileScreenResume";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -56,6 +57,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   };
 
   handleGoHome = () => {
+    forgetMobileScreen(localStorage);
     window.location.href = "/";
   };
 

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { forgetMobileScreen } from "./lib/mobileScreenResume";
 
 function showFatalOverlay(label: string, detail: string) {
   try {
@@ -40,6 +41,7 @@ function showFatalOverlay(label: string, detail: string) {
     document.body.appendChild(overlay);
     document.getElementById("__fatal_reload__")?.addEventListener("click", () => window.location.reload());
     document.getElementById("__fatal_home__")?.addEventListener("click", () => {
+      forgetMobileScreen(localStorage);
       window.location.href = "/";
     });
   } catch {
