@@ -5008,7 +5008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: 'A customer ID and Roster user ID are required' });
     }
     try {
-      const user = await storage.getUser(rosterUserId);
+      const user = /^U\d{5}$/i.test(rosterUserId.trim())
+        ? await storage.getUserByDisplayId(rosterUserId.trim().toUpperCase())
+        : await storage.getUser(rosterUserId.trim());
       if (!user) return res.status(404).json({ message: 'Roster user not found' });
       const { getRevenueCatAppleSubscriptions } = await import('./revenueCatApi');
       const subscriptions = await getRevenueCatAppleSubscriptions(customerId);

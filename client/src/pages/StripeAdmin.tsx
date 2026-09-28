@@ -64,6 +64,15 @@ type DiagnosticData = {
   };
 };
 
+type RevenueCatDiagnostic = {
+  rosterUserId: string;
+  currentRole: string;
+  alreadyLinkedToIap: boolean;
+  activeAppleSubscriptions: Array<{ productId: string; role: string; expiresAt: string }>;
+  accountOwnershipVerified: false;
+  roleChanged: false;
+};
+
 export default function StripeAdmin() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -72,9 +81,20 @@ export default function StripeAdmin() {
   const queryClient = useQueryClient();
   const [userId, setUserId] = useState('');
   const [searchTriggered, setSearchTriggered] = useState(false);
+  const [appleCustomerId, setAppleCustomerId] = useState('');
+  const [appleRosterId, setAppleRosterId] = useState('');
 
   // Check if user has admin permission
   const isAdmin = hasSpecialPermission('admin');
+  const revenueCatCheck = useMutation({
+    mutationFn: async (): Promise<RevenueCatDiagnostic> => {
+      const response = await apiRequest('POST', '/api/admin/iap/revenuecat/check', {
+        customerId: appleCustomerId.trim(),
+        rosterUserId: appleRosterId.trim(),
+      });
+      return response.json();
+    },
+  });
 
   // Fetch diagnostic data
   const { data: diagnostic, isLoading: isLoadingDiagnostic, error: diagnosticError } = useQuery<DiagnosticData>({
@@ -151,6 +171,52 @@ export default function StripeAdmin() {
             </div>
           </div>
         </div>
+
+        <Card data-testid="card-revenuecat-check">
+          <CardHeader>
+            <CardTitle>Apple subscription check (RevenueCat)</CardTitle>
+            <CardDescription>
+              Checks Railway&apos;s RevenueCat connection. This does not link a purchase or change anyone&apos;s access.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="apple-roster-id">Roster user ID</Label>
+                <Input id="apple-roster-id" placeholder="U00096" value={appleRosterId}
+                  onChange={e => setAppleRosterId(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="apple-customer-id">RevenueCat customer ID</Label>
+                <Input id="apple-customer-id" placeholder="$RCAnonymousID:…" value={appleCustomerId}
+                  onChange={e => setAppleCustomerId(e.target.value)} />
+              </div>
+            </div>
+            <Button type="button" variant="outline" disabled={!appleCustomerId.trim() || !appleRosterId.trim() || revenueCatCheck.isPending}
+              onClick={() => revenueCatCheck.mutate()}>
+              {revenueCatCheck.isPending ? 'Checking…' : 'Check Apple subscription'}
+            </Button>
+            {revenueCatCheck.isError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{revenueCatCheck.error.message}</AlertDescription>
+              </Alert>
+            )}
+            {revenueCatCheck.data && (
+              <Alert>
+                <AlertDescription className="space-y-1">
+                  <p>Roster role: {revenueCatCheck.data.currentRole}. Existing in-app purchase link: {revenueCatCheck.data.alreadyLinkedToIap ? 'Yes' : 'No'}.</p>
+                  {revenueCatCheck.data.activeAppleSubscriptions.length
+                    ? revenueCatCheck.data.activeAppleSubscriptions.map(sub => (
+                      <p key={sub.productId}>{sub.role} — {sub.productId} — active until {new Date(sub.expiresAt).toLocaleString()}.</p>
+                    ))
+                    : <p>No active purchased Apple subscription found for this RevenueCat ID.</p>}
+                  <p>This check does not prove which Roster account owns the purchase. No access was changed.</p>
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Search Section */}
         <Card data-testid="card-search">
