@@ -4,6 +4,7 @@ import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
@@ -1032,6 +1033,63 @@ async function applyAdditionalTeamPaymentFromSession(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const currentTeamIds = async (userId: string, leagueId?: string) => {
+    const userTeams = await storage.getUserTeams(userId);
+    return activeTeamIds(userTeams, leagueId);
+  };
+
+  const canViewPlayerStats = async (viewer: any, playerId: string, leagueId?: string): Promise<boolean> => {
+    if (viewer.id === playerId) return true;
+    if (leagueId
+      ? await canAccessLeaguePremiumFeatures(viewer, leagueId)
+      : canAccessPremiumFeatures(viewer)) return true;
+    const viewerTeams = await currentTeamIds(viewer.id, leagueId);
+    if (!viewerTeams.size) return false;
+    if (playerId.startsWith('placeholder:')) {
+      const [placeholder] = await db.select({ teamId: placeholderPlayers.teamId, leagueId: placeholderPlayers.leagueId })
+        .from(placeholderPlayers).where(eq(placeholderPlayers.id, playerId.slice('placeholder:'.length))).limit(1);
+      return !!placeholder?.teamId && viewerTeams.has(placeholder.teamId)
+        && (!leagueId || placeholder.leagueId === leagueId);
+    }
+    const playerTeams = await currentTeamIds(playerId, leagueId);
+    return sharesCurrentTeam(viewerTeams, playerTeams);
+  };
+
+  const filterPlayerStats = async <T extends { userId: string | null }>(viewer: any, rows: T[], leagueId: string): Promise<T[]> => {
+    if (await canAccessLeaguePremiumFeatures(viewer, leagueId)) return rows;
+    const eligibility = new Map(await Promise.all(
+      Array.from(new Set(rows.map(row => row.userId).filter((id): id is string => !!id))).map(async userId =>
+        [userId, await canViewPlayerStats(viewer, userId, leagueId)] as const),
+    ));
+    return rows.filter(row => !!row.userId && eligibility.get(row.userId));
+  };
+
+  const requireScrimmageOrganizerPremium = async (req: any, res: any, next: any) => {
+    try {
+      const scrimmage = await storage.getScrimmage(req.params.id);
+      if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
+      if (!await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to manage scrimmages' });
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+  const requireRequestOrganizerPremium = async (req: any, res: any, next: any) => {
+    try {
+      const request = await storage.getScrimmageRequestById(req.params.id);
+      if (!request) return res.status(404).json({ message: 'Request not found' });
+      const scrimmage = await storage.getScrimmage(request.scrimmageId);
+      if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
+      if (!await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to manage scrimmages' });
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
   // Auth middleware
   await setupAuth(app);
   await ensureBadgeTables();
@@ -3014,7 +3072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user's created scrimmages - MUST be before /api/users/:userId
-  app.get('/api/users/scrimmages', isAuthenticated, async (req: any, res) => {
+  app.get('/api/users/scrimmages', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -3024,7 +3082,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const scrimmages = await storage.getUserScrimmages(userId);
-      res.json(scrimmages);
+      const accessByLeague = new Map<string, boolean>();
+      const visible = [];
+      for (const scrimmage of scrimmages) {
+        if (!accessByLeague.has(scrimmage.leagueId)) {
+          accessByLeague.set(scrimmage.leagueId,
+            await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId));
+        }
+        if (accessByLeague.get(scrimmage.leagueId)) visible.push(scrimmage);
+      }
+      res.json(visible);
     } catch (error) {
       console.error('Error fetching user scrimmages:', error);
       res.status(500).json({ message: 'Failed to fetch user scrimmages' });
@@ -8917,7 +8984,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUserTeams(userId),
         storage.getActiveLeagueProSeatsForUser(userId, currentMonth()),
       ]);
-      const isOwnTeam = viewerTeams.some((viewerTeam) => viewerTeam.id === teamId);
+      const isOwnTeam = viewerTeams.some((viewerTeam) => viewerTeam.id === teamId
+        && viewerTeam.seasonIsActive !== false && !viewerTeam.isInCompletedTournament);
       const isLeagueCommissioner = league?.commissionerId === userId;
       const hasGlobalPremiumAccess = viewer && (
         viewer.role === 'commissioner' ||
@@ -10893,7 +10961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/leagues/:leagueId/star-leaderboard", async (req: any, res) => {
+  app.get("/api/leagues/:leagueId/star-leaderboard", isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { leagueId } = req.params;
       const requestedLimit = typeof req.query.limit === "string" ? req.query.limit : undefined;
@@ -10910,9 +10978,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!league) {
         return res.status(404).json({ message: "League not found" });
       }
+      const membership = await storage.getUserLeagueMembership(req.user.claims.sub, leagueId);
+      if (membership?.status !== 'approved' && league.commissionerId !== req.user.claims.sub) {
+        return res.status(403).json({ message: 'Not a member of this league' });
+      }
 
       const leaderboard = await storage.getLeagueStarLeaderboard(leagueId, limit, seasonId);
-      res.json(leaderboard);
+      const permitted = await filterPlayerStats(
+        req.userWithPermissions,
+        leaderboard.map(row => ({ ...row, userId: row.user.id })),
+        leagueId,
+      );
+      res.json(permitted.map(({ userId: _userId, ...row }) => row));
     } catch (error) {
       console.error("Error fetching star leaderboard:", error);
       res.status(500).json({ message: "Failed to fetch leaderboard" });
@@ -18495,7 +18572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  // Create scrimmage (available to all users)
+  // Organizing a scrimmage requires Player Pro or a league-provided seat.
   app.post('/api/scrimmages', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -18551,6 +18628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const membership = await storage.getUserLeagueMembership(userId, scrimmageData.leagueId);
       if (!membership || membership.status !== 'approved') {
         return res.status(403).json({ message: "Must be an approved league member to create scrimmages" });
+      }
+      if (!await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmageData.leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to create scrimmages' });
       }
 
       // Persist the explicit rink relationship and use its canonical display
@@ -19374,11 +19454,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // historical PUT registered for backwards compatibility and accept PATCH
   // so the per-scrimmage payment-link overrides (and other field edits)
   // can be saved from the existing client.
-  app.put('/api/scrimmages/:id', isAuthenticated, updateScrimmageHandler);
-  app.patch('/api/scrimmages/:id', isAuthenticated, updateScrimmageHandler);
+  app.put('/api/scrimmages/:id', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, updateScrimmageHandler);
+  app.patch('/api/scrimmages/:id', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, updateScrimmageHandler);
 
   // Retry a deliberately-deferred delivery without changing the occurrence.
-  app.post('/api/scrimmages/:id/send-invites', isAuthenticated, async (req: any, res) => {
+  app.post('/api/scrimmages/:id/send-invites', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmage = await storage.getScrimmage(req.params.id);
       if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
@@ -19409,7 +19489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Batch delete scrimmages (Creator only) - must be before :id route to avoid conflict
-  app.delete('/api/scrimmages/batch', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/scrimmages/batch', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { ids } = req.body;
@@ -19425,6 +19505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const scrimmage = await storage.getScrimmage(scrimmageId);
           if (!scrimmage) { skipped++; continue; }
           if (scrimmage.creatorId !== userId) { skipped++; continue; }
+          if (!await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId)) { skipped++; continue; }
 
           // Resolve delivered invitees and approved players before deletion
           // removes the source rows used to identify them.
@@ -19475,7 +19556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete entire recurring scrimmage series (Creator only) - must be before :id route
-  app.delete('/api/scrimmages/series/:parentId', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/scrimmages/series/:parentId', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const parentId = req.params.parentId;
       const userId = req.user.claims.sub;
@@ -19492,6 +19573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (representative.creatorId !== userId) {
         return res.status(403).json({ message: 'Only the creator can delete this series' });
+      }
+      if (!await canAccessLeaguePremiumFeatures(req.userWithPermissions, representative.leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to manage scrimmages' });
       }
 
       // Collect delivered invitees and approved players across all occurrences.
@@ -19981,7 +20065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get approved players for scrimmage (Any league member)
-  app.get('/api/scrimmages/:id/approved-players', isAuthenticated, async (req: any, res) => {
+  app.get('/api/scrimmages/:id/approved-players', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20021,7 +20105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Determine whether the requesting user can manage player assignments
       // (creator or co-host with canApproveRequests permission)
       const { canManage, isCoHost, permissions } = await storage.canUserManageScrimmage(scrimmageId, userId);
-      const canManagePlayers = canManage && (!isCoHost || (permissions?.canApproveRequests ?? false));
+      const entitled = await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId);
+      const canManagePlayers = entitled && canManage && (!isCoHost || (permissions?.canApproveRequests ?? false));
 
       res.json({
         scrimmage,
@@ -20029,7 +20114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         backupPlayers,
         openSpots,
         creator,
-        canEditScrimmage: canManage,
+        canEditScrimmage: entitled && canManage,
         canManagePlayers,
       });
     } catch (error) {
@@ -20039,7 +20124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get scrimmage requests (Creator or Co-Host with canApproveRequests permission)
-  app.get('/api/scrimmages/:id/requests', isAuthenticated, async (req: any, res) => {
+  app.get('/api/scrimmages/:id/requests', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20070,7 +20155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update scrimmage request status (Creator or Co-Host with canApproveRequests permission)
-  app.put('/api/scrimmage-requests/:id/status', isAuthenticated, async (req: any, res) => {
+  app.put('/api/scrimmage-requests/:id/status', isAuthenticated, loadUserPermissions, requireRequestOrganizerPremium, async (req: any, res) => {
     try {
       const requestId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20312,7 +20397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add a league member directly to the organizer-managed backup queue.
   // This is intentionally separate from player RSVP: organizers may add a
   // player who has not submitted a request yet once the roster is full.
-  app.post('/api/scrimmages/:id/backup-players', isAuthenticated, async (req: any, res) => {
+  app.post('/api/scrimmages/:id/backup-players', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20406,7 +20491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Set team assignment on an already-approved scrimmage request
-  app.put('/api/scrimmage-requests/:id/team-assignment', isAuthenticated, async (req: any, res) => {
+  app.put('/api/scrimmage-requests/:id/team-assignment', isAuthenticated, loadUserPermissions, requireRequestOrganizerPremium, async (req: any, res) => {
     try {
       const requestId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20483,7 +20568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reorder backup queue — organiser sends an array of { requestId, position }
-  app.put('/api/scrimmage-requests/backup-positions', isAuthenticated, async (req: any, res) => {
+  app.put('/api/scrimmage-requests/backup-positions', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { positions } = req.body as { positions: { requestId: string; position: number }[] };
@@ -20505,6 +20590,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'All request IDs must belong to the same scrimmage' });
       }
       const authorizedScrimmageId = Array.from(scrimmageIds)[0];
+      const scrimmage = await storage.getScrimmage(authorizedScrimmageId);
+      if (!scrimmage) return res.status(404).json({ message: 'Scrimmage not found' });
+      if (!await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to manage scrimmages' });
+      }
       const { canManage, isCoHost, permissions } = await storage.canUserManageScrimmage(authorizedScrimmageId, userId);
       if (!canManage || (isCoHost && permissions && !permissions.canApproveRequests)) {
         return res.status(403).json({ message: 'Not authorized to manage this scrimmage' });
@@ -20612,7 +20702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete scrimmage request
-  app.delete('/api/scrimmage-requests/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/scrimmage-requests/:id', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const requestId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20639,6 +20729,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.isUserScrimmageCoHost(scrimmage.id, userId);
       if (request.playerId !== userId && !isManager) {
         return res.status(403).json({ message: 'Unauthorized to delete this request' });
+      }
+      if (request.playerId !== userId &&
+          !await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to manage scrimmages' });
       }
 
       // Players may withdraw at any point before the scrimmage starts.
@@ -20749,7 +20843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Send payment requests before roster finalization. Pending players are
   // included so payment-gated scrimmages do not require approval before the
   // player has an invoice to pay.
-  app.post('/api/scrimmages/:id/send-payment-requests', isAuthenticated, async (req: any, res) => {
+  app.post('/api/scrimmages/:id/send-payment-requests', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -20814,7 +20908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Finalize scrimmage roster and send confirmation notifications (Creator or Co-Host)
-  app.put('/api/scrimmages/:id/finalize', isAuthenticated, async (req: any, res) => {
+  app.put('/api/scrimmages/:id/finalize', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -21071,7 +21165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add a co-host to a scrimmage (Creator only)
-  app.post('/api/scrimmages/:id/co-hosts', isAuthenticated, async (req: any, res) => {
+  app.post('/api/scrimmages/:id/co-hosts', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -21142,7 +21236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remove a co-host from a scrimmage (Creator only)
-  app.delete('/api/scrimmages/:id/co-hosts/:coHostUserId', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/scrimmages/:id/co-hosts/:coHostUserId', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const coHostUserId = req.params.coHostUserId;
@@ -21184,13 +21278,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check if current user can manage a scrimmage (Creator or Co-Host)
-  app.get('/api/scrimmages/:id/can-manage', isAuthenticated, async (req: any, res) => {
+  app.get('/api/scrimmages/:id/can-manage', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
       
       const result = await storage.canUserManageScrimmage(scrimmageId, userId);
-      res.json(result);
+      const scrimmage = await storage.getScrimmage(scrimmageId);
+      const entitled = !!scrimmage && await canAccessLeaguePremiumFeatures(req.userWithPermissions, scrimmage.leagueId);
+      res.json({ ...result, canManage: result.canManage && entitled });
     } catch (error) {
       console.error('Error checking management permissions:', error);
       res.status(500).json({ message: 'Failed to check permissions' });
@@ -21198,7 +21294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete scrimmage and notify confirmed players
-  app.delete('/api/scrimmages/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/scrimmages/:id', isAuthenticated, loadUserPermissions, requireScrimmageOrganizerPremium, async (req: any, res) => {
     try {
       const scrimmageId = req.params.id;
       const userId = req.user.claims.sub;
@@ -21303,7 +21399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get player stats for a league (with optional season filter)
-  app.get('/api/leagues/:leagueId/stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/leagues/:leagueId/stats', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
       const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
@@ -21341,7 +21437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           goalsAgainstAverage: stat.goalsAgainstAverage,
           user: stat.user
         }));
-        res.json(response);
+        res.json(await filterPlayerStats(req.userWithPermissions, response, leagueId));
       } else {
         // Get regular player statistics with discriminated union type
         const playerStats = await storage.getPlayerStats(leagueId, seasonId, playerType as 'non-goalies' | undefined);
@@ -21376,7 +21472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isGoalie: stat.isGoalie,
           user: stat.user
         }));
-        res.json(response);
+        res.json(await filterPlayerStats(req.userWithPermissions, response, leagueId));
       }
     } catch (error) {
       console.error('Error fetching player stats:', error);
@@ -21388,7 +21484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sums tournament_stats across every tournament that belongs to the league
   // (optionally narrowed by seasonId) and returns the same skater shape as
   // /api/leagues/:leagueId/stats so the frontend can swap them transparently.
-  app.get('/api/leagues/:leagueId/playoff-stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/leagues/:leagueId/playoff-stats', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const leagueId = req.params.leagueId;
       const seasonId = Array.isArray(req.query.seasonId)
@@ -21476,7 +21572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      res.json(response);
+      res.json(await filterPlayerStats(req.userWithPermissions, response, leagueId));
     } catch (error) {
       console.error('Error fetching playoff stats:', error);
       res.status(500).json({ message: 'Failed to fetch playoff stats' });
@@ -21484,7 +21580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get individual player's stats
-  app.get('/api/leagues/:leagueId/stats/players/:playerId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/leagues/:leagueId/stats/players/:playerId', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { leagueId, playerId } = req.params;
       const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
@@ -21494,6 +21590,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userMembership = await storage.getUserLeagueMembership(userId, leagueId);
       if (!userMembership || userMembership.status !== 'approved') {
         return res.status(403).json({ message: "Access denied - not an approved league member" });
+      }
+      if (!await canViewPlayerStats(req.userWithPermissions, playerId, leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to view stats outside your current team' });
       }
       
       // Validate season ownership if seasonId is provided
@@ -30000,9 +30099,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get tournament stats for all players
-  app.get('/api/tournaments/:tournamentId/stats', async (req: any, res) => {
+  app.get('/api/tournaments/:tournamentId/stats', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { tournamentId } = req.params;
+      const [tournament] = await db.select({ leagueId: tournaments.leagueId })
+        .from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+      if (!tournament?.leagueId) return res.status(404).json({ message: 'Tournament league not found' });
+      const membership = await storage.getUserLeagueMembership(req.user.claims.sub, tournament.leagueId);
+      const league = await storage.getLeague(tournament.leagueId);
+      if (membership?.status !== 'approved' && league?.commissionerId !== req.user.claims.sub) {
+        return res.status(403).json({ message: 'Not a member of this league' });
+      }
 
       const stats = await db
         .select({
@@ -30026,7 +30133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(users, eq(tournamentStats.userId, users.id))
         .where(eq(tournamentStats.tournamentId, tournamentId));
 
-      res.json(stats);
+      res.json(await filterPlayerStats(req.userWithPermissions, stats, tournament.leagueId));
     } catch (error) {
       console.error("Error fetching tournament stats:", error);
       res.status(500).json({ message: "Failed to fetch tournament stats" });
@@ -30944,11 +31051,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
      * RSVPs do not create games in this view.
    * Requires the requester to be a member of the specified league.
    */
-  app.get('/api/users/:userId/stats-trends', isAuthenticated, async (req: any, res) => {
+  app.get('/api/users/:userId/stats-access', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = typeof req.query.leagueId === 'string' ? req.query.leagueId : undefined;
+      if (leagueId) {
+        const membership = await storage.getUserLeagueMembership(req.user.claims.sub, leagueId);
+        const league = await storage.getLeague(leagueId);
+        if (membership?.status !== 'approved' && league?.commissionerId !== req.user.claims.sub) {
+          return res.json({ allowed: false });
+        }
+      }
+      res.json({ allowed: await canViewPlayerStats(req.userWithPermissions, req.params.userId, leagueId) });
+    } catch (error) {
+      console.error('Error checking player stats access:', error);
+      res.status(500).json({ message: 'Failed to check player stats access' });
+    }
+  });
+
+  app.get('/api/users/:userId/stats-trends', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
       const { userId } = req.params;
       const { leagueId, seasonId } = req.query as { leagueId?: string; seasonId?: string };
       const requesterId = req.user?.claims?.sub;
+      if (leagueId && seasonId) {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: 'Season does not belong to this league' });
+        }
+      }
+      if (!await canViewPlayerStats(req.userWithPermissions, userId, leagueId)) {
+        return res.status(403).json({ message: 'Player Pro is required to view stats outside your current team' });
+      }
       const isSyntheticPlaceholder = userId.startsWith('placeholder:');
       const placeholderId = isSyntheticPlaceholder ? userId.slice('placeholder:'.length) : null;
       let placeholderIsGoalie = false;
@@ -30977,12 +31110,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.userId, requesterId)));
         const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
         const isCommissioner = league?.commissionerId === requesterId;
-        if (!membership && !isCommissioner) {
+        if (membership?.status !== 'approved' && !isCommissioner) {
           return res.status(403).json({ message: 'Not a member of this league' });
         }
       }
-      // No leagueId: isAuthenticated (already checked) is sufficient — the requester can only see
-      // another user's stats if they share a league (this is low-sensitivity data).
+      // No leagueId: the current-team check above still protects career views.
 
       // Goalie stats are recorded separately from skater stats. Identify goalies
       // from the league-specific assignment first, then fall back to the user's

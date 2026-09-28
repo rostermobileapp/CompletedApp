@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { getImageUrl } from '@/lib/queryClient';
-import { X } from 'lucide-react';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
+import { Lock, X } from 'lucide-react';
 
 interface ProfilePhotoPreviewProps {
   isOpen: boolean;
@@ -35,6 +36,20 @@ export function ProfilePhotoPreview({
 }: ProfilePhotoPreviewProps) {
   const [, navigate] = useLocation();
   const [isAnimating, setIsAnimating] = useState(false);
+  const statsAccessQuery = useQuery<{ allowed: boolean }>({
+    queryKey: ['/api/users', userId, 'stats-access', leagueId ?? ''],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (leagueId) params.set('leagueId', leagueId);
+      const query = params.toString();
+      const response = await apiRequest(
+        'GET',
+        `/api/users/${encodeURIComponent(userId)}/stats-access${query ? `?${query}` : ''}`,
+      );
+      return response.json();
+    },
+    enabled: isOpen && !!userId,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -55,11 +70,18 @@ export function ProfilePhotoPreview({
   };
 
   const handleStatsTrends = () => {
+    if (!statsAccessQuery.data?.allowed) return;
     setPageTransitionDirection('up');
     const params = new URLSearchParams({ name: fullName });
     if (leagueId) params.set('leagueId', leagueId);
     if (seasonId) params.set('seasonId', seasonId);
     navigate(`/player-stats/${userId}?${params}`);
+    onClose();
+  };
+
+  const handleUpgrade = () => {
+    setPageTransitionDirection('up');
+    navigate('/subscription');
     onClose();
   };
 
@@ -140,14 +162,34 @@ export function ProfilePhotoPreview({
                 View Profile
               </Button>
             )}
-            <Button
-              onClick={handleStatsTrends}
-              variant="secondary"
-              className="w-full"
-              data-testid="button-stats-trends"
-            >
-              Player Stats &amp; Trends
-            </Button>
+            {statsAccessQuery.data?.allowed ? (
+              <Button
+                onClick={handleStatsTrends}
+                variant="secondary"
+                className="w-full"
+                data-testid="button-stats-trends"
+              >
+                Player Stats &amp; Trends
+              </Button>
+            ) : statsAccessQuery.isLoading ? (
+              <Button variant="secondary" className="w-full" disabled data-testid="button-stats-trends">
+                Checking stats access…
+              </Button>
+            ) : statsAccessQuery.isError ? (
+              <div className="text-center text-sm text-white" role="alert">
+                Stats access could not be checked. Please try again.
+              </div>
+            ) : (
+              <Button
+                onClick={handleUpgrade}
+                variant="secondary"
+                className="w-full"
+                data-testid="button-upgrade-stats"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Upgrade to view stats
+              </Button>
+            )}
           </div>
         )}
       </div>

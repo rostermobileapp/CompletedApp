@@ -8,10 +8,11 @@
  *
  * Placeholders (no userId) show only the name (no actions).
  */
-import { Flame, Snowflake, User, BarChart2 } from 'lucide-react';
+import { Flame, Snowflake, User, BarChart2, Lock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { setPageTransitionDirection } from '@/components/PageTransition';
-import { getImageUrl } from '@/lib/queryClient';
+import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import {
   Sheet,
   SheetContent,
@@ -56,6 +57,20 @@ export function PlayerActionSheet({
   const [, navigate] = useLocation();
   const fullName = `${firstName} ${lastName}`.trim() || 'Player';
   const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || '?';
+  const statsAccessQuery = useQuery<{ allowed: boolean }>({
+    queryKey: ['/api/users', userId, 'stats-access', leagueId ?? ''],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (leagueId) params.set('leagueId', leagueId);
+      const query = params.toString();
+      const response = await apiRequest(
+        'GET',
+        `/api/users/${encodeURIComponent(userId!)}/stats-access${query ? `?${query}` : ''}`,
+      );
+      return response.json();
+    },
+    enabled: open && !!userId,
+  });
 
   const goToProfile = () => {
     onClose();
@@ -64,12 +79,19 @@ export function PlayerActionSheet({
   };
 
   const goToStatsTrends = () => {
+    if (!statsAccessQuery.data?.allowed) return;
     onClose();
     setPageTransitionDirection('up');
     const params = new URLSearchParams({ name: fullName });
     if (leagueId) params.set('leagueId', leagueId);
     if (seasonId) params.set('seasonId', seasonId);
     navigate(`/player-stats/${userId}?${params}`);
+  };
+
+  const goToUpgrade = () => {
+    onClose();
+    setPageTransitionDirection('up');
+    navigate('/subscription');
   };
 
   return (
@@ -113,15 +135,35 @@ export function PlayerActionSheet({
               <User className="w-5 h-5 text-muted-foreground" />
               View Profile
             </Button>
-            <Button
-              variant="outline"
-              className="w-full h-12 text-base justify-start gap-3"
-              onClick={goToStatsTrends}
-              data-testid="action-stats-trends"
-            >
-              <BarChart2 className="w-5 h-5 text-muted-foreground" />
-              Player Stats &amp; Trends
-            </Button>
+            {statsAccessQuery.data?.allowed ? (
+              <Button
+                variant="outline"
+                className="w-full h-12 text-base justify-start gap-3"
+                onClick={goToStatsTrends}
+                data-testid="action-stats-trends"
+              >
+                <BarChart2 className="w-5 h-5 text-muted-foreground" />
+                Player Stats &amp; Trends
+              </Button>
+            ) : statsAccessQuery.isLoading ? (
+              <Button variant="outline" className="w-full h-12 text-base justify-start gap-3" disabled>
+                Checking stats access…
+              </Button>
+            ) : statsAccessQuery.isError ? (
+              <p className="text-center text-sm text-destructive" role="alert">
+                Stats access could not be checked. Please try again.
+              </p>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full h-12 text-base justify-start gap-3"
+                onClick={goToUpgrade}
+                data-testid="action-upgrade-stats"
+              >
+                <Lock className="w-5 h-5 text-muted-foreground" />
+                Upgrade to view stats
+              </Button>
+            )}
           </div>
         ) : (
           <p className="text-center text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
-import { ArrowLeft, Flame, Snowflake, Minus } from 'lucide-react';
+import { ArrowLeft, Flame, Snowflake, Minus, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { setPageTransitionDirection } from '@/components/PageTransition';
@@ -98,6 +98,22 @@ export default function PlayerStatsTrends() {
   const seasonId = searchParams.get('seasonId') ?? '';
   const displayName = searchParams.get('name') ?? 'Player';
 
+  const accessQuery = useQuery<{ allowed: boolean }>({
+    queryKey: ['/api/users', userId, 'stats-access', leagueId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (leagueId) params.set('leagueId', leagueId);
+      const query = params.toString();
+      const response = await apiRequest(
+        'GET',
+        `/api/users/${encodeURIComponent(userId)}/stats-access${query ? `?${query}` : ''}`,
+      );
+      return response.json();
+    },
+    enabled: !!userId,
+  });
+  const hasStatsAccess = accessQuery.data?.allowed === true;
+
   const { data: profileData } = useQuery<{
     firstName?: string;
     lastName?: string;
@@ -109,10 +125,10 @@ export default function PlayerStatsTrends() {
     queryKey: ['/api/users', userId],
     // Synthetic placeholder IDs do not have a users-table profile. Their
     // display name comes from the roster link's `name` query parameter.
-    enabled: !!userId && !userId.startsWith('placeholder:'),
+    enabled: hasStatsAccess && !!userId && !userId.startsWith('placeholder:'),
   });
 
-  const { data, isLoading } = useQuery<StatsTrendsData>({
+  const { data, isLoading, isError, refetch } = useQuery<StatsTrendsData>({
     queryKey: ['/api/users', userId, 'stats-trends', leagueId, seasonId],
     queryFn: async () => {
       const p = new URLSearchParams();
@@ -122,7 +138,7 @@ export default function PlayerStatsTrends() {
       const res = await apiRequest('GET', `/api/users/${userId}/stats-trends${qs ? `?${qs}` : ''}`);
       return res.json();
     },
-    enabled: !!userId,
+    enabled: hasStatsAccess && !!userId,
   });
 
   const fullName = profileData
@@ -219,8 +235,52 @@ export default function PlayerStatsTrends() {
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {isLoading ? (
+        {accessQuery.isLoading ? (
+          <div className="text-center py-12 text-muted-foreground" role="status">
+            Checking stats access…
+          </div>
+        ) : accessQuery.isError ? (
+          <div className="mx-auto max-w-md rounded-xl border border-destructive/30 bg-card p-6 text-center" role="alert">
+            <h2 className="text-lg font-semibold">Stats access couldn’t be checked</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please check your connection and try again.
+            </p>
+            <Button className="mt-4" variant="outline" onClick={() => accessQuery.refetch()}>
+              Try again
+            </Button>
+          </div>
+        ) : !hasStatsAccess ? (
+          <div className="mx-auto max-w-md rounded-xl border border-border bg-card p-6 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Lock className="h-6 w-6 text-primary" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold">Player Stats &amp; Trends is locked</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Upgrade to Player Pro to view stats and trends for this player.
+            </p>
+            <Button
+              className="mt-4"
+              onClick={() => {
+                setPageTransitionDirection('up');
+                navigate('/subscription');
+              }}
+              data-testid="button-upgrade-stats"
+            >
+              Upgrade
+            </Button>
+          </div>
+        ) : isLoading ? (
           <div className="text-center py-12 text-muted-foreground">Loading stats…</div>
+        ) : isError ? (
+          <div className="mx-auto max-w-md rounded-xl border border-destructive/30 bg-card p-6 text-center" role="alert">
+            <h2 className="text-lg font-semibold">Stats couldn’t be loaded</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please check your connection and try again.
+            </p>
+            <Button className="mt-4" variant="outline" onClick={() => refetch()}>
+              Try again
+            </Button>
+          </div>
         ) : (
           <>
             {/* Season Totals */}

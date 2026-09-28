@@ -73,37 +73,47 @@ export default function ScrimmageManagement() {
     canManagePayments: true,
   });
   const [pendingTeamAssignment, setPendingTeamAssignment] = useState<Record<string, 'light' | 'dark' | null>>({});
-  const { canAccessPremiumFeatures } = usePermissions();
+  const { hasRole, hasLeagueProSeat, user: permissionUser, isLoading: permissionsLoading } = usePermissions();
+  const [activeLeagueId] = useState<string | null>(() => {
+    const selectedType = localStorage.getItem('dashboardSelectedType');
+    return selectedType === 'league' ? localStorage.getItem('dashboardSelectedId') : null;
+  });
+  const hasGlobalAccess = hasRole('player_pro') || !!permissionUser?.feeExempt;
 
   const handleBack = () => {
     setPageTransitionDirection('down');
     navigate('/more');
   };
 
-  const { data: scrimmages = [], isLoading, error: scrimmagesError } = useQuery({
+  const { data: allScrimmages = [], isLoading, error: scrimmagesError } = useQuery({
     queryKey: ['/api/users', 'scrimmages'],
+    enabled: !permissionsLoading,
   }) as { data: ScrimmageWithCreatorAndCount[], isLoading: boolean, error: any };
+  const canManageScrimmages = hasGlobalAccess ||
+    (!!activeLeagueId && hasLeagueProSeat(activeLeagueId)) ||
+    allScrimmages.some(scrimmage => hasLeagueProSeat(scrimmage.leagueId));
+  const scrimmages = allScrimmages.filter(scrimmage => hasGlobalAccess || hasLeagueProSeat(scrimmage.leagueId));
 
   const { data: requests = [], isLoading: requestsLoading, error: requestsError } = useQuery({
     queryKey: ['/api/scrimmages', selectedScrimmage, 'requests'],
-    enabled: !!selectedScrimmage,
+    enabled: canManageScrimmages && !permissionsLoading && !!selectedScrimmage,
   }) as { data: ScrimmageRequestWithPlayer[], isLoading: boolean, error: any };
 
   const { data: rosterData, isLoading: rosterLoading, error: rosterError } = useQuery({
     queryKey: ['/api/scrimmages', viewRosterScrimmage, 'approved-players'],
-    enabled: !!viewRosterScrimmage,
+    enabled: canManageScrimmages && !permissionsLoading && !!viewRosterScrimmage,
   }) as { data: { scrimmage: any; approvedPlayers: ScrimmageRequestWithPlayer[] } | undefined, isLoading: boolean, error: any };
 
   const { data: coHosts = [], isLoading: coHostsLoading } = useQuery({
     queryKey: ['/api/scrimmages', selectedScrimmage, 'co-hosts'],
-    enabled: !!selectedScrimmage,
+    enabled: canManageScrimmages && !permissionsLoading && !!selectedScrimmage,
   }) as { data: ScrimmageCoHostWithUser[], isLoading: boolean };
 
   const membersDialogScrimmageId = coHostDialogOpen ?? backupDialogOpen;
   const selectedScrimmageData = scrimmages.find(s => s.id === membersDialogScrimmageId);
   const { data: leagueMembers = [] } = useQuery({
     queryKey: ['/api/leagues', selectedScrimmageData?.leagueId, 'members'],
-    enabled: !!membersDialogScrimmageId && !!selectedScrimmageData?.leagueId,
+    enabled: canManageScrimmages && !permissionsLoading && !!membersDialogScrimmageId && !!selectedScrimmageData?.leagueId,
   }) as { data: { user: User; status: string }[] };
 
   // --- Mutations ---
@@ -367,6 +377,28 @@ export default function ScrimmageManagement() {
     else newSet.add(id);
     setSelectedForDeletion(newSet);
   };
+
+  if (permissionsLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Checking Player Pro access…</div>;
+  }
+
+  if (!isLoading && !canManageScrimmages) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" data-testid="scrimmage-pro-lock">
+        <div className="w-full max-w-md rounded-xl border border-[hsl(var(--hairline))] bg-card p-8 shadow-[var(--elev-rest)]">
+          <Crown className="mx-auto mb-4 h-12 w-12 text-primary" />
+          <h1 className="mb-2 text-2xl font-bold">Player Pro required</h1>
+          <p className="mb-6 text-muted-foreground">
+            Scrimmage management requires Player Pro or a Player Pro seat provided by your active league.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Button onClick={() => navigate('/subscription')}>Upgrade to Player Pro</Button>
+            <Button variant="outline" onClick={handleBack}>Back</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // --- Loading/Error states ---
   if (scrimmagesError) {
@@ -1156,11 +1188,11 @@ export default function ScrimmageManagement() {
           <Crown className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No Scrimmages Created</h3>
           <p className="text-muted-foreground mb-4">
-            {canAccessPremiumFeatures()
+            {canManageScrimmages
               ? "You haven't created any scrimmages yet."
               : "Creating scrimmages requires Player Pro subscription or higher."}
           </p>
-          {canAccessPremiumFeatures() && (
+          {canManageScrimmages && (
             <Button onClick={() => navigate('/create-scrimmage')}>Create Scrimmage</Button>
           )}
         </div>

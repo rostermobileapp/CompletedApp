@@ -114,7 +114,7 @@ export default function CreateScrimmage() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canAccessPremiumFeatures } = usePermissions();
+  const { hasRole, hasLeagueProSeat, user: permissionUser, isLoading: permissionsLoading } = usePermissions();
   const { user } = useAuth();
   const [goalieSearchTerm, setGoalieSearchTerm] = useState("");
   const [skaterSearchTerm, setSkaterSearchTerm] = useState("");
@@ -180,6 +180,22 @@ export default function CreateScrimmage() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
 
+  // A league-provided Player Pro seat is scoped to the active/selected league.
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(() => {
+    if (savedDraft?.selectedLeagueId !== undefined) {
+      return savedDraft.selectedLeagueId;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const urlLeagueId = params.get('leagueId');
+    if (urlLeagueId) return urlLeagueId;
+    const dashType = localStorage.getItem('dashboardSelectedType');
+    const dashId = localStorage.getItem('dashboardSelectedId');
+    if (dashType === 'league' && dashId) return dashId;
+    return null;
+  });
+  const hasGlobalScrimmageAccess = hasRole('player_pro') || !!permissionUser?.feeExempt;
+  const hasSelectedLeagueProSeat = !!selectedLeagueId && hasLeagueProSeat(selectedLeagueId);
+
   // Fetch existing scrimmage data for edit mode
   const { data: existingScrimmage, isLoading: scrimmageLoading } = useQuery({
     queryKey: ['/api/scrimmages', scrimmageId],
@@ -187,11 +203,14 @@ export default function CreateScrimmage() {
       const response = await apiRequest('GET', `/api/scrimmages/${scrimmageId}`);
       return response.json();
     },
-    enabled: isEditMode,
+    enabled: isEditMode && !permissionsLoading,
   });
 
-
-  // 🚨 SUBSCRIPTION GATE REMOVED - ALL USERS CAN CREATE SCRIMMAGES 🚨
+  const canManageScrimmages = hasGlobalScrimmageAccess || (
+    isEditMode
+      ? (!!existingScrimmage?.leagueId && hasLeagueProSeat(existingScrimmage.leagueId))
+      : hasSelectedLeagueProSeat
+  );
 
   const form = useForm<CreateScrimmageForm>({
     resolver: zodResolver(createScrimmageSchema),
@@ -234,25 +253,11 @@ export default function CreateScrimmage() {
   // Fetch user's leagues to get league members
   const { data: userLeagues = [], isLoading: leaguesLoading } = useQuery({
     queryKey: ['/api/user/leagues'],
+    enabled: !permissionsLoading,
   });
 
   // Which league's roster to browse in the invite picker.
   // Prefer: (1) URL ?leagueId param, (2) Dashboard's localStorage selection, (3) first league.
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(() => {
-    if (savedDraft?.selectedLeagueId !== undefined) {
-      return savedDraft.selectedLeagueId;
-    }
-    // Check URL search params first
-    const params = new URLSearchParams(window.location.search);
-    const urlLeagueId = params.get('leagueId');
-    if (urlLeagueId) return urlLeagueId;
-    // Fall back to what the Dashboard had selected
-    const dashType = localStorage.getItem('dashboardSelectedType');
-    const dashId = localStorage.getItem('dashboardSelectedId');
-    if (dashType === 'league' && dashId) return dashId;
-    return null;
-  });
-
   // If nothing was in URL/localStorage, fall back to first league once loaded.
   useEffect(() => {
     if (selectedLeagueId === null && (userLeagues as any[]).length > 0) {
@@ -282,7 +287,7 @@ export default function CreateScrimmage() {
       );
       return response.json();
     },
-    enabled: !!selectedRinkFacilityId,
+    enabled: canManageScrimmages && !permissionsLoading && !!selectedRinkFacilityId,
   });
   const venueLeagues = (venuePlayerPool?.leagues || []) as Array<{ id: string; name: string }>;
   const venueMembers = (venuePlayerPool?.members || []) as any[];
@@ -298,7 +303,7 @@ export default function CreateScrimmage() {
   // groups were created and the canonical list was invalidated.
   const { data: allInviteGroups = [], isLoading: groupsLoading } = useQuery({
     queryKey: ['/api/invite-groups'],
-    enabled: !!user,
+    enabled: canManageScrimmages && !permissionsLoading && !!user,
   });
   const inviteGroups = (allInviteGroups as any[]).filter(
     (group: any) =>
@@ -315,7 +320,7 @@ export default function CreateScrimmage() {
       if (!response.ok) throw new Error('Failed to search users');
       return response.json();
     },
-    enabled: emailSearchTerm.length > 2,
+    enabled: canManageScrimmages && !permissionsLoading && emailSearchTerm.length > 2,
   });
 
   // Separate goalie / skater lists with independent search
@@ -736,6 +741,10 @@ export default function CreateScrimmage() {
 
   const onSubmit = (data: CreateScrimmageForm) => {
     setSubmitError(null);
+    if (!canManageScrimmages) {
+      setSubmitError('Creating or editing scrimmages requires Player Pro.');
+      return;
+    }
     if (!isEditMode && !selectedLeague?.id) {
       setSubmitError('League: Please select a league before creating the scrimmage.');
       return;
@@ -971,8 +980,33 @@ export default function CreateScrimmage() {
     form.setValue('selectedEmails', nextEmails);
   };
 
-  // 🚨 SUBSCRIPTION GATE REMOVED - FULL ACCESS FOR EVERYONE! 🚨
-  // All users now have free access to scrimmage creation
+  if (permissionsLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Checking Player Pro access…</div>;
+  }
+
+  if (isEditMode && scrimmageLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Checking scrimmage access…</div>;
+  }
+
+  if (!canManageScrimmages) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center" data-testid="scrimmage-pro-lock">
+        <div className="w-full max-w-md rounded-xl border border-[hsl(var(--hairline))] bg-card p-8 shadow-[var(--elev-rest)]">
+          <Crown className="mx-auto mb-4 h-12 w-12 text-primary" />
+          <h1 className="mb-2 text-2xl font-bold">Player Pro required</h1>
+          <p className="mb-6 text-muted-foreground">
+            {isEditMode
+              ? 'Creating and managing scrimmages requires Player Pro, including a Player Pro seat provided by the scrimmage’s league.'
+              : 'Scheduling a scrimmage requires Player Pro, including a Player Pro seat provided by your selected league.'}
+          </p>
+          <div className="flex flex-col gap-3">
+            <Button onClick={() => navigate('/subscription')}>Upgrade to Player Pro</Button>
+            <Button variant="outline" onClick={() => { setPageTransitionDirection('down'); navigate('/'); }}>Back to home</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col pb-[100px]" data-testid="create-scrimmage-page">
