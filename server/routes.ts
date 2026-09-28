@@ -37,6 +37,7 @@ import { db } from "./db";
 import { gamePenalties } from "@shared/schema";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
+import { isVerifiedPriorGoogleClaim } from "./googleIap";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
@@ -110,7 +111,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, createHmac, randomBytes } from 'crypto';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail, sendNewDirectMessageEmail } from "./emails";
@@ -5196,8 +5197,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         iapOriginalTransactionId: users.iapOriginalTransactionId,
       }).from(users).where(eq(users.id, userId)).for('update');
       if (!user) throw new Error('Roster user not found');
+      const oldTokenHash = user.iapOriginalTransactionId && user.iapOriginalTransactionId !== purchaseToken
+        ? hashGoogleIapToken(user.iapOriginalTransactionId) : null;
+      const [oldGoogleClaim] = oldTokenHash ? await tx.select({
+        userId: googleIapClaims.userId, productId: googleIapClaims.productId,
+      })
+        .from(googleIapClaims).where(eq(googleIapClaims.tokenHash, oldTokenHash)).limit(1) : [];
       if (rejectMixedStore && (appleOriginal ||
-          (user.iapOriginalTransactionId && user.iapOriginalTransactionId !== purchaseToken))) {
+          (oldTokenHash && !isVerifiedPriorGoogleClaim(userId, oldGoogleClaim)))) {
         throw Object.assign(new Error('This Roster account has another store purchase. Contact support to review both subscriptions before linking this order.'), { status: 409 });
       }
       const activeClaims = await tx.execute(sql`
@@ -5670,57 +5677,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Recovery for Natively Android builds whose restore callback contains
-  // RevenueCat CustomerInfo but does not expose the Google purchase token.
-  // The order ID is NOT proof: we require the app's current anonymous
-  // RevenueCat ID to hash to Google's account binding on that same purchase.
-  app.post('/api/iap/restore-google-order', isAuthenticated, async (req: any, res) => {
-    res.set('Cache-Control', 'no-store');
-    const { orderId, customerId } = req.body ?? {};
-    if (typeof orderId !== 'string' ||
-        !/^GPA\.\d{4}-\d{4}-\d{4}-\d{5}(?:\.\.\d+)?$/.test(orderId) ||
-        typeof customerId !== 'string' || customerId.length > 160) {
-      return res.status(400).json({ message: 'Enter the Google Play GPA order ID from your receipt.' });
+  // An order number is only a lookup hint. Both the automatic and receipt
+  // fallback paths require Google's account binding to match the native
+  // RevenueCat identity before they can touch an entitlement.
+  const verifyGoogleRecoveryOrder = async (
+    orderId: string,
+    proof: { kind: 'anonymous-device'; customerId: string } | { kind: 'signed-in-revenuecat' },
+  ) => {
+    const {
+      getGooglePlayOrderToken, verifySubscriptionPurchase,
+      matchesGooglePlayCustomer, isSubscriptionEntitled, isGoogleIapConfigured,
+    } = await import('./googleIap');
+    if (!isGoogleIapConfigured()) {
+      throw Object.assign(new Error('Google Play verification is unavailable.'), { status: 503 });
     }
+    const order = await getGooglePlayOrderToken(GOOGLE_PLAY_PACKAGE_NAME, orderId);
+    if (order.state !== 'PROCESSED') {
+      throw Object.assign(new Error('This Google Play order is not completed.'), { status: 402 });
+    }
+    const purchase = await verifySubscriptionPurchase(GOOGLE_PLAY_PACKAGE_NAME, order.purchaseToken);
+    if (proof.kind === 'anonymous-device' &&
+        !matchesGooglePlayCustomer(proof.customerId, purchase.obfuscatedExternalAccountId)) {
+      throw Object.assign(new Error('This purchase does not match the current Android app. Contact support if you changed devices or Play accounts.'), { status: 403 });
+    }
+    if (!isSubscriptionEntitled(purchase.subscriptionState, purchase.expiryTimeMs) ||
+        !Number.isFinite(purchase.expiryTimeMs)) {
+      throw Object.assign(new Error('This Google Play subscription is not currently active.'), { status: 402 });
+    }
+    const role = GOOGLE_PLAY_PRODUCT_ROLES[purchase.productId];
+    if (!role || !order.productIds.includes(purchase.productId)) {
+      throw Object.assign(new Error('This order does not match an active Roster subscription.'), { status: 400 });
+    }
+    return { role, purchase };
+  };
+
+  const revenueCatRosterId = (userId: string) => {
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) throw Object.assign(new Error('Account-linked restore is unavailable.'), { status: 503 });
+    return `roster_${createHmac('sha256', secret).update(`revenuecat-android:${userId}`).digest('hex')}`;
+  };
+
+  app.get('/api/iap/revenuecat-login-id', isAuthenticated, (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
     try {
-      const {
-        getGooglePlayOrderToken, verifySubscriptionPurchase,
-        matchesGooglePlayCustomer, isSubscriptionEntitled, isGoogleIapConfigured,
-      } = await import('./googleIap');
-      if (!isGoogleIapConfigured()) {
-        return res.status(503).json({ message: 'Google Play verification is unavailable.' });
+      return res.json({ loginId: revenueCatRosterId(req.user.claims.sub) });
+    } catch (error: any) {
+      return sendGoogleRecoveryError(res, error);
+    }
+  });
+
+  const sendGoogleRecoveryError = (res: any, error: any) => {
+    const status = [400, 402, 403, 404, 409, 503].includes(error.status) ? error.status : 502;
+    console.warn('[GoogleIAP] Recovery failed:', status);
+    return res.status(status).json({
+      message: status === 502 ? 'Could not verify this purchase right now. Please try again later.' : error.message,
+    });
+  };
+
+  // Natively restore may return CustomerInfo without Play's purchase token.
+  // RevenueCat v1 includes each active subscription's latest GPA order ID.
+  // Look it up server-side, then independently verify with Google as above.
+  app.post('/api/iap/restore-google-automatic', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const { getRevenueCatGoogleOrderIds } = await import('./revenueCatApi');
+      // The client cannot select which customer the server looks up. Native
+      // logIn/restore must first attach the Play receipt to this signed-in
+      // account's opaque RevenueCat identity.
+      const orderIds = await getRevenueCatGoogleOrderIds(revenueCatRosterId(req.user.claims.sub));
+      if (!orderIds.length) {
+        return res.status(404).json({ message: 'No active Google Play purchase was found for this app identity.', receiptFallback: true });
       }
-      const order = await getGooglePlayOrderToken(GOOGLE_PLAY_PACKAGE_NAME, orderId);
-      if (order.state !== 'PROCESSED') {
-        return res.status(402).json({ message: 'This Google Play order is not completed.' });
+      let best: Awaited<ReturnType<typeof verifyGoogleRecoveryOrder>> | null = null;
+      let lastError: any = null;
+      for (const orderId of orderIds.slice(0, 4)) {
+        try {
+          const candidate = await verifyGoogleRecoveryOrder(orderId, { kind: 'signed-in-revenuecat' });
+          if (!best || (candidate.role === 'commissioner' && best.role !== 'commissioner')) {
+            best = candidate;
+          }
+        } catch (error) {
+          lastError = error;
+        }
       }
-      const purchase = await verifySubscriptionPurchase(GOOGLE_PLAY_PACKAGE_NAME, order.purchaseToken);
-      if (!matchesGooglePlayCustomer(customerId, purchase.obfuscatedExternalAccountId)) {
-        return res.status(403).json({
-          message: 'This purchase is not linked to the current Android app customer. Check the Play account used for the purchase or contact support.',
-        });
-      }
-      if (!isSubscriptionEntitled(purchase.subscriptionState, purchase.expiryTimeMs) ||
-          !Number.isFinite(purchase.expiryTimeMs)) {
-        return res.status(402).json({ message: 'This Google Play subscription is not currently active.' });
-      }
-      const role = GOOGLE_PLAY_PRODUCT_ROLES[purchase.productId];
-      if (!role || !order.productIds.includes(purchase.productId)) {
-        return res.status(400).json({ message: 'This order does not match an active Roster subscription.' });
-      }
-      // This recovery route refuses mixed-store accounts inside the claim
-      // transaction, where the account row is locked.
+      if (!best) throw lastError ?? Object.assign(new Error('No verifiable Google Play purchase found.'), { status: 404 });
+      const { purchase, role } = best;
       const appliedRole = await claimGoogleIapRole(
-        req.user.claims.sub, role, order.purchaseToken, purchase.productId, purchase.expiryTimeMs!, true,
+        req.user.claims.sub, role, purchase.purchaseToken, purchase.productId, purchase.expiryTimeMs!, true,
       );
       return res.json({ role: appliedRole, message: 'Google Play subscription linked to your Roster account.' });
     } catch (error: any) {
-      const status = [400, 402, 403, 404, 409, 503].includes(error.status) ? error.status : 502;
-      console.warn('[GoogleIAP] Order recovery failed:', status);
-      return res.status(status).json({
-        message: status === 502 ? 'Could not verify this order with Google Play. Please try again later.' :
-          error.message,
+      return sendGoogleRecoveryError(res, error);
+    }
+  });
+
+  // Receipt ID remains an explicit fallback if RevenueCat cannot supply an
+  // order ID. It never grants access from the GPA number alone.
+  app.post('/api/iap/restore-google-order', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    const { orderId, customerId } = req.body ?? {};
+    const { isValidGoogleReceiptRecoveryInput } = await import('./googleIap');
+    if (!isValidGoogleReceiptRecoveryInput(orderId, customerId)) {
+      return res.status(400).json({ message: 'Enter the Google Play GPA order ID from your receipt.' });
+    }
+    try {
+      const { role, purchase } = await verifyGoogleRecoveryOrder(orderId, {
+        kind: 'anonymous-device', customerId,
       });
+      const appliedRole = await claimGoogleIapRole(
+        req.user.claims.sub, role, purchase.purchaseToken, purchase.productId, purchase.expiryTimeMs!, true,
+      );
+      return res.json({ role: appliedRole, message: 'Google Play subscription linked to your Roster account.' });
+    } catch (error: any) {
+      return sendGoogleRecoveryError(res, error);
     }
   });
 

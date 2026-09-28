@@ -439,6 +439,22 @@ export async function getAndroidPurchaseCustomerId(): Promise<string> {
   return id.trim();
 }
 
+/** Identify RevenueCat with a server-issued ID for the authenticated Roster
+ * account. Called only when the user chooses to restore an existing purchase.
+ */
+export async function loginAndroidPurchaseAccount(loginId: string): Promise<void> {
+  if (!await isAndroidBillingSupported() || !/^roster_[a-f0-9]{64}$/.test(loginId)) {
+    throw new Error('Android purchase account linking is unavailable.');
+  }
+  const data = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
+  if (data?.status === 'FAILED' || !data) {
+    throw new Error(data?.error || 'Could not link the Android purchase account.');
+  }
+  if (await getAndroidPurchaseCustomerId() !== loginId) {
+    throw new Error('The Android app did not confirm the linked purchase account.');
+  }
+}
+
 /**
  * Restore previous purchases via the Natively StoreKit bridge.
  */

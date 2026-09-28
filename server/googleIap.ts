@@ -149,6 +149,26 @@ export function matchesGooglePlayCustomer(
   return received.length === expected.length && timingSafeEqual(received, expected);
 }
 
+export function isValidGoogleReceiptRecoveryInput(orderId: unknown, customerId: unknown): boolean {
+  return typeof orderId === 'string' &&
+    /^GPA\.\d{4}-\d{4}-\d{4}-\d{5}(?:\.\.\d+)?$/.test(orderId) &&
+    typeof customerId === 'string' &&
+    /^\$RCAnonymousID:[A-Za-z0-9_-]{20,128}$/.test(customerId);
+}
+
+/** Startup legacy backfill also hashes Apple transaction IDs, so a matching
+ * google_iap_claims row is NOT evidence of Google provenance unless a
+ * Google-verified product was recorded for it.
+ */
+export function isVerifiedPriorGoogleClaim(
+  userId: string,
+  claim: { userId: string; productId: string | null } | undefined,
+): boolean {
+  return claim?.userId === userId && [
+    'player_pro_monthly', 'player_pro_yearly', 'commissioner_monthly', 'commissioner_yearly',
+  ].includes(claim.productId ?? '');
+}
+
 /**
  * Subset of fields returned by purchases.subscriptionsv2.get that we care about.
  * https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptionsv2/get

@@ -22,6 +22,7 @@ import {
   purchaseProductAndroid,
   inspectAndroidPurchases,
   getAndroidPurchaseCustomerId,
+  loginAndroidPurchaseAccount,
   restorePurchases,
   restorePurchasesAndroid,
   PRODUCT_PLAYER_PRO,
@@ -47,6 +48,7 @@ export default function Subscription() {
   const [showFreeHelp, setShowFreeHelp] = useState(false);
   const [showGoogleOrderRecovery, setShowGoogleOrderRecovery] = useState(false);
   const [googleOrderId, setGoogleOrderId] = useState('');
+  const [recoveryCustomerId, setRecoveryCustomerId] = useState<string | null>(null);
 
   // In-app embedded Stripe checkout for subscription upgrades — replaces the
   // hosted-checkout redirect we previously used. The server creates a Checkout
@@ -715,7 +717,37 @@ export default function Subscription() {
       setAndroidOwnedProducts(activeProductIds);
 
       if (!purchases.length) {
-        setShowGoogleOrderRecovery(true);
+        const originalCustomerId = await getAndroidPurchaseCustomerId();
+        setRecoveryCustomerId(originalCustomerId.startsWith('$RCAnonymousID:') ? originalCustomerId : null);
+        try {
+          const identityResponse = await apiRequest('GET', '/api/iap/revenuecat-login-id');
+          const { loginId } = await identityResponse.json() as { loginId: string };
+          await loginAndroidPurchaseAccount(loginId);
+          // RevenueCat associates the restored Play receipt with the
+          // authenticated Roster account's server-derived identity.
+          await inspectAndroidPurchases();
+          const response = await apiRequest('POST', '/api/iap/restore-google-automatic');
+          const data = await response.json() as { role?: string; message?: string };
+          if (!data.role) throw new Error(data.message || 'Google Play could not verify this purchase.');
+          toast({
+            title: 'Google Play purchase verified',
+            description: data.role === 'commissioner'
+              ? 'Commissioner remains your highest verified tier.'
+              : 'Your Player Pro subscription is linked to your Roster account.',
+          });
+          await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+          window.location.reload();
+        } catch (error: any) {
+          // Only an original anonymous identity can be matched to Google's
+          // purchase binding by the receipt fallback. A conflicting claim
+          // needs support rather than another attempted transfer.
+          if (originalCustomerId.startsWith('$RCAnonymousID:') &&
+              (error?.status == null || [402, 404, 502, 503].includes(error.status))) {
+            setShowGoogleOrderRecovery(true);
+          } else {
+            throw error;
+          }
+        }
         return;
       }
 
@@ -769,7 +801,7 @@ export default function Subscription() {
       // The native bridge supplies the original anonymous RevenueCat identity.
       // Google must independently confirm that this identity belongs to the
       // order. A receipt number by itself never grants access.
-      const customerId = await getAndroidPurchaseCustomerId();
+      const customerId = recoveryCustomerId ?? await getAndroidPurchaseCustomerId();
       const response = await apiRequest('POST', '/api/iap/restore-google-order', {
         orderId: googleOrderId.trim(),
         customerId,
@@ -850,7 +882,7 @@ export default function Subscription() {
           <DialogHeader>
             <DialogTitle>Recover your Google Play purchase</DialogTitle>
             <DialogDescription>
-              The Android app did not return a purchase token. Enter the GPA order ID from your Google Play receipt. Roster will link it only if Google confirms both an active subscription and a match to this app's purchase identity. This does not charge you.
+              Automatic verification could not find this purchase. As a fallback, enter the GPA order ID from your Google Play receipt. Roster will still check the active subscription and this app's purchase identity. This does not charge you.
             </DialogDescription>
           </DialogHeader>
           <label htmlFor="google-order-id" className="text-sm font-medium">Google Play order ID</label>

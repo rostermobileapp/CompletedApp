@@ -8,6 +8,7 @@ interface RevenueCatSubscription {
   original_purchase_date?: string | null;
   refunded_at?: string | null;
   ownership_type?: string | null;
+  store_transaction_id?: string | number | null;
 }
 
 interface RevenueCatResponse {
@@ -77,4 +78,55 @@ export async function getRevenueCatAppleSubscriptions(
     throw new Error(`RevenueCat subscriber lookup failed (HTTP ${response.status})`);
   }
   return getActiveAppleSubscriptions(await response.json() as RevenueCatResponse);
+}
+
+const GOOGLE_ORDER_ID = /^GPA\.\d{4}-\d{4}-\d{4}-\d{5}(?:\.\.\d+)?$/;
+const GOOGLE_PRODUCTS = new Set([
+  'player_pro_monthly', 'player_pro_yearly', 'commissioner_monthly', 'commissioner_yearly',
+]);
+
+/**
+ * RevenueCat's v1 subscriber response includes the latest Play order ID for
+ * each subscription. This is only a lookup hint, not entitlement proof: the
+ * caller MUST verify that order with Google and compare its account binding
+ * to the native customer ID before claiming it.
+ */
+export function getActiveGoogleOrderIds(
+  data: RevenueCatResponse, now = Date.now(),
+): string[] {
+  const subscriptions = data.subscriber?.subscriptions;
+  if (!subscriptions || typeof subscriptions !== 'object' || Array.isArray(subscriptions)) {
+    throw new Error('RevenueCat returned an invalid subscriber response');
+  }
+  return Array.from(new Set(Object.entries(subscriptions).flatMap(([productId, sub]) => {
+    if (!GOOGLE_PRODUCTS.has(productId) || sub?.store !== 'play_store' ||
+        sub.ownership_type !== 'PURCHASED' || sub.refunded_at ||
+        typeof sub.store_transaction_id !== 'string' ||
+        !GOOGLE_ORDER_ID.test(sub.store_transaction_id) ||
+        !(Date.parse(sub.expires_date ?? '') > now)) return [];
+    return [sub.store_transaction_id];
+  })));
+}
+
+export async function getRevenueCatGoogleOrderIds(
+  customerId: string,
+  options: { apiKey?: string; fetcher?: typeof fetch } = {},
+): Promise<string[]> {
+  if (!/^(?:\$RCAnonymousID:[A-Za-z0-9_-]{20,128}|roster_[a-f0-9]{64})$/.test(customerId)) {
+    throw Object.assign(new Error('The Android app did not provide a valid purchase identity.'), { status: 400 });
+  }
+  const key = options.apiKey ?? process.env.REVENUECAT_API_KEY;
+  if (!key) throw Object.assign(new Error('Automatic Google Play restore is unavailable.'), { status: 503 });
+  const response = await (options.fetcher ?? fetch)(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(customerId)}`,
+    {
+      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    },
+  );
+  if (!response.ok) {
+    // Do not expose the provider response body, customer ID or credentials.
+    throw Object.assign(new Error('RevenueCat could not look up this purchase.'), { status: 502 });
+  }
+  return getActiveGoogleOrderIds(await response.json() as RevenueCatResponse);
 }
