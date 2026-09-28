@@ -180,16 +180,6 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
               </select>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => navigate('/trophy-case')}
-            className={`${cardClass} elev-rest inline-flex flex-col items-center justify-center gap-1 px-5 py-2 text-sm font-medium hover:bg-[#f2f2f2] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
-            style={cardStyle}
-            data-testid="button-patches-home-desktop"
-          >
-            <img src="/patches-home-icon.png?v=20260927" alt="" aria-hidden="true" className="w-[3.3rem] h-[3.3rem] sm:w-[3.6rem] sm:h-[3.6rem] shrink-0 object-contain" />
-            <span>Patches</span>
-          </button>
         </div>
 
         {isTournamentScope ? (
@@ -205,11 +195,14 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                 selectedTournamentId={selectedTournamentId}
                 seasonId={selectedSeasonId}
               />
-              <AlertsExpanded
-                effectiveLeagueId={effectiveLeagueId}
-                userTeamIds={allUserTeamIds}
-                seasonId={selectedSeasonId}
-              />
+              <div className="flex flex-col gap-4">
+                <AlertsExpanded
+                  effectiveLeagueId={effectiveLeagueId}
+                  userTeamIds={allUserTeamIds}
+                  seasonId={selectedSeasonId}
+                />
+                <PatchesHomeButton onClick={() => navigate('/trophy-case')} />
+              </div>
             </div>
             {/* Tournament Row 2: Schedule (unchanged) */}
             <div className="mx-auto w-full max-w-[1080px]">
@@ -250,6 +243,7 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
                   userTeamIds={allUserTeamIds}
                   seasonId={selectedSeasonId}
                 />
+                <PatchesHomeButton onClick={() => navigate('/trophy-case')} />
               </div>
               {/* Right column: Stats + Standings side by side, full height */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr] lg:items-stretch">
@@ -283,6 +277,21 @@ export function HomeDesktop({ onAddEvent }: HomeDesktopProps = {}) {
         )}
       </div>
     </div>
+  );
+}
+
+function PatchesHomeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${cardClass} elev-rest inline-flex flex-col items-center justify-center gap-1 px-5 py-2 text-sm font-medium transition-colors hover:bg-[#f2f2f2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
+      style={cardStyle}
+      data-testid="button-patches-home-desktop"
+    >
+      <img src="/patches-home-icon.png?v=20260927" alt="" aria-hidden="true" className="h-[3.3rem] w-[3.3rem] shrink-0 object-contain sm:h-[3.6rem] sm:w-[3.6rem]" />
+      <span>Patches</span>
+    </button>
   );
 }
 
