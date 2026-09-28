@@ -507,7 +507,12 @@ export default function Subscription() {
         setIsLoading(false);
         return;
       }
-      toast({ title: 'Purchase failed', description: error.message || 'Something went wrong. Please try again.', variant: 'destructive' });
+      const purchaseNeedsVerification = error?.message?.startsWith('Purchase completed');
+      toast({ title: purchaseNeedsVerification ? 'Purchase needs verification' : 'Purchase failed',
+        description: purchaseNeedsVerification
+          ? `${error.message} Do not purchase again; contact support.`
+          : error.message || 'Something went wrong. Please try again.',
+        variant: 'destructive' });
       setIsLoading(false);
     }
   };
@@ -518,7 +523,7 @@ export default function Subscription() {
       const purchases = await restorePurchases();
 
       if (!purchases.length) {
-        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        toast({ title: 'Purchase could not be verified', description: 'The App Store may have an active subscription, but this version of the app did not return transaction details. Please do not purchase again; contact support.' });
         setIsLoading(false);
         return;
       }
@@ -536,7 +541,7 @@ export default function Subscription() {
       }
 
       if (!verifyPayload) {
-        toast({ title: 'No purchases found', description: 'No active subscription was found to restore.' });
+        toast({ title: 'Purchase could not be verified', description: 'The App Store may have an active subscription, but this version of the app did not return transaction details. Please do not purchase again; contact support.' });
         setIsLoading(false);
         return;
       }
