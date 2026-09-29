@@ -57,6 +57,7 @@
 - [Google Play billing readiness](google-play-billing-readiness.md) — native product visibility and server purchase verification are separate prerequisites; test both before enabling payment.
 - [Natively RevenueCat proof gap](natively-revenuecat-proof.md) — purchase/restore callbacks do not supply Apple transaction proof; verify entitlements server-side before granting access.
 - [Google Play order recovery](google-play-order-recovery.md) — orders.get can reveal a token and RevenueCat anonymous owner; a GPA number alone does not establish the Roster account to link.
+- [Google Play sandbox isolation](google-play-sandbox-isolation.md) — RevenueCat webhook filtering cannot protect independent Play verification paths; reject test purchases before role claims.
 - [RevenueCat native identity](revenuecat-native-identity.md) — use one stable opaque account ID across iOS/Android; preserve existing purchasers, never silently rename or auto-alias established subscribers.
 - [RevenueCat webhook URL uniqueness](revenuecat-webhook-url-uniqueness.md) — one project cannot register the same URL twice; use one signed mixed-environment webhook or distinct URLs.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
