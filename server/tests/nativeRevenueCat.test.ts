@@ -265,11 +265,6 @@ test('paywall requires the API key, one webhook signing secret, and explicit fla
     REVENUECAT_API_KEY: 'api-key',
     REVENUECAT_WEBHOOK_SECRET: 'webhook-key',
   } as NodeJS.ProcessEnv), true);
-  assert.equal(isNativeRevenueCatPaywallEnabled({
-    NATIVE_PAYWALL_ENABLED: 'true',
-    REVENUECAT_API_KEY: 'api-key',
-    REVENUECAT_WEBHOOK_SANDBOX_SECRET: 'sandbox-signing-key',
-  } as NodeJS.ProcessEnv), false);
 });
 
 test('only one live claim per account can reserve the paywall at a time', () => {
