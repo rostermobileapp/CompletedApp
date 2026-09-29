@@ -191,7 +191,10 @@ export function NativeFirstSignInPaywall() {
           if (stage === 'login' || stage === 'paywall') {
             toast({
               title: 'Subscriptions are temporarily unavailable',
-              description: 'Your account could not be linked to the store. Please try again later.',
+              description: error instanceof Error
+                ? `${stage === 'login' ? 'Store account link' : 'Paywall'} failed: ${error.message.slice(0, 200)}`
+                : 'Your account could not be linked to the store. Please try again later.',
+              duration: 30_000,
               variant: 'destructive',
             });
           }
