@@ -1,0 +1,41 @@
+Pre-flight (do once, before any purchase)
+ NATIVE_PAYWALL_ENABLED is off in production; test against a build that shows the paywall in a test/staging context only.
+ Sandbox accounts ready: an App Store sandbox tester (App Store Connect → Users and Access → Sandbox) and a Google Play license tester (Play Console → Setup → License testing), signed into the test devices.
+ Account linking works: the bridge calls logIn(<server opaque account ID>) before the paywall renders. Verify the RevenueCat customer uses that ID, not a $RCAnonymousID:….
+ Confirm the paywall loads the Default Mobile offering with all four packages visible.
+Entitlement mapping you're validating
+Product (package)	Store product examples	Should flip entitlement
+player_pro_monthly	prod933d39f21b (player_pro_monthly:monthly)	player_pro
+player_pro_yearly	prod1b58d62c6b (player_pro_yearly:annual)	player_pro
+commissioner_monthly	prod53036e3aa3 (commissioner_monthly:monthly)	commissioner
+commissioner_yearly	proddbe7d81680 (commissioner_yearly:annual)	commissioner
+iOS (App Store sandbox)
+ Purchase Player Pro (yearly, the default): buy → app unlocks Player Pro features.
+RevenueCat customer shows player_pro active, store = App Store, correct product.
+Webhook fires INITIAL_PURCHASE → your endpoint → 200. Customer state reconciled to active.
+ Purchase Player Pro monthly (fresh sandbox tester): same checks, player_pro active.
+ Purchase Commissioner (yearly): confirm it flips commissioner — not player_pro. (This tier was added late — verify explicitly.)
+ Purchase Commissioner monthly: commissioner active.
+ Restore: delete/reinstall (or fresh session) → sign in (logIn same account) → Restore Purchases → entitlement returns, no second charge.
+ Free trial (if the offer applies): starting the trial shows period_type: TRIAL, entitlement active, price: 0 handled as trial (not "paid").
+Android (Google Play sandbox)
+ Repeat all four purchases above using the Play products → same entitlement outcomes.
+ Restore on Android → entitlement returns, no double charge.
+ Note: Play products have a 3-day grace period configured — fine for now, just be aware the lifecycle differs slightly from iOS.
+Cross-checks in RevenueCat (per test customer)
+ Customer profile shows the right active entitlement and the matching store transaction.
+ environment on those events is SANDBOX (confirms your prod/sandbox branching is reading real sandbox traffic).
+ No orphaned $RCAnonymousID purchase — the transaction is attached to the logged-in account ID.
+Edge cases worth one pass each
+ Purchase → cancel (sandbox auto-renew off): entitlement stays active until expiry, then EXPIRATION fires and access is removed.
+ Tier switch (optional): if you allow upgrading Player Pro → Commissioner, buy one then the other → confirm PRODUCT_CHANGE and the entitlement reflects the new tier.
+ Duplicate/retry safety: already proven idempotent by the TEST event, but confirm a real renewal doesn't double-apply.
+Green light to enable
+Flip NATIVE_PAYWALL_ENABLED on only after: all four products flip the correct entitlement on both platforms, restore works without recharge, and each shows correctly in RevenueCat. Also confirm the outstanding project-wide TypeScript errors are cleared (Replit's earlier gate) before shipping.
+
+If any purchase doesn't flip the entitlement, grab the test customer's app_user_id and send it over — I'll pull their events and entitlements and we'll trace exactly where it broke (mapping, offering, or the bridge's customer-info read).
+
+One thing only you can confirm as you go: does a sandbox purchase actually flip the entitlement in the app UI, not just in RevenueCat? That's the real end-to-end proof. Want me to also draft the "enable the paywall" cutover steps for when these all pass?
+
+That's your full sandbox test matrix — four products × two platforms, restore, plus edge cases, each with the exact entitlement it should flip. The Commissioner tier and the account-linking-before-purchase steps are the two I'd watch most closely. When you run these, send me any test customer's app_user_id if a purchase doesn't unlock correctly and I'll trace it. Want the paywall-enable cutover steps drafted too, for when everything passes?
+
