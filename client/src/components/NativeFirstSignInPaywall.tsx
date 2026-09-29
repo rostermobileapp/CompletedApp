@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react';
-import { useLocation } from 'wouter';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDemo } from '@/context/DemoContext';
 import { usePermissions } from '@/context/SubscriptionContext';
@@ -21,7 +20,6 @@ import { syncKnownNativeRevenueCatAccount } from '@/lib/nativeRevenueCat';
 type CurrentState = {
   authenticated: boolean;
   userId: string | null;
-  location: string;
   demo: boolean;
   permissionLoading: boolean;
   role: string;
@@ -34,10 +32,6 @@ type CurrentState = {
 // shown; a fresh app session can retry.
 const attemptedNativePaywallAccounts = new Set<string>();
 
-function isHomeLocation(location: string): boolean {
-  return location === '/' || location === '/app';
-}
-
 /**
  * Starts the server-authorized native offering only after Home has rendered.
  * This component intentionally renders no UI; all purchase UI belongs to the
@@ -47,12 +41,11 @@ export function NativeFirstSignInPaywall() {
   const { user, isAuthenticated } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const { role, isPrimaryCommissioner, isLoading: permissionsLoading } = usePermissions();
-  const [location] = useLocation();
+  const [nativeReady, setNativeReady] = useState(isNativelyPurchasesApp);
   const { toast } = useToast();
   const current = useRef<CurrentState>({
     authenticated: false,
     userId: null,
-    location,
     demo: false,
     permissionLoading: true,
     role: 'free_tier',
@@ -61,7 +54,6 @@ export function NativeFirstSignInPaywall() {
   current.current = {
     authenticated: isAuthenticated,
     userId: user?.id ?? null,
-    location,
     demo: isDemoActive,
     permissionLoading: permissionsLoading,
     role,
@@ -69,12 +61,33 @@ export function NativeFirstSignInPaywall() {
   };
 
   useEffect(() => {
+    if (nativeReady) return;
+    const refresh = () => {
+      if (isNativelyPurchasesApp()) setNativeReady(true);
+    };
+    // Native bridge injection can happen after Home mounts, with or without a
+    // nativelyReady event. Bound the polling for browsers that never get one.
+    const interval = window.setInterval(refresh, 500);
+    const timeout = window.setTimeout(() => window.clearInterval(interval), 15_000);
+    window.addEventListener('nativelyReady', refresh);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('resume', refresh);
+    window.addEventListener('pageshow', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+      window.removeEventListener('nativelyReady', refresh);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('resume', refresh);
+      window.removeEventListener('pageshow', refresh);
+    };
+  }, [nativeReady]);
+
+  useEffect(() => {
     const accountId = user?.id;
     const paidRole = role === 'player_pro' || role === 'commissioner';
-    const isPreview = import.meta.env.DEV && location.toLowerCase().includes('preview');
     if (!accountId || !isAuthenticated || isDemoActive || permissionsLoading ||
-        paidRole || isPrimaryCommissioner || isPreview ||
-        !isHomeLocation(location) || !isNativelyPurchasesApp() ||
+        paidRole || isPrimaryCommissioner || !nativeReady ||
         attemptedNativePaywallAccounts.has(accountId)) {
       return;
     }
@@ -92,10 +105,9 @@ export function NativeFirstSignInPaywall() {
     const isStillEligible = () => {
       const state = current.current;
       const currentPaidRole = state.role === 'player_pro' || state.role === 'commissioner';
-      return active && isNativelyPurchasesApp() && state.authenticated &&
+      return active && nativeReady && isNativelyPurchasesApp() && state.authenticated &&
         state.userId === accountId && !state.demo && !state.permissionLoading &&
-        !currentPaidRole && !state.primaryCommissioner &&
-        isHomeLocation(state.location);
+        !currentPaidRole && !state.primaryCommissioner;
     };
 
     const reportResult = async (presented: boolean) => {
@@ -228,7 +240,7 @@ export function NativeFirstSignInPaywall() {
     permissionsLoading,
     role,
     isPrimaryCommissioner,
-    location,
+    nativeReady,
     toast,
   ]);
 
