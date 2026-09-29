@@ -1,6 +1,6 @@
 - [MP4 faststart for video scrub](mp4-faststart-scrub.md) — any seekable/scrub MP4 must have moov atom at front; use ffmpeg -movflags +faststart or currentTime seeks silently fail.
 - [Raw fetch auth pattern](raw-fetch-auth.md) — raw fetch() to backend must use getAuthHeaders() from queryClient; credentials:'include' does nothing (JWT not cookie).
-- [Database provider](db-provider.md) — PostgreSQL is hosted on Supabase, not Neon. DATABASE_URL points to Supabase's connection string.
+- [Database provider](db-provider.md) — Supabase hosts PostgreSQL; the serverless driver's pool needs client-level listeners for checked-out disconnects.
 - [Placeholder player orphaned teamId](placeholder-orphaned-teamid.md) — placeholder_players can have stale team_id pointing to deleted teams; fix is in getLeaguePlaceholderPlayers to null-out via LEFT JOIN detection.
 - [Draft keeper ID format](draft-keeper-id-format.md) — draft_keepers.placeholder_player_id stores "placeholder:{uuid}" WITH the prefix; draft_picks.placeholder_player_id stores bare UUID (applyPick strips prefix). Never add the prefix again when reading from draft_keepers.
 - [Draft rehydrate vs active-drafts scope](draft-rehydrate-scope.md) — active-drafts endpoint includes "paused" status but rehydrateActiveDraftTimers only queries "active"/"awaiting_captains" — paused drafts are not auto-recovered on server restart.
