@@ -45,12 +45,10 @@ export default function VisitorMap() {
       maxBounds: northAmericaBounds,
       maxBoundsViscosity: 1.0,
       zoomControl: true,
-      attributionControl: false,
     });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-      subdomains: "abcd",
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
       maxZoom: 19,
     }).addTo(map);
 
