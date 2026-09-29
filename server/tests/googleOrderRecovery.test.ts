@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { isValidGoogleReceiptRecoveryInput, isVerifiedPriorGoogleClaim, matchesGooglePlayCustomer } from '../googleIap';
+import { assertGooglePlayPurchaseAllowed, isValidGoogleReceiptRecoveryInput, isVerifiedPriorGoogleClaim, matchesGooglePlayCustomer } from '../googleIap';
 import { getActiveGoogleOrderIds, getRevenueCatGoogleOrderIds } from '../revenueCatApi';
 
 const customer = '$RCAnonymousID:41dedea94486443a9242902ecf5424d1';
@@ -27,6 +27,19 @@ test('legacy Apple backfill is not mistaken for a verified older Google claim', 
   assert.equal(isVerifiedPriorGoogleClaim('current', { userId: 'current', productId: null }), false);
   assert.equal(isVerifiedPriorGoogleClaim('current', { userId: 'other', productId: 'player_pro_monthly' }), false);
   assert.equal(isVerifiedPriorGoogleClaim('current', { userId: 'current', productId: 'player_pro_yearly' }), true);
+});
+
+test('production rejects Play license-test purchases before any purchase or restore can claim a role', () => {
+  assert.throws(
+    () => assertGooglePlayPurchaseAllowed({ subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE', testPurchase: {} }, 'production'),
+    { status: 403, message: 'Google Play test purchases cannot grant production access.' },
+  );
+  assert.throws(
+    () => assertGooglePlayPurchaseAllowed({ testPurchase: null }, 'production'),
+    { status: 403 },
+  );
+  assert.doesNotThrow(() => assertGooglePlayPurchaseAllowed({ subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' }, 'production'));
+  assert.doesNotThrow(() => assertGooglePlayPurchaseAllowed({ testPurchase: {} }, 'development'));
 });
 
 test('RevenueCat supplies active purchased Google orders for automatic lookup', () => {
