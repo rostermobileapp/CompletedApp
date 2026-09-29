@@ -1,0 +1,28 @@
+Context: Roster is a React + TypeScript (Vite) web app that runs both in normal browsers and inside Natively iOS/Android WebView wrappers. On mobile, in-app purchases go through Natively's native purchase bridge to RevenueCat (Apple App Store billing on iOS, Google Play on Android). This bridge already works for existing purchases — reuse it. Do NOT add @revenuecat/purchases-js, Stripe, or any web-checkout flow for the in-app purchase path, because inside the wrappers, digital-goods purchases must go through native store IAP or Apple/Google will reject the app.
+
+Goal: We have an existing 9-page onboarding flow, and the current final step is a page labelled "Paywall". Replace that existing "Paywall" page with a new RevenueCat-driven paywall — keep it as the last (9th) step of onboarding, preserving the surrounding flow, navigation, and step count. Remove the old paywall page's purchase UI/logic and swap in the new component described below. After a successful purchase — or if the user already has an active entitlement — mark onboarding complete and route them into the main app, exactly where the old "Paywall" page did.
+
+Migration requirements:
+
+Locate the existing page labelled "Paywall" in the onboarding flow and replace its contents with the new Paywall component. Do not add a 10th page or change the position of the other 8 steps — this is a like-for-like replacement of the final step.
+Preserve the existing onboarding navigation (back/next, progress indicator, completion callback). The new paywall should hook into the same "onboarding complete → enter app" transition the old page used.
+Remove any now-unused purchase code, hardcoded prices, or product references that belonged to the old "Paywall" page.
+RevenueCat offering & entitlement details (use these exact identifiers):
+
+Offering to display: the current offering, lookup key default ("Default Mobile").
+The paywall has three tiers presented as a segmented tab control: Free, Player Pro, Commissioner. Only the active tab's content is visible at a time.
+Free tab: no packages — feature list only. Selecting Free (or a "Continue with Free" action) skips purchase and enters the app with no entitlement.
+Player Pro tab: two package cards side by side — player_pro_yearly (default selected, show "SAVE %" badge computed from real prices) and player_pro_monthly.
+Commissioner tab: two package cards side by side — commissioner_yearly (default selected, "SAVE %" badge) and commissioner_monthly.
+Entitlements: purchasing a Player Pro package grants the player_pro entitlement; purchasing a Commissioner package grants the commissioner entitlement. Unlock app features based on whichever entitlement is active.
+Read all products, prices, and durations dynamically from the offering via the bridge. Do NOT hardcode prices, product IDs, or savings percentages — compute savings from the actual yearly vs monthly prices returned by RevenueCat.
+Requirements:
+
+Create a Paywall React component (replacing the old "Paywall" page) with a three-tab segmented control (Free / Player Pro / Commissioner). Default to the Player Pro tab, yearly plan pre-selected.
+Fetch the current offering and its packages through our existing Natively/RevenueCat bridge; render each package with its localized price and duration from RevenueCat.
+On purchase, call the existing Natively purchase bridge to run the native store purchase for the selected package. Do NOT use any web checkout.
+After purchase, read the customer's active entitlements (player_pro / commissioner) via the bridge; if active, mark onboarding complete and navigate into the app.
+Handle these states: purchase cancelled, purchase error, already subscribed (skip the paywall and go straight in), and Free tier selected (enter app with no entitlement). Include a Restore Purchases action.
+Keep the App Store compliance elements: visible price per package, a clear purchase/CTA button, and the working Terms of Service (https://www.roster-app.com/terms-of-service) and Privacy Policy (https://www.roster-app.com/privacy-policy) links.
+Reuse the existing Natively bridge wrapper in our codebase for offerings/purchase/restore/customer-info calls — follow those existing method names rather than inventing new ones. If the bridge API is unclear, follow Natively's official documentation. Do not guess method signatures.
+Do not: add a 10th onboarding page, add a second purchase path, use purchases-js or Stripe for in-app purchases, hardcode product IDs / prices / savings, or bypass the native store for digital-goods purchases inside the wrapper.
