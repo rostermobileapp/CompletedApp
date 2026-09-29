@@ -7,6 +7,7 @@ import {
   canPurchaseAndroidProduct,
   getAndroidProducts,
   isAndroidBillingSupported,
+  showNativeRevenueCatPaywall,
 } from './nativePurchases';
 import { isNativelyAndroidApp } from '../hooks/useIosPlatform';
 
@@ -104,4 +105,14 @@ test('empty and failed product callbacks cannot enable checkout', async (t) => {
   });
   assert.deepEqual(await getAndroidProducts(), []);
   assert.equal(canPurchaseAndroidProduct({}, PRODUCT_PLAYER_PRO, true, [PRODUCT_PLAYER_PRO]), false);
+});
+
+test('native paywall timeout resolves as unconfirmed when an older bridge never calls back', async (t) => {
+  mockAndroid(t);
+  Object.defineProperty(globalThis, 'natively', {
+    configurable: true,
+    value: { trigger() { /* Older native bridge never returns a paywall callback. */ } },
+  });
+  const result = await showNativeRevenueCatPaywall(5);
+  assert.deepEqual(result, { status: 'TIMEOUT', message: 'timeout' });
 });

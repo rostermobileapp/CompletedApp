@@ -1197,7 +1197,9 @@ export class MessagingService {
 
     // For captain-only chats, any captain in the league can manage
     if (conversation.type === "captain_only") {
-      return await this.isUserCaptain(userId, conversation.leagueId);
+      return conversation.leagueId
+        ? await this.isUserCaptain(userId, conversation.leagueId)
+        : false;
     }
 
     return false;

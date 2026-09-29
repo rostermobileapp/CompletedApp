@@ -56,6 +56,7 @@ import {
   tournamentTeams,
   tournamentMatches,
   tournamentParticipants,
+  tournamentStats,
   tournamentPhotos,
   leaguePhotos,
   tournamentPhotoTags,
@@ -93,6 +94,8 @@ import {
   type UpdateNotificationPreferences,
   type TournamentPhoto,
   type InsertTournamentPhoto,
+  type TournamentParticipant,
+  type InsertTournamentParticipant,
   type LeaguePhoto,
   type InsertLeaguePhoto,
   type TournamentPhotoTag,
@@ -226,7 +229,7 @@ import { canAcceptFreshScrimmageRequest } from "./scrimmageLifecycle";
 import { normalizeEmail } from "./emailNormalization";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists, type SQL } from "drizzle-orm";
 
 // Recipient row hydrated with either the real user or the placeholder player.
 // Exactly one of `user` / `placeholderPlayer` is populated for any given row.
@@ -251,6 +254,57 @@ export type InvoiceablePlayer = {
   teamName: string | null;
   isPlaceholderUser: boolean; // true for @placeholder.roster users
 };
+
+function buildStatsUser(
+  user: Partial<User> & Pick<User, 'id'>,
+): User {
+  const now = new Date();
+  const { id, ...userFields } = user;
+  return {
+    id,
+    displayId: null,
+    email: null,
+    firstName: null,
+    lastName: null,
+    profileImageUrl: null,
+    age: null,
+    dateOfBirth: null,
+    phoneNumber: null,
+    city: null,
+    zipCode: null,
+    lat: null,
+    lng: null,
+    primarySport: null,
+    playerType: null,
+    shoots: null,
+    role: 'free_tier',
+    specialPermissions: null,
+    isPrimaryCommissioner: false,
+    createdBy: null,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    iapOriginalTransactionId: null,
+    venmoUsername: null,
+    cashappUsername: null,
+    timezone: null,
+    timezoneManuallySet: false,
+    navigationPreferences: null,
+    competitiveLevel: null,
+    rosterUseCase: null,
+    onboardingCompleted: false,
+    onboardingProgress: null,
+    selectedFacilityId: null,
+    referralCode: null,
+    referralPartnerId: null,
+    referralSourceOther: null,
+    lastUpdated: now,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    feeExempt: false,
+    ...userFields,
+  };
+}
 
 export interface IStorage {
   // Display ID generators
@@ -4782,7 +4836,7 @@ export class DatabaseStorage implements IStorage {
               eq(games.homeTeamId, membership.assignedTeamId),
               eq(games.awayTeamId, membership.assignedTeamId)
             ),
-            gte(games.scheduledAt, new Date()) // Only future games
+            gte(games.scheduledAt, new Date().toISOString()) // Only future games
           )
         );
       
@@ -4910,7 +4964,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(games.leagueId, leagueId),
-            gte(games.scheduledAt, new Date()) // Only future games
+            gte(games.scheduledAt, new Date().toISOString()) // Only future games
           )
         );
 
@@ -4939,7 +4993,7 @@ export class DatabaseStorage implements IStorage {
           and(
             eq(games.leagueId, leagueId),
             eq(games.homeBeverageDutyUserId, userId),
-            gte(games.scheduledAt, new Date())
+            gte(games.scheduledAt, new Date().toISOString())
           )
         );
 
@@ -4953,7 +5007,7 @@ export class DatabaseStorage implements IStorage {
           and(
             eq(games.leagueId, leagueId),
             eq(games.awayBeverageDutyUserId, userId),
-            gte(games.scheduledAt, new Date())
+            gte(games.scheduledAt, new Date().toISOString())
           )
         );
 
@@ -5061,7 +5115,8 @@ export class DatabaseStorage implements IStorage {
           status: leagueMemberships.status,
           joinedAt: leagueMemberships.requestedAt,
           approvedBy: leagueMemberships.approvedBy,
-          skillLevel: leagueMemberships.skillLevel
+          skillLevel: leagueMemberships.skillLevel,
+          isCaptain: sql<boolean>`false`
         },
         users: users
       })
@@ -5148,7 +5203,7 @@ export class DatabaseStorage implements IStorage {
         position: null,
         jerseyNumber: null,
         skillLevel: null,
-        joinedAt: leagueMembershipAssignment.joinedAt,
+        joinedAt: leagueMembershipAssignment.requestedAt,
         isCaptain: false,
       };
     }
@@ -5222,7 +5277,7 @@ export class DatabaseStorage implements IStorage {
               eq(games.homeTeamId, teamId),
               eq(games.awayTeamId, teamId)
             ),
-            gte(games.scheduledAt, new Date())
+            gte(games.scheduledAt, new Date().toISOString())
           )
         );
 
@@ -5304,8 +5359,8 @@ export class DatabaseStorage implements IStorage {
             and(eq(games.homeTeamId, awayTeamId), eq(games.awayTeamId, homeTeamId))
           ),
           and(
-            gte(games.scheduledAt, startTime),
-            lte(games.scheduledAt, endTime)
+            gte(games.scheduledAt, startTime.toISOString()),
+            lte(games.scheduledAt, endTime.toISOString())
           )
         )
       )
@@ -5359,7 +5414,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(gameRsvps.userId, userId),
           eq(gameRsvps.status, 'attending'),
-          gte(games.scheduledAt, generousCutoff)
+          gte(games.scheduledAt, generousCutoff.toISOString())
         )
       );
     const rsvpGameIds = rsvpGames.map(r => r.gameId);
@@ -5373,7 +5428,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(substituteRequests.substitutePlayerId, userId),
           eq(substituteRequests.status, 'approved'),
-          gte(games.scheduledAt, generousCutoff)
+          gte(games.scheduledAt, generousCutoff.toISOString())
         )
       );
     const substituteGameIds = substituteGames.map(r => r.gameId);
@@ -5427,8 +5482,9 @@ export class DatabaseStorage implements IStorage {
     if (rsvpGameIds.length > 0) {
       conditions.push(inArray(games.id, rsvpGameIds));
     }
-    if (substituteGameIds.length > 0) {
-      conditions.push(inArray(games.id, substituteGameIds));
+    const validSubstituteGameIds = substituteGameIds.filter((id): id is string => id !== null);
+    if (validSubstituteGameIds.length > 0) {
+      conditions.push(inArray(games.id, validSubstituteGameIds));
     }
 
     // Get all games first (with generous cutoff), then filter per-game based on league timezone.
@@ -5441,7 +5497,7 @@ export class DatabaseStorage implements IStorage {
           .from(games)
           .where(
             and(
-              gte(games.scheduledAt, generousCutoff),
+              gte(games.scheduledAt, generousCutoff.toISOString()),
               or(...conditions)
             )
           )
@@ -5457,8 +5513,9 @@ export class DatabaseStorage implements IStorage {
     
     for (const game of gamesResult) {
       // Get league timezone (cache for performance)
-      let league = leagueCache.get(game.leagueId);
-      if (league === undefined && !leagueCache.has(game.leagueId)) {
+      let league: League | undefined;
+      if (game.leagueId) league = leagueCache.get(game.leagueId);
+      if (game.leagueId && league === undefined && !leagueCache.has(game.leagueId)) {
         league = await this.getLeague(game.leagueId);
         leagueCache.set(game.leagueId, league);
       }
@@ -5471,6 +5528,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       const [homeTeam] = await db.select().from(teams).where(eq(teams.id, game.homeTeamId));
+      if (!game.awayTeamId) continue;
       const [awayTeam] = await db.select().from(teams).where(eq(teams.id, game.awayTeamId));
       
       gamesWithTeams.push({
@@ -5493,7 +5551,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(scrimmageRequests.playerId, userId),
           eq(scrimmageRequests.status, 'approved'),
-          gte(scrimmages.dateTime, generousCutoff),
+          gte(scrimmages.dateTime, generousCutoff.toISOString()),
           // Only roster_confirmed scrimmages should show on schedule
           eq(scrimmages.status, 'roster_confirmed')
         )
@@ -5646,7 +5704,7 @@ export class DatabaseStorage implements IStorage {
           .where(
             and(
               isNotNull(tournamentMatches.scheduledTime),
-              gte(tournamentMatches.scheduledTime, generousCutoff),
+              gte(tournamentMatches.scheduledTime, generousCutoff.toISOString()),
               inArray(tournamentMatches.tournamentId, userTournamentIds)
             )
           );
@@ -5890,8 +5948,9 @@ export class DatabaseStorage implements IStorage {
     if (leagueIds.length > 0) {
       conditions.push(inArray(games.leagueId, leagueIds));
     }
-    if (substituteGameIds.length > 0) {
-      conditions.push(inArray(games.id, substituteGameIds));
+    const validSubstituteGameIds = substituteGameIds.filter((id): id is string => id !== null);
+    if (validSubstituteGameIds.length > 0) {
+      conditions.push(inArray(games.id, validSubstituteGameIds));
     }
 
     // Get all games (past and future)
@@ -5905,6 +5964,7 @@ export class DatabaseStorage implements IStorage {
     const gamesWithTeams = [];
     for (const game of gamesResult) {
       const [homeTeam] = await db.select().from(teams).where(eq(teams.id, game.homeTeamId));
+      if (!game.awayTeamId) continue;
       const [awayTeam] = await db.select().from(teams).where(eq(teams.id, game.awayTeamId));
       
       gamesWithTeams.push({
@@ -6195,7 +6255,7 @@ export class DatabaseStorage implements IStorage {
       homeTeamId: row.home_team_id as string,
       awayTeamId: row.away_team_id as string | null,
       opponentName: row.opponent_name as string | null,
-      scheduledAt: row.scheduled_at as Date,
+      scheduledAt: new Date(String(row.scheduled_at)).toISOString(),
       venue: row.venue as string | null,
       lockerRoom: row.locker_room as string | null,
       homeTeamLockerRoom: row.home_team_locker_room as string | null,
@@ -6203,11 +6263,13 @@ export class DatabaseStorage implements IStorage {
       homeScore: row.home_score as number | null,
       awayScore: row.away_score as number | null,
       isCompleted: row.is_completed as boolean,
+      isScrimmage: row.is_scrimmage as boolean,
       homeBeverageDutyUserId: row.home_beverage_duty_user_id as string | null,
       homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
       awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
       resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
+      color: row.color as string | null,
       createdAt: row.created_at as Date,
       homeTeam: {
         id: row.home_team_id as string,
@@ -6737,11 +6799,12 @@ export class DatabaseStorage implements IStorage {
 
     return result.rows.map((row: any) => ({
       id: row.id as string,
-      leagueId: row.league_id as string,
+      leagueId: row.league_id as string | null,
       seasonId: row.season_id as string | null,
       homeTeamId: row.home_team_id as string,
       awayTeamId: row.away_team_id as string,
-      scheduledAt: row.scheduled_at as Date,
+      opponentName: row.opponent_name as string | null,
+      scheduledAt: new Date(String(row.scheduled_at)).toISOString(),
       venue: row.venue as string | null,
       lockerRoom: row.locker_room as string | null,
       homeTeamLockerRoom: row.home_team_locker_room as string | null,
@@ -6749,11 +6812,13 @@ export class DatabaseStorage implements IStorage {
       homeScore: row.home_score as number | null,
       awayScore: row.away_score as number | null,
       isCompleted: row.is_completed as boolean,
+      isScrimmage: row.is_scrimmage as boolean,
       homeBeverageDutyUserId: row.home_beverage_duty_user_id as string | null,
       homeBeverageDutyClaimedAt: row.home_beverage_duty_claimed_at as Date | null,
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
       awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
       resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
+      color: row.color as string | null,
       createdAt: row.created_at as Date,
       homeTeam: {
         id: row.home_team_id as string,
@@ -6817,11 +6882,12 @@ export class DatabaseStorage implements IStorage {
 
     return result.rows.map((row: any) => ({
       id: row.id as string,
-      leagueId: row.league_id as string,
+      leagueId: row.league_id as string | null,
       seasonId: row.season_id as string | null,
       homeTeamId: row.home_team_id as string,
       awayTeamId: row.away_team_id as string,
-      scheduledAt: row.scheduled_at as Date,
+      opponentName: row.opponent_name as string | null,
+      scheduledAt: new Date(String(row.scheduled_at)).toISOString(),
       venue: row.venue as string | null,
       lockerRoom: row.locker_room as string | null,
       homeTeamLockerRoom: row.home_team_locker_room as string | null,
@@ -6835,6 +6901,7 @@ export class DatabaseStorage implements IStorage {
       awayBeverageDutyUserId: row.away_beverage_duty_user_id as string | null,
       awayBeverageDutyClaimedAt: row.away_beverage_duty_claimed_at as Date | null,
       resultType: row.result_type as "regulation" | "overtime" | "shootout" | null,
+      color: row.color as string | null,
       createdAt: row.created_at as Date,
       homeTeam: {
         id: row.home_team_id as string,
@@ -7175,7 +7242,7 @@ export class DatabaseStorage implements IStorage {
         awarder: sql`NULL`.as('awarder'),
       })
       .from(gameStars)
-      .leftJoin(users, eq(gameStars.firstStarUserId, users.id))
+        .innerJoin(users, eq(gameStars.firstStarUserId, users.id))
       .where(eq(gameStars.gameId, gameId))
       .limit(1);
 
@@ -7186,6 +7253,7 @@ export class DatabaseStorage implements IStorage {
     const [secondStar] = await db.select().from(users).where(eq(users.id, gameStarRecord.secondStarUserId));
     const [thirdStar] = await db.select().from(users).where(eq(users.id, gameStarRecord.thirdStarUserId));
     const [awarder] = await db.select().from(users).where(eq(users.id, gameStarRecord.awardedBy));
+    if (!secondStar || !thirdStar || !awarder) return undefined;
 
     return {
       id: gameStarRecord.id,
@@ -7296,6 +7364,8 @@ export class DatabaseStorage implements IStorage {
     const results = await db.select({
       id: personalReminders.id,
       userId: personalReminders.userId,
+      photoUrl: personalReminders.photoUrl,
+      color: personalReminders.color,
       title: personalReminders.title,
       description: personalReminders.description,
       scheduledAt: personalReminders.scheduledAt,
@@ -7596,22 +7666,26 @@ export class DatabaseStorage implements IStorage {
 
       if (game) {
         // Find the goalies for both teams via league memberships
-        const goalies = await tx
-          .select({
-            userId: leagueMemberships.userId,
-            teamId: leagueMemberships.assignedTeamId,
-          })
-          .from(leagueMemberships)
-          .where(
-            and(
-              eq(leagueMemberships.leagueId, game.leagueId),
-              eq(leagueMemberships.isGoalie, true),
-              or(
-                eq(leagueMemberships.assignedTeamId, game.homeTeamId),
-                eq(leagueMemberships.assignedTeamId, game.awayTeamId)
+        const goalies = game.leagueId
+          ? await tx
+              .select({
+                userId: leagueMemberships.userId,
+                teamId: leagueMemberships.assignedTeamId,
+              })
+              .from(leagueMemberships)
+              .where(
+                and(
+                  eq(leagueMemberships.leagueId, game.leagueId),
+                  eq(leagueMemberships.isGoalie, true),
+                  game.awayTeamId
+                    ? or(
+                        eq(leagueMemberships.assignedTeamId, game.homeTeamId),
+                        eq(leagueMemberships.assignedTeamId, game.awayTeamId),
+                      )
+                    : eq(leagueMemberships.assignedTeamId, game.homeTeamId),
+                ),
               )
-            )
-          );
+          : [];
 
         // Create or update game_goalies records for each goalie
         for (const goalie of goalies) {
@@ -7730,13 +7804,15 @@ export class DatabaseStorage implements IStorage {
           .from(leagueMemberships)
           .where(
             and(
-              eq(leagueMemberships.leagueId, game.leagueId),
+              eq(leagueMemberships.leagueId, leagueId),
               eq(leagueMemberships.isGoalie, true),
-              or(
-                eq(leagueMemberships.assignedTeamId, game.homeTeamId),
-                eq(leagueMemberships.assignedTeamId, game.awayTeamId)
-              )
-            )
+              game.awayTeamId
+                ? or(
+                    eq(leagueMemberships.assignedTeamId, game.homeTeamId),
+                    eq(leagueMemberships.assignedTeamId, game.awayTeamId),
+                  )
+                : eq(leagueMemberships.assignedTeamId, game.homeTeamId),
+            ),
           );
 
         // Create or update game_goalies records for each goalie
@@ -7937,7 +8013,9 @@ export class DatabaseStorage implements IStorage {
     }
 
     const homeTeamMembers = await this.getTeamMembers(game.homeTeamId);
-    const awayTeamMembers = await this.getTeamMembers(game.awayTeamId);
+    const awayTeamMembers = game.awayTeamId
+      ? await this.getTeamMembers(game.awayTeamId)
+      : [];
     const allTeamMembers = [...homeTeamMembers, ...awayTeamMembers];
 
     const rsvpUserIds = rsvps.map(r => r.game_rsvps.userId);
@@ -7952,7 +8030,9 @@ export class DatabaseStorage implements IStorage {
       ...noResponse.map(n => n.id)
     ];
     const uniqueUserIds = Array.from(new Set(allUserIds));
-    const skillMap = await this.fetchUserSkills(uniqueUserIds, game.leagueId);
+    const skillMap = game.leagueId
+      ? await this.fetchUserSkills(uniqueUserIds, game.leagueId)
+      : new Map<string, string | null>();
 
     // Attach skill levels to user objects
     attending.forEach(a => {
@@ -8049,7 +8129,9 @@ export class DatabaseStorage implements IStorage {
       ...noResponse.map(n => n.id)
     ];
     const uniqueUserIds = Array.from(new Set(allUserIds));
-    const skillMap = await this.fetchUserSkills(uniqueUserIds, game.leagueId);
+    const skillMap = game.leagueId
+      ? await this.fetchUserSkills(uniqueUserIds, game.leagueId)
+      : new Map<string, string | null>();
 
     // Attach skill levels to user objects
     attending.forEach(a => {
@@ -8072,6 +8154,9 @@ export class DatabaseStorage implements IStorage {
     const game = await this.getGameById(gameId);
     if (!game) {
       throw new Error('Game not found');
+    }
+    if (!game.awayTeamId) {
+      throw new Error('Game does not have an away team');
     }
 
     const homeTeamSummary = await this.getTeamRsvpSummary(gameId, game.homeTeamId);
@@ -8105,8 +8190,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(games.leagueId, leagueId),
-          gte(games.scheduledAt, startOfDay),
-          lte(games.scheduledAt, endOfDay)
+          gte(games.scheduledAt, startOfDay.toISOString()),
+          lte(games.scheduledAt, endOfDay.toISOString())
         )
       );
 
@@ -8114,7 +8199,9 @@ export class DatabaseStorage implements IStorage {
     const scheduledUserIds = new Set<string>();
     for (const game of gamesOnDate) {
       const homeMembers = await this.getTeamMembers(game.homeTeamId);
-      const awayMembers = await this.getTeamMembers(game.awayTeamId);
+      const awayMembers = game.awayTeamId
+        ? await this.getTeamMembers(game.awayTeamId)
+        : [];
       [...homeMembers, ...awayMembers].forEach(member => {
         scheduledUserIds.add(member.userId);
       });
@@ -8157,8 +8244,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(games.leagueId, leagueId),
-          gte(games.scheduledAt, startOfDay),
-          lte(games.scheduledAt, endOfDay)
+          gte(games.scheduledAt, startOfDay.toISOString()),
+          lte(games.scheduledAt, endOfDay.toISOString())
         )
       );
 
@@ -8173,24 +8260,26 @@ export class DatabaseStorage implements IStorage {
     for (const game of gamesOnDate) {
       const homeMembers = await this.getTeamMembers(game.homeTeamId);
       // Check if away team is a real team (not a placeholder like "opponent")
-      const hasRealAwayTeam = game.awayTeamId && game.awayTeamId !== 'opponent' && game.awayTeamId.length > 0;
-      const awayMembers = hasRealAwayTeam ? await this.getTeamMembers(game.awayTeamId) : [];
+      const awayTeamId = game.awayTeamId;
+      const hasRealAwayTeam = typeof awayTeamId === 'string' &&
+        awayTeamId !== 'opponent' && awayTeamId.length > 0;
+      const awayMembers = hasRealAwayTeam ? await this.getTeamMembers(awayTeamId) : [];
       
       console.log(`🔍 Game ${game.id.substring(0, 8)}...`);
       console.log(`  Home team ${game.homeTeamId.substring(0, 8)}: ${homeMembers.length} members`);
       if (hasRealAwayTeam) {
-        console.log(`  Away team ${game.awayTeamId.substring(0, 8)}: ${awayMembers.length} members`);
+        console.log(`  Away team ${awayTeamId.substring(0, 8)}: ${awayMembers.length} members`);
       } else {
-        console.log(`  Away team: none (no opposing team or placeholder "${game.awayTeamId}")`);
+        console.log(`  Away team: none (no opposing team or placeholder "${awayTeamId}")`);
       }
       
       homeMembers.forEach(member => {
-        userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.homeTeamId });
+        userGameInfo.set(member.userId, { gameTime: new Date(game.scheduledAt), teamId: game.homeTeamId });
       });
       
       if (hasRealAwayTeam) {
         awayMembers.forEach(member => {
-          userGameInfo.set(member.userId, { gameTime: game.scheduledAt, teamId: game.awayTeamId });
+        userGameInfo.set(member.userId, { gameTime: new Date(game.scheduledAt), teamId: awayTeamId });
         });
       }
     }
@@ -8326,11 +8415,12 @@ export class DatabaseStorage implements IStorage {
     
     const result = [];
     for (const request of requests) {
+      if (!request.gameId) continue;
       const game = await this.getGameById(request.gameId);
       
       // Apply league filtering if specified (for commissioner authorization)
       if (options?.leagueIds && options.leagueIds.length > 0) {
-        if (!game || !options.leagueIds.includes(game.leagueId)) {
+        if (!game?.leagueId || !options.leagueIds.includes(game.leagueId)) {
           continue; // Skip requests not in commissioner's leagues
         }
       }
@@ -8338,7 +8428,7 @@ export class DatabaseStorage implements IStorage {
       const requestedByUser = await this.getUser(request.requestedBy);
       let substitutePlayer = undefined;
       
-      if (request.substitutePlayerId) {
+      if (request.substitutePlayerId && request.gameId) {
         substitutePlayer = await this.getUser(request.substitutePlayerId);
       }
 
@@ -8357,7 +8447,9 @@ export class DatabaseStorage implements IStorage {
         if (substitutePlayer) {
           userIds.push(substitutePlayer.id);
         }
-        const skillMap = await this.fetchUserSkills(userIds, game.leagueId);
+        const skillMap = game.leagueId
+          ? await this.fetchUserSkills(userIds, game.leagueId)
+          : new Map<string, string | null>();
 
         result.push({
           ...request,
@@ -8432,6 +8524,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(substituteRequests.id, requestId));
 
     if (!request) return undefined;
+    if (!request.gameId) return undefined;
 
     const game = await this.getGameById(request.gameId);
     const originalPlayer = await this.getUser(request.originalPlayerId);
@@ -8513,7 +8606,7 @@ export class DatabaseStorage implements IStorage {
           eq(substituteRequests.status, 'approved')
         )
       );
-    return results.map(r => r.gameId);
+    return results.flatMap((r) => r.gameId ? [r.gameId] : []);
   }
 
   // Substitution approval operations
@@ -8580,6 +8673,7 @@ export class DatabaseStorage implements IStorage {
       const game = row.game;
 
       // Get team information
+      if (!game.awayTeamId) continue;
       const homeTeam = await this.getTeam(game.homeTeamId);
       const awayTeam = await this.getTeam(game.awayTeamId);
       
@@ -8696,6 +8790,7 @@ export class DatabaseStorage implements IStorage {
 
       // Only include if no existing approval
       if (existingApproval.length === 0) {
+        if (!request.gameId) continue;
         const game = await this.getGameById(request.gameId);
         const originalPlayer = await this.getUser(request.originalPlayerId);
         let substitutePlayer = undefined;
@@ -8815,7 +8910,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       // 8. If fully approved, add substitute player to RSVP and game schedule
-      if (nextStatus === 'approved' && request.substitutePlayerId) {
+      if (nextStatus === 'approved' && request.substitutePlayerId && request.gameId) {
         // Create RSVP for the substitute player with 'attending' status
         const existingRsvp = await tx
           .select()
@@ -8883,6 +8978,9 @@ export class DatabaseStorage implements IStorage {
 
       case 'commissioner':
         // Validate commissioner of the league
+        if (!request.game.leagueId) {
+          throw new Error('Cannot validate commissioner approval: game is not assigned to a league');
+        }
         const league = await this.getLeague(request.game.leagueId);
         if (!league || league.commissionerId !== approverId) {
           throw new Error(`User ${approverId} is not the commissioner of this league`);
@@ -8928,6 +9026,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const leagueId = originalRequest.game.leagueId;
       const gameId = originalRequest.gameId;
+      if (!leagueId || !gameId) return;
       const { sendSubstitutionPushNotification } = await import('./oneSignalNotifications');
       
       if (decision === 'denied') {
@@ -9222,7 +9321,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(substituteRequests.id, requestId));
 
       // 4. Remove the substitute player's RSVP for this game/team
-      if (request.substitutePlayerId) {
+      if (request.substitutePlayerId && request.gameId) {
         await tx.delete(gameRsvps)
           .where(
             and(
@@ -11348,7 +11447,7 @@ export class DatabaseStorage implements IStorage {
       createdAt: r.statsCreatedAt || new Date(),
       updatedAt: r.statsUpdatedAt || new Date(),
       isGoalie: r.membershipIsGoalie || false,
-      user: {
+      user: buildStatsUser({
         id: r.userId,
         email: r.userEmail,
         firstName: r.userFirstName,
@@ -11372,7 +11471,7 @@ export class DatabaseStorage implements IStorage {
         venmoUsername: null,
         cashappUsername: null,
         navigationPreferences: null,
-      }
+      })
     }));
 
     // Keep placeholder goalies visible in the regular player-stats response
@@ -11399,7 +11498,7 @@ export class DatabaseStorage implements IStorage {
             createdAt: timestamp,
             updatedAt: timestamp,
             isGoalie: true,
-            user: {
+            user: buildStatsUser({
               id: placeholderUserId,
               email: placeholder.email ?? null,
               firstName: placeholder.firstName,
@@ -11412,7 +11511,7 @@ export class DatabaseStorage implements IStorage {
               playerType: null,
               createdAt: timestamp,
               updatedAt: timestamp,
-              role: 'free_tier' as any,
+              role: 'free_tier',
               specialPermissions: null,
               isPrimaryCommissioner: false,
               createdBy: placeholder.addedBy ?? null,
@@ -11423,7 +11522,7 @@ export class DatabaseStorage implements IStorage {
               venmoUsername: null,
               cashappUsername: null,
               navigationPreferences: null,
-            }
+            })
           };
         });
 
@@ -11469,7 +11568,7 @@ export class DatabaseStorage implements IStorage {
       createdAt: r.statsCreatedAt || new Date(),
       updatedAt: r.statsUpdatedAt || new Date(),
       isGoalie: false,
-      user: {
+      user: buildStatsUser({
         id: r.statsImportedPlayerId || '',
         email: '',
         firstName: r.ipFirstName || '',
@@ -11479,21 +11578,23 @@ export class DatabaseStorage implements IStorage {
         phoneNumber: null,
         city: null,
         primarySport: null,
-        playerType: r.ipPosition || null,
+        playerType: r.ipPosition === 'Skater' || r.ipPosition === 'Goalie'
+          ? r.ipPosition
+          : null,
         createdAt: r.statsCreatedAt || new Date(),
         updatedAt: r.statsUpdatedAt || new Date(),
-        role: 'free_tier' as any,
+        role: 'free_tier',
         specialPermissions: null,
         isPrimaryCommissioner: false,
         createdBy: null,
-        lastUpdated: null,
+        lastUpdated: r.statsCreatedAt || new Date(),
         dateOfBirth: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         venmoUsername: null,
         cashappUsername: null,
         navigationPreferences: null,
-      }
+      })
     }));
 
     return [...registeredRows, ...placeholderGoalieRows, ...importedMappedRows];
@@ -11750,31 +11851,26 @@ export class DatabaseStorage implements IStorage {
       user: User;
     }>();
 
-    const buildGoalieUser = (row: any): User => ({
-      id: row.userId,
-      email: row.userEmail,
-      firstName: row.userFirstName,
-      lastName: row.userLastName,
-      profileImageUrl: row.userProfileImageUrl,
-      age: row.userAge,
-      phoneNumber: row.userPhoneNumber,
-      city: row.userCity,
-      primarySport: row.userPrimarySport,
-      playerType: row.userPlayerType,
-      createdAt: row.userCreatedAt,
-      updatedAt: row.userUpdatedAt,
-      role: row.userRole,
-      specialPermissions: row.userSpecialPermissions,
-      isPrimaryCommissioner: row.userIsPrimaryCommissioner,
-      createdBy: row.userCreatedBy,
-      lastUpdated: row.userLastUpdated,
-      dateOfBirth: null,
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      venmoUsername: null,
-      cashappUsername: null,
-      navigationPreferences: null,
-    });
+    const buildGoalieUser = (row: (typeof goalieMemberships)[number]): User =>
+      buildStatsUser({
+        id: row.userId,
+        email: row.userEmail,
+        firstName: row.userFirstName,
+        lastName: row.userLastName,
+        profileImageUrl: row.userProfileImageUrl,
+        age: row.userAge,
+        phoneNumber: row.userPhoneNumber,
+        city: row.userCity,
+        primarySport: row.userPrimarySport,
+        playerType: row.userPlayerType,
+        createdAt: row.userCreatedAt,
+        updatedAt: row.userUpdatedAt,
+        role: row.userRole,
+        specialPermissions: row.userSpecialPermissions,
+        isPrimaryCommissioner: row.userIsPrimaryCommissioner,
+        createdBy: row.userCreatedBy,
+        lastUpdated: row.userLastUpdated,
+      });
 
     goalieMemberships.forEach(goalie => {
       goalieStatsMap.set(goalie.userId, {
@@ -11810,24 +11906,16 @@ export class DatabaseStorage implements IStorage {
         shutouts: 0,
         totalMinutes: 0,
         teamId: placeholder.teamId ?? undefined,
-        user: buildGoalieUser({
-          userId: placeholderUserId,
-          userEmail: placeholder.email,
-          userFirstName: placeholder.firstName,
-          userLastName: placeholder.lastName,
-          userProfileImageUrl: null,
-          userAge: null,
-          userPhoneNumber: placeholder.phoneNumber,
-          userCity: null,
-          userPrimarySport: null,
-          userPlayerType: null,
-          userCreatedAt: placeholder.createdAt,
-          userUpdatedAt: placeholder.createdAt,
-          userRole: 'free_tier',
-          userSpecialPermissions: null,
-          userIsPrimaryCommissioner: false,
-          userCreatedBy: placeholder.addedBy,
-          userLastUpdated: placeholder.createdAt,
+        user: buildStatsUser({
+          id: placeholderUserId,
+          email: placeholder.email,
+          firstName: placeholder.firstName,
+          lastName: placeholder.lastName,
+          phoneNumber: placeholder.phoneNumber,
+          createdAt: placeholder.createdAt,
+          updatedAt: placeholder.createdAt,
+          lastUpdated: placeholder.createdAt,
+          createdBy: placeholder.addedBy,
         }),
       });
     });

@@ -16,7 +16,7 @@ export async function initReferralDb(): Promise<void> {
     await db.execute(sql`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'referral_partner_status') THEN
-          CREATE TYPE referral_partner_status AS ENUM ('pending', 'approved', 'rejected');
+          CREATE TYPE referral_partner_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
         END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'referral_platform') THEN
           CREATE TYPE referral_platform AS ENUM ('ios', 'android', 'web');
@@ -25,6 +25,11 @@ export async function initReferralDb(): Promise<void> {
           CREATE TYPE referral_conversion_status AS ENUM ('active', 'cancelled', 'refunded');
         END IF;
       END $$;
+    `);
+    // Existing installations may have created the enum before suspension was
+    // introduced. Keep the startup safety net idempotently in sync with schema.
+    await db.execute(sql`
+      ALTER TYPE referral_partner_status ADD VALUE IF NOT EXISTS 'suspended';
     `);
 
     await db.execute(sql`

@@ -8,6 +8,11 @@ import { initReferralDb } from "./referralDbInit";
 import { initDraftDb } from "./draftDbInit";
 import { initGoogleIapClaimsDb } from "./googleIapClaimsInit";
 import { initApplePurchaseLinks, reconcileApplePurchaseLinks, startApplePurchaseLinkJob } from "./applePurchaseLinks";
+import {
+  initNativeRevenueCatDb,
+  startRevenueCatEntitlementExpiryJob,
+  startRevenueCatWebhookInboxWorker,
+} from "./nativeRevenueCat";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
@@ -47,6 +52,9 @@ app.use(cookieParser());
 
 // Stripe webhook needs raw body for signature verification
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
+// RevenueCat signs the exact raw UTF-8 body; this must precede express.json().
+app.use('/api/webhooks/revenuecat-native',
+  express.raw({ type: 'application/json', limit: '1mb', inflate: false }));
 
 // All other routes use JSON parsing
 app.use(express.json());
@@ -88,10 +96,13 @@ app.use((req, res, next) => {
   await initDraftDb();
   await initGoogleIapClaimsDb();
   await initApplePurchaseLinks();
+  await initNativeRevenueCatDb();
 
   const server = await registerRoutes(app);
   await reconcileApplePurchaseLinks();
   startApplePurchaseLinkJob();
+  startRevenueCatEntitlementExpiryJob();
+  startRevenueCatWebhookInboxWorker();
   startBeerBadgeEvaluationWorker();
   // An end date can pass without a commissioner explicitly closing the season.
   setInterval(() => {

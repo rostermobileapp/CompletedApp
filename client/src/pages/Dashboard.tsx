@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import type { User } from '@shared/schema';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import lightModeLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 import darkModeLogo from '@assets/Dark_Mode_Logo_1770738054930.png';
@@ -50,6 +51,7 @@ import StatsPage from '@/pages/Stats';
 import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
+import { NativeFirstSignInPaywall } from '@/components/NativeFirstSignInPaywall';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1225,6 +1227,7 @@ export default function Dashboard() {
   if (isDesktopWeb) {
     return (
       <>
+        <NativeFirstSignInPaywall />
         <DemoBanner />
         <HomeDesktop onAddEvent={() => setShowAddEventDialog(true)} />
         <AddEventDialog
@@ -1237,6 +1240,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <NativeFirstSignInPaywall />
       <DemoBanner />
       <DashboardMobile />
     </>
@@ -1253,7 +1257,7 @@ function DashboardMobile() {
   const { openOverlay } = useSlideUpOverlay();
 
   // Fetch full user profile (includes profileImageUrl, firstName, etc.)
-  const { data: userProfile } = useQuery({
+  const { data: userProfile } = useQuery<User>({
     queryKey: ['/api/user'],
     enabled: !!supabaseUser,
   });

@@ -330,7 +330,8 @@ export async function syncDemo() {
         if (firstStarUserId && secondStarUserId && thirdStarUserId && awardedBy) await tx.insert(gameStars).values({ ...row, id: crypto.randomUUID(), gameId: gameMap.get(row.gameId)!, firstStarUserId, secondStarUserId, thirdStarUserId, awardedBy });
       }
       for (const row of await tx.select().from(gameGoals).where(inArray(gameGoals.gameId, sourceGameIds))) {
-        const teamId = teamMap.get(row.teamId), scorerId = userMap.get(row.scorerId);
+      const teamId = row.teamId ? teamMap.get(row.teamId) : undefined;
+      const scorerId = row.scorerId ? userMap.get(row.scorerId) : undefined;
         const primaryAssistId = row.primaryAssistId ? userMap.get(row.primaryAssistId) : null, secondaryAssistId = row.secondaryAssistId ? userMap.get(row.secondaryAssistId) : null;
         if (teamId && scorerId && (!row.primaryAssistId || primaryAssistId) && (!row.secondaryAssistId || secondaryAssistId)) await tx.insert(gameGoals).values({ ...row, id: crypto.randomUUID(), gameId: gameMap.get(row.gameId)!, teamId, scorerId, primaryAssistId, secondaryAssistId });
       }

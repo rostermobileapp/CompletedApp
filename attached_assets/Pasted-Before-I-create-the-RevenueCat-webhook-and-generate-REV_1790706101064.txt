@@ -1,0 +1,14 @@
+Before I create the RevenueCat webhook and generate REVENUECAT_WEBHOOK_SECRET, I need you to confirm exactly what your webhook-verification code expects. RevenueCat offers two different auth mechanisms and the secret's value differs depending on which one you implemented:
+
+Static Authorization header — RevenueCat sends a fixed string I define as the Authorization header on every POST; your server checks it matches. In this case REVENUECAT_WEBHOOK_SECRET is just that string, and I set it when creating the webhook.
+HMAC signature verification — RevenueCat sends an X-RevenueCat-Webhook-Signature header formatted t=<unix_timestamp>,v1=<hmac_sha256_hex>, and your server recomputes the HMAC-SHA256 to verify it. In this case REVENUECAT_WEBHOOK_SECRET is the signing secret RevenueCat generates when I enable HMAC signing (shown only once).
+Please answer these so I set it up correctly:
+
+Which method did you implement — static Authorization header, or X-RevenueCat-Webhook-Signature HMAC? (HMAC is the more secure option and preferred for a payments backend — if you haven't built either yet, implement HMAC.)
+What is the exact HTTPS webhook endpoint URL on the server that RevenueCat should POST to (e.g. https://<host>/api/webhooks/revenuecat)?
+Confirm the handler returns 200 quickly and defers processing (RevenueCat times out at 60s and retries up to 5 times), and that it deduplicates on the event id so retries/duplicates don't double-apply.
+If you implemented HMAC, critical implementation requirement: compute the HMAC over the raw request body bytes exactly as received, before any JSON parsing. Re-serializing a parsed object (JSON.parse → JSON.stringify, or any middleware that reparses the body) changes the bytes and will make verification fail on valid requests. On our Express server that means using express.raw() on the webhook route so the raw body is available, and using a constant-time comparison (crypto.timingSafeEqual) for the signature check.
+
+Also confirm the handler reads event data correctly: all event fields live on the event object in the body (only api_version is at the root), and money-movement should be decided from the price field (negative = refund, 0 = zero-price/trial, null = unknown — not "no refund"), not from the event type alone. Unrecognized/new event types should leave subscription state unchanged rather than defaulting a user to unpaid.
+
+Once you confirm the method and give me the endpoint URL, I'll create the webhook (a production config, plus a sandbox-filtered one for testing) and generate the matching secret to load into Replit Secrets.

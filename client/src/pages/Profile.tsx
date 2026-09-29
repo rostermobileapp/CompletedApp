@@ -17,6 +17,7 @@ import { NotificationPreferencesModal } from '@/components/NotificationPreferenc
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Settings, Bell, Moon, Shield, LogOut, Camera, Edit, Save, X, Users, Plus, Calendar, Crown, DollarSign, Lock, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
+import type { User } from '@shared/schema';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { FeatureLockOverlay } from '@/components/FeatureLockOverlay';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -107,7 +108,7 @@ export default function Profile() {
   const [referralOtherText, setReferralOtherText] = useState('');
 
   // Fetch full user profile from database (includes displayId)
-  const { data: user } = useQuery({
+  const { data: user } = useQuery<User>({
     queryKey: ['/api/user'],
     enabled: !!supabaseUser,
   });
@@ -331,12 +332,12 @@ export default function Profile() {
   });
 
   // Fetch user leagues
-  const { data: userLeagues } = useQuery({
+  const { data: userLeagues } = useQuery<Record<string, unknown>[]>({
     queryKey: ['/api/user/leagues'],
   });
 
   // Fetch user teams
-  const { data: userTeams } = useQuery({
+  const { data: userTeams } = useQuery<Record<string, unknown>[]>({
     queryKey: ['/api/user/teams'],
   });
 

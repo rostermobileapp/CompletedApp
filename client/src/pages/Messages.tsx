@@ -915,18 +915,19 @@ export default function Messages() {
   const effectiveDmScope = useMemo<{
     leagueId: string | null;
     tournamentId: string | null;
+    teamId: string | null;
   }>(() => {
     if (selectedTournamentId) {
-      return { leagueId: null, tournamentId: selectedTournamentId };
+      return { leagueId: null, tournamentId: selectedTournamentId, teamId: null };
     }
     if (selectedTeamId) {
       const team = (userTeams as any[]).find((t: any) => t.id === selectedTeamId);
-      return { leagueId: team?.leagueId ?? null, tournamentId: null };
+      return { leagueId: team?.leagueId ?? null, tournamentId: null, teamId: selectedTeamId };
     }
     if (selectedLeagueId) {
-      return { leagueId: selectedLeagueId, tournamentId: null };
+      return { leagueId: selectedLeagueId, tournamentId: null, teamId: null };
     }
-    return { leagueId: null, tournamentId: null };
+    return { leagueId: null, tournamentId: null, teamId: null };
   }, [selectedLeagueId, selectedTeamId, selectedTournamentId, userTeams]);
 
   // Filter conversations by selected league, team, or tournament (client-side for instant filtering).

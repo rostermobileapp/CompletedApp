@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 import Stripe from "stripe";
+import { applyStoredRevenueCatRole } from "./nativeRevenueCat";
 
 // Types matching the frontend permission system
 export type UserRole = 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
@@ -9,7 +10,7 @@ export type SpecialPermission = 'admin' | 'stat_manager';
 
 // Initialize Stripe if available
 const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-09-30.clover" })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
   : null;
 
 // Cache for subscription checks to avoid hitting Stripe API too frequently
@@ -43,8 +44,8 @@ async function verifyAndEnforceSubscriptionStatus(user: User): Promise<boolean> 
   const cached = subscriptionCheckCache.get(userId);
   if (cached && (now - cached.lastChecked) < CACHE_DURATION_MS) {
     if (cached.shouldDowngrade) {
-      await storage.updateUserRole(userId, 'free_tier');
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+      await applyStoredRevenueCatRole(userId, { source: 'stripe', role: 'free_tier', expiresAt: null });
       console.log('[Subscription Verify] Downgraded cached user to free_tier:', userId);
       return true;
     }
@@ -64,8 +65,8 @@ async function verifyAndEnforceSubscriptionStatus(user: User): Promise<boolean> 
     subscriptionCheckCache.set(userId, { lastChecked: now, shouldDowngrade });
 
     if (shouldDowngrade) {
-      await storage.updateUserRole(userId, 'free_tier');
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
+      await applyStoredRevenueCatRole(userId, { source: 'stripe', role: 'free_tier', expiresAt: null });
       console.log('[Subscription Verify] Downgraded user to free_tier:', userId, 'Reason:', 
         subscription.cancel_at_period_end ? 'cancel_at_period_end' : `status=${subscription.status}`);
       return true;
@@ -74,10 +75,17 @@ async function verifyAndEnforceSubscriptionStatus(user: User): Promise<boolean> 
     // Verify role matches subscription
     const priceId = subscription.items.data[0]?.price?.id;
     const expectedRole = priceId ? PRICE_TO_ROLE[priceId] : null;
-    if (expectedRole && expectedRole !== user.role) {
-      await storage.updateUserRole(userId, expectedRole);
-      console.log('[Subscription Verify] Updated user role to match subscription:', userId, 'New role:', expectedRole);
-      return true;
+    if (expectedRole) {
+      const effectiveRole = await applyStoredRevenueCatRole(userId, {
+        source: 'stripe',
+        role: expectedRole,
+        expiresAt: new Date(Number((subscription as any).current_period_end ??
+          (subscription.items.data[0] as any)?.current_period_end) * 1000),
+      });
+      if (effectiveRole !== user.role) {
+        console.log('[Subscription Verify] Reconciled user role with current billing sources:', userId, 'New role:', effectiveRole);
+        return true;
+      }
     }
 
     return false;

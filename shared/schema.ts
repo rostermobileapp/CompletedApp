@@ -50,7 +50,7 @@ export const visitorLocations = pgTable("visitor_locations", {
   index("idx_visitor_locations_visited_at").on(table.visitedAt),
 ]);
 
-export const insertVisitorLocationSchema = createInsertSchema(visitorLocations).omit({ id: true, visitedAt: true });
+export const insertVisitorLocationSchema = createInsertSchema(visitorLocations).omit({ visitedAt: true });
 export type InsertVisitorLocation = z.infer<typeof insertVisitorLocationSchema>;
 export type VisitorLocation = typeof visitorLocations.$inferSelect;
 
@@ -4146,6 +4146,7 @@ export const referralPartnerStatusEnum = pgEnum("referral_partner_status", [
   "pending",
   "approved",
   "rejected",
+  "suspended",
 ]);
 
 export const referralPlatformEnum = pgEnum("referral_platform", [

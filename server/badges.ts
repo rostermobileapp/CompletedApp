@@ -615,7 +615,7 @@ export async function getSeasonRsvpKingStatus(userId: string, seasonId: string) 
 }
 
 export async function evaluateSeasonRsvpKingForUser(
-  userId: string, definition: DefinitionWithTiers, seasonId: string,
+  userId: string, definition: BadgeDefinition, seasonId: string,
   status?: Awaited<ReturnType<typeof getSeasonRsvpKingStatus>>,
 ) {
   status ??= await getSeasonRsvpKingStatus(userId, seasonId);

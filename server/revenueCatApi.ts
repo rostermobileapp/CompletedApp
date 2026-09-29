@@ -4,6 +4,7 @@ type AppleRole = 'player_pro' | 'commissioner';
 
 interface RevenueCatSubscription {
   store?: string;
+  is_sandbox?: boolean;
   expires_date?: string | null;
   original_purchase_date?: string | null;
   refunded_at?: string | null;
@@ -15,6 +16,82 @@ interface RevenueCatResponse {
   subscriber?: {
     subscriptions?: Record<string, RevenueCatSubscription>;
   };
+}
+
+export interface VerifiedRevenueCatNativeSubscription {
+  productId: string;
+  role: AppleRole;
+  store: 'app_store' | 'play_store';
+  expiresAt: string;
+}
+
+const PLAY_PRODUCT_ROLES: Record<string, AppleRole> = {
+  commissioner_monthly: 'commissioner',
+  commissioner_yearly: 'commissioner',
+  player_pro_monthly: 'player_pro',
+  player_pro_yearly: 'player_pro',
+};
+
+/**
+ * RevenueCat is the entitlement authority for the native paywall. Only
+ * recognized, currently active, purchased store subscriptions are eligible;
+ * client callbacks, aliases and anonymous customer IDs are never considered.
+ */
+export function getActiveRevenueCatNativeSubscriptions(
+  data: RevenueCatResponse,
+  now = Date.now(),
+  allowSandbox = process.env.NODE_ENV !== 'production',
+): VerifiedRevenueCatNativeSubscription[] {
+  const subscriptions = data.subscriber?.subscriptions;
+  if (!subscriptions || typeof subscriptions !== 'object' || Array.isArray(subscriptions)) {
+    throw new Error('RevenueCat returned an invalid subscriber response');
+  }
+
+  return Object.entries(subscriptions).flatMap(([productId, subscription]) => {
+    // Sandbox receipts are useful in development but must not unlock paid
+    // access on the production service. An absent flag is not production proof.
+    if (!subscription || (!allowSandbox && subscription.is_sandbox !== false) ||
+        subscription.refunded_at ||
+        subscription.ownership_type !== 'PURCHASED') return [];
+
+    const role = subscription.store === 'app_store'
+      ? IAP_PRODUCT_ROLES[productId]
+      : subscription.store === 'play_store'
+        ? PLAY_PRODUCT_ROLES[productId]
+        : undefined;
+    const expiresAt = Date.parse(subscription.expires_date ?? '');
+    if (!role || !Number.isFinite(expiresAt) || expiresAt <= now) return [];
+
+    return [{
+      productId,
+      role,
+      store: subscription.store as 'app_store' | 'play_store',
+      expiresAt: new Date(expiresAt).toISOString(),
+    }];
+  });
+}
+
+export async function getRevenueCatNativeSubscriptions(
+  appUserId: string,
+  options: { apiKey?: string; fetcher?: typeof fetch } = {},
+): Promise<VerifiedRevenueCatNativeSubscription[]> {
+  if (!/^roster_[a-f0-9]{64}$/.test(appUserId)) {
+    throw Object.assign(new Error('Invalid RevenueCat account identity'), { status: 400 });
+  }
+  const key = options.apiKey ?? process.env.REVENUECAT_API_KEY;
+  if (!key) throw Object.assign(new Error('RevenueCat API key is not configured'), { status: 503 });
+
+  const response = await (options.fetcher ?? fetch)(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
+    {
+      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    },
+  );
+  if (!response.ok) {
+    throw Object.assign(new Error('RevenueCat subscriber lookup failed'), { status: 502 });
+  }
+  return getActiveRevenueCatNativeSubscriptions(await response.json() as RevenueCatResponse);
 }
 
 export interface VerifiedAppleSubscription {
@@ -32,6 +109,7 @@ export function isRevenueCatApiConfigured(): boolean {
 export function getActiveAppleSubscriptions(
   data: RevenueCatResponse,
   now = Date.now(),
+  allowSandbox = process.env.NODE_ENV !== 'production',
 ): VerifiedAppleSubscription[] {
   const subscriptions = data.subscriber?.subscriptions;
   if (!subscriptions || typeof subscriptions !== 'object' || Array.isArray(subscriptions)) {
@@ -40,7 +118,7 @@ export function getActiveAppleSubscriptions(
 
   return Object.entries(subscriptions).flatMap(([productId, sub]) => {
     const role = IAP_PRODUCT_ROLES[productId];
-    if (!role || !sub || sub.store !== 'app_store' ||
+    if (!role || !sub || (!allowSandbox && sub.is_sandbox !== false) || sub.store !== 'app_store' ||
         sub.refunded_at || sub.ownership_type !== 'PURCHASED') return [];
     const expiry = Date.parse(sub.expires_date ?? '');
     const original = Date.parse(sub.original_purchase_date ?? '');

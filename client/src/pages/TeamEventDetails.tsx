@@ -506,7 +506,7 @@ export default function TeamEventDetails() {
           <DutiesSection
             gameId={eventData.id}
             teamId={eventData.teamId}
-            userId={(user as User).id}
+            userId={user.id}
             isCaptain={eventData.isCaptain}
             isTeamMember={true}
           />

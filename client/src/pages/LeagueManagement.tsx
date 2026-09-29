@@ -272,6 +272,7 @@ type Team = {
   captainId: string;
   leagueId: string;
   seasonId?: string | null;
+  logoUrl?: string | null;
   isFreeAgents?: boolean; // Added missing property
 };
 
@@ -4185,7 +4186,7 @@ export default function LeagueManagement() {
                       id: 'free-agents',
                       name: 'Free Agents',
                       captainId: null,
-                      leagueId: league.id,
+                      leagueId: league?.id ?? leagueId ?? '',
                       isFreeAgents: true
                     },
                     ...teams
@@ -4255,7 +4256,7 @@ export default function LeagueManagement() {
                                     // Check if user can join the team
                                     const userMembership = members.find(m => m.userId === user?.id);
                                     const isCaptain = team.captainId === user?.id;
-                                    const isCommissioner = league.commissionerId === user?.id;
+                                    const isCommissioner = league?.commissionerId === user?.id;
                                     
                                     // User can join if they're captain/commissioner AND either:
                                     // 1. They have no membership yet (haven't joined league), OR

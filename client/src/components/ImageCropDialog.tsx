@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
-import type { Area, MediaSize } from "react-easy-crop/types";
+import type { Area, MediaSize } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

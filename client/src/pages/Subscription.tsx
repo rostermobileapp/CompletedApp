@@ -22,7 +22,6 @@ import {
   purchaseProductAndroid,
   inspectAndroidPurchases,
   getAndroidPurchaseCustomerId,
-  loginAndroidPurchaseAccount,
   restorePurchases,
   restorePurchasesAndroid,
   PRODUCT_PLAYER_PRO,
@@ -31,6 +30,10 @@ import {
   PRODUCT_COMMISSIONER_YEARLY,
   type NativelyTransaction,
 } from '@/lib/nativePurchases';
+import {
+  isNativeRevenueCatIdentityAlreadyCanonical,
+  linkNativeRevenueCatAccount,
+} from '@/lib/nativeRevenueCat';
 
 export default function Subscription() {
   const { user } = usePermissions();
@@ -181,6 +184,10 @@ export default function Subscription() {
     if (!isAndroid || androidLookupState !== 'ready' || !googleBillingAvailability?.available) return;
     (async () => {
       try {
+        // Background discovery is non-migrating: only inspect a Play restore
+        // when this native app is already on the account's canonical ID.
+        if (!await isNativeRevenueCatIdentityAlreadyCanonical()) return;
+        await linkNativeRevenueCatAccount();
         const { purchases, activeProductIds } = await inspectAndroidPurchases();
         setAndroidOwnedProducts(activeProductIds);
         if (!purchases.length) return;
@@ -483,6 +490,7 @@ export default function Subscription() {
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {
+      await linkNativeRevenueCatAccount();
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
@@ -530,6 +538,7 @@ export default function Subscription() {
   const handleIosRestore = async () => {
     setIsLoading(true);
     try {
+      await linkNativeRevenueCatAccount();
       const purchases = await restorePurchases();
 
       if (!purchases.length) {
@@ -604,6 +613,7 @@ export default function Subscription() {
       hasAgent: typeof (window as any).$agent !== 'undefined',
     });
     try {
+      await linkNativeRevenueCatAccount();
       console.log(`Step 2: Calling Natively Google Play purchase method for productId=${productId}`);
       const purchase = await purchaseProductAndroid(productId);
       console.log('Step 3: Natively purchase callback received; requesting server verification');
@@ -640,6 +650,7 @@ export default function Subscription() {
         pendingPollRef.current = setInterval(async () => {
           attempts += 1;
           try {
+            await linkNativeRevenueCatAccount();
             const purchases = await restorePurchasesAndroid();
             for (const p of purchases) {
               try {
@@ -713,18 +724,19 @@ export default function Subscription() {
   const handleAndroidRestore = async () => {
     setIsLoading(true);
     try {
+      // Capture the pre-link identity for verified legacy Google recovery,
+      // then identify this Roster account before any native restore call.
+      const originalCustomerId = await getAndroidPurchaseCustomerId();
+      await linkNativeRevenueCatAccount();
       const { purchases, activeProductIds } = await inspectAndroidPurchases();
       setAndroidOwnedProducts(activeProductIds);
 
       if (!purchases.length) {
-        const originalCustomerId = await getAndroidPurchaseCustomerId();
         setRecoveryCustomerId(originalCustomerId.startsWith('$RCAnonymousID:') ? originalCustomerId : null);
         try {
-          const identityResponse = await apiRequest('GET', '/api/iap/revenuecat-login-id');
-          const { loginId } = await identityResponse.json() as { loginId: string };
-          await loginAndroidPurchaseAccount(loginId);
           // RevenueCat associates the restored Play receipt with the
           // authenticated Roster account's server-derived identity.
+          await linkNativeRevenueCatAccount();
           await inspectAndroidPurchases();
           const response = await apiRequest('POST', '/api/iap/restore-google-automatic');
           const data = await response.json() as { role?: string; message?: string };

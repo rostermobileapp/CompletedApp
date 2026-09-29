@@ -4,6 +4,14 @@ import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
 import { containsForbiddenDemoBody, demoBodyUserIdsAreMapped, demoMutationAllowed, demoResourcesAreIsolated, hasDemoPaymentScrimmageFields, DEMO_OWNER_DISPLAY_ID, getDemoContext } from './demo';
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { claims: { sub: string; [key: string]: unknown } };
+    }
+  }
+}
+
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase environment variables');
 }
@@ -11,7 +19,9 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { realtime: { transport: ws } }
+  // ws works as the Node 20 transport; its server-side constructor overload
+  // is broader than the browser-style signature in Supabase's current types.
+  { realtime: { transport: ws as unknown as typeof WebSocket } },
 );
 
 // Export supabase client for use in other modules
