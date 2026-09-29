@@ -62,3 +62,4 @@
 - [RevenueCat webhook URL uniqueness](revenuecat-webhook-url-uniqueness.md) — one project cannot register the same URL twice; use one signed mixed-environment webhook or distinct URLs.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
+- [GitHub push confirmation](github-push-confirmation.md) — a CLI auth failure may precede platform sync; check the remote branch and Railway commit before declaring deployment blocked.
