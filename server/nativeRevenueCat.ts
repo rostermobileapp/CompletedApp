@@ -12,11 +12,11 @@ import {
   getRevenueCatWebhookRetryDelaySeconds,
   isRecognizedRevenueCatLifecycleEvent,
   isRevenueCatWebhookEnvironmentAllowed,
+  shouldProcessRevenueCatWebhookEnvironment,
   roleValue,
   revenueCatWebhookEnqueueOutcome,
   shouldRetryRevenueCatWebhookForLag,
   verifyRevenueCatWebhookSignature,
-  type RevenueCatWebhookSigningKey,
   type BillingRole,
 } from './nativeRevenueCatLogic';
 import { getRevenueCatNativeSubscriptions, type VerifiedRevenueCatNativeSubscription } from './revenueCatApi';
@@ -586,6 +586,11 @@ async function processRevenueCatWebhookEvent(
 ): Promise<'processed' | 'duplicate' | 'unlinked' | 'ignored'> {
   const eventType = typeof event?.type === 'string' ? event.type : '';
   if (!isRecognizedRevenueCatLifecycleEvent(eventType)) return 'ignored';
+  // A single webhook integration delivers both environments. A production
+  // service acknowledges sandbox events but never reconciles sandbox purchases.
+  if (!shouldProcessRevenueCatWebhookEnvironment(event?.environment)) {
+    return 'ignored';
+  }
   const appUserId = typeof event?.app_user_id === 'string' ? event.app_user_id : '';
   if (!/^roster_[a-f0-9]{64}$/.test(appUserId)) return 'unlinked';
 
@@ -903,9 +908,8 @@ export function registerNativeRevenueCatRoutes(app: Express, isAuthenticated: Re
   });
 
   app.post('/api/webhooks/revenuecat-native', async (req, res) => {
-    const productionSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
-    const sandboxSecret = process.env.REVENUECAT_WEBHOOK_SANDBOX_SECRET;
-    if (!productionSecret || (sandboxSecret !== undefined && !productionSecret)) {
+    const signingSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+    if (!signingSecret) {
       return res.status(503).json({ message: 'RevenueCat webhook signing is unavailable.' });
     }
     if (!Buffer.isBuffer(req.body)) {
@@ -913,13 +917,12 @@ export function registerNativeRevenueCatRoutes(app: Express, isAuthenticated: Re
     }
     const rawBody = req.body as Buffer;
     const signature = req.header('X-RevenueCat-Webhook-Signature');
-    const signingKey = verifyRevenueCatWebhookSignature(
+    const signatureValid = verifyRevenueCatWebhookSignature(
       rawBody,
       signature,
-      productionSecret,
-      sandboxSecret,
+      signingSecret,
     );
-    if (!signingKey) {
+    if (!signatureValid) {
       return res.status(401).json({ message: 'Invalid RevenueCat webhook signature.' });
     }
 
@@ -933,7 +936,7 @@ export function registerNativeRevenueCatRoutes(app: Express, isAuthenticated: Re
     const eventId = typeof event?.id === 'string' ? event.id : '';
     const eventType = typeof event?.type === 'string' ? event.type : '';
     if (!eventId || eventId.length > 200 || !eventType || eventType.length > 80 ||
-        !isRevenueCatWebhookEnvironmentAllowed(signingKey, event?.environment)) {
+        !isRevenueCatWebhookEnvironmentAllowed(event?.environment, eventType)) {
       return res.status(400).json({ message: 'Invalid RevenueCat webhook event or environment.' });
     }
 

@@ -13,8 +13,6 @@ const ROLE_RANK: Record<BillingRole, number> = {
   commissioner: 3,
 };
 
-export type RevenueCatWebhookSigningKey = 'production' | 'sandbox';
-
 export const roleValue = (value: unknown): BillingRole =>
   value === 'player_pro' || value === 'secondary_commissioner' || value === 'commissioner'
     ? value
@@ -82,49 +80,49 @@ export function shouldRetryRevenueCatWebhookForLag(
 export function verifyRevenueCatWebhookSignature(
   rawBody: Buffer,
   signatureHeader: string | undefined,
-  productionSecret: string | undefined,
-  sandboxSecret: string | undefined,
+  signingSecret: string | undefined,
   now = Date.now(),
-): RevenueCatWebhookSigningKey | null {
-  if (!signatureHeader || !productionSecret ||
-      (sandboxSecret !== undefined && !productionSecret)) return null;
+): boolean {
+  if (!signatureHeader || !signingSecret) return false;
   const parts = signatureHeader.split(',').map((part) => part.trim());
   const timestamps = parts.filter((part) => part.startsWith('t=')).map((part) => part.slice(2));
-  if (timestamps.length !== 1 || !/^\d{1,12}$/.test(timestamps[0])) return null;
+  if (timestamps.length !== 1 || !/^\d{1,12}$/.test(timestamps[0])) return false;
   const timestamp = Number(timestamps[0]);
-  if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(now / 1000) - timestamp) > 300) return null;
+  if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(now / 1000) - timestamp) > 300) return false;
 
   const suppliedSignatures = parts
     .filter((part) => part.startsWith('v1='))
     .map((part) => part.slice(3))
     .filter((value) => /^[a-f0-9]{64}$/i.test(value))
     .map((value) => Buffer.from(value, 'hex'));
-  if (!suppliedSignatures.length) return null;
+  if (!suppliedSignatures.length) return false;
 
-  const matchesSecret = (secret: string): boolean => {
-    const expected = createHmac('sha256', secret)
-      .update(`${timestamps[0]}.`, 'utf8')
-      .update(rawBody)
-      .digest();
-    return suppliedSignatures.reduce((matched, supplied) =>
-      timingSafeEqual(expected, supplied) || matched, false);
-  };
-  const productionMatches = matchesSecret(productionSecret);
-  const sandboxMatches = sandboxSecret ? matchesSecret(sandboxSecret) : false;
-  if (productionMatches === sandboxMatches) return null;
-  return productionMatches ? 'production' : 'sandbox';
+  const expected = createHmac('sha256', signingSecret)
+    .update(`${timestamps[0]}.`, 'utf8')
+    .update(rawBody)
+    .digest();
+  return suppliedSignatures.reduce((matched, supplied) =>
+    timingSafeEqual(expected, supplied) || matched, false);
 }
 
 export function isRevenueCatWebhookEnvironmentAllowed(
-  signingKey: RevenueCatWebhookSigningKey,
+  environment: unknown,
+  eventType: unknown,
+): boolean {
+  // TEST events may not carry an environment. Lifecycle events must state one.
+  if (environment == null || environment === '') return eventType === 'TEST';
+  if (typeof environment !== 'string') return false;
+  const normalized = environment.trim().toUpperCase();
+  return normalized === 'SANDBOX' || normalized === 'PRODUCTION';
+}
+
+export function shouldProcessRevenueCatWebhookEnvironment(
   environment: unknown,
   runtimeEnvironment: string | undefined = process.env.NODE_ENV,
 ): boolean {
-  if (typeof environment !== 'string' || !environment.trim()) return signingKey === 'production';
-  const normalized = environment.trim().toUpperCase();
-  return signingKey === 'sandbox'
-    ? normalized === 'SANDBOX' && runtimeEnvironment !== 'production'
-    : normalized === 'PRODUCTION';
+  if (!isRevenueCatWebhookEnvironmentAllowed(environment, 'LIFECYCLE')) return false;
+  return runtimeEnvironment !== 'production' ||
+    (environment as string).trim().toUpperCase() === 'PRODUCTION';
 }
 
 const REVENUECAT_LIFECYCLE_EVENT_TYPES = new Set([
@@ -171,6 +169,5 @@ export function isPaywallClaimAvailable(
 
 export function isNativeRevenueCatPaywallEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NATIVE_PAYWALL_ENABLED === 'true' &&
-    Boolean(env.REVENUECAT_API_KEY && env.REVENUECAT_WEBHOOK_SECRET &&
-      (!env.REVENUECAT_WEBHOOK_SANDBOX_SECRET || env.REVENUECAT_WEBHOOK_SECRET));
+    Boolean(env.REVENUECAT_API_KEY && env.REVENUECAT_WEBHOOK_SECRET);
 }

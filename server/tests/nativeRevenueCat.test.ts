@@ -12,6 +12,7 @@ import {
   isNativeRevenueCatPaywallEnabled,
   isPaywallClaimAvailable,
   isRevenueCatWebhookEnvironmentAllowed,
+  shouldProcessRevenueCatWebhookEnvironment,
   deriveRevenueCatAppUserId,
   revenueCatWebhookEnqueueOutcome,
   resolveManualRoleBackfill,
@@ -198,37 +199,34 @@ test('RevenueCat webhook HMAC verifies exact raw bytes and rejects tampering or 
     .digest('hex');
   const header = `t=${timestamp},v1=${digest}`;
 
-  assert.equal(verifyRevenueCatWebhookSignature(rawBody, header, secret, undefined, now), 'production');
+  assert.equal(verifyRevenueCatWebhookSignature(rawBody, header, secret, now), true);
   assert.equal(
-    verifyRevenueCatWebhookSignature(Buffer.from('{"event":{"id":"evt-1"}}'), header, secret, undefined, now),
-    null,
+    verifyRevenueCatWebhookSignature(Buffer.from('{"event":{"id":"evt-1"}}'), header, secret, now),
+    false,
   );
-  assert.equal(verifyRevenueCatWebhookSignature(rawBody, header, secret, undefined, now + 301_000), null);
+  assert.equal(verifyRevenueCatWebhookSignature(rawBody, header, secret, now + 301_000), false);
 });
 
-test('sandbox webhook key is restricted to development sandbox events, production key to production', () => {
+test('one signed webhook accepts both environments but production processes only live events', () => {
   const now = Date.parse('2027-01-01T00:00:00.000Z');
   const timestamp = Math.floor(now / 1000);
-  const body = Buffer.from('{"event":{"type":"TEST"}}');
-  const sign = (secret: string) => createHmac('sha256', secret)
-    .update(`${timestamp}.`, 'utf8').update(body).digest('hex');
-  const sandboxKey = 'provider-generated-sandbox-secret';
-  const productionKey = 'provider-generated-production-secret';
-  const sandboxSigner = verifyRevenueCatWebhookSignature(
-    body, `t=${timestamp},v1=${sign(sandboxKey)}`, productionKey, sandboxKey, now,
-  );
-  const productionSigner = verifyRevenueCatWebhookSignature(
-    body, `t=${timestamp},v1=${sign(productionKey)}`, productionKey, sandboxKey, now,
-  );
-
-  assert.equal(sandboxSigner, 'sandbox');
-  assert.equal(isRevenueCatWebhookEnvironmentAllowed(sandboxSigner!, 'SANDBOX', 'development'), true);
-  assert.equal(isRevenueCatWebhookEnvironmentAllowed(sandboxSigner!, 'PRODUCTION', 'development'), false);
-  assert.equal(isRevenueCatWebhookEnvironmentAllowed(sandboxSigner!, 'SANDBOX', 'production'), false);
-  assert.equal(isRevenueCatWebhookEnvironmentAllowed(sandboxSigner!, 'SANDBOX', 'development'), true);
-  assert.equal(productionSigner, 'production');
-  assert.equal(isRevenueCatWebhookEnvironmentAllowed(productionSigner!, 'PRODUCTION', 'production'), true);
-  assert.equal(isRevenueCatWebhookEnvironmentAllowed(productionSigner!, 'SANDBOX', 'development'), false);
+  const secret = 'provider-generated-single-integration-secret';
+  for (const environment of ['PRODUCTION', 'SANDBOX']) {
+    const body = Buffer.from(JSON.stringify({ event: { id: `evt-${environment}`, environment } }));
+    const signature = createHmac('sha256', secret)
+      .update(`${timestamp}.`, 'utf8').update(body).digest('hex');
+    assert.equal(verifyRevenueCatWebhookSignature(
+      body, `t=${timestamp},v1=${signature}`, secret, now,
+    ), true);
+    assert.equal(isRevenueCatWebhookEnvironmentAllowed(environment, 'INITIAL_PURCHASE'), true);
+  }
+  assert.equal(isRevenueCatWebhookEnvironmentAllowed(undefined, 'TEST'), true);
+  assert.equal(isRevenueCatWebhookEnvironmentAllowed(undefined, 'INITIAL_PURCHASE'), false);
+  assert.equal(isRevenueCatWebhookEnvironmentAllowed('UNKNOWN', 'INITIAL_PURCHASE'), false);
+  assert.equal(shouldProcessRevenueCatWebhookEnvironment('SANDBOX', 'production'), false);
+  assert.equal(shouldProcessRevenueCatWebhookEnvironment('SANDBOX', 'development'), true);
+  assert.equal(shouldProcessRevenueCatWebhookEnvironment('PRODUCTION', 'production'), true);
+  assert.equal(shouldProcessRevenueCatWebhookEnvironment(123, 'production'), false);
 });
 
 test('TEST and unknown RevenueCat event types are acknowledged without lifecycle processing', () => {
@@ -256,7 +254,7 @@ test('canonical identity preserves the existing Android HMAC recipe', () => {
   );
 });
 
-test('paywall cannot be enabled until both secrets and explicit flag exist', () => {
+test('paywall requires the API key, one webhook signing secret, and explicit flag', () => {
   assert.equal(isNativeRevenueCatPaywallEnabled({}), false);
   assert.equal(isNativeRevenueCatPaywallEnabled({
     NATIVE_PAYWALL_ENABLED: 'true',
@@ -272,12 +270,6 @@ test('paywall cannot be enabled until both secrets and explicit flag exist', () 
     REVENUECAT_API_KEY: 'api-key',
     REVENUECAT_WEBHOOK_SANDBOX_SECRET: 'sandbox-signing-key',
   } as NodeJS.ProcessEnv), false);
-  assert.equal(isNativeRevenueCatPaywallEnabled({
-    NATIVE_PAYWALL_ENABLED: 'true',
-    REVENUECAT_API_KEY: 'api-key',
-    REVENUECAT_WEBHOOK_SECRET: 'production-signing-key',
-    REVENUECAT_WEBHOOK_SANDBOX_SECRET: 'sandbox-signing-key',
-  } as NodeJS.ProcessEnv), true);
 });
 
 test('only one live claim per account can reserve the paywall at a time', () => {

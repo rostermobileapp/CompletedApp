@@ -1,0 +1,42 @@
+Constraint: webhook URL is unique per project
+In RevenueCat, a webhook integration's url must be unique within a project — you can't have two integrations pointing at the same URL. Replit's plan is a production and a sandbox integration both pointing at …/revenuecat-native, each with its own HMAC secret. RevenueCat won't allow two integrations on that one URL, so the "separate prod HMAC secret vs sandbox HMAC secret" model doesn't map cleanly onto a single endpoint.
+
+Two ways to resolve it — this is a design decision:
+
+Option A — One native integration, no environment filter (simplest).
+
+Single webhook → receives both production and sandbox events (the payload's environment field is PRODUCTION or SANDBOX, so the handler already knows which is which).
+One HMAC signing secret for the native endpoint. Railway needs just that one, not two.
+Downside: Replit built for two separate secrets, so it'd need to collapse to one.
+Option B — Two integrations, two distinct URLs.
+
+e.g. …/revenuecat-native (production) and …/revenuecat-native?env=sandbox (or a -sandbox path) for sandbox.
+Keeps Replit's two-secret design intact, but Replit must expose a second URL/route.
+Let me verify I'm not overstating the uniqueness rule before you decide.
+
+Confirmed the constraint. Here's what the docs and the API actually say — they point in slightly different directions, and that's the crux:
+
+Docs: you can run two webhook integrations filtered to production and sandbox respectively — but their example is "if you use a different backend for production and sandbox," i.e. different URLs.
+API (create-webhook-integration): both name and url are unique per project — re-posting the same URL fails with 409 resource_already_exists.
+So two native integrations on the same …/revenuecat-native URL is not possible. Replit's two-secret plan needs one of these:
+
+Option A — One native integration, both environments (recommended, simplest).
+
+Single webhook at …/revenuecat-native, no environment filter → receives production and sandbox events.
+The handler reads the payload's environment field (PRODUCTION / SANDBOX) to tell them apart — RevenueCat has no separate sandbox/prod system, that field is the signal.
+One HMAC signing secret. Replit collapses to a single native secret instead of two.
+Option B — Two native integrations, two distinct URLs.
+
+Prod → …/revenuecat-native, sandbox → a second route (e.g. …/revenuecat-native-sandbox).
+Preserves Replit's separate prod/sandbox HMAC secrets, but Replit must expose and deploy that second route.
+My recommendation: Option A. One endpoint, one secret, environment field disambiguates — less to deploy, less to misconfigure, and it's a perfectly standard single-project setup. Only go with B if Replit has a real reason to isolate sandbox on a different route/secret.
+
+Referral webhook — still pending your call
+Separately, you haven't told me whether to keep referral attribution. If yes, it's a third integration (static Authorization header, its own REVENUECAT_REFERRAL_WEBHOOK_AUTH_SECRET, and note it's likely never actually been receiving events). If you're not using it, skip it.
+
+What I need to proceed
+Option A or B for the native webhook?
+Keep or skip the referral webhook?
+Once you decide, I'll create the integration(s) at https://completedapp-production.up.railway.app/api/webhooks/revenuecat-native, then you enable HMAC in the dashboard and copy the secret(s) into Railway's production variables (Replit's note is right — Replit dev secrets and Railway prod vars are separate).
+
+Bottom line: two RevenueCat webhooks can't share the same URL, so Replit's separate prod/sandbox HMAC-secret plan needs a decision — one native webhook handling both environments (Option A, my pick), or two webhooks on two different URLs (Option B). Plus tell me whether to keep or skip the referral webhook. Give me those two answers and I'll create the integration(s).
