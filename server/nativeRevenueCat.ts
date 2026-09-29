@@ -7,12 +7,13 @@ import {
   highestBillingRole,
   deriveRevenueCatAppUserId,
   isNativeRevenueCatPaywallEnabled,
+  isNativePaywallTestAccount,
   isPaywallClaimAvailable,
   resolveEffectiveBillingRole,
   getRevenueCatWebhookRetryDelaySeconds,
   isRecognizedRevenueCatLifecycleEvent,
   isRevenueCatWebhookEnvironmentAllowed,
-  shouldProcessRevenueCatWebhookEnvironment,
+  shouldProcessRevenueCatWebhookForAccount,
   roleValue,
   revenueCatWebhookEnqueueOutcome,
   shouldRetryRevenueCatWebhookForLag,
@@ -107,6 +108,7 @@ export async function initNativeRevenueCatDb(): Promise<void> {
       store VARCHAR NOT NULL CHECK (store IN ('app_store', 'play_store')),
       role VARCHAR(32) NOT NULL CHECK (role IN ('player_pro', 'commissioner')),
       expires_at TIMESTAMPTZ NOT NULL,
+      is_sandbox BOOLEAN,
       verified_at TIMESTAMPTZ NOT NULL,
         role_reconciled_at TIMESTAMPTZ,
       PRIMARY KEY (user_id, product_id, store)
@@ -114,6 +116,11 @@ export async function initNativeRevenueCatDb(): Promise<void> {
   `);
   await pool.query(`ALTER TABLE revenuecat_native_entitlements
     ADD COLUMN IF NOT EXISTS role_reconciled_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE revenuecat_native_entitlements
+    ADD COLUMN IF NOT EXISTS is_sandbox BOOLEAN`);
+  // NULL is unknown provenance for historical rows: never presume production.
+  await pool.query(`ALTER TABLE revenuecat_native_entitlements ALTER COLUMN is_sandbox DROP DEFAULT`);
+  await pool.query(`ALTER TABLE revenuecat_native_entitlements ALTER COLUMN is_sandbox DROP NOT NULL`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS apple_iap_claims (
       user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -279,12 +286,13 @@ async function applyRevenueCatSnapshot(
   for (const subscription of subscriptions) {
     await client.query(
       `INSERT INTO revenuecat_native_entitlements
-        (user_id, product_id, store, role, expires_at, verified_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
+        (user_id, product_id, store, role, expires_at, is_sandbox, verified_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
        ON CONFLICT (user_id, product_id, store) DO UPDATE
          SET role = EXCLUDED.role, expires_at = EXCLUDED.expires_at,
-              verified_at = EXCLUDED.verified_at, role_reconciled_at = NULL`,
-      [userId, subscription.productId, subscription.store, subscription.role, subscription.expiresAt],
+             is_sandbox = EXCLUDED.is_sandbox,
+             verified_at = EXCLUDED.verified_at, role_reconciled_at = NULL`,
+      [userId, subscription.productId, subscription.store, subscription.role, subscription.expiresAt, subscription.isSandbox],
     );
   }
   const role = await reconcileStoredBillingRole(client, userId, stripeSourceUpdate);
@@ -306,7 +314,7 @@ async function reconcileStoredBillingRole(
   if (!user) throw Object.assign(new Error('Roster account not found.'), { status: 404 });
 
   const accountResult = await client.query(
-    `SELECT manual_role, stripe_role, stripe_expires_at, applied_role
+    `SELECT manual_role, stripe_role, stripe_expires_at, applied_role, app_user_id
        FROM revenuecat_native_accounts WHERE user_id = $1 FOR UPDATE`,
     [userId],
   );
@@ -354,16 +362,21 @@ async function reconcileStoredBillingRole(
     stripeExpiresAt = null;
   }
 
+  const allowSandbox = process.env.NODE_ENV !== 'production' ||
+    isNativePaywallTestAccount(account.app_user_id as string);
   const native = await client.query(
     `SELECT role, expires_at FROM revenuecat_native_entitlements
-      WHERE user_id = $1 AND expires_at > NOW()`,
-    [userId],
+      WHERE user_id = $1 AND expires_at > NOW()
+        AND (is_sandbox = FALSE OR (is_sandbox = TRUE AND $2 = TRUE))`,
+    [userId, allowSandbox],
   );
   await client.query(
     `UPDATE revenuecat_native_entitlements
         SET role_reconciled_at = NOW()
-      WHERE user_id = $1 AND expires_at <= NOW() AND role_reconciled_at IS NULL`,
-    [userId],
+       WHERE user_id = $1 AND (expires_at <= NOW()
+         OR (is_sandbox IS DISTINCT FROM FALSE AND (is_sandbox IS NULL OR $2 = FALSE)))
+         AND role_reconciled_at IS NULL`,
+    [userId, allowSandbox],
   );
   const apple = await client.query(
     `SELECT product_id, expires_at FROM apple_purchase_links
@@ -554,6 +567,12 @@ export async function reconcileExpiredBillingRoleSources(): Promise<void> {
                WHERE n.user_id = a.user_id AND n.expires_at <= NOW()
             )
          OR EXISTS (
+              SELECT 1 FROM revenuecat_native_entitlements n
+               WHERE n.user_id = a.user_id AND n.is_sandbox IS DISTINCT FROM FALSE
+                 AND n.role_reconciled_at IS NULL
+                 AND (n.is_sandbox IS NULL OR $1 = '' OR a.app_user_id <> $1)
+            )
+         OR EXISTS (
               SELECT 1 FROM apple_purchase_links p
                WHERE p.user_id = a.user_id AND p.expires_at <= NOW()
             )
@@ -566,9 +585,35 @@ export async function reconcileExpiredBillingRoleSources(): Promise<void> {
                WHERE g.user_id = a.user_id AND g.expires_at <= NOW()
             )
          OR a.stripe_expires_at <= NOW()
-      ORDER BY a.user_id LIMIT 250`,
+      ORDER BY EXISTS (
+        SELECT 1 FROM revenuecat_native_entitlements n
+         WHERE n.user_id = a.user_id AND n.is_sandbox IS DISTINCT FROM FALSE
+           AND n.role_reconciled_at IS NULL
+           AND (n.is_sandbox IS NULL OR $1 = '' OR a.app_user_id <> $1)
+      ) DESC, a.user_id LIMIT 250`,
+    [process.env.NODE_ENV === 'production' &&
+      isNativePaywallTestAccount(process.env.NATIVE_PAYWALL_TEST_APP_USER_ID ?? '')
+      ? process.env.NATIVE_PAYWALL_TEST_APP_USER_ID : ''],
   );
   for (const row of expired.rows) {
+    await applyStoredRevenueCatRole(row.user_id as string);
+  }
+}
+
+/** Fail closed before accepting traffic after removing the tester exception. */
+export async function reconcileDisallowedNativeSandboxRoles(): Promise<void> {
+  if (process.env.NODE_ENV !== 'production') return;
+  const testerId = isNativePaywallTestAccount(process.env.NATIVE_PAYWALL_TEST_APP_USER_ID ?? '')
+    ? process.env.NATIVE_PAYWALL_TEST_APP_USER_ID : '';
+  const rows = await pool.query(
+    `SELECT DISTINCT a.user_id
+       FROM revenuecat_native_accounts a
+       JOIN revenuecat_native_entitlements n ON n.user_id = a.user_id
+      WHERE n.expires_at > NOW() AND n.is_sandbox IS DISTINCT FROM FALSE
+        AND (n.is_sandbox IS NULL OR $1 = '' OR a.app_user_id <> $1)`,
+    [testerId],
+  );
+  for (const row of rows.rows) {
     await applyStoredRevenueCatRole(row.user_id as string);
   }
 }
@@ -586,12 +631,12 @@ async function processRevenueCatWebhookEvent(
 ): Promise<'processed' | 'duplicate' | 'unlinked' | 'ignored'> {
   const eventType = typeof event?.type === 'string' ? event.type : '';
   if (!isRecognizedRevenueCatLifecycleEvent(eventType)) return 'ignored';
-  // A single webhook integration delivers both environments. A production
-  // service acknowledges sandbox events but never reconciles sandbox purchases.
-  if (!shouldProcessRevenueCatWebhookEnvironment(event?.environment)) {
+  const appUserId = typeof event?.app_user_id === 'string' ? event.app_user_id : '';
+  // A signed sandbox webhook is reconciled only for the configured tester.
+  // All other sandbox events are acknowledged but ignored in production.
+  if (!shouldProcessRevenueCatWebhookForAccount(event?.environment, appUserId)) {
     return 'ignored';
   }
-  const appUserId = typeof event?.app_user_id === 'string' ? event.app_user_id : '';
   if (!/^roster_[a-f0-9]{64}$/.test(appUserId)) return 'unlinked';
 
   const owner = await pool.query(
@@ -772,12 +817,12 @@ export function registerNativeRevenueCatRoutes(app: Express, isAuthenticated: Re
     res.set('Cache-Control', 'no-store');
     if (rejectDemoPov(req, res)) return;
     const userId = req.user.claims.sub as string;
-    const enabled = isNativeRevenueCatPaywallEnabled();
     if (!process.env.REVENUECAT_API_KEY) {
       return res.json({ enabled: false, eligible: false, shown: false });
     }
     try {
       const loginId = await getOrCreateRevenueCatAppUserId(userId);
+      const enabled = isNativeRevenueCatPaywallEnabled() || isNativePaywallTestAccount(loginId);
       const result = await syncRevenueCatNativeEntitlements(userId, loginId);
       const user = await pool.query(
         `SELECT role, first_name, last_name, onboarding_completed,
@@ -812,12 +857,12 @@ export function registerNativeRevenueCatRoutes(app: Express, isAuthenticated: Re
   app.post('/api/iap/native-paywall-claim', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     if (rejectDemoPov(req, res)) return;
-    if (!isNativeRevenueCatPaywallEnabled()) {
-      return res.status(409).json({ message: 'Native paywall is not enabled.' });
-    }
     const userId = req.user.claims.sub as string;
     try {
       const appUserId = await getOrCreateRevenueCatAppUserId(userId);
+      if (!isNativeRevenueCatPaywallEnabled() && !isNativePaywallTestAccount(appUserId)) {
+        return res.status(409).json({ message: 'Native paywall is not enabled.' });
+      }
       await syncRevenueCatNativeEntitlements(userId, appUserId);
       const eligibility = await pool.query(
         `SELECT u.role, u.first_name, u.last_name, u.onboarding_completed,

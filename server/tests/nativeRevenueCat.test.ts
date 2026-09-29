@@ -4,15 +4,18 @@ import { createHmac } from 'crypto';
 import {
   getActiveAppleSubscriptions,
   getActiveRevenueCatNativeSubscriptions,
+  getRevenueCatNativeSubscriptions,
 } from '../revenueCatApi';
 import {
   getRevenueCatWebhookRetryDelaySeconds,
   highestBillingRole,
   isRecognizedRevenueCatLifecycleEvent,
   isNativeRevenueCatPaywallEnabled,
+  isNativePaywallTestAccount,
   isPaywallClaimAvailable,
   isRevenueCatWebhookEnvironmentAllowed,
   shouldProcessRevenueCatWebhookEnvironment,
+  shouldProcessRevenueCatWebhookForAccount,
   deriveRevenueCatAppUserId,
   revenueCatWebhookEnqueueOutcome,
   resolveManualRoleBackfill,
@@ -134,6 +137,51 @@ test('production access excludes sandbox and unknown-environment receipts', () =
     ['commissioner_yearly'],
   );
   assert.equal(getActiveRevenueCatNativeSubscriptions(subscriptions, now, true).length, 3);
+});
+
+test('production test access is limited to the configured persisted identity', async () => {
+  const testerId = `roster_${'a'.repeat(64)}`;
+  const otherId = `roster_${'b'.repeat(64)}`;
+  const env = {
+    NODE_ENV: 'production',
+    REVENUECAT_API_KEY: 'test-api-key',
+    REVENUECAT_WEBHOOK_SECRET: 'test-webhook-secret',
+    NATIVE_PAYWALL_TEST_APP_USER_ID: testerId,
+  };
+  assert.equal(isNativeRevenueCatPaywallEnabled(env), false);
+  assert.equal(isNativePaywallTestAccount(testerId, env), true);
+  assert.equal(isNativePaywallTestAccount(otherId, env), false);
+  assert.equal(isNativePaywallTestAccount(testerId, { ...env, NATIVE_PAYWALL_TEST_APP_USER_ID: '' }), false);
+  assert.equal(isNativePaywallTestAccount(testerId, { ...env, REVENUECAT_WEBHOOK_SECRET: '' }), false);
+  assert.equal(shouldProcessRevenueCatWebhookForAccount('SANDBOX', testerId, env), true);
+  assert.equal(shouldProcessRevenueCatWebhookForAccount('SANDBOX', otherId, env), false);
+  assert.equal(shouldProcessRevenueCatWebhookForAccount('PRODUCTION', otherId, env), true);
+  assert.equal(shouldProcessRevenueCatWebhookForAccount(undefined, testerId, env), false);
+
+  const now = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  const fetcher = async () => new Response(JSON.stringify({
+    subscriber: {
+      subscriptions: {
+        commissioner_monthly: {
+          store: 'play_store', ownership_type: 'PURCHASED', is_sandbox: true, expires_date: now,
+        },
+        'com.rosterapp.player_pro_yearly': {
+          store: 'app_store', ownership_type: 'PURCHASED', is_sandbox: true, expires_date: now,
+        },
+        player_pro_yearly: {
+          store: 'play_store', ownership_type: 'PURCHASED', expires_date: now,
+        },
+      },
+    },
+  })) as ReturnType<typeof fetch>;
+  const tester = await getRevenueCatNativeSubscriptions(testerId, { env, fetcher });
+  assert.deepEqual(tester.map((sub) => [sub.role, sub.isSandbox]), [
+    ['commissioner', true], ['player_pro', true],
+  ]);
+  assert.deepEqual(await getRevenueCatNativeSubscriptions(otherId, { env, fetcher }), []);
+  assert.deepEqual(await getRevenueCatNativeSubscriptions(testerId, {
+    env: { ...env, NATIVE_PAYWALL_TEST_APP_USER_ID: '' }, fetcher,
+  }), []);
 });
 
 test('billing role precedence preserves independent commissioner access', () => {

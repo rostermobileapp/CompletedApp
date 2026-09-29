@@ -1,4 +1,5 @@
 import { IAP_PRODUCT_ROLES } from './appleNotificationHandler';
+import { isNativePaywallTestAccount } from './nativeRevenueCatLogic';
 
 type AppleRole = 'player_pro' | 'commissioner';
 
@@ -23,6 +24,7 @@ export interface VerifiedRevenueCatNativeSubscription {
   role: AppleRole;
   store: 'app_store' | 'play_store';
   expiresAt: string;
+  isSandbox: boolean;
 }
 
 const PLAY_PRODUCT_ROLES: Record<string, AppleRole> = {
@@ -41,6 +43,7 @@ export function getActiveRevenueCatNativeSubscriptions(
   data: RevenueCatResponse,
   now = Date.now(),
   allowSandbox = process.env.NODE_ENV !== 'production',
+  requireKnownEnvironment = process.env.NODE_ENV === 'production',
 ): VerifiedRevenueCatNativeSubscription[] {
   const subscriptions = data.subscriber?.subscriptions;
   if (!subscriptions || typeof subscriptions !== 'object' || Array.isArray(subscriptions)) {
@@ -48,9 +51,10 @@ export function getActiveRevenueCatNativeSubscriptions(
   }
 
   return Object.entries(subscriptions).flatMap(([productId, subscription]) => {
-    // Sandbox receipts are useful in development but must not unlock paid
-    // access on the production service. An absent flag is not production proof.
+    // Production requires explicit store-environment proof, even for the single
+    // tester. An absent flag is neither production nor sandbox proof.
     if (!subscription || (!allowSandbox && subscription.is_sandbox !== false) ||
+        (requireKnownEnvironment && typeof subscription.is_sandbox !== 'boolean') ||
         subscription.refunded_at ||
         subscription.ownership_type !== 'PURCHASED') return [];
 
@@ -67,18 +71,20 @@ export function getActiveRevenueCatNativeSubscriptions(
       role,
       store: subscription.store as 'app_store' | 'play_store',
       expiresAt: new Date(expiresAt).toISOString(),
+      isSandbox: subscription.is_sandbox === true,
     }];
   });
 }
 
 export async function getRevenueCatNativeSubscriptions(
   appUserId: string,
-  options: { apiKey?: string; fetcher?: typeof fetch } = {},
+  options: { apiKey?: string; fetcher?: typeof fetch; env?: NodeJS.ProcessEnv } = {},
 ): Promise<VerifiedRevenueCatNativeSubscription[]> {
   if (!/^roster_[a-f0-9]{64}$/.test(appUserId)) {
     throw Object.assign(new Error('Invalid RevenueCat account identity'), { status: 400 });
   }
-  const key = options.apiKey ?? process.env.REVENUECAT_API_KEY;
+  const env = options.env ?? process.env;
+  const key = options.apiKey ?? env.REVENUECAT_API_KEY;
   if (!key) throw Object.assign(new Error('RevenueCat API key is not configured'), { status: 503 });
 
   const response = await (options.fetcher ?? fetch)(
@@ -91,7 +97,12 @@ export async function getRevenueCatNativeSubscriptions(
   if (!response.ok) {
     throw Object.assign(new Error('RevenueCat subscriber lookup failed'), { status: 502 });
   }
-  return getActiveRevenueCatNativeSubscriptions(await response.json() as RevenueCatResponse);
+  return getActiveRevenueCatNativeSubscriptions(
+    await response.json() as RevenueCatResponse,
+    Date.now(),
+    env.NODE_ENV !== 'production' || isNativePaywallTestAccount(appUserId, env),
+    env.NODE_ENV === 'production',
+  );
 }
 
 export interface VerifiedAppleSubscription {

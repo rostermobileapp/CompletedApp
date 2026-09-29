@@ -10,6 +10,7 @@ import { initGoogleIapClaimsDb } from "./googleIapClaimsInit";
 import { initApplePurchaseLinks, reconcileApplePurchaseLinks, startApplePurchaseLinkJob } from "./applePurchaseLinks";
 import {
   initNativeRevenueCatDb,
+  reconcileDisallowedNativeSandboxRoles,
   startRevenueCatEntitlementExpiryJob,
   startRevenueCatWebhookInboxWorker,
 } from "./nativeRevenueCat";
@@ -97,6 +98,9 @@ app.use((req, res, next) => {
   await initGoogleIapClaimsDb();
   await initApplePurchaseLinks();
   await initNativeRevenueCatDb();
+  // A removed tester exception must revoke cached sandbox-only roles before
+  // this process begins serving production requests.
+  await reconcileDisallowedNativeSandboxRoles();
 
   const server = await registerRoutes(app);
   await reconcileApplePurchaseLinks();
@@ -111,11 +115,6 @@ app.use((req, res, next) => {
     reconcileSeasonRsvpKing(true).catch((error) =>
       console.error("[Badges] RSVP King season reconciliation failed:", error));
   }, 60 * 60 * 1000).unref();
-
-  // Pre-warm the city geo cache from existing DB records so the first heatmap
-  // request after a cold restart requires no external geocoding API calls.
-  // Awaited before listen() to guarantee cache readiness before traffic arrives.
-  await warmCityGeoCache();
 
   // Start background jobs (scrimmage reminders + backup queue timeout cascade)
   startScrimmageReminderJob();
@@ -148,6 +147,8 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    // Optional cache warming must not keep the API offline when the DB is slow.
+    void warmCityGeoCache();
     // Backfill historical badges after readiness. Errors are logged per badge
     // family, so corrupt history cannot take down the API for every user.
     void runHistoricalBadgeBackfills().catch((error) =>

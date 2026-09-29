@@ -171,3 +171,23 @@ export function isNativeRevenueCatPaywallEnabled(env: NodeJS.ProcessEnv = proces
   return env.NATIVE_PAYWALL_ENABLED === 'true' &&
     Boolean(env.REVENUECAT_API_KEY && env.REVENUECAT_WEBHOOK_SECRET);
 }
+
+/** A single explicitly configured, persisted RevenueCat identity may run the native sandbox test. */
+export function isNativePaywallTestAccount(
+  appUserId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return /^roster_[a-f0-9]{64}$/.test(appUserId) &&
+    env.NATIVE_PAYWALL_TEST_APP_USER_ID === appUserId &&
+    Boolean(env.REVENUECAT_API_KEY && env.REVENUECAT_WEBHOOK_SECRET);
+}
+
+export function shouldProcessRevenueCatWebhookForAccount(
+  environment: unknown,
+  appUserId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return shouldProcessRevenueCatWebhookEnvironment(environment, env.NODE_ENV) ||
+    (typeof environment === 'string' && environment.trim().toUpperCase() === 'SANDBOX' &&
+      isNativePaywallTestAccount(appUserId, env));
+}
