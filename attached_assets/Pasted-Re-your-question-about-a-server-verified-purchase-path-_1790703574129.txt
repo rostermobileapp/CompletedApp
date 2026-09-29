@@ -1,0 +1,27 @@
+Re: your question about a server-verified purchase path — yes, build the account-linked path, but with an important architecture correction.
+
+Do NOT verify Apple/Google receipts on Roster's own server. RevenueCat is already our receipt-verification layer: when a purchase goes through the Natively → RevenueCat bridge, RevenueCat validates the Apple/Google transaction and is the single source of truth for entitlements. Re-verifying raw store receipts on our server duplicates that and is the source of the "transaction proof" gap you hit. The correct pattern is to trust RevenueCat's validation and read entitlement status from RevenueCat, not from Apple/Google directly.
+
+What to build before enabling the native paywall:
+
+1. Account linking (do this BEFORE the paywall/purchase):
+
+Call the bridge's login/identify method with Roster's authenticated user ID so the RevenueCat App User ID equals our own account ID (not an anonymous $RCAnonymousID). This ties subscriptions to the account and survives reinstalls.
+Critical ordering: establish the logged-in identity before any purchase. Per RevenueCat's aliasing rules, if you log in from an anonymous ID to a custom ID that already exists and already has an anonymous alias, the identities are not merged and no purchase transfer occurs — so purchasing while still anonymous risks an orphaned purchase. Log in first, then present the paywall.
+Users must have an authenticated Roster account before reaching the paywall step. If a user could reach onboarding's final step without being logged in, handle that (e.g. require auth first).
+2. Entitlement checks (via RevenueCat, two layers):
+
+Client: after purchase, read active entitlements (player_pro / commissioner) from RevenueCat through the bridge's customer-info method, and gate features on those.
+Server (for authoritative gating of premium features): Roster's Node/Express API should read entitlements from the RevenueCat REST API for the given App User ID, and/or consume RevenueCat webhooks to react to purchases, renewals, cancellations, and refunds. This is the "server-verified" path — it verifies against RevenueCat, not against Apple/Google.
+3. Remove the custom store-receipt verification for this flow:
+
+Disable/remove Roster's own Apple/Google receipt-verification endpoints in the purchase path. Do not re-verify store receipts ourselves. If those endpoints are used elsewhere, isolate them so the subscription flow relies solely on RevenueCat.
+4. Gating and rollout:
+
+Keep the native paywall disabled until: (a) the logIn() identity flow works, (b) the RevenueCat entitlement check (client and/or server) works, and (c) both are tested end-to-end in sandbox on iOS and Android.
+Fix the project-wide TypeScript errors outside the onboarding file before shipping.
+Important — bridge method names are Natively's, not RevenueCat's: the exact method names for login/identify, fetching customer info, purchase, and restore belong to the Natively bridge API, not RevenueCat's SDK. Reuse the existing bridge wrapper in our codebase and follow Natively's official documentation for these calls — do not invent method signatures. Point of truth for the architecture is RevenueCat (entitlements, account linking, webhooks); point of truth for the bridge calls is Natively.
+
+Server-side RevenueCat access needs an API key: the REST API / webhook setup requires a RevenueCat secret API key and (for webhooks) an endpoint + authorization header on our server. Flag exactly what config values you need and where they should go (env vars); do not hardcode secrets.
+
+To confirm before you code: (a) where Roster's authenticated user ID comes from at the onboarding paywall step, (b) whether we already have a webhook endpoint or REST integration on the server, and (c) the bridge wrapper file path. List anything else you need from us.
