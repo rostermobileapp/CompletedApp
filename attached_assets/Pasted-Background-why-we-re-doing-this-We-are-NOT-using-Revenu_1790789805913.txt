@@ -1,0 +1,64 @@
+Background / why we're doing this
+We are NOT using RevenueCat's hosted paywall for onboarding. RevenueCat's dashboard paywalls render via their native UI SDK and can initiate a purchase themselves, outside our control — and the Natively/WebView JS bridge gives us no pre-Buy hook to verify identity before that purchase fires. So instead, build a custom screen that mirrors the design below and, when the user selects a plan and confirms, routes into our already-functioning subscription/purchase flow (the same one the existing subscriptions screen uses). This puts the purchase trigger back in our own code, where we control identity verification.
+
+Scope
+
+This screen REPLACES the existing "Paywall"-labelled page (page 9, the final step) of the 9-page onboarding flow.
+Purchases must go through native store IAP via the existing Natively purchase bridge (Apple on iOS, Google Play on Android). Do NOT introduce purchases-js or any web/browser checkout for these digital goods — Apple prohibits it inside the app.
+Design to mirror (from our published RevenueCat paywall, revision 328)
+
+Layout: a three-tab segmented selector at top — Free / Player Pro / Commissioner — switching the tier detail shown below it.
+
+Tiers, headers, and feature lists:
+
+Free — subtitle "For Casual Players". Features: View Schedule · Personal Stats · Team-Only Messaging · Share and View Team/League Photos · Join Teams/Leagues/Tournaments. (No purchase — informational tab.)
+Player Pro — subtitle "For Serious Hockey Players", intro line "Everything in Free +". Features: Full Suite League Stats & Schedule · Scorekeeping Tool · Awards & Records · Unlimited Player Messaging · Collect Achievement Patches · Playoff/Tournament Bracket Tool.
+Commissioner — badge "most popular tier", subtitle "For League Managers", intro line "Everything in Free & Player Pro +", secondary note "only 1 needed per league". Features: League Scheduling · League Announcements · Schedule Team Events/Games & Private Skates.
+Per paid tier, show two package options — Yearly (default-selected) and Monthly — each showing {{ price }} {{ period }} (e.g. "$64.99 / year"). Put a "SAVE {discount}" badge on the yearly option, computed from the real prices at runtime — do NOT hardcode a percentage.
+
+CTA: sticky footer button reading "Continue" (or "Start your free trial" if a trial applies). Below/around it: Restore Purchases, Terms of Service (https://www.roster-app.com/terms-of-service), Privacy Policy (https://www.roster-app.com/privacy-policy).
+
+Colors: primary action/accent blue 
+#3E83F6
+; light bg 
+#FEFEFE
+, dark bg 
+#000000
+; grays 
+#6B7280
+ and 
+#94A3B8
+; card border 
+#C6C6C8
+. Support light/dark.
+
+Product wiring — each selectable option maps to these store products/entitlements:
+
+Tier	Period	iOS product ID	Android product	Entitlement
+Player Pro	Monthly	com.rosterapp.player_pro_monthly	player_pro_monthly:monthly	player_pro
+Player Pro	Yearly	com.rosterapp.player_pro_yearly	player_pro_yearly:annual	player_pro
+Commissioner	Monthly	com.rosterapp.commissioner_monthly	commissioner_monthly:monthly	commissioner
+Commissioner	Yearly	com.rosterapp.commissioner_yearly	commissioner_yearly:annual	commissioner
+Pull live prices from the bridge/offering rather than hardcoding — the offering is RevenueCat's current "Default Mobile" offering, packages player_pro_yearly/monthly and commissioner_yearly/monthly.
+
+Identity safety (the whole point of doing it this way)
+Because the purchase now fires from OUR code, do the identity check right before the purchase call:
+
+When the user taps the purchase CTA, read the SDK's current app user ID via the bridge (the "who am I logged in as right now" value, i.e. RevenueCat Purchases.shared.appUserID), NOT customerInfo.originalAppUserId (which is expected to be anonymous after an anon→custom merge and is what caused the earlier false negative).
+If it does not equal the signed-in account's custom ID, do NOT purchase — run logIn(<custom id>) once, re-read, and require an exact match before proceeding.
+If the bridge cannot expose the current appUserID (only customerId() is available and it maps to the original field), block the purchase and surface the state rather than charging under an unverified identity. (We have a separate open request to BuildNatively to expose Purchases.shared.appUserID; if this lands, use it here.)
+Presentation is NOT gated — any signed-in account reaches and sees this screen at the end of onboarding. The identity check gates the purchase, not the display.
+Do NOT
+
+Do NOT call logOut() automatically (it changes device purchase identity and can affect a real purchaser).
+Do NOT use the RevenueCat hosted paywall / showPaywall for this onboarding screen.
+Do NOT hardcode prices or discount percentages.
+Acceptance criteria
+
+Onboarding page 9 is the new custom screen; the old hosted-paywall step is removed.
+Any signed-in account sees the screen at the end of onboarding (no identity precondition on display).
+Selecting a plan + confirming routes into the existing working subscription/purchase flow and completes a native store purchase.
+Before the purchase call, current appUserID is verified to equal the signed-in custom ID; mismatch blocks the purchase.
+Restore Purchases, Terms, and Privacy links all function.
+Prices and the yearly SAVE badge render from live product data.
+Project-wide TypeScript check is clean; builds and starts.
