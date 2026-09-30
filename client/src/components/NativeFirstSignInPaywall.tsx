@@ -188,16 +188,17 @@ export function NativeFirstSignInPaywall() {
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 409)) {
           console.warn(`[Native paywall] ${stage} step did not complete:`, error);
-          if (stage === 'login' || stage === 'paywall') {
-            toast({
-              title: 'Subscriptions are temporarily unavailable',
-              description: error instanceof Error
-                ? `${stage === 'login' ? 'Store account link' : 'Paywall'} failed: ${error.message.slice(0, 200)}`
-                : 'Your account could not be linked to the store. Please try again later.',
-              duration: 30_000,
-              variant: 'destructive',
-            });
-          }
+          const step = stage === 'status' ? 'Eligibility check'
+            : stage === 'login' ? 'Store account link'
+              : stage === 'claim' ? 'Paywall authorization' : 'Paywall';
+          toast({
+            title: 'Subscriptions are temporarily unavailable',
+            description: error instanceof Error
+              ? `${step} failed: ${error.message.slice(0, 200)}`
+              : `${step} failed. Please try again later.`,
+            duration: 30_000,
+            variant: 'destructive',
+          });
         }
       } finally {
         // A claim must not remain held when navigation or login prevents the

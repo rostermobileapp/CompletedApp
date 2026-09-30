@@ -473,6 +473,10 @@ async function refreshExpiredStripeRoleSource(userId: string): Promise<Extract<R
   return { source: 'stripe', role, expiresAt: sourceExpiry };
 }
 
+// Distinct from the old session-lock key so existing orphaned locks cannot
+// block the new transaction-scoped billing flow during a rolling deployment.
+const revenueCatBillingLockKey = (userId: string) => `revenuecat-billing:${userId}`;
+
 export async function syncRevenueCatNativeEntitlements(
   userId: string,
   appUserId?: string,
@@ -490,16 +494,16 @@ export async function syncRevenueCatNativeEntitlements(
   }
   const client = await pool.connect();
   let transactionStarted = false;
-  let locked = false;
   try {
-    // Serialize provider reads for this Roster account. A slower response from
-    // an older webhook/request must never overwrite a newer subscriber fetch.
-    await client.query('SELECT pg_advisory_lock(hashtext($1))', [userId]);
-    locked = true;
-    const subscriptions = await getRevenueCatNativeSubscriptions(canonicalId);
-    const stripeSource = await refreshExpiredStripeRoleSource(userId);
+    // Keep provider reads serialized with writes so an older response cannot
+    // overwrite a newer one. Session locks can leak through a pooled database
+    // connection; a transaction lock is released even when the client drops.
+    // The new namespace does not wait on locks leaked by earlier deployments.
     await client.query('BEGIN');
     transactionStarted = true;
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [revenueCatBillingLockKey(userId)]);
+    const subscriptions = await getRevenueCatNativeSubscriptions(canonicalId);
+    const stripeSource = await refreshExpiredStripeRoleSource(userId);
     const result = await applyRevenueCatSnapshot(client, userId, subscriptions, stripeSource);
     await client.query('COMMIT');
     transactionStarted = false;
@@ -508,7 +512,6 @@ export async function syncRevenueCatNativeEntitlements(
     if (transactionStarted) await client.query('ROLLBACK');
     throw error;
   } finally {
-    if (locked) await client.query('SELECT pg_advisory_unlock(hashtext($1))', [userId]);
     client.release();
   }
 }
@@ -520,13 +523,11 @@ export async function applyStoredRevenueCatRole(
 ): Promise<BillingRole | null> {
   await backfillUnattributedManualRoles(userId);
   const client = await pool.connect();
-  let locked = false;
   let transactionStarted = false;
   try {
-    await client.query('SELECT pg_advisory_lock(hashtext($1))', [userId]);
-    locked = true;
     await client.query('BEGIN');
     transactionStarted = true;
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [revenueCatBillingLockKey(userId)]);
     const user = await client.query(
       `SELECT id FROM users WHERE id = $1 FOR UPDATE`,
       [userId],
@@ -544,7 +545,6 @@ export async function applyStoredRevenueCatRole(
     if (transactionStarted) await client.query('ROLLBACK');
     throw error;
   } finally {
-    if (locked) await client.query('SELECT pg_advisory_unlock(hashtext($1))', [userId]);
     client.release();
   }
 }
