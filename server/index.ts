@@ -18,6 +18,7 @@ import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runHistoricalBadgeBackfills } from "./badgeDbInit";
+import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 
 const app = express();
 
@@ -98,6 +99,7 @@ app.use((req, res, next) => {
   await initGoogleIapClaimsDb();
   await initApplePurchaseLinks();
   await initNativeRevenueCatDb();
+  await initAccountUserMergeDb();
   // A removed tester exception must revoke cached sandbox-only roles before
   // this process begins serving production requests.
   await reconcileDisallowedNativeSandboxRoles();

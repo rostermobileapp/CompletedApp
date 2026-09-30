@@ -5,6 +5,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict } from "./leaguePlayerMerge";
+import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
@@ -36,7 +37,7 @@ import {
   requireTournamentScorekeeperOrManagementByMatch,
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { gamePenalties } from "@shared/schema";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
@@ -16827,6 +16828,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // modified records without a transaction. It is deliberately retired.
   app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
     return res.status(410).json({ message: 'Use the commissioner Merge Player review in League Management instead.' });
+  });
+
+  // Separate account-support operation. League ownership does not authorize
+  // cross-account changes; demo impersonation cannot access these endpoints.
+  const requireAccountMergeOperator = async (req: any, res: any, next: any) => {
+    try {
+      if (req.demoContext || req.user?.claims?.email?.toLowerCase() !== 'tobin@rosterhockey.com' ||
+          req.realActor?.id !== req.user?.claims?.sub) {
+        return res.status(403).json({ message: 'Account support access required' });
+      }
+      const { data, error } = await supabase.auth.admin.getUserById(req.user.claims.supabaseId);
+      if (error || !data.user || data.user.email?.toLowerCase() !== 'tobin@rosterhockey.com')
+        return res.status(403).json({ message: 'Account support access required' });
+      next();
+    } catch {
+      res.status(503).json({ message: 'Could not verify support access' });
+    }
+  };
+  const mergeAccountsSchema = z.object({
+    sourceId: z.string().uuid(),
+    survivorId: z.string().uuid(),
+  });
+  const verifyRegisteredAuthAccounts = async (sourceId: string, survivorId: string) => {
+    const ids = [sourceId, survivorId];
+    const results = await Promise.all(ids.map(id => supabase.auth.admin.getUserById(id)));
+    const accounts = await pool.query('SELECT id,email FROM users WHERE id=ANY($1::varchar[]) AND deleted_at IS NULL', [ids]);
+    const emails = new Map(accounts.rows.map(row => [row.id, row.email?.toLowerCase()]));
+    return results.every(({ data, error }, i) => !error && data.user?.id === ids[i] &&
+      !!data.user.email && !data.user.email.toLowerCase().endsWith('@placeholder.roster') &&
+      data.user.email.toLowerCase() === emails.get(ids[i]));
+  };
+  app.get('/api/account-user-merge/candidates', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
+    try {
+      const search = z.string().max(100).parse(req.query.search || '');
+      if (search.trim().length < 2) return res.json([]);
+      const candidates = await searchAccountUsers(search);
+      const verified = await Promise.all(candidates.map(async candidate => {
+        const { data, error } = await supabase.auth.admin.getUserById(candidate.id);
+        if (error) throw error;
+        return data.user?.id === candidate.id && data.user.email?.toLowerCase() === candidate.email?.toLowerCase()
+          ? candidate : null;
+      }));
+      res.json(verified.filter(Boolean));
+    } catch (error) {
+      console.error('Account merge candidate lookup failed:', error);
+      res.status(503).json({ message: 'Could not verify registered accounts' });
+    }
+  });
+  app.post('/api/account-user-merge/preview', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
+    try {
+      const { sourceId, survivorId } = mergeAccountsSchema.parse(req.body);
+      if (!await verifyRegisteredAuthAccounts(sourceId, survivorId))
+        return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
+      res.json(await previewAccountUserMerge(sourceId, survivorId));
+    } catch (error: any) {
+      res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Could not review account merge.' });
+    }
+  });
+  app.post('/api/account-user-merge/confirm', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
+    try {
+      const body = mergeAccountsSchema.extend({
+        previewFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+        acknowledgeSourceId: z.string(),
+        acknowledgeSurvivorId: z.string(),
+        acknowledgeIdentity: z.literal(true),
+      }).parse(req.body);
+      if (!await verifyRegisteredAuthAccounts(body.sourceId, body.survivorId))
+        return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
+      const [source, survivor] = await Promise.all([body.sourceId, body.survivorId].map(id =>
+        pool.query('SELECT display_id FROM users WHERE id=$1 AND deleted_at IS NULL', [id])));
+      if (!source.rows[0]?.display_id || !survivor.rows[0]?.display_id ||
+          body.acknowledgeSourceId !== source.rows[0].display_id ||
+          body.acknowledgeSurvivorId !== survivor.rows[0].display_id)
+        return res.status(409).json({ message: 'Type both exact displayed U IDs before confirming.' });
+      res.json(await confirmAccountUserMerge(body.sourceId, body.survivorId, req.user.claims.sub, body.previewFingerprint));
+    } catch (error: any) {
+      console.error('Account-wide merge failed:', error);
+      res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Account merge failed. No database changes were saved.' });
+    }
   });
 
   // Leave a league (reverse of player merge)

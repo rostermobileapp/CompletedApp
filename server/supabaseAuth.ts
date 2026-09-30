@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
+import { pool } from './db';
 import { containsForbiddenDemoBody, demoBodyUserIdsAreMapped, demoMutationAllowed, demoResourcesAreIsolated, hasDemoPaymentScrimmageFields, DEMO_OWNER_DISPLAY_ID, getDemoContext } from './demo';
 
 declare global {
@@ -27,10 +28,16 @@ const supabase = createClient(
 // Export supabase client for use in other modules
 export { supabase };
 
+export async function isRetiredAccount(authId: string): Promise<boolean> {
+  const result = await pool.query('SELECT 1 FROM account_user_merges WHERE source_user_id=$1', [authId]);
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function getAuthenticatedDatabaseUser(accessToken: string) {
   if (!accessToken || accessToken.length < 10) return null;
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
   if (error || !user) return null;
+  if (await isRetiredAccount(user.id)) return null;
   return storage.upsertUser({
     id: user.id,
     email: user.email || '',
@@ -76,6 +83,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     if (!user) {
       console.error('[Auth] No user returned from Supabase');
       return res.status(401).json({ message: 'Unauthorized' });
+    }
+    if (await isRetiredAccount(user.id)) {
+      return res.status(403).json({ message: 'This account was retired. Sign in with the surviving account.' });
     }
 
     // Sync user with our database

@@ -67,3 +67,4 @@
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
 - [GitHub push confirmation](github-push-confirmation.md) — a CLI auth failure may precede platform sync; check the remote branch and Railway commit before declaring deployment blocked.
 - [Native frontend deployment timing](native-frontend-deployment-timing.md) — Railway API readiness does not prove the Vercel-served native webview has the new frontend; verify both before device tests.
+- [Account merge safety boundary](account-merge-safety-boundary.md) — cross-account transfers must block unclassified references and provider/authority records; never infer purchase ownership from matching identities.
