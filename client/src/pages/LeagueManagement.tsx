@@ -113,6 +113,8 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import { DraftSetupWizard } from '@/components/DraftSetupWizard';
+import { LeaguePlayerMerge } from '@/components/LeaguePlayerMerge';
+import { AccountUserMerge } from '@/components/AccountUserMerge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -150,6 +152,21 @@ type LeagueMember = {
     displayId?: string;
   };
 };
+
+async function confirmPlayerReplacement(leagueId: string, sourceId: string, survivorId: string): Promise<boolean> {
+  const response = await apiRequest('POST', `/api/leagues/${leagueId}/player-replacement/preview`, {
+    sourceId, survivorId,
+  });
+  const { source, survivor } = await response.json();
+  const describe = (identity: any) =>
+    `${identity.name} (${identity.email || 'no email'})\nID: ${identity.displayId || identity.id}\n` +
+    `Teams: ${identity.teams.join(', ') || 'none'}; Seasons: ${identity.seasons.map((s: any) => s.name || 'unassigned').join(', ') || 'none'}\n` +
+    `Goal events: ${identity.history.goals}, goalie appearances: ${identity.history.goalie}, stars: ${identity.history.stars}, attendance: ${identity.history.attendance}`;
+  return window.confirm(
+    `Move league history FROM:\n${describe(source)}\n\nINTO the signed-in account:\n${describe(survivor)}\n\n` +
+    'I verified these exact IDs belong to the same person. Names alone do not establish identity. This merge is irreversible. Continue?',
+  );
+}
 
 
 // Compact Score Verification Alert Component
@@ -272,6 +289,7 @@ type Team = {
   captainId: string;
   leagueId: string;
   seasonId?: string | null;
+  logoUrl?: string | null;
   isFreeAgents?: boolean; // Added missing property
 };
 
@@ -633,6 +651,7 @@ export default function LeagueManagement() {
   const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([]);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
+  const [accountMergeSurvivorId, setAccountMergeSurvivorId] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamCaptains, setTeamCaptains] = useState<string[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -3417,6 +3436,7 @@ export default function LeagueManagement() {
                 <h3 className="text-lg font-semibold">Players</h3>
               </div>
               <div className="flex gap-2">
+                <LeaguePlayerMerge leagueId={leagueId} />
                 <button
                   onClick={() => setShowBulkImport(!showBulkImport)}
                   disabled={seasons.length === 0}
@@ -4185,7 +4205,7 @@ export default function LeagueManagement() {
                       id: 'free-agents',
                       name: 'Free Agents',
                       captainId: null,
-                      leagueId: league.id,
+                      leagueId: league?.id ?? leagueId ?? '',
                       isFreeAgents: true
                     },
                     ...teams
@@ -4255,7 +4275,7 @@ export default function LeagueManagement() {
                                     // Check if user can join the team
                                     const userMembership = members.find(m => m.userId === user?.id);
                                     const isCaptain = team.captainId === user?.id;
-                                    const isCommissioner = league.commissionerId === user?.id;
+                                    const isCommissioner = league?.commissionerId === user?.id;
                                     
                                     // User can join if they're captain/commissioner AND either:
                                     // 1. They have no membership yet (haven't joined league), OR
@@ -5208,6 +5228,8 @@ export default function LeagueManagement() {
         )}
       </div>
       {/* Player Detail Modal */}
+      {accountMergeSurvivorId && <AccountUserMerge key={accountMergeSurvivorId}
+        survivorId={accountMergeSurvivorId} onClose={() => setAccountMergeSurvivorId(null)} />}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-xl hairline elev-inset w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -5216,6 +5238,7 @@ export default function LeagueManagement() {
                 <div>
                   <h3 className="text-lg font-semibold">{formatUserName(selectedPlayer.user, selectedPlayer)}</h3>
                   <p className="text-sm text-muted-foreground">{selectedPlayer.user.email}</p>
+                  {selectedPlayer.user.displayId && <p className="text-sm font-semibold">{selectedPlayer.user.displayId}</p>}
                 </div>
                 <button
                   onClick={() => setSelectedPlayer(null)}
@@ -5226,6 +5249,19 @@ export default function LeagueManagement() {
               </div>
 
               <div className="space-y-4">
+                {user?.email?.toLowerCase() === 'tobin@rosterhockey.com' &&
+                  selectedPlayer.user.displayId?.startsWith('U') &&
+                  selectedPlayer.user.email &&
+                  !selectedPlayer.user.email.toLowerCase().endsWith('@placeholder.roster') && (
+                    <Button type="button" variant="outline" className="w-full border-amber-500/60"
+                      data-testid="button-merge-into-registered-account"
+                      onClick={() => {
+                        setAccountMergeSurvivorId(selectedPlayer.user.id);
+                        setSelectedPlayer(null);
+                      }}>
+                      Merge another account into this account (support only)
+                    </Button>
+                  )}
                 {/* Team Assignment */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Assigned Team</label>
@@ -7839,12 +7875,13 @@ export default function LeagueManagement() {
                         
                         setIsReplacingInApproval(true);
                         try {
-                          // Replace the placeholder with the new user, and delete the pending membership atomically
+                          if (!await confirmPlayerReplacement(leagueId, selectedPlaceholder.userId, selectedMember.userId)) return;
                           const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
                             placeholderUserId: selectedPlaceholder.userId,
                             newUserId: selectedMember.userId,
                             preserveDisplayName: false,
-                            pendingMembershipIdToDelete: selectedMember.id
+                            pendingMembershipIdToDelete: selectedMember.id,
+                            acknowledgeIdentity: true,
                           });
                           
                           if (response.ok) {
@@ -7871,15 +7908,7 @@ export default function LeagueManagement() {
                               description: `Placeholder replaced successfully!${statsMessage}`,
                             });
                             
-                            // If this was a placeholder user, ask if they want to delete it
-                            if (result.isPlaceholder && result.placeholderUserId) {
-                              setPostMergePlaceholderInfo({
-                                userId: result.placeholderUserId,
-                                name: result.placeholderName || 'Unknown',
-                                hadStats: result.hadStats || false,
-                              });
-                              setShowPostMergeDeleteDialog(true);
-                            }
+                            // Keep the former profile: it may own activity in other leagues.
                           } else {
                             const error = await response.json();
                             toast({
@@ -8392,10 +8421,12 @@ export default function LeagueManagement() {
                       
                       setIsReplacingPlayer(true);
                       try {
+                        if (!await confirmPlayerReplacement(leagueId, selectedPlayerToReplace.userId, replaceTargetUserId)) return;
                         const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
                           placeholderUserId: selectedPlayerToReplace.userId,
                           newUserId: replaceTargetUserId,
-                          preserveDisplayName: preserveDisplayName
+                          preserveDisplayName: preserveDisplayName,
+                          acknowledgeIdentity: true,
                         });
                         
                         if (response.ok) {

@@ -226,7 +226,7 @@ import { canAcceptFreshScrimmageRequest } from "./scrimmageLifecycle";
 import { normalizeEmail } from "./emailNormalization";
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, gte, lte, inArray, asc, isNull, isNotNull, not, gt, notLike, ne, exists, notExists, type SQL } from "drizzle-orm";
 
 // Recipient row hydrated with either the real user or the placeholder player.
 // Exactly one of `user` / `placeholderPlayer` is populated for any given row.
@@ -251,6 +251,55 @@ export type InvoiceablePlayer = {
   teamName: string | null;
   isPlaceholderUser: boolean; // true for @placeholder.roster users
 };
+
+function buildStatsUser(user: Partial<User> & Pick<User, 'id'>): User {
+  const now = new Date();
+  const { id, ...userFields } = user;
+  return {
+    id,
+    displayId: null,
+    email: null,
+    firstName: null,
+    lastName: null,
+    profileImageUrl: null,
+    age: null,
+    dateOfBirth: null,
+    phoneNumber: null,
+    city: null,
+    zipCode: null,
+    lat: null,
+    lng: null,
+    primarySport: null,
+    playerType: null,
+    shoots: null,
+    role: 'free_tier',
+    specialPermissions: null,
+    isPrimaryCommissioner: false,
+    createdBy: null,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    iapOriginalTransactionId: null,
+    venmoUsername: null,
+    cashappUsername: null,
+    timezone: null,
+    timezoneManuallySet: false,
+    navigationPreferences: null,
+    competitiveLevel: null,
+    rosterUseCase: null,
+    onboardingCompleted: false,
+    onboardingProgress: null,
+    selectedFacilityId: null,
+    referralCode: null,
+    referralPartnerId: null,
+    referralSourceOther: null,
+    lastUpdated: now,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    feeExempt: false,
+    ...userFields,
+  };
+}
 
 export interface IStorage {
   // Display ID generators
@@ -11308,25 +11357,6 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.leagueId, leagueId),
           eq(leagueMemberships.status, "approved"),
-          // Keep true free agents with no stats off the leaderboard, but do
-          // not hide historical players whose official season stats exist
-          // after their team-membership row has been removed or was never
-          // created.
-          or(
-            isNotNull(playerStats.id),
-            exists(
-              db.select({ one: sql`1` })
-                .from(teamMemberships)
-                .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-                .where(
-                  and(
-                    eq(teamMemberships.userId, users.id),
-                    eq(teams.leagueId, leagueId),
-                    eq(teamMemberships.status, 'approved')
-                  )
-                )
-            )
-          ),
           // Filter by player type if specified
           ...(playerType === 'goalies' ? [eq(leagueMemberships.isGoalie, true)] : []),
           ...(playerType === 'non-goalies' ? [eq(leagueMemberships.isGoalie, false)] : [])
@@ -11348,7 +11378,7 @@ export class DatabaseStorage implements IStorage {
       createdAt: r.statsCreatedAt || new Date(),
       updatedAt: r.statsUpdatedAt || new Date(),
       isGoalie: r.membershipIsGoalie || false,
-      user: {
+      user: buildStatsUser({
         id: r.userId,
         email: r.userEmail,
         firstName: r.userFirstName,
@@ -11372,17 +11402,18 @@ export class DatabaseStorage implements IStorage {
         venmoUsername: null,
         cashappUsername: null,
         navigationPreferences: null,
-      }
+      })
     }));
 
-    // Keep placeholder goalies visible in the regular player-stats response
-    // with the same synthetic identity used by the League Players screen.
-    // The dedicated goalie-stats response calculates their goalie record;
-    // this row gives the regular stats table a zero-valued placeholder row.
-    const placeholderGoalieRows = playerType === 'goalies'
+    // Include placeholders using the same synthetic identity as the League
+    // Players screen. Goalie placeholders are provided by getGoalieStats for
+    // the goalie tab; the unfiltered response includes both player types.
+    const placeholderRows = playerType === 'goalies'
       ? []
       : (await this.getLeaguePlaceholderPlayers(leagueId))
-        .filter(placeholder => placeholder.isGoalie)
+        .filter(placeholder => playerType !== 'non-goalies'
+          ? placeholder.isGoalie || placeholder.isSkater
+          : !placeholder.isGoalie && placeholder.isSkater)
         .map(placeholder => {
           const placeholderUserId = `placeholder:${placeholder.id}`;
           const timestamp = placeholder.createdAt;
@@ -11398,8 +11429,8 @@ export class DatabaseStorage implements IStorage {
             penaltyMinutes: 0,
             createdAt: timestamp,
             updatedAt: timestamp,
-            isGoalie: true,
-            user: {
+            isGoalie: placeholder.isGoalie,
+            user: buildStatsUser({
               id: placeholderUserId,
               email: placeholder.email ?? null,
               firstName: placeholder.firstName,
@@ -11423,7 +11454,7 @@ export class DatabaseStorage implements IStorage {
               venmoUsername: null,
               cashappUsername: null,
               navigationPreferences: null,
-            }
+            })
           };
         });
 
@@ -11454,7 +11485,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(playerStats)
       .innerJoin(importedPlayers, eq(playerStats.importedPlayerId, importedPlayers.id))
-      .where(and(...importedStatsConditions));
+      .where(and(...importedStatsConditions, isNull(importedPlayers.mergedWithUserId)));
 
     const importedMappedRows = importedRows.map(r => ({
       id: r.statsId,
@@ -11469,7 +11500,7 @@ export class DatabaseStorage implements IStorage {
       createdAt: r.statsCreatedAt || new Date(),
       updatedAt: r.statsUpdatedAt || new Date(),
       isGoalie: false,
-      user: {
+      user: buildStatsUser({
         id: r.statsImportedPlayerId || '',
         email: '',
         firstName: r.ipFirstName || '',
@@ -11479,24 +11510,55 @@ export class DatabaseStorage implements IStorage {
         phoneNumber: null,
         city: null,
         primarySport: null,
-        playerType: r.ipPosition || null,
+        playerType: r.ipPosition === 'Skater' || r.ipPosition === 'Goalie'
+          ? r.ipPosition
+          : null,
         createdAt: r.statsCreatedAt || new Date(),
         updatedAt: r.statsUpdatedAt || new Date(),
         role: 'free_tier' as any,
         specialPermissions: null,
         isPrimaryCommissioner: false,
         createdBy: null,
-        lastUpdated: null,
+        lastUpdated: r.statsCreatedAt || new Date(),
         dateOfBirth: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         venmoUsername: null,
         cashappUsername: null,
         navigationPreferences: null,
-      }
+      })
     }));
 
-    return [...registeredRows, ...placeholderGoalieRows, ...importedMappedRows];
+    // In an all-season view, represent each player once while retaining the
+    // sum of their season records. A selected season remains unaggregated.
+    const combineSeasons = <T extends {
+      id: string;
+      gamesPlayed: number;
+      goals: number;
+      assists: number;
+      penaltyMinutes: number;
+    }>(rows: T[], identity: (row: T) => string): T[] => {
+      if (seasonId) return rows;
+      const combined = new Map<string, T>();
+      for (const row of rows) {
+        const key = identity(row);
+        const previous = combined.get(key);
+        if (!previous) {
+          combined.set(key, { ...row });
+        } else {
+          previous.gamesPlayed += row.gamesPlayed;
+          previous.goals += row.goals;
+          previous.assists += row.assists;
+          previous.penaltyMinutes += row.penaltyMinutes;
+        }
+      }
+      return Array.from(combined.values());
+    };
+    return [
+      ...combineSeasons(registeredRows, row => row.userId),
+      ...placeholderRows,
+      ...combineSeasons(importedMappedRows, row => row.importedPlayerId!),
+    ];
   }
 
   async getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined> {
@@ -11750,7 +11812,7 @@ export class DatabaseStorage implements IStorage {
       user: User;
     }>();
 
-    const buildGoalieUser = (row: any): User => ({
+    const buildGoalieUser = (row: any): User => buildStatsUser({
       id: row.userId,
       email: row.userEmail,
       firstName: row.userFirstName,
@@ -11768,12 +11830,6 @@ export class DatabaseStorage implements IStorage {
       isPrimaryCommissioner: row.userIsPrimaryCommissioner,
       createdBy: row.userCreatedBy,
       lastUpdated: row.userLastUpdated,
-      dateOfBirth: null,
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      venmoUsername: null,
-      cashappUsername: null,
-      navigationPreferences: null,
     });
 
     goalieMemberships.forEach(goalie => {
@@ -11810,24 +11866,16 @@ export class DatabaseStorage implements IStorage {
         shutouts: 0,
         totalMinutes: 0,
         teamId: placeholder.teamId ?? undefined,
-        user: buildGoalieUser({
-          userId: placeholderUserId,
-          userEmail: placeholder.email,
-          userFirstName: placeholder.firstName,
-          userLastName: placeholder.lastName,
-          userProfileImageUrl: null,
-          userAge: null,
-          userPhoneNumber: placeholder.phoneNumber,
-          userCity: null,
-          userPrimarySport: null,
-          userPlayerType: null,
-          userCreatedAt: placeholder.createdAt,
-          userUpdatedAt: placeholder.createdAt,
-          userRole: 'free_tier',
-          userSpecialPermissions: null,
-          userIsPrimaryCommissioner: false,
-          userCreatedBy: placeholder.addedBy,
-          userLastUpdated: placeholder.createdAt,
+        user: buildStatsUser({
+          id: placeholderUserId,
+          email: placeholder.email,
+          firstName: placeholder.firstName,
+          lastName: placeholder.lastName,
+          phoneNumber: placeholder.phoneNumber,
+          createdAt: placeholder.createdAt,
+          updatedAt: placeholder.createdAt,
+          lastUpdated: placeholder.createdAt,
+          createdBy: placeholder.addedBy,
         }),
       });
     });
@@ -11996,8 +12044,17 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
+    // Historical goalie game records can exist for someone whose current
+    // league request is pending. Do not publish that applicant on the stats
+    // list before their membership is approved.
+    const pendingGoalies = await db
+      .select({ userId: leagueMemberships.userId })
+      .from(leagueMemberships)
+      .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.status, 'pending')));
+    const pendingIds = new Set(pendingGoalies.map(row => row.userId));
+
     // Convert to final format with proper GAA calculation
-    const finalStats = Array.from(goalieStatsMap.values()).map(stats => ({
+    const finalStats = Array.from(goalieStatsMap.values()).filter(stats => !pendingIds.has(stats.userId)).map(stats => ({
       userId: stats.userId,
       gamesPlayed: stats.gamesPlayed,
       wins: stats.wins,

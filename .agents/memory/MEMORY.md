@@ -59,3 +59,5 @@
 - [Google Play order recovery](google-play-order-recovery.md) — orders.get can reveal a token and RevenueCat anonymous owner; a GPA number alone does not establish the Roster account to link.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
+- [Account merge safety boundary](account-merge-safety-boundary.md) — registered-account merges must fail closed on unclassified records, authority, and billing; never infer identity from name or email.
+- [League merge dialog boundary](league-merge-dialog-boundary.md) — the U-account-only commissioner picker and placeholder replacement preview have different eligibility rules.

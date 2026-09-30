@@ -12,6 +12,7 @@ import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runHistoricalBadgeBackfills } from "./badgeDbInit";
+import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use((req, res, next) => {
   await initDraftDb();
   await initGoogleIapClaimsDb();
   await initApplePurchaseLinks();
+  await initAccountUserMergeDb();
 
   const server = await registerRoutes(app);
   await reconcileApplePurchaseLinks();

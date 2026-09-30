@@ -4,6 +4,9 @@ import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
+import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
+import { hasAccountMergeOperatorContext } from "./accountMergeAuthorization";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
@@ -35,7 +38,7 @@ import {
   requireTournamentScorekeeperOrManagementByMatch,
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { gamePenalties } from "@shared/schema";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
@@ -16398,7 +16401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all league members
-      const members = await storage.getLeagueMembersWithDetails(leagueId);
+      const members = await storage.getLeagueMembers(leagueId);
       
       if (!query || (query as string).trim().length === 0) {
         // Return all members (excluding the source user if specified)
@@ -16495,13 +16498,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Source user is not a member of this league' });
       }
 
-      // Perform the merge
-      const mergedMembership = await storage.mergeUsersInLeague(
-        leagueId,
-        validatedData.fromUserId,
-        validatedData.toUserId,
-        validatedData.preserveName
-      );
+      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(validatedData.toUserId);
+      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      await mergeLeaguePlayer(leagueId, userId, { type: 'user', id: validatedData.fromUserId }, validatedData.toUserId);
+      const mergedMembership = await storage.getUserLeagueMembership(validatedData.toUserId, leagueId);
 
       res.json({
         message: 'Users merged successfully',
@@ -16517,7 +16517,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: error.errors 
         });
       }
-      res.status(500).json({ message: 'Failed to merge users' });
+      res.status(error instanceof PlayerMergeConflict ? 409 : 500).json({
+        message: error instanceof PlayerMergeConflict ? error.message : 'Failed to merge users',
+      });
     }
   });
 
@@ -16537,6 +16539,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const validatedData = replaceRequestSchema.parse({ placeholderUserId, newUserId, preserveDisplayName, pendingMembershipIdToDelete });
+      if (req.body.acknowledgeIdentity !== true) {
+        return res.status(400).json({ message: 'Review both profile IDs and confirm the irreversible merge first.' });
+      }
 
       if (validatedData.placeholderUserId === validatedData.newUserId) {
         return res.status(400).json({ message: 'Cannot replace user with themselves' });
@@ -16577,27 +16582,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (s.gamesPlayed || 0) > 0 || (s.goals || 0) > 0 || (s.assists || 0) > 0
       );
 
-      // Delete pending membership first if specified (before merge creates issues)
-      // Important: Only delete a membership that belongs to the NEW user, never the placeholder
-      if (validatedData.pendingMembershipIdToDelete) {
-        // Verify the membership to delete belongs to the new user (not the placeholder)
-        const membershipToDelete = await storage.getLeagueMembership(validatedData.pendingMembershipIdToDelete);
-        if (membershipToDelete && 
-            membershipToDelete.userId === validatedData.newUserId &&
-            membershipToDelete.id !== placeholderMembership.id) {
-          await db
-            .delete(leagueMemberships)
-            .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
-        }
-      }
-
-      // Use mergeUsersInLeague to properly transfer all stats, goals, assists, etc.
-      const mergedMembership = await storage.mergeUsersInLeague(
-        leagueId,
-        validatedData.placeholderUserId, // from (placeholder)
-        validatedData.newUserId, // to (real user)
-        validatedData.preserveDisplayName
-      );
+      // The transaction consolidates the pending and approved memberships;
+      // never delete either membership outside it.
+      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(validatedData.newUserId);
+      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      await mergeLeaguePlayer(leagueId, userId, { type: 'user', id: validatedData.placeholderUserId }, validatedData.newUserId, validatedData.preserveDisplayName);
+      const mergedMembership = await storage.getUserLeagueMembership(validatedData.newUserId, leagueId);
 
       res.json({
         message: 'Player replaced successfully',
@@ -16625,13 +16615,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Return more specific error message
       const errorMessage = error?.message || 'Failed to replace player';
-      res.status(500).json({ message: errorMessage });
+      res.status(error instanceof PlayerMergeConflict ? 409 : 500).json({ message: errorMessage });
+    }
+  });
+
+  const canMergeLeague = async (leagueId: string, userId: string) =>
+    (await storage.getLeague(leagueId))?.commissionerId === userId;
+  app.get('/api/leagues/:leagueId/player-merge/candidates', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      res.json(await findLeagueMergeCandidates(req.params.leagueId, String(req.query.search || '')));
+    } catch (error) {
+      console.error('Player merge search failed:', error);
+      res.status(500).json({ message: 'Could not search league players' });
+    }
+  });
+  app.post('/api/leagues/:leagueId/player-merge/preview', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { source, survivor } = leagueMergeDialogPreviewSchema.parse(req.body);
+      if (source.id === survivor.id) return res.status(400).json({ message: 'Choose a different registered account as the survivor.' });
+      const [from, to] = await Promise.all([
+        previewLeaguePlayerMerge(req.params.leagueId, source),
+        previewLeaguePlayerMerge(req.params.leagueId, survivor),
+      ]);
+      if (!to.canSurvive) return res.status(400).json({ message: 'The survivor must be an active registered account.' });
+      const { data, error } = await supabase.auth.admin.getUserById(survivor.id);
+      if (error || !data.user) return res.status(400).json({ message: 'The survivor must have a signed-in account. Choose a registered player.' });
+      res.json({ source: from, survivor: to });
+    } catch (error: any) {
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 400 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not preview these players' });
+    }
+  });
+  app.post('/api/leagues/:leagueId/player-replacement/preview', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { sourceId, survivorId } = z.object({ sourceId: z.string().min(1), survivorId: z.string().min(1) }).parse(req.body);
+      if (sourceId === survivorId) return res.status(400).json({ message: 'Choose two different accounts.' });
+      const [source, survivor] = await Promise.all([
+        previewLeaguePlayerMerge(req.params.leagueId, { type: 'user', id: sourceId }, true),
+        previewLeaguePlayerMerge(req.params.leagueId, { type: 'user', id: survivorId }, true),
+      ]);
+      if (!survivor.canSurvive) return res.status(400).json({ message: 'The survivor must be an active registered account.' });
+      const { data, error } = await supabase.auth.admin.getUserById(survivorId);
+      if (error || !data.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      res.json({ source, survivor });
+    } catch (error: any) {
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 400 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not preview this replacement.' });
+    }
+  });
+  app.post('/api/leagues/:leagueId/player-merge/confirm', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { source, survivorId } = leagueMergeDialogConfirmSchema.parse(req.body);
+      const { data, error } = await supabase.auth.admin.getUserById(survivorId);
+      if (error || !data.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      res.json(await mergeLeaguePlayer(req.params.leagueId, req.user.claims.sub, source, survivorId, false, true));
+    } catch (error: any) {
+      console.error('League player merge failed:', error);
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not merge players. No changes were saved.' });
+    }
+  });
+
+  const requireAccountMergeOperator = async (req: any, res: any, next: any) => {
+    try {
+      if (!hasAccountMergeOperatorContext(req)) return res.status(403).json({ message: 'Account support access required' });
+      const { data, error } = await supabase.auth.admin.getUserById(req.user.claims.supabaseId);
+      if (error || !data.user || data.user.email?.toLowerCase() !== 'tobin@rosterhockey.com')
+        return res.status(403).json({ message: 'Account support access required' });
+      next();
+    } catch {
+      res.status(503).json({ message: 'Could not verify support access' });
+    }
+  };
+  const mergeAccountsSchema = z.object({ sourceId: z.string().uuid(), survivorId: z.string().uuid() });
+  const verifyRegisteredAuthAccounts = async (sourceId: string, survivorId: string) => {
+    const ids = [sourceId, survivorId];
+    const results = await Promise.all(ids.map(id => supabase.auth.admin.getUserById(id)));
+    const accounts = await pool.query('SELECT id,email FROM users WHERE id=ANY($1::varchar[]) AND deleted_at IS NULL', [ids]);
+    const emails = new Map(accounts.rows.map(row => [row.id, row.email?.toLowerCase()]));
+    return results.every(({ data, error }, i) => !error && data.user?.id === ids[i] &&
+      !!data.user.email && !data.user.email.toLowerCase().endsWith('@placeholder.roster') &&
+      data.user.email.toLowerCase() === emails.get(ids[i]));
+  };
+  app.get('/api/account-user-merge/candidates', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
+    try {
+      const search = z.string().max(100).parse(req.query.search || '');
+      if (search.trim().length < 2) return res.json([]);
+      const candidates = await searchAccountUsers(search);
+      const verified = await Promise.all(candidates.map(async candidate => {
+        const { data, error } = await supabase.auth.admin.getUserById(candidate.id);
+        if (error) throw error;
+        return data.user?.id === candidate.id && data.user.email?.toLowerCase() === candidate.email?.toLowerCase()
+          ? candidate : null;
+      }));
+      res.json(verified.filter(Boolean));
+    } catch (error) {
+      console.error('Account merge candidate lookup failed:', error);
+      res.status(503).json({ message: 'Could not verify registered accounts' });
+    }
+  });
+  app.post('/api/account-user-merge/preview', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
+    try {
+      const { sourceId, survivorId } = mergeAccountsSchema.parse(req.body);
+      if (!await verifyRegisteredAuthAccounts(sourceId, survivorId))
+        return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
+      res.json(await previewAccountUserMerge(sourceId, survivorId));
+    } catch (error: any) {
+      res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Could not review account merge.' });
+    }
+  });
+  app.post('/api/account-user-merge/confirm', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
+    try {
+      const body = mergeAccountsSchema.extend({
+        previewFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+        acknowledgeSourceId: z.string(),
+        acknowledgeSurvivorId: z.string(),
+        acknowledgeIdentity: z.literal(true),
+      }).parse(req.body);
+      if (!await verifyRegisteredAuthAccounts(body.sourceId, body.survivorId))
+        return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
+      const [source, survivor] = await Promise.all([body.sourceId, body.survivorId].map(id =>
+        pool.query('SELECT display_id FROM users WHERE id=$1 AND deleted_at IS NULL', [id])));
+      if (!source.rows[0]?.display_id || !survivor.rows[0]?.display_id ||
+          body.acknowledgeSourceId !== source.rows[0].display_id ||
+          body.acknowledgeSurvivorId !== survivor.rows[0].display_id)
+        return res.status(409).json({ message: 'Type both exact displayed U IDs before confirming.' });
+      res.json(await confirmAccountUserMerge(body.sourceId, body.survivorId, req.user.claims.sub, body.previewFingerprint));
+    } catch (error: any) {
+      console.error('Account-wide merge failed:', error);
+      res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Account merge failed. No database changes were saved.' });
     }
   });
 
   // Merge an imported player with a real user account
   app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
     try {
+      return res.status(410).json({ message: 'Use the commissioner Merge Player review in League Management instead.' });
       const { leagueId } = req.params;
       const { membershipId, importedPlayerId } = req.body;
       const userId = req.user.claims.sub;
@@ -16643,7 +16768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check commissioner access
       const league = await storage.getLeague(leagueId);
-      if (!league || league.commissionerId !== userId) {
+      if (!league || league?.commissionerId !== userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -16675,13 +16800,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Find or create the team
         let team = await db.select()
           .from(teams)
-          .where(and(eq(teams.leagueId, leagueId), eq(teams.name, player.teamName)))
+          .where(and(eq(teams.leagueId, leagueId), eq(teams.name, player.teamName || '')))
           .limit(1);
 
         if (!team.length) {
           // Create team if it doesn't exist
           const newTeam = await storage.createTeam({
-            name: player.teamName,
+            name: player.teamName || '',
             leagueId: leagueId,
           });
           team = [newTeam];
@@ -16711,8 +16836,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             and(
               eq(leagueMemberships.leagueId, leagueId),
               ilike(users.email, '%@placeholder.roster'),
-              ilike(users.firstName, player.firstName),
-              ilike(users.lastName, player.lastName)
+              ilike(users.firstName, player.firstName || ''),
+              ilike(users.lastName, player.lastName || '')
             )
           );
         
