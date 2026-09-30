@@ -114,6 +114,7 @@ import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import { DraftSetupWizard } from '@/components/DraftSetupWizard';
 import { LeaguePlayerMerge } from '@/components/LeaguePlayerMerge';
+import { AccountUserMerge } from '@/components/AccountUserMerge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -651,6 +652,7 @@ export default function LeagueManagement() {
   const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([]);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<LeagueMember | null>(null);
+  const [accountMergeSurvivorId, setAccountMergeSurvivorId] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamCaptains, setTeamCaptains] = useState<string[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -5218,6 +5220,8 @@ export default function LeagueManagement() {
         )}
       </div>
       {/* Player Detail Modal */}
+      {accountMergeSurvivorId && <AccountUserMerge key={accountMergeSurvivorId}
+        survivorId={accountMergeSurvivorId} onClose={() => setAccountMergeSurvivorId(null)} />}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-background rounded-xl hairline elev-inset w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -5226,6 +5230,7 @@ export default function LeagueManagement() {
                 <div>
                   <h3 className="text-lg font-semibold">{formatUserName(selectedPlayer.user, selectedPlayer)}</h3>
                   <p className="text-sm text-muted-foreground">{selectedPlayer.user.email}</p>
+                  {selectedPlayer.user.displayId && <p className="text-sm font-semibold">{selectedPlayer.user.displayId}</p>}
                 </div>
                 <button
                   onClick={() => setSelectedPlayer(null)}
@@ -5236,6 +5241,19 @@ export default function LeagueManagement() {
               </div>
 
               <div className="space-y-4">
+                {user?.email?.toLowerCase() === 'tobin@rosterhockey.com' &&
+                  selectedPlayer.user.displayId?.startsWith('U') &&
+                  selectedPlayer.user.email &&
+                  !selectedPlayer.user.email.toLowerCase().endsWith('@placeholder.roster') && (
+                    <Button type="button" variant="outline" className="w-full border-amber-500/60"
+                      data-testid="button-merge-into-registered-account"
+                      onClick={() => {
+                        setAccountMergeSurvivorId(selectedPlayer.user.id);
+                        setSelectedPlayer(null);
+                      }}>
+                      Merge another account into this account (support only)
+                    </Button>
+                  )}
                 {/* Team Assignment */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Assigned Team</label>

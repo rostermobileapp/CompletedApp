@@ -86,12 +86,12 @@ export function LeaguePlayerMerge({ leagueId }: { leagueId: string }) {
     }
   };
   return <>
-    <Button type="button" variant="outline" onClick={() => setOpen(true)} data-testid="button-merge-player">Merge Player</Button>
+    <Button type="button" variant="outline" onClick={() => setOpen(true)} data-testid="button-merge-player">Merge league roster entry</Button>
     <Dialog open={open} onOpenChange={value => { if (!value && !busy) reset(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Merge league player profiles</DialogTitle>
-          <DialogDescription>Choose the old league entry and the signed-in account that keeps its login. Names and emails are search hints, not proof of identity.</DialogDescription>
+          <DialogDescription>Commissioner-only: move player history in this league from a legacy, imported, placeholder, or roster entry to a registered player. This does not retire a login or merge account-wide data. Names and emails are search hints, not proof of identity.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <Picker leagueId={leagueId} label="Source · history to move" selected={source} onSelect={changeSource} />

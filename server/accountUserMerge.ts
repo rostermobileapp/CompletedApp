@@ -15,6 +15,8 @@ type MergePreview = {
   other: { domain: string; count: number }[];
   combinable: Combinable[];
   blockers: Blocker[];
+  legacy: { id: string; league: string; name: string; kind: string; disposition: string }[];
+  lookalikes: { id: string; league: string; name: string; kind: string }[];
   fingerprint: string;
 };
 
@@ -39,6 +41,7 @@ const transferableReferences = new Set([
   'user_online_status.user_id',
   'typing_indicators.user_id',
   'league_memberships.user_id',
+  'imported_players.merged_with_user_id',
   'team_memberships.user_id',
   'player_stats.user_id',
   'game_attendance.user_id',
@@ -122,7 +125,8 @@ export async function searchAccountUsers(search = ''): Promise<UserSummary[]> {
       AND ($1='' OR id=$1 OR display_id ILIKE '%' || $1 || '%'
         OR email ILIKE '%' || $1 || '%' OR first_name ILIKE '%' || $1 || '%'
         OR last_name ILIKE '%' || $1 || '%')
-    ORDER BY display_id NULLS LAST, id LIMIT 100`, [term]);
+    ORDER BY CASE WHEN upper(display_id)=upper($1) THEN 0 ELSE 1 END,
+      display_id NULLS LAST, id LIMIT 100`, [term]);
   return result.rows;
 }
 
@@ -487,6 +491,33 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
   if (!source || !survivor)
     throw new AccountUserMergeConflict('Both selected IDs must be active registered accounts. Refresh the search.');
   const { refs, blockers: refBlockers, evidence } = await references(client, sourceId, survivorId);
+  // merged_with_user_id is an explicit relational link. An imported row with
+  // only the same name/email is NOT linked and must never be moved implicitly.
+  const linkedRows = await client.query(`
+    SELECT i.id, coalesce(l.name,'Unknown league') AS league,
+      concat_ws(' ',i.first_name,i.last_name) AS name
+    FROM imported_players i LEFT JOIN leagues l ON l.id=i.league_id
+    WHERE i.merged_with_user_id=$1 ORDER BY i.id`, [sourceId]);
+  const legacy = linkedRows.rows.map(row => ({
+    ...row, kind: 'Imported', disposition: 'Explicit link transfers to survivor; imported history remains a separate row',
+  }));
+  const unlinkedRows = await client.query(`
+    SELECT kind,id,league,name FROM (
+      SELECT 'Imported' AS kind,i.id,coalesce(l.name,'Unknown league') AS league,
+        concat_ws(' ',i.first_name,i.last_name) AS name, i.email
+      FROM imported_players i LEFT JOIN leagues l ON l.id=i.league_id
+      WHERE i.merged_with_user_id IS NULL
+      UNION ALL
+      SELECT 'Placeholder',p.id,coalesce(l.name,'Unknown league'),
+        concat_ws(' ',p.first_name,p.last_name),p.email
+      FROM placeholder_players p LEFT JOIN leagues l ON l.id=p.league_id
+    ) x
+    WHERE (nullif(trim(x.email),'') IS NOT NULL AND
+      lower(trim(x.email)) IN (lower(trim($1)),lower(trim($3))))
+      OR (nullif(trim(x.name),'') IS NOT NULL AND
+        lower(trim(x.name)) IN (lower(trim($2)),lower(trim($4))))
+    ORDER BY kind,id`, [source.email, source.name, survivor.email, survivor.name]);
+  const lookalikes = unlinkedRows.rows;
   const collisionBlockers = await detectUniqueCollisions(client, refs, sourceId, survivorId);
   const accountDataCollisions = await detectAccountDataCollisions(client, sourceId, survivorId);
   const blockers = [...refBlockers, ...collisionBlockers, ...accountDataCollisions.blockers];
@@ -536,9 +567,11 @@ async function buildPreview(client: PoolClient, sourceId: string, survivorId: st
     other: other.map(record => [record.domain, record.count]).sort(),
     combinable: combinable.map(({ domain, count, label }) => [domain, count, label]).sort(),
     blockers: blockers.map(({ domain, reason, count }) => [domain, reason, count]).sort(),
+    legacy,
+    lookalikes,
   };
   const fingerprint = createHash('sha256').update(JSON.stringify(fingerprintPayload)).digest('hex');
-  return { source, survivor, leagues, other, combinable, blockers, fingerprint };
+  return { source, survivor, leagues, other, combinable, blockers, legacy, lookalikes, fingerprint };
 }
 
 export async function previewAccountUserMerge(sourceId: string, survivorId: string): Promise<MergePreview> {

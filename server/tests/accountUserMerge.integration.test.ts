@@ -10,6 +10,24 @@ import {
   searchAccountUsers,
 } from '../accountUserMerge';
 
+test('account search is bounded, empty on a miss, and prioritizes an exact U ID', async () => {
+  const key = randomUUID().replaceAll('-', '');
+  const prefix = `merge_search_${key}_`;
+  const q = (sql: string, params: unknown[] = []) => pool.query(sql, params);
+  try {
+    await q(`INSERT INTO users (id,email,first_name)
+      SELECT $1 || n, $1 || n || '@example.test', $2
+      FROM generate_series(1,105) n`, [prefix, `Search${key}`]);
+    assert.equal((await searchAccountUsers(`not_found_${key}`)).length, 0);
+    assert.equal((await searchAccountUsers(`Search${key}`)).length, 100);
+    const last = (await q('SELECT id, display_id FROM users WHERE id=$1', [`${prefix}105`])).rows[0];
+    assert.ok(last.display_id);
+    assert.deepEqual((await searchAccountUsers(last.display_id)).map(user => user.id), [last.id]);
+  } finally {
+    await q('DELETE FROM users WHERE id LIKE $1', [`${prefix}%`]);
+  }
+});
+
 test('account merge searches registered accounts, retires atomically, and safely replays', async () => {
   const key = randomUUID().replaceAll('-', '');
   const ids = {
@@ -26,6 +44,12 @@ test('account merge searches registered accounts, retires atomically, and safely
     standaloneTournamentTeam: `merge_standalone_tournament_team_${key}`,
     paymentRequest: `merge_payment_${key}`,
     conversation: `merge_conversation_${key}`,
+    batch: `merge_batch_${key}`,
+    linked: `merge_linked_${key}`,
+    lookalike: `merge_lookalike_${key}`,
+    placeholder: `merge_placeholder_${key}`,
+    survivorLookalike: `merge_survivor_lookalike_${key}`,
+    legacyUser: `merge_legacy_user_${key}`,
   };
   const q = (sql: string, params: unknown[] = []) => pool.query(sql, params);
   try {
@@ -36,12 +60,23 @@ test('account merge searches registered accounts, retires atomically, and safely
     ]) {
       await q('INSERT INTO users (id,email,first_name) VALUES ($1,$2,$3)', [id, email, name]);
     }
+    await q('INSERT INTO users (id,email,first_name) VALUES ($1,$2,$3)',
+      [ids.legacyUser, `${key}@placeholder.roster`, 'Source']);
     for (const [id, suffix] of [[ids.leagueOne, 'A'], [ids.leagueTwo, 'B']]) {
       await q(`INSERT INTO leagues (id,name,unique_league_id,sport,commissioner_id)
         VALUES ($1,$2,$3,'hockey',$4)`, [id, `Merge league ${suffix}`, `${key.slice(0, 5)}${suffix}`, ids.operator]);
       await q(`INSERT INTO league_memberships (user_id,league_id,status) VALUES ($1,$2,'approved')`,
         [ids.source, id]);
     }
+    await q(`INSERT INTO player_imports (id,league_id,imported_by,file_name,total_records,successful_records,failed_records)
+      VALUES ($1,$2,$3,'merge.csv',2,2,0)`, [ids.batch, ids.leagueOne, ids.operator]);
+    await q(`INSERT INTO imported_players (id,import_id,league_id,first_name,email,merged_with_user_id)
+      VALUES ($1,$3,$4,'Source',$5,$6),($2,$3,$4,'Source',$5,NULL)`,
+      [ids.linked, ids.lookalike, ids.batch, ids.leagueOne, `${key}_source@example.test`, ids.source]);
+    await q(`INSERT INTO placeholder_players (id,league_id,first_name,last_name,email)
+      VALUES ($1,$3,'Source','', $4),($2,$3,'Survivor','', $5)`,
+      [ids.placeholder, ids.survivorLookalike, ids.leagueOne,
+        `${key}_source@example.test`, `${key}_survivor@example.test`]);
     await q(`INSERT INTO seasons (id,name,league_id) VALUES ($1,'Merge season',$2)`,
       [ids.season, ids.leagueOne]);
     await q(`INSERT INTO birthday_greetings (user_id,birthday_date,popup_dismissed_at)
@@ -83,6 +118,7 @@ test('account merge searches registered accounts, retires atomically, and safely
 
     const found = await searchAccountUsers(ids.source);
     assert.deepEqual(found.map(user => user.id), [ids.source]);
+    assert.ok(!(await searchAccountUsers('Source')).some(user => user.id === ids.legacyUser));
     const preview = await previewAccountUserMerge(ids.source, ids.survivor);
     assert.equal(preview.source.id, ids.source);
     assert.equal(preview.survivor.id, ids.survivor);
@@ -97,10 +133,26 @@ test('account merge searches registered accounts, retires atomically, and safely
     assert.ok(preview.other.some(record => record.domain === 'birthday_greetings.user_id' && record.count === 1));
     assert.ok(preview.other.some(record => record.domain === 'payment_request_recipients.user_id' && record.count === 1));
     assert.ok(preview.other.some(record => record.domain === 'personal_reminders.user_id' && record.count === 1));
+    assert.ok(preview.legacy.some(row => row.id === ids.linked && row.league === 'Merge league A'));
+    assert.ok(preview.leagues.some(league => league.records.some(record =>
+      record.domain === 'imported_players.merged_with_user_id')));
+    assert.ok(preview.lookalikes.some(row => row.id === ids.lookalike && row.kind === 'Imported'));
+    assert.ok(preview.lookalikes.some(row => row.id === ids.placeholder && row.kind === 'Placeholder'));
+    assert.ok(preview.lookalikes.some(row => row.id === ids.survivorLookalike && row.kind === 'Placeholder'));
+    assert.ok(!preview.legacy.some(row => row.id === ids.lookalike || row.id === ids.placeholder));
+    // Even changing a separate lookalike during review requires a fresh preview.
+    await q('UPDATE placeholder_players SET first_name=$2 WHERE id=$1', [ids.placeholder, 'Changed']);
+    await assert.rejects(
+      confirmAccountUserMerge(ids.source, ids.survivor, ids.operator, preview.fingerprint),
+      /changed after review/,
+    );
+    assert.equal((await q('SELECT deleted_at FROM users WHERE id=$1', [ids.source])).rows[0].deleted_at, null);
+    await q('UPDATE placeholder_players SET first_name=$2 WHERE id=$1', [ids.placeholder, 'Source']);
+    const freshPreview = await previewAccountUserMerge(ids.source, ids.survivor);
 
     const concurrentResults = await Promise.all([
-      confirmAccountUserMerge(ids.source, ids.survivor, ids.operator, preview.fingerprint),
-      confirmAccountUserMerge(ids.source, ids.survivor, ids.operator, preview.fingerprint),
+      confirmAccountUserMerge(ids.source, ids.survivor, ids.operator, freshPreview.fingerprint),
+      confirmAccountUserMerge(ids.source, ids.survivor, ids.operator, freshPreview.fingerprint),
     ]);
     assert.equal(concurrentResults.filter(result => !result.alreadyMerged).length, 1);
     assert.equal(concurrentResults.filter(result => result.alreadyMerged).length, 1);
@@ -132,14 +184,17 @@ test('account merge searches registered accounts, retires atomically, and safely
       ids.survivor);
     assert.equal((await q('SELECT user_id FROM conversation_participants WHERE conversation_id=$1',
       [ids.conversation])).rows[0].user_id, ids.survivor);
+    assert.equal((await q('SELECT merged_with_user_id FROM imported_players WHERE id=$1', [ids.linked])).rows[0].merged_with_user_id, ids.survivor);
+    assert.equal((await q('SELECT merged_with_user_id FROM imported_players WHERE id=$1', [ids.lookalike])).rows[0].merged_with_user_id, null);
+    assert.equal((await q('SELECT id FROM placeholder_players WHERE id=$1', [ids.placeholder])).rows.length, 1);
     assert.equal((await searchAccountUsers(ids.source)).length, 0);
 
     // A network retry of the exact operation must not create another merge.
     assert.deepEqual(await confirmAccountUserMerge(
-      ids.source, ids.survivor, ids.operator, preview.fingerprint,
+      ids.source, ids.survivor, ids.operator, freshPreview.fingerprint,
     ), { sourceId: ids.source, survivorId: ids.survivor, alreadyMerged: true });
     await assert.rejects(
-      confirmAccountUserMerge(ids.source, ids.operator, ids.survivor, preview.fingerprint),
+      confirmAccountUserMerge(ids.source, ids.operator, ids.survivor, freshPreview.fingerprint),
       AccountUserMergeConflict,
     );
   } finally {
@@ -162,9 +217,12 @@ test('account merge searches registered accounts, retires atomically, and safely
     await q('DELETE FROM conversation_participants WHERE conversation_id=$1', [ids.conversation]);
     await q('DELETE FROM conversations WHERE id=$1', [ids.conversation]);
     await q('DELETE FROM league_memberships WHERE league_id=ANY($1::varchar[])', [[ids.leagueOne, ids.leagueTwo]]);
+    await q('DELETE FROM imported_players WHERE id IN ($1,$2)', [ids.linked, ids.lookalike]);
+    await q('DELETE FROM player_imports WHERE id=$1', [ids.batch]);
+    await q('DELETE FROM placeholder_players WHERE id IN ($1,$2)', [ids.placeholder, ids.survivorLookalike]);
     await q('DELETE FROM seasons WHERE id=$1', [ids.season]);
     await q('DELETE FROM leagues WHERE id=ANY($1::varchar[])', [[ids.leagueOne, ids.leagueTwo]]);
-    await q('DELETE FROM users WHERE id=ANY($1::varchar[])', [[ids.source, ids.survivor, ids.operator]]);
+    await q('DELETE FROM users WHERE id=ANY($1::varchar[])', [[ids.source, ids.survivor, ids.operator, ids.legacyUser]]);
   }
 });
 

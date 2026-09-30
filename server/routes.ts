@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict } from "./leaguePlayerMerge";
 import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
+import { hasAccountMergeOperatorContext } from "./accountMergeAuthorization";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
@@ -16834,8 +16835,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // cross-account changes; demo impersonation cannot access these endpoints.
   const requireAccountMergeOperator = async (req: any, res: any, next: any) => {
     try {
-      if (req.demoContext || req.user?.claims?.email?.toLowerCase() !== 'tobin@rosterhockey.com' ||
-          req.realActor?.id !== req.user?.claims?.sub) {
+      if (!hasAccountMergeOperatorContext(req)) {
         return res.status(403).json({ message: 'Account support access required' });
       }
       const { data, error } = await supabase.auth.admin.getUserById(req.user.claims.supabaseId);
