@@ -20,7 +20,11 @@ import {
   verifyRevenueCatWebhookSignature,
   type BillingRole,
 } from './nativeRevenueCatLogic';
-import { getRevenueCatNativeSubscriptions, type VerifiedRevenueCatNativeSubscription } from './revenueCatApi';
+import {
+  compareRevenueCatOriginalAnonymousId,
+  getRevenueCatNativeSubscriptions,
+  type VerifiedRevenueCatNativeSubscription,
+} from './revenueCatApi';
 
 export {
   highestBillingRole,
@@ -851,6 +855,29 @@ export function registerNativeRevenueCatRoutes(app: Express, isAuthenticated: Re
       return res.status(statusFromError(error)).json({
         message: 'RevenueCat subscription status is temporarily unavailable.',
       });
+    }
+  });
+
+  app.post('/api/iap/native-paywall-identity-check', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (rejectDemoPov(req, res)) return;
+    try {
+      // This is a temporary diagnostic for the single allowlisted tester,
+      // not an identity-verification or entitlement endpoint.
+      const account = await pool.query(
+        'SELECT app_user_id FROM revenuecat_native_accounts WHERE user_id = $1',
+        [req.user.claims.sub as string],
+      );
+      const canonicalId = account.rows[0]?.app_user_id as string | undefined;
+      if (!canonicalId || !isNativePaywallTestAccount(canonicalId)) {
+        return res.status(403).json({ message: 'Purchase diagnostic is unavailable.' });
+      }
+      const result = await compareRevenueCatOriginalAnonymousId(
+        canonicalId, req.body?.anonymousCustomerHash,
+      );
+      return res.json({ result });
+    } catch (error: any) {
+      return res.status(statusFromError(error)).json({ message: 'Purchase diagnostic is unavailable.' });
     }
   });
 

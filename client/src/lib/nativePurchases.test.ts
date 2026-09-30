@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, webcrypto } from 'node:crypto';
 import {
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO,
@@ -122,8 +123,14 @@ test('native paywall timeout resolves as unconfirmed when an older bridge never 
 test('native account diagnostics classify anonymous responses without exposing either ID', async (t) => {
   const window = mockAndroid(t);
   window.$agent = {};
+  const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
+  t.after(() => {
+    if (originalCrypto) Object.defineProperty(globalThis, 'crypto', originalCrypto);
+    else Reflect.deleteProperty(globalThis, 'crypto');
+  });
   const loginId = `roster_${'a'.repeat(64)}`;
-  const anonymousId = '$RCAnonymousID:private-device-id';
+  const anonymousId = '$RCAnonymousID:private-device-identity-123';
   const actions: string[] = [];
   Object.defineProperty(globalThis, 'natively', {
     configurable: true,
@@ -141,6 +148,7 @@ test('native account diagnostics classify anonymous responses without exposing e
     assert.ok(error.diagnostics.slice(4).every(line => /Read-back: success, customer anonymous/.test(line)));
     assert.ok(!JSON.stringify(error.diagnostics).includes(loginId));
     assert.ok(!JSON.stringify(error.diagnostics).includes(anonymousId));
+    assert.equal(error.anonymousCustomerHash, createHash('sha256').update(anonymousId).digest('hex'));
     return true;
   });
   assert.deepEqual(actions, [

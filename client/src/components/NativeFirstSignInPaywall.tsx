@@ -217,6 +217,23 @@ export function NativeFirstSignInPaywall({
           console.warn(`[Native paywall] ${stage} step did not complete:`, error);
           if (active && error instanceof NativePurchaseLinkError) {
             setLinkDiagnostics(error.diagnostics);
+            if (error.anonymousCustomerHash) {
+              void apiRequest('POST', '/api/iap/native-paywall-identity-check', {
+                anonymousCustomerHash: error.anonymousCustomerHash,
+              }).then(response => response.json() as Promise<{ result: string }>)
+                .then(data => {
+                  if (active) setLinkDiagnostics([
+                    ...error.diagnostics,
+                    `RevenueCat original anonymous ID: ${
+                      data.result === 'match' ? 'MATCHES native ID (current account still unverified)'
+                        : data.result === 'different' ? 'DIFFERENT from native ID'
+                          : data.result === 'not-anonymous' ? 'not anonymous' : 'unavailable'
+                    }`,
+                  ]);
+                }).catch(() => {
+                  if (active) setLinkDiagnostics([...error.diagnostics, 'RevenueCat comparison: unavailable']);
+                });
+            }
           }
           const step = stage === 'status' ? 'Eligibility check'
             : stage === 'login' ? 'Store account link'

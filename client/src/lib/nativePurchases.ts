@@ -90,9 +90,24 @@ function nativeCustomerIdKind(id: unknown, expectedId?: string): string {
 
 /** Only redacted bridge observations are kept here; never include customer IDs. */
 export class NativePurchaseLinkError extends Error {
-  constructor(message: string, public readonly diagnostics: readonly string[]) {
+  constructor(
+    message: string,
+    public readonly diagnostics: readonly string[],
+    public readonly anonymousCustomerHash?: string,
+  ) {
     super(message);
     this.name = 'NativePurchaseLinkError';
+  }
+}
+
+async function hashAnonymousCustomerId(id: unknown): Promise<string | undefined> {
+  if (typeof id !== 'string' || !/^\$RCAnonymousID:[A-Za-z0-9_-]{20,128}$/.test(id) ||
+      !globalThis.crypto?.subtle) return undefined;
+  try {
+    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id));
+    return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return undefined;
   }
 }
 
@@ -151,6 +166,7 @@ export async function loginNativePurchaseAccount(loginId: string): Promise<void>
       `(login reported ${nativeCustomerIdKind(loginResult.customerId)}; ` +
       `read-back ${nativeCustomerIdKind(observedCustomerId)}).`,
       diagnostics,
+      await hashAnonymousCustomerId(observedCustomerId),
     );
   } catch (error) {
     if (error instanceof NativePurchaseLinkError) throw error;

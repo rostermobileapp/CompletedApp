@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { IAP_PRODUCT_ROLES } from './appleNotificationHandler';
 import { isNativePaywallTestAccount } from './nativeRevenueCatLogic';
 
@@ -103,6 +104,34 @@ export async function getRevenueCatNativeSubscriptions(
     env.NODE_ENV !== 'production' || isNativePaywallTestAccount(appUserId, env),
     env.NODE_ENV === 'production',
   );
+}
+
+/** Diagnostic only: compare a high-entropy native ID hash without disclosing IDs. */
+export async function compareRevenueCatOriginalAnonymousId(
+  appUserId: string,
+  anonymousCustomerHash: string,
+  options: { apiKey?: string; fetcher?: typeof fetch } = {},
+): Promise<'match' | 'different' | 'not-anonymous'> {
+  if (!/^roster_[a-f0-9]{64}$/.test(appUserId) || !/^[a-f0-9]{64}$/.test(anonymousCustomerHash)) {
+    throw Object.assign(new Error('Invalid purchase identity diagnostic'), { status: 400 });
+  }
+  const key = options.apiKey ?? process.env.REVENUECAT_API_KEY;
+  if (!key) throw Object.assign(new Error('RevenueCat API is unavailable'), { status: 503 });
+  // The status endpoint has already looked up this exact account. Do not set
+  // X-Platform (which would modify RevenueCat's last_seen field).
+  const response = await (options.fetcher ?? fetch)(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
+    { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!response.ok) throw Object.assign(new Error('RevenueCat diagnostic lookup failed'), { status: 502 });
+  const data = await response.json() as { subscriber?: { original_app_user_id?: unknown } };
+  const originalId = data.subscriber?.original_app_user_id;
+  if (typeof originalId !== 'string') {
+    throw Object.assign(new Error('RevenueCat original identity unavailable'), { status: 502 });
+  }
+  if (!originalId.startsWith('$RCAnonymousID:')) return 'not-anonymous';
+  const originalHash = createHash('sha256').update(originalId).digest('hex');
+  return originalHash === anonymousCustomerHash ? 'match' : 'different';
 }
 
 export interface VerifiedAppleSubscription {
