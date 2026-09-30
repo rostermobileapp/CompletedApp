@@ -7,3 +7,17 @@ uri = "file://roster-app-qr.png"
 type = "image"
 title = "QR Code — roster-app.com/hpib"
 logical_id = "f60eb079-5972-4473-8ac5-7ffdff8ae9dc"
+
+[[outputs]]
+id = "Djp7ITIr-DTH4ArToEP39"
+uri = "file://screenshots/onboarding-tiers-preview.jpg"
+type = "image"
+title = "Onboarding tier screen preview"
+description = "The existing questionnaire screen with Included Free and Player Pro — Unlock More."
+logical_id = "31d6aa38-71fe-4720-ad07-5b2fed3f0216"
+content_hash = "sha256:a274305a74ca6d3fb17966b54dddb9bc9a0ea66028a0fc5727055f5c0b9ab315"
+size = 39218
+mtime_ms = 1790732426208
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/31d6aa38-71fe-4720-ad07-5b2fed3f0216/0ddc1858-1f11-4d06-b132-bce549419032"
+storage_version_token = "1790732431184215"
+content_type = "image/jpeg"
