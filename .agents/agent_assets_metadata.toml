@@ -21,3 +21,17 @@ mtime_ms = 1790732426208
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/31d6aa38-71fe-4720-ad07-5b2fed3f0216/0ddc1858-1f11-4d06-b132-bce549419032"
 storage_version_token = "1790732431184215"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "sd-38Mj0ThAR2zSRGLPZg"
+uri = "file://screenshots/subscription-tiers-preview.jpg"
+type = "image"
+title = "Subscription screen preview"
+description = "Current Manage Subscription page with Free Tier, Player Pro and Commissioner plans below. Visual preview only; no account changes."
+logical_id = "fbd957b7-885b-47d6-802b-af05b6201c77"
+content_hash = "sha256:21a1192a517d0966c88857a5fb170c6aa3f8549c018a23f77ba1ee3158dbe968"
+size = 32194
+mtime_ms = 1790732711760
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/fbd957b7-885b-47d6-802b-af05b6201c77/6ad264f8-5292-42ad-9e23-246d2348428a"
+storage_version_token = "1790732726320131"
+content_type = "image/jpeg"
