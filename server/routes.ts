@@ -5395,6 +5395,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // ─── POST /api/iap/verify ──────────────────────────────────────────────────
+  // An onboarding purchase carries the account identity captured before the
+  // store sheet. Reject a receipt if the browser session changed meanwhile.
+  // Existing Subscriptions callers omit this optional value.
+  const matchesExpectedOnboardingPurchaseAccount = async (req: any, userId: string) => {
+    const expected = req.body?.expectedRevenueCatAppUserId;
+    if (expected === undefined) return true;
+    return typeof expected === 'string' && /^roster_[a-f0-9]{64}$/.test(expected) &&
+      await getOrCreateRevenueCatAppUserId(userId) === expected;
+  };
+
   // Called by the iOS client after a successful StoreKit purchase.
   //
   // Accepts (in priority order):
@@ -5406,6 +5416,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { jws, transactionId } = req.body;
+      if (!await matchesExpectedOnboardingPurchaseAccount(req, userId)) {
+        return res.status(409).json({ message: 'The account changed during purchase. Sign back in to the original account and restore.' });
+      }
 
       // ── Path 1: StoreKit 2 JWS transaction ──────────────────────────────
       if (jws && typeof jws === 'string' && jws.trim()) {
@@ -5789,6 +5802,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/iap/verify-google', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      if (!await matchesExpectedOnboardingPurchaseAccount(req, userId)) {
+        return res.status(409).json({ message: 'The account changed during purchase. Sign back in to the original account and restore.' });
+      }
       const { purchaseToken, productId: clientProductId } = req.body as {
         purchaseToken?: string;
         productId?: string;
@@ -5945,6 +5961,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: 'Native purchases are unavailable in Demo.' });
     }
     try {
+      if (!await matchesExpectedOnboardingPurchaseAccount(req, req.user.claims.sub)) {
+        return res.status(409).json({ message: 'The account changed during restore. Sign back in to the original account.' });
+      }
       const { getRevenueCatGoogleOrderIds } = await import('./revenueCatApi');
       // The client cannot select which customer the server looks up. Native
       // logIn/restore must first attach the Play receipt to this signed-in

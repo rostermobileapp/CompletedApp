@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
-import { isNativelyPurchasesApp } from '@/lib/nativePurchases';
-import { PermissionProvider } from '@/context/SubscriptionContext';
-import { NativeFirstSignInPaywall } from '@/components/NativeFirstSignInPaywall';
+import { OnboardingSubscriptionOffer } from '@/components/onboarding/OnboardingSubscriptionOffer';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ArrowLeft, BarChart2, Bell, Calendar, Check, DollarSign, MessageSquare, Star, Trophy, Users, Zap } from 'lucide-react';
@@ -151,7 +149,7 @@ export default function OnboardingQuestionnaire() {
   const [screen, setScreen] = useState<Screen>(() => {
     if (previewScreen) return previewScreen;
     try {
-      if (isAuthenticated && sessionStorage.getItem(PENDING_PAYWALL_KEY) === '1') return 'paywall';
+      if (sessionStorage.getItem(PENDING_PAYWALL_KEY) === '1') return 'paywall';
     } catch {}
     return 'welcome';
   });
@@ -169,8 +167,6 @@ export default function OnboardingQuestionnaire() {
     retry: false,
   });
   const [processingDone, setProcessingDone] = useState(false);
-  const [paywallOutcome, setPaywallOutcome] = useState<'waiting' | 'disabled' | 'unavailable' | 'presented' | 'link-error' | 'error'>('waiting');
-  const [paywallAttempt, setPaywallAttempt] = useState(0);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStep = SCREEN_ORDER.indexOf(screen) + 1;
@@ -238,7 +234,9 @@ export default function OnboardingQuestionnaire() {
   const selectedPains = rolePainPoints.filter(p => state.pains.includes(p.value));
 
   return (
-    <div className="min-h-screen bg-white flex flex-col max-w-lg mx-auto">
+    <div className={screen === 'paywall'
+      ? 'min-h-screen bg-black flex flex-col'
+      : 'min-h-screen bg-white flex flex-col max-w-lg mx-auto'}>
       {isPreviewMode && (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-b border-amber-200 text-amber-950">
           <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap">Dev preview</span>
@@ -255,7 +253,7 @@ export default function OnboardingQuestionnaire() {
         </div>
       )}
       {/* Header with progress */}
-      {screen !== 'welcome' && (
+      {screen !== 'welcome' && screen !== 'paywall' && (
         <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-gray-100">
           <div className="flex items-center gap-3 mb-3">
             <button
@@ -272,7 +270,7 @@ export default function OnboardingQuestionnaire() {
           </div>
         </div>
       )}
-      <div className="flex-1 px-5 pb-8">
+      <div className={screen === 'paywall' ? 'flex-1 min-h-0' : 'flex-1 px-5 pb-8'}>
 
         {/* ── WELCOME ─────────────────────────────────── */}
         {screen === 'welcome' && (
@@ -711,92 +709,22 @@ export default function OnboardingQuestionnaire() {
 
         {/* ── SUBSCRIPTION OFFER ───────────────────────── */}
         {screen === 'paywall' && (
-          <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
-            {isPreviewMode ? (
-              <p className="max-w-sm text-sm text-gray-500">
-                This is the handoff to your published RevenueCat paywall. The paywall is rendered by the native app, not this browser preview; its design cannot be previewed here.
-              </p>
-            ) : !isAuthenticated ? (
-              <>
-                <p className="mb-6 max-w-sm text-gray-600">Sign in to open your subscription options.</p>
-                <button
-                  type="button"
-                  onClick={signInForPaywall}
-                  className="w-full max-w-sm rounded-2xl bg-[#3c82f4] px-6 py-4 text-lg font-bold text-white"
-                >
-                  Sign in to continue
-                </button>
-              </>
-            ) : (
-              <>
-                {isNativelyPurchasesApp() ? (
-                  <>
-                    <PermissionProvider>
-                      <NativeFirstSignInPaywall key={paywallAttempt} onOutcome={setPaywallOutcome} />
-                    </PermissionProvider>
-                    {paywallOutcome === 'waiting' ? (
-                      <p role="status" className="text-sm text-gray-500">Opening your RevenueCat subscription offer…</p>
-                    ) : (
-                      <>
-                        {paywallOutcome === 'disabled' && (
-                          <p role="alert" className="mb-6 max-w-sm text-sm text-gray-600">
-                            The subscription offer is not enabled for this account yet. No paywall was opened.
-                          </p>
-                        )}
-                        {paywallOutcome === 'unavailable' && (
-                          <p role="status" className="mb-6 max-w-sm text-sm text-gray-600">
-                            The subscription offer is unavailable for this account. No paywall was opened.
-                          </p>
-                        )}
-                        {paywallOutcome === 'error' && (
-                          <p className="mb-6 max-w-sm text-sm text-gray-600">
-                            The subscription offer could not be confirmed. If you completed a purchase or restore, access will unlock after verification.
-                          </p>
-                        )}
-                        {paywallOutcome === 'link-error' && (
-                          <p role="alert" className="mb-6 max-w-sm text-sm text-gray-600">
-                            The purchase account could not be linked. No paywall opened and no purchase started. You can try again.
-                          </p>
-                        )}
-                        {(paywallOutcome === 'disabled' || paywallOutcome === 'unavailable' || paywallOutcome === 'link-error') && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPaywallOutcome('waiting');
-                              setPaywallAttempt(attempt => attempt + 1);
-                            }}
-                            className="mb-3 w-full max-w-sm rounded-2xl bg-[#3c82f4] px-6 py-4 font-semibold text-white"
-                          >
-                            Check again
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={continueFromPaywall}
-                          className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
-                        >
-                          {paywallOutcome === 'presented' ? 'Continue to Roster' : 'Continue without subscription'}
-                        </button>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="mb-6 max-w-sm text-sm text-gray-500">
-                      Your published RevenueCat paywall is available in the Roster mobile app.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={continueFromPaywall}
-                      className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
-                    >
-                      Continue to Roster
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+          isPreviewMode || isAuthenticated ? (
+            <OnboardingSubscriptionOffer
+              accountId={isPreviewMode ? undefined : userData?.id}
+              preview={isPreviewMode}
+              onFinished={continueFromPaywall}
+              onBack={goBack}
+            />
+          ) : (
+            <div className="flex min-h-screen flex-col items-center justify-center bg-black px-6 text-center text-white">
+              <p className="mb-6">Sign in to see your subscription options.</p>
+              <button type="button" onClick={signInForPaywall}
+                className="w-full max-w-sm rounded-full bg-[#3e83f6] px-6 py-4 font-bold text-white">
+                Sign in to continue
+              </button>
+            </div>
+          )
         )}
 
       </div>

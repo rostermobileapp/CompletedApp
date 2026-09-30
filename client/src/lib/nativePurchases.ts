@@ -193,6 +193,61 @@ export async function getNativePurchaseCustomerId(): Promise<string> {
 }
 
 /**
+ * customerId() may report RevenueCat's original anonymous identity, so it
+ * cannot authorize a purchase. Only an explicit native bridge method backed
+ * by the SDK's current appUserID is accepted. Older builds fail closed.
+ */
+async function readCurrentNativePurchaseIdentity(): Promise<{ appUserID: string; hasPurchaseHistory?: boolean }> {
+  if (!isNativelyPurchasesApp()) {
+    throw new Error('Purchases are available only in the Roster mobile app.');
+  }
+  const bridge = np as NativelyPurchases & {
+    currentAppUserId?: (callback: (result: unknown) => void) => void;
+  };
+  if (typeof bridge.currentAppUserId !== 'function') {
+    throw new Error('This app version cannot verify the current store account. Paid checkout is unavailable; you can continue for free.');
+  }
+  const result = await toPromise<any>((callback) => bridge.currentAppUserId!(callback), 8000);
+  if (result?.status !== 'SUCCESS' || typeof result.appUserID !== 'string' ||
+      !result.appUserID.trim()) {
+    throw new Error('The current store account could not be verified. No purchase was started.');
+  }
+  return {
+    appUserID: result.appUserID,
+    hasPurchaseHistory: typeof result.hasPurchaseHistory === 'boolean'
+      ? result.hasPurchaseHistory : undefined,
+  };
+}
+
+export async function getCurrentNativePurchaseAppUserId(): Promise<string> {
+  return (await readCurrentNativePurchaseIdentity()).appUserID;
+}
+
+/** Retry login only when the native SDK confirms there is no anonymous purchase history. */
+export async function ensureCurrentNativePurchaseAccount(expectedId: string): Promise<void> {
+  if (!SERVER_REVENUECAT_ID.test(expectedId)) {
+    throw new Error('The signed-in purchase account is unavailable.');
+  }
+  const observed = await readCurrentNativePurchaseIdentity();
+  if (observed.appUserID === expectedId) return;
+  // Switching directly from another known account can transfer its purchases.
+  if (!observed.appUserID.startsWith('$RCAnonymousID:')) {
+    throw new Error('A different purchase account is active on this device. No purchase was started.');
+  }
+  if (observed.hasPurchaseHistory !== false) {
+    throw new Error('This device may have purchases under an anonymous account. No account switch or purchase was started; restore under the original account.');
+  }
+  const response = await toPromise<any>((callback) => np.login(expectedId, undefined, callback));
+  if (response?.status !== 'SUCCESS') {
+    throw new Error('The store account could not be linked. No purchase was started.');
+  }
+  const current = await getCurrentNativePurchaseAppUserId();
+  if (current !== expectedId) {
+    throw new Error('The store did not confirm the signed-in account. No purchase was started.');
+  }
+}
+
+/**
  * Present the configured current/default RevenueCat offering through
  * Natively. Older Natively builds may never invoke this callback, so resolve
  * with an unconfirmed timeout outcome rather than holding a claim indefinitely.
@@ -271,6 +326,8 @@ export async function isAndroidBillingSupported(waitMs = 5000): Promise<boolean>
 export interface NativelyProductPrice {
   identifier: string;
   priceString: string;
+  amount?: number;
+  currencyCode?: string;
 }
 
 export function canPurchaseAndroidProduct(
@@ -313,6 +370,14 @@ function formatPrice(data: any, requireCurrency = false): string {
   return requireCurrency ? '' : `$${amount.toFixed(2)}`;
 }
 
+function numericStorePrice(data: any): Pick<NativelyProductPrice, 'amount' | 'currencyCode'> {
+  const amount = Number(data?.price);
+  const currencyCode = data?.currencyCode ?? data?.currency ?? data?.priceCurrencyCode;
+  if (!Number.isFinite(amount) || amount <= 0 ||
+      typeof currencyCode !== 'string' || !/^[A-Z]{3}$/i.test(currencyCode)) return {};
+  return { amount, currencyCode: currencyCode.toUpperCase() };
+}
+
 /**
  * Fetch the localised App Store price for each subscription product.
  * Called sequentially — each call gets its own NativelyPurchases instance
@@ -335,7 +400,7 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
       const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
       const priceString = formatPrice(data);
       if (priceString) {
-        results.push({ identifier: id, priceString });
+        results.push({ identifier: id, priceString, ...numericStorePrice(data) });
       }
     } catch (err: any) {
       console.warn(`[IAP] packagePrice(${id}) failed:`, err?.message ?? err);
@@ -375,7 +440,7 @@ export async function getAndroidProducts(
       }
       const priceString = formatPrice(data, true);
       if (priceString) {
-        const product = { identifier: id, priceString };
+        const product = { identifier: id, priceString, ...numericStorePrice(data) };
         onProduct?.(product);
         return product;
       } else {

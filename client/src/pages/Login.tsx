@@ -24,6 +24,15 @@ export default function Login() {
   const [emailTaken, setEmailTaken] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const afterSignIn = () => {
+    try {
+      if (sessionStorage.getItem('roster:pending-onboarding-paywall') === '1') {
+        setLocation('/get-started');
+        return;
+      }
+    } catch {}
+    setLocation('/app');
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -66,7 +75,7 @@ export default function Login() {
             title: 'Welcome!',
             description: 'Your account has been created.',
           });
-          setLocation('/app');
+          afterSignIn();
         } else {
           console.log('[Signup] No user or session returned');
           toast({
@@ -87,7 +96,7 @@ export default function Login() {
           title: 'Welcome back!',
           description: 'You have successfully signed in.',
         });
-        setLocation('/app');
+        afterSignIn();
       }
     } catch (error: unknown) {
       toast({
@@ -116,7 +125,7 @@ export default function Login() {
       title: 'Welcome!',
       description: 'Your account is now active. You are signed in.',
     });
-    setLocation('/app');
+    afterSignIn();
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
