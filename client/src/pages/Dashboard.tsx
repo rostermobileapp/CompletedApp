@@ -1246,7 +1246,7 @@ export default function Dashboard() {
 function DashboardMobile() {
   const { user: supabaseUser } = useAuth();
   const tier = (supabaseUser as any)?.role || 'free_tier';
-  const { canAccessPremiumFeatures, hasStatManagerAccess } = usePermissions();
+  const { user: currentUser, canAccessPremiumFeatures, hasStatManagerAccess } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { theme } = useTheme();
@@ -1316,6 +1316,7 @@ function DashboardMobile() {
 
   // Standings modal state
   const [showStandingsModal, setShowStandingsModal] = useState(false);
+  const [showStatsChoice, setShowStatsChoice] = useState(false);
   
   // Needs Attention modal state
   const [showNeedsAttentionModal, setShowNeedsAttentionModal] = useState(false);
@@ -2921,16 +2922,17 @@ function DashboardMobile() {
             </div>
 
             {/* Stats Card */}
-            <div 
-              className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
+            <button
+              type="button"
+              className="w-full text-left rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               data-testid="card-stats"
-              onClick={() => openOverlay('/stats', <StatsPage />)}
+              onClick={() => setShowStatsChoice(true)}
             >
               <div className="h-full flex flex-col items-center justify-center">
                 <BarChart3 className="w-8 h-8 text-blue-500 mb-[10px]" />
                 <p className="text-xs font-medium">Stats</p>
               </div>
-            </div>
+            </button>
 
             {/* Standings Card */}
             <div 
@@ -3909,6 +3911,49 @@ function DashboardMobile() {
             underneath the lifted icon. */}
         <div className="h-72 md:hidden" aria-hidden="true" />
       </div>
+      <Dialog open={showStatsChoice} onOpenChange={setShowStatsChoice}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-sm" data-testid="dialog-stats-choice">
+          <DialogHeader>
+            <DialogTitle>View Stats</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 justify-start gap-3 text-base"
+              disabled={!currentUser?.id}
+              data-testid="button-personal-stats"
+              onClick={() => {
+                if (!currentUser?.id) return;
+                const params = new URLSearchParams();
+                if (effectiveLeagueId) {
+                  params.set('leagueId', effectiveLeagueId);
+                  if (prefetchSeasonId) params.set('seasonId', prefetchSeasonId);
+                }
+                setShowStatsChoice(false);
+                setPageTransitionDirection('up');
+                navigate(`/player-stats/${encodeURIComponent(currentUser.id)}${params.size ? `?${params}` : ''}`);
+              }}
+            >
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Personal Stats
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 justify-start gap-3 text-base"
+              data-testid="button-league-stats"
+              onClick={() => {
+                setShowStatsChoice(false);
+                openOverlay('/stats', <StatsPage />);
+              }}
+            >
+              <BarChart3 className="h-5 w-5 text-primary" />
+              League Stats
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Score Submission Modal */}
       <Dialog open={showScoreModal} onOpenChange={setShowScoreModal}>
         <DialogContent className="sm:max-w-md">
