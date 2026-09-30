@@ -103,7 +103,14 @@ app.use((req, res, next) => {
   await reconcileDisallowedNativeSandboxRoles();
 
   const server = await registerRoutes(app);
-  await reconcileApplePurchaseLinks();
+  if (app.get("env") === "development") {
+    // Slow or disconnected Apple links must not keep the local preview
+    // offline. Production still reconciles before accepting requests.
+    void reconcileApplePurchaseLinks().catch((error) =>
+      console.error("[Apple link] Startup reconciliation failed:", error));
+  } else {
+    await reconcileApplePurchaseLinks();
+  }
   startApplePurchaseLinkJob();
   startRevenueCatEntitlementExpiryJob();
   startRevenueCatWebhookInboxWorker();
