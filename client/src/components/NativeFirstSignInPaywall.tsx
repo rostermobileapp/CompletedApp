@@ -40,7 +40,7 @@ const attemptedNativePaywallAccounts = new Set<string>();
 export function NativeFirstSignInPaywall({
   onOutcome,
 }: {
-  onOutcome?: (outcome: 'unavailable' | 'presented' | 'error') => void;
+  onOutcome?: (outcome: 'disabled' | 'unavailable' | 'presented' | 'error') => void;
 } = {}) {
   const { user, isAuthenticated } = useAuth();
   const { isActive: isDemoActive } = useDemo();
@@ -140,7 +140,7 @@ export function NativeFirstSignInPaywall({
         const status = await statusResponse.json() as NativePaywallStatus;
         if (!isStillEligible()) return;
         if (!canPresentNativePaywall(status)) {
-          if (active) outcomeCallback.current?.('unavailable');
+          if (active) outcomeCallback.current?.(status.enabled === false ? 'disabled' : 'unavailable');
           return;
         }
 

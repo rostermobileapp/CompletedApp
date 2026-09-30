@@ -169,7 +169,8 @@ export default function OnboardingQuestionnaire() {
     retry: false,
   });
   const [processingDone, setProcessingDone] = useState(false);
-  const [paywallOutcome, setPaywallOutcome] = useState<'waiting' | 'unavailable' | 'presented' | 'error'>('waiting');
+  const [paywallOutcome, setPaywallOutcome] = useState<'waiting' | 'disabled' | 'unavailable' | 'presented' | 'error'>('waiting');
+  const [paywallAttempt, setPaywallAttempt] = useState(0);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStep = SCREEN_ORDER.indexOf(screen) + 1;
@@ -731,23 +732,45 @@ export default function OnboardingQuestionnaire() {
                 {isNativelyPurchasesApp() ? (
                   <>
                     <PermissionProvider>
-                      <NativeFirstSignInPaywall onOutcome={setPaywallOutcome} />
+                      <NativeFirstSignInPaywall key={paywallAttempt} onOutcome={setPaywallOutcome} />
                     </PermissionProvider>
                     {paywallOutcome === 'waiting' ? (
                       <p role="status" className="text-sm text-gray-500">Opening your RevenueCat subscription offer…</p>
                     ) : (
                       <>
+                        {paywallOutcome === 'disabled' && (
+                          <p role="alert" className="mb-6 max-w-sm text-sm text-gray-600">
+                            The subscription offer is not enabled for this account yet. No paywall was opened.
+                          </p>
+                        )}
+                        {paywallOutcome === 'unavailable' && (
+                          <p role="status" className="mb-6 max-w-sm text-sm text-gray-600">
+                            The subscription offer is unavailable for this account. No paywall was opened.
+                          </p>
+                        )}
                         {paywallOutcome === 'error' && (
                           <p className="mb-6 max-w-sm text-sm text-gray-600">
                             The subscription offer could not be confirmed. If you completed a purchase or restore, access will unlock after verification.
                           </p>
+                        )}
+                        {(paywallOutcome === 'disabled' || paywallOutcome === 'unavailable') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaywallOutcome('waiting');
+                              setPaywallAttempt(attempt => attempt + 1);
+                            }}
+                            className="mb-3 w-full max-w-sm rounded-2xl bg-[#3c82f4] px-6 py-4 font-semibold text-white"
+                          >
+                            Check again
+                          </button>
                         )}
                         <button
                           type="button"
                           onClick={continueFromPaywall}
                           className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
                         >
-                          Continue to Roster
+                          {paywallOutcome === 'presented' ? 'Continue to Roster' : 'Continue without subscription'}
                         </button>
                       </>
                     )}
