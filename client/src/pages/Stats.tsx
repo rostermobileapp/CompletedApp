@@ -790,6 +790,7 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'skater' ? stat.points || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
                   membershipMap={membershipMap}
                   teamMap={teamMap}
                   onClick={() => handleStatClick('points')}

@@ -3941,7 +3941,7 @@ function DashboardMobile() {
             <Button
               type="button"
               variant="outline"
-              className="h-14 justify-start gap-3 text-base"
+              className="h-14 justify-start gap-3 text-base bg-[#e2e2e2] dark:bg-[#212121] hover:bg-[#d6d6d6] dark:hover:bg-[#303030]"
               data-testid="button-league-stats"
               onClick={() => {
                 setShowStatsChoice(false);
