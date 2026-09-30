@@ -80,6 +80,13 @@ export interface NativelyPaywallResult {
 
 const SERVER_REVENUECAT_ID = /^roster_[a-f0-9]{64}$/;
 
+function nativeCustomerIdKind(id: unknown): string {
+  if (typeof id !== 'string' || !id) return 'missing';
+  if (id.startsWith('$RCAnonymousID:')) return 'anonymous';
+  if (SERVER_REVENUECAT_ID.test(id)) return 'another Roster account';
+  return 'unrecognized';
+}
+
 /**
  * Identify RevenueCat with the authenticated account's opaque ID from the
  * server, then verify the bridge reports that exact identity before billing.
@@ -94,13 +101,24 @@ export async function loginNativePurchaseAccount(loginId: string): Promise<void>
     throw new Error(loginResult?.error || 'Could not link the native purchase account.');
   }
 
-  const customerResult = await toPromise<any>((cb) => np.customerId(cb));
-  if (customerResult?.status === 'FAILED') {
-    throw new Error(customerResult.error || 'Could not verify the native purchase account.');
+  let observedCustomerId: unknown;
+  // Some native builds deliver the login callback before customerId reflects
+  // the switch. Never bill using the callback alone: require the read-back
+  // identity to match exactly, but allow a few seconds for it to settle.
+  for (const delayMs of [0, 500, 1500, 3000]) {
+    if (delayMs) await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+    const customerResult = await toPromise<any>((cb) => np.customerId(cb));
+    if (customerResult?.status === 'FAILED') {
+      throw new Error(customerResult.error || 'Could not verify the native purchase account.');
+    }
+    observedCustomerId = customerResult?.customerId;
+    if (observedCustomerId === loginId) return;
   }
-  if (customerResult?.customerId !== loginId) {
-    throw new Error('The native app did not confirm the signed-in purchase account.');
-  }
+  throw new Error(
+    `The native app did not confirm the signed-in purchase account ` +
+    `(login reported ${nativeCustomerIdKind(loginResult.customerId)}; ` +
+    `read-back ${nativeCustomerIdKind(observedCustomerId)}).`,
+  );
 }
 
 /** Read the RevenueCat customer identity on either supported native platform. */
