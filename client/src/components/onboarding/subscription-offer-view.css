@@ -139,12 +139,7 @@
   box-shadow: 0 3px 11px rgb(62 131 246 / 22%);
 }
 
-.subscription-offer__commissioner-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.subscription-offer__tier-note {
   margin: -13px 0 19px;
   text-align: center;
 }
@@ -155,16 +150,17 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .025em;
-  text-transform: uppercase;
 }
 
 .subscription-offer__popular {
-  color: #8eb8ff;
+  color: #f4f6fb;
+  font-size: 13px;
 }
 
 .subscription-offer__league-note {
   color: var(--offer-muted);
   font-size: 11px;
+  text-transform: uppercase;
 }
 
 .subscription-offer__features {
@@ -425,11 +421,7 @@
 }
 
 .subscription-offer.is-light .subscription-offer__popular {
-  color: #2868c5;
-}
-
-.subscription-offer.is-light .subscription-offer__commissioner-note .subscription-offer__popular {
-  color: #2868c5;
+  color: #304056;
 }
 
 .subscription-offer.is-light .subscription-offer__footer {

@@ -147,11 +147,15 @@ export default function SubscriptionOfferView({
               ))}
             </div>
 
+            {tier === 'player_pro' && (
+              <p className="subscription-offer__tier-note subscription-offer__popular">
+                *most popular tier*
+              </p>
+            )}
             {tier === 'commissioner' && (
-              <div className="subscription-offer__commissioner-note">
-                <span className="subscription-offer__popular">Most popular tier</span>
-                <span className="subscription-offer__league-note">Only 1 needed per league</span>
-              </div>
+              <p className="subscription-offer__tier-note subscription-offer__league-note">
+                Only 1 needed per league
+              </p>
             )}
 
             <ul className="subscription-offer__features" aria-label={`${title} features`}>
