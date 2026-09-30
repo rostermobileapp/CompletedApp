@@ -33,7 +33,7 @@ type CurrentState = {
 const attemptedNativePaywallAccounts = new Set<string>();
 
 /**
- * Starts the server-authorized native offering only after Home has rendered.
+ * Starts the server-authorized native offering after the onboarding paywall step renders.
  * This component intentionally renders no UI; all purchase UI belongs to the
  * RevenueCat offering presented by Natively.
  */
@@ -217,7 +217,7 @@ export function NativeFirstSignInPaywall() {
       }
     };
 
-    // The two animation frames ensure Home committed and had a chance to paint
+    // The two animation frames ensure the onboarding step had a chance to paint
     // before the two-second delay begins.
     firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
@@ -236,7 +236,7 @@ export function NativeFirstSignInPaywall() {
       window.cancelAnimationFrame(secondFrame);
       window.clearTimeout(timer);
       // Failures and native "not_presented" outcomes can retry on a later
-      // Home visit; confirmed presentations remain guarded for this session.
+      // onboarding visit; confirmed presentations remain guarded for this session.
       if (flowStarted && !presentationConfirmed && !callbackTimedOut) {
         attemptedNativePaywallAccounts.delete(accountId);
       }

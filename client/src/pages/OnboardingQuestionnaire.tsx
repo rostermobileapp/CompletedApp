@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
+import { isNativelyPurchasesApp } from '@/lib/nativePurchases';
+import { PermissionProvider } from '@/context/SubscriptionContext';
+import { NativeFirstSignInPaywall } from '@/components/NativeFirstSignInPaywall';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ArrowLeft, BarChart2, Bell, Calendar, Check, DollarSign, MessageSquare, Star, Trophy, Users, Zap } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
+const PENDING_PAYWALL_KEY = 'roster:pending-onboarding-paywall';
 
 type OnboardingRole =
   | 'player'
@@ -24,7 +28,8 @@ type Screen =
   | 'join_play_features'
   | 'solution'
   | 'preferences'
-  | 'processing';
+  | 'processing'
+  | 'paywall';
 
 const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
   { value: 'welcome', label: 'Welcome' },
@@ -35,6 +40,7 @@ const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
   { value: 'join_play_features', label: 'Join-play features' },
   { value: 'preferences', label: 'Preferences' },
   { value: 'processing', label: 'Processing' },
+  { value: 'paywall', label: 'Subscription offer' },
 ];
 
 interface QuestionnaireState {
@@ -117,6 +123,7 @@ const SCREEN_ORDER: Screen[] = [
   'join_play_features',
   'preferences',
   'processing',
+  'paywall',
 ];
 
 const PREVIEW_SAMPLE_PAINS = ROLE_PAIN_POINTS.player.slice(0, 3).map((pain) => pain.value);
@@ -141,7 +148,13 @@ export default function OnboardingQuestionnaire() {
     ? previewParam as Screen
     : null;
   const isPreviewMode = import.meta.env.DEV && previewParam !== null;
-  const [screen, setScreen] = useState<Screen>(previewScreen || 'welcome');
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (previewScreen) return previewScreen;
+    try {
+      if (isAuthenticated && sessionStorage.getItem(PENDING_PAYWALL_KEY) === '1') return 'paywall';
+    } catch {}
+    return 'welcome';
+  });
   const [state, setState] = useState<QuestionnaireState>({
     role: previewScreen ? 'player' : '',
     pains: previewScreen ? PREVIEW_SAMPLE_PAINS : [],
@@ -166,14 +179,27 @@ export default function OnboardingQuestionnaire() {
       processingTimerRef.current = setTimeout(() => {
         setProcessingDone(true);
         processingTimerRef.current = setTimeout(() => {
-          if (!isPreviewMode) navigate(isAuthenticated ? '/' : '/login');
+          if (!isPreviewMode) {
+            setScreen('paywall');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }, 400);
       }, 2200);
     }
     return () => {
       if (processingTimerRef.current) clearTimeout(processingTimerRef.current);
     };
-  }, [screen, isAuthenticated, isPreviewMode, navigate]);
+  }, [screen, isPreviewMode]);
+
+  const continueFromPaywall = () => {
+    try { sessionStorage.removeItem(PENDING_PAYWALL_KEY); } catch {}
+    navigate('/');
+  };
+
+  const signInForPaywall = () => {
+    try { sessionStorage.setItem(PENDING_PAYWALL_KEY, '1'); } catch {}
+    navigate('/login');
+  };
 
   function goTo(s: Screen) {
     setScreen(s);
@@ -501,7 +527,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('join_play_features')}
+              onClick={() => goTo('preferences')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Looks good — let's go →
@@ -546,7 +572,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('preferences')}
+              onClick={() => goTo('join_play_features')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Set up my experience →
@@ -678,6 +704,49 @@ export default function OnboardingQuestionnaire() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── SUBSCRIPTION OFFER ───────────────────────── */}
+        {screen === 'paywall' && (
+          <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
+            <img src={rosterLightLogo} alt="Roster" className="mb-8 h-12 object-contain" />
+            <h2 className="mb-3 text-3xl font-black text-gray-900">Your Roster is ready</h2>
+            <p className="mb-8 max-w-sm text-gray-500">
+              Explore the subscription options, or keep using Roster for free.
+            </p>
+            {isPreviewMode ? (
+              <div className="mb-8 w-full max-w-sm rounded-2xl border border-blue-200 bg-blue-50 p-5 text-left">
+                <p className="font-bold text-[#3c82f4]">RevenueCat paywall opens here</p>
+                <p className="mt-2 text-sm text-gray-600">
+                  This preview does not open a store or charge an account. In the native app, the subscription offer appears after your account is ready.
+                </p>
+              </div>
+            ) : !isAuthenticated ? (
+              <button
+                type="button"
+                onClick={signInForPaywall}
+                className="w-full max-w-sm rounded-2xl bg-[#3c82f4] px-6 py-4 text-lg font-bold text-white"
+              >
+                Sign in to view subscription options
+              </button>
+            ) : (
+              <>
+                <PermissionProvider><NativeFirstSignInPaywall /></PermissionProvider>
+                {!isNativelyPurchasesApp() && (
+                  <p className="mb-6 max-w-sm text-sm text-gray-500">
+                    The RevenueCat subscription offer is available in the Roster mobile app.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={continueFromPaywall}
+                  className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
+                >
+                  Continue to Roster
+                </button>
+              </>
+            )}
           </div>
         )}
 

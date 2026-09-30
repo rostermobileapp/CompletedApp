@@ -51,7 +51,6 @@ import StatsPage from '@/pages/Stats';
 import { HomeDesktop } from '@/components/home-desktop/HomeDesktop';
 import { AddEventDialog } from '@/components/dashboard/AddEventDialog';
 import { TournamentCountdown } from '@/components/TournamentCountdown';
-import { NativeFirstSignInPaywall } from '@/components/NativeFirstSignInPaywall';
 
 // Icon mapper for duty icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -1227,7 +1226,6 @@ export default function Dashboard() {
   if (isDesktopWeb) {
     return (
       <>
-        <NativeFirstSignInPaywall />
         <DemoBanner />
         <HomeDesktop onAddEvent={() => setShowAddEventDialog(true)} />
         <AddEventDialog
@@ -1240,7 +1238,6 @@ export default function Dashboard() {
 
   return (
     <>
-      <NativeFirstSignInPaywall />
       <DemoBanner />
       <DashboardMobile />
     </>

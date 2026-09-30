@@ -35,3 +35,17 @@ mtime_ms = 1790732711760
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/fbd957b7-885b-47d6-802b-af05b6201c77/6ad264f8-5292-42ad-9e23-246d2348428a"
 storage_version_token = "1790732726320131"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "qmNIqI9OIYLvfbp86PRYi"
+uri = "file://screenshots/onboarding-step-9-preview.jpg"
+type = "image"
+title = "New onboarding step 9"
+description = "Development preview of the new RevenueCat offer position, after Building your Roster. Native purchase UI only opens in the authenticated mobile app."
+logical_id = "794cc5f5-d3d2-4679-a644-e1ca5212a9e6"
+content_hash = "sha256:9293521cb79d16217a81e4bc6b9ad95b84f8e92404e3c2bd7877220233d1bd2d"
+size = 33612
+mtime_ms = 1790736678907
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:39867995-7b19-456e-8c3d-5a178c8dbc31/794cc5f5-d3d2-4679-a644-e1ca5212a9e6/51deb3e5-b9b6-4301-a3ac-508e205a59e1"
+storage_version_token = "1790736849903401"
+content_type = "image/jpeg"
