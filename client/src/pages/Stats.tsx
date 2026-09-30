@@ -28,13 +28,6 @@ type StarLeaderboardEntry = {
   thirdStars: number;
 };
 
-type PatchLeader = {
-  userId: string;
-  user: Pick<SkaterStats['user'], 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
-  patchesEarned: number;
-};
-type PatchStat = SkaterStats & { patchesEarned: number };
-
 export default function Stats() {
   const { user } = useAuth();
   const { canAccessPremiumFeatures, canEditStats } = usePermissions();
@@ -86,7 +79,7 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
   const [viewMode, setViewMode] = useState<'summary' | 'table' | 'stars'>('summary');
-  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'patchesEarned' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
+  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
   const [actionSheetPlayer, setActionSheetPlayer] = useState<{
     userId: string;
     firstName: string;
@@ -235,28 +228,6 @@ export default function Stats() {
   // Ensure playerStats is an array
   const statsArray = Array.isArray(playerStats) ? playerStats : [];
 
-  // Match the selected season while keeping viewer filtering on the server.
-  const { data: patchLeaders, isLoading: patchesLoading, isError: patchesError } = useQuery<PatchLeader[]>({
-    queryKey: ['/api/leagues', leagueId, 'patch-leaderboard', { seasonId: selectedSeason }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (selectedSeason && selectedSeason !== 'all') params.set('seasonId', selectedSeason);
-      const res = await apiRequest('GET', `/api/leagues/${leagueId}/patch-leaderboard${params.size ? `?${params}` : ''}`);
-      return res.json();
-    },
-    enabled: !!leagueId && !isTournamentContext && !!selectedSeason,
-    staleTime: 5 * 60 * 1000,
-  });
-  const patchStats: PatchStat[] = (patchLeaders ?? [])
-    .map(leader => ({
-      type: 'skater' as const,
-      userId: leader.userId,
-      user: leader.user as SkaterStats['user'],
-      gamesPlayed: 0, goals: 0, assists: 0, penaltyMinutes: 0, points: 0,
-      patchesEarned: leader.patchesEarned,
-    }))
-    .sort((a, b) => b.patchesEarned - a.patchesEarned);
-
   // Fetch league memberships to get position and jersey number data (only for leagues)
   const { data: leagueMemberships } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`],
@@ -314,8 +285,7 @@ export default function Stats() {
   });
 
   // Get top players by category
-  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'patchesEarned' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
-    if (category === 'patchesEarned') return patchStats.slice(0, limit);
+  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
     if (activeTab === 'goalies') {
       const goalieStats = filteredStats.filter((stat): stat is GoalieStats => stat.type === 'goalie');
       if (category === 'wins') {
@@ -377,7 +347,6 @@ export default function Stats() {
 
   // Get sorted stats for table view
   const getSortedStatsForTable = () => {
-    if (sortBy === 'patchesEarned' && activeTab === 'skaters' && !isTournamentContext) return patchStats;
     const stats = [...filteredStats];
     
     if (activeTab === 'goalies') {
@@ -535,11 +504,7 @@ export default function Stats() {
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={(value) => {
-            setActiveTab(value as 'skaters' | 'goalies');
-            setViewMode('summary');
-            setSortBy(value === 'goalies' ? 'wins' : 'points');
-          }} className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
             <TabsList className="w-full bg-transparent border-b border-gray-200 dark:border-gray-800 rounded-none h-auto p-0 gap-8 px-4">
               <TabsTrigger 
                 value="skaters" 
@@ -693,7 +658,7 @@ export default function Stats() {
                 </div>
               )}
             </div>
-          ) : isLoading || (activeTab === 'skaters' && !isTournamentContext && patchesLoading) ? (
+          ) : isLoading ? (
             <div className="space-y-6" data-testid="loading-stats">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse">
@@ -702,7 +667,7 @@ export default function Stats() {
                 </div>
               ))}
             </div>
-          ) : filteredStats.length === 0 && (activeTab === 'goalies' || patchStats.length === 0) ? (
+          ) : filteredStats.length === 0 ? (
             <div className="text-center py-12" data-testid="no-stats-state">
               <Trophy className="w-12 h-12 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-600 dark:text-gray-400">No player statistics available</p>
@@ -720,7 +685,7 @@ export default function Stats() {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h2 className="text-xl font-bold text-[#212121] dark:text-white capitalize" data-testid="text-table-title">
-                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy === 'beers' ? 'Beers Drank 🍺' : sortBy === 'patchesEarned' ? 'Patches Earned' : sortBy}
+                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy === 'beers' ? 'Beers Drank 🍺' : sortBy}
                 </h2>
               </div>
               {/* Stats Table */}
@@ -730,9 +695,7 @@ export default function Stats() {
                     <tr>
                       <th className="text-left px-2 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 w-8">#</th>
                       <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
-                      {sortBy === 'patchesEarned' && !isTournamentContext ? (
-                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Patches Earned</th>
-                      ) : activeTab === 'skaters' ? (
+                      {activeTab === 'skaters' ? (
                         <>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">G</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">A</th>
@@ -791,11 +754,7 @@ export default function Stats() {
                               </div>
                             </div>
                           </td>
-                          {sortBy === 'patchesEarned' && !isTournamentContext ? (
-                            <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">
-                              {(stat as PatchStat).patchesEarned}
-                            </td>
-                          ) : activeTab === 'skaters' && stat.type === 'skater' ? (
+                          {activeTab === 'skaters' && stat.type === 'skater' ? (
                             <>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goals || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.assists || 0}</td>
@@ -831,6 +790,8 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'skater' ? stat.points || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('points')}
 
                 />
@@ -843,6 +804,9 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'skater' ? stat.goals || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('goals')}
 
                 />
@@ -855,7 +819,10 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'skater' ? stat.assists || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
                   showMoreIndicator={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('assists')}
 
                 />
@@ -868,6 +835,9 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'skater' ? stat.penaltyMinutes || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('penaltyMinutes')}
 
                 />
@@ -880,23 +850,12 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'skater' ? stat.beers || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('beers')}
 
                 />
-              )}
-              {activeTab !== 'goalies' && !isTournamentContext && (
-                patchesError ? (
-                  <p role="alert" className="text-sm text-red-500">Unable to load Patches Earned.</p>
-                ) : (
-                  <StatSection
-                    title="Patches Earned"
-                    players={getTopPlayers('patchesEarned', 1)}
-                    renderStat={(stat) => (stat as PatchStat).patchesEarned}
-                    formatPlayerName={formatPlayerName}
-                    getInitials={getInitials}
-                    onClick={() => handleStatClick('patchesEarned')}
-                  />
-                )
               )}
               {/* Wins Section (Goalies) */}
               {activeTab === 'goalies' && (
@@ -906,6 +865,9 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'goalie' ? stat.wins || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('wins')}
 
                 />
@@ -918,6 +880,9 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'goalie' ? stat.goalsAgainstAverage?.toFixed(2) || '0.00' : '0.00')}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('goalsAgainstAverage')}
 
                 />
@@ -930,6 +895,9 @@ export default function Stats() {
                   renderStat={(stat) => (stat.type === 'goalie' ? stat.shutouts || 0 : 0)}
                   formatPlayerName={formatPlayerName}
                   getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
                   onClick={() => handleStatClick('shutouts')}
 
                 />
@@ -962,7 +930,10 @@ interface StatSectionProps {
   renderStat: (stat: PlayerStatsUnion) => number | string;
   formatPlayerName: (stat: PlayerStatsUnion) => string;
   getInitials: (firstName?: string | null, lastName?: string | null) => string;
+  showPosition?: boolean;
   showMoreIndicator?: boolean;
+  membershipMap: Map<any, any>;
+  teamMap: Map<any, any>;
   onClick?: () => void;
   onPlayerClick?: (player: PlayerStatsUnion) => void;
 }
@@ -973,7 +944,10 @@ function StatSection({
   renderStat, 
   formatPlayerName, 
   getInitials, 
+  showPosition = false,
   showMoreIndicator = false,
+  membershipMap,
+  teamMap,
   onClick,
   onPlayerClick,
 }: StatSectionProps) {
@@ -987,8 +961,8 @@ function StatSection({
   return (
     <div
       data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
-      className="mt-[8px]">
-      <h2 className="text-[#00A9FF] text-sm font-semibold uppercase tracking-wide mt-[12px] mb-[0px]" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      className="mt-[16px]">
+      <h2 className="text-[#00A9FF] text-sm font-semibold mb-3 uppercase tracking-wide" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
         {title}
       </h2>
       <div
@@ -1033,6 +1007,14 @@ function StatSection({
             <div className="text-[#212121] dark:text-white font-medium" data-testid="text-player-name">
               {isTied ? `${tiedPlayers.length} Tied` : formatPlayerName(players[0])}
             </div>
+            {showPosition && !isTied && (() => {
+              const membership = membershipMap.get(players[0].userId);
+              return (
+                <div className="text-gray-400 text-sm" data-testid="text-player-team">
+                  {teamMap.get(membership?.assignedTeamId) || 'N/A'} • #{membership?.jerseyNumber ?? 'N/A'}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

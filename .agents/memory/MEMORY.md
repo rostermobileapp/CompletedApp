@@ -1,7 +1,6 @@
 - [MP4 faststart for video scrub](mp4-faststart-scrub.md) — any seekable/scrub MP4 must have moov atom at front; use ffmpeg -movflags +faststart or currentTime seeks silently fail.
 - [Raw fetch auth pattern](raw-fetch-auth.md) — raw fetch() to backend must use getAuthHeaders() from queryClient; credentials:'include' does nothing (JWT not cookie).
-- [Database provider](db-provider.md) — Supabase hosts PostgreSQL; the serverless driver's pool needs client-level listeners for checked-out disconnects.
-- [Supabase advisory lock scope](supabase-advisory-lock-scope.md) — session-level locks can remain on idle pooled backends; serialize billing with transaction locks inside BEGIN/COMMIT.
+- [Database provider](db-provider.md) — PostgreSQL is hosted on Supabase, not Neon. DATABASE_URL points to Supabase's connection string.
 - [Placeholder player orphaned teamId](placeholder-orphaned-teamid.md) — placeholder_players can have stale team_id pointing to deleted teams; fix is in getLeaguePlaceholderPlayers to null-out via LEFT JOIN detection.
 - [Draft keeper ID format](draft-keeper-id-format.md) — draft_keepers.placeholder_player_id stores "placeholder:{uuid}" WITH the prefix; draft_picks.placeholder_player_id stores bare UUID (applyPick strips prefix). Never add the prefix again when reading from draft_keepers.
 - [Draft rehydrate vs active-drafts scope](draft-rehydrate-scope.md) — active-drafts endpoint includes "paused" status but rehydrateActiveDraftTimers only queries "active"/"awaiting_captains" — paused drafts are not auto-recovered on server restart.
@@ -58,14 +57,5 @@
 - [Google Play billing readiness](google-play-billing-readiness.md) — native product visibility and server purchase verification are separate prerequisites; test both before enabling payment.
 - [Natively RevenueCat proof gap](natively-revenuecat-proof.md) — purchase/restore callbacks do not supply Apple transaction proof; verify entitlements server-side before granting access.
 - [Google Play order recovery](google-play-order-recovery.md) — orders.get can reveal a token and RevenueCat anonymous owner; a GPA number alone does not establish the Roster account to link.
-- [Google Play sandbox isolation](google-play-sandbox-isolation.md) — RevenueCat webhook filtering cannot protect independent Play verification paths; reject test purchases before role claims.
-- [RevenueCat native identity](revenuecat-native-identity.md) — use one stable opaque account ID across iOS/Android; preserve existing purchasers, never silently rename or auto-alias established subscribers.
-- [RevenueCat paywall previews](revenuecat-paywall-preview.md) — never mock the published native paywall in browser; show a truthful handoff notice instead.
-- [Native paywall test allowlist](native-paywall-test-allowlist.md) — after replacing a tester, retarget the production one-account gate; a new account is not automatically enabled.
-- [RevenueCat webhook URL uniqueness](revenuecat-webhook-url-uniqueness.md) — one project cannot register the same URL twice; use one signed mixed-environment webhook or distinct URLs.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
-- [GitHub push confirmation](github-push-confirmation.md) — a CLI auth failure may precede platform sync; check the remote branch and Railway commit before declaring deployment blocked.
-- [Native frontend deployment timing](native-frontend-deployment-timing.md) — Railway API readiness does not prove the Vercel-served native webview has the new frontend; verify both before device tests.
-- [Account merge safety boundary](account-merge-safety-boundary.md) — cross-account transfers must block unclassified references and provider/authority records; never infer purchase ownership from matching identities.
-- [League merge dialog boundary](league-merge-dialog-boundary.md) — U-account-only dialog validation must stay separate from commissioner replacement of legacy placeholder-backed users.

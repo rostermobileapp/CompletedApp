@@ -207,25 +207,6 @@ export function isSubscriptionEntitled(state: string, expiryTimeMs?: number): bo
 }
 
 /**
- * subscriptionsv2.get only includes testPurchase for Play license-test
- * purchases. Check for the field itself: Google represents it as an empty
- * object, not a boolean.
- */
-export function assertGooglePlayPurchaseAllowed(
-  payload: unknown,
-  nodeEnv: string | undefined = process.env.NODE_ENV,
-): void {
-  if (nodeEnv === 'production' &&
-      payload !== null && typeof payload === 'object' &&
-      Object.prototype.hasOwnProperty.call(payload, 'testPurchase')) {
-    throw Object.assign(
-      new Error('Google Play test purchases cannot grant production access.'),
-      { status: 403 },
-    );
-  }
-}
-
-/**
  * Verify a Google Play subscription purchase token via the v2 endpoint.
  * Throws on network / auth / 4xx errors; returns the normalised payload otherwise.
  */
@@ -243,9 +224,6 @@ export async function verifySubscriptionPurchase(
     );
   }
   const data: any = await resp.json();
-  // All purchase, restore, and order-recovery routes use this verifier. Reject
-  // test purchases here, before any caller can claim a production role.
-  assertGooglePlayPurchaseAllowed(data);
 
   // v2 schema: lineItems[0].productId is the active SKU; expiryTime is RFC3339.
   const lineItem = Array.isArray(data.lineItems) && data.lineItems.length > 0

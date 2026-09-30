@@ -4,11 +4,7 @@ import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
-import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
-import { hasAccountMergeOperatorContext } from "./accountMergeAuthorization";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
-import { achievementPatchCounts } from "./achievementPatchCounts";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
@@ -39,16 +35,11 @@ import {
   requireTournamentScorekeeperOrManagementByMatch,
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
-import { db, pool } from "./db";
-import { gamePenalties, badgeAwards } from "@shared/schema";
+import { db } from "./db";
+import { gamePenalties } from "@shared/schema";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
-import {
-  applyStoredRevenueCatRole,
-  getOrCreateRevenueCatAppUserId,
-  registerNativeRevenueCatRoutes,
-} from "./nativeRevenueCat";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
@@ -122,7 +113,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, createHmac, randomBytes } from 'crypto';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail, sendNewDirectMessageEmail } from "./emails";
@@ -606,50 +597,6 @@ function formatGameForResponse(game: any) {
   return game;
 }
 
-function isAppleTransactionPayload(
-  payload: Record<string, unknown>,
-): payload is Record<string, unknown> & import('./appleIap').AppleTransactionPayload {
-  return typeof payload.bundleId === 'string' &&
-    typeof payload.productId === 'string' &&
-    typeof payload.transactionId === 'string' &&
-    typeof payload.originalTransactionId === 'string' &&
-    typeof payload.purchaseDate === 'number' &&
-    typeof payload.environment === 'string' &&
-    (payload.environment === 'Sandbox' || payload.environment === 'Production') &&
-    typeof payload.type === 'string' &&
-    (payload.appAccountToken === undefined || typeof payload.appAccountToken === 'string') &&
-    (payload.expiresDate === undefined || typeof payload.expiresDate === 'number') &&
-    (payload.revocationDate === undefined || typeof payload.revocationDate === 'number') &&
-    (payload.revocationReason === undefined || typeof payload.revocationReason === 'number') &&
-    (payload.inAppOwnershipType === undefined || typeof payload.inAppOwnershipType === 'string');
-}
-
-function getStripeInvoiceSubscriptionId(invoice: Stripe.Invoice): string | undefined {
-  const legacyReference: unknown = Reflect.get(invoice, 'subscription');
-  const legacyId = getStripeSubscriptionId(legacyReference);
-  if (legacyId) return legacyId;
-
-  const subscriptionReference = invoice.parent?.type === 'subscription_details'
-    ? invoice.parent.subscription_details?.subscription
-    : null;
-  return getStripeSubscriptionId(subscriptionReference);
-}
-
-function getStripeSubscriptionId(reference: unknown): string | undefined {
-  if (typeof reference === 'string') return reference;
-  if (reference && typeof reference === 'object' && 'id' in reference &&
-    typeof reference.id === 'string') {
-    return reference.id;
-  }
-  return undefined;
-}
-
-function getStripeSubscriptionPeriodEnd(subscription: Stripe.Subscription): number | undefined {
-  const legacyPeriodEnd: unknown = Reflect.get(subscription, 'current_period_end');
-  if (typeof legacyPeriodEnd === 'number') return legacyPeriodEnd;
-  return subscription.items.data[0]?.current_period_end;
-}
-
 type CalendarFeedEvent = {
   uid: string;
   title: string;
@@ -1028,11 +975,7 @@ async function getPlayerProMonthlyCents(): Promise<number> {
   const priceId = process.env.STRIPE_PRICE_PLAYER_PRO_MONTHLY;
   if (!priceId) return LEAGUE_PRO_DEFAULT_MONTHLY_CENTS;
   try {
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    if (!stripeSecretKey) return LEAGUE_PRO_DEFAULT_MONTHLY_CENTS;
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
-    });
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
     const price = await stripe.prices.retrieve(priceId);
     if (price.unit_amount && price.unit_amount > 0) return price.unit_amount;
   } catch (err) {
@@ -1202,7 +1145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'no-store');
       const userId = currentUserId(req);
       const viewer = await storage.getUser(userId);
-      if (!viewer || !hasPaidTrophyCaseAccess(viewer)) {
+      if (!hasPaidTrophyCaseAccess(viewer)) {
         return res.status(403).json({
           code: "TROPHY_CASE_PREMIUM_REQUIRED",
           message: "Trophy Case access requires Player Pro or Commissioner access.",
@@ -3399,24 +3342,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
   }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2024-06-20" as Stripe.LatestApiVersion,
+    apiVersion: "2024-06-20",
   });
-  const applyStripeRole = (
-    userId: string,
-    role: 'free_tier' | 'player_pro' | 'commissioner',
-    subscription?: Stripe.Subscription,
-  ) => {
-    const periodEnd = subscription
-      ? getStripeSubscriptionPeriodEnd(subscription)
-      : undefined;
-    return applyStoredRevenueCatRole(userId, {
-      source: 'stripe',
-      role,
-      expiresAt: role === 'free_tier' || periodEnd === undefined
-        ? null
-        : new Date(periodEnd * 1000),
-    });
-  };
 
   // Create checkout session for new subscriptions
   app.post('/api/stripe/create-checkout-session', isAuthenticated, async (req: any, res) => {
@@ -4177,8 +4104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Immediately downgrade role and clear subscription info in our DB
       // (the webhook will also fire and confirm this, but we do it here for instant feedback)
+      await storage.updateUserRole(userId, 'free_tier');
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
-      await applyStripeRole(userId, 'free_tier');
 
       console.log(`[Stripe] Subscription ${user.stripeSubscriptionId} cancelled immediately for user ${userId}`);
 
@@ -4287,7 +4214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: sub.id,
           status: sub.status,
           cancelAtPeriodEnd: sub.cancel_at_period_end,
-          currentPeriodEnd: getStripeSubscriptionPeriodEnd(sub),
+          currentPeriodEnd: sub.current_period_end,
           priceId: sub.items.data[0]?.price?.id,
           productName: sub.items.data[0]?.price?.nickname,
         }));
@@ -4389,26 +4316,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!activeSubscription) {
         // No active subscription - downgrade to free tier
+        await storage.updateUserRole(userId, 'free_tier');
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
-        const effectiveRole = await applyStripeRole(userId, 'free_tier');
         
-        return res.json({
-          message: 'No active subscription found - Stripe access removed',
+        return res.json({ 
+          message: 'No active subscription found - user downgraded to free_tier', 
           previousRole: user.role,
-          newRole: effectiveRole,
+          newRole: 'free_tier',
           subscriptionsFound: subscriptions.data.map(s => ({ id: s.id, status: s.status }))
         });
       }
 
       // Check if subscription should be active
       if (activeSubscription.cancel_at_period_end || activeSubscription.status === 'canceled' || activeSubscription.status === 'unpaid') {
+        await storage.updateUserRole(userId, 'free_tier');
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
-        const effectiveRole = await applyStripeRole(userId, 'free_tier');
         
-        return res.json({
-          message: 'Subscription is cancelled - Stripe access removed',
+        return res.json({ 
+          message: 'Subscription is cancelled - user downgraded to free_tier', 
           previousRole: user.role,
-          newRole: effectiveRole,
+          newRole: 'free_tier',
           subscriptionId: activeSubscription.id,
           reason: activeSubscription.cancel_at_period_end ? 'cancel_at_period_end' : `status=${activeSubscription.status}`
         });
@@ -4429,13 +4356,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update subscription ID and role
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, activeSubscription.id);
-      const effectiveRole = await applyStripeRole(userId, tier, activeSubscription);
+      await storage.updateUserRole(userId, tier);
 
       
       res.json({ 
         message: 'Subscription synced successfully', 
         previousRole: user.role,
-        newRole: effectiveRole,
+        newRole: tier,
         subscriptionId: activeSubscription.id,
         subscriptionStatus: activeSubscription.status
       });
@@ -4473,13 +4400,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if subscription should be downgraded
       if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid') {
+        await storage.updateUserRole(userId, 'free_tier');
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
-        const effectiveRole = await applyStripeRole(userId, 'free_tier');
         
-        return res.json({
-          message: 'Stripe access removed',
+        return res.json({ 
+          message: 'User downgraded to free_tier', 
           previousRole: user.role,
-          newRole: effectiveRole,
+          newRole: 'free_tier',
           reason: subscription.cancel_at_period_end ? 'cancel_at_period_end' : `status=${subscription.status}`
         });
       } else if (subscription.status === 'active' || subscription.status === 'trialing') {
@@ -4487,26 +4414,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const priceId = subscription.items.data[0]?.price?.id;
         const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
         
-        if (tier) {
-          const effectiveRole = await applyStripeRole(userId, tier, subscription);
-          if (tier !== user.role || effectiveRole !== user.role) {
+        if (tier && tier !== user.role) {
+          await storage.updateUserRole(userId, tier);
           
-            return res.json({
-              message: 'User role updated',
-              previousRole: user.role,
-              newRole: effectiveRole
-            });
-          }
+          return res.json({ 
+            message: 'User role updated', 
+            previousRole: user.role,
+            newRole: tier
+          });
+        } else {
           return res.json({ 
             message: 'User role is already correct', 
-            currentRole: effectiveRole,
+            currentRole: user.role,
             subscriptionStatus: subscription.status
           });
         }
-        return res.json({
-          message: 'No configured Stripe role matches this subscription price.',
-          subscriptionStatus: subscription.status,
-        });
       } else {
         return res.json({ 
           message: 'Subscription status not handled', 
@@ -4928,7 +4850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                await applyStripeRole(user.id, tier, subscription);
+                await storage.updateUserRole(user.id, tier);
               } else {
                 console.warn('[Webhook] Unknown price ID:', priceId);
               }
@@ -4955,20 +4877,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // IMMEDIATE ACCESS RESTRICTION: Check if subscription is cancelled or will be cancelled
             // This ensures users lose access immediately upon cancellation, not at period end
             if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
+              await storage.updateUserRole(user.id, 'free_tier');
+              
               // Clear subscription ID when downgrading to free tier
               await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
-              await applyStripeRole(user.id, 'free_tier');
             } else if (subscription.status === 'active' || subscription.status === 'trialing') {
               // Get the price ID to determine tier
               const priceId = subscription.items.data[0]?.price?.id;
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
+                await storage.updateUserRole(user.id, tier);
+                
                 // Update subscription ID if it changed
                 if (user.stripeSubscriptionId !== subscription.id) {
                   await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', subscription.id);
                 }
-                await applyStripeRole(user.id, tier, subscription);
               } else {
                 console.warn('[Webhook] Unknown price ID in subscription:', priceId);
               }
@@ -4981,7 +4905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const invoice = event.data.object as Stripe.Invoice;
           
           // If this invoice has a subscription, update the user's role
-          const subscriptionId = getStripeInvoiceSubscriptionId(invoice);
+          const subscriptionId = (invoice as any).subscription;
           if (subscriptionId) {
             const subscription = await stripe.subscriptions.retrieve(subscriptionId as string);
             const users = await storage.getAllUsers();
@@ -4993,7 +4917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                await applyStripeRole(user.id, tier, subscription);
+                await storage.updateUserRole(user.id, tier);
               } else {
                 console.warn('[Webhook] Unknown price ID in invoice:', priceId);
               }
@@ -5006,7 +4930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const invoice = event.data.object as Stripe.Invoice;
           
           // Find user by subscription ID
-          const subscriptionId = getStripeInvoiceSubscriptionId(invoice);
+          const subscriptionId = invoice.subscription as string;
           if (subscriptionId) {
             const users = await storage.getAllUsers();
             const user = users.find(u => u.stripeSubscriptionId === subscriptionId);
@@ -5014,9 +4938,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (user) {
               
               // Downgrade user to free tier
+              await storage.updateUserRole(user.id, 'free_tier');
+              
               // Clear subscription ID
               await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
-              await applyStripeRole(user.id, 'free_tier');
               
               // Create notification for user
               await storage.createNotification({
@@ -5090,7 +5015,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's subscription info and role
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, subscription.id);
-      const effectiveTier = await applyStripeRole(userId, tier, subscription);
+      // Stripe is only one payment source. A verified, still-active Play or
+      // App Store claim may entitle this account to a higher tier.
+      const { preserveLinkedAppleRole } = await import('./appleClaimRole');
+      const effectiveTier = await preserveLinkedAppleRole(userId, tier);
+      
+      // Keep the explicit enum update used by this sync path, but parameterize
+      // it and write the effective tier instead of blindly writing Stripe's.
+      await db.execute(sql`
+        UPDATE users
+        SET role = CAST(${effectiveTier} AS user_role),
+            last_updated = NOW(),
+            updated_at = NOW()
+        WHERE id = ${userId}
+      `);
       
       // Also sync role to Supabase user metadata for tracking
       try {
@@ -5172,19 +5110,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     jws: string,
     userId: string,
   ): Promise<import('./appleIap').AppleTransactionPayload> => {
-    const { decodeAppleJWSPayload, isAppleIapEnvironmentAllowed } = await import('./appleIap');
+    const { decodeAppleJWSPayload } = await import('./appleIap');
     const { v5: uuidv5 } = await import('uuid');
 
-    const decodedPayload = await decodeAppleJWSPayload(jws);
-    if (!isAppleTransactionPayload(decodedPayload)) {
-      throw new Error('Apple transaction payload is missing required fields');
-    }
-    const tx = decodedPayload;
-    if (!isAppleIapEnvironmentAllowed(tx.environment)) {
-      throw Object.assign(new Error('Sandbox Apple transactions cannot grant production access.'), {
-        status: 403,
-      });
-    }
+    const tx = await decodeAppleJWSPayload(jws) as import('./appleIap').AppleTransactionPayload;
     const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
 
     if (tx.appAccountToken) {
@@ -5220,17 +5149,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const applyIapRole = async (
     userId: string,
     newRole: 'commissioner' | 'player_pro',
-    appleEnvironment: 'Sandbox' | 'Production',
     originalTransactionId?: string,
-    productId?: string,
-    expiresDate?: number,
-  ): Promise<'commissioner' | 'player_pro' | 'secondary_commissioner' | 'free_tier'> => {
-    const { isAppleIapEnvironmentAllowed } = await import('./appleIap');
-    if (!isAppleIapEnvironmentAllowed(appleEnvironment)) {
-      throw Object.assign(new Error('Sandbox Apple transactions cannot grant production access.'), {
-        status: 403,
-      });
-    }
+  ) => {
     const grantedRole = await db.transaction(async (tx) => {
       let linkedOwner: string | undefined;
       if (originalTransactionId) {
@@ -5255,40 +5175,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       const [user] = await tx.select({
-        iapOriginalTransactionId: users.iapOriginalTransactionId,
+        role: users.role, iapOriginalTransactionId: users.iapOriginalTransactionId,
+        stripeSubscriptionId: users.stripeSubscriptionId,
       }).from(users).where(eq(users.id, userId)).for('update');
       if (!user) throw new Error('Roster user not found');
       if (originalTransactionId && user.iapOriginalTransactionId &&
           user.iapOriginalTransactionId !== originalTransactionId && linkedOwner !== userId) {
         throw Object.assign(new Error('Account already has another IAP purchase'), { status: 409 });
       }
-      if (originalTransactionId && productId && Number.isFinite(expiresDate)) {
-        const claim = await tx.execute(sql`
-          INSERT INTO apple_iap_claims
-            (user_id, original_transaction_id, product_id, expires_at, environment, revoked, verified_at)
-          VALUES (${userId}, ${originalTransactionId}, ${productId}, ${new Date(expiresDate!)},
-                  ${appleEnvironment}, FALSE, NOW())
-          ON CONFLICT (original_transaction_id) DO UPDATE
-            SET product_id = EXCLUDED.product_id, expires_at = EXCLUDED.expires_at,
-                environment = EXCLUDED.environment, revoked = FALSE, verified_at = NOW()
-          WHERE apple_iap_claims.user_id = EXCLUDED.user_id
-          RETURNING user_id
-        `);
-        if (!claim.rows.length) {
-          throw Object.assign(new Error('This Apple purchase is linked to another account'), { status: 409 });
-        }
-      }
+      const googleCommissioner = await tx.execute(sql`
+        SELECT 1 FROM google_iap_claims WHERE user_id = ${userId}
+          AND product_id IN ('commissioner_monthly', 'commissioner_yearly')
+          AND expires_at > NOW() LIMIT 1
+      `);
+      const role = user.role === 'commissioner' && newRole === 'player_pro' &&
+        (user.stripeSubscriptionId || googleCommissioner.rows.length)
+        ? 'commissioner' : newRole;
       await tx.update(users).set({
+        role,
         lastUpdated: new Date(),
         updatedAt: new Date(),
         ...(originalTransactionId ? { iapOriginalTransactionId: originalTransactionId } : {}),
       }).where(eq(users.id, userId));
-      return newRole;
+      return role;
     });
-    const effectiveRole = await applyStoredRevenueCatRole(userId, { source: 'store' }) ?? grantedRole;
-    await syncIapRoleMetadata(userId,
-      effectiveRole === 'secondary_commissioner' ? 'commissioner' : effectiveRole);
-    return effectiveRole;
+    await syncIapRoleMetadata(userId, grantedRole);
   };
 
   const verifyLinkedApplePurchase = async (userId: string, originalId: string) => {
@@ -5350,6 +5261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const appleOriginal = linkedApple.rows[0]?.original_transaction_id as string | undefined;
       const [user] = await tx.select({
+        role: users.role, stripeSubscriptionId: users.stripeSubscriptionId,
         iapOriginalTransactionId: users.iapOriginalTransactionId,
       }).from(users).where(eq(users.id, userId)).for('update');
       if (!user) throw new Error('Roster user not found');
@@ -5373,7 +5285,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               AND product_id IN ('player_pro_monthly', 'player_pro_yearly')) AS google_pro
       `);
       const { resolveLinkedPurchaseRole } = await import('./linkedPurchaseRole');
-      const role = resolveLinkedPurchaseRole(newRole, {
+      const requestedRole = newRole === 'player_pro' && user.role === 'commissioner' && user.stripeSubscriptionId
+        ? 'commissioner' : newRole;
+      const role = resolveLinkedPurchaseRole(requestedRole, {
         appleActive: Boolean(appleOriginal),
         googleCommissioner: activeClaims.rows[0]?.google_commissioner === true,
         googlePro: activeClaims.rows[0]?.google_pro === true,
@@ -5388,23 +5302,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).where(eq(users.id, userId));
       return role;
     });
-    const effectiveRole = await applyStoredRevenueCatRole(userId, { source: 'store' }) ?? appliedRole;
-    const metadataRole = effectiveRole === 'secondary_commissioner' ? 'commissioner' : effectiveRole;
-    await syncIapRoleMetadata(userId, metadataRole);
-    return metadataRole === 'free_tier' ? appliedRole : metadataRole;
+    await syncIapRoleMetadata(userId, appliedRole);
+    return appliedRole;
   };
 
   // ─── POST /api/iap/verify ──────────────────────────────────────────────────
-  // An onboarding purchase carries the account identity captured before the
-  // store sheet. Reject a receipt if the browser session changed meanwhile.
-  // Existing Subscriptions callers omit this optional value.
-  const matchesExpectedOnboardingPurchaseAccount = async (req: any, userId: string) => {
-    const expected = req.body?.expectedRevenueCatAppUserId;
-    if (expected === undefined) return true;
-    return typeof expected === 'string' && /^roster_[a-f0-9]{64}$/.test(expected) &&
-      await getOrCreateRevenueCatAppUserId(userId) === expected;
-  };
-
   // Called by the iOS client after a successful StoreKit purchase.
   //
   // Accepts (in priority order):
@@ -5416,9 +5318,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { jws, transactionId } = req.body;
-      if (!await matchesExpectedOnboardingPurchaseAccount(req, userId)) {
-        return res.status(409).json({ message: 'The account changed during purchase. Sign back in to the original account and restore.' });
-      }
 
       // ── Path 1: StoreKit 2 JWS transaction ──────────────────────────────
       if (jws && typeof jws === 'string' && jws.trim()) {
@@ -5439,29 +5338,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
         if (linked) return res.json(linked);
-        const effectiveRole = await applyIapRole(
-          userId, newRole, tx.environment, tx.originalTransactionId, tx.productId, tx.expiresDate,
-        );
+        await applyIapRole(userId, newRole, tx.originalTransactionId);
         console.log(`[IAP] JWS verified for user ${userId}: role → ${newRole} (${tx.environment})`);
-        return res.json({ message: 'IAP verified and role updated', role: effectiveRole });
+        return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
       // ── Path 2: Transaction ID → App Store Server API ───────────────────
       if (transactionId && typeof transactionId === 'string' && transactionId.trim()) {
-        const {
-          lookupTransactionById,
-          isAppleIapConfigured,
-          isAppleIapEnvironmentAllowed,
-        } = await import('./appleIap');
+        const { lookupTransactionById, isAppleIapConfigured } = await import('./appleIap');
 
         if (!isAppleIapConfigured()) {
           return res.status(503).json({ message: 'Apple IAP API not configured on server' });
         }
 
-        const { payload: tx, environment } = await lookupTransactionById(transactionId);
-        if (tx.environment !== environment || !isAppleIapEnvironmentAllowed(environment)) {
-          return res.status(403).json({ message: 'Sandbox Apple transactions cannot grant production access.' });
-        }
+        const { payload: tx } = await lookupTransactionById(transactionId);
         const now = Date.now();
 
         if (tx.revocationDate) {
@@ -5492,11 +5382,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
         if (linked) return res.json(linked);
-        const effectiveRole = await applyIapRole(
-          userId, newRole, environment, tx.originalTransactionId, tx.productId, tx.expiresDate,
-        );
+        await applyIapRole(userId, newRole, tx.originalTransactionId);
         console.log(`[IAP] Transaction ID verified for user ${userId}: role → ${newRole}`);
-        return res.json({ message: 'IAP verified and role updated', role: effectiveRole });
+        return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
       return res.status(400).json({ message: 'Missing jws or transactionId' });
@@ -5523,10 +5411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Missing signedPayload' });
       }
 
-      const {
-        decodeAppleJWSPayload,
-        isAppleIapEnvironmentAllowed,
-      } = await import('./appleIap');
+      const { decodeAppleJWSPayload } = await import('./appleIap');
 
       // Decode the outer notification envelope (verified against Apple Root CA G3).
       // The outer envelope does not carry a bundleId field, so skipBundleCheck=true.
@@ -5549,13 +5434,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Decode the signed transaction payload — bundleId is enforced here (skipBundleCheck defaults to false)
       const txRaw = await decodeAppleJWSPayload(data.signedTransactionInfo);
-      const transactionEnvironment = txRaw.environment;
-      if (!isAppleIapEnvironmentAllowed(transactionEnvironment) ||
-          notifRaw.environment !== transactionEnvironment ||
-          data.environment !== transactionEnvironment) {
-        console.warn('[IAP/Notify] Ignoring notification with disallowed/mismatched Apple environment');
-        return res.status(200).json({ message: 'Notification acknowledged (environment not allowed)' });
-      }
       const productId = txRaw.productId as string;
       const originalTransactionId = txRaw.originalTransactionId as string | undefined;
       const expiresDate = txRaw.expiresDate as number | undefined;
@@ -5589,13 +5467,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const decision = resolveNotificationAction(notificationType, productId, expiresDate, Date.now());
       if (decision.action !== 'ignore' && originalTransactionId) {
         const link = await db.execute(sql`
-          SELECT user_id, environment FROM apple_purchase_links
+          SELECT user_id FROM apple_purchase_links
           WHERE original_transaction_id = ${originalTransactionId} LIMIT 1
         `);
         if (link.rows.length) {
-          if (link.rows[0].environment !== transactionEnvironment) {
-            return res.status(200).json({ message: 'Notification acknowledged (link environment mismatch)' });
-          }
           if (!Number.isFinite(signedAtMs)) {
             return res.status(200).json({ message: 'Notification ignored (missing signed date)' });
           }
@@ -5665,38 +5540,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `);
             return true;
           });
-          if (changedRole) {
-            const effectiveRole = await applyStoredRevenueCatRole(notifUserId, { source: 'store' });
-            await syncIapRoleMetadata(notifUserId,
-              effectiveRole === 'secondary_commissioner' ? 'commissioner' : effectiveRole ?? 'free_tier');
-          }
+          if (changedRole) await syncIapRoleMetadata(notifUserId, 'free_tier');
           return res.status(200).json({ message: 'Linked Apple purchase revoked' });
         }
       }
 
       if (decision.action === 'grant') {
-        await applyIapRole(
-          notifUserId, decision.role, transactionEnvironment, originalTransactionId, productId, expiresDate,
-        );
-        const effectiveRole = await applyStoredRevenueCatRole(notifUserId, { source: 'store' });
-        if (effectiveRole) {
-          await syncIapRoleMetadata(notifUserId,
-            effectiveRole === 'secondary_commissioner' ? 'commissioner' : effectiveRole);
-        }
+        await applyIapRole(notifUserId, decision.role, originalTransactionId);
         console.log(`[IAP/Notify] ${notificationType} → role set to ${decision.role} for user ${notifUserId}`);
 
       } else if (decision.action === 'revoke') {
         // Legacy, unlinked Apple purchases still require source-aware downgrade.
-        if (originalTransactionId) {
-          await db.execute(sql`
-            UPDATE apple_iap_claims
-               SET expires_at = NULL, revoked = TRUE, verified_at = NOW()
-             WHERE user_id = ${notifUserId}
-               AND original_transaction_id = ${originalTransactionId}
-               AND (${Number.isFinite(expiresDate) ? new Date(expiresDate!) : null}::timestamptz IS NULL
-                 OR expires_at <= ${Number.isFinite(expiresDate) ? new Date(expiresDate!) : null})
-          `);
-        }
         const { preserveLinkedAppleRole } = await import('./appleClaimRole');
         const remainingRole = await preserveLinkedAppleRole(notifUserId, 'free_tier');
         const downgraded = await db
@@ -5718,11 +5572,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (e) {
           console.warn('[IAP/Notify] Supabase metadata sync failed on revoke:', e);
-        }
-        const effectiveRole = await applyStoredRevenueCatRole(notifUserId, { source: 'store' });
-        if (effectiveRole) {
-          await syncIapRoleMetadata(notifUserId,
-            effectiveRole === 'secondary_commissioner' ? 'commissioner' : effectiveRole);
         }
         console.log(`[IAP/Notify] ${notificationType} → Apple source revoked for user ${notifUserId}`);
 
@@ -5802,9 +5651,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/iap/verify-google', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      if (!await matchesExpectedOnboardingPurchaseAccount(req, userId)) {
-        return res.status(409).json({ message: 'The account changed during purchase. Sign back in to the original account and restore.' });
-      }
       const { purchaseToken, productId: clientProductId } = req.body as {
         purchaseToken?: string;
         productId?: string;
@@ -5933,16 +5779,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { role, purchase };
   };
 
+  const revenueCatRosterId = (userId: string) => {
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) throw Object.assign(new Error('Account-linked restore is unavailable.'), { status: 503 });
+    return `roster_${createHmac('sha256', secret).update(`revenuecat-android:${userId}`).digest('hex')}`;
+  };
+
   app.get('/api/iap/revenuecat-login-id', isAuthenticated, (req: any, res) => {
     res.set('Cache-Control', 'no-store');
-    if (req.demoContext || (req.realActor && req.realActor.id !== req.user?.claims?.sub)) {
-      return res.status(403).json({ message: 'Native purchases are unavailable in Demo.' });
+    try {
+      return res.json({ loginId: revenueCatRosterId(req.user.claims.sub) });
+    } catch (error: any) {
+      return sendGoogleRecoveryError(res, error);
     }
-    getOrCreateRevenueCatAppUserId(req.user.claims.sub)
-      .then((loginId) => res.json({ loginId }))
-      .catch((error: any) => sendGoogleRecoveryError(res, error));
   });
-  registerNativeRevenueCatRoutes(app, isAuthenticated);
 
   const sendGoogleRecoveryError = (res: any, error: any) => {
     const status = [400, 402, 403, 404, 409, 503].includes(error.status) ? error.status : 502;
@@ -5957,20 +5807,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Look it up server-side, then independently verify with Google as above.
   app.post('/api/iap/restore-google-automatic', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
-    if (req.demoContext || (req.realActor && req.realActor.id !== req.user?.claims?.sub)) {
-      return res.status(403).json({ message: 'Native purchases are unavailable in Demo.' });
-    }
     try {
-      if (!await matchesExpectedOnboardingPurchaseAccount(req, req.user.claims.sub)) {
-        return res.status(409).json({ message: 'The account changed during restore. Sign back in to the original account.' });
-      }
       const { getRevenueCatGoogleOrderIds } = await import('./revenueCatApi');
       // The client cannot select which customer the server looks up. Native
       // logIn/restore must first attach the Play receipt to this signed-in
       // account's opaque RevenueCat identity.
-      const orderIds = await getRevenueCatGoogleOrderIds(
-        await getOrCreateRevenueCatAppUserId(req.user.claims.sub),
-      );
+      const orderIds = await getRevenueCatGoogleOrderIds(revenueCatRosterId(req.user.claims.sub));
       if (!orderIds.length) {
         return res.status(404).json({ message: 'No active Google Play purchase was found for this app identity.', receiptFallback: true });
       }
@@ -7990,7 +7832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (league && league.commissionerId) {
           const requestingUser = await storage.getUser(userId);
           const requesterName = requestingUser 
-            ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email || 'Someone'
+            ? `${requestingUser.firstName} ${requestingUser.lastName}`.trim() || requestingUser.email 
             : 'Someone';
           
           // Send WebSocket message to commissioner for immediate UI update
@@ -8129,8 +7971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Verify user is commissioner or secondary commissioner
       const isCommissioner = league.commissionerId === userId;
-        const leaguePermissions = await storage.getUserLeaguePermissions(userId, leagueId);
-        const isSecondaryCommissioner = leaguePermissions?.leagueRole === 'secondary_commissioner';
+      const isSecondaryCommissioner = league.secondaryCommissionerId === userId;
       if (!isCommissioner && !isSecondaryCommissioner) {
         return res.status(403).json({ message: "Only commissioners can update player details" });
       }
@@ -9603,7 +9444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch and add substitute games that aren't already in the list
       // Games drop off by noon the following day according to league timezone
-      const leagueCache = new Map<string, Awaited<ReturnType<typeof storage.getLeague>>>();
+      const leagueCache = new Map<string, any>();
       
       const substituteGames: typeof games = [];
       for (const gameId of substituteGameIds) {
@@ -9614,13 +9455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (game) {
             // Get league timezone (cache for performance)
-            let league: Awaited<ReturnType<typeof storage.getLeague>> | undefined;
-            if (game.leagueId) {
-              league = leagueCache.get(game.leagueId);
-              if (league === undefined && !leagueCache.has(game.leagueId)) {
-                league = await storage.getLeague(game.leagueId);
-                leagueCache.set(game.leagueId, league);
-              }
+            let league = leagueCache.get(game.leagueId);
+            if (league === undefined && !leagueCache.has(game.leagueId)) {
+              league = await storage.getLeague(game.leagueId);
+              leagueCache.set(game.leagueId, league);
             }
             
             const leagueTimezone = league?.timezone || 'America/New_York';
@@ -11030,9 +10868,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Determine the winning team
       let winningTeamId: string | null = null;
-      if (game.homeScore === null || game.awayScore === null) {
-        return res.status(400).json({ message: "Game must have a score before stars can be awarded" });
-      }
       if (game.homeScore > game.awayScore) {
         winningTeamId = game.homeTeamId;
       } else if (game.awayScore > game.homeScore) {
@@ -11042,9 +10877,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is captain of the winning team
-      if (!winningTeamId) {
-        return res.status(400).json({ message: "Game has no winning team" });
-      }
       const winningTeam = await storage.getTeam(winningTeamId);
       if (!winningTeam || winningTeam.captainId !== userId) {
         return res.status(403).json({ 
@@ -11176,13 +11008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { seasonId: starsSeasonId } = req.query as { leagueId?: string; seasonId?: string };
 
       // Filter down to completed games with scores, not tied, and optionally by league
-      const completedGamesWithScores = allGames.filter((game): game is (typeof allGames)[number] & {
-        homeScore: number;
-        awayScore: number;
-        awayTeamId: string;
-      } => {
+      const completedGamesWithScores = allGames.filter((game: any) => {
         if (game.isScrimmage) return false;
-        if (!game.isCompleted || game.homeScore === null || game.awayScore === null || !game.awayTeamId) return false;
+        if (!game.isCompleted || game.homeScore === null || game.awayScore === null) return false;
         if (game.homeScore === game.awayScore) return false;
         if (leagueId && game.leagueId !== leagueId) return false;
         if (starsSeasonId && game.seasonId !== starsSeasonId) return false;
@@ -11968,9 +11796,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         game = tournamentMatch;
         isTournamentMatch = true;
-      }
-      if (!game) {
-        return res.status(404).json({ message: 'Game not found' });
       }
       
       const formattedGame = formatGameForResponse(game);
@@ -15102,20 +14927,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     throw error;
                   }
 
-                  const resolvedAuthUser = authUser && 'user' in authUser
-                    ? authUser.user
-                    : authUser;
-                  if (!resolvedAuthUser) {
-                    throw new Error('Failed to resolve created authentication user');
-                  }
-
                   // Add user to local Roster database using upsert
-                  newUserId = resolvedAuthUser.id;
+                  newUserId = authUser.id;
                   await storage.upsertUser({
-                    id: resolvedAuthUser.id,
+                    id: authUser.id,
                     email: player.email,
                     firstName: player.firstName,
                     lastName: player.lastName,
+                    displayName: `${player.firstName} ${player.lastName}`,
                   });
                 }
               } else {
@@ -16031,7 +15850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 seasonId: activeSeasonForSchedule.id,
                 homeTeamId: schedule.homeTeamId,
                 awayTeamId: schedule.awayTeamId,
-                scheduledAt: scheduledAt.toISOString(),
+                scheduledAt: scheduledAt,
                 venue: null,
                 homeTeamLockerRoom: schedule.homeTeamLockerRoom,
                 awayTeamLockerRoom: schedule.awayTeamLockerRoom,
@@ -16579,7 +16398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all league members
-      const members = await storage.getLeagueMembers(leagueId);
+      const members = await storage.getLeagueMembersWithDetails(leagueId);
       
       if (!query || (query as string).trim().length === 0) {
         // Return all members (excluding the source user if specified)
@@ -16676,17 +16495,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Source user is not a member of this league' });
       }
 
-      // The legacy endpoint uses the same league-scoped transaction as the new
-      // commissioner review. It cannot bypass collision checks.
-      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(validatedData.toUserId);
-      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
-      await mergeLeaguePlayer(leagueId, userId, { type: 'user', id: validatedData.fromUserId }, validatedData.toUserId);
-      const mergedMembership = await storage.getUserLeagueMembership(validatedData.toUserId, leagueId);
+      // Perform the merge
+      const mergedMembership = await storage.mergeUsersInLeague(
+        leagueId,
+        validatedData.fromUserId,
+        validatedData.toUserId,
+        validatedData.preserveName
+      );
 
       res.json({
         message: 'Users merged successfully',
         membership: mergedMembership,
-        preservedName: false
+        preservedName: validatedData.preserveName
       });
 
     } catch (error) {
@@ -16697,9 +16517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: error.errors 
         });
       }
-      res.status(error instanceof PlayerMergeConflict ? 409 : 500).json({
-        message: error instanceof PlayerMergeConflict ? error.message : 'Failed to merge users',
-      });
+      res.status(500).json({ message: 'Failed to merge users' });
     }
   });
 
@@ -16719,9 +16537,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const validatedData = replaceRequestSchema.parse({ placeholderUserId, newUserId, preserveDisplayName, pendingMembershipIdToDelete });
-      if (req.body.acknowledgeIdentity !== true) {
-        return res.status(400).json({ message: 'Review both profile IDs and confirm the irreversible merge first.' });
-      }
 
       if (validatedData.placeholderUserId === validatedData.newUserId) {
         return res.status(400).json({ message: 'Cannot replace user with themselves' });
@@ -16762,12 +16577,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (s.gamesPlayed || 0) > 0 || (s.goals || 0) > 0 || (s.assists || 0) > 0
       );
 
-      // Never remove the pending membership outside the merge transaction.
-      // The new service consolidates it together with the approved roster row.
-      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(validatedData.newUserId);
-      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
-      await mergeLeaguePlayer(leagueId, userId, { type: 'user', id: validatedData.placeholderUserId }, validatedData.newUserId, validatedData.preserveDisplayName);
-      const mergedMembership = await storage.getUserLeagueMembership(validatedData.newUserId, leagueId);
+      // Delete pending membership first if specified (before merge creates issues)
+      // Important: Only delete a membership that belongs to the NEW user, never the placeholder
+      if (validatedData.pendingMembershipIdToDelete) {
+        // Verify the membership to delete belongs to the new user (not the placeholder)
+        const membershipToDelete = await storage.getLeagueMembership(validatedData.pendingMembershipIdToDelete);
+        if (membershipToDelete && 
+            membershipToDelete.userId === validatedData.newUserId &&
+            membershipToDelete.id !== placeholderMembership.id) {
+          await db
+            .delete(leagueMemberships)
+            .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
+        }
+      }
+
+      // Use mergeUsersInLeague to properly transfer all stats, goals, assists, etc.
+      const mergedMembership = await storage.mergeUsersInLeague(
+        leagueId,
+        validatedData.placeholderUserId, // from (placeholder)
+        validatedData.newUserId, // to (real user)
+        validatedData.preserveDisplayName
+      );
 
       res.json({
         message: 'Player replaced successfully',
@@ -16795,158 +16625,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Return more specific error message
       const errorMessage = error?.message || 'Failed to replace player';
-      res.status(error instanceof PlayerMergeConflict ? 409 : 500).json({ message: errorMessage });
+      res.status(500).json({ message: errorMessage });
     }
   });
 
-  const canMergeLeague = async (leagueId: string, userId: string) =>
-    (await storage.getLeague(leagueId))?.commissionerId === userId;
-  app.get('/api/leagues/:leagueId/player-merge/candidates', isAuthenticated, async (req: any, res) => {
-    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
-    try {
-      res.json(await findLeagueMergeCandidates(req.params.leagueId, String(req.query.search || '')));
-    } catch (error) {
-      console.error('Player merge search failed:', error);
-      res.status(500).json({ message: 'Could not search league players' });
-    }
-  });
-  app.post('/api/leagues/:leagueId/player-merge/preview', isAuthenticated, async (req: any, res) => {
-    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
-    try {
-      const { source, survivor } = leagueMergeDialogPreviewSchema.parse(req.body);
-      if (source.id === survivor.id)
-        return res.status(400).json({ message: 'Choose a different registered account as the survivor.' });
-      const [from, to] = await Promise.all([
-        previewLeaguePlayerMerge(req.params.leagueId, source),
-        previewLeaguePlayerMerge(req.params.leagueId, survivor),
-      ]);
-      if (!to.canSurvive) return res.status(400).json({ message: 'The survivor must be an active registered account.' });
-      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(survivor.id);
-      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account. Choose a registered player.' });
-      res.json({ source: from, survivor: to });
-    } catch (error: any) {
-      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 400 : 500)
-        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not preview these players' });
-    }
-  });
-  // Older placeholder-backed users are reviewed by the replacement workflow,
-  // never by the user-only merge dialog.
-  app.post('/api/leagues/:leagueId/player-replacement/preview', isAuthenticated, async (req: any, res) => {
-    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
-    try {
-      const { sourceId, survivorId } = z.object({
-        sourceId: z.string().min(1), survivorId: z.string().min(1),
-      }).parse(req.body);
-      if (sourceId === survivorId) return res.status(400).json({ message: 'Choose two different accounts.' });
-      const [source, survivor] = await Promise.all([
-        previewLeaguePlayerMerge(req.params.leagueId, { type: 'user', id: sourceId }, true),
-        previewLeaguePlayerMerge(req.params.leagueId, { type: 'user', id: survivorId }, true),
-      ]);
-      if (!survivor.canSurvive) return res.status(400).json({ message: 'The survivor must be an active registered account.' });
-      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(survivorId);
-      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
-      res.json({ source, survivor });
-    } catch (error: any) {
-      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 400 : 500)
-        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not preview this replacement.' });
-    }
-  });
-  app.post('/api/leagues/:leagueId/player-merge/confirm', isAuthenticated, async (req: any, res) => {
-    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
-    try {
-      const { source, survivorId } = leagueMergeDialogConfirmSchema.parse(req.body);
-      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(survivorId);
-      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
-      res.json(await mergeLeaguePlayer(req.params.leagueId, req.user.claims.sub, source, survivorId, false, true));
-    } catch (error: any) {
-      console.error('League player merge failed:', error);
-      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 409 : 500)
-        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not merge players. No changes were saved.' });
-    }
-  });
-  // The former imported-player endpoint matched legacy users by name and
-  // modified records without a transaction. It is deliberately retired.
+  // Merge an imported player with a real user account
   app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
-    return res.status(410).json({ message: 'Use the commissioner Merge Player review in League Management instead.' });
-  });
+    try {
+      const { leagueId } = req.params;
+      const { membershipId, importedPlayerId } = req.body;
+      const userId = req.user.claims.sub;
 
-  // Separate account-support operation. League ownership does not authorize
-  // cross-account changes; demo impersonation cannot access these endpoints.
-  const requireAccountMergeOperator = async (req: any, res: any, next: any) => {
-    try {
-      if (!hasAccountMergeOperatorContext(req)) {
-        return res.status(403).json({ message: 'Account support access required' });
+      // Validate required fields
+      if (!membershipId || !importedPlayerId) {
+        return res.status(400).json({ message: 'Missing required fields: membershipId and importedPlayerId are required' });
       }
-      const { data, error } = await supabase.auth.admin.getUserById(req.user.claims.supabaseId);
-      if (error || !data.user || data.user.email?.toLowerCase() !== 'tobin@rosterhockey.com')
-        return res.status(403).json({ message: 'Account support access required' });
-      next();
-    } catch {
-      res.status(503).json({ message: 'Could not verify support access' });
-    }
-  };
-  const mergeAccountsSchema = z.object({
-    sourceId: z.string().uuid(),
-    survivorId: z.string().uuid(),
-  });
-  const verifyRegisteredAuthAccounts = async (sourceId: string, survivorId: string) => {
-    const ids = [sourceId, survivorId];
-    const results = await Promise.all(ids.map(id => supabase.auth.admin.getUserById(id)));
-    const accounts = await pool.query('SELECT id,email FROM users WHERE id=ANY($1::varchar[]) AND deleted_at IS NULL', [ids]);
-    const emails = new Map(accounts.rows.map(row => [row.id, row.email?.toLowerCase()]));
-    return results.every(({ data, error }, i) => !error && data.user?.id === ids[i] &&
-      !!data.user.email && !data.user.email.toLowerCase().endsWith('@placeholder.roster') &&
-      data.user.email.toLowerCase() === emails.get(ids[i]));
-  };
-  app.get('/api/account-user-merge/candidates', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
-    try {
-      const search = z.string().max(100).parse(req.query.search || '');
-      if (search.trim().length < 2) return res.json([]);
-      const candidates = await searchAccountUsers(search);
-      const verified = await Promise.all(candidates.map(async candidate => {
-        const { data, error } = await supabase.auth.admin.getUserById(candidate.id);
-        if (error) throw error;
-        return data.user?.id === candidate.id && data.user.email?.toLowerCase() === candidate.email?.toLowerCase()
-          ? candidate : null;
-      }));
-      res.json(verified.filter(Boolean));
-    } catch (error) {
-      console.error('Account merge candidate lookup failed:', error);
-      res.status(503).json({ message: 'Could not verify registered accounts' });
-    }
-  });
-  app.post('/api/account-user-merge/preview', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
-    try {
-      const { sourceId, survivorId } = mergeAccountsSchema.parse(req.body);
-      if (!await verifyRegisteredAuthAccounts(sourceId, survivorId))
-        return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
-      res.json(await previewAccountUserMerge(sourceId, survivorId));
+
+      // Check commissioner access
+      const league = await storage.getLeague(leagueId);
+      if (!league || league.commissionerId !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Get the imported player details
+      const importedPlayer = await db.select()
+        .from(importedPlayers)
+        .where(eq(importedPlayers.id, importedPlayerId))
+        .limit(1);
+
+      if (!importedPlayer.length) {
+        return res.status(404).json({ message: 'Imported player not found' });
+      }
+
+      const player = importedPlayer[0];
+
+      // Get the membership first to verify it exists
+      const membershipCheck = await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1);
+      if (!membershipCheck.length) {
+        return res.status(404).json({ message: 'Membership not found' });
+      }
+
+      const realUserId = membershipCheck[0].userId;
+
+      // Approve the membership and assign to team if available
+      await storage.approveLeagueMembership(membershipId, userId);
+
+      // If imported player has team info, assign the user to that team
+      if (player.teamName) {
+        // Find or create the team
+        let team = await db.select()
+          .from(teams)
+          .where(and(eq(teams.leagueId, leagueId), eq(teams.name, player.teamName)))
+          .limit(1);
+
+        if (!team.length) {
+          // Create team if it doesn't exist
+          const newTeam = await storage.createTeam({
+            name: player.teamName,
+            leagueId: leagueId,
+          });
+          team = [newTeam];
+        }
+
+        // Assign the user to the team
+        await db.update(leagueMemberships)
+          .set({ assignedTeamId: team[0].id })
+          .where(eq(leagueMemberships.id, membershipId));
+
+        // Sync team chat participants after team assignment
+        try {
+          await messagingService.syncTeamChatParticipants(team[0].id, leagueId);
+        } catch (error) {
+          console.error('Error syncing team chat after merge team assignment:', error);
+        }
+      }
+
+      // Find and delete the placeholder user's league membership
+      // Placeholder users have emails ending with @placeholder.roster
+      // Only attempt to find placeholder if we have both first and last name
+      if (player.firstName && player.lastName) {
+        const placeholderMemberships = await db.select()
+          .from(leagueMemberships)
+          .innerJoin(users, eq(leagueMemberships.userId, users.id))
+          .where(
+            and(
+              eq(leagueMemberships.leagueId, leagueId),
+              ilike(users.email, '%@placeholder.roster'),
+              ilike(users.firstName, player.firstName),
+              ilike(users.lastName, player.lastName)
+            )
+          );
+        
+        // Delete placeholder memberships
+        for (const pm of placeholderMemberships) {
+          const placeholderUserId = pm.league_memberships.userId;
+          
+          // Only delete if it's not the real user
+          if (placeholderUserId !== realUserId) {
+            // Transfer all stat/game records from placeholder → real user BEFORE
+            // deleting the placeholder (cascade would otherwise wipe the data).
+
+            // player_stats has a unique(userId, leagueId, seasonId) constraint, so
+            // upsert: add placeholder's numbers into any existing real-user row, then
+            // delete the now-redundant placeholder rows.
+            await db.execute(sql`
+              INSERT INTO player_stats
+                (id, user_id, league_id, season_id, games_played, goals, assists, penalty_minutes, created_at, updated_at)
+              SELECT
+                gen_random_uuid(),
+                ${realUserId},
+                league_id,
+                season_id,
+                games_played,
+                goals,
+                assists,
+                penalty_minutes,
+                created_at,
+                NOW()
+              FROM player_stats
+              WHERE user_id = ${placeholderUserId}
+              ON CONFLICT (user_id, league_id, season_id) DO UPDATE SET
+                games_played    = player_stats.games_played    + EXCLUDED.games_played,
+                goals           = player_stats.goals           + EXCLUDED.goals,
+                assists         = player_stats.assists         + EXCLUDED.assists,
+                penalty_minutes = player_stats.penalty_minutes + EXCLUDED.penalty_minutes,
+                updated_at      = NOW()
+            `);
+            await db.delete(playerStats).where(eq(playerStats.userId, placeholderUserId));
+
+            // game_goals: scorer and both assists
+            await db.update(gameGoals)
+              .set({ scorerId: realUserId })
+              .where(eq(gameGoals.scorerId, placeholderUserId));
+            await db.update(gameGoals)
+              .set({ primaryAssistId: realUserId })
+              .where(eq(gameGoals.primaryAssistId, placeholderUserId));
+            await db.update(gameGoals)
+              .set({ secondaryAssistId: realUserId })
+              .where(eq(gameGoals.secondaryAssistId, placeholderUserId));
+
+            // game_goalies: goalie of record
+            await db.update(gameGoalies)
+              .set({ goalieUserId: realUserId })
+              .where(eq(gameGoalies.goalieUserId, placeholderUserId));
+
+            // game_stars: all three star slots
+            await db.update(gameStars)
+              .set({ firstStarUserId: realUserId })
+              .where(eq(gameStars.firstStarUserId, placeholderUserId));
+            await db.update(gameStars)
+              .set({ secondStarUserId: realUserId })
+              .where(eq(gameStars.secondStarUserId, placeholderUserId));
+            await db.update(gameStars)
+              .set({ thirdStarUserId: realUserId })
+              .where(eq(gameStars.thirdStarUserId, placeholderUserId));
+
+            // game_rsvps: attendance records
+            await db.update(gameRsvps)
+              .set({ userId: realUserId })
+              .where(eq(gameRsvps.userId, placeholderUserId));
+
+            // game_score_submissions: audit trail
+            await db.update(gameScoreSubmissions)
+              .set({ submittedBy: realUserId })
+              .where(eq(gameScoreSubmissions.submittedBy, placeholderUserId));
+
+            await db.delete(leagueMemberships)
+              .where(eq(leagueMemberships.id, pm.league_memberships.id));
+            
+            // Delete the placeholder user if they have no other memberships
+            const otherMemberships = await db.select()
+              .from(leagueMemberships)
+              .where(eq(leagueMemberships.userId, placeholderUserId));
+            
+            if (otherMemberships.length === 0) {
+              await db.delete(users).where(eq(users.id, placeholderUserId));
+            }
+          }
+        }
+      }
+      
+      // Mark the imported player as merged
+      await db.update(importedPlayers)
+        .set({ 
+          mergedWithUserId: realUserId,
+          mergedAt: new Date()
+        })
+        .where(eq(importedPlayers.id, importedPlayerId));
+
+      res.json({ success: true });
     } catch (error: any) {
-      res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
-        .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Could not review account merge.' });
-    }
-  });
-  app.post('/api/account-user-merge/confirm', isAuthenticated, requireAccountMergeOperator, async (req: any, res) => {
-    try {
-      const body = mergeAccountsSchema.extend({
-        previewFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-        acknowledgeSourceId: z.string(),
-        acknowledgeSurvivorId: z.string(),
-        acknowledgeIdentity: z.literal(true),
-      }).parse(req.body);
-      if (!await verifyRegisteredAuthAccounts(body.sourceId, body.survivorId))
-        return res.status(409).json({ message: 'Both IDs must identify active Supabase sign-in accounts.' });
-      const [source, survivor] = await Promise.all([body.sourceId, body.survivorId].map(id =>
-        pool.query('SELECT display_id FROM users WHERE id=$1 AND deleted_at IS NULL', [id])));
-      if (!source.rows[0]?.display_id || !survivor.rows[0]?.display_id ||
-          body.acknowledgeSourceId !== source.rows[0].display_id ||
-          body.acknowledgeSurvivorId !== survivor.rows[0].display_id)
-        return res.status(409).json({ message: 'Type both exact displayed U IDs before confirming.' });
-      res.json(await confirmAccountUserMerge(body.sourceId, body.survivorId, req.user.claims.sub, body.previewFingerprint));
-    } catch (error: any) {
-      console.error('Account-wide merge failed:', error);
-      res.status(error instanceof AccountUserMergeConflict || error instanceof z.ZodError ? 409 : 500)
-        .json({ message: error instanceof AccountUserMergeConflict ? error.message : 'Account merge failed. No database changes were saved.' });
+      console.error('Error merging player:', error);
+      console.error('Error stack:', error?.stack);
+      res.status(500).json({ message: 'Failed to merge player', error: error?.message });
     }
   });
 
@@ -17266,7 +17137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .map(m => m.user.id);
         } else {
           // League-wide announcement - send to all approved league members
-          const leagueMembers = await storage.getLeagueMembers(leagueId);
+          const leagueMembers = await storage.getLeagueMemberships(leagueId);
           recipientUserIds = leagueMembers
             .filter(m => m.status === 'approved' && m.userId !== userId)
             .map(m => m.userId);
@@ -17317,9 +17188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is commissioner of the league or the author of the announcement
-      const league = announcement.leagueId
-        ? await storage.getLeague(announcement.leagueId)
-        : undefined;
+      const league = await storage.getLeague(announcement.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       const isAuthor = announcement.authorId === userId;
 
@@ -17355,9 +17224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is commissioner of the league or the author of the announcement
-      const league = announcement.leagueId
-        ? await storage.getLeague(announcement.leagueId)
-        : undefined;
+      const league = await storage.getLeague(announcement.leagueId);
       const isCommissioner = league && league.commissionerId === userId;
       const isAuthor = announcement.authorId === userId;
 
@@ -17643,9 +17510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is commissioner of the league
-      const league = announcement.leagueId
-        ? await storage.getLeague(announcement.leagueId)
-        : undefined;
+      const league = await storage.getLeague(announcement.leagueId);
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: 'Only commissioners can create polls' });
       }
@@ -17688,9 +17553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: 'Announcement not found' });
         }
 
-        const membership = announcement.leagueId
-          ? await storage.getUserLeagueMembership(userId, announcement.leagueId)
-          : undefined;
+        const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
         if (!membership || membership.status !== 'approved') {
           return res.status(403).json({ message: 'Access denied' });
         }
@@ -17736,9 +17599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Announcement not found' });
       }
 
-      const membership = announcement.leagueId
-        ? await storage.getUserLeagueMembership(userId, announcement.leagueId)
-        : undefined;
+      const membership = await storage.getUserLeagueMembership(userId, announcement.leagueId);
       if (!membership || membership.status !== 'approved') {
         return res.status(403).json({ message: 'Access denied' });
       }
@@ -17770,9 +17631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is commissioner of the league
-      const league = announcement.leagueId
-        ? await storage.getLeague(announcement.leagueId)
-        : undefined;
+      const league = await storage.getLeague(announcement.leagueId);
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: 'Only commissioners can add attachments' });
       }
@@ -20438,7 +20297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const { date: rejDate, time: rejTime } = formatDayAndTime(scrimmage.dateTime, timezone);
             await storage.createNotification({
               userId: player.id,
-              type: 'general',
+              type: 'scrimmage_rejected',
               title: `Not selected for ${scrimmage.title}`,
               message: `Unfortunately you were not selected for "${scrimmage.title}" on ${rejDate} at ${rejTime}.`,
               actionUrl: `/scrimmage/${scrimmage.id}`,
@@ -21539,86 +21398,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Achievement patches earned in the selected league season(s), subject
-  // to the same paid/free viewer rules as the league stats endpoint.
-  app.get('/api/leagues/:leagueId/patch-leaderboard', isAuthenticated, loadUserPermissions, async (req: any, res) => {
-    try {
-      const leagueId = req.params.leagueId;
-      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
-      const viewerId = req.user.claims.sub;
-      const membership = await storage.getUserLeagueMembership(viewerId, leagueId);
-      if (!membership || membership.status !== 'approved') {
-        return res.status(403).json({ message: 'Access denied - not an approved league member' });
-      }
-      if (seasonId && seasonId !== 'all') {
-        const season = await storage.getSeason(seasonId);
-        if (!season || season.leagueId !== leagueId) {
-          return res.status(400).json({ message: 'Season not found or does not belong to this league' });
-        }
-      }
-
-      // Some leagues do not set season dates. Use the first and last scheduled
-      // game dates as the window for otherwise unscoped achievement awards.
-      const windowRows = await db.execute(sql`
-        SELECT s.id,
-          COALESCE(s.start_date, date_trunc('day', min(g.scheduled_at))) AS starts,
-          COALESCE(date_trunc('day', s.end_date) + interval '1 day',
-                   date_trunc('day', max(g.scheduled_at)) + interval '1 day') AS ends
-        FROM seasons s LEFT JOIN games g ON g.season_id = s.id
-        WHERE s.league_id = ${leagueId}
-          ${seasonId && seasonId !== 'all' ? sql`AND s.id = ${seasonId}` : sql``}
-        GROUP BY s.id
-      `);
-      const seasonWindows = windowRows.rows.map((row: any) => ({
-        id: String(row.id),
-        start: row.starts ? new Date(row.starts) : null,
-        endExclusive: row.ends ? new Date(row.ends) : null,
-      }));
-
-      // Match the stats endpoint's viewer filtering before looking up awards.
-      const members = await filterPlayerStats(req.userWithPermissions,
-        (await storage.getLeagueMembers(leagueId)).map(member => ({
-          userId: member.userId,
-          user: {
-            id: member.user.id,
-            firstName: member.user.firstName,
-            lastName: member.user.lastName,
-            profileImageUrl: member.user.profileImageUrl,
-          },
-        })), leagueId);
-      const ids = members.map(member => member.userId);
-      const awards = ids.length ? await db
-        .select({
-          userId: badgeAwards.userId,
-          badgeDefinitionId: badgeAwards.badgeDefinitionId,
-          tier: badgeAwards.tier,
-          achievementType: badgeDefinitions.achievementType,
-          triggerKey: badgeDefinitions.triggerKey,
-          scopeKey: badgeAwards.scopeKey,
-          count: badgeAwards.count,
-          leagueId: badgeAwards.leagueId,
-          seasonId: badgeAwards.seasonId,
-          awardedAt: badgeAwards.awardedAt,
-        })
-        .from(badgeAwards)
-        .innerJoin(badgeDefinitions, eq(badgeAwards.badgeDefinitionId, badgeDefinitions.id))
-        .where(and(
-          inArray(badgeAwards.userId, ids),
-          eq(badgeDefinitions.category, 'achievement'),
-          isNull(badgeDefinitions.ownerTeamId),
-          isNull(badgeDefinitions.ownerSeasonId),
-        )) : [];
-      const counts = achievementPatchCounts(awards, leagueId, seasonWindows);
-      res.json(members.map(member => ({
-        ...member,
-        patchesEarned: counts.get(member.userId) ?? 0,
-      })));
-    } catch (error) {
-      console.error('Error fetching patch leaderboard:', error);
-      res.status(500).json({ message: 'Failed to fetch patch leaderboard' });
-    }
-  });
-
   // Get player stats for a league (with optional season filter)
   app.get('/api/leagues/:leagueId/stats', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {
@@ -21689,7 +21468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assists: stat.assists,
           penaltyMinutes: stat.penaltyMinutes,
           points: stat.goals + stat.assists,
-          beers: stat.userId ? beerMap.get(stat.userId) ?? 0 : 0,
+          beers: beerMap.get(stat.userId) ?? 0,
           isGoalie: stat.isGoalie,
           user: stat.user
         }));
@@ -22520,13 +22299,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!conversation || conversation.type !== 'team_group') {
           // Check whether founder is a participant — if so, bypass the gate
           const participants = await messagingService.getConversationParticipants(conversationId);
-          const founder = await db.query.users.findFirst({
-            where: eq(users.displayId, 'U00001'),
-            columns: { id: true },
-          });
-          const hasFounder = founder
-            ? participants.some((participant) => participant.userId === founder.id)
-            : false;
+          const hasFounder = participants.some(
+            (p) => (p.user as any)?.displayId === 'U00001'
+          );
           if (!hasFounder) {
             return res.status(403).json({ message: 'A Player Pro subscription is required to reply in this conversation.' });
           }
@@ -22610,9 +22385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('[Message Notification Debug] All participants:', JSON.stringify(participants.map(p => ({ id: p.id, oderId: p.userId, name: (p as any).firstName }))));
           
           const sender = await storage.getUser(userId);
-          const senderName = sender
-            ? `${sender.firstName} ${sender.lastName}`.trim() || sender.email || 'Someone'
-            : 'Someone';
+          const senderName = sender ? `${sender.firstName} ${sender.lastName}`.trim() || sender.email : 'Someone';
           console.log('[Message Notification Debug] Sender name:', senderName);
           
           // Use userId (actual user UUID) instead of id (participant record ID)
@@ -23279,7 +23052,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const errors: string[] = [];
       
       for (const team of teamsWithLeagues) {
-        if (!team.leagueId) continue;
         try {
           await messagingService.syncTeamChatParticipants(team.id, team.leagueId);
           synced++;
@@ -24994,9 +24766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (async () => {
         try {
           const creator = await storage.getUser(userId);
-          const creatorName = creator
-            ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email || 'Someone'
-            : 'Someone';
+          const creatorName = creator ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email : 'Someone';
           
           if (validatedData.recipientUserIds.length > 0) {
             const { sendPaymentRequestPushNotification } = await import('./oneSignalNotifications');
@@ -26435,7 +26205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (team && creator && teamMembers.length > 0) {
           const creatorName = `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || 'Team member';
-              const formattedDate = formatDayAndTime(newEvent.scheduledAt);
+          const formattedDate = formatDayAndTime(newEvent.scheduledAt);
           
           // Send notifications to all team members except the creator
           for (const member of teamMembers) {
@@ -26445,7 +26215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 creatorName,
                 newEvent.title,
                 newEvent.eventType,
-                `${formattedDate.date} ${formattedDate.time}`,
+                formattedDate,
                 newEvent.location,
                 newEvent.id,
                 team.name
@@ -27095,6 +26865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 email,
                 firstName,
                 lastName,
+                displayName: fullName,
                 role: 'free_tier'
               }).returning();
               playerUserId = newUser.id;
@@ -27944,7 +27715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ message: "User permissions not loaded" });
         }
 
-        const userRole: keyof typeof roleHierarchy = user.role || 'free_tier';
+        const userRole = user.role || 'free_tier';
         const hasAdmin = user.specialPermissions && user.specialPermissions.includes('admin');
         
         // Check if user has global permissions or is a commissioner of any league
@@ -28286,7 +28057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const sm of shiftedMatches) {
           await tx
             .update(tournamentMatches)
-            .set({ scheduledTime: sm.scheduledTime.toISOString() })
+            .set({ scheduledTime: sm.scheduledTime })
             .where(eq(tournamentMatches.id, sm.id));
         }
 
@@ -28954,7 +28725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(401).json({ message: "User permissions not loaded" });
         }
 
-        const userRole: keyof typeof roleHierarchy = user.role || 'free_tier';
+        const userRole = user.role || 'free_tier';
         const hasAdmin = user.specialPermissions && user.specialPermissions.includes('admin');
         
         const hasGlobalPermissions = user.isPrimaryCommissioner || hasAdmin || (roleHierarchy[userRole] >= roleHierarchy['secondary_commissioner']);
@@ -30133,12 +29904,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(tournamentTeams.tournamentId, tournament.id));
       
       // Get league info
-      const [league] = tournament.leagueId
-        ? await db
-            .select()
-            .from(leagues)
-            .where(eq(leagues.id, tournament.leagueId))
-        : [];
+      const [league] = await db
+        .select()
+        .from(leagues)
+        .where(eq(leagues.id, tournament.leagueId));
 
       res.json({
         ...tournament,
@@ -30704,27 +30473,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check tournament commissioner access
-      const [tournament] = await db
-        .select()
-        .from(tournaments)
-        .where(eq(tournaments.id, tournamentId))
-        .limit(1);
+      const tournament = await storage.getTournament(tournamentId);
       if (!tournament) {
         return res.status(404).json({ message: 'Tournament not found' });
       }
 
       // Check if user is commissioner of the tournament's league
-      const league = tournament.leagueId
-        ? await storage.getLeague(tournament.leagueId)
-        : undefined;
+      const league = await storage.getLeague(tournament.leagueId);
       if (!league || league.commissionerId !== userId) {
         return res.status(403).json({ message: 'Unauthorized - only league commissioner can merge participants' });
       }
 
       // Verify both users exist
       const [fromUser, toUser] = await Promise.all([
-        storage.getUser(validatedData.fromUserId),
-        storage.getUser(validatedData.toUserId)
+        storage.getUserById(validatedData.fromUserId),
+        storage.getUserById(validatedData.toUserId)
       ]);
 
       if (!fromUser) {

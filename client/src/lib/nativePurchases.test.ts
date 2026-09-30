@@ -1,7 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash, webcrypto } from 'node:crypto';
-import { NativelyPurchases } from 'natively';
 import {
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO,
@@ -9,15 +7,7 @@ import {
   canPurchaseAndroidProduct,
   getAndroidProducts,
   isAndroidBillingSupported,
-  loginNativePurchaseAccount,
-  getCurrentNativePurchaseAppUserId,
-  ensureCurrentNativePurchaseAccount,
-  NativePurchaseLinkError,
-  purchaseProduct,
-  purchaseProductAndroid,
-  showNativeRevenueCatPaywall,
 } from './nativePurchases';
-import { onboardingProductId, type PaidTier, type BillingPeriod } from './onboardingNativeProducts';
 import { isNativelyAndroidApp } from '../hooks/useIosPlatform';
 
 function mockAndroid(t: Parameters<typeof test>[1] extends (t: infer T) => void ? T : never) {
@@ -114,158 +104,4 @@ test('empty and failed product callbacks cannot enable checkout', async (t) => {
   });
   assert.deepEqual(await getAndroidProducts(), []);
   assert.equal(canPurchaseAndroidProduct({}, PRODUCT_PLAYER_PRO, true, [PRODUCT_PLAYER_PRO]), false);
-});
-
-test('native paywall timeout resolves as unconfirmed when an older bridge never calls back', async (t) => {
-  mockAndroid(t);
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: { trigger() { /* Older native bridge never returns a paywall callback. */ } },
-  });
-  const result = await showNativeRevenueCatPaywall(5);
-  assert.deepEqual(result, { status: 'TIMEOUT', message: 'timeout' });
-});
-
-test('native account diagnostics classify anonymous responses without exposing either ID', async (t) => {
-  const window = mockAndroid(t);
-  window.$agent = {};
-  const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
-  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
-  t.after(() => {
-    if (originalCrypto) Object.defineProperty(globalThis, 'crypto', originalCrypto);
-    else Reflect.deleteProperty(globalThis, 'crypto');
-  });
-  const loginId = `roster_${'a'.repeat(64)}`;
-  const anonymousId = '$RCAnonymousID:private-device-identity-123';
-  const actions: string[] = [];
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: {
-      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
-        actions.push(action);
-        callback({ status: 'SUCCESS', customerId: anonymousId });
-      },
-    },
-  });
-  await assert.rejects(loginNativePurchaseAccount(loginId), (error: unknown) => {
-    assert.ok(error instanceof NativePurchaseLinkError);
-    assert.equal(error.diagnostics.length, 8);
-    assert.match(error.diagnostics[3], /Login callback: success, customer anonymous/);
-    assert.ok(error.diagnostics.slice(4).every(line => /Read-back: success, customer anonymous/.test(line)));
-    assert.ok(!JSON.stringify(error.diagnostics).includes(loginId));
-    assert.ok(!JSON.stringify(error.diagnostics).includes(anonymousId));
-    assert.equal(error.anonymousCustomerHash, createHash('sha256').update(anonymousId).digest('hex'));
-    return true;
-  });
-  assert.deepEqual(actions, [
-    'purchases_login', 'purchases_customerid', 'purchases_customerid',
-    'purchases_customerid', 'purchases_customerid',
-  ]);
-});
-
-test('matching native read-back remains required before account linking succeeds', async (t) => {
-  const window = mockAndroid(t);
-  window.$agent = {};
-  const loginId = `roster_${'b'.repeat(64)}`;
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: {
-      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
-        callback({
-          status: 'SUCCESS',
-          customerId: action === 'purchases_customerid' ? loginId : '$RCAnonymousID:old',
-        });
-      },
-    },
-  });
-  await loginNativePurchaseAccount(loginId);
-});
-
-test('each onboarding paid choice opens the same native store purchase action on iOS and Android', async (t) => {
-  const window = mockAndroid(t);
-  window.$agent = {};
-  const calls: string[] = [];
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: {
-      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void,
-        action: string, params: { packageId: string }) {
-        assert.equal(action, 'purchases_package');
-        calls.push(params.packageId);
-        callback({
-          status: 'SUCCESS',
-          transactionId: '123456789',
-          purchaseToken: 'play-token',
-          productIdentifier: params.packageId,
-        });
-      },
-    },
-  });
-  const expected: string[] = [];
-  for (const tier of ['player_pro', 'commissioner'] as PaidTier[]) {
-    for (const period of ['monthly', 'yearly'] as BillingPeriod[]) {
-      const productId = onboardingProductId(tier, period);
-      assert.equal((await purchaseProduct(productId)).productIdentifier, productId);
-      assert.equal((await purchaseProductAndroid(productId)).productIdentifier, productId);
-      expected.push(productId, productId);
-    }
-  }
-  assert.deepEqual(calls, expected);
-});
-
-test('checkout identity fails closed when the bridge only exposes ambiguous customerId', async (t) => {
-  const window = mockAndroid(t);
-  window.$agent = {};
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: { trigger() { assert.fail('No ambiguous identity method may authorize checkout'); } },
-  });
-  await assert.rejects(getCurrentNativePurchaseAppUserId(), /cannot verify the current store account/);
-});
-
-test('checkout identity requires current appUserID, retries anonymous login once, and rejects mismatches', async (t) => {
-  const window = mockAndroid(t);
-  window.$agent = {};
-  const account = `roster_${'a'.repeat(64)}`;
-  const other = `roster_${'b'.repeat(64)}`;
-  const proto = NativelyPurchases.prototype as NativelyPurchases & {
-    currentAppUserId?: (cb: (data: object) => void) => void;
-  };
-  const original = proto.currentAppUserId;
-  t.after(() => { if (original) proto.currentAppUserId = original; else delete proto.currentAppUserId; });
-  let current = '$RCAnonymousID:existing-purchaser';
-  let logins = 0;
-  proto.currentAppUserId = (cb) => cb({ status: 'SUCCESS', appUserID: current, hasPurchaseHistory: false });
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: {
-      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
-        assert.equal(action, 'purchases_login');
-        logins++;
-        current = account;
-        callback({ status: 'SUCCESS', customerId: '$RCAnonymousID:original-not-current' });
-      },
-    },
-  });
-  await ensureCurrentNativePurchaseAccount(account);
-  assert.equal(logins, 1);
-  await ensureCurrentNativePurchaseAccount(account);
-  assert.equal(logins, 1);
-  current = other;
-  await assert.rejects(ensureCurrentNativePurchaseAccount(account), /different purchase account/);
-  assert.equal(logins, 1);
-  current = '$RCAnonymousID:existing-purchaser';
-  proto.currentAppUserId = (cb) => cb({ status: 'SUCCESS', appUserID: current });
-  await assert.rejects(ensureCurrentNativePurchaseAccount(account), /may have purchases/);
-  assert.equal(logins, 1);
-  proto.currentAppUserId = (cb) => cb({ status: 'SUCCESS', appUserID: current, hasPurchaseHistory: false });
-  Object.defineProperty(globalThis, 'natively', {
-    configurable: true,
-    value: { trigger(_instance: unknown, _type: unknown, callback: (data: object) => void) {
-      logins++;
-      callback({ status: 'SUCCESS', customerId: account });
-    } },
-  });
-  await assert.rejects(ensureCurrentNativePurchaseAccount(account), /did not confirm/);
-  assert.equal(logins, 2);
 });

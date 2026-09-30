@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, getAuthHeaders } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { AlertCircle, Plus, ArrowLeft, Loader2, ArrowUp, ArrowDown, MessageSquare, Send } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 
 interface FeedbackModalProps {
   isOpen: boolean;

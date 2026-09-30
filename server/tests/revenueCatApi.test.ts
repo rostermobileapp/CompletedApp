@@ -1,11 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import {
-  compareRevenueCatOriginalAnonymousId,
-  getActiveAppleSubscriptions,
-  getRevenueCatAppleSubscriptions,
-} from '../revenueCatApi';
+import { getActiveAppleSubscriptions, getRevenueCatAppleSubscriptions } from '../revenueCatApi';
 
 const purchased = {
   store: 'app_store',
@@ -66,29 +61,4 @@ test('provider errors fail explicitly and do not treat a failed lookup as no sub
     apiKey: 'test-key',
     fetcher: async () => assert.fail('Invalid IDs must never reach RevenueCat'),
   }), /Invalid RevenueCat customer ID/);
-});
-
-test('diagnostic compares only hashed native identity with RevenueCat original ID', async () => {
-  const canonical = `roster_${'f'.repeat(64)}`;
-  const original = '$RCAnonymousID:private-original-identity';
-  const hash = createHash('sha256').update(original).digest('hex');
-  const fetcher = async (url: string | URL | Request) => {
-    assert.equal(String(url), `https://api.revenuecat.com/v1/subscribers/${canonical}`);
-    return new Response(JSON.stringify({ subscriber: { original_app_user_id: original } }), { status: 200 });
-  };
-  assert.equal(await compareRevenueCatOriginalAnonymousId(canonical, hash, {
-    apiKey: 'test-key', fetcher: fetcher as typeof fetch,
-  }), 'match');
-  assert.equal(await compareRevenueCatOriginalAnonymousId(canonical, '0'.repeat(64), {
-    apiKey: 'test-key', fetcher: fetcher as typeof fetch,
-  }), 'different');
-  assert.equal(await compareRevenueCatOriginalAnonymousId(canonical, hash, {
-    apiKey: 'test-key',
-    fetcher: async () => new Response(JSON.stringify({ subscriber: {
-      original_app_user_id: canonical,
-    } }), { status: 200 }),
-  }), 'not-anonymous');
-  await assert.rejects(compareRevenueCatOriginalAnonymousId(canonical, original, {
-    apiKey: 'test-key', fetcher: async () => assert.fail('Unhashed IDs must not reach RevenueCat'),
-  }), /Invalid purchase identity diagnostic/);
 });

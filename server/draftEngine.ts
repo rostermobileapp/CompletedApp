@@ -16,7 +16,7 @@ import {
   type User,
 } from "@shared/schema";
 import { eq, and, asc, desc, isNull, isNotNull, inArray, sql, or, gt } from "drizzle-orm";
-import { buildAutoPickSchedule, rankToRound, type AutoPickSchedule, type FlaggedSlot, type ScheduledSlot } from "@shared/autoPickSchedule";
+import { buildAutoPickSchedule, rankToRound, type AutoPickSchedule, type FlaggedSlot } from "@shared/autoPickSchedule";
 
 // How long after a pick the commissioner can undo it (milliseconds)
 export const UNDO_WINDOW_MS = 30_000;
@@ -1259,21 +1259,18 @@ async function validateStartPrereqs(draft: Draft): Promise<{ ok: boolean; error?
   if (draft.skillRankingEnabled) {
     // Only auto-pick participants (captains, keepers, buddy-pair members) need tiers.
     const captainAssignments = (draft.captainAssignments as Record<string, string>) || {};
-    const keepers = await db
-      .select({ userId: draftKeepers.userId })
-      .from(draftKeepers)
-      .where(eq(draftKeepers.draftId, draft.id));
-    const buddyPairs = await db
-      .select({ userIds: draftBuddyPairs.userIds })
-      .from(draftBuddyPairs)
-      .where(eq(draftBuddyPairs.draftId, draft.id));
+    const keepersByTeam = (draft.keepersByTeam as Record<string, { userId: string; rank?: string }[] | string[]>) || {};
+    const buddyPairs = (draft.buddyPairs as { userIds: string[] }[] | string[][]) || [];
 
     const autoPickUserIds = new Set<string>();
     for (const uid of Object.values(captainAssignments)) {
       if (uid) autoPickUserIds.add(uid);
     }
-    for (const keeper of keepers) {
-      if (keeper.userId) autoPickUserIds.add(keeper.userId);
+    for (const entries of Object.values(keepersByTeam)) {
+      for (const e of entries) {
+        const uid = typeof e === "string" ? e : e.userId;
+        if (uid) autoPickUserIds.add(uid);
+      }
     }
     for (const pair of buddyPairs) {
       const uids = Array.isArray(pair) && typeof pair[0] === "string"

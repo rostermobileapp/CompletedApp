@@ -8,17 +8,10 @@ import { initReferralDb } from "./referralDbInit";
 import { initDraftDb } from "./draftDbInit";
 import { initGoogleIapClaimsDb } from "./googleIapClaimsInit";
 import { initApplePurchaseLinks, reconcileApplePurchaseLinks, startApplePurchaseLinkJob } from "./applePurchaseLinks";
-import {
-  initNativeRevenueCatDb,
-  reconcileDisallowedNativeSandboxRoles,
-  startRevenueCatEntitlementExpiryJob,
-  startRevenueCatWebhookInboxWorker,
-} from "./nativeRevenueCat";
 import { startScrimmageReminderJob } from "./scrimmageReminderJob";
 import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runHistoricalBadgeBackfills } from "./badgeDbInit";
-import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 
 const app = express();
 
@@ -54,9 +47,6 @@ app.use(cookieParser());
 
 // Stripe webhook needs raw body for signature verification
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
-// RevenueCat signs the exact raw UTF-8 body; this must precede express.json().
-app.use('/api/webhooks/revenuecat-native',
-  express.raw({ type: 'application/json', limit: '1mb', inflate: false }));
 
 // All other routes use JSON parsing
 app.use(express.json());
@@ -98,24 +88,10 @@ app.use((req, res, next) => {
   await initDraftDb();
   await initGoogleIapClaimsDb();
   await initApplePurchaseLinks();
-  await initNativeRevenueCatDb();
-  await initAccountUserMergeDb();
-  // A removed tester exception must revoke cached sandbox-only roles before
-  // this process begins serving production requests.
-  await reconcileDisallowedNativeSandboxRoles();
 
   const server = await registerRoutes(app);
-  if (app.get("env") === "development") {
-    // Slow or disconnected Apple links must not keep the local preview
-    // offline. Production still reconciles before accepting requests.
-    void reconcileApplePurchaseLinks().catch((error) =>
-      console.error("[Apple link] Startup reconciliation failed:", error));
-  } else {
-    await reconcileApplePurchaseLinks();
-  }
+  await reconcileApplePurchaseLinks();
   startApplePurchaseLinkJob();
-  startRevenueCatEntitlementExpiryJob();
-  startRevenueCatWebhookInboxWorker();
   startBeerBadgeEvaluationWorker();
   // An end date can pass without a commissioner explicitly closing the season.
   setInterval(() => {
@@ -124,6 +100,11 @@ app.use((req, res, next) => {
     reconcileSeasonRsvpKing(true).catch((error) =>
       console.error("[Badges] RSVP King season reconciliation failed:", error));
   }, 60 * 60 * 1000).unref();
+
+  // Pre-warm the city geo cache from existing DB records so the first heatmap
+  // request after a cold restart requires no external geocoding API calls.
+  // Awaited before listen() to guarantee cache readiness before traffic arrives.
+  await warmCityGeoCache();
 
   // Start background jobs (scrimmage reminders + backup queue timeout cascade)
   startScrimmageReminderJob();
@@ -156,8 +137,6 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-    // Optional cache warming must not keep the API offline when the DB is slow.
-    void warmCityGeoCache();
     // Backfill historical badges after readiness. Errors are logged per badge
     // family, so corrupt history cannot take down the API for every user.
     void runHistoricalBadgeBackfills().catch((error) =>

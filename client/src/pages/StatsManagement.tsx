@@ -90,7 +90,7 @@ export default function StatsManagement() {
   });
 
   // Get seasons for selected league
-  const { data: seasons = [] } = useQuery<{ id: string; name: string; isActive: boolean }[]>({
+  const { data: seasons = [] } = useQuery({
     queryKey: [`/api/leagues/${selectedLeague}/seasons`],
     enabled: !!selectedLeague,
   });

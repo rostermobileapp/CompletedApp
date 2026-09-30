@@ -79,7 +79,15 @@ test('goalie stats include approved goalies with no completed games', async () =
     assert.ok(selectedSeasonStats.every(stat => stat.gamesPlayed === 0));
 
     const skaterStats = await storage.getPlayerStats(leagueId, seasonId, 'non-goalies');
-    assert.equal(skaterStats.some(stat => stat.userId === `placeholder:${placeholderId}`), false);
+    const placeholderSkaterRow = skaterStats.find(
+      stat => stat.userId === `placeholder:${placeholderId}`,
+    );
+    assert.ok(placeholderSkaterRow);
+    assert.equal(placeholderSkaterRow?.isGoalie, true);
+    assert.equal(placeholderSkaterRow?.gamesPlayed, 0);
+    assert.equal(placeholderSkaterRow?.goals, 0);
+    assert.equal(placeholderSkaterRow?.assists, 0);
+    assert.equal(placeholderSkaterRow?.penaltyMinutes, 0);
   } finally {
     await db.execute(sql`DELETE FROM placeholder_players WHERE id = ${placeholderId}`);
     await db.execute(sql`DELETE FROM league_memberships WHERE id = ${membershipId}`);

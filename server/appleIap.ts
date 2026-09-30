@@ -56,14 +56,6 @@ export interface AppleTransactionPayload {
   revocationReason?: number;
 }
 
-export function isAppleIapEnvironmentAllowed(
-  environment: unknown,
-  runtimeEnvironment: string | undefined = process.env.NODE_ENV,
-): environment is 'Sandbox' | 'Production' {
-  return environment === 'Production' ||
-    (environment === 'Sandbox' && runtimeEnvironment !== 'production');
-}
-
 export interface AppleNotificationPayload {
   notificationType: string;
   subtype?: string;
@@ -251,12 +243,6 @@ export async function lookupTransactionById(transactionId: string): Promise<{
 
   const data = await res.json() as { signedTransactionInfo: string };
   const payload = await decodeAppleJWSPayload(data.signedTransactionInfo) as unknown as AppleTransactionPayload;
-  if (payload.environment !== environment ||
-      !isAppleIapEnvironmentAllowed(environment)) {
-    throw Object.assign(new Error('Apple transaction environment is not allowed for this deployment.'), {
-      status: 403,
-    });
-  }
   return { payload, environment };
 }
 
@@ -287,9 +273,6 @@ export async function getSubscriptionStatuses(originalTransactionId: string): Pr
     const body = await res.text();
     throw new Error(`Apple subscriptions API error ${res.status}: ${body}`);
   }
-  if (!isAppleIapEnvironmentAllowed(environment)) {
-    return { activePayloads: [], environment };
-  }
 
   const data = await res.json() as {
     data: Array<{
@@ -308,7 +291,6 @@ export async function getSubscriptionStatuses(originalTransactionId: string): Pr
       if (tx.status === 1 || tx.status === 4) {
         try {
           const decoded = await decodeAppleJWSPayload(tx.signedTransactionInfo) as unknown as AppleTransactionPayload;
-          if (decoded.environment !== environment) continue;
           // Double-check expiry from the payload itself
           if (!decoded.expiresDate || decoded.expiresDate > now) {
             activePayloads.push(decoded);

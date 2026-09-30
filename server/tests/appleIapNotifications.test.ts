@@ -31,17 +31,8 @@ import {
   GRANT_TYPES,
   REVOKE_TYPES,
 } from '../appleNotificationHandler.js';
-import { isAppleIapEnvironmentAllowed } from '../appleIap.js';
 
 const NOW = 1_700_000_000_000;
-
-test('Apple sandbox transactions are allowed only outside production', () => {
-  assert.equal(isAppleIapEnvironmentAllowed('Production', 'production'), true);
-  assert.equal(isAppleIapEnvironmentAllowed('Sandbox', 'production'), false);
-  assert.equal(isAppleIapEnvironmentAllowed('Sandbox', 'development'), true);
-  assert.equal(isAppleIapEnvironmentAllowed('Sandbox', 'test'), true);
-  assert.equal(isAppleIapEnvironmentAllowed(undefined, 'development'), false);
-});
 const FUTURE = NOW + 30 * 24 * 60 * 60 * 1000;
 const PAST = NOW - 1_000;
 

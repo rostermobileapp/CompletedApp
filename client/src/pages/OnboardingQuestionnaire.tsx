@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { setSubscriberAttributes } from '@/lib/nativePurchases';
-import { OnboardingSubscriptionOffer } from '@/components/onboarding/OnboardingSubscriptionOffer';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { ArrowLeft, BarChart2, Bell, Calendar, Check, DollarSign, MessageSquare, Star, Trophy, Users, Zap } from 'lucide-react';
 import rosterLightLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 
 const TOTAL_STEPS = 9;
-const PENDING_PAYWALL_KEY = 'roster:pending-onboarding-paywall';
 
 type OnboardingRole =
   | 'player'
@@ -38,7 +36,7 @@ const QUESTIONNAIRE_SCREENS: { value: Screen; label: string }[] = [
   { value: 'join_play_features', label: 'Join-play features' },
   { value: 'preferences', label: 'Preferences' },
   { value: 'processing', label: 'Processing' },
-  { value: 'paywall', label: 'Subscription offer' },
+  { value: 'paywall', label: 'Paywall' },
 ];
 
 interface QuestionnaireState {
@@ -146,13 +144,7 @@ export default function OnboardingQuestionnaire() {
     ? previewParam as Screen
     : null;
   const isPreviewMode = import.meta.env.DEV && previewParam !== null;
-  const [screen, setScreen] = useState<Screen>(() => {
-    if (previewScreen) return previewScreen;
-    try {
-      if (sessionStorage.getItem(PENDING_PAYWALL_KEY) === '1') return 'paywall';
-    } catch {}
-    return 'welcome';
-  });
+  const [screen, setScreen] = useState<Screen>(previewScreen || 'welcome');
   const [state, setState] = useState<QuestionnaireState>({
     role: previewScreen ? 'player' : '',
     pains: previewScreen ? PREVIEW_SAMPLE_PAINS : [],
@@ -176,28 +168,13 @@ export default function OnboardingQuestionnaire() {
       setProcessingDone(false);
       processingTimerRef.current = setTimeout(() => {
         setProcessingDone(true);
-        processingTimerRef.current = setTimeout(() => {
-          if (!isPreviewMode) {
-            setScreen('paywall');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }
-        }, 400);
+        setTimeout(() => goTo('paywall'), 400);
       }, 2200);
     }
     return () => {
       if (processingTimerRef.current) clearTimeout(processingTimerRef.current);
     };
-  }, [screen, isPreviewMode]);
-
-  const continueFromPaywall = () => {
-    try { sessionStorage.removeItem(PENDING_PAYWALL_KEY); } catch {}
-    navigate('/');
-  };
-
-  const signInForPaywall = () => {
-    try { sessionStorage.setItem(PENDING_PAYWALL_KEY, '1'); } catch {}
-    navigate('/login');
-  };
+  }, [screen]);
 
   function goTo(s: Screen) {
     setScreen(s);
@@ -234,9 +211,7 @@ export default function OnboardingQuestionnaire() {
   const selectedPains = rolePainPoints.filter(p => state.pains.includes(p.value));
 
   return (
-    <div className={screen === 'paywall'
-      ? 'min-h-screen bg-black flex flex-col'
-      : 'min-h-screen bg-white flex flex-col max-w-lg mx-auto'}>
+    <div className="min-h-screen bg-white flex flex-col max-w-lg mx-auto">
       {isPreviewMode && (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-b border-amber-200 text-amber-950">
           <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap">Dev preview</span>
@@ -270,7 +245,7 @@ export default function OnboardingQuestionnaire() {
           </div>
         </div>
       )}
-      <div className={screen === 'paywall' ? 'flex-1 min-h-0' : 'flex-1 px-5 pb-8'}>
+      <div className="flex-1 px-5 pb-8">
 
         {/* ── WELCOME ─────────────────────────────────── */}
         {screen === 'welcome' && (
@@ -527,7 +502,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('preferences')}
+              onClick={() => goTo('join_play_features')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Looks good — let's go →
@@ -572,7 +547,7 @@ export default function OnboardingQuestionnaire() {
             </div>
 
             <button
-              onClick={() => goTo('join_play_features')}
+              onClick={() => goTo('preferences')}
               className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors"
             >
               Set up my experience →
@@ -707,27 +682,107 @@ export default function OnboardingQuestionnaire() {
           </div>
         )}
 
-        {/* ── SUBSCRIPTION OFFER ───────────────────────── */}
+        {/* ── PAYWALL ──────────────────────────────────── */}
         {screen === 'paywall' && (
-          isPreviewMode || isAuthenticated ? (
-            <OnboardingSubscriptionOffer
-              accountId={isPreviewMode ? undefined : userData?.id}
-              preview={isPreviewMode}
-              onFinished={continueFromPaywall}
-              onBack={goBack}
-            />
-          ) : (
-            <div className="flex min-h-screen flex-col items-center justify-center bg-black px-6 text-center text-white">
-              <p className="mb-6">Sign in to see your subscription options.</p>
-              <button type="button" onClick={signInForPaywall}
-                className="w-full max-w-sm rounded-full bg-[#3e83f6] px-6 py-4 font-bold text-white">
-                Sign in to continue
-              </button>
-            </div>
-          )
+          <PaywallScreen
+            isAuthenticated={isAuthenticated}
+            onSignUp={() => navigate(isAuthenticated ? '/' : '/login')}
+          />
         )}
-
       </div>
+    </div>
+  );
+}
+
+function PaywallScreen({ isAuthenticated, onSignUp }: { isAuthenticated: boolean; onSignUp: () => void }) {
+  const { data: stripePrices } = useQuery<{
+    player_pro_monthly?: { amount: number | null; currency: string | null };
+    commissioner_monthly?: { amount: number | null; currency: string | null };
+  }>({ queryKey: ['/api/stripe/prices'] });
+
+  const proAmount = stripePrices?.player_pro_monthly?.amount;
+  const proDisplay = proAmount != null ? `$${proAmount % 1 === 0 ? proAmount : proAmount.toFixed(2)}` : '~$6';
+
+  const commAmount = stripePrices?.commissioner_monthly?.amount;
+  const commDisplay = commAmount != null ? `$${commAmount % 1 === 0 ? commAmount : commAmount.toFixed(2)}` : '~$14';
+
+  return (
+    <div className="pt-8 pb-4">
+      <img src={rosterLightLogo} alt="Roster" className="h-10 object-contain mx-auto mb-6" />
+      {/* Plans */}
+      <div className="space-y-3 mb-6">
+
+        {/* Free */}
+        <div className="rounded-2xl border-2 border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-gray-900 text-[18px] font-black">Free</p>
+              <p className="text-xs text-gray-400">For basic players</p>
+            </div>
+            <p className="text-2xl font-black text-gray-900">$0</p>
+          </div>
+          <div className="space-y-1">
+            {['Team schedule & RSVPs', 'Team chat', 'Stats & standings'].map(f => (
+              <div key={f} className="flex items-center gap-2 text-xs text-gray-500">
+                <Check className="w-3.5 h-3.5 text-green-500" /> {f}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Player Pro — highlighted */}
+        <div className="rounded-2xl border-2 border-[#3c82f4] bg-[#3c82f4]/5 p-4 relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-[#3c82f4] text-white text-xs font-bold px-3 py-1 rounded-bl-xl">Most popular</div>
+          <div className="flex items-center justify-between mb-2 pr-20">
+            <div>
+              <p className="text-[#3c82f4] text-[18px] font-black">Player Pro</p>
+              <p className="text-xs text-gray-500">For captains & active players</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-[#3c82f4]">{proDisplay}</p>
+              <p className="text-xs text-gray-400">/month</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {['Everything in Free', 'Roster & attendance tracking', 'Sub request tool', 'Fee & payment tracking', 'Polls & bulletins', 'Create team events'].map(f => (
+              <div key={f} className="flex items-center gap-2 text-xs text-gray-700">
+                <Check className="w-3.5 h-3.5 text-[#3c82f4]" /> {f}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Commissioner */}
+        <div className="rounded-2xl border-2 border-gray-800 p-4 relative overflow-hidden bg-[#3c82f4]">
+          <div className="absolute top-0 right-0 bg-gray-700 text-[#ffffff] text-xs font-bold px-3 py-1 rounded-bl-xl">For leagues</div>
+          <div className="flex items-center justify-between mb-2 pr-24">
+            <div>
+              <p className="text-white font-black text-[18px]">Commissioner</p>
+              <p className="text-xs text-[#ffffff]">Run a full league or tournament</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-white">{commDisplay}</p>
+              <p className="text-xs text-[#ffffff]">/month</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {['Everything in Player Pro', 'A-Z League Management', 'Bracket Generation Tool', 'In-Game Scorekeeping', 'Tournaments Mode', 'League Drafts'].map(f => (
+              <div key={f} className="flex items-center gap-2 text-xs text-[#ffffff]">
+                <Check className="w-3.5 h-3.5 text-[#ffffff]" /> {f}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="text-center text-xs text-gray-400 mb-5">
+        Free to start. Visit the Subscriptions in your Profile page to upgrade for the full range of features.
+      </p>
+      <button
+        onClick={onSignUp}
+        className="w-full py-4 rounded-2xl bg-[#3c82f4] text-white font-bold text-lg hover:bg-[#3c82f4]/90 transition-colors shadow-lg shadow-blue-200"
+      >
+        {isAuthenticated ? 'Go to my dashboard →' : 'Create My Free Account'}
+      </button>
     </div>
   );
 }

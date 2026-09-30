@@ -2,14 +2,11 @@ import { pool } from './db';
 import { supabase } from './supabaseAuth';
 import { getRevenueCatAppleSubscriptions, type VerifiedAppleSubscription } from './revenueCatApi';
 import { matchingApplePurchase, isLaterVerifiedPeriod } from './applePurchaseMatch';
-import { applyStoredRevenueCatRole } from './nativeRevenueCat';
-import { isAppleIapEnvironmentAllowed } from './appleIap';
 
 type Link = {
   user_id: string;
   customer_id: string;
   original_transaction_id: string;
-  environment: string | null;
   product_id: string;
   original_purchased_at: Date;
   expires_at: Date | null;
@@ -26,7 +23,6 @@ export async function initApplePurchaseLinks(): Promise<void> {
       user_id VARCHAR PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       customer_id VARCHAR NOT NULL UNIQUE,
       original_transaction_id VARCHAR NOT NULL UNIQUE,
-      environment VARCHAR(16),
       product_id VARCHAR NOT NULL,
       original_purchased_at TIMESTAMPTZ NOT NULL,
       expires_at TIMESTAMPTZ,
@@ -46,7 +42,6 @@ export async function initApplePurchaseLinks(): Promise<void> {
     revoked_period_expires_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
     last_apple_signed_at TIMESTAMPTZ`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS environment VARCHAR(16)`);
   const duplicates = await pool.query(`
     SELECT 1 FROM users WHERE iap_original_transaction_id IS NOT NULL
     GROUP BY iap_original_transaction_id HAVING COUNT(*) > 1 LIMIT 1
@@ -63,12 +58,11 @@ export async function initApplePurchaseLinks(): Promise<void> {
  */
 export async function stageApplePurchaseLink(
   displayId: string, customerId: string, originalTransactionId: string,
-  productId: string, originalPurchasedAt: string, environment: string,
+  productId: string, originalPurchasedAt: string,
 ): Promise<void> {
   const purchasedAt = new Date(originalPurchasedAt);
   if (!/^U\d{5}$/.test(displayId) || !/^\$RCAnonymousID:[\w-]+$/.test(customerId) ||
       !/^\d{10,20}$/.test(originalTransactionId) ||
-      !isAppleIapEnvironmentAllowed(environment) ||
       !['com.rosterapp.player_pro_monthly', 'com.rosterapp.player_pro_yearly'].includes(productId) ||
       !Number.isFinite(purchasedAt.getTime()) || purchasedAt.getTime() > Date.now()) {
     throw new Error('Invalid operator-attested purchase');
@@ -91,7 +85,7 @@ export async function stageApplePurchaseLink(
     )).rows[0];
     if (owner) throw new Error('Original transaction is already owned');
     const existing = (await client.query(
-       `SELECT user_id, customer_id, original_transaction_id, product_id, original_purchased_at, environment
+      `SELECT user_id, customer_id, original_transaction_id, product_id, original_purchased_at
          FROM apple_purchase_links
         WHERE user_id = $1 OR customer_id = $2 OR original_transaction_id = $3`,
       [user.id, customerId, originalTransactionId],
@@ -101,16 +95,15 @@ export async function stageApplePurchaseLink(
           existing[0].customer_id !== customerId ||
           existing[0].original_transaction_id !== originalTransactionId ||
           existing[0].product_id !== productId ||
-          existing[0].environment !== environment ||
           +new Date(existing[0].original_purchased_at) !== +purchasedAt) {
         throw new Error('Purchase, customer, or user is already claimed');
       }
     } else {
       await client.query(
         `INSERT INTO apple_purchase_links
-          (user_id, customer_id, original_transaction_id, product_id, original_purchased_at, environment)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [user.id, customerId, originalTransactionId, productId, purchasedAt, environment],
+          (user_id, customer_id, original_transaction_id, product_id, original_purchased_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [user.id, customerId, originalTransactionId, productId, purchasedAt],
       );
     }
     await client.query('COMMIT');
@@ -123,27 +116,6 @@ export async function stageApplePurchaseLink(
 }
 
 async function reconcileOne(link: Link): Promise<void> {
-  if (!isAppleIapEnvironmentAllowed(link.environment)) {
-    await pool.query(
-      `UPDATE apple_purchase_links SET expires_at = NULL
-        WHERE user_id = $1 AND original_transaction_id = $2`,
-      [link.user_id, link.original_transaction_id],
-    );
-    const effectiveRole = await applyStoredRevenueCatRole(link.user_id, { source: 'store' });
-    if (effectiveRole) {
-      try {
-        const { error } = await supabase.auth.admin.updateUserById(link.user_id, {
-          user_metadata: {
-            subscription_tier: effectiveRole === 'secondary_commissioner' ? 'commissioner' : effectiveRole,
-          },
-        });
-        if (error) console.warn('[Apple link] Metadata sync failed:', error.message);
-      } catch (error) {
-        console.warn('[Apple link] Metadata sync failed:', error instanceof Error ? error.message : 'unknown');
-      }
-    }
-    return;
-  }
   let subscriptions: VerifiedAppleSubscription[] | undefined;
   try {
     subscriptions = await getRevenueCatAppleSubscriptions(link.customer_id);
@@ -248,13 +220,9 @@ async function reconcileOne(link: Link): Promise<void> {
     client.release();
   }
   if (changedRole) {
-    const effectiveRole = await applyStoredRevenueCatRole(link.user_id, { source: 'store' });
     try {
       const { error } = await supabase.auth.admin.updateUserById(link.user_id, {
-        user_metadata: {
-          subscription_tier: effectiveRole === 'secondary_commissioner'
-            ? 'commissioner' : effectiveRole ?? changedRole,
-        },
+        user_metadata: { subscription_tier: changedRole },
       });
       if (error) console.warn('[Apple link] Metadata sync failed:', error.message);
     } catch (error) {
@@ -270,7 +238,7 @@ export async function reconcileApplePurchaseLinks(): Promise<void> {
   running = true;
   try {
     const rows = (await pool.query(
-       `SELECT user_id, customer_id, original_transaction_id, product_id, environment,
+      `SELECT user_id, customer_id, original_transaction_id, product_id,
               original_purchased_at, expires_at, revoked_by_apple,
               last_apple_signed_at, last_checked_at, apple_revocation_reason,
               revoked_period_expires_at FROM apple_purchase_links`,

@@ -19,7 +19,7 @@ import {
   type ReferralPartner,
 } from "@shared/schema";
 import { createClient } from "@supabase/supabase-js";
-import { randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import {
@@ -971,11 +971,7 @@ export function registerReferralRoutes(app: Express) {
         if (!isPartnerStatus(status)) {
           return res.status(400).json({ message: `Invalid status. Allowed: ${PARTNER_STATUSES.join(", ")}` });
         }
-        if (status === "suspended") {
-          conditions.push(sql`${referralPartners.status}::text = ${status}`);
-        } else {
-          conditions.push(eq(referralPartners.status, status));
-        }
+        conditions.push(eq(referralPartners.status, status));
       }
       if (search) {
         conditions.push(
@@ -1150,10 +1146,7 @@ export function registerReferralRoutes(app: Express) {
       }
       const [updated] = await db
         .update(referralPartners)
-        .set({
-          status: sql`'suspended'::referral_partner_status`,
-          updatedAt: new Date(),
-        })
+        .set({ status: "suspended", updatedAt: new Date() })
         .where(eq(referralPartners.id, req.params.id))
         .returning();
       if (!updated) return res.status(404).json({ message: "Partner not found" });
@@ -1916,22 +1909,14 @@ export function registerReferralRoutes(app: Express) {
   // ═══════════════════════════════════════════════════════════════════════════
 
   app.post("/api/webhooks/revenuecat-referral", async (req, res) => {
-    // This older referral integration still uses a static Authorization
-    // credential. Keep it separate from the native endpoint's HMAC key. To
-    // move this endpoint to HMAC, verify its raw body independently before
-    // parsing it; never reuse the native endpoint's provider-generated key.
-    const secret = process.env.REVENUECAT_REFERRAL_WEBHOOK_AUTH_SECRET;
-    if (!secret) {
-      return res.status(503).json({
-        message: "Referral webhook authorization is not configured.",
-      });
-    }
-    const auth = req.headers["authorization"];
-    const supplied = typeof auth === "string" ? Buffer.from(auth) : Buffer.alloc(0);
-    const expected = Buffer.from(secret);
-    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
-      console.warn("[RCWebhook] Invalid authorization header");
-      return res.status(401).json({ message: "Unauthorized" });
+    // Validate secret
+    const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
+    if (secret) {
+      const auth = req.headers["authorization"];
+      if (auth !== secret) {
+        console.warn("[RCWebhook] Invalid authorization header");
+        return res.status(401).json({ message: "Unauthorized" });
+      }
     }
 
     try {

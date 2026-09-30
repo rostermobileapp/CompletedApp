@@ -30,7 +30,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import type { User } from '@shared/schema';
 import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import lightModeLogo from '@assets/Light_Mode_Logo_1768322748282.png';
 import darkModeLogo from '@assets/Dark_Mode_Logo_1770738054930.png';
@@ -1254,7 +1253,7 @@ function DashboardMobile() {
   const { openOverlay } = useSlideUpOverlay();
 
   // Fetch full user profile (includes profileImageUrl, firstName, etc.)
-  const { data: userProfile } = useQuery<User>({
+  const { data: userProfile } = useQuery({
     queryKey: ['/api/user'],
     enabled: !!supabaseUser,
   });
@@ -1317,7 +1316,6 @@ function DashboardMobile() {
 
   // Standings modal state
   const [showStandingsModal, setShowStandingsModal] = useState(false);
-  const [showStatsChoice, setShowStatsChoice] = useState(false);
   
   // Needs Attention modal state
   const [showNeedsAttentionModal, setShowNeedsAttentionModal] = useState(false);
@@ -2926,7 +2924,7 @@ function DashboardMobile() {
             <div 
               className="rounded-xl hairline elev-rest p-[17px] min-h-[61px] cursor-pointer hover:bg-muted/50 transition-colors bg-[#e2e2e2] dark:bg-[#212121]"
               data-testid="card-stats"
-              onClick={() => setShowStatsChoice(true)}
+              onClick={() => openOverlay('/stats', <StatsPage />)}
             >
               <div className="h-full flex flex-col items-center justify-center">
                 <BarChart3 className="w-8 h-8 text-blue-500 mb-[10px]" />
@@ -3994,49 +3992,6 @@ function DashboardMobile() {
               : null
         }
       />
-      <Dialog open={showStatsChoice} onOpenChange={setShowStatsChoice}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>View Stats</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <Button
-              variant="outline"
-              className="h-14 justify-start gap-3 text-base"
-              data-testid="button-personal-stats"
-              disabled={!userProfile?.id && !supabaseUser?.id}
-              onClick={() => {
-                const userId = userProfile?.id ?? supabaseUser?.id;
-                if (!userId) return;
-                setShowStatsChoice(false);
-                setPageTransitionDirection('up');
-                const params = new URLSearchParams();
-                const name = [userProfile?.firstName, userProfile?.lastName].filter(Boolean).join(' ');
-                if (name) params.set('name', name);
-                if (effectiveLeagueId) params.set('leagueId', effectiveLeagueId);
-                if (effectiveLeagueId && prefetchSeasonId) params.set('seasonId', prefetchSeasonId);
-                const query = params.toString();
-                navigate(`/player-stats/${encodeURIComponent(userId)}${query ? `?${query}` : ''}`);
-              }}
-            >
-              <TrendingUp className="h-5 w-5 text-blue-500" />
-              Personal Stats
-            </Button>
-            <Button
-              variant="outline"
-              className="h-14 justify-start gap-3 text-base"
-              data-testid="button-league-stats"
-              onClick={() => {
-                setShowStatsChoice(false);
-                openOverlay('/stats', <StatsPage />);
-              }}
-            >
-              <BarChart3 className="h-5 w-5 text-blue-500" />
-              League Stats
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
       {/* Needs Attention Modal */}
       <NeedsAttentionModal 
         isOpen={showNeedsAttentionModal}

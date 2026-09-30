@@ -24,7 +24,6 @@ import { useIsDesktopWeb, isInsideNativeWrapper } from "@/hooks/useIsDesktopWeb"
 import { forgetMobileScreen, resolveLaunchScreen, rememberMobileScreen, shouldRestoreOnLaunch } from "@/lib/mobileScreenResume";
 import { NativelyNotificationsInitializer } from "@/components/NativelyNotificationsInitializer";
 import { NativeCalendarAutoSync } from "@/components/NativeCalendarAutoSync";
-import { NativeRevenueCatSync } from "@/components/NativeRevenueCatSync";
 import { BadgeEarnedHost } from "@/components/BadgeEarnedHost";
 import { BirthdayHost } from "@/components/BirthdayHost";
 import { WebSocketProvider } from "@/context/WebSocketContext";
@@ -324,7 +323,7 @@ function Router() {
               <Route path="/messages/:conversationId" component={Messages} />
               <Route path="/user/:userId" component={UserProfile} />
               <Route path="/trophy-case/earned-patches" component={EarnedPatches} />
-              <Route path="/trophy-case">{() => <TrophyCase />}</Route>
+              <Route path="/trophy-case" component={TrophyCase} />
               <Route path="/admin/badges" component={BadgeCatalogAdmin} />
               <Route path="/subscription" component={Subscription} />
               <Route path="/roster" component={Roster} />
@@ -371,15 +370,9 @@ function Router() {
               <Route path="/tournaments/:tournamentId/custom-builder" component={CustomBracketBuilderPage} />
               <Route path="/tournament-teams/:tournamentId" component={TournamentTeams} />
               <Route path="/tournaments/:tournamentId" component={TournamentDetail} />
-              <Route path="/media/tournament/:id">
-                {(params) => <MediaGalleryPage overlayEntityType="tournament" overlayEntityId={params.id} />}
-              </Route>
-              <Route path="/media/league/:id">
-                {(params) => <MediaGalleryPage overlayEntityType="league" overlayEntityId={params.id} />}
-              </Route>
-              <Route path="/media/team/:id">
-                {(params) => <MediaGalleryPage overlayEntityType="team" overlayEntityId={params.id} />}
-              </Route>
+              <Route path="/media/tournament/:id" component={MediaGalleryPage} />
+              <Route path="/media/league/:id" component={MediaGalleryPage} />
+              <Route path="/media/team/:id" component={MediaGalleryPage} />
               <Route path="/referral-program/portal/auth" component={ReferralPortalAuth} />
               <Route path="/referral-program/portal/set-password" component={ReferralPortalSetPassword} />
               <Route path="/referral-program/portal/forgot-password" component={ReferralPortalForgotPassword} />
@@ -445,7 +438,6 @@ function App() {
                 <BadgeEarnedHost />
                 <ErrorBoundary>
                   <DemoContextProvider>
-                    <NativeRevenueCatSync />
                     <BirthdayHost />
                     <Router />
                   </DemoContextProvider>

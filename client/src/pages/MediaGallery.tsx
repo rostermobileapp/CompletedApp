@@ -96,7 +96,7 @@ function UserFilterSearch({
               >
                 {user.profileImageUrl ? (
                   <img
-                    src={getImageUrl(user.profileImageUrl) ?? undefined}
+                    src={getImageUrl(user.profileImageUrl)}
                     alt=""
                     className="w-8 h-8 rounded-full object-cover"
                   />

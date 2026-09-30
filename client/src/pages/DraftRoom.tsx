@@ -51,7 +51,6 @@ interface Draft {
   seasonId?: string;
   draftStyle?: string;
   goalieMethod?: string;
-  pickMode?: "captains" | "commissioner";
   status: string;
   currentRound: number;
   currentTurn: number;
@@ -885,7 +884,6 @@ export default function DraftRoom() {
   });
 
   const exportRosters = async (format: "jpg" | "pdf") => {
-    if (!draft || !bundle) return;
     if (isExportingRosters) return;
     setIsExportingRosters(format);
     try {

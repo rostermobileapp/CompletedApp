@@ -162,7 +162,7 @@ export function RinkPickerField({ onSelect, initialSelection }: Props) {
     },
     onSuccess: (result) => {
       if (result.conflict) {
-        setDuplicateWarning(result.existingFacility ?? null);
+        setDuplicateWarning(result.existingFacility);
         return;
       }
       queryClient.invalidateQueries({ queryKey: ['/api/facilities'] });

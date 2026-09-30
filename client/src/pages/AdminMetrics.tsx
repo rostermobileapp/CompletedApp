@@ -3,7 +3,6 @@ import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
-import { AccountUserMerge } from '@/components/AccountUserMerge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -162,14 +161,6 @@ export default function AdminMetrics() {
             <p className="text-sm text-muted-foreground">Live data · founder access only</p>
           </div>
         </div>
-
-        <section className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 space-y-2">
-          <h2 className="font-semibold">Account support operations</h2>
-          <p className="text-sm text-muted-foreground">
-            Restricted founder/support workflow for account-wide registered-user merges. This is separate from league-only player history merges.
-          </p>
-          <AccountUserMerge />
-        </section>
 
         {/* ── Overview ─────────────────────────────────────────────────── */}
         <section>

@@ -59,236 +59,6 @@ export async function isBillingSupported(): Promise<boolean> {
 }
 
 /**
- * True only for the Natively shell that owns this RevenueCat bridge. A
- * Capacitor installation or a normal mobile browser must not show its
- * RevenueCat paywall.
- */
-export function isNativelyPurchasesApp(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent;
-  return typeof (window as any).$agent !== 'undefined' ||
-    ua.includes('Natively/iOS') ||
-    ua.includes('Natively/iPadOS') ||
-    ua.includes('Natively/Android') ||
-    ua.includes('NativelyAndroid');
-}
-
-export interface NativelyPaywallResult {
-  status: string;
-  message: string;
-}
-
-const SERVER_REVENUECAT_ID = /^roster_[a-f0-9]{64}$/;
-
-function nativeCustomerIdKind(id: unknown, expectedId?: string): string {
-  if (typeof id !== 'string' || !id) return 'missing';
-  if (expectedId && id === expectedId) return 'matching account';
-  if (id.startsWith('$RCAnonymousID:')) return 'anonymous';
-  if (SERVER_REVENUECAT_ID.test(id)) return 'another Roster account';
-  return 'unrecognized';
-}
-
-/** Only redacted bridge observations are kept here; never include customer IDs. */
-export class NativePurchaseLinkError extends Error {
-  constructor(
-    message: string,
-    public readonly diagnostics: readonly string[],
-    public readonly anonymousCustomerHash?: string,
-  ) {
-    super(message);
-    this.name = 'NativePurchaseLinkError';
-  }
-}
-
-async function hashAnonymousCustomerId(id: unknown): Promise<string | undefined> {
-  if (typeof id !== 'string' || !/^\$RCAnonymousID:[A-Za-z0-9_-]{20,128}$/.test(id) ||
-      !globalThis.crypto?.subtle) return undefined;
-  try {
-    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id));
-    return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
-  } catch {
-    return undefined;
-  }
-}
-
-function nativeCallbackStatus(result: any): string {
-  if (result?.status === 'SUCCESS') return 'success';
-  if (result?.status === 'FAILED') return 'failed';
-  return result?.status == null ? 'missing' : 'other';
-}
-
-/**
- * Identify RevenueCat with the authenticated account's opaque ID from the
- * server, then verify the bridge reports that exact identity before billing.
- */
-export async function loginNativePurchaseAccount(loginId: string): Promise<void> {
-  if (!isNativelyPurchasesApp() || !SERVER_REVENUECAT_ID.test(loginId)) {
-    throw new Error('Native purchase account linking is unavailable.');
-  }
-
-  const startedAt = Date.now();
-  const bridgeVersion = (window as any).natively?.app_version;
-  const diagnostics: string[] = [
-    `Bridge injected: ${typeof (window as any).$agent !== 'undefined' ? 'yes' : 'no'}`,
-    `Natively script loaded: ${(window as any).nativelyLoaded === true ? 'yes' : 'no'}`,
-    `Native bridge version: ${typeof bridgeVersion === 'number' && Number.isInteger(bridgeVersion) &&
-      bridgeVersion >= 0 && bridgeVersion <= 1000 ? bridgeVersion : 'unknown'}`,
-  ];
-  const elapsed = () => `${Date.now() - startedAt}ms`;
-
-  try {
-    const loginResult = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
-    diagnostics.push(`Login callback: ${nativeCallbackStatus(loginResult)}, ` +
-      `customer ${nativeCustomerIdKind(loginResult?.customerId, loginId)}, at ${elapsed()}, ` +
-      `native error ${loginResult?.error ? 'present' : 'absent'}`);
-    if (!loginResult || loginResult.status === 'FAILED') {
-      throw new NativePurchaseLinkError('The native purchase login failed.', diagnostics);
-    }
-
-    let observedCustomerId: unknown;
-    // Some native builds deliver the login callback before customerId reflects
-    // the switch. Never bill using the callback alone: require the read-back
-    // identity to match exactly, but allow a few seconds for it to settle.
-    for (const delayMs of [0, 500, 1500, 3000]) {
-      if (delayMs) await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
-      const customerResult = await toPromise<any>((cb) => np.customerId(cb));
-      diagnostics.push(`Read-back: ${nativeCallbackStatus(customerResult)}, ` +
-        `customer ${nativeCustomerIdKind(customerResult?.customerId, loginId)}, at ${elapsed()}, ` +
-        `native error ${customerResult?.error ? 'present' : 'absent'}`);
-      if (customerResult?.status === 'FAILED') {
-        throw new NativePurchaseLinkError('The native purchase identity check failed.', diagnostics);
-      }
-      observedCustomerId = customerResult?.customerId;
-      if (observedCustomerId === loginId) return;
-    }
-    throw new NativePurchaseLinkError(
-      `The native app did not confirm the signed-in purchase account ` +
-      `(login reported ${nativeCustomerIdKind(loginResult.customerId)}; ` +
-      `read-back ${nativeCustomerIdKind(observedCustomerId)}).`,
-      diagnostics,
-      await hashAnonymousCustomerId(observedCustomerId),
-    );
-  } catch (error) {
-    if (error instanceof NativePurchaseLinkError) throw error;
-    diagnostics.push(`Bridge exception: ${error instanceof Error && error.message.startsWith('NATIVELY_TIMEOUT')
-      ? 'callback timed out' : 'other'}`);
-    throw new NativePurchaseLinkError('The native purchase account link did not complete.', diagnostics);
-  }
-}
-
-/** Read the RevenueCat customer identity on either supported native platform. */
-export async function getNativePurchaseCustomerId(): Promise<string> {
-  if (!isNativelyPurchasesApp()) {
-    throw new Error('Open Roster in the Natively app to check the purchase identity.');
-  }
-  const data = await toPromise<any>((cb) => np.customerId(cb));
-  if (data?.status === 'FAILED') {
-    throw new Error(data.error || 'Could not read the native purchase identity.');
-  }
-  const id = data?.customerId;
-  if (typeof id !== 'string' || !id.trim()) {
-    throw new Error('The native app did not provide its purchase identity.');
-  }
-  return id.trim();
-}
-
-/**
- * customerId() may report RevenueCat's original anonymous identity, so it
- * cannot authorize a purchase. Only an explicit native bridge method backed
- * by the SDK's current appUserID is accepted. Older builds fail closed.
- */
-async function readCurrentNativePurchaseIdentity(): Promise<{ appUserID: string; hasPurchaseHistory?: boolean }> {
-  if (!isNativelyPurchasesApp()) {
-    throw new Error('Purchases are available only in the Roster mobile app.');
-  }
-  const bridge = np as NativelyPurchases & {
-    currentAppUserId?: (callback: (result: unknown) => void) => void;
-  };
-  if (typeof bridge.currentAppUserId !== 'function') {
-    throw new Error('This app version cannot verify the current store account. Paid checkout is unavailable; you can continue for free.');
-  }
-  const result = await toPromise<any>((callback) => bridge.currentAppUserId!(callback), 8000);
-  if (result?.status !== 'SUCCESS' || typeof result.appUserID !== 'string' ||
-      !result.appUserID.trim()) {
-    throw new Error('The current store account could not be verified. No purchase was started.');
-  }
-  return {
-    appUserID: result.appUserID,
-    hasPurchaseHistory: typeof result.hasPurchaseHistory === 'boolean'
-      ? result.hasPurchaseHistory : undefined,
-  };
-}
-
-export async function getCurrentNativePurchaseAppUserId(): Promise<string> {
-  return (await readCurrentNativePurchaseIdentity()).appUserID;
-}
-
-/** Retry login only when the native SDK confirms there is no anonymous purchase history. */
-export async function ensureCurrentNativePurchaseAccount(expectedId: string): Promise<void> {
-  if (!SERVER_REVENUECAT_ID.test(expectedId)) {
-    throw new Error('The signed-in purchase account is unavailable.');
-  }
-  const observed = await readCurrentNativePurchaseIdentity();
-  if (observed.appUserID === expectedId) return;
-  // Switching directly from another known account can transfer its purchases.
-  if (!observed.appUserID.startsWith('$RCAnonymousID:')) {
-    throw new Error('A different purchase account is active on this device. No purchase was started.');
-  }
-  if (observed.hasPurchaseHistory !== false) {
-    throw new Error('This device may have purchases under an anonymous account. No account switch or purchase was started; restore under the original account.');
-  }
-  const response = await toPromise<any>((callback) => np.login(expectedId, undefined, callback));
-  if (response?.status !== 'SUCCESS') {
-    throw new Error('The store account could not be linked. No purchase was started.');
-  }
-  const current = await getCurrentNativePurchaseAppUserId();
-  if (current !== expectedId) {
-    throw new Error('The store did not confirm the signed-in account. No purchase was started.');
-  }
-}
-
-/**
- * Present the configured current/default RevenueCat offering through
- * Natively. Older Natively builds may never invoke this callback, so resolve
- * with an unconfirmed timeout outcome rather than holding a claim indefinitely.
- */
-export function showNativeRevenueCatPaywall(timeoutMs = 90_000): Promise<NativelyPaywallResult> {
-  if (!isNativelyPurchasesApp()) {
-    return Promise.reject(new Error('RevenueCat paywall is available only in the Natively app.'));
-  }
-  if (typeof np.showPaywall !== 'function') {
-    return Promise.reject(new Error('The Natively bridge does not support the RevenueCat paywall.'));
-  }
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const timeout = setTimeout(() => {
-      settled = true;
-      resolve({ status: 'TIMEOUT', message: 'timeout' });
-    }, timeoutMs);
-    try {
-      np.showPaywall(true, undefined, (data: any) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        if (!data || typeof data !== 'object') {
-          reject(new Error('The native paywall returned no result.'));
-          return;
-        }
-        resolve({
-          status: typeof data.status === 'string' ? data.status : '',
-          message: typeof data.message === 'string' ? data.message : '',
-        });
-      });
-    } catch (error) {
-      settled = true;
-      clearTimeout(timeout);
-      reject(error);
-    }
-  });
-}
-
-/**
  * Returns true when running inside the Natively native Android shell.
  *
  * Matches the same belt-and-suspenders logic as isNativelyAndroidApp() in
@@ -326,8 +96,6 @@ export async function isAndroidBillingSupported(waitMs = 5000): Promise<boolean>
 export interface NativelyProductPrice {
   identifier: string;
   priceString: string;
-  amount?: number;
-  currencyCode?: string;
 }
 
 export function canPurchaseAndroidProduct(
@@ -370,14 +138,6 @@ function formatPrice(data: any, requireCurrency = false): string {
   return requireCurrency ? '' : `$${amount.toFixed(2)}`;
 }
 
-function numericStorePrice(data: any): Pick<NativelyProductPrice, 'amount' | 'currencyCode'> {
-  const amount = Number(data?.price);
-  const currencyCode = data?.currencyCode ?? data?.currency ?? data?.priceCurrencyCode;
-  if (!Number.isFinite(amount) || amount <= 0 ||
-      typeof currencyCode !== 'string' || !/^[A-Z]{3}$/i.test(currencyCode)) return {};
-  return { amount, currencyCode: currencyCode.toUpperCase() };
-}
-
 /**
  * Fetch the localised App Store price for each subscription product.
  * Called sequentially — each call gets its own NativelyPurchases instance
@@ -400,7 +160,7 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
       const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
       const priceString = formatPrice(data);
       if (priceString) {
-        results.push({ identifier: id, priceString, ...numericStorePrice(data) });
+        results.push({ identifier: id, priceString });
       }
     } catch (err: any) {
       console.warn(`[IAP] packagePrice(${id}) failed:`, err?.message ?? err);
@@ -440,7 +200,7 @@ export async function getAndroidProducts(
       }
       const priceString = formatPrice(data, true);
       if (priceString) {
-        const product = { identifier: id, priceString, ...numericStorePrice(data) };
+        const product = { identifier: id, priceString };
         onProduct?.(product);
         return product;
       } else {
@@ -670,7 +430,13 @@ export async function getAndroidPurchaseCustomerId(): Promise<string> {
   if (!await isAndroidBillingSupported()) {
     throw new Error('Open Roster in the Android app to recover a Google Play purchase.');
   }
-  return getNativePurchaseCustomerId();
+  const data = await toPromise<any>((cb) => np.customerId(cb));
+  if (data?.status === 'FAILED') throw new Error(data.error || 'Could not read the Android purchase identity.');
+  const id = data?.customerId;
+  if (typeof id !== 'string' || !id.trim()) {
+    throw new Error('The Android app did not provide its purchase identity. Contact support.');
+  }
+  return id.trim();
 }
 
 /** Identify RevenueCat with a server-issued ID for the authenticated Roster

@@ -19,7 +19,7 @@ export function Toaster() {
         timers.current.set(t.id, setTimeout(() => {
           dismiss(t.id)
           timers.current.delete(t.id)
-        }, t.duration ?? 1500))
+        }, 1500))
       }
     })
     timers.current.forEach((timer, id) => {

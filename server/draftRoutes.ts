@@ -387,9 +387,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
             ),
           );
         for (const s of stats) {
-          if (s.userId) {
-            priorStatsByUser[s.userId] = { goals: s.goals || 0, assists: s.assists || 0 };
-          }
+          priorStatsByUser[s.userId] = { goals: s.goals || 0, assists: s.assists || 0 };
         }
       }
 
@@ -857,7 +855,8 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const leagueName = league?.name || "your league";
       const [commish] = await db.select().from(users).where(eq(users.id, userId));
       const commishName =
-        [commish?.firstName, commish?.lastName].filter(Boolean).join(" ").trim() ||
+        (commish?.firstName || "").trim() ||
+        commish?.displayName ||
         "Your commissioner";
       for (const captainUserId of result.captainUserIds || []) {
         if (captainUserId === userId) continue;
@@ -931,7 +930,8 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
       const leagueName = league?.name || "your league";
       const [commish] = await db.select().from(users).where(eq(users.id, userId));
       const commishName =
-        [commish?.firstName, commish?.lastName].filter(Boolean).join(" ").trim() ||
+        (commish?.firstName || "").trim() ||
+        commish?.displayName ||
         "Your commissioner";
       let sent = 0;
       for (const captainUserId of pendingCaptains) {
@@ -1023,8 +1023,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         .update(drafts)
         .set({
           status: "pending",
-          currentRound: 1,
-          currentTurn: 1,
+          currentPickIndex: 0,
           captainReadyState: {},
           completedAt: null,
           startedAt: null,
@@ -1225,6 +1224,7 @@ export function registerDraftRoutes(app: Express, isAuthenticated: IsAuth) {
         const cap = team?.captainId ? userById.get(team.captainId) : null;
         const pickingCaptainName = cap
           ? (`${cap.firstName || ""} ${cap.lastName || ""}`.trim() ||
+              cap.displayName ||
               cap.email ||
               "Captain")
           : null;
