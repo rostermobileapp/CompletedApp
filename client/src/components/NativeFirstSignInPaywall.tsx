@@ -27,7 +27,7 @@ type CurrentState = {
 };
 
 // A callback timeout is ambiguous on older native builds: keep this in-memory
-// guard until the app reloads so returning to Home cannot stack another native
+// guard until the app reloads so revisiting onboarding cannot stack another native
 // sheet while the first one may still be visible. The server is not marked
 // shown; a fresh app session can retry.
 const attemptedNativePaywallAccounts = new Set<string>();
@@ -37,13 +37,19 @@ const attemptedNativePaywallAccounts = new Set<string>();
  * This component intentionally renders no UI; all purchase UI belongs to the
  * RevenueCat offering presented by Natively.
  */
-export function NativeFirstSignInPaywall() {
+export function NativeFirstSignInPaywall({
+  onOutcome,
+}: {
+  onOutcome?: (outcome: 'unavailable' | 'presented' | 'error') => void;
+} = {}) {
   const { user, isAuthenticated } = useAuth();
   const { isActive: isDemoActive } = useDemo();
   const { role, isPrimaryCommissioner, isLoading: permissionsLoading } = usePermissions();
   const [nativeReady, setNativeReady] = useState(isNativelyPurchasesApp);
   const [flowError, setFlowError] = useState<string | null>(null);
   const { toast } = useToast();
+  const outcomeCallback = useRef(onOutcome);
+  outcomeCallback.current = onOutcome;
   const current = useRef<CurrentState>({
     authenticated: false,
     userId: null,
@@ -69,7 +75,10 @@ export function NativeFirstSignInPaywall() {
     // Native bridge injection can happen after Home mounts, with or without a
     // nativelyReady event. Bound the polling for browsers that never get one.
     const interval = window.setInterval(refresh, 500);
-    const timeout = window.setTimeout(() => window.clearInterval(interval), 15_000);
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(interval);
+      outcomeCallback.current?.('error');
+    }, 15_000);
     window.addEventListener('nativelyReady', refresh);
     window.addEventListener('focus', refresh);
     window.addEventListener('resume', refresh);
@@ -87,6 +96,11 @@ export function NativeFirstSignInPaywall() {
   useEffect(() => {
     const accountId = user?.id;
     const paidRole = role === 'player_pro' || role === 'commissioner';
+    if (accountId && isAuthenticated && !permissionsLoading &&
+        (paidRole || isPrimaryCommissioner || isDemoActive ||
+          attemptedNativePaywallAccounts.has(accountId))) {
+      outcomeCallback.current?.('unavailable');
+    }
     if (!accountId || !isAuthenticated || isDemoActive || permissionsLoading ||
         paidRole || isPrimaryCommissioner || !nativeReady ||
         attemptedNativePaywallAccounts.has(accountId)) {
@@ -101,7 +115,6 @@ export function NativeFirstSignInPaywall() {
     let paywallOutcomeReceived = false;
     let firstFrame = 0;
     let secondFrame = 0;
-    let timer = 0;
 
     const isStillEligible = () => {
       const state = current.current;
@@ -125,7 +138,11 @@ export function NativeFirstSignInPaywall() {
         setFlowError(null);
         const statusResponse = await apiRequest('GET', '/api/iap/native-paywall-status');
         const status = await statusResponse.json() as NativePaywallStatus;
-        if (!isStillEligible() || !canPresentNativePaywall(status)) return;
+        if (!isStillEligible()) return;
+        if (!canPresentNativePaywall(status)) {
+          if (active) outcomeCallback.current?.('unavailable');
+          return;
+        }
 
         stage = 'login';
         await loginNativePurchaseAccount(status.loginId!);
@@ -145,6 +162,7 @@ export function NativeFirstSignInPaywall() {
         paywallOutcomeReceived = true;
         callbackTimedOut = result.status === 'TIMEOUT';
         presentationConfirmed = wasNativePaywallPresented(result);
+        if (active) outcomeCallback.current?.(presentationConfirmed ? 'presented' : 'error');
         void reportResult(presentationConfirmed).catch((error) => {
           console.warn('[Native paywall] Could not record presentation with the server:', error);
         });
@@ -188,6 +206,9 @@ export function NativeFirstSignInPaywall() {
           });
         }
       } catch (error) {
+        if (active) outcomeCallback.current?.(
+          error instanceof ApiError && error.status === 409 ? 'unavailable' : 'error',
+        );
         if (!(error instanceof ApiError && error.status === 409)) {
           console.warn(`[Native paywall] ${stage} step did not complete:`, error);
           const step = stage === 'status' ? 'Eligibility check'
@@ -217,16 +238,13 @@ export function NativeFirstSignInPaywall() {
       }
     };
 
-    // The two animation frames ensure the onboarding step had a chance to paint
-    // before the two-second delay begins.
+    // Let the onboarding step paint, then open the native RevenueCat paywall.
     firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
-        timer = window.setTimeout(() => {
-          if (!isStillEligible()) return;
-          flowStarted = true;
-          attemptedNativePaywallAccounts.add(accountId);
-          void runPaywallFlow();
-        }, 2000);
+        if (!isStillEligible()) return;
+        flowStarted = true;
+        attemptedNativePaywallAccounts.add(accountId);
+        void runPaywallFlow();
       });
     });
 
@@ -234,7 +252,6 @@ export function NativeFirstSignInPaywall() {
       active = false;
       window.cancelAnimationFrame(firstFrame);
       window.cancelAnimationFrame(secondFrame);
-      window.clearTimeout(timer);
       // Failures and native "not_presented" outcomes can retry on a later
       // onboarding visit; confirmed presentations remain guarded for this session.
       if (flowStarted && !presentationConfirmed && !callbackTimedOut) {

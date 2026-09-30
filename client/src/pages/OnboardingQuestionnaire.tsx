@@ -169,6 +169,7 @@ export default function OnboardingQuestionnaire() {
     retry: false,
   });
   const [processingDone, setProcessingDone] = useState(false);
+  const [paywallOutcome, setPaywallOutcome] = useState<'waiting' | 'unavailable' | 'presented' | 'error'>('waiting');
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStep = SCREEN_ORDER.indexOf(screen) + 1;
@@ -710,41 +711,61 @@ export default function OnboardingQuestionnaire() {
         {/* ── SUBSCRIPTION OFFER ───────────────────────── */}
         {screen === 'paywall' && (
           <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
-            <img src={rosterLightLogo} alt="Roster" className="mb-8 h-12 object-contain" />
-            <h2 className="mb-3 text-3xl font-black text-gray-900">Your Roster is ready</h2>
-            <p className="mb-8 max-w-sm text-gray-500">
-              Explore the subscription options, or keep using Roster for free.
-            </p>
             {isPreviewMode ? (
-              <div className="mb-8 w-full max-w-sm rounded-2xl border border-blue-200 bg-blue-50 p-5 text-left">
-                <p className="font-bold text-[#3c82f4]">RevenueCat paywall opens here</p>
-                <p className="mt-2 text-sm text-gray-600">
-                  This preview does not open a store or charge an account. In the native app, the subscription offer appears after your account is ready.
-                </p>
-              </div>
+              <p className="max-w-sm text-sm text-gray-500">
+                This is the handoff to your published RevenueCat paywall. The paywall is rendered by the native app, not this browser preview; its design cannot be previewed here.
+              </p>
             ) : !isAuthenticated ? (
-              <button
-                type="button"
-                onClick={signInForPaywall}
-                className="w-full max-w-sm rounded-2xl bg-[#3c82f4] px-6 py-4 text-lg font-bold text-white"
-              >
-                Sign in to view subscription options
-              </button>
-            ) : (
               <>
-                <PermissionProvider><NativeFirstSignInPaywall /></PermissionProvider>
-                {!isNativelyPurchasesApp() && (
-                  <p className="mb-6 max-w-sm text-sm text-gray-500">
-                    The RevenueCat subscription offer is available in the Roster mobile app.
-                  </p>
-                )}
+                <p className="mb-6 max-w-sm text-gray-600">Sign in to open your subscription options.</p>
                 <button
                   type="button"
-                  onClick={continueFromPaywall}
-                  className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
+                  onClick={signInForPaywall}
+                  className="w-full max-w-sm rounded-2xl bg-[#3c82f4] px-6 py-4 text-lg font-bold text-white"
                 >
-                  Continue to Roster
+                  Sign in to continue
                 </button>
+              </>
+            ) : (
+              <>
+                {isNativelyPurchasesApp() ? (
+                  <>
+                    <PermissionProvider>
+                      <NativeFirstSignInPaywall onOutcome={setPaywallOutcome} />
+                    </PermissionProvider>
+                    {paywallOutcome === 'waiting' ? (
+                      <p role="status" className="text-sm text-gray-500">Opening your RevenueCat subscription offer…</p>
+                    ) : (
+                      <>
+                        {paywallOutcome === 'error' && (
+                          <p className="mb-6 max-w-sm text-sm text-gray-600">
+                            The subscription offer could not be confirmed. If you completed a purchase or restore, access will unlock after verification.
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={continueFromPaywall}
+                          className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
+                        >
+                          Continue to Roster
+                        </button>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="mb-6 max-w-sm text-sm text-gray-500">
+                      Your published RevenueCat paywall is available in the Roster mobile app.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={continueFromPaywall}
+                      className="w-full max-w-sm rounded-2xl border border-gray-300 px-6 py-4 font-semibold text-gray-700"
+                    >
+                      Continue to Roster
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
