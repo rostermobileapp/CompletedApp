@@ -8,6 +8,7 @@ import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer,
 import { searchAccountUsers, previewAccountUserMerge, confirmAccountUserMerge, AccountUserMergeConflict } from "./accountUserMerge";
 import { hasAccountMergeOperatorContext } from "./accountMergeAuthorization";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
+import { achievementPatchCounts } from "./achievementPatchCounts";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
 import { messagingService } from "./messagingService";
@@ -39,7 +40,7 @@ import {
   canScorekeeperTournamentSpecific
 } from "./permissionMiddleware";
 import { db, pool } from "./db";
-import { gamePenalties } from "@shared/schema";
+import { gamePenalties, badgeAwards } from "@shared/schema";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
@@ -21519,6 +21520,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Achievement patches earned in the selected league season(s), subject
+  // to the same paid/free viewer rules as the league stats endpoint.
+  app.get('/api/leagues/:leagueId/patch-leaderboard', isAuthenticated, loadUserPermissions, async (req: any, res) => {
+    try {
+      const leagueId = req.params.leagueId;
+      const seasonId = Array.isArray(req.query.seasonId) ? req.query.seasonId[0] : req.query.seasonId;
+      const viewerId = req.user.claims.sub;
+      const membership = await storage.getUserLeagueMembership(viewerId, leagueId);
+      if (!membership || membership.status !== 'approved') {
+        return res.status(403).json({ message: 'Access denied - not an approved league member' });
+      }
+      if (seasonId && seasonId !== 'all') {
+        const season = await storage.getSeason(seasonId);
+        if (!season || season.leagueId !== leagueId) {
+          return res.status(400).json({ message: 'Season not found or does not belong to this league' });
+        }
+      }
+
+      // Some leagues do not set season dates. Use the first and last scheduled
+      // game dates as the window for otherwise unscoped achievement awards.
+      const windowRows = await db.execute(sql`
+        SELECT s.id,
+          COALESCE(s.start_date, date_trunc('day', min(g.scheduled_at))) AS starts,
+          COALESCE(date_trunc('day', s.end_date) + interval '1 day',
+                   date_trunc('day', max(g.scheduled_at)) + interval '1 day') AS ends
+        FROM seasons s LEFT JOIN games g ON g.season_id = s.id
+        WHERE s.league_id = ${leagueId}
+          ${seasonId && seasonId !== 'all' ? sql`AND s.id = ${seasonId}` : sql``}
+        GROUP BY s.id
+      `);
+      const seasonWindows = windowRows.rows.map((row: any) => ({
+        id: String(row.id),
+        start: row.starts ? new Date(row.starts) : null,
+        endExclusive: row.ends ? new Date(row.ends) : null,
+      }));
+
+      // Match the stats endpoint's viewer filtering before looking up awards.
+      const members = await filterPlayerStats(req.userWithPermissions,
+        (await storage.getLeagueMembers(leagueId)).map(member => ({
+          userId: member.userId,
+          user: {
+            id: member.user.id,
+            firstName: member.user.firstName,
+            lastName: member.user.lastName,
+            profileImageUrl: member.user.profileImageUrl,
+          },
+        })), leagueId);
+      const ids = members.map(member => member.userId);
+      const awards = ids.length ? await db
+        .select({
+          userId: badgeAwards.userId,
+          badgeDefinitionId: badgeAwards.badgeDefinitionId,
+          tier: badgeAwards.tier,
+          achievementType: badgeDefinitions.achievementType,
+          triggerKey: badgeDefinitions.triggerKey,
+          scopeKey: badgeAwards.scopeKey,
+          count: badgeAwards.count,
+          leagueId: badgeAwards.leagueId,
+          seasonId: badgeAwards.seasonId,
+          awardedAt: badgeAwards.awardedAt,
+        })
+        .from(badgeAwards)
+        .innerJoin(badgeDefinitions, eq(badgeAwards.badgeDefinitionId, badgeDefinitions.id))
+        .where(and(
+          inArray(badgeAwards.userId, ids),
+          eq(badgeDefinitions.category, 'achievement'),
+          isNull(badgeDefinitions.ownerTeamId),
+          isNull(badgeDefinitions.ownerSeasonId),
+        )) : [];
+      const counts = achievementPatchCounts(awards, leagueId, seasonWindows);
+      res.json(members.map(member => ({
+        ...member,
+        patchesEarned: counts.get(member.userId) ?? 0,
+      })));
+    } catch (error) {
+      console.error('Error fetching patch leaderboard:', error);
+      res.status(500).json({ message: 'Failed to fetch patch leaderboard' });
+    }
+  });
+
   // Get player stats for a league (with optional season filter)
   app.get('/api/leagues/:leagueId/stats', isAuthenticated, loadUserPermissions, async (req: any, res) => {
     try {

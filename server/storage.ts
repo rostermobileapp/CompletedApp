@@ -11407,25 +11407,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(leagueMemberships.leagueId, leagueId),
           eq(leagueMemberships.status, "approved"),
-          // Keep true free agents with no stats off the leaderboard, but do
-          // not hide historical players whose official season stats exist
-          // after their team-membership row has been removed or was never
-          // created.
-          or(
-            isNotNull(playerStats.id),
-            exists(
-              db.select({ one: sql`1` })
-                .from(teamMemberships)
-                .innerJoin(teams, eq(teamMemberships.teamId, teams.id))
-                .where(
-                  and(
-                    eq(teamMemberships.userId, users.id),
-                    eq(teams.leagueId, leagueId),
-                    eq(teamMemberships.status, 'approved')
-                  )
-                )
-            )
-          ),
+          isNull(users.deletedAt),
           // Filter by player type if specified
           ...(playerType === 'goalies' ? [eq(leagueMemberships.isGoalie, true)] : []),
           ...(playerType === 'non-goalies' ? [eq(leagueMemberships.isGoalie, false)] : [])
@@ -11474,14 +11456,15 @@ export class DatabaseStorage implements IStorage {
       })
     }));
 
-    // Keep placeholder goalies visible in the regular player-stats response
-    // with the same synthetic identity used by the League Players screen.
-    // The dedicated goalie-stats response calculates their goalie record;
-    // this row gives the regular stats table a zero-valued placeholder row.
-    const placeholderGoalieRows = playerType === 'goalies'
+    // Placeholder skaters have no registered stats row. Goalies are supplied
+    // by getGoalieStats instead, so they must not leak into the skater tab.
+    // The unfiltered response still includes both kinds of placeholders.
+    const placeholderSkaterRows = playerType === 'goalies'
       ? []
       : (await this.getLeaguePlaceholderPlayers(leagueId))
-        .filter(placeholder => placeholder.isGoalie)
+        .filter(placeholder => playerType !== 'non-goalies'
+          ? placeholder.isGoalie || placeholder.isSkater
+          : !placeholder.isGoalie && placeholder.isSkater)
         .map(placeholder => {
           const placeholderUserId = `placeholder:${placeholder.id}`;
           const timestamp = placeholder.createdAt;
@@ -11497,7 +11480,7 @@ export class DatabaseStorage implements IStorage {
             penaltyMinutes: 0,
             createdAt: timestamp,
             updatedAt: timestamp,
-            isGoalie: true,
+            isGoalie: placeholder.isGoalie,
             user: buildStatsUser({
               id: placeholderUserId,
               email: placeholder.email ?? null,
@@ -11553,7 +11536,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(playerStats)
       .innerJoin(importedPlayers, eq(playerStats.importedPlayerId, importedPlayers.id))
-      .where(and(...importedStatsConditions));
+      .where(and(...importedStatsConditions, isNull(importedPlayers.mergedWithUserId)));
 
     const importedMappedRows = importedRows.map(r => ({
       id: r.statsId,
@@ -11597,7 +11580,32 @@ export class DatabaseStorage implements IStorage {
       })
     }));
 
-    return [...registeredRows, ...placeholderGoalieRows, ...importedMappedRows];
+    // All-season views should show one player, not one entry per season.
+    // Keep selected-season values unchanged and sum only when no season is selected.
+    const combineSeasons = <T extends { id: string; gamesPlayed: number; goals: number; assists: number; penaltyMinutes: number }>(
+      rows: T[], identity: (row: T) => string,
+    ): T[] => {
+      if (seasonId) return rows;
+      const combined = new Map<string, T>();
+      for (const row of rows) {
+        const key = identity(row);
+        const previous = combined.get(key);
+        if (!previous) {
+          combined.set(key, { ...row });
+        } else {
+          previous.gamesPlayed += row.gamesPlayed;
+          previous.goals += row.goals;
+          previous.assists += row.assists;
+          previous.penaltyMinutes += row.penaltyMinutes;
+        }
+      }
+      return [...combined.values()];
+    };
+    return [
+      ...combineSeasons(registeredRows, row => row.userId),
+      ...placeholderSkaterRows,
+      ...combineSeasons(importedMappedRows, row => row.importedPlayerId!),
+    ];
   }
 
   async getPlayerStatsByUser(userId: string, leagueId: string, seasonId?: string): Promise<PlayerStats | undefined> {
@@ -12084,8 +12092,17 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
+    // Historical goalie game records can exist for someone whose current
+    // league request is pending. Do not publish that applicant on the stats
+    // list before their membership is approved.
+    const pendingGoalies = await db
+      .select({ userId: leagueMemberships.userId })
+      .from(leagueMemberships)
+      .where(and(eq(leagueMemberships.leagueId, leagueId), eq(leagueMemberships.status, 'pending')));
+    const pendingIds = new Set(pendingGoalies.map(row => row.userId));
+
     // Convert to final format with proper GAA calculation
-    const finalStats = Array.from(goalieStatsMap.values()).map(stats => ({
+    const finalStats = Array.from(goalieStatsMap.values()).filter(stats => !pendingIds.has(stats.userId)).map(stats => ({
       userId: stats.userId,
       gamesPlayed: stats.gamesPlayed,
       wins: stats.wins,
