@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, CircleCheck, LoaderCircle } from 'lucide-react';
 import hockeyHero from './roster-hockey-hero.jpg';
-import freePlayerArt from './free-player-art.jpg';
+import freePlayerAnimation from '@assets/giphy_(1)_1790792027182.gif';
 import './subscription-offer-view.css';
 
 export type SubscriptionOfferTier = 'free' | 'player_pro' | 'commissioner';
@@ -172,7 +172,7 @@ export default function SubscriptionOfferView({
               <div className="subscription-offer__free-art-wrap">
                 <img
                   className="subscription-offer__free-art"
-                  src={freePlayerArt}
+                  src={freePlayerAnimation}
                   alt="Hockey player giving a thumbs-down"
                   loading="lazy"
                 />
