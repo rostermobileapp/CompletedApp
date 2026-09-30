@@ -1,69 +1,73 @@
 import { pool } from './db';
 import type { PoolClient } from '@neondatabase/serverless';
+import { z } from 'zod';
 
 export type MergeIdentity = { type: 'user' | 'placeholder' | 'imported'; id: string };
 export class PlayerMergeConflict extends Error {}
+export const leagueMergeDialogIdentitySchema = z.object({ type: z.literal('user'), id: z.string().min(1) });
+export const leagueMergeDialogPreviewSchema = z.object({
+  source: leagueMergeDialogIdentitySchema, survivor: leagueMergeDialogIdentitySchema,
+});
+export const leagueMergeDialogConfirmSchema = z.object({
+  source: leagueMergeDialogIdentitySchema, survivorId: z.string().min(1), acknowledgeIdentity: z.literal(true),
+});
 
 const query = (client: PoolClient, text: string, params: unknown[] = []) => client.query(text, params);
 
-/** The same identity list is used for search and for the review screen. Names are hints, never identity proof. */
+/** Candidates for the commissioner dialog are active U accounts in this league only. */
 export async function findLeagueMergeCandidates(leagueId: string, search = '') {
   const term = search.trim().slice(0, 100);
   const { rows } = await pool.query(`
-    SELECT * FROM (
-      SELECT 'user' AS type, u.id, u.display_id AS "displayId",
-        concat_ws(' ', coalesce(lm.display_first_name, u.first_name), coalesce(lm.display_last_name, u.last_name)) AS name,
-        u.email, CASE WHEN u.email ILIKE '%@placeholder.roster' THEN 'legacy' ELSE 'account' END AS "identityKind",
-        (u.deleted_at IS NULL AND u.email IS NOT NULL AND u.email NOT ILIKE '%@placeholder.roster') AS "canSurvive"
-      FROM league_memberships lm JOIN users u ON u.id=lm.user_id WHERE lm.league_id=$1
-      UNION ALL
-      SELECT 'placeholder', p.id, NULL, concat_ws(' ', p.first_name, p.last_name), p.email, 'roster', false
-      FROM placeholder_players p LEFT JOIN teams t ON t.id=p.team_id
-      WHERE coalesce(p.league_id,t.league_id)=$1
-      UNION ALL
-      SELECT 'imported', i.id, NULL, concat_ws(' ', i.first_name, i.last_name), i.email, 'import', false
-      FROM imported_players i WHERE i.league_id=$1 AND i.merged_with_user_id IS NULL
-    ) identities
-    WHERE $2='' OR name ILIKE '%' || $2 || '%' OR email ILIKE '%' || $2 || '%'
-       OR "displayId" ILIKE '%' || $2 || '%' OR id=$2
-    ORDER BY name, type, id LIMIT 100`, [leagueId, term]);
+    SELECT 'user' AS type, u.id, u.display_id AS "displayId",
+      concat_ws(' ', coalesce(lm.display_first_name, u.first_name), coalesce(lm.display_last_name, u.last_name)) AS name,
+      u.email, 'account' AS "identityKind", true AS "canSurvive"
+    FROM league_memberships lm JOIN users u ON u.id=lm.user_id
+    WHERE lm.league_id=$1 AND u.deleted_at IS NULL AND u.email IS NOT NULL
+      AND u.email NOT ILIKE '%@placeholder.roster' AND u.display_id ~ '^U[0-9]{5}$'
+      AND ($2='' OR concat_ws(' ', coalesce(lm.display_first_name, u.first_name), coalesce(lm.display_last_name, u.last_name)) ILIKE '%' || $2 || '%'
+        OR u.email ILIKE '%' || $2 || '%' OR upper(u.display_id)=upper($2) OR u.id=$2)
+    ORDER BY CASE WHEN upper(u.display_id)=upper($2) THEN 0 ELSE 1 END, name, u.id LIMIT 100`, [leagueId, term]);
   return rows;
 }
 
-export async function previewLeaguePlayerMerge(leagueId: string, identity: MergeIdentity) {
+export async function previewLeaguePlayerMerge(leagueId: string, identity: MergeIdentity, allowNonDialogUser = false) {
+  if (identity.type !== 'user') throw new PlayerMergeConflict('Select a user account with a U ID in this league.');
   const candidates = await findLeagueMergeCandidates(leagueId);
   // Search by exact ID separately: the capped list should never hide an explicitly selected identity.
-  const match = candidates.find(c => c.type === identity.type && c.id === identity.id)
-    || (await findLeagueMergeCandidates(leagueId, identity.id)).find(c => c.type === identity.type && c.id === identity.id);
+  let match = candidates.find(c => c.id === identity.id)
+    || (await findLeagueMergeCandidates(leagueId, identity.id)).find(c => c.id === identity.id);
+  // The separate replacement workflow may review an older users row without a U ID.
+  if (!match && allowNonDialogUser) {
+    const { rows } = await pool.query(`
+      SELECT 'user' AS type, u.id, u.display_id AS "displayId",
+        concat_ws(' ', coalesce(lm.display_first_name, u.first_name), coalesce(lm.display_last_name, u.last_name)) AS name,
+        u.email, CASE WHEN u.email ILIKE '%@placeholder.roster' THEN 'legacy' ELSE 'account' END AS "identityKind",
+        (u.email IS NOT NULL AND u.email NOT ILIKE '%@placeholder.roster') AS "canSurvive"
+      FROM users u JOIN league_memberships lm ON lm.user_id=u.id
+      WHERE lm.league_id=$1 AND u.id=$2 AND u.deleted_at IS NULL
+      `, [leagueId, identity.id]);
+    match = rows[0];
+  }
   if (!match) throw new PlayerMergeConflict('This player is no longer available in this league. Refresh the search.');
-  const user = identity.type === 'user' ? identity.id : null;
-  const imported = identity.type === 'imported' ? identity.id : null;
-  const placeholder = identity.type === 'placeholder' ? identity.id : null;
+  const user = identity.id;
   const { rows: seasons } = await pool.query(`
     SELECT s.name, ps.games_played AS games, ps.goals, ps.assists, ps.penalty_minutes AS penalties
     FROM player_stats ps LEFT JOIN seasons s ON s.id=ps.season_id
-    WHERE ps.league_id=$1 AND (($2::text IS NOT NULL AND ps.user_id=$2) OR ($3::text IS NOT NULL AND ps.imported_player_id=$3))
-    ORDER BY s.name`, [leagueId, user, imported]);
+    WHERE ps.league_id=$1 AND ps.user_id=$2
+    ORDER BY s.name`, [leagueId, user]);
   const { rows: teams } = await pool.query(`
     SELECT DISTINCT t.name FROM teams t
-    LEFT JOIN team_memberships tm ON tm.team_id=t.id AND tm.user_id=$2
-    LEFT JOIN placeholder_players pp ON pp.team_id=t.id AND pp.id=$3
-    LEFT JOIN imported_players ip ON ip.team_id=t.id AND ip.id=$4
-    WHERE t.league_id=$1 AND (tm.id IS NOT NULL OR pp.id IS NOT NULL OR ip.id IS NOT NULL)
-    ORDER BY t.name`, [leagueId, user, placeholder, imported]);
-  if (identity.type === 'imported' && teams.length === 0) {
-    const importedTeam = await pool.query('SELECT team_name FROM imported_players WHERE id=$1 AND league_id=$2', [identity.id, leagueId]);
-    if (importedTeam.rows[0]?.team_name) teams.push({ name: importedTeam.rows[0].team_name });
-  }
+    JOIN team_memberships tm ON tm.team_id=t.id AND tm.user_id=$2
+    WHERE t.league_id=$1 ORDER BY t.name`, [leagueId, user]);
   const { rows: [history] } = await pool.query(`
     SELECT
       (SELECT count(*)::int FROM game_goals gg JOIN games g ON g.id=gg.game_id WHERE g.league_id=$1 AND $2::text IN (gg.scorer_id, gg.primary_assist_id, gg.secondary_assist_id)) AS goals,
       (SELECT count(*)::int FROM game_penalties gp JOIN games g ON g.id=gp.game_id WHERE g.league_id=$1 AND gp.player_id=$2) AS penalties,
       (SELECT count(*)::int FROM game_goalies gl JOIN games g ON g.id=gl.game_id WHERE g.league_id=$1 AND gl.goalie_user_id=$2) AS goalie,
       (SELECT count(*)::int FROM game_stars gs JOIN games g ON g.id=gs.game_id WHERE g.league_id=$1 AND $2::text IN (gs.first_star_user_id,gs.second_star_user_id,gs.third_star_user_id)) AS stars,
-      (SELECT count(*)::int FROM game_attendance a JOIN games g ON g.id=a.game_id WHERE g.league_id=$1 AND (a.user_id=$2 OR a.placeholder_player_id=$3)) AS attendance,
+       (SELECT count(*)::int FROM game_attendance a JOIN games g ON g.id=a.game_id WHERE g.league_id=$1 AND a.user_id=$2) AS attendance,
       (SELECT count(*)::int FROM game_rsvps r JOIN games g ON g.id=r.game_id WHERE g.league_id=$1 AND r.user_id=$2) AS rsvps`,
-    [leagueId, user, placeholder]);
+    [leagueId, user]);
   return { ...match, seasons, teams: teams.map(t => t.name), history };
 }
 
@@ -74,7 +78,9 @@ export async function previewLeaguePlayerMerge(leagueId: string, identity: Merge
 export async function mergeLeaguePlayer(
   leagueId: string, commissionerId: string, source: MergeIdentity, survivorId: string,
   preserveLeagueDisplayName = false,
+  dialogUsersOnly = false,
 ) {
+  if (dialogUsersOnly && source.type !== 'user') throw new PlayerMergeConflict('Select a user account with a U ID in this league.');
   if (source.type === 'user' && source.id === survivorId) throw new PlayerMergeConflict('Select two different player profiles.');
   const client = await pool.connect();
   const run = (sql: string, params: unknown[] = []) => query(client, sql, params);
@@ -87,7 +93,10 @@ export async function mergeLeaguePlayer(
     const league = await run('SELECT commissioner_id FROM leagues WHERE id=$1 FOR UPDATE', [leagueId]);
     if (league.rows[0]?.commissioner_id !== commissionerId) throw new PlayerMergeConflict('Only the league commissioner can merge players.');
     const target = await run(`SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL AND email IS NOT NULL
-      AND email NOT ILIKE '%@placeholder.roster' FOR UPDATE`, [survivorId]);
+      AND email NOT ILIKE '%@placeholder.roster'
+      ${dialogUsersOnly ? `AND display_id ~ '^U[0-9]{5}$'
+        AND EXISTS (SELECT 1 FROM league_memberships WHERE league_id=$2 AND user_id=users.id)` : ''}
+      FOR UPDATE`, dialogUsersOnly ? [survivorId, leagueId] : [survivorId]);
     if (!target.rowCount) throw new PlayerMergeConflict('The surviving profile must be an active registered account.');
     const sourceScope = source.type === 'user'
       ? `EXISTS (SELECT 1 FROM league_memberships WHERE league_id=$2 AND user_id=$1)`
@@ -103,7 +112,9 @@ export async function mergeLeaguePlayer(
       if (!locked.rowCount) throw new PlayerMergeConflict('This roster entry was claimed during review. Refresh the search.');
     }
     if (source.type === 'user') {
-      const sourceUser = await run('SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', [source.id]);
+      const sourceUser = await run(`SELECT id FROM users WHERE id=$1 AND deleted_at IS NULL
+        ${dialogUsersOnly ? `AND email IS NOT NULL AND email NOT ILIKE '%@placeholder.roster'
+          AND display_id ~ '^U[0-9]{5}$'` : ''} FOR UPDATE`, [source.id]);
       if (!sourceUser.rowCount) throw new PlayerMergeConflict('The source profile is no longer active.');
       const owner = await run('SELECT 1 FROM leagues WHERE id=$1 AND commissioner_id=$2', [leagueId, source.id]);
       if (owner.rowCount) throw new PlayerMergeConflict('Transfer league ownership before merging the commissioner profile.');

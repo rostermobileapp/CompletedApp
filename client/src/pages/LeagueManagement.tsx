@@ -154,9 +154,8 @@ type LeagueMember = {
 };
 
 async function confirmPlayerReplacement(leagueId: string, sourceId: string, survivorId: string): Promise<boolean> {
-  const response = await apiRequest('POST', `/api/leagues/${leagueId}/player-merge/preview`, {
-    source: { type: 'user', id: sourceId },
-    survivor: { type: 'user', id: survivorId },
+  const response = await apiRequest('POST', `/api/leagues/${leagueId}/player-replacement/preview`, {
+    sourceId, survivorId,
   });
   const { source, survivor } = await response.json();
   const describe = (identity: any) =>

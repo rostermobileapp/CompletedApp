@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { pool } from '../db';
-import { findLeagueMergeCandidates, mergeLeaguePlayer, previewLeaguePlayerMerge } from '../leaguePlayerMerge';
+import { findLeagueMergeCandidates, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema, mergeLeaguePlayer, previewLeaguePlayerMerge } from '../leaguePlayerMerge';
 
 test('commissioner merge transfers different-email league history and preserves other leagues', async () => {
   const key = randomUUID().replaceAll('-', '');
@@ -14,6 +14,9 @@ test('commissioner merge transfers different-email league history and preserves 
     for (const name of ['commissioner', 'old', 'new', 'other', 'legacy'])
       await q('INSERT INTO users (id,email,first_name) VALUES ($1,$2,$3)',
         [ids[name], name === 'legacy' ? `${key}@placeholder.roster` : `${name}_${key}@example.com`, name]);
+    const displayBase = 10000 + (parseInt(key.slice(0, 7), 16) % 80000);
+    await q(`UPDATE users SET display_id=CASE id WHEN $1 THEN $3 WHEN $2 THEN $4 END
+      WHERE id IN ($1,$2)`, [old, target, `U${displayBase}`, `U${displayBase + 1}`]);
     for (const name of ['league', 'outside'])
       await q(`INSERT INTO leagues (id,name,unique_league_id,sport,commissioner_id)
         VALUES ($1,'Merge test',$2,'hockey',$3)`, [ids[name], `Z${key.slice(name === 'league' ? 0 : 5, name === 'league' ? 5 : 10)}`.toUpperCase(), ids.commissioner]);
@@ -134,5 +137,91 @@ test('commissioner merge transfers different-email league history and preserves 
     await q('DELETE FROM seasons WHERE id=$1', [ids.season]);
     await q('DELETE FROM leagues WHERE id IN ($1,$2)', [l, ids.outside]);
     await q('DELETE FROM users WHERE id IN ($1,$2,$3,$4,$5)', [ids.commissioner, old, target, ids.other, ids.legacy]);
+  }
+});
+
+test('dialog searches only eligible league U accounts and rejects roster identities at both API boundaries', async () => {
+  const key = randomUUID().replaceAll('-', '');
+  const ids = Object.fromEntries(['commissioner', 'first', 'second', 'legacy', 'nonmember', 'league', 'batch', 'import1', 'import2', 'placeholder1', 'placeholder2']
+    .map(name => [name, `merge_picker_${key}_${name}`]));
+  const q = (text: string, params: unknown[] = []) => pool.query(text, params);
+  const base = 10000 + (parseInt(key.slice(0, 7), 16) % 80000);
+  const firstDisplay = `U${base}`, secondDisplay = `U${base + 1}`;
+  try {
+    for (const name of ['commissioner', 'first', 'second', 'legacy', 'nonmember'])
+      await q(`INSERT INTO users (id,email,first_name,last_name,display_id)
+        VALUES ($1,$2,'Brad','Edwards',$3)`, [
+        ids[name],
+        name === 'legacy' ? `${key}@placeholder.roster` : `brad_${name}_${key}@example.com`,
+        name === 'first' ? firstDisplay : name === 'second' ? secondDisplay : null,
+      ]);
+    await q(`INSERT INTO leagues (id,name,unique_league_id,sport,commissioner_id)
+      VALUES ($1,'Picker test',$2,'hockey',$3)`, [ids.league, `Z${key.slice(0, 5)}`.toUpperCase(), ids.commissioner]);
+    for (const name of ['first', 'second', 'legacy'])
+      await q(`INSERT INTO league_memberships (user_id,league_id,status) VALUES ($1,$2,'approved')`, [ids[name], ids.league]);
+    for (const name of ['placeholder1', 'placeholder2'])
+      await q(`INSERT INTO placeholder_players (id,league_id,first_name,last_name,email)
+        VALUES ($1,$2,'Brad','Edwards',$3)`, [ids[name], ids.league, `brad_${key}@example.com`]);
+    await q(`INSERT INTO player_imports (id,league_id,imported_by,file_name,total_records,successful_records,failed_records)
+      VALUES ($1,$2,$3,'test.csv',2,2,0)`, [ids.batch, ids.league, ids.commissioner]);
+    for (const name of ['import1', 'import2'])
+      await q(`INSERT INTO imported_players (id,import_id,league_id,first_name,last_name,email)
+        VALUES ($1,$2,$3,'Brad','Edwards',$4)`, [ids[name], ids.batch, ids.league, `brad_${key}@example.com`]);
+
+    for (const search of ['Brad Edwards', 'brad_first_', firstDisplay, secondDisplay]) {
+      const found = await findLeagueMergeCandidates(ids.league, search);
+      assert.deepEqual(found.map(c => c.id).sort(), search === 'Brad Edwards'
+        ? [ids.first, ids.second].sort()
+        : [search === secondDisplay ? ids.second : ids.first]);
+      for (const c of found) {
+        assert.equal(c.type, 'user');
+        assert.match(c.displayId, /^U[0-9]{5}$/);
+        assert.match(c.email, /@example.com$/);
+        assert.equal(c.canSurvive, true);
+      }
+    }
+    assert.deepEqual(await findLeagueMergeCandidates(ids.league, ids.import1), []);
+    assert.deepEqual(await findLeagueMergeCandidates(ids.league, ids.nonmember), []);
+
+    // Both pickers use the same candidate endpoint. The route's shared schema rejects
+    // non-user identities before preview/confirm, and the service checks eligibility again.
+    for (const type of ['placeholder', 'imported'] as const) {
+      const sourceId = type === 'placeholder' ? ids.placeholder1 : ids.import1;
+      assert.throws(() => leagueMergeDialogPreviewSchema.parse({
+        source: { type, id: sourceId }, survivor: { type: 'user', id: ids.second },
+      }));
+      assert.throws(() => leagueMergeDialogPreviewSchema.parse({
+        source: { type: 'user', id: ids.first }, survivor: { type, id: sourceId },
+      }));
+      assert.throws(() => leagueMergeDialogConfirmSchema.parse({
+        source: { type, id: sourceId }, survivorId: ids.second, acknowledgeIdentity: true,
+      }));
+      await assert.rejects(previewLeaguePlayerMerge(ids.league, { type, id: sourceId }), /user account with a U ID/);
+      await assert.rejects(previewLeaguePlayerMerge(ids.league, { type: 'user', id: sourceId }), /no longer available/);
+      await assert.rejects(mergeLeaguePlayer(ids.league, ids.commissioner, { type, id: sourceId }, ids.second, false, true), /user account with a U ID/);
+      await assert.rejects(mergeLeaguePlayer(ids.league, ids.commissioner, { type: 'user', id: sourceId }, ids.second, false, true), /not in this league/);
+    }
+    await assert.rejects(previewLeaguePlayerMerge(ids.league, { type: 'user', id: ids.legacy }), /no longer available/);
+    const legacyReplacementPreview = await previewLeaguePlayerMerge(ids.league, { type: 'user', id: ids.legacy }, true);
+    assert.equal(legacyReplacementPreview.id, ids.legacy);
+    await assert.rejects(mergeLeaguePlayer(ids.league, ids.commissioner, { type: 'user', id: ids.legacy }, ids.second, false, true), /no longer active/);
+    await assert.rejects(mergeLeaguePlayer(ids.league, ids.commissioner, { type: 'user', id: ids.first }, ids.legacy, false, true), /surviving profile/);
+    const from = await previewLeaguePlayerMerge(ids.league, { type: 'user', id: ids.first });
+    const to = await previewLeaguePlayerMerge(ids.league, { type: 'user', id: ids.second });
+    assert.equal(from.displayId, firstDisplay);
+    assert.equal(to.displayId, secondDisplay);
+    await mergeLeaguePlayer(ids.league, ids.commissioner, { type: 'user', id: ids.first }, ids.second, false, true);
+    assert.equal((await q('SELECT count(*)::int AS n FROM league_memberships WHERE league_id=$1 AND user_id=$2',
+      [ids.league, ids.first])).rows[0].n, 0);
+    assert.equal((await q('SELECT count(*)::int AS n FROM imported_players WHERE league_id=$1', [ids.league])).rows[0].n, 2);
+    assert.equal((await q('SELECT count(*)::int AS n FROM placeholder_players WHERE league_id=$1', [ids.league])).rows[0].n, 2);
+  } finally {
+    await q('DELETE FROM imported_players WHERE import_id=$1', [ids.batch]);
+    await q('DELETE FROM player_imports WHERE id=$1', [ids.batch]);
+    await q('DELETE FROM placeholder_players WHERE league_id=$1', [ids.league]);
+    await q('DELETE FROM league_memberships WHERE league_id=$1', [ids.league]);
+    await q('DELETE FROM leagues WHERE id=$1', [ids.league]);
+    await q('DELETE FROM users WHERE id IN ($1,$2,$3,$4,$5)',
+      [ids.commissioner, ids.first, ids.second, ids.legacy, ids.nonmember]);
   }
 });

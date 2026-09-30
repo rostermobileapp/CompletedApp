@@ -68,3 +68,4 @@
 - [GitHub push confirmation](github-push-confirmation.md) — a CLI auth failure may precede platform sync; check the remote branch and Railway commit before declaring deployment blocked.
 - [Native frontend deployment timing](native-frontend-deployment-timing.md) — Railway API readiness does not prove the Vercel-served native webview has the new frontend; verify both before device tests.
 - [Account merge safety boundary](account-merge-safety-boundary.md) — cross-account transfers must block unclassified references and provider/authority records; never infer purchase ownership from matching identities.
+- [League merge dialog boundary](league-merge-dialog-boundary.md) — U-account-only dialog validation must stay separate from commissioner replacement of legacy placeholder-backed users.

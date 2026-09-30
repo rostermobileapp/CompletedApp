@@ -8,9 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 type Candidate = {
-  type: 'user' | 'placeholder' | 'imported';
-  id: string; displayId: string | null; name: string; email: string | null;
-  identityKind: string; canSurvive: boolean;
+  type: 'user';
+  id: string; displayId: string; name: string; email: string;
 };
 type Detail = Candidate & {
   seasons: { name: string | null; games: number; goals: number; assists: number; penalties: number }[];
@@ -18,9 +17,9 @@ type Detail = Candidate & {
   history: { goals: number; penalties: number; goalie: number; stars: number; attendance: number; rsvps: number };
 };
 
-function Picker({ leagueId, label, selected, onSelect, survivorOnly }: {
+function Picker({ leagueId, label, selected, onSelect }: {
   leagueId: string; label: string; selected: Candidate | null;
-  onSelect: (candidate: Candidate | null) => void; survivorOnly?: boolean;
+  onSelect: (candidate: Candidate | null) => void;
 }) {
   const [search, setSearch] = useState('');
   const { data = [], isFetching } = useQuery<Candidate[]>({
@@ -30,21 +29,21 @@ function Picker({ leagueId, label, selected, onSelect, survivorOnly }: {
   return (
     <div className="space-y-2 min-w-0">
       <label className="text-sm font-semibold">{label}</label>
-      <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email or ID" aria-label={`Search ${label}`} />
+       <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email or U ID" aria-label={`Search ${label}`} />
       {selected && <div className="rounded border border-primary p-2 text-sm">
-        <b>{selected.name}</b> · {selected.identityKind} · {selected.displayId || selected.id}<br />{selected.email || 'No email'}
+         <b>{selected.name}</b> · {selected.displayId}<br />{selected.email}
         <button type="button" className="ml-2 underline" onClick={() => onSelect(null)}>Change</button>
       </div>}
       {!selected && <div className="max-h-48 overflow-y-auto rounded border" role="listbox" aria-label={label}>
         {isFetching && <p className="p-2 text-sm">Searching…</p>}
-        {data.filter(c => !survivorOnly || c.canSurvive).map(c => (
+         {data.map(c => (
           <button type="button" key={`${c.type}:${c.id}`} onClick={() => onSelect(c)}
             className="block w-full border-b p-2 text-left text-sm hover:bg-muted">
-            <b>{c.name || 'Unnamed player'}</b> · {c.identityKind}<br />
-            <span className="text-muted-foreground">{c.email || 'No email'} · {c.displayId || c.id}</span>
+             <b>{c.name || 'Unnamed user'}</b> · {c.displayId}<br />
+             <span className="text-muted-foreground">{c.email}</span>
           </button>
         ))}
-        {!isFetching && !data.some(c => !survivorOnly || c.canSurvive) && <p className="p-2 text-sm">No matching players</p>}
+         {!isFetching && !data.length && <p className="p-2 text-sm">No matching user accounts found in this league</p>}
       </div>}
     </div>
   );
@@ -53,8 +52,7 @@ function Picker({ leagueId, label, selected, onSelect, survivorOnly }: {
 function IdentityDetail({ title, value }: { title: string; value: Detail }) {
   return <section className="min-w-0 rounded-lg border p-3 text-sm space-y-2">
     <h3 className="font-bold">{title}</h3>
-    <p>{value.name} · {value.identityKind}<br />{value.email || 'No email'}<br />
-      <span className="break-all text-muted-foreground">{value.displayId || value.id}</span></p>
+     <p>{value.name} · {value.displayId}<br />{value.email}</p>
     <p><b>Teams:</b> {value.teams.join(', ') || 'None'}</p>
     <p><b>Season totals:</b> {value.seasons.length ? value.seasons.map(s =>
       `${s.name || 'No season'}: ${s.games} GP, ${s.goals} G, ${s.assists} A, ${s.penalties} PIM`).join('; ') : 'None'}</p>
@@ -91,11 +89,11 @@ export function LeaguePlayerMerge({ leagueId }: { leagueId: string }) {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Merge league player profiles</DialogTitle>
-          <DialogDescription>Commissioner-only: move player history in this league from a legacy, imported, placeholder, or roster entry to a registered player. This does not retire a login or merge account-wide data. Names and emails are search hints, not proof of identity.</DialogDescription>
+           <DialogDescription>Select two user accounts in this league by U ID to move league history from one to the other. This does not retire either login or merge account-wide data. Names and emails are search hints, not proof of identity.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Picker leagueId={leagueId} label="Source · history to move" selected={source} onSelect={changeSource} />
-          <Picker leagueId={leagueId} label="Survivor · registered account" selected={survivor} onSelect={changeSurvivor} survivorOnly />
+           <Picker leagueId={leagueId} label="Source user account · history to move" selected={source} onSelect={changeSource} />
+           <Picker leagueId={leagueId} label="Survivor user account · keep history" selected={survivor} onSelect={changeSurvivor} />
         </div>
         {!preview && <Button disabled={!source || !survivor || busy || source.type === survivor.type && source.id === survivor.id}
           onClick={async () => {
