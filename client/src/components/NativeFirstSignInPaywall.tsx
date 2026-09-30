@@ -42,6 +42,7 @@ export function NativeFirstSignInPaywall() {
   const { isActive: isDemoActive } = useDemo();
   const { role, isPrimaryCommissioner, isLoading: permissionsLoading } = usePermissions();
   const [nativeReady, setNativeReady] = useState(isNativelyPurchasesApp);
+  const [flowError, setFlowError] = useState<string | null>(null);
   const { toast } = useToast();
   const current = useRef<CurrentState>({
     authenticated: false,
@@ -121,6 +122,7 @@ export function NativeFirstSignInPaywall() {
     const runPaywallFlow = async () => {
       let stage: 'status' | 'login' | 'claim' | 'paywall' = 'status';
       try {
+        setFlowError(null);
         const statusResponse = await apiRequest('GET', '/api/iap/native-paywall-status');
         const status = await statusResponse.json() as NativePaywallStatus;
         if (!isStillEligible() || !canPresentNativePaywall(status)) return;
@@ -191,11 +193,13 @@ export function NativeFirstSignInPaywall() {
           const step = stage === 'status' ? 'Eligibility check'
             : stage === 'login' ? 'Store account link'
               : stage === 'claim' ? 'Paywall authorization' : 'Paywall';
+          const detail = error instanceof Error
+            ? `${step} failed: ${error.message.slice(0, 200)}`
+            : `${step} failed. Please try again later.`;
+          if (active) setFlowError(detail);
           toast({
             title: 'Subscriptions are temporarily unavailable',
-            description: error instanceof Error
-              ? `${step} failed: ${error.message.slice(0, 200)}`
-              : `${step} failed. Please try again later.`,
+            description: detail,
             duration: 30_000,
             variant: 'destructive',
           });
@@ -248,5 +252,26 @@ export function NativeFirstSignInPaywall() {
     toast,
   ]);
 
-  return null;
+  if (!flowError) return null;
+  return (
+    <div
+      role="alert"
+      className="fixed left-4 right-4 top-20 z-[301] mx-auto max-w-lg rounded-lg border border-destructive bg-background p-4 text-foreground shadow-lg"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">Subscriptions are temporarily unavailable</p>
+          <p className="mt-1 break-words text-sm">{flowError}</p>
+        </div>
+        <button
+          type="button"
+          className="shrink-0 rounded px-2 py-1 text-sm underline"
+          onClick={() => setFlowError(null)}
+          aria-label="Dismiss subscription error"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
 }
