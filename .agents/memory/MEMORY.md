@@ -61,6 +61,7 @@
 - [Google Play sandbox isolation](google-play-sandbox-isolation.md) — RevenueCat webhook filtering cannot protect independent Play verification paths; reject test purchases before role claims.
 - [RevenueCat native identity](revenuecat-native-identity.md) — use one stable opaque account ID across iOS/Android; preserve existing purchasers, never silently rename or auto-alias established subscribers.
 - [RevenueCat paywall previews](revenuecat-paywall-preview.md) — never mock the published native paywall in browser; show a truthful handoff notice instead.
+- [Native paywall test allowlist](native-paywall-test-allowlist.md) — after replacing a tester, retarget the production one-account gate; a new account is not automatically enabled.
 - [RevenueCat webhook URL uniqueness](revenuecat-webhook-url-uniqueness.md) — one project cannot register the same URL twice; use one signed mixed-environment webhook or distinct URLs.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
