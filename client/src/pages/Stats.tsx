@@ -562,7 +562,7 @@ export default function Stats() {
                     >
                       <Avatar className="w-12 h-12">
                         <AvatarImage src={getImageUrl(leader.user?.profileImageUrl) || undefined} />
-                        <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
+                        <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-sm">
                           {getInitials(leader.user?.firstName, leader.user?.lastName)}
                         </AvatarFallback>
                       </Avatar>
@@ -743,7 +743,7 @@ export default function Stats() {
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <div className="text-[#212121] dark:text-[#212121] dark:text-white text-sm font-medium">
+                                <div className="text-[#212121] dark:text-white text-sm font-medium">
                                   {formatPlayerName(stat)}
                                 </div>
                                 {membership && (
@@ -982,7 +982,7 @@ function StatSection({
                 {tiedPlayers.slice(0, 3).map((player, idx) => (
                   <Avatar key={idx} className="w-12 h-12 border-2 border-black" data-testid={`avatar-player-${idx}`}>
                     <AvatarImage src={getImageUrl(player.user?.profileImageUrl) || undefined} />
-                    <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
+                    <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-sm">
                       {getInitials(player.user?.firstName, player.user?.lastName)}
                     </AvatarFallback>
                   </Avatar>
@@ -996,7 +996,7 @@ function StatSection({
             ) : (
               (<Avatar className="w-12 h-12" data-testid="avatar-player-single">
                 <AvatarImage src={getImageUrl(players[0].user?.profileImageUrl) || undefined} />
-                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-[#212121] dark:text-white text-sm">
+                <AvatarFallback className="bg-gray-300 dark:bg-gray-700 text-[#212121] dark:text-white text-sm">
                   {getInitials(players[0].user?.firstName, players[0].user?.lastName)}
                 </AvatarFallback>
               </Avatar>)
