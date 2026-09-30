@@ -1,34 +1,20 @@
 import { apiRequest, queryClient } from './queryClient';
 import {
   canPurchaseAndroidProduct,
-  ensureCurrentNativePurchaseAccount,
-  getCurrentNativePurchaseAppUserId,
   purchaseProduct,
   purchaseProductAndroid,
   restorePurchases,
   restorePurchasesAndroid,
 } from './nativePurchases';
-import { getCanonicalNativeRevenueCatId } from './nativeRevenueCat';
+import { getCanonicalNativeRevenueCatId, linkNativeRevenueCatAccount } from './nativeRevenueCat';
 import { onboardingProductId, type PaidTier, type BillingPeriod } from './onboardingNativeProducts';
-
-/** A server-issued account ID plus an authoritative *current* native read-back. */
-async function authorizeStoreAccount(): Promise<string> {
-  const id = await getCanonicalNativeRevenueCatId();
-  await ensureCurrentNativePurchaseAccount(id);
-  // Prevent a sign-out/account switch while native login was pending.
-  if (await getCanonicalNativeRevenueCatId() !== id ||
-      await getCurrentNativePurchaseAppUserId() !== id) {
-    throw new Error('The signed-in purchase account changed. No purchase was started.');
-  }
-  return id;
-}
 
 async function refreshAccess() {
   await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
   await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
 }
 
-/** Uses the same store callbacks and verification endpoints as Subscriptions. */
+/** Uses the same native account-link and store callbacks as Subscriptions. */
 export async function buyOnboardingNativePlan(
   platform: 'ios' | 'android',
   tier: PaidTier,
@@ -43,7 +29,7 @@ export async function buyOnboardingNativePlan(
     prices, productId, googleAvailability?.available, googleAvailability?.productIds,
   )) throw new Error('Google Play cannot verify this plan right now. No purchase was started.');
 
-  const accountId = await authorizeStoreAccount();
+  const accountId = await linkNativeRevenueCatAccount();
   // There must be no awaited work between this check and the native purchase call.
   onPurchaseStarted?.();
   if (platform === 'ios') {
@@ -90,7 +76,7 @@ export async function buyOnboardingNativePlan(
 }
 
 export async function restoreOnboardingNativePurchase(platform: 'ios' | 'android'): Promise<boolean> {
-  const accountId = await authorizeStoreAccount();
+  const accountId = await linkNativeRevenueCatAccount();
   if (platform === 'ios') {
     const purchases = await restorePurchases();
     if (!purchases.some(p => p.jwsRepresentation || p.transactionId)) {

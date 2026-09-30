@@ -13,8 +13,11 @@ import {
   getCurrentNativePurchaseAppUserId,
   ensureCurrentNativePurchaseAccount,
   NativePurchaseLinkError,
+  purchaseProduct,
+  purchaseProductAndroid,
   showNativeRevenueCatPaywall,
 } from './nativePurchases';
+import { onboardingProductId, type PaidTier, type BillingPeriod } from './onboardingNativeProducts';
 import { isNativelyAndroidApp } from '../hooks/useIosPlatform';
 
 function mockAndroid(t: Parameters<typeof test>[1] extends (t: infer T) => void ? T : never) {
@@ -176,6 +179,38 @@ test('matching native read-back remains required before account linking succeeds
     },
   });
   await loginNativePurchaseAccount(loginId);
+});
+
+test('each onboarding paid choice opens the same native store purchase action on iOS and Android', async (t) => {
+  const window = mockAndroid(t);
+  window.$agent = {};
+  const calls: string[] = [];
+  Object.defineProperty(globalThis, 'natively', {
+    configurable: true,
+    value: {
+      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void,
+        action: string, params: { packageId: string }) {
+        assert.equal(action, 'purchases_package');
+        calls.push(params.packageId);
+        callback({
+          status: 'SUCCESS',
+          transactionId: '123456789',
+          purchaseToken: 'play-token',
+          productIdentifier: params.packageId,
+        });
+      },
+    },
+  });
+  const expected: string[] = [];
+  for (const tier of ['player_pro', 'commissioner'] as PaidTier[]) {
+    for (const period of ['monthly', 'yearly'] as BillingPeriod[]) {
+      const productId = onboardingProductId(tier, period);
+      assert.equal((await purchaseProduct(productId)).productIdentifier, productId);
+      assert.equal((await purchaseProductAndroid(productId)).productIdentifier, productId);
+      expected.push(productId, productId);
+    }
+  }
+  assert.deepEqual(calls, expected);
 });
 
 test('checkout identity fails closed when the bridge only exposes ambiguous customerId', async (t) => {
