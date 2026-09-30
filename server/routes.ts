@@ -4,6 +4,7 @@ import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict } from "./leaguePlayerMerge";
 import { activeTeamIds, sharesCurrentTeam } from "./playerStatsVisibility";
 import { normalizeEmail } from "./emailNormalization";
 import { objectStorageClient } from "./objectStorage";
@@ -16653,18 +16654,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Source user is not a member of this league' });
       }
 
-      // Perform the merge
-      const mergedMembership = await storage.mergeUsersInLeague(
-        leagueId,
-        validatedData.fromUserId,
-        validatedData.toUserId,
-        validatedData.preserveName
-      );
+      // The legacy endpoint uses the same league-scoped transaction as the new
+      // commissioner review. It cannot bypass collision checks.
+      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(validatedData.toUserId);
+      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      await mergeLeaguePlayer(leagueId, userId, { type: 'user', id: validatedData.fromUserId }, validatedData.toUserId);
+      const mergedMembership = await storage.getUserLeagueMembership(validatedData.toUserId, leagueId);
 
       res.json({
         message: 'Users merged successfully',
         membership: mergedMembership,
-        preservedName: validatedData.preserveName
+        preservedName: false
       });
 
     } catch (error) {
@@ -16675,7 +16675,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: error.errors 
         });
       }
-      res.status(500).json({ message: 'Failed to merge users' });
+      res.status(error instanceof PlayerMergeConflict ? 409 : 500).json({
+        message: error instanceof PlayerMergeConflict ? error.message : 'Failed to merge users',
+      });
     }
   });
 
@@ -16695,6 +16697,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const validatedData = replaceRequestSchema.parse({ placeholderUserId, newUserId, preserveDisplayName, pendingMembershipIdToDelete });
+      if (req.body.acknowledgeIdentity !== true) {
+        return res.status(400).json({ message: 'Review both profile IDs and confirm the irreversible merge first.' });
+      }
 
       if (validatedData.placeholderUserId === validatedData.newUserId) {
         return res.status(400).json({ message: 'Cannot replace user with themselves' });
@@ -16735,27 +16740,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (s.gamesPlayed || 0) > 0 || (s.goals || 0) > 0 || (s.assists || 0) > 0
       );
 
-      // Delete pending membership first if specified (before merge creates issues)
-      // Important: Only delete a membership that belongs to the NEW user, never the placeholder
-      if (validatedData.pendingMembershipIdToDelete) {
-        // Verify the membership to delete belongs to the new user (not the placeholder)
-        const membershipToDelete = await storage.getLeagueMembership(validatedData.pendingMembershipIdToDelete);
-        if (membershipToDelete && 
-            membershipToDelete.userId === validatedData.newUserId &&
-            membershipToDelete.id !== placeholderMembership.id) {
-          await db
-            .delete(leagueMemberships)
-            .where(eq(leagueMemberships.id, validatedData.pendingMembershipIdToDelete));
-        }
-      }
-
-      // Use mergeUsersInLeague to properly transfer all stats, goals, assists, etc.
-      const mergedMembership = await storage.mergeUsersInLeague(
-        leagueId,
-        validatedData.placeholderUserId, // from (placeholder)
-        validatedData.newUserId, // to (real user)
-        validatedData.preserveDisplayName
-      );
+      // Never remove the pending membership outside the merge transaction.
+      // The new service consolidates it together with the approved roster row.
+      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(validatedData.newUserId);
+      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      await mergeLeaguePlayer(leagueId, userId, { type: 'user', id: validatedData.placeholderUserId }, validatedData.newUserId, validatedData.preserveDisplayName);
+      const mergedMembership = await storage.getUserLeagueMembership(validatedData.newUserId, leagueId);
 
       res.json({
         message: 'Player replaced successfully',
@@ -16783,200 +16773,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Return more specific error message
       const errorMessage = error?.message || 'Failed to replace player';
-      res.status(500).json({ message: errorMessage });
+      res.status(error instanceof PlayerMergeConflict ? 409 : 500).json({ message: errorMessage });
     }
   });
 
-  // Merge an imported player with a real user account
-  app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
+  const canMergeLeague = async (leagueId: string, userId: string) =>
+    (await storage.getLeague(leagueId))?.commissionerId === userId;
+  const mergeIdentitySchema = z.object({ type: z.enum(['user', 'placeholder', 'imported']), id: z.string().min(1) });
+  app.get('/api/leagues/:leagueId/player-merge/candidates', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
     try {
-      const { leagueId } = req.params;
-      const { membershipId, importedPlayerId } = req.body;
-      const userId = req.user.claims.sub;
-
-      // Validate required fields
-      if (!membershipId || !importedPlayerId) {
-        return res.status(400).json({ message: 'Missing required fields: membershipId and importedPlayerId are required' });
-      }
-
-      // Check commissioner access
-      const league = await storage.getLeague(leagueId);
-      if (!league || league.commissionerId !== userId) {
-        return res.status(403).json({ message: 'Access denied' });
-      }
-
-      // Get the imported player details
-      const importedPlayer = await db.select()
-        .from(importedPlayers)
-        .where(eq(importedPlayers.id, importedPlayerId))
-        .limit(1);
-
-      if (!importedPlayer.length) {
-        return res.status(404).json({ message: 'Imported player not found' });
-      }
-
-      const player = importedPlayer[0];
-
-      // Get the membership first to verify it exists
-      const membershipCheck = await db.select().from(leagueMemberships).where(eq(leagueMemberships.id, membershipId)).limit(1);
-      if (!membershipCheck.length) {
-        return res.status(404).json({ message: 'Membership not found' });
-      }
-
-      const realUserId = membershipCheck[0].userId;
-
-      // Approve the membership and assign to team if available
-      await storage.approveLeagueMembership(membershipId, userId);
-
-      // If imported player has team info, assign the user to that team
-      if (player.teamName) {
-        // Find or create the team
-        let team = await db.select()
-          .from(teams)
-          .where(and(eq(teams.leagueId, leagueId), eq(teams.name, player.teamName)))
-          .limit(1);
-
-        if (!team.length) {
-          // Create team if it doesn't exist
-          const newTeam = await storage.createTeam({
-            name: player.teamName,
-            leagueId: leagueId,
-          });
-          team = [newTeam];
-        }
-
-        // Assign the user to the team
-        await db.update(leagueMemberships)
-          .set({ assignedTeamId: team[0].id })
-          .where(eq(leagueMemberships.id, membershipId));
-
-        // Sync team chat participants after team assignment
-        try {
-          await messagingService.syncTeamChatParticipants(team[0].id, leagueId);
-        } catch (error) {
-          console.error('Error syncing team chat after merge team assignment:', error);
-        }
-      }
-
-      // Find and delete the placeholder user's league membership
-      // Placeholder users have emails ending with @placeholder.roster
-      // Only attempt to find placeholder if we have both first and last name
-      if (player.firstName && player.lastName) {
-        const placeholderMemberships = await db.select()
-          .from(leagueMemberships)
-          .innerJoin(users, eq(leagueMemberships.userId, users.id))
-          .where(
-            and(
-              eq(leagueMemberships.leagueId, leagueId),
-              ilike(users.email, '%@placeholder.roster'),
-              ilike(users.firstName, player.firstName),
-              ilike(users.lastName, player.lastName)
-            )
-          );
-        
-        // Delete placeholder memberships
-        for (const pm of placeholderMemberships) {
-          const placeholderUserId = pm.league_memberships.userId;
-          
-          // Only delete if it's not the real user
-          if (placeholderUserId !== realUserId) {
-            // Transfer all stat/game records from placeholder → real user BEFORE
-            // deleting the placeholder (cascade would otherwise wipe the data).
-
-            // player_stats has a unique(userId, leagueId, seasonId) constraint, so
-            // upsert: add placeholder's numbers into any existing real-user row, then
-            // delete the now-redundant placeholder rows.
-            await db.execute(sql`
-              INSERT INTO player_stats
-                (id, user_id, league_id, season_id, games_played, goals, assists, penalty_minutes, created_at, updated_at)
-              SELECT
-                gen_random_uuid(),
-                ${realUserId},
-                league_id,
-                season_id,
-                games_played,
-                goals,
-                assists,
-                penalty_minutes,
-                created_at,
-                NOW()
-              FROM player_stats
-              WHERE user_id = ${placeholderUserId}
-              ON CONFLICT (user_id, league_id, season_id) DO UPDATE SET
-                games_played    = player_stats.games_played    + EXCLUDED.games_played,
-                goals           = player_stats.goals           + EXCLUDED.goals,
-                assists         = player_stats.assists         + EXCLUDED.assists,
-                penalty_minutes = player_stats.penalty_minutes + EXCLUDED.penalty_minutes,
-                updated_at      = NOW()
-            `);
-            await db.delete(playerStats).where(eq(playerStats.userId, placeholderUserId));
-
-            // game_goals: scorer and both assists
-            await db.update(gameGoals)
-              .set({ scorerId: realUserId })
-              .where(eq(gameGoals.scorerId, placeholderUserId));
-            await db.update(gameGoals)
-              .set({ primaryAssistId: realUserId })
-              .where(eq(gameGoals.primaryAssistId, placeholderUserId));
-            await db.update(gameGoals)
-              .set({ secondaryAssistId: realUserId })
-              .where(eq(gameGoals.secondaryAssistId, placeholderUserId));
-
-            // game_goalies: goalie of record
-            await db.update(gameGoalies)
-              .set({ goalieUserId: realUserId })
-              .where(eq(gameGoalies.goalieUserId, placeholderUserId));
-
-            // game_stars: all three star slots
-            await db.update(gameStars)
-              .set({ firstStarUserId: realUserId })
-              .where(eq(gameStars.firstStarUserId, placeholderUserId));
-            await db.update(gameStars)
-              .set({ secondStarUserId: realUserId })
-              .where(eq(gameStars.secondStarUserId, placeholderUserId));
-            await db.update(gameStars)
-              .set({ thirdStarUserId: realUserId })
-              .where(eq(gameStars.thirdStarUserId, placeholderUserId));
-
-            // game_rsvps: attendance records
-            await db.update(gameRsvps)
-              .set({ userId: realUserId })
-              .where(eq(gameRsvps.userId, placeholderUserId));
-
-            // game_score_submissions: audit trail
-            await db.update(gameScoreSubmissions)
-              .set({ submittedBy: realUserId })
-              .where(eq(gameScoreSubmissions.submittedBy, placeholderUserId));
-
-            await db.delete(leagueMemberships)
-              .where(eq(leagueMemberships.id, pm.league_memberships.id));
-            
-            // Delete the placeholder user if they have no other memberships
-            const otherMemberships = await db.select()
-              .from(leagueMemberships)
-              .where(eq(leagueMemberships.userId, placeholderUserId));
-            
-            if (otherMemberships.length === 0) {
-              await db.delete(users).where(eq(users.id, placeholderUserId));
-            }
-          }
-        }
-      }
-      
-      // Mark the imported player as merged
-      await db.update(importedPlayers)
-        .set({ 
-          mergedWithUserId: realUserId,
-          mergedAt: new Date()
-        })
-        .where(eq(importedPlayers.id, importedPlayerId));
-
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error('Error merging player:', error);
-      console.error('Error stack:', error?.stack);
-      res.status(500).json({ message: 'Failed to merge player', error: error?.message });
+      res.json(await findLeagueMergeCandidates(req.params.leagueId, String(req.query.search || '')));
+    } catch (error) {
+      console.error('Player merge search failed:', error);
+      res.status(500).json({ message: 'Could not search league players' });
     }
+  });
+  app.post('/api/leagues/:leagueId/player-merge/preview', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { source, survivor } = z.object({ source: mergeIdentitySchema, survivor: mergeIdentitySchema }).parse(req.body);
+      if (survivor.type !== 'user' || source.type === survivor.type && source.id === survivor.id)
+        return res.status(400).json({ message: 'Choose a different registered account as the survivor.' });
+      const [from, to] = await Promise.all([
+        previewLeaguePlayerMerge(req.params.leagueId, source),
+        previewLeaguePlayerMerge(req.params.leagueId, survivor),
+      ]);
+      if (!to.canSurvive) return res.status(400).json({ message: 'The survivor must be an active registered account.' });
+      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(survivor.id);
+      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account. Choose a registered player.' });
+      res.json({ source: from, survivor: to });
+    } catch (error: any) {
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 400 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not preview these players' });
+    }
+  });
+  app.post('/api/leagues/:leagueId/player-merge/confirm', isAuthenticated, async (req: any, res) => {
+    if (!await canMergeLeague(req.params.leagueId, req.user.claims.sub)) return res.status(403).json({ message: 'Commissioner access required' });
+    try {
+      const { source, survivorId } = z.object({
+        source: mergeIdentitySchema, survivorId: z.string().min(1), acknowledgeIdentity: z.literal(true),
+      }).parse(req.body);
+      const { data: authIdentity, error: authError } = await supabase.auth.admin.getUserById(survivorId);
+      if (authError || !authIdentity.user) return res.status(400).json({ message: 'The survivor must have a signed-in account.' });
+      res.json(await mergeLeaguePlayer(req.params.leagueId, req.user.claims.sub, source, survivorId));
+    } catch (error: any) {
+      console.error('League player merge failed:', error);
+      res.status(error instanceof PlayerMergeConflict || error instanceof z.ZodError ? 409 : 500)
+        .json({ message: error instanceof PlayerMergeConflict ? error.message : 'Could not merge players. No changes were saved.' });
+    }
+  });
+  // The former imported-player endpoint matched legacy users by name and
+  // modified records without a transaction. It is deliberately retired.
+  app.post('/api/leagues/:leagueId/players/merge', isAuthenticated, async (req: any, res) => {
+    return res.status(410).json({ message: 'Use the commissioner Merge Player review in League Management instead.' });
   });
 
   // Leave a league (reverse of player merge)

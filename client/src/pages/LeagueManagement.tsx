@@ -113,6 +113,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { useIsDesktopWeb } from '@/hooks/useIsDesktopWeb';
 import { DesktopRequiredDialog, DESKTOP_REQUIRED_COPY } from '@/components/DesktopRequiredDialog';
 import { DraftSetupWizard } from '@/components/DraftSetupWizard';
+import { LeaguePlayerMerge } from '@/components/LeaguePlayerMerge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -150,6 +151,22 @@ type LeagueMember = {
     displayId?: string;
   };
 };
+
+async function confirmPlayerReplacement(leagueId: string, sourceId: string, survivorId: string): Promise<boolean> {
+  const response = await apiRequest('POST', `/api/leagues/${leagueId}/player-merge/preview`, {
+    source: { type: 'user', id: sourceId },
+    survivor: { type: 'user', id: survivorId },
+  });
+  const { source, survivor } = await response.json();
+  const describe = (identity: any) =>
+    `${identity.name} (${identity.email || 'no email'})\nID: ${identity.displayId || identity.id}\n` +
+    `Teams: ${identity.teams.join(', ') || 'none'}; Seasons: ${identity.seasons.map((s: any) => s.name || 'unassigned').join(', ') || 'none'}\n` +
+    `Goal events: ${identity.history.goals}, goalie appearances: ${identity.history.goalie}, stars: ${identity.history.stars}, attendance: ${identity.history.attendance}`;
+  return window.confirm(
+    `Move league history FROM:\n${describe(source)}\n\nINTO the signed-in account:\n${describe(survivor)}\n\n` +
+    'I verified these exact IDs belong to the same person. Names alone do not establish identity. This merge is irreversible. Continue?',
+  );
+}
 
 
 // Compact Score Verification Alert Component
@@ -723,15 +740,6 @@ export default function LeagueManagement() {
   const [teamToDelete, setTeamToDelete] = useState<string | null>(null);
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<Team | null>(null);
-  
-  // Post-merge placeholder deletion state
-  const [showPostMergeDeleteDialog, setShowPostMergeDeleteDialog] = useState(false);
-  const [postMergePlaceholderInfo, setPostMergePlaceholderInfo] = useState<{
-    userId: string;
-    name: string;
-    hadStats: boolean;
-  } | null>(null);
-  const [isDeletingPostMergePlaceholder, setIsDeletingPostMergePlaceholder] = useState(false);
   
   // Delete placeholder with stats dialog state
   const [showDeletePlaceholderWithStatsDialog, setShowDeletePlaceholderWithStatsDialog] = useState(false);
@@ -3418,6 +3426,7 @@ export default function LeagueManagement() {
                 <h3 className="text-lg font-semibold">Players</h3>
               </div>
               <div className="flex gap-2">
+                <LeaguePlayerMerge leagueId={leagueId} />
                 <button
                   onClick={() => setShowBulkImport(!showBulkImport)}
                   disabled={seasons.length === 0}
@@ -7840,12 +7849,13 @@ export default function LeagueManagement() {
                         
                         setIsReplacingInApproval(true);
                         try {
-                          // Replace the placeholder with the new user, and delete the pending membership atomically
+                          if (!await confirmPlayerReplacement(leagueId, selectedPlaceholder.userId, selectedMember.userId)) return;
                           const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
                             placeholderUserId: selectedPlaceholder.userId,
                             newUserId: selectedMember.userId,
                             preserveDisplayName: false,
-                            pendingMembershipIdToDelete: selectedMember.id
+                            pendingMembershipIdToDelete: selectedMember.id,
+                            acknowledgeIdentity: true,
                           });
                           
                           if (response.ok) {
@@ -7872,15 +7882,8 @@ export default function LeagueManagement() {
                               description: `Placeholder replaced successfully!${statsMessage}`,
                             });
                             
-                            // If this was a placeholder user, ask if they want to delete it
-                            if (result.isPlaceholder && result.placeholderUserId) {
-                              setPostMergePlaceholderInfo({
-                                userId: result.placeholderUserId,
-                                name: result.placeholderName || 'Unknown',
-                                hadStats: result.hadStats || false,
-                              });
-                              setShowPostMergeDeleteDialog(true);
-                            }
+                            // Keep the former user account: it may still own
+                            // activity in another league.
                           } else {
                             const error = await response.json();
                             toast({
@@ -7908,92 +7911,6 @@ export default function LeagueManagement() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Post-Merge Placeholder Delete Dialog */}
-      {showPostMergeDeleteDialog && postMergePlaceholderInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-          <div className="bg-card rounded-lg p-4 sm:p-6 w-full max-w-[calc(100vw-1rem)] sm:max-w-md hairline elev-rest">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Delete Placeholder User?</h3>
-              <button
-                onClick={() => {
-                  setShowPostMergeDeleteDialog(false);
-                  setPostMergePlaceholderInfo(null);
-                }}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                The placeholder user <span className="font-medium text-foreground">{postMergePlaceholderInfo.name}</span> has been replaced and all data has been transferred to the new user.
-              </p>
-              
-              {postMergePlaceholderInfo.hadStats && (
-                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    All stats have been successfully transferred to the new player.
-                  </p>
-                </div>
-              )}
-              
-              <p className="text-sm text-muted-foreground">
-                Would you like to delete the placeholder user from the system? This is optional - the placeholder is no longer in this league.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setShowPostMergeDeleteDialog(false);
-                    setPostMergePlaceholderInfo(null);
-                  }}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg"
-                >
-                  Keep Placeholder
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!postMergePlaceholderInfo) return;
-                    
-                    setIsDeletingPostMergePlaceholder(true);
-                    try {
-                      const response = await apiRequest('DELETE', `/api/users/${postMergePlaceholderInfo.userId}`);
-                      
-                      if (response.ok) {
-                        toast({
-                          title: "Success",
-                          description: "Placeholder user deleted successfully.",
-                        });
-                      } else {
-                        const error = await response.json();
-                        toast({
-                          title: "Note",
-                          description: error.message || "Could not delete placeholder user. They may be in other leagues.",
-                        });
-                      }
-                    } catch (error) {
-                      console.error('Delete placeholder error:', error);
-                      toast({
-                        title: "Note",
-                        description: "Could not delete placeholder user.",
-                      });
-                    } finally {
-                      setIsDeletingPostMergePlaceholder(false);
-                      setShowPostMergeDeleteDialog(false);
-                      setPostMergePlaceholderInfo(null);
-                    }
-                  }}
-                  disabled={isDeletingPostMergePlaceholder}
-                  className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 font-medium disabled:opacity-50"
-                >
-                  {isDeletingPostMergePlaceholder ? 'Deleting...' : 'Delete Placeholder'}
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -8393,10 +8310,12 @@ export default function LeagueManagement() {
                       
                       setIsReplacingPlayer(true);
                       try {
+                        if (!await confirmPlayerReplacement(leagueId, selectedPlayerToReplace.userId, replaceTargetUserId)) return;
                         const response = await apiRequest('POST', `/api/leagues/${leagueId}/replace-player`, {
                           placeholderUserId: selectedPlayerToReplace.userId,
                           newUserId: replaceTargetUserId,
-                          preserveDisplayName: preserveDisplayName
+                          preserveDisplayName: preserveDisplayName,
+                          acknowledgeIdentity: true,
                         });
                         
                         if (response.ok) {
