@@ -80,11 +80,26 @@ export interface NativelyPaywallResult {
 
 const SERVER_REVENUECAT_ID = /^roster_[a-f0-9]{64}$/;
 
-function nativeCustomerIdKind(id: unknown): string {
+function nativeCustomerIdKind(id: unknown, expectedId?: string): string {
   if (typeof id !== 'string' || !id) return 'missing';
+  if (expectedId && id === expectedId) return 'matching account';
   if (id.startsWith('$RCAnonymousID:')) return 'anonymous';
   if (SERVER_REVENUECAT_ID.test(id)) return 'another Roster account';
   return 'unrecognized';
+}
+
+/** Only redacted bridge observations are kept here; never include customer IDs. */
+export class NativePurchaseLinkError extends Error {
+  constructor(message: string, public readonly diagnostics: readonly string[]) {
+    super(message);
+    this.name = 'NativePurchaseLinkError';
+  }
+}
+
+function nativeCallbackStatus(result: any): string {
+  if (result?.status === 'SUCCESS') return 'success';
+  if (result?.status === 'FAILED') return 'failed';
+  return result?.status == null ? 'missing' : 'other';
 }
 
 /**
@@ -96,29 +111,53 @@ export async function loginNativePurchaseAccount(loginId: string): Promise<void>
     throw new Error('Native purchase account linking is unavailable.');
   }
 
-  const loginResult = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
-  if (!loginResult || loginResult.status === 'FAILED') {
-    throw new Error(loginResult?.error || 'Could not link the native purchase account.');
-  }
+  const startedAt = Date.now();
+  const bridgeVersion = (window as any).natively?.app_version;
+  const diagnostics: string[] = [
+    `Bridge injected: ${typeof (window as any).$agent !== 'undefined' ? 'yes' : 'no'}`,
+    `Natively script loaded: ${(window as any).nativelyLoaded === true ? 'yes' : 'no'}`,
+    `Native bridge version: ${typeof bridgeVersion === 'number' && Number.isInteger(bridgeVersion) &&
+      bridgeVersion >= 0 && bridgeVersion <= 1000 ? bridgeVersion : 'unknown'}`,
+  ];
+  const elapsed = () => `${Date.now() - startedAt}ms`;
 
-  let observedCustomerId: unknown;
-  // Some native builds deliver the login callback before customerId reflects
-  // the switch. Never bill using the callback alone: require the read-back
-  // identity to match exactly, but allow a few seconds for it to settle.
-  for (const delayMs of [0, 500, 1500, 3000]) {
-    if (delayMs) await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
-    const customerResult = await toPromise<any>((cb) => np.customerId(cb));
-    if (customerResult?.status === 'FAILED') {
-      throw new Error(customerResult.error || 'Could not verify the native purchase account.');
+  try {
+    const loginResult = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
+    diagnostics.push(`Login callback: ${nativeCallbackStatus(loginResult)}, ` +
+      `customer ${nativeCustomerIdKind(loginResult?.customerId, loginId)}, at ${elapsed()}, ` +
+      `native error ${loginResult?.error ? 'present' : 'absent'}`);
+    if (!loginResult || loginResult.status === 'FAILED') {
+      throw new NativePurchaseLinkError('The native purchase login failed.', diagnostics);
     }
-    observedCustomerId = customerResult?.customerId;
-    if (observedCustomerId === loginId) return;
+
+    let observedCustomerId: unknown;
+    // Some native builds deliver the login callback before customerId reflects
+    // the switch. Never bill using the callback alone: require the read-back
+    // identity to match exactly, but allow a few seconds for it to settle.
+    for (const delayMs of [0, 500, 1500, 3000]) {
+      if (delayMs) await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      const customerResult = await toPromise<any>((cb) => np.customerId(cb));
+      diagnostics.push(`Read-back: ${nativeCallbackStatus(customerResult)}, ` +
+        `customer ${nativeCustomerIdKind(customerResult?.customerId, loginId)}, at ${elapsed()}, ` +
+        `native error ${customerResult?.error ? 'present' : 'absent'}`);
+      if (customerResult?.status === 'FAILED') {
+        throw new NativePurchaseLinkError('The native purchase identity check failed.', diagnostics);
+      }
+      observedCustomerId = customerResult?.customerId;
+      if (observedCustomerId === loginId) return;
+    }
+    throw new NativePurchaseLinkError(
+      `The native app did not confirm the signed-in purchase account ` +
+      `(login reported ${nativeCustomerIdKind(loginResult.customerId)}; ` +
+      `read-back ${nativeCustomerIdKind(observedCustomerId)}).`,
+      diagnostics,
+    );
+  } catch (error) {
+    if (error instanceof NativePurchaseLinkError) throw error;
+    diagnostics.push(`Bridge exception: ${error instanceof Error && error.message.startsWith('NATIVELY_TIMEOUT')
+      ? 'callback timed out' : 'other'}`);
+    throw new NativePurchaseLinkError('The native purchase account link did not complete.', diagnostics);
   }
-  throw new Error(
-    `The native app did not confirm the signed-in purchase account ` +
-    `(login reported ${nativeCustomerIdKind(loginResult.customerId)}; ` +
-    `read-back ${nativeCustomerIdKind(observedCustomerId)}).`,
-  );
 }
 
 /** Read the RevenueCat customer identity on either supported native platform. */

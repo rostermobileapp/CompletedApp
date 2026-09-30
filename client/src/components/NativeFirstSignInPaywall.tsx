@@ -7,6 +7,7 @@ import { ApiError, apiRequest } from '@/lib/queryClient';
 import {
   isNativelyPurchasesApp,
   loginNativePurchaseAccount,
+  NativePurchaseLinkError,
   showNativeRevenueCatPaywall,
 } from '@/lib/nativePurchases';
 import {
@@ -47,6 +48,7 @@ export function NativeFirstSignInPaywall({
   const { role, isPrimaryCommissioner, isLoading: permissionsLoading } = usePermissions();
   const [nativeReady, setNativeReady] = useState(isNativelyPurchasesApp);
   const [flowError, setFlowError] = useState<string | null>(null);
+  const [linkDiagnostics, setLinkDiagnostics] = useState<readonly string[] | null>(null);
   const { toast } = useToast();
   const outcomeCallback = useRef(onOutcome);
   outcomeCallback.current = onOutcome;
@@ -136,6 +138,7 @@ export function NativeFirstSignInPaywall({
       let stage: 'status' | 'login' | 'claim' | 'paywall' = 'status';
       try {
         setFlowError(null);
+        setLinkDiagnostics(null);
         const statusResponse = await apiRequest('GET', '/api/iap/native-paywall-status');
         const status = await statusResponse.json() as NativePaywallStatus;
         if (!isStillEligible()) return;
@@ -212,6 +215,9 @@ export function NativeFirstSignInPaywall({
         );
         if (!(error instanceof ApiError && error.status === 409)) {
           console.warn(`[Native paywall] ${stage} step did not complete:`, error);
+          if (active && error instanceof NativePurchaseLinkError) {
+            setLinkDiagnostics(error.diagnostics);
+          }
           const step = stage === 'status' ? 'Eligibility check'
             : stage === 'login' ? 'Store account link'
               : stage === 'claim' ? 'Paywall authorization' : 'Paywall';
@@ -280,6 +286,14 @@ export function NativeFirstSignInPaywall({
         <div>
           <p className="font-semibold">Subscriptions are temporarily unavailable</p>
           <p className="mt-1 break-words text-sm">{flowError}</p>
+          {linkDiagnostics && (
+            <div className="mt-3 rounded border border-border bg-muted p-2 text-left text-xs">
+              <p className="font-semibold">Purchase link diagnostics (no account IDs)</p>
+              <pre className="mt-1 whitespace-pre-wrap break-words font-mono">
+                {linkDiagnostics.join('\n')}
+              </pre>
+            </div>
+          )}
         </div>
         <button
           type="button"

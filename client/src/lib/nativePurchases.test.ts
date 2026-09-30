@@ -7,6 +7,8 @@ import {
   canPurchaseAndroidProduct,
   getAndroidProducts,
   isAndroidBillingSupported,
+  loginNativePurchaseAccount,
+  NativePurchaseLinkError,
   showNativeRevenueCatPaywall,
 } from './nativePurchases';
 import { isNativelyAndroidApp } from '../hooks/useIosPlatform';
@@ -115,4 +117,52 @@ test('native paywall timeout resolves as unconfirmed when an older bridge never 
   });
   const result = await showNativeRevenueCatPaywall(5);
   assert.deepEqual(result, { status: 'TIMEOUT', message: 'timeout' });
+});
+
+test('native account diagnostics classify anonymous responses without exposing either ID', async (t) => {
+  const window = mockAndroid(t);
+  window.$agent = {};
+  const loginId = `roster_${'a'.repeat(64)}`;
+  const anonymousId = '$RCAnonymousID:private-device-id';
+  const actions: string[] = [];
+  Object.defineProperty(globalThis, 'natively', {
+    configurable: true,
+    value: {
+      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
+        actions.push(action);
+        callback({ status: 'SUCCESS', customerId: anonymousId });
+      },
+    },
+  });
+  await assert.rejects(loginNativePurchaseAccount(loginId), (error: unknown) => {
+    assert.ok(error instanceof NativePurchaseLinkError);
+    assert.equal(error.diagnostics.length, 8);
+    assert.match(error.diagnostics[3], /Login callback: success, customer anonymous/);
+    assert.ok(error.diagnostics.slice(4).every(line => /Read-back: success, customer anonymous/.test(line)));
+    assert.ok(!JSON.stringify(error.diagnostics).includes(loginId));
+    assert.ok(!JSON.stringify(error.diagnostics).includes(anonymousId));
+    return true;
+  });
+  assert.deepEqual(actions, [
+    'purchases_login', 'purchases_customerid', 'purchases_customerid',
+    'purchases_customerid', 'purchases_customerid',
+  ]);
+});
+
+test('matching native read-back remains required before account linking succeeds', async (t) => {
+  const window = mockAndroid(t);
+  window.$agent = {};
+  const loginId = `roster_${'b'.repeat(64)}`;
+  Object.defineProperty(globalThis, 'natively', {
+    configurable: true,
+    value: {
+      trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
+        callback({
+          status: 'SUCCESS',
+          customerId: action === 'purchases_customerid' ? loginId : '$RCAnonymousID:old',
+        });
+      },
+    },
+  });
+  await loginNativePurchaseAccount(loginId);
 });
