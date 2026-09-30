@@ -963,7 +963,7 @@ function StatSection({
     <div
       data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
       className="mt-[12px]">
-      <h2 className="text-[#00A9FF] text-sm font-semibold mb-3 uppercase tracking-wide" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <h2 className="text-[#00A9FF] text-sm font-semibold uppercase tracking-wide mb-[0px] mt-[12px]" data-testid={`header-${title.toLowerCase().replace(/\s+/g, '-')}`}>
         {title}
       </h2>
       <div
