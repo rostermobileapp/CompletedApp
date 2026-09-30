@@ -40,7 +40,7 @@ const attemptedNativePaywallAccounts = new Set<string>();
 export function NativeFirstSignInPaywall({
   onOutcome,
 }: {
-  onOutcome?: (outcome: 'disabled' | 'unavailable' | 'presented' | 'error') => void;
+  onOutcome?: (outcome: 'disabled' | 'unavailable' | 'presented' | 'link-error' | 'error') => void;
 } = {}) {
   const { user, isAuthenticated } = useAuth();
   const { isActive: isDemoActive } = useDemo();
@@ -207,7 +207,8 @@ export function NativeFirstSignInPaywall({
         }
       } catch (error) {
         if (active) outcomeCallback.current?.(
-          error instanceof ApiError && error.status === 409 ? 'unavailable' : 'error',
+          error instanceof ApiError && error.status === 409 ? 'unavailable'
+            : stage === 'login' ? 'link-error' : 'error',
         );
         if (!(error instanceof ApiError && error.status === 409)) {
           console.warn(`[Native paywall] ${stage} step did not complete:`, error);

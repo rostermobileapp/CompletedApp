@@ -169,7 +169,7 @@ export default function OnboardingQuestionnaire() {
     retry: false,
   });
   const [processingDone, setProcessingDone] = useState(false);
-  const [paywallOutcome, setPaywallOutcome] = useState<'waiting' | 'disabled' | 'unavailable' | 'presented' | 'error'>('waiting');
+  const [paywallOutcome, setPaywallOutcome] = useState<'waiting' | 'disabled' | 'unavailable' | 'presented' | 'link-error' | 'error'>('waiting');
   const [paywallAttempt, setPaywallAttempt] = useState(0);
   const processingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -753,7 +753,12 @@ export default function OnboardingQuestionnaire() {
                             The subscription offer could not be confirmed. If you completed a purchase or restore, access will unlock after verification.
                           </p>
                         )}
-                        {(paywallOutcome === 'disabled' || paywallOutcome === 'unavailable') && (
+                        {paywallOutcome === 'link-error' && (
+                          <p role="alert" className="mb-6 max-w-sm text-sm text-gray-600">
+                            The purchase account could not be linked. No paywall opened and no purchase started. You can try again.
+                          </p>
+                        )}
+                        {(paywallOutcome === 'disabled' || paywallOutcome === 'unavailable' || paywallOutcome === 'link-error') && (
                           <button
                             type="button"
                             onClick={() => {
