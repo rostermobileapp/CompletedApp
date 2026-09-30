@@ -100,7 +100,7 @@ export function getActiveGoogleOrderIds(
   }
   return Array.from(new Set(Object.entries(subscriptions).flatMap(([productId, sub]) => {
     if (!GOOGLE_PRODUCTS.has(productId) || sub?.store !== 'play_store' ||
-        sub.ownership_type !== 'PURCHASED' || sub.refunded_at ||
+        (sub.ownership_type != null && sub.ownership_type !== 'PURCHASED') || sub.refunded_at ||
         typeof sub.store_transaction_id !== 'string' ||
         !GOOGLE_ORDER_ID.test(sub.store_transaction_id) ||
         !(Date.parse(sub.expires_date ?? '') > now)) return [];

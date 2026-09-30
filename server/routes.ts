@@ -5852,9 +5852,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: 'Enter the Google Play GPA order ID from your receipt.' });
     }
     try {
-      const { role, purchase } = await verifyGoogleRecoveryOrder(orderId, {
-        kind: 'anonymous-device', customerId,
-      });
+      const { verifyGoogleOrderWithLinkedFallback } = await import('./googleOrderRecovery');
+      // Native restore may move the receipt to the signed-in account while
+      // Google's original binding still names the old anonymous identity.
+      const verified = await verifyGoogleOrderWithLinkedFallback(
+        orderId,
+        () => verifyGoogleRecoveryOrder(orderId, { kind: 'anonymous-device', customerId }),
+        async () => {
+          const { getRevenueCatGoogleOrderIds } = await import('./revenueCatApi');
+          return getRevenueCatGoogleOrderIds(revenueCatRosterId(req.user.claims.sub));
+        },
+        () => verifyGoogleRecoveryOrder(orderId, { kind: 'signed-in-revenuecat' }),
+      );
+      const { role, purchase } = verified;
       const appliedRole = await claimGoogleIapRole(
         req.user.claims.sub, role, purchase.purchaseToken, purchase.productId, purchase.expiryTimeMs!, true,
       );
