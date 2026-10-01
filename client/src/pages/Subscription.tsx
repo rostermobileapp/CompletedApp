@@ -2,6 +2,8 @@ import { usePermissions } from '@/context/SubscriptionContext';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { ArrowLeft, CheckCircle2, Crown, Star, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import rosterLogo from '@assets/Roster-10_1775764992636.png';
+import subscriptionBanner from '@assets/2026-09-29_10_05_08-_1790880968971.png';
+import './subscription-visual.css';
 import { useLocation } from 'wouter';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -100,6 +102,9 @@ export default function Subscription() {
   const isPlayerPlus = role === 'player_pro';
   const isFree = role === 'free_tier';
   const hasStripePlan = Boolean(user?.stripeSubscriptionId);
+  const [selectedTier, setSelectedTier] = useState<'free_tier' | 'player_pro' | 'commissioner'>(
+    isCommissioner ? 'commissioner' : isPlayerPlus ? 'player_pro' : 'free_tier',
+  );
 
   // Initialize IAP on iOS — check billing support then fetch real App Store prices
   useEffect(() => {
@@ -288,6 +293,40 @@ export default function Subscription() {
       return tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay;
     }
     return tier === 'player_pro' ? proMonthlyDisplay : commMonthlyDisplay;
+  };
+
+  const getPriceForPeriod = (tier: 'player_pro' | 'commissioner', period: 'monthly' | 'yearly') => {
+    if (isIos || isAndroid) {
+      const productId = period === 'yearly'
+        ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
+        : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
+      const price = iosProductPrices[productId];
+      if (price) return price;
+      const nativePricesLoading = isIos
+        ? !iapReady
+        : androidLookupState === 'checking' || androidLookupState === 'loading' || googleBillingAvailabilityLoading;
+      return nativePricesLoading ? 'Loading price' : 'Price unavailable';
+    }
+    const entry = period === 'yearly'
+      ? (tier === 'player_pro' ? stripePrices?.player_pro_yearly : stripePrices?.commissioner_yearly)
+      : (tier === 'player_pro' ? stripePrices?.player_pro_monthly : stripePrices?.commissioner_monthly);
+    return formatPrice(entry) ?? (pricesLoading ? 'Loading price' : 'Price unavailable');
+  };
+
+  const getStripeSavingsPercent = (tier: 'player_pro' | 'commissioner') => {
+    const monthly = tier === 'player_pro' ? stripePrices?.player_pro_monthly : stripePrices?.commissioner_monthly;
+    const yearly = tier === 'player_pro' ? stripePrices?.player_pro_yearly : stripePrices?.commissioner_yearly;
+    if (
+      !monthly || !yearly ||
+      monthly.amount === null || yearly.amount === null ||
+      !Number.isFinite(monthly.amount) || !Number.isFinite(yearly.amount) ||
+      !monthly.currency || !yearly.currency ||
+      monthly.currency.toLowerCase() !== yearly.currency.toLowerCase() ||
+      monthly.amount <= 0 || yearly.amount < 0
+    ) return null;
+    const annualAtMonthlyRate = monthly.amount * 12;
+    const savings = Math.floor(((annualAtMonthlyRate - yearly.amount) / annualAtMonthlyRate) * 100);
+    return savings > 0 ? savings : null;
   };
 
   const subscriptionPlans = [
@@ -858,7 +897,7 @@ export default function Subscription() {
   });
 
   return (
-    <div className="min-h-screen flex flex-col pb-24" data-testid="subscription-page">
+    <div className="subscription-page flex flex-col" data-testid="subscription-page">
       {/* In-app Stripe payment modal — replaces the previous redirect to
          hosted Stripe checkout. After payment we sync the user's subscription
          server-side, refetch user data, then auto-close the modal. */}
@@ -1005,21 +1044,51 @@ export default function Subscription() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-      {/* Header */}
-      <div className="p-6 pt-12">
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => { setPageTransitionDirection('down'); navigate('/profile'); }}
-            className="text-muted-foreground"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Manage Subscription</h1>
-        </div>
+      <div className="subscription-banner-wrap">
+        <img
+          className="subscription-banner"
+          src={subscriptionBanner}
+          alt="Roster hockey app, achievement patches, and a player"
+        />
+        <button
+          onClick={() => { setPageTransitionDirection('down'); navigate('/profile'); }}
+          className="subscription-back"
+          aria-label="Back to profile"
+          data-testid="button-back"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
       </div>
+      <header className="subscription-hero">
+        <h1 data-testid="text-page-title">
+          {selectedTier === 'commissioner'
+            ? 'For League Managers'
+            : selectedTier === 'player_pro'
+            ? 'For Serious Hockey Players'
+            : 'For every hockey player'}
+        </h1>
+      </header>
+      <nav className="subscription-selector" aria-label="Choose a subscription plan">
+        <div className="subscription-tier-tabs" role="group" aria-label="Subscription tiers">
+          {subscriptionPlans.map((plan) => (
+            <button
+              key={plan.tier}
+              type="button"
+              aria-pressed={selectedTier === plan.tier}
+              onClick={() => setSelectedTier(plan.tier)}
+              className="subscription-tier-tab"
+              data-testid={`tab-${plan.tier}`}
+            >
+              {plan.name === 'Free Tier' ? 'Free' : plan.name}
+            </button>
+          ))}
+        </div>
+        <p className="subscription-tier-description">
+          {subscriptionPlans.find((plan) => plan.tier === selectedTier)?.description}
+        </p>
+      </nav>
       {/* Current Status */}
-      <div className="px-6 mb-6">
+      <div className="subscription-status px-6 mb-6">
         <div className="bg-card rounded-xl border border-[hsl(var(--hairline))] shadow-[var(--elev-rest)] p-6">
           <div className="flex items-center gap-3 mb-3">
             <Crown className="w-6 h-6 text-primary" />
@@ -1190,50 +1259,22 @@ export default function Subscription() {
       {isFree && <LeagueProSeatsFullUpsell />}
 
       {/* Available Plans */}
-      <div className="px-6">
-        <h2 className="text-lg font-semibold mb-4">Available Plans</h2>
-
-        {/* Monthly / Yearly billing toggle */}
-        <div className="flex items-center justify-center mb-5">
-          <div className="flex bg-secondary rounded-lg p-1">
-            <button
-              onClick={() => setBillingPeriod('monthly')}
-              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                billingPeriod === 'monthly'
-                  ? 'bg-[#3c83f6] text-white'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingPeriod('yearly')}
-              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                billingPeriod === 'yearly'
-                  ? 'bg-[#3c83f6] text-white'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Yearly · <span className={`text-xs font-bold ${billingPeriod === 'yearly' ? 'text-white/90' : 'text-green-500'}`}>Save up to 23%</span>
-            </button>
-          </div>
-        </div>
-
+      <section className="subscription-plans-block order-2 w-full" aria-label="Selected plan details">
         <div className="space-y-4">
           {subscriptionPlans.map((plan, index) => (
             <div
               key={plan.name}
-              className={`bg-card rounded-xl border p-6 ${plan.highlight ? 'border-primary' : 'border-border'}`}
+              className={`subscription-plan-panel ${selectedTier === plan.tier ? 'is-active' : 'is-inactive'}`}
               data-testid={`plan-${plan.name.toLowerCase().replace(' ', '-')}`}
             >
               {plan.highlight && (
-                <div className="flex items-center gap-2 mb-3">
+                <div className="subscription-recommendation flex items-center gap-2 mb-3">
                   <Star className="w-4 h-4 text-primary" />
                   <span className="text-primary text-sm font-medium">Recommended</span>
                 </div>
               )}
 
-              <div className="flex items-start justify-between mb-4">
+              <div className="plan-intro flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold" data-testid={`text-plan-name-${index}`}>{plan.name}</h3>
                   <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
@@ -1244,14 +1285,50 @@ export default function Subscription() {
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
+              <div className={`sub-feature-list ${plan.tier === 'free_tier' ? 'tier-free' : 'tier-paid'}`}>
                 {plan.features.map((feature, featureIndex) => (
                   <div key={featureIndex} className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    <div className="subscription-check" aria-hidden="true">✓</div>
                     <span className="text-sm" data-testid={`text-feature-${index}-${featureIndex}`}>{feature}</span>
                   </div>
                 ))}
               </div>
+
+              {plan.tier === 'free_tier' && (
+                <p className="subscription-free-price" data-testid="free-plan-price">
+                  <strong>{plan.price}</strong>/{plan.period}
+                </p>
+              )}
+
+              {plan.tier !== 'free_tier' && (
+                <div className="subscription-price-choices" aria-label="Billing period">
+                  <button
+                    type="button"
+                    onClick={() => setBillingPeriod('yearly')}
+                    aria-pressed={billingPeriod === 'yearly'}
+                    className="subscription-price-choice"
+                    data-testid={`billing-choice-yearly-${plan.tier}`}
+                  >
+                    <span className="price-period">Yearly</span>
+                    <span className="price-value">{getPriceForPeriod(plan.tier, 'yearly')}</span>
+                    {!isIos && !isAndroid && getStripeSavingsPercent(plan.tier) !== null && (
+                      <span className="subscription-savings-pill">Save {getStripeSavingsPercent(plan.tier)}%</span>
+                    )}
+                    <span className="price-check" aria-hidden="true">✓</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingPeriod('monthly')}
+                    aria-pressed={billingPeriod === 'monthly'}
+                    className="subscription-price-choice"
+                    data-testid={`billing-choice-monthly-${plan.tier}`}
+                  >
+                    <span className="price-period">Monthly</span>
+                    <span className="price-value">{getPriceForPeriod(plan.tier, 'monthly')}</span>
+                    <span className="price-check" aria-hidden="true">✓</span>
+                  </button>
+                </div>
+              )}
 
               {plan.current ? (
                 <button
@@ -1452,25 +1529,25 @@ export default function Subscription() {
                   const stripePriceId = `price-web-${plan.tier}-${index}`;
                   const periodSuffix = billingPeriod === 'yearly' ? 'yr' : 'mo';
                   return (
-                    <div className="flex items-center gap-3">
+                    <div className="subscription-web-actions">
                       <button
                         onClick={() => handleStripeUpgrade(plan.tier as 'player_pro' | 'commissioner')}
                         disabled={isLoading || pricesLoading}
                         aria-describedby={stripePriceStr && stripePriceStr !== '...' ? stripePriceId : undefined}
-                        className="flex-1 py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="w-full py-3 rounded-lg font-semibold bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 flex items-center justify-center gap-2"
                         data-testid={`button-${plan.tier}`}
                       >
                         {(isLoading || pricesLoading) ? (
                           <><Loader2 className="w-4 h-4 animate-spin" />Loading...</>
                         ) : (
-                          <>{plan.buttonText}<ExternalLink className="w-4 h-4" /></>
+                          'Continue'
                         )}
                       </button>
                       {stripePriceStr && stripePriceStr !== '...' && (
                         <span
                           id={stripePriceId}
                           aria-label={`Price ${stripePriceStr} per ${billingPeriod === 'yearly' ? 'year' : 'month'}`}
-                          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+                          className="sr-only"
                           data-testid={`price-web-${plan.tier}`}
                         >
                           {stripePriceStr}/{periodSuffix}
@@ -1480,12 +1557,17 @@ export default function Subscription() {
                   );
                 })()
               )}
+              <nav className="subscription-legal-links" aria-label="Subscription legal information">
+                <a href="/terms-of-service">Terms of Service</a>
+                <span aria-hidden="true">·</span>
+                <a href="/privacy-policy">Privacy Policy</a>
+              </nav>
             </div>
           ))}
         </div>
-      </div>
+      </section>
       {/* Information Notice */}
-      <div className="px-6 mt-[0px]">
+      <div className="subscription-disclosure px-6 mt-[0px]">
         <p className="text-xs text-muted-foreground text-center">
           {isIos
             ? 'App Store subscriptions are managed through Apple. Cancel anytime via Settings → Apple ID → Subscriptions.'
@@ -1565,7 +1647,7 @@ function LeagueProActiveSeatNotice() {
   >({ queryKey: ['/api/user/league-pro-seats'] });
   if (activeSeats.length === 0) return null;
   return (
-    <div className="px-6 mb-4" data-testid="league-pro-active-seat-notice">
+    <div className="subscription-notice px-6 mb-4" data-testid="league-pro-active-seat-notice">
       <div className="rounded-xl border border-primary/40 bg-primary/10 p-4">
         <div className="flex items-start gap-3">
           <Crown className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -1621,7 +1703,7 @@ function LeagueProUpcomingSeatNotice() {
   >({ queryKey: ['/api/user/league-pro-seats-upcoming'] });
   if (upcoming.length === 0) return null;
   return (
-    <div className="px-6 mb-4" data-testid="league-pro-upcoming-seats-notice">
+    <div className="subscription-notice px-6 mb-4" data-testid="league-pro-upcoming-seats-notice">
       <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4">
         <div className="flex items-start gap-3">
           <Crown className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
@@ -1657,7 +1739,7 @@ function LeagueProSeatsFullUpsell() {
   if (leaguesFull.length === 0) return null;
   const single = leaguesFull.length === 1;
   return (
-    <div className="px-6 mb-4" data-testid="league-pro-seats-full-upsell">
+    <div className="subscription-notice px-6 mb-4" data-testid="league-pro-seats-full-upsell">
       <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
         <div className="flex items-start gap-3">
           <Crown className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />

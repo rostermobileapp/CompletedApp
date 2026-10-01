@@ -61,3 +61,4 @@
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
 - [Account merge safety boundary](account-merge-safety-boundary.md) — registered-account merges must fail closed on unclassified records, authority, and billing; never infer identity from name or email.
 - [League merge dialog boundary](league-merge-dialog-boundary.md) — the U-account-only commissioner picker and placeholder replacement preview have different eligibility rules.
+- [Responsive fixture verification](responsive-fixture-verification.md) — phone-width containers still use desktop media queries; use iframe viewports and explicit UTF-8 in isolated checks.
