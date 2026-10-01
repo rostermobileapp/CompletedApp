@@ -1253,7 +1253,7 @@ export default function Subscription() {
           {subscriptionPlans.map((plan, index) => (
             <div
               key={plan.name}
-              className={`subscription-plan-panel ${selectedTier === plan.tier ? 'is-active' : 'is-inactive'}`}
+              className={`subscription-plan-panel ${selectedTier === plan.tier ? 'is-active mt-[0px]' : 'is-inactive'}`}
               data-testid={`plan-${plan.name.toLowerCase().replace(' ', '-')}`}
             >
               {plan.highlight && (
@@ -1290,7 +1290,7 @@ export default function Subscription() {
               )}
 
               {plan.tier !== 'free_tier' && (
-                <div className="subscription-price-choices" aria-label="Billing period">
+                <div className="subscription-price-choices mt-[4px] mb-[8px]" aria-label="Billing period">
                   <button
                     type="button"
                     onClick={() => setBillingPeriod('yearly')}
@@ -1309,7 +1309,7 @@ export default function Subscription() {
                     type="button"
                     onClick={() => setBillingPeriod('monthly')}
                     aria-pressed={billingPeriod === 'monthly'}
-                    className="subscription-price-choice"
+                    className="subscription-price-choice pt-[5px] pb-[5px]"
                     data-testid={`billing-choice-monthly-${plan.tier}`}
                   >
                     <span className="price-period">Monthly</span>

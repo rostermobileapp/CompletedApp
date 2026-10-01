@@ -101,6 +101,10 @@
   margin-inline: auto;
 }
 
+.subscription-page .subscription-plan-panel.is-active.mt-\[0px\] {
+  margin-top: 0;
+}
+
 .subscription-plan-panel.is-inactive {
   display: none;
 }
@@ -142,7 +146,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .6rem;
-  margin: 1.45rem 0 1.5rem;
+  margin-inline: 0;
 }
 
 .subscription-price-choice {
@@ -157,6 +161,11 @@
   color: var(--sub-ink);
   cursor: pointer;
   transition: border-color .18s ease, transform .18s ease;
+}
+
+.subscription-price-choice.pt-\[5px\].pb-\[5px\] {
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
 .subscription-price-choice:active {
