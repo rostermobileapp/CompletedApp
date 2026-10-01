@@ -107,7 +107,7 @@ function BeerLoggingHelp() {
       <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>How to log beers</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-[#ffffff] text-[16px]">
             Open a regular league game and tap the beer-can button in the top-right of Game Details. Each tap adds one beer.
           </DialogDescription>
         </DialogHeader>
