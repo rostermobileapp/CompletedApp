@@ -35,11 +35,6 @@
   background: #000;
 }
 
-.subscription-hero {
-  padding: 1rem 1.2rem .6rem;
-  text-align: center;
-}
-
 .subscription-back {
   position: absolute;
   left: 1.2rem;
@@ -53,20 +48,6 @@
   background: rgba(0,0,0,.78);
   color: var(--sub-ink);
   z-index: 2;
-}
-
-.subscription-hero h1 {
-  margin: .3rem 0 .35rem;
-  font-size: clamp(1.25rem, 4vw, 1.85rem);
-  line-height: 1.2;
-  font-weight: 750;
-  letter-spacing: -.025em;
-}
-
-.subscription-hero p {
-  margin: 0;
-  color: var(--sub-muted);
-  font-size: .9rem;
 }
 
 .subscription-selector {

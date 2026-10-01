@@ -1059,15 +1059,6 @@ export default function Subscription() {
           <ArrowLeft className="w-5 h-5" />
         </button>
       </div>
-      <header className="subscription-hero">
-        <h1 data-testid="text-page-title">
-          {selectedTier === 'commissioner'
-            ? 'For League Managers'
-            : selectedTier === 'player_pro'
-            ? 'For Serious Hockey Players'
-            : 'For every hockey player'}
-        </h1>
-      </header>
       <nav className="subscription-selector" aria-label="Choose a subscription plan">
         <div className="subscription-tier-tabs" role="group" aria-label="Subscription tiers">
           {subscriptionPlans.map((plan) => (
