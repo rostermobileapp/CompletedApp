@@ -3864,8 +3864,14 @@ function DashboardMobile() {
                           </div>
                         );
                       })()}
+                      <span
+                        className="ml-auto shrink-0 whitespace-nowrap text-sm font-medium text-primary"
+                        data-testid={`text-view-details-${game.id}`}
+                      >
+                        View
+                      </span>
                       <ChevronRight 
-                        className="w-8 h-8 text-primary ml-auto"
+                        className="w-8 h-8 shrink-0 text-primary"
                         data-testid={`icon-view-details-${game.id}`}
                       />
                     </div>
