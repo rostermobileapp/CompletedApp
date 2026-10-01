@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
-import { ArrowLeft, Flame, Snowflake, Minus, Lock } from 'lucide-react';
+import { ArrowLeft, Flame, Snowflake, Minus, Lock, CircleHelp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { setPageTransitionDirection } from '@/components/PageTransition';
 import { getImageUrl, apiRequest } from '@/lib/queryClient';
+import beerLoggingScreenshot from '@assets/signal-2026-10-01-08-40-08-979_1790858458217.png';
 import {
   ComposedChart,
   Line,
@@ -84,6 +86,41 @@ function NoDataMessage() {
     <p className="text-sm text-muted-foreground text-center py-6 italic">
       Not enough data to calculate trends
     </p>
+  );
+}
+
+function BeerLoggingHelp() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground"
+          aria-label="How to log beers"
+          data-testid="button-beer-logging-help"
+        >
+          <CircleHelp className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>How to log beers</DialogTitle>
+          <DialogDescription>
+            Open a regular league game and tap the beer-can button in the top-right of Game Details. Each tap adds one beer.
+          </DialogDescription>
+        </DialogHeader>
+        <img
+          src={beerLoggingScreenshot}
+          alt="Game Details screen showing the beer-can button in the upper-right corner"
+          className="w-full max-h-[42vh] rounded-lg border bg-black object-contain"
+        />
+        <p className="text-sm text-muted-foreground">
+          The button is available from 2 hours before the scheduled start until 6 hours after. It isn’t available for scrimmages.
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -321,6 +358,7 @@ export default function PlayerStatsTrends() {
                         <span className="text-xl font-bold">{totals.beers ?? (data as any)?.beers ?? 0}</span>
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-muted-foreground">Beers Drank 🍺</span>
+                          <BeerLoggingHelp />
                         </div>
                       </div>
                     </div>
@@ -341,7 +379,10 @@ export default function PlayerStatsTrends() {
                       <div className="grid grid-cols-1 mb-3">
                         <div className="text-center bg-muted/40 rounded-lg py-3 flex items-center justify-center gap-2">
                           <span className="text-xl font-bold">{(data as any)?.beers}</span>
-                          <span className="text-xs text-muted-foreground">Beers Drank 🍺</span>
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            Beers Drank 🍺
+                            <BeerLoggingHelp />
+                          </span>
                         </div>
                       </div>
                     )}
