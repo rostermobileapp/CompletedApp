@@ -20,6 +20,7 @@ interface RSVPDetailModalProps {
   onClose: () => void;
   onRequestSubstitute?: (playerId: string, playerName: string, teamId?: string) => void;
   showSubstituteButtons?: boolean;
+  showOnlyOutPlayers?: boolean;
   teamId?: string;
 }
 
@@ -29,6 +30,7 @@ export function RSVPDetailModal({
   onClose, 
   onRequestSubstitute,
   showSubstituteButtons = false,
+  showOnlyOutPlayers = false,
   teamId 
 }: RSVPDetailModalProps) {
   const { data: rsvpSummary, isLoading } = useQuery({
@@ -102,16 +104,25 @@ export function RSVPDetailModal({
     </div>
   );
 
+  const hasOutPlayers = Boolean(rsvpSummary?.notAttending?.length);
+  const hasAnyRsvpInformation = Boolean(
+    rsvpSummary?.attending?.length ||
+    rsvpSummary?.notAttending?.length ||
+    rsvpSummary?.noResponse?.length
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh]" data-testid="rsvp-detail-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Game RSVP Details
+            {showOnlyOutPlayers ? "Find Substitutes" : "Game RSVP Details"}
           </DialogTitle>
           <DialogDescription>
-            View who's attending, not attending, and hasn't responded
+            {showOnlyOutPlayers
+              ? "Only players who RSVP'd out are shown."
+              : "View who's attending, not attending, and hasn't responded"}
           </DialogDescription>
         </DialogHeader>
 
@@ -131,7 +142,7 @@ export function RSVPDetailModal({
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-6">
               {/* Attending Section */}
-              {rsvpSummary?.attending && rsvpSummary.attending.length > 0 && (
+              {!showOnlyOutPlayers && rsvpSummary?.attending && rsvpSummary.attending.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-green-700 mb-3 flex items-center gap-2">
                     <UserCheck className="h-4 w-4" />
@@ -152,7 +163,7 @@ export function RSVPDetailModal({
               {/* Not Attending Section */}
               {rsvpSummary?.notAttending && rsvpSummary.notAttending.length > 0 && (
                 <div>
-                  <Separator />
+                  {!showOnlyOutPlayers && <Separator />}
                   <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
                     <UserX className="h-4 w-4" />
                     Not Attending ({rsvpSummary.notAttending.length})
@@ -171,7 +182,7 @@ export function RSVPDetailModal({
               )}
 
               {/* No Response Section */}
-              {rsvpSummary?.noResponse && rsvpSummary.noResponse.length > 0 && (
+              {!showOnlyOutPlayers && rsvpSummary?.noResponse && rsvpSummary.noResponse.length > 0 && (
                 <div>
                   <Separator />
                   <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
@@ -191,10 +202,12 @@ export function RSVPDetailModal({
               )}
 
               {/* Empty State */}
-              {(!rsvpSummary?.attending?.length && !rsvpSummary?.notAttending?.length && !rsvpSummary?.noResponse?.length) && (
+              {(showOnlyOutPlayers ? !hasOutPlayers : !hasAnyRsvpInformation) && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No RSVP information available</p>
+                  {showOnlyOutPlayers
+                    ? <UserX className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    : <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />}
+                  <p>{showOnlyOutPlayers ? "No players have RSVP'd out." : "No RSVP information available"}</p>
                 </div>
               )}
             </div>

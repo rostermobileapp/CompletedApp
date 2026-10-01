@@ -2003,6 +2003,7 @@ export default function GameDetails() {
           setShowSubstituteModal(true);
         }}
         showSubstituteButtons={isCaptain}
+        showOnlyOutPlayers
         teamId={userTeam?.id}
       />
       {/* Substitute Request Modal */}
