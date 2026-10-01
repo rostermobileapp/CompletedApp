@@ -323,7 +323,7 @@ export default function PlayerStatsTrends() {
           <>
             {/* Season Totals */}
             <Card className="hairline elev-rest">
-              <CardHeader className="pb-2 pt-4 px-4">
+              <CardHeader className="px-4 pt-[4px] pb-[4px]">
                 <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Season Totals
                 </CardTitle>
