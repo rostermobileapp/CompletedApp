@@ -116,7 +116,7 @@ function BeerLoggingHelp() {
           alt="Game Details screen showing the beer-can button in the upper-right corner"
           className="w-full max-h-[42vh] rounded-lg border bg-black object-contain"
         />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[#ffffff] text-[16px]">
           The button is available from 1 hour before the scheduled start until 4 hours after. It isn’t available for scrimmages.
         </p>
       </DialogContent>
@@ -270,7 +270,6 @@ export default function PlayerStatsTrends() {
           </div>
         </div>
       </div>
-
       <div className="px-4 py-4 space-y-4">
         {accessQuery.isLoading ? (
           <div className="text-center py-12 text-muted-foreground" role="status">
@@ -449,7 +448,7 @@ export default function PlayerStatsTrends() {
                   </ResponsiveContainer>
                 ) : (
                   /* Empty-state chart axes so the card looks like a chart placeholder */
-                  <div className="relative">
+                  (<div className="relative">
                     <ResponsiveContainer width="100%" height={180}>
                       <ComposedChart data={[]} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -472,7 +471,7 @@ export default function PlayerStatsTrends() {
                         Not enough data to calculate trends
                       </p>
                     </div>
-                  </div>
+                  </div>)
                 )}
               </CardContent>
             </Card>
