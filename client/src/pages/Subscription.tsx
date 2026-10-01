@@ -351,7 +351,7 @@ export default function Subscription() {
       name: "Player Pro",
       price: getPriceDisplay('player_pro'),
       period: billingPeriod === 'yearly' ? 'year' : 'month',
-      description: "Enhanced features for serious players",
+      description: "For serious players",
       features: [
         "FREE +",
         "Team Management",
