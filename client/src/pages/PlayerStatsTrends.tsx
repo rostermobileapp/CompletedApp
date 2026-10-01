@@ -328,7 +328,7 @@ export default function PlayerStatsTrends() {
                   Season Totals
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-4">
+              <CardContent className="px-4 pb-[4px]">
                 {totals ? (
                   <>
                     <div className="grid grid-cols-3 gap-3">
