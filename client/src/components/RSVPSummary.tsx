@@ -166,9 +166,9 @@ export function RSVPSummary({ gameId, teamId, showTeamSeparation, onViewDetails,
           <Button 
             onClick={onViewDetails}
             className="w-full bg-primary text-primary-foreground hover:bg-primary"
-            data-testid="button-view-details"
+            data-testid="button-rsvp-find-substitutes"
           >
-            View Details
+            Find Substitutes
           </Button>
         )}
       </CardContent>
