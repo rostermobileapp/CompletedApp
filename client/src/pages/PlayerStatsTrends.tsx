@@ -355,7 +355,7 @@ export default function PlayerStatsTrends() {
                     </div>
                     {/* Beer counter row */}
                     <div className="mt-3 grid grid-cols-1">
-                      <div className="text-center bg-muted/40 rounded-lg py-3 flex items-center justify-center gap-2">
+                      <div className="text-center bg-muted/40 rounded-lg py-3 flex items-center justify-center gap-2 pt-[4px] pb-[4px]">
                         <span className="text-xl font-bold">{totals.beers ?? (data as any)?.beers ?? 0}</span>
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-muted-foreground">Beers Drank 🍺</span>
