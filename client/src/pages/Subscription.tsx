@@ -840,7 +840,7 @@ export default function Subscription() {
       // The native bridge supplies the original anonymous RevenueCat identity.
       // Google must independently confirm that this identity belongs to the
       // order. A receipt number by itself never grants access.
-      const customerId = recoveryCustomerId ?? await getAndroidPurchaseCustomerId();
+      const customerId = recoveryCustomerId ?? (await getAndroidPurchaseCustomerId());
       const response = await apiRequest('POST', '/api/iap/restore-google-order', {
         orderId: googleOrderId.trim(),
         customerId,
@@ -982,7 +982,6 @@ export default function Subscription() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Confirmation shown after a redirect-based Stripe success returns to
          this page (billing-portal upgrade or 3DS fallback). Visually mirrors
          the embedded modal's success state so both flows feel consistent. */}
@@ -1074,7 +1073,7 @@ export default function Subscription() {
             </button>
           ))}
         </div>
-        <p className="subscription-tier-description">
+        <p className="subscription-tier-description mt-[0px]">
           {subscriptionPlans.find((plan) => plan.tier === selectedTier)?.description}
         </p>
       </nav>
@@ -1248,7 +1247,6 @@ export default function Subscription() {
       <LeagueProActiveSeatNotice />
       <LeagueProUpcomingSeatNotice />
       {isFree && <LeagueProSeatsFullUpsell />}
-
       {/* Available Plans */}
       <section className="subscription-plans-block order-2 w-full" aria-label="Selected plan details">
         <div className="space-y-4">
@@ -1368,7 +1366,7 @@ export default function Subscription() {
                 </div>
               ) : isAndroid ? (
                 /* Android: only Google Play Billing inside the native app. */
-                (() => {
+                ((() => {
                   const productId = billingPeriod === 'yearly'
                     ? (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
                     : (plan.tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
@@ -1460,13 +1458,13 @@ export default function Subscription() {
                       </button>
                     </div>
                   );
-                })()
+                })())
               ) : isIos ? (
                 /* iOS: Roster (Stripe) on top dominant, App Store below outlined.
                    Each button shows its own price label so users can see the
                    difference without any "save" / promotional language in the
                    CTA itself (App Store anti-steering compliance). */
-                (() => {
+                ((() => {
                   const stripePriceStr = billingPeriod === 'yearly'
                     ? (plan.tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay)
                     : (plan.tier === 'player_pro' ? proMonthlyDisplay : commMonthlyDisplay);
@@ -1510,10 +1508,10 @@ export default function Subscription() {
                       </p>
                     </div>
                   );
-                })()
+                })())
               ) : (
                 /* Web / non-iOS: Stripe only */
-                (() => {
+                ((() => {
                   const stripePriceStr = billingPeriod === 'yearly'
                     ? (plan.tier === 'player_pro' ? proYearlyDisplay : commYearlyDisplay)
                     : (plan.tier === 'player_pro' ? proMonthlyDisplay : commMonthlyDisplay);
@@ -1546,7 +1544,7 @@ export default function Subscription() {
                       )}
                     </div>
                   );
-                })()
+                })())
               )}
               <nav className="subscription-legal-links" aria-label="Subscription legal information">
                 <a href="/terms-of-service">Terms of Service</a>
