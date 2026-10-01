@@ -46,6 +46,7 @@ import { isVerifiedPriorGoogleClaim } from "./googleIap";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
+import { incrementBeerCountIfWindowOpen } from "./beerLogging";
 import { generateSingleElimination, generateDoubleElimination, generateRoundRobin, generateRoundRobinSplit, generateThreeGameGuarantee, applyBracketType } from "./tournaments/bracketGenerator";
 import { getFormatRecommendations } from "./tournaments/formatRecommendations";
 import { eq, ne, and, or, ilike, sql, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -13183,18 +13184,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { gameId } = req.params;
       const userId = req.user.claims.sub;
-      const [badgeGame] = await db.select({ leagueId: games.leagueId, seasonId: games.seasonId, scheduledAt: games.scheduledAt })
-        .from(games).where(eq(games.id, gameId)).limit(1);
+      const [badgeGame] = await db.select({
+        leagueId: games.leagueId,
+        seasonId: games.seasonId,
+        scheduledAt: games.scheduledAt,
+        isScrimmage: games.isScrimmage,
+        timezone: leagues.timezone,
+      })
+        .from(games)
+        .leftJoin(leagues, eq(games.leagueId, leagues.id))
+        .where(eq(games.id, gameId))
+        .limit(1);
       if (!badgeGame) {
         return res.status(404).json({ message: 'Game not found' });
       }
-      const result = await db.execute(sql`
-        INSERT INTO game_beer_counts (user_id, game_id, count, updated_at)
-        VALUES (${userId}, ${gameId}, 1, NOW())
-        ON CONFLICT (user_id, game_id) DO UPDATE
-          SET count = game_beer_counts.count + 1, updated_at = NOW()
-        RETURNING count
-      `);
+      const incrementResult = await incrementBeerCountIfWindowOpen(
+        {
+          scheduledAt: badgeGame.scheduledAt,
+          timezone: badgeGame.timezone,
+          isScrimmage: badgeGame.isScrimmage,
+        },
+        () => db.execute(sql`
+          INSERT INTO game_beer_counts (user_id, game_id, count, updated_at)
+          VALUES (${userId}, ${gameId}, 1, NOW())
+          ON CONFLICT (user_id, game_id) DO UPDATE
+            SET count = game_beer_counts.count + 1, updated_at = NOW()
+          RETURNING count
+        `),
+      );
+      if (!incrementResult.allowed) {
+        return res.status(403).json({
+          message: 'Beer logging is available from 1 hour before until 4 hours after the scheduled game start.',
+        });
+      }
+      const result = incrementResult.result;
       const count = result.rows?.[0]?.count ?? 1;
       try {
         await evaluateBadgesForUser(userId, {

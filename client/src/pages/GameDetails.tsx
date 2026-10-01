@@ -26,6 +26,7 @@ import beverageJarUrl from '@assets/Luminari Report (1)_1757085824172.png';
 import { getScrimmageCoverSrc } from '@/lib/scrimmageCoverOptions';
 import queueIconUrl from '@assets/image_1788289865365.png';
 import type { GameWithTeams, TeamMemberWithUser, UserTeam, League, GameScoreSubmission, User, ScrimmageRequest } from "@shared/schema";
+import { isBeerLoggingWindowOpen } from "@shared/beerLoggingWindow";
 import DutiesSection from "@/components/DutiesSection";
 import LocationLink from "@/components/LocationLink";
 import { PaymentMethodPicker, type PaymentMethod } from "@/components/PaymentMethodPicker";
@@ -211,13 +212,14 @@ export default function GameDetails() {
     _myScrimmageRequestForHooks?.status === 'approved' ||
     _myScrimmageRequestForHooks?.status === 'pending';
 
-  // Beer counter — visible 2 h before game time through 6 h after
+  // Beer counter — visible 1 h before game time through 4 h after
   const beerWindowOpen = React.useMemo(() => {
     if (isScrimmage || !fullGameData?.game?.scheduledAt) return false;
-    const t = new Date(fullGameData.game.scheduledAt).getTime();
-    const now = Date.now();
-    return now >= t - 2 * 60 * 60 * 1000 && now <= t + 6 * 60 * 60 * 1000;
-  }, [fullGameData?.game?.scheduledAt, isScrimmage]);
+    return isBeerLoggingWindowOpen(
+      fullGameData.game.scheduledAt,
+      fullGameData.league?.timezone,
+    );
+  }, [fullGameData?.game?.scheduledAt, fullGameData?.league?.timezone, isScrimmage]);
 
   const { data: beerData } = useQuery({
     queryKey: [`/api/games/${gameId}/beers`],

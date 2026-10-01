@@ -117,7 +117,7 @@ function BeerLoggingHelp() {
           className="w-full max-h-[42vh] rounded-lg border bg-black object-contain"
         />
         <p className="text-sm text-muted-foreground">
-          The button is available from 2 hours before the scheduled start until 6 hours after. It isn’t available for scrimmages.
+          The button is available from 1 hour before the scheduled start until 4 hours after. It isn’t available for scrimmages.
         </p>
       </DialogContent>
     </Dialog>
