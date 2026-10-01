@@ -347,7 +347,7 @@ export default function PlayerStatsTrends() {
                             { label: 'P/GP', value: totals.pointsPerGame },
                           ]
                       ).map(({ label, value }) => (
-                        <div key={label} className="text-center bg-muted/40 rounded-lg py-3">
+                        <div key={label} className="text-center bg-muted/40 rounded-lg py-3 pt-[4px] pb-[4px]">
                           <div className="text-xl font-bold">{value}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
                         </div>
