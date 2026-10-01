@@ -334,7 +334,7 @@ export default function Subscription() {
       name: "Free Tier",
       price: "$0",
       period: "forever",
-      description: "Basic features for casual players",
+      description: "Basic features for basic players",
       features: [
         "Join Leagues / Teams",
         "Scheduling",
