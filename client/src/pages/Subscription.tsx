@@ -336,12 +336,12 @@ export default function Subscription() {
       period: "forever",
       description: "Basic features for basic players",
       features: [
-        "Join Leagues / Teams",
-        "Scheduling",
-        "RSVP Function",
-        "Team Only Stats",
+        "Join Teams/Leagues/Tournaments",
+        "View Schedule",
+        "Personal Stats",
         "Team-Only Messaging"
       ],
+      excludedFeatures: ["Player Pro Features/Access"],
       current: isFree,
       buttonText: isFree ? "Current Plan" : "Manage Subscription",
       buttonDisabled: isFree,
@@ -353,14 +353,13 @@ export default function Subscription() {
       period: billingPeriod === 'yearly' ? 'year' : 'month',
       description: "For serious players",
       features: [
-        "FREE +",
-        "Team Management",
-        "Unlimited Messaging",
-        "Payment Tracking",
-        "Team Scheduling",
-        "League Stats",
-        "League Standings",
-        "League Announcements"
+        "Everything in Free +",
+        "Collect Achievement Patches",
+        "Full Suite League Stats & Schedule",
+        "Schedule Team Events/Games & Private Skates",
+        "Share and View Team/League Photos",
+        'Unlocked Messaging & Posting to "The Wall"',
+        "Payments"
       ],
       current: isPlayerPlus,
       buttonText: isPlayerPlus ? "Current Plan" : "Upgrade Plan",
@@ -374,13 +373,12 @@ export default function Subscription() {
       period: billingPeriod === 'yearly' ? 'year' : 'month',
       description: "Full league management capabilities",
       features: [
-        "FREE & PLAYER PRO +",
+        "Everything in Free & Player Pro +",
         "League Scheduling",
-        "Scorekeeping",
-        "Player Management",
-        "League Wide Posts",
+        "Scorekeeping Tool",
+        "League Announcements",
         "Awards & Records",
-        "Bracket Management"
+        "Playoff/Tournament Bracket Tool"
       ],
       current: isCommissioner,
       buttonText: isCommissioner ? "Current Plan" : "Upgrade Plan",
@@ -1279,6 +1277,15 @@ export default function Subscription() {
                   <div key={featureIndex} className="flex items-center gap-2">
                     <div className="subscription-check" aria-hidden="true">✓</div>
                     <span className="text-sm" data-testid={`text-feature-${index}-${featureIndex}`}>{feature}</span>
+                  </div>
+                ))}
+                {plan.excludedFeatures?.map((feature, featureIndex) => (
+                  <div key={feature} className="subscription-feature-excluded flex items-center gap-2">
+                    <div className="subscription-check is-excluded" aria-hidden="true">×</div>
+                    <span className="text-sm" data-testid={`text-excluded-feature-${index}-${featureIndex}`}>
+                      <span className="sr-only">Not included: </span>
+                      {feature}
+                    </span>
                   </div>
                 ))}
               </div>

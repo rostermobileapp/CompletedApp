@@ -142,6 +142,15 @@
   font-weight: 700;
 }
 
+.subscription-check.is-excluded {
+  background: #f00;
+  color: #000;
+}
+
+.subscription-feature-excluded {
+  font-weight: 700;
+}
+
 .subscription-price-choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
