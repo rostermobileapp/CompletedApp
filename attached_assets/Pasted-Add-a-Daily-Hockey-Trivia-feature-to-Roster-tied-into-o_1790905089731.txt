@@ -1,0 +1,165 @@
+Add a Daily Hockey Trivia feature to Roster, tied into our existing achievement patch system and Trophy Case. Trivia is available to ALL users (free and paid). Patches and the Trophy Case are already a paid feature, and that gating stays exactly as it is. Adapt to our existing stack, database, subscription/entitlement conventions, and UI patterns. Ask me before changing anything unrelated or restructuring existing behavior.
+
+# 1. ACCESS
+
+- Daily trivia is available to every authenticated user, free or paid.
+- Patch earning, patch display, and the Trophy Case remain paid-only. Reuse our existing subscription/entitlement check and the Trophy Case's existing gating (locked state, paywall) for free users. Do not build a new gating system.
+- Correct-answer counts are tracked for EVERY user, free or paid, so a free user who upgrades later sees the progress they already earned, including any tiers already reached.
+- Enforce patch gating server-side: patch/tier endpoints return a locked/403 response for free users. Never rely on the client hiding UI.
+- If a paid subscription lapses, the patch UI locks again (same as other patches), but all answers, streaks, counts, and unlocked tiers are kept. They reappear on resubscribe.
+
+## Test mode (temporary)
+- Add a feature flag TRIVIA_TEST_MODE (env var / Replit Secret, default true) and an allowlist TRIVIA_TEST_USER_IDS = ["U00001"].
+- When TRIVIA_TEST_MODE is true, ONLY users in the allowlist can see the modal or call any /trivia endpoint. Everyone else gets 403 and never sees the modal.
+- Enforce this server-side. The client never decides eligibility.
+- Test mode only controls who sees trivia. It does NOT bypass patch gating: U00001 sees the Trophy Case Trivia section based on their actual subscription tier, so I can test both the free and paid experiences.
+- When TRIVIA_TEST_MODE is false, the allowlist is ignored and trivia is open to all users.
+- The generation job, fallback logic, and everything else run normally regardless of test mode.
+- Add a manual admin/dev command to reset U00001's answer for a given date: delete the trivia_answers row AND reverse any count it added (use progress_awarded), so repeated testing doesn't inflate counts.
+- Log a clear startup message stating whether test mode is on and which user IDs are allowed.
+
+# 2. BEHAVIOR
+
+- Once per day, every user gets the same hockey trivia question.
+- Each question is multiple choice with exactly 4 options.
+- Each user can answer once per day. Store the answer and whether it was correct.
+- "Day" is defined in America/New_York time, not UTC or device time.
+
+# 3. POPUP MODAL (iOS and Android)
+
+- On app open, if the user hasn't answered today's question, show a popup modal. This applies to free and paid users alike.
+- Modal contents: category label, question text, exactly 4 tappable answer buttons, and a "Not now" / close button. For paid users, also show the category's patch icon.
+- Tapping an option submits immediately and locks the answer. The modal then shows correct/incorrect, highlights the right answer, shows the explanation, and shows the user's current streak.
+- Post-answer feedback for PAID users:
+  - If correct: show "+1 toward [Category] patch" with an animated progress bar toward the next tier threshold.
+  - If the answer unlocked a new tier: show a celebratory unlock moment with the patch art and Tier number, using the same celebration/notification pattern the existing patch system uses. Optionally send a OneSignal push if that's how other patch unlocks notify.
+  - If incorrect: show the correct answer and explanation, and the patch's current progress unchanged.
+  - Include a "View in Trophy Case" button that opens the relevant patch, plus a "Done" button.
+- Post-answer feedback for FREE users:
+  - Show correct/incorrect, the explanation, and the streak, with a "Done" button.
+  - If correct, show a subtle, non-blocking teaser such as "You've got X correct in [Category]. Upgrade to unlock trivia patches." with a button that opens our existing upgrade/paywall flow. Keep it to one compact line and button. Do not interrupt the answer flow, and never show it before the user has answered.
+  - Free users never see tier unlock celebrations and never receive patch-unlock pushes. Their counts still accumulate silently.
+- If dismissed with "Not now", don't show again until the next app launch that day. Once answered, never show again that day.
+- Never show the modal in the middle of an active task (editing a lineup, mid-game scoring, etc.). Show it only on app launch or when returning to the home screen.
+- Accessibility: large tap targets, screen reader labels, light and dark mode support.
+
+# 4. DATA MODEL
+
+Table `daily_trivia`:
+- id, date (unique, YYYY-MM-DD, Eastern), category, question, choices (JSON array of exactly 4), correct_index (0-3), explanation, difficulty (easy/medium/hard), verification_status (verified / fallback), verification_notes, created_at
+
+Table `trivia_answers`:
+- id, user_id, trivia_date, category, chosen_index (0-3), is_correct, progress_awarded (0 or 1), answered_at
+- Unique constraint on (user_id, trivia_date)
+
+Table `trivia_fallback`:
+- Same fields as daily_trivia minus date, plus used_on. Seed with 30 well-known, easy-to-verify hockey questions (4 choices each), spread across all 9 categories, each with a category and difficulty. Mark used_on when used so none repeat.
+
+Table `trivia_category_patches` (config):
+- category, patch_id. Editable without a deploy.
+
+Table or config `trivia_tiers` (one shared tier table, not hardcoded in logic):
+- tier number, correct_answers_required (see section 7)
+
+Per-user, per-category stats (answered, correct, current tier, unlock date per tier). Track these for all users, free and paid. Reuse existing patch tables if they already track this.
+
+# 5. DAILY GENERATION JOB
+
+Create a Scheduled Deployment (cron) that runs daily at 12:00 PM (noon) America/New_York. Use the America/New_York time zone setting, not a fixed UTC offset, so it stays at noon local time through daylight saving changes.
+
+The job generates TOMORROW's question (target_date = tomorrow in Eastern time), so it is always ready before midnight. The trivia "day" still rolls over at midnight Eastern for users.
+
+1. Skip if a row already exists for target_date.
+2. Pick the category for target_date using a weekday rotation of these 9 categories: NHL History, Stanley Cup, Players & Legends, Records & Stats, Teams & Franchises, Hockey Culture, Movies & Media, Nicknames & Slang, Arenas & Fans.
+   - Also support occasional special FORMATS: "This Day in Hockey History" (tied to target_date's calendar date), "Name That Player" (3 clues), "Who Am I?" (career path), "Stat Line Mystery."
+   - Special formats are a presentation style, not a category. Every question must still carry one of the 9 categories above, and that category determines which patch it counts toward. The generator prompt and schema validation must require this.
+3. Load the last 60 questions and pass them to Claude so it avoids repeats and near-duplicates.
+4. GENERATE: Call the Claude API (model `claude-sonnet-5-5`) asking for ONE multiple-choice question with exactly 4 options as strict JSON: {category, question, choices[4], correct_index, explanation, difficulty, source_basis}. Rules in the prompt:
+   - Only use facts you are highly confident are correct and widely documented.
+   - Avoid obscure stats, disputed records, or anything that changes over time (current rosters, standings, active-player career totals).
+   - Exactly one unambiguously correct answer; the 3 distractors must be plausible but clearly wrong.
+   - Question under 200 characters, each option under 40 characters (must fit a phone modal), explanation 1 to 2 sentences.
+5. VERIFY (separate API call, fresh context, does not see the generator's reasoning): Give the verifier the question and the 4 choices WITHOUT telling it which is keyed correct. Ask it to independently pick the answer, then compare. Also ask it to check: (a) is the keyed answer actually correct, (b) is any other choice also arguably correct, (c) is the question time-sensitive or ambiguous, and (d) its confidence (high/medium/low). Return strict JSON.
+6. Publish only if the verifier's independent answer matches correct_index, no other choice is arguably correct, and confidence is "high". Otherwise regenerate (max 3 attempts total), passing the failure reason into the next attempt.
+7. If all attempts fail or the API errors, use an unused row from trivia_fallback and set verification_status = "fallback". The day must never be empty.
+8. Log every attempt (question, verdict, notes) so I can review failures, and send me an email or log alert whenever a fallback is used.
+
+Safety net: if GET /trivia/today ever finds no row for today (job failed, outage), it must immediately pull an unused fallback question, save it for today with verification_status = "fallback", and alert me.
+
+# 6. API ENDPOINTS (all require auth)
+
+Trivia endpoints (open to all authenticated users):
+- GET /trivia/today: returns today's question, the 4 choices, category, difficulty, and whether this user has already answered. For paid users, also include the category's patch info. NEVER include correct_index or explanation until the user has answered.
+- POST /trivia/answer: body {chosen_index} (integer 0-3). Rejects if already answered today. Must be idempotent. Returns: is_correct, correct_index, explanation, updated streak, category, and the user's new correct count for that category. For paid users, additionally return the next tier threshold and whether this answer unlocked a new tier (with the tier number). For free users, omit tier-unlock data and return only the count so the client can show the upgrade teaser.
+- GET /trivia/stats: total answered, total correct, accuracy, current streak, best streak (streak = consecutive Eastern days answered correctly). Available to all users. Per-category correct counts are included for all users.
+
+Patch endpoint (paid only):
+- GET /trivia/patches (or fold into stats if cleaner): all 9 categories with current tier, correct count, next threshold, tier unlock dates, and totals, INCLUDING categories the user hasn't started. Free users get the same locked/403 response the existing Trophy Case endpoints return.
+
+# 7. ACHIEVEMENT PATCH INTEGRATION
+
+Roster already has an embroidery-style achievement patch system that is a paid feature. First inspect how it works (tables, progress tracking, unlock logic, display, paid gating) and extend it rather than building a parallel system. Reuse its existing progress and notification mechanisms.
+
+## Category-to-patch mapping
+- Each of the 9 trivia categories maps to exactly one patch family via trivia_category_patches.
+- Create a placeholder patch family for each category if one doesn't exist (name, description, 8 tiers) with placeholder art I can replace later.
+
+## Progress rules and tiers
+- Each correct answer adds exactly 1 to that question's category count, for every user. No difficulty weighting. An incorrect answer adds nothing and never reduces the count.
+- Tiers per category, determined by cumulative correct answers in that category:
+  - Tier 1: 1 correct
+  - Tier 2: 5 correct
+  - Tier 3: 10 correct
+  - Tier 4: 25 correct
+  - Tier 5: 50 correct
+  - Tier 6: 100 correct
+  - Tier 7: 150 correct
+  - Tier 8: 200 correct
+- Store thresholds in config so I can change them without a deploy.
+- Tier is derived from the correct count; one answer can unlock at most one tier. Store the unlock date for each tier the first time it's reached.
+- Free users: counts and tier unlock dates are recorded silently in the background. Tiers are not displayed, celebrated, or pushed to them. When a free user upgrades, the Trophy Case shows their earned tiers right away. A tier earned while on the free plan should NOT trigger a retroactive flood of unlock celebrations on upgrade; show them as already unlocked (use the "new" indicator at most once, if it exists).
+- Counts are cumulative and never expire. Tier 8 is the max; show a "Complete" state after that.
+- Record the answer and increment the category count in the same database transaction so a retry or double tap can never double count. progress_awarded on trivia_answers is 0 or 1 so the test-mode reset can reverse it.
+- Use "Tier 1" through "Tier 8" naming, or the existing patch system's tier naming if it has one.
+- Fallback questions count the same way as generated ones.
+
+# 8. TROPHY CASE: TRIVIA PATCHES SECTION
+
+The app already has a "Trophy Case" screen (a paid feature). First inspect how it's built (layout, patch card component, locked/unlocked states, grouping, paywall for free users, navigation) and add a Trivia section matching its existing look and conventions. If it already groups patches by type, follow that grouping pattern.
+
+## Section layout
+- Add a "Trivia Patches" section, placed after existing sections unless the current layout suggests a better spot.
+- One patch card per category (9 total), using the existing patch card component and embroidery styling.
+- Each card shows: patch art, category name, current tier (or "Not started"), correct count, and a progress bar toward the next tier (e.g. "Tier 3, 14 / 25 toward Tier 4").
+- Unstarted patches appear in the existing locked style (not hidden) so users can see what's available.
+- Maxed patches (Tier 8) show a "Complete" state.
+- Summary row at the top: total trivia answered, total correct, accuracy %, current streak, best streak.
+
+## Free users
+- Free users see the Trivia section exactly the way they see other patches in the Trophy Case today (locked state / existing paywall). Do not invent a new locked design. Reuse the existing one.
+- Optionally show the free user's per-category correct counts on locked cards as a teaser (e.g. "12 correct, upgrade to unlock Tier 3") if that fits the existing locked-state pattern. Otherwise skip it.
+
+## Patch detail view (paid)
+- Tapping a card opens the existing patch detail screen/sheet (or a new one if none exists): large patch art, description, all 8 tiers with thresholds and which are unlocked, total correct in this category, and the unlock date for each tier.
+- Include a "Play today's trivia" button if the user hasn't answered today. Hide it otherwise.
+
+## Polish
+- Newly unlocked patches show the Trophy Case's existing "new" indicator, if one exists.
+- Cache on the client and refresh after each answer.
+- Light and dark mode, screen reader labels on every card (e.g. "Stanley Cup patch, Tier 3, 14 of 25 toward Tier 4").
+- Empty state (no trivia answered yet): show all 9 patches unstarted with a line like "Answer daily trivia to earn these patches."
+- If a paid subscription lapses, the section locks like the rest of the Trophy Case. Data is kept and reappears on resubscribe.
+
+# 9. SECURITY AND CONFIG
+
+- Store the Anthropic API key in Replit Secrets as ANTHROPIC_API_KEY. Never expose it to the client.
+- Validate all API JSON responses against a schema (exactly 4 choices, correct_index 0-3, category must be one of the 9) before saving.
+- Retries with backoff on all API calls.
+- The upgrade teaser must use our existing upgrade/paywall flow (RevenueCat). Do not add any new external payment links or purchase paths.
+
+# 10. DELIVERABLES
+
+- Migrations, the cron script, the endpoints, the seeded fallback questions, the modal UI (free and paid variants), the Trophy Case section, and the patch config/seed data.
+- A README section explaining how to run the job manually (`npm run generate-trivia` or equivalent), how to review the generation log, how to edit tier thresholds and category-to-patch mapping, and how to turn off test mode.
+- A manual admin script to pre-generate and review the next 7 days of questions.
+- The test-mode reset command described in section 1.
