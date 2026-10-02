@@ -22,3 +22,9 @@ Prioritize sharp, readable trivia text over decorative blur or scaling effects.
 **Why:** The owner reported that the trivia screen looked blurry and was barely readable.
 
 **How to apply:** Keep the panel opaque and text on an untransformed surface. Use a dimmed background and simple fades; verify readability rather than assuming background effects cannot affect browser rendering.
+
+Reopening completed trivia for presentation review should restore the saved result, not create a fresh attempt.
+
+**Why:** The owner chose saved-result review for production rather than resetting the day's answer and reversing its earned progress.
+
+**How to apply:** Restore the saved selection and authoritative feedback without answer submissions or progress changes. Treat a reset as a separate, explicitly authorized action.

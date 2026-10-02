@@ -10,7 +10,7 @@ import { shouldShowBirthdayGreeting, type BirthdayStatus } from "./birthdayVisib
 import {
   canStartManualTrivia, isSafeTriviaOpportunity, isValidTriviaQuestion,
   hasServerPatchAccess, readTriviaDismissal, retainQuestionPatch, shouldOfferTrivia,
-  shouldRetainTriviaPriority, triviaPlayDestination,
+  shouldRetainTriviaPriority, triviaPlayDestination, savedTriviaReviewKey,
   type TriviaToday, writeTriviaDismissal,
 } from "./triviaVisibility";
 import "./TriviaHost.css";
@@ -67,7 +67,7 @@ export function TriviaHost() {
   const currentUserId = useRef<string | null>(user?.id ?? null);
   currentUserId.current = user?.id ?? null;
   const manualOpenRequested = useRef(false);
-  const designReviewOpened = useRef(false);
+  const savedReviewOpened = useRef(false);
   const triviaEngaged = useRef(false);
   const [submitError, setSubmitError] = useState("");
   const [hasExistingDialog, setHasExistingDialog] = useState(false);
@@ -199,27 +199,26 @@ export function TriviaHost() {
     setDismissed(true);
   }, [today?.date, today?.answered, displayResult]);
 
-  // One-time, development-only review requested by the owner. Restore the
-  // saved result without resetting an answer or touching earned progress.
+  // This owner-requested review also works in published builds. Only the
+  // targeted account/date can open it; no answer or progress is changed.
   useEffect(() => {
-    const reviewKey = "roster.trivia.design-review:1790951555";
-    if (!import.meta.env.DEV || Date.now() > 1790952155000 ||
-        designReviewOpened.current || permissionUser?.displayId !== "U00001" ||
-        !user || demoActive || !dismissalHydrated || !today?.answered ||
-        !today.feedback || waitingOnOtherHost || hasExistingDialog) return;
+    const reviewKey = savedTriviaReviewKey(permissionUser?.displayId, today);
+    if (!reviewKey || savedReviewOpened.current ||
+        !user || demoActive || !dismissalHydrated || !today?.feedback ||
+        waitingOnOtherHost || hasExistingDialog) return;
     try { if (window.sessionStorage.getItem(reviewKey)) return; } catch {}
     if (!HOME_OPPORTUNITY(path)) {
       navigate("/");
       return;
     }
-    designReviewOpened.current = true;
+    savedReviewOpened.current = true;
     try { window.sessionStorage.setItem(reviewKey, "opened"); } catch {}
     triviaEngaged.current = true;
     setChoice(today.chosen_index ?? null);
     setFeedback(today.feedback as TriviaFeedback);
     setFeedbackDate(today.date);
     setDismissed(false);
-    console.info("[Trivia] Opened saved result for design review.");
+    console.info("[Trivia] Opened requested saved-result review.");
   }, [permissionUser?.displayId, user, demoActive, dismissalHydrated, today,
     waitingOnOtherHost, hasExistingDialog, path, navigate]);
 

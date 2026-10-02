@@ -4,7 +4,7 @@ import {
   canStartManualTrivia, findTriviaCategory, hasServerPatchAccess,
   isSafeTriviaOpportunity, isValidTriviaQuestion,
   readTriviaDismissal, retainQuestionPatch, shouldOfferTrivia,
-  shouldRetainTriviaPriority, triviaPlayDestination,
+  shouldRetainTriviaPriority, triviaPlayDestination, savedTriviaReviewKey,
   writeTriviaDismissal,
 } from "./triviaVisibility";
 
@@ -87,4 +87,24 @@ test("patch feedback requires both paid entitlement and a server-provided patch"
   assert.equal(hasServerPatchAccess(true, { name: "NHL History" }), true);
   assert.equal(hasServerPatchAccess(true, undefined), false);
   assert.equal(hasServerPatchAccess(false, { name: "NHL History" }), false);
+});
+
+test("saved-result review targets only the requested account and Eastern trivia date", () => {
+  const today = {
+    date: "2026-10-02", category: "NHL History", question: "Q?",
+    choices: ["A", "B", "C", "D"], difficulty: "easy", answered: true, chosen_index: 1,
+    feedback: { is_correct: false, correct_index: 0, explanation: "A is correct.",
+      streak: 0, category: "NHL History", correct_count: 0 },
+  };
+  const original = structuredClone(today);
+  assert.equal(savedTriviaReviewKey("U00001", today), "roster.trivia.saved-review:U00001:2026-10-02");
+  assert.equal(savedTriviaReviewKey("U00002", today), null);
+  assert.equal(savedTriviaReviewKey(undefined, today), null);
+  assert.equal(savedTriviaReviewKey("U00001", { ...today, date: "2026-10-03" }), null);
+  assert.equal(savedTriviaReviewKey("U00001", { ...today, answered: false }), null);
+  assert.equal(savedTriviaReviewKey("U00001", { ...today, feedback: undefined }), null);
+  assert.equal(savedTriviaReviewKey("U00001", { ...today, chosen_index: undefined }), null);
+  assert.equal(savedTriviaReviewKey("U00001", { ...today, chosen_index: 4 }), null);
+  assert.equal(savedTriviaReviewKey("U00001", null), null);
+  assert.deepEqual(today, original, "review eligibility must not modify the saved answer or progress");
 });

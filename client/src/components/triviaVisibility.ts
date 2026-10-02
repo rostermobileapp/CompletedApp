@@ -21,6 +21,20 @@ export type TriviaToday = {
 
 export const TRIVIA_DISMISSAL_KEY = "roster.trivia.dismissed";
 
+/** An explicitly requested, read-only review; expires with the API's daily date. */
+export function savedTriviaReviewKey(displayId: unknown, today: TriviaToday | null): string | null {
+  if (displayId !== "U00001" || today?.date !== "2026-10-02" ||
+      !today.answered || !today.feedback ||
+      typeof today.feedback.is_correct !== "boolean" ||
+      !Number.isInteger(today.feedback.correct_index) ||
+      today.feedback.correct_index < 0 || today.feedback.correct_index >= today.choices.length ||
+      !Number.isInteger(today.chosen_index) ||
+      today.chosen_index === undefined || today.chosen_index < 0 || today.chosen_index >= today.choices.length) {
+    return null;
+  }
+  return `roster.trivia.saved-review:${displayId}:${today.date}`;
+}
+
 export function triviaDismissalStorageKey(userId: string, date: string): string {
   return `${TRIVIA_DISMISSAL_KEY}:${encodeURIComponent(userId)}:${date}`;
 }
