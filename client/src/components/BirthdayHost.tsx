@@ -15,6 +15,7 @@ export function BirthdayHost() {
   const [dismissing, setDismissing] = useState(false);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [triviaOpen, setTriviaOpen] = useState(false);
   const statusKey = ["/api/birthday/status", user?.id];
   const { data: status } = useQuery<BirthdayStatus>({
     queryKey: statusKey,
@@ -59,7 +60,14 @@ export function BirthdayHost() {
     };
   }, [status?.expiresAt]);
 
-  const open = !!user && !demoActive
+  useEffect(() => {
+    const onTriviaModal = (event: Event) => setTriviaOpen(!!(event as CustomEvent<{ open?: boolean }>).detail?.open);
+    window.addEventListener("roster:trivia-modal", onTriviaModal);
+    return () => window.removeEventListener("roster:trivia-modal", onTriviaModal);
+  }, []);
+
+  const open = !!user && !demoActive && !triviaOpen
+    && (badgeCheckFailed || Array.isArray(pendingBadges))
     && shouldShowBirthdayGreeting(status, now, badgeCheckFailed ? [] : pendingBadges);
   async function dismiss() {
     if (dismissing) return;

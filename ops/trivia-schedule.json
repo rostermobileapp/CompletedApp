@@ -1,0 +1,12 @@
+{
+  "name": "roster-daily-hockey-trivia-generation",
+  "deployment_target": "scheduled",
+  "configuration_status": "not_configured",
+  "schedule": "0 12 * * *",
+  "timezone": "America/New_York",
+  "command": "npm run generate-trivia",
+  "purpose": "Generate tomorrow's Eastern-date hockey trivia question.",
+  "required_server_secret": "ANTHROPIC_API_KEY",
+  "fallback_behavior": "Use a reviewed database fallback and emit an alert if model generation or verification fails.",
+  "deployment_note": "Create this as a separate Scheduled Deployment. This manifest does not provision a live schedule and must not replace the existing web deployment."
+}

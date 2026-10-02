@@ -26,6 +26,7 @@ import { NativelyNotificationsInitializer } from "@/components/NativelyNotificat
 import { NativeCalendarAutoSync } from "@/components/NativeCalendarAutoSync";
 import { BadgeEarnedHost } from "@/components/BadgeEarnedHost";
 import { BirthdayHost } from "@/components/BirthdayHost";
+import { TriviaHost } from "@/components/TriviaHost";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
@@ -439,6 +440,7 @@ function App() {
                 <ErrorBoundary>
                   <DemoContextProvider>
                     <BirthdayHost />
+                    <TriviaHost />
                     <Router />
                   </DemoContextProvider>
                 </ErrorBoundary>

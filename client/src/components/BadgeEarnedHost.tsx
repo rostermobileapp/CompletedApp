@@ -94,6 +94,10 @@ export function BadgeEarnedAnnouncement({
   onViewTrophyCase?: () => void | Promise<void>;
 }) {
   const tier = payload.tier;
+  const triviaTier = payload.trivia && payload.tierNumber !== undefined
+    && Number.isInteger(Number(payload.tierNumber))
+    ? `Tier ${Number(payload.tierNumber)}`
+    : null;
   const isMultiplier = badge.achievementType === "multiplier" && payload.count;
 
   useEffect(() => {
@@ -116,7 +120,7 @@ export function BadgeEarnedAnnouncement({
       >
         <div className="pointer-events-none absolute inset-1 rounded-[1.2rem] border border-white/80" />
         <button onClick={() => { void onDismiss(); }} className="absolute right-3 top-3 rounded-full p-2 text-[#597087] transition hover:bg-[#e8f0f6] hover:text-[#173d5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#164a73] sm:right-4 sm:top-4" aria-label="Close achievement announcement"><X size={20} /></button>
-        <p className="px-9 text-[10px] font-bold uppercase tracking-[.24em] text-[#d52d3b]">{tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
+        <p className="px-9 text-[10px] font-bold uppercase tracking-[.24em] text-[#d52d3b]">{triviaTier ? `Trivia patch · ${triviaTier}` : tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
         <div className={`badge-click-pop relative mx-auto mt-5 flex h-40 w-40 items-center justify-center sm:h-48 sm:w-48 ${badge.imagePath ? "bg-transparent" : "rounded-full bg-[#e8f0f6]"}`}>
           {badge.imagePath ? <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#164a73]">{badge.name || "Badge"}</span>}
         </div>
@@ -135,6 +139,7 @@ export function BadgeEarnedHost() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [queue, setQueue] = useState<EarnedEvent[]>([]);
+  const [triviaOpen, setTriviaOpen] = useState(false);
   const current = queue[0];
   const { data: pending } = useQuery<EarnedEvent[]>({
     queryKey: ["/api/badges/events/pending"],
@@ -162,7 +167,17 @@ export function BadgeEarnedHost() {
     });
   }), [onConnected, queryClient]);
 
-  if (!current) return null;
+  useEffect(() => {
+    const onTriviaModal = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>).detail;
+      setTriviaOpen(!!detail?.open);
+      if (!detail?.open) void queryClient.invalidateQueries({ queryKey: ["/api/badges/events/pending"] });
+    };
+    window.addEventListener("roster:trivia-modal", onTriviaModal);
+    return () => window.removeEventListener("roster:trivia-modal", onTriviaModal);
+  }, [queryClient]);
+
+  if (!current || triviaOpen) return null;
   const payload = current.payload || current.badge || {};
   const badgeDefinition = current.badge || current.definition || {};
   const badge = payload.imagePath

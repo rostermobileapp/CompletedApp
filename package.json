@@ -4,10 +4,14 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "dev": "tsx scripts/generate-trivia-patches.ts && NODE_ENV=development tsx server/index.ts",
+    "build": "tsx scripts/generate-trivia-patches.ts && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
+    "generate-trivia": "tsx scripts/trivia.ts generate",
+    "trivia:review": "tsx scripts/trivia.ts review",
+    "trivia:reset": "tsx scripts/trivia.ts reset",
+    "trivia:seed": "tsx scripts/trivia.ts seed-fallbacks",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

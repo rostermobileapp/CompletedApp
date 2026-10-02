@@ -1,0 +1,20 @@
+# Apply only in the NEW standalone scheduler project.
+# Do not replace the original Roster project's .replit.
+modules = ["nodejs-20"]
+run = "npm run generate-trivia"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+deploymentTarget = "scheduled"
+build = ["npm", "ci"]
+run = ["npm", "run", "generate-trivia"]
+
+[env]
+NODE_ENV = "production"
+
+# Configure these in the new project's Publishing settings:
+# Cron: 0 12 * * *
+# Time zone: America/New_York
+# Add DATABASE_URL and ANTHROPIC_API_KEY through Secrets, never in this file.

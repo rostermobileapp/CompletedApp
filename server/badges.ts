@@ -1,4 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { isTriviaDefinition, isTriviaUserEnabled } from "@shared/trivia";
+import { hasPaidTrophyCaseAccess } from "@shared/trophyCaseAccess";
 import {
   badgeAwards,
   badgeDefinitions,
@@ -19,6 +21,7 @@ import {
   seasons,
   teams,
   teamMemberships,
+  users,
   type BadgeDefinition,
   type BadgeEarnedEvent,
 } from "@shared/schema";
@@ -1138,6 +1141,12 @@ async function definitionsWithTiers(includeArchived = false) {
   return definitions.map((definition) => ({ ...definition, tiers: tiersByDefinition.get(definition.id) ?? [] }));
 }
 
+async function maySeeTriviaBadges(userId: string): Promise<boolean> {
+  const [viewer] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return !!viewer && isTriviaUserEnabled(viewer.displayId)
+    && hasPaidTrophyCaseAccess(viewer) && getTrophyCaseAccess(viewer.dateOfBirth) === "eligible";
+}
+
 function scopeKeyFor(definition: Pick<BadgeDefinition, "category">, context?: { leagueId?: string | null; seasonId?: string | null; teamId?: string | null }) {
   if (definition.category === "achievement") return "global";
   if (definition.category === "nhl_trophy") {
@@ -1459,6 +1468,7 @@ export async function evaluateBadgesForUser(
   const definitions = await definitionsWithTiers();
   const earned: Array<Record<string, unknown>> = [];
   for (const definition of definitions.filter((item) => item.category === "achievement" && item.achievementType
+    && !isTriviaDefinition(item)
     && (!onlyTriggerKey || item.triggerKey === onlyTriggerKey))) {
     if (definition.triggerKey === "calendar_year_beers") {
       earned.push(...await evaluateCalendarYearBeerBadgeForUser(userId, definition, context?.year ?? currentCenturyClubYear()));
@@ -1676,13 +1686,16 @@ export async function getEarnedPatches(userId: string) {
       .leftJoin(teams, eq(badgeAwards.teamId, teams.id))
       .where(eq(badgeAwards.userId, userId)),
   ]);
-  return collectEarnedPatches(definitions, awardRows.map(({ award, leagueName, seasonName, teamName }) => ({
+  const triviaVisible = await maySeeTriviaBadges(userId);
+  return collectEarnedPatches(definitions.filter((definition) => !isTriviaDefinition(definition) || triviaVisible), awardRows.map(({ award, leagueName, seasonName, teamName }) => ({
     ...award, leagueName, seasonName, teamName,
   })));
 }
 
 export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: string) {
-  const definitions = await definitionsWithTiers();
+  // Trivia is lifetime-only and has its own section; never duplicate it into
+  // season-selected achievement groups or expose it through another user's case.
+  const definitions = (await definitionsWithTiers()).filter((definition) => !isTriviaDefinition(definition));
   const centuryYear = currentCenturyClubYear();
   const [awards, progress, goalieMembership, goalieAppearance, goalieTeamMembership, beerCount, threeStarPoints, centuryCount, ironManCount, shutoutCount, hatTrickSeasonsResult] = await Promise.all([
     db.select().from(badgeAwards).where(eq(badgeAwards.userId, userId)).orderBy(desc(badgeAwards.awardedAt)),
@@ -1819,7 +1832,7 @@ export async function getTrophyCase(userId: string, requestedHatTrickSeasonId?: 
 
 // Catalog-only preview; never reads or writes a player's awards.
 export async function getTrophyCasePreview() {
-  const definitions = await definitionsWithTiers();
+  const definitions = (await definitionsWithTiers()).filter((definition) => !isTriviaDefinition(definition));
   const badges = definitions.map((definition) => ({
     id: definition.id,
     slug: definition.slug,
@@ -1896,8 +1909,17 @@ export async function getPendingBadgeEvents(userId: string) {
   const centuryYear = currentCenturyClubYear();
   const goalieEligible = events.some((event) => event.definition.triggerKey === "career_shutouts")
     ? await isCareerGoalie(userId) : false;
+  const triviaVisible = events.some((event) => isTriviaDefinition(event.definition))
+    ? await maySeeTriviaBadges(userId) : false;
+  // Suppressed events must not replay after an upgrade/resubscription.
+  const suppressedTriviaIds = events.filter((event) => isTriviaDefinition(event.definition) && !triviaVisible).map((event) => event.id);
+  if (suppressedTriviaIds.length) {
+    await db.update(badgeEarnedEvents).set({ acknowledgedAt: new Date() })
+      .where(inArray(badgeEarnedEvents.id, suppressedTriviaIds));
+  }
   const currentEvents = events.filter((event) =>
-    (event.definition.triggerKey !== "career_shutouts" || goalieEligible)
+    (!isTriviaDefinition(event.definition) || triviaVisible)
+    && (event.definition.triggerKey !== "career_shutouts" || goalieEligible)
     && ((event.definition.triggerKey !== "calendar_year_appearances"
       && event.definition.triggerKey !== "calendar_year_beers")
     || (event.payload as Record<string, unknown>)?.year === centuryYear));
@@ -1983,6 +2005,7 @@ export async function acknowledgeBadgeEvent(userId: string, eventId: string) {
   )).returning();
 }
 
-export async function getBadgeCatalog(includeArchived = true) {
-  return definitionsWithTiers(includeArchived);
+export async function getBadgeCatalog(includeArchived = true, viewerId?: string) {
+  const triviaVisible = viewerId ? await maySeeTriviaBadges(viewerId) : false;
+  return (await definitionsWithTiers(includeArchived)).filter((definition) => !isTriviaDefinition(definition) || triviaVisible);
 }

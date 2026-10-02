@@ -1,6 +1,7 @@
 import { sql, relations } from "drizzle-orm";
 import {
   index,
+  uniqueIndex,
   jsonb,
   pgTable,
   timestamp,
@@ -4522,6 +4523,102 @@ export const badgeEarnedEvents = pgTable("badge_earned_events", {
 }, (table) => [
   index("idx_badge_events_user_pending").on(table.userId, table.acknowledgedAt),
   index("idx_badge_events_created").on(table.createdAt),
+]);
+
+export const triviaCategoryEnum = pgEnum("trivia_category", [
+  "nhl_history",
+  "stanley_cup",
+  "players_legends",
+  "records_stats",
+  "teams_franchises",
+  "hockey_culture",
+  "movies_media",
+  "nicknames_slang",
+  "arenas_fans",
+]);
+
+export const dailyTrivia = pgTable("daily_trivia", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: date("date", { mode: "string" }).notNull().unique(),
+  category: triviaCategoryEnum("category").notNull(),
+  question: text("question").notNull(),
+  choices: jsonb("choices").$type<string[]>().notNull(),
+  correctIndex: integer("correct_index").notNull(),
+  explanation: text("explanation").notNull(),
+  difficulty: varchar("difficulty", { length: 10 }).notNull(),
+  format: varchar("format", { length: 50 }),
+  verificationStatus: varchar("verification_status", { length: 20 }).notNull(),
+  verificationNotes: text("verification_notes"),
+  sourceBasis: text("source_basis"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  check("daily_trivia_correct_index_check", sql`${table.correctIndex} BETWEEN 0 AND 3`),
+  check("daily_trivia_choices_check", sql`jsonb_typeof(${table.choices}) = 'array' AND jsonb_array_length(${table.choices}) = 4`),
+]);
+
+export const triviaAnswers = pgTable("trivia_answers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  triviaDate: date("trivia_date", { mode: "string" }).notNull(),
+  category: triviaCategoryEnum("category").notNull(),
+  chosenIndex: integer("chosen_index").notNull(),
+  isCorrect: boolean("is_correct").notNull(),
+  progressAwarded: integer("progress_awarded").default(0).notNull(),
+  answeredAt: timestamp("answered_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("uq_trivia_answers_user_date").on(table.userId, table.triviaDate),
+  check("trivia_answers_chosen_index_check", sql`${table.chosenIndex} BETWEEN 0 AND 3`),
+  check("trivia_answers_progress_awarded_check", sql`${table.progressAwarded} IN (0, 1)`),
+  index("idx_trivia_answers_user_date").on(table.userId, table.triviaDate),
+  index("idx_trivia_answers_category").on(table.userId, table.category),
+]);
+
+export const triviaFallback = pgTable("trivia_fallback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  category: triviaCategoryEnum("category").notNull(),
+  question: text("question").notNull(),
+  choices: jsonb("choices").$type<string[]>().notNull(),
+  correctIndex: integer("correct_index").notNull(),
+  explanation: text("explanation").notNull(),
+  difficulty: varchar("difficulty", { length: 10 }).notNull(),
+  format: varchar("format", { length: 50 }),
+  verificationNotes: text("verification_notes").notNull(),
+  usedOn: date("used_on", { mode: "string" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  check("trivia_fallback_correct_index_check", sql`${table.correctIndex} BETWEEN 0 AND 3`),
+  check("trivia_fallback_choices_check", sql`jsonb_typeof(${table.choices}) = 'array' AND jsonb_array_length(${table.choices}) = 4`),
+  index("idx_trivia_fallback_used_on").on(table.usedOn),
+]);
+
+export const triviaCategoryPatches = pgTable("trivia_category_patches", {
+  category: triviaCategoryEnum("category").primaryKey(),
+  patchId: varchar("patch_id").references(() => badgeDefinitions.id, { onDelete: "cascade" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("idx_trivia_category_patches_patch_id").on(table.patchId),
+]);
+
+export const triviaTiers = pgTable("trivia_tiers", {
+  tier: integer("tier").primaryKey(),
+  correctAnswersRequired: integer("correct_answers_required").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  check("trivia_tiers_number_check", sql`${table.tier} BETWEEN 1 AND 8`),
+  check("trivia_tiers_threshold_check", sql`${table.correctAnswersRequired} > 0`),
+]);
+
+export const triviaGenerationAttempts = pgTable("trivia_generation_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  targetDate: date("target_date", { mode: "string" }).notNull(),
+  attempt: integer("attempt").notNull(),
+  question: jsonb("question"),
+  verdict: varchar("verdict", { length: 20 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("idx_trivia_generation_attempts_date").on(table.targetDate, table.attempt),
 ]);
 
 export const insertBadgeDefinitionSchema = createInsertSchema(badgeDefinitions).omit({

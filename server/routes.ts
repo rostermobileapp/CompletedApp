@@ -145,6 +145,9 @@ import {
   getTrophyCasePreview,
 } from "./badges";
 import { ensureBadgeTables } from "./badgeDbInit";
+import { ensureTriviaTables } from "./triviaDbInit";
+import { registerTriviaRoutes } from "./triviaRoutes";
+import { isTriviaDefinition } from "@shared/trivia";
 import { ensureBirthdayTable, getBirthdayStatus, dismissBirthday, startBirthdayPushJob } from "./birthday";
 import { ensureBeerBadgeEvaluationQueue } from "./beerBadgeEvaluationQueue";
 import { getLeagueInviteCandidates, selectInviteRecipients } from "./leagueInviteRecipients";
@@ -1097,6 +1100,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
   await ensureBadgeTables();
+  await ensureTriviaTables();
+  registerTriviaRoutes(app);
   await ensureBirthdayTable();
   console.log("[Init] badge catalog tables ensured");
   // Demo tables are startup-safe for deployments that use runtime migrations.
@@ -1245,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/badges/catalog', isAuthenticated, badgeAdmin, async (_req: any, res) => {
     try {
-      res.json(await getBadgeCatalog(true));
+      res.json(await getBadgeCatalog(true, currentUserId(_req)));
     } catch (error) {
       res.status(500).json({ message: 'Failed to load badge catalog' });
     }
@@ -1316,6 +1321,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/admin/badges/catalog/:badgeId', isAuthenticated, badgeAdmin, async (req: any, res) => {
     try {
+      const visible = await getBadgeCatalog(true, currentUserId(req));
+      if (!visible.some((badge) => badge.id === req.params.badgeId)) {
+        return res.status(404).json({ message: 'Badge definition not found' });
+      }
       const body = req.body ?? {};
       const updates: any = {};
       for (const key of ['name', 'description', 'lockedHint', 'category', 'achievementType', 'triggerType', 'triggerKey', 'triggerConfig', 'imagePath', 'placeholderColor']) {
@@ -1344,6 +1353,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/badges/catalog/:badgeId/:action', isAuthenticated, badgeAdmin, async (req: any, res) => {
     if (!['publish', 'archive'].includes(req.params.action)) return res.status(404).json({ message: 'Unknown badge action' });
+    const visible = await getBadgeCatalog(true, currentUserId(req));
+    if (!visible.some((badge) => badge.id === req.params.badgeId)) {
+      return res.status(404).json({ message: 'Badge definition not found' });
+    }
     const status = req.params.action === 'publish' ? 'published' : 'archived';
     const [updated] = await db.update(badgeDefinitions).set({
       status,
@@ -1359,6 +1372,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const [definition] = await db.select().from(badgeDefinitions).where(eq(badgeDefinitions.id, req.params.badgeId)).limit(1);
       if (!definition) return res.status(404).json({ message: 'Badge definition not found' });
+      if (isTriviaDefinition(definition)) {
+        return res.status(403).json({ message: 'Trivia patches are earned only by answering daily trivia.' });
+      }
       const context = {
         leagueId: req.body?.leagueId ?? null,
         seasonId: req.body?.seasonId ?? null,
