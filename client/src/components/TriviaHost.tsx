@@ -202,8 +202,8 @@ export function TriviaHost() {
   // One-time, development-only review requested by the owner. Restore the
   // saved result without resetting an answer or touching earned progress.
   useEffect(() => {
-    const reviewKey = "roster.trivia.design-review:1790950866";
-    if (!import.meta.env.DEV || Date.now() > 1790951466000 ||
+    const reviewKey = "roster.trivia.design-review:1790951555";
+    if (!import.meta.env.DEV || Date.now() > 1790952155000 ||
         designReviewOpened.current || permissionUser?.displayId !== "U00001" ||
         !user || demoActive || !dismissalHydrated || !today?.answered ||
         !today.feedback || waitingOnOtherHost || hasExistingDialog) return;
