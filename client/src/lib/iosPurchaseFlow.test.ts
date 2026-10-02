@@ -1,116 +1,104 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { activateIosPurchase, type IosPurchaseFlow } from './iosPurchaseFlow';
-
 function fixture() {
-  let user: string | undefined = 'test-account-a';
-  let customer = 'test-anonymous';
+  let user = 'account-a';
+  let version = 0;
   const events: string[] = [];
-  const loginId = 'roster_ios_' + 'a'.repeat(64);
   const flow: IosPurchaseFlow = {
-    currentUserId: () => user,
-    account: async () => { events.push('account'); return { loginId, userId: user! }; },
-    login: async (id) => { events.push('login'); customer = id; },
-    customerId: async () => customer,
-    purchase: async (productId) => { events.push(`purchase:${productId}`); return { status: 'SUCCESS', packageId: productId }; },
-    restore: async () => { events.push('restore'); return { status: 'SUCCESS', customerId: customer }; },
-    verify: async (payload) => {
-      events.push('verify');
-      assert.equal(payload.loginId, loginId);
-      if (payload.expectedProductId) assert.match(payload.expectedProductId, /^com\.rosterapp\./);
-      return { verified: true, role: 'player_pro' };
-    },
-    refresh: async () => { events.push('refresh'); },
+    associate: async loginId => ({ loginReportedId: loginId, readBackId: loginId }),
+    confirmAssociation: async () => ({ confirmed: true }),
+    nativeIdentity: async () => 'test-login',
+    currentUserId: () => user, accountVersion: () => version,
+    account: async () => { events.push('account'); return { userId: 'account-a', loginId: 'test-login', available: true }; },
+    purchase: async product => { events.push('purchase'); return { productIdentifier: product, transactionId: 'apple-transaction' }; },
+    restore: async () => { events.push('restore'); return [{ productIdentifier: 'player_pro_monthly', jwsRepresentation: 'signed-apple-proof' }]; },
+    verify: async payload => { events.push('verify'); assert.equal(payload.expectedUserId, 'account-a'); assert.equal(payload.loginId, 'test-login'); return { role: 'player_pro' }; },
+    refresh: async (id, role) => { events.push('refresh'); assert.equal(id, 'account-a'); assert.equal(role, 'player_pro'); },
   };
-  return { flow, events, switchUser: (id?: string) => { user = id; }, loginId };
+  return { flow, events, switchUser() { user = 'account-b'; version++; } };
 }
-
 for (const product of ['player_pro_monthly', 'player_pro_yearly', 'commissioner_monthly', 'commissioner_yearly']) {
-  test(`${product}: associate before checkout; callback is not proof; refresh after verification`, async () => {
+  test(`${product}: account-associated Apple verification precedes tier refresh`, async () => {
     const { flow, events } = fixture();
+    const verify = flow.verify;
+    flow.verify = async payload => { assert.equal(payload.expectedProductId, 'com.rosterapp.' + product); return verify(payload); };
     await activateIosPurchase(flow, product);
-    assert.deepEqual(events, ['account', 'login', `purchase:${product}`, 'verify', 'refresh']);
+    assert.deepEqual(events, ['account', 'purchase', 'verify', 'refresh']);
   });
 }
-
-test('restore with documented customer-only callback verifies and refreshes immediately', async () => {
+test('restore uses the server-derived account for Apple verification', async () => {
   const { flow, events } = fixture();
   await activateIosPurchase(flow);
-  assert.deepEqual(events, ['account', 'login', 'restore', 'verify', 'refresh']);
+  assert.deepEqual(events, ['account', 'restore', 'verify', 'refresh']);
 });
-
-test('provider setup outage prevents checkout', async () => {
+test('documented proofless purchase callback still requires server verification', async () => {
   const { flow, events } = fixture();
-  flow.account = async () => { throw new Error('Apple verification unavailable'); };
-  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /unavailable/);
+  flow.purchase = async () => ({ productIdentifier: 'player_pro_monthly' });
+  await activateIosPurchase(flow, 'player_pro_monthly');
+  assert.deepEqual(events, ['account', 'verify', 'refresh']);
+});
+test('proofless restore cannot report success without verified server tier', async () => {
+  const { flow } = fixture();
+  flow.restore = async () => [];
+  flow.verify = async () => ({ role: 'free_tier' });
+  await assert.rejects(activateIosPurchase(flow), /No active/);
+});
+test('unavailable Apple verifier prevents payment', async () => {
+  const { flow, events } = fixture();
+  flow.account = async () => ({ userId: 'account-a', available: false });
+  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /Apple verification is unavailable/);
   assert.deepEqual(events, []);
 });
-
-for (const message of ['Already linked to another account', 'Provider unavailable', 'Subscription expired', 'Subscription refunded']) {
-  test(`${message}: no success or refresh; actionable no-repurchase error`, async () => {
-    const { flow, events } = fixture();
-    flow.verify = async () => { throw new Error(message); };
-    await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /Do not purchase again.*Restore purchases/);
-    assert.equal(events.includes('refresh'), false);
-  });
-}
-
-test('Free response is not activation even when bridge callback succeeds', async () => {
+test('unconfirmed native association prevents Apple payment', async () => {
   const { flow, events } = fixture();
-  flow.verify = async () => ({ verified: true, role: 'free_tier' });
-  await assert.rejects(activateIosPurchase(flow), /No active App Store subscription/);
-  assert.equal(events.includes('refresh'), false);
-});
-
-test('account switch during login stops before checkout', async () => {
-  const { flow, events, switchUser } = fixture();
-  flow.login = async () => { switchUser('test-account-b'); };
-  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /account changed/);
+  let paymentCalls = 0;
+  flow.confirmAssociation = async () => ({ confirmed: false });
+  flow.purchase = async product => { paymentCalls++; return { productIdentifier: product }; };
+  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /Checkout was not opened/);
+  assert.equal(paymentCalls, 0);
   assert.deepEqual(events, ['account']);
 });
-
-test('server login identity for a different account stops before login', async () => {
-  const { flow, events, loginId } = fixture();
-  flow.account = async () => ({ loginId, userId: 'test-account-b' });
-  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /account changed/);
-  assert.deepEqual(events, []);
-});
-
-test('account switch during purchase never verifies or refreshes the new user', async () => {
-  const { flow, events, switchUser } = fixture();
-  flow.purchase = async () => { switchUser('test-account-b'); };
-  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /purchasing account/);
-  assert.deepEqual(events, ['account', 'login']);
-});
-
-test('native identity mismatch prevents checkout', async () => {
+test('verified existing-lineage restore does not require callback transaction proof', async () => {
   const { flow, events } = fixture();
-  flow.customerId = async () => 'test-other-customer';
-  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /could not be linked/);
-  assert.deepEqual(events, ['account', 'login']);
-});
-
-test('cancelled purchase does not verify and releases the operation lock', async () => {
-  const { flow, events } = fixture();
-  flow.purchase = async () => { throw Object.assign(new Error('Purchase cancelled'), { code: 'PURCHASE_CANCELLED' }); };
-  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), { code: 'PURCHASE_CANCELLED' });
-  assert.equal(events.includes('verify'), false);
   await activateIosPurchase(flow);
+  assert.deepEqual(events, ['account', 'restore', 'verify', 'refresh']);
 });
-
-test('concurrent operations cannot overwrite the native identity', async () => {
+for (const stage of ['account', 'purchase', 'verify', 'refresh'] as const) {
+  test(`iOS account race at ${stage} prevents subsequent work and success`, async () => {
+    const f = fixture();
+    const original = f.flow[stage] as (...args: any[]) => Promise<any>;
+    (f.flow as any)[stage] = async (...args: any[]) => { const value = await original(...args); f.switchUser(); return value; };
+    await assert.rejects(activateIosPurchase(f.flow, 'player_pro_monthly'), /account changed/);
+    assert.equal(f.events.length, ['account', 'purchase', 'verify', 'refresh'].indexOf(stage) + 1);
+  });
+}
+for (const error of ['Already linked to another account', 'Apple verification unavailable', 'Subscription refunded']) {
+  test(`${error} does not refresh or charge again`, async () => {
+    const { flow, events } = fixture();
+    flow.verify = async () => { throw new Error(error); };
+    await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /Do not purchase again/);
+    assert.deepEqual(events, ['account', 'purchase']);
+  });
+}
+test('Free tier is not successful activation', async () => {
   const { flow } = fixture();
-  let release!: () => void;
-  flow.restore = () => new Promise<void>((resolve) => { release = resolve; });
-  const first = activateIosPurchase(flow);
-  while (!release) await new Promise(resolve => setTimeout(resolve, 1));
-  await assert.rejects(activateIosPurchase(fixture().flow), /operation is in progress/);
-  release();
-  await first;
+  flow.verify = async () => ({ role: 'free_tier' });
+  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /No active/);
 });
-
-test('a failed account refresh is exposed instead of reporting activation', async () => {
+test('failed account refresh does not report success', async () => {
   const { flow } = fixture();
-  flow.refresh = async () => { throw new Error('Could not refresh your account'); };
-  await assert.rejects(activateIosPurchase(flow), /Purchase needs verification.*refresh your account/);
+  flow.refresh = async () => { throw new Error('Tier refresh failed'); };
+  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /Tier refresh failed/);
+});
+test('cancellation is preserved and releases the shared lock', async () => {
+  const { flow } = fixture();
+  flow.purchase = async () => { throw Object.assign(new Error('Cancelled'), { code: 'PURCHASE_CANCELLED' }); };
+  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), { code: 'PURCHASE_CANCELLED' });
+  await activateIosPurchase(fixture().flow, 'player_pro_monthly');
+});
+test('iOS timeout is ambiguous, not an invitation to pay again', async () => {
+  const { flow } = fixture();
+  flow.purchase = async () => { throw new Error('NATIVELY_TIMEOUT'); };
+  await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), /Do not purchase again/);
 });

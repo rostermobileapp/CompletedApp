@@ -13,8 +13,31 @@ interface RevenueCatSubscription {
 
 interface RevenueCatResponse {
   subscriber?: {
+    original_app_user_id?: string;
     subscriptions?: Record<string, RevenueCatSubscription>;
   };
+}
+
+export async function getRevenueCatSubscriber(
+  loginId: string, options: { apiKey?: string; fetcher?: typeof fetch } = {},
+): Promise<NonNullable<RevenueCatResponse['subscriber']>> {
+  if (!/^roster_(?:ios_)?[a-f0-9]{64}$/.test(loginId)) {
+    throw Object.assign(new Error('Invalid purchase-account context.'), { status: 400 });
+  }
+  const key = options.apiKey ?? process.env.REVENUECAT_API_KEY;
+  if (!key) throw Object.assign(new Error('Subscription verification is unavailable. Please try later.'), { status: 503 });
+  const response = await (options.fetcher ?? fetch)(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(loginId)}`,
+    { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!response.ok) throw Object.assign(new Error('Subscription verification is temporarily unavailable. Please try later.'), { status: 503 });
+  const data = await response.json() as RevenueCatResponse;
+  if (!data?.subscriber || typeof data.subscriber.original_app_user_id !== 'string' ||
+      !data.subscriber.subscriptions || typeof data.subscriber.subscriptions !== 'object' ||
+      Array.isArray(data.subscriber.subscriptions)) {
+    throw Object.assign(new Error('Subscription verification returned an invalid response.'), { status: 503 });
+  }
+  return data.subscriber;
 }
 
 export interface VerifiedAppleSubscription {

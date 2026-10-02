@@ -43,6 +43,8 @@ import { gamePenalties } from "@shared/schema";
 import { googleIapClaims } from "@shared/schema";
 import { hashGoogleIapToken } from "./googleIapClaimsInit";
 import { isVerifiedPriorGoogleClaim } from "./googleIap";
+import { assertNativeBillingRequestAccount } from "./nativeBillingAccount";
+import { nativePurchaseLoginId, confirmReportedNativeIdentity } from "./nativePurchaseAccount";
 import { leagues, leagueMemberships, importedPlayers, teams, users, announcementPolls, createChatPollRequestSchema, type DutyTemplate, visitorCount, waitlistSignups, onboardingSportPoll, insertOnboardingSportPollSchema, tournaments, tournamentTeams, tournamentMatches, tournamentMatchRsvps, tournamentStats, tournamentParticipants, tournamentScorekeeperInvites, insertTournamentSchema, insertTournamentTeamSchema, insertTournamentMatchSchema, updateTournamentMatchSchema, games, dutyExclusions, gameScoreSubmissions, gameStars, gameGoals, gameGoalies, gameRsvps, gameAttendance, playerStats, teamMemberships, conversationParticipants, seasons, substituteRequests, leagueProGrants, leagueProBulkInputSchema, referralUserLinks, referralPartners, referralConversions, placeholderPlayers, hpibEvents, facilityMemberships, leagueInvitesSent, scrimmageCoHosts, calendarFeedTokens, badgeDefinitions, badgeTiers } from "@shared/schema";
 import { computeLeagueProPricing, monthsBetween, currentMonth, LEAGUE_PRO_DEFAULT_MONTHLY_CENTS } from "./leaguePro";
 import { checkAndReservePhotoQuota, rollbackPhotoQuota, getPhotoQuotaStatus } from "./quotaHelpers";
@@ -117,7 +119,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import * as fs from 'fs';
 import * as path from 'path';
-import { createHash, createHmac, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
 import { sendBulkScrimmageInvites, sendScrimmageApprovalEmail, sendScrimmageReminderEmail, sendWelcomeEmail, sendNewDirectMessageEmail } from "./emails";
@@ -5216,6 +5218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return role;
     });
     await syncIapRoleMetadata(userId, grantedRole);
+    return grantedRole;
   };
 
   const verifyLinkedApplePurchase = async (userId: string, originalId: string) => {
@@ -5227,8 +5230,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (result.rows[0].user_id !== userId) {
       throw Object.assign(new Error('This Apple purchase is linked to another account'), { status: 409 });
     }
-      const { reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
-      await reconcileApplePurchaseLinkForUser(userId);
+    const { reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
+    await reconcileApplePurchaseLinkForUser(userId);
     const current = await storage.getUser(userId);
     return { message: 'Apple purchase checked against current subscription status',
       role: current?.role ?? 'free_tier' };
@@ -5247,6 +5250,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return claim.rows[0]?.owned === true;
   };
 
+  const activateDirectApplePurchase = async (
+    userId: string, originalTransactionId: string, expectedProductId: string,
+  ): Promise<string> => {
+    const { getAppleStoreSubscriptions } = await import('./appleStoreSubscriptions');
+    const { getSubscriptionStatuses, lookupTransactionById } = await import('./appleIap');
+    const subscriptions = await getAppleStoreSubscriptions(originalTransactionId, {
+      statuses: getSubscriptionStatuses, transaction: lookupTransactionById,
+    });
+    const active = subscriptions.find(sub => sub.productId === expectedProductId);
+    if (!active) throw Object.assign(new Error('Apple did not confirm an active subscription for this plan.'), { status: 402 });
+    const { claimAutomaticApplePurchase, reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
+    const linked = await verifyLinkedApplePurchase(userId, originalTransactionId);
+    if (!linked) {
+      // A stable, local DB key only. This is not a RevenueCat identity and is
+      // never sent to RevenueCat or accepted as purchase/account proof.
+      await claimAutomaticApplePurchase({
+        userId, customerId: `apple_store_${createHash('sha256').update(userId).digest('hex')}`,
+        originalTransactionId, productId: active.productId,
+        originalPurchasedAt: active.originalPurchasedAt, expiresAt: active.expiresAt,
+      });
+    }
+    const reconciled = await reconcileApplePurchaseLinkForUser(userId);
+    if (!reconciled?.active || !reconciled.role || reconciled.role === 'free_tier') {
+      throw Object.assign(new Error('Your Apple purchase is verified, but the account tier could not be updated. Restore or contact support; do not purchase again.'), { status: 409 });
+    }
+    return reconciled.role;
+  };
+
   // Serialize claims for the same token so two accounts cannot race to reuse
   // a verified purchase. Do not acknowledge a token before ownership is checked.
   const claimGoogleIapRole = async (
@@ -5256,18 +5287,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     productId: string,
     expiryTimeMs: number,
     rejectMixedStore = false,
+    linkedPurchaseToken?: string,
   ) => {
     const appliedRole = await db.transaction(async (tx) => {
       // Claims for distinct tokens on the same Roster account must also be
       // serialized so a lower-tier restore cannot race a higher-tier one.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${purchaseToken}))`);
+      const lineageTokens = Array.from(new Set([purchaseToken, linkedPurchaseToken].filter((token): token is string => Boolean(token)))).sort();
+      for (const token of lineageTokens) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${token}))`);
+      }
       const legacyOwners = await tx
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.iapOriginalTransactionId, purchaseToken));
+        .where(inArray(users.iapOriginalTransactionId, lineageTokens));
       if (legacyOwners.some((owner) => owner.id !== userId)) {
         throw Object.assign(new Error('This Google Play subscription is already linked to another account'), { status: 409 });
+      }
+      if (linkedPurchaseToken) {
+        const [ancestor] = await tx.select({ userId: googleIapClaims.userId })
+          .from(googleIapClaims).where(eq(googleIapClaims.tokenHash, hashGoogleIapToken(linkedPurchaseToken))).limit(1);
+        if (ancestor && ancestor.userId !== userId) {
+          throw Object.assign(new Error('The original Google Play subscription is linked to another Roster account.'), { status: 409 });
+        }
       }
       const tokenHash = hashGoogleIapToken(purchaseToken);
       await tx.insert(googleIapClaims).values({ tokenHash, userId }).onConflictDoNothing();
@@ -5350,11 +5392,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { jws, transactionId } = req.body;
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
+      const expectedProductId = req.body?.expectedProductId;
+      if (expectedProductId !== undefined &&
+          (typeof expectedProductId !== 'string' || !IAP_PRODUCT_ROLES[expectedProductId])) {
+        return res.status(400).json({ message: 'The selected Apple product is not recognized.' });
+      }
 
       // ── Path 1: StoreKit 2 JWS transaction ──────────────────────────────
       if (jws && typeof jws === 'string' && jws.trim()) {
         const tx = await validateAppleTransaction(jws, userId);
         const now = Date.now();
+        if (expectedProductId !== undefined && tx.productId !== expectedProductId) {
+          return res.status(409).json({ message: 'The verified Apple transaction does not match the selected plan.' });
+        }
 
         if (tx.revocationDate) {
           return res.status(402).json({ message: 'Transaction has been revoked' });
@@ -5368,14 +5419,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: `Unrecognised product: ${tx.productId}` });
         }
 
-        const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
-        if (linked) return res.json(linked);
         if (!tx.appAccountToken && !await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
-          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Use automatic Apple activation or contact support.' });
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Update Roster and restore, or contact support; do not purchase again.' });
         }
-        await applyIapRole(userId, newRole, tx.originalTransactionId);
+        const appliedRole = await activateDirectApplePurchase(userId, tx.originalTransactionId, tx.productId);
         console.log(`[IAP] JWS verified: role → ${newRole} (${tx.environment})`);
-        return res.json({ message: 'IAP verified and role updated', role: newRole });
+        return res.json({ message: 'IAP verified and role updated', role: appliedRole });
       }
 
       // ── Path 2: Transaction ID → App Store Server API ───────────────────
@@ -5388,6 +5437,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { payload: tx } = await lookupTransactionById(transactionId);
         const now = Date.now();
+        if (expectedProductId !== undefined && tx.productId !== expectedProductId) {
+          return res.status(409).json({ message: 'The verified Apple transaction does not match the selected plan.' });
+        }
 
         if (tx.revocationDate) {
           return res.status(402).json({ message: 'Transaction has been revoked' });
@@ -5405,7 +5457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(403).json({ message: 'Purchase does not belong to this account' });
           }
         } else if (!await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
-          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Use automatic Apple activation or contact support.' });
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Update Roster and restore, or contact support; do not purchase again.' });
         }
 
         const newRole = IAP_PRODUCT_ROLES[tx.productId] ?? null;
@@ -5413,17 +5465,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: `Unrecognised product: ${tx.productId}` });
         }
 
-        const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
-        if (linked) return res.json(linked);
-        if (!tx.appAccountToken && !await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
-          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Use automatic Apple activation or contact support.' });
-        }
-        await applyIapRole(userId, newRole, tx.originalTransactionId);
+        const appliedRole = await activateDirectApplePurchase(userId, tx.originalTransactionId, tx.productId);
         console.log(`[IAP] Transaction ID verified: role → ${newRole}`);
-        return res.json({ message: 'IAP verified and role updated', role: newRole });
+        return res.json({ message: 'IAP verified and role updated', role: appliedRole });
       }
 
-      return res.status(400).json({ message: 'Missing jws or transactionId' });
+      return res.status(400).json({ message: 'This app build did not provide an Apple transaction for verification. Update Roster and restore, or contact support. Do not purchase again.' });
 
     } catch (error: any) {
       const status = [400, 402, 403, 409, 503].includes(error?.status) ? error.status : 502;
@@ -5514,7 +5561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(200).json({ message: 'Notification ignored (missing signed date)' });
           }
           if (decision.action === 'grant') {
-            // RevenueCat's lineage-anchored check grants access. A notification
+            // Apple's lineage-anchored status check grants access. A notification
             // alone never clears a refund or grants a linked account.
             await db.execute(sql`
               UPDATE apple_purchase_links
@@ -5639,11 +5686,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   let googleCatalogCache: { checkedAt: number; productIds: string[] } | null = null;
   // Do not offer a purchase unless the server can authenticate with Play and
   // the selected product has an active base plan in this application's catalog.
-  app.get('/api/iap/google-availability', isAuthenticated, async (_req: any, res) => {
+  app.get('/api/iap/google-availability', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     try {
       const { isGoogleIapConfigured, getGooglePlaySubscriptionCatalog } = await import('./googleIap');
-      if (!isGoogleIapConfigured()) return res.json({ available: false, productIds: [] });
+      const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+      const loginId = nativePurchaseLoginId(req.user.claims.sub, 'android');
+      if (!isGoogleIapConfigured() || !isRevenueCatApiConfigured()) {
+        return res.json({ available: false, productIds: [], userId: req.user.claims.sub, loginId });
+      }
       if (!googleCatalogCache || Date.now() - googleCatalogCache.checkedAt > 60_000) {
         const catalog = await getGooglePlaySubscriptionCatalog(GOOGLE_PLAY_PACKAGE_NAME);
         const productIds = catalog.status === 200
@@ -5658,10 +5709,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         googleCatalogCache = { checkedAt: Date.now(), productIds };
       }
-      res.json({ available: googleCatalogCache.productIds.length > 0, productIds: googleCatalogCache.productIds });
+      res.json({ available: googleCatalogCache.productIds.length > 0, productIds: googleCatalogCache.productIds, userId: req.user.claims.sub, loginId });
     } catch (error) {
       console.warn('[GoogleIAP] Catalog availability check failed:', error instanceof Error ? error.name : 'unknown error');
-      res.json({ available: false, productIds: [] });
+      res.json({ available: false, productIds: [], userId: req.user.claims.sub });
     }
   });
 
@@ -5674,16 +5725,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // (productId is optional — we use the productId returned by the Play API
   // as the source of truth for role mapping, but the client value is logged
   // for debugging when they disagree.)
-  app.post('/api/iap/verify-google', isAuthenticated, async (req: any, res) => {
+  app.post(['/api/iap/verify-google', '/api/iap/restore-google-order'], isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { purchaseToken, productId: clientProductId } = req.body as {
         purchaseToken?: string;
         productId?: string;
       };
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
 
       if (!purchaseToken || typeof purchaseToken !== 'string' || !purchaseToken.trim()) {
-        return res.status(400).json({ message: 'Missing purchaseToken' });
+        return res.status(400).json({ message: 'This app build did not provide the Google Play purchase token needed for verification. Update Roster and restore, or contact support. Do not purchase again.' });
       }
 
       const {
@@ -5703,11 +5755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (clientProductId && purchase.productId && clientProductId !== purchase.productId) {
-        console.warn('[GoogleIAP] Client/server productId mismatch', {
-          userId,
-          clientProductId,
-          serverProductId: purchase.productId,
-        });
+        return res.status(409).json({ message: 'The verified Google Play purchase does not match the selected plan.' });
       }
 
       // Promo code accepted but payment not yet processed — the subscription
@@ -5739,7 +5787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isFinite(purchase.expiryTimeMs)) {
         return res.status(402).json({ message: 'Google Play did not provide a valid subscription expiration' });
       }
-      const appliedRole = await claimGoogleIapRole(userId, newRole, purchaseToken.trim(), purchase.productId, purchase.expiryTimeMs!);
+      const appliedRole = await claimGoogleIapRole(userId, newRole, purchaseToken.trim(), purchase.productId, purchase.expiryTimeMs!, false, purchase.linkedPurchaseToken);
 
       // Acknowledge the purchase if Google hasn't seen us do so yet. Required
       // within 3 days of purchase or Google auto-refunds. Idempotent and
@@ -5752,7 +5800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             purchaseToken.trim(),
           );
         } catch (error) {
-          console.error('[GoogleIAP] Purchase acknowledgement failed; restore must retry:', error);
+          console.error('[GoogleIAP] Purchase acknowledgement failed; restore must retry.');
         }
       }
 
@@ -5761,242 +5809,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // the future RTDN handler (see TODO in server/googleIap.ts) can look
       // up the user from a Pub/Sub notification payload.
       console.log(
-        `[GoogleIAP] Verified for user ${userId}: role → ${appliedRole} (${purchase.productId}, ${purchase.subscriptionState})`,
+        `[GoogleIAP] Verified: role → ${appliedRole} (${purchase.productId}, ${purchase.subscriptionState})`,
       );
       return res.json({ message: 'IAP verified and role updated', role: appliedRole });
     } catch (error: any) {
-      console.error('[GoogleIAP] Verification error:', error);
+      console.warn('[GoogleIAP] Verification failed', { status: typeof error.status === 'number' ? error.status : 500 });
       const status = typeof error.status === 'number' ? error.status : 500;
-      res.status(status).json({ message: error.message || 'Google IAP verification failed' });
+      res.status(status).json({ message: [400, 409, 503].includes(status) ? error.message : 'Google Play could not verify this purchase. Use Restore purchases or contact support; do not purchase again.' });
     }
   });
-
-  // An order number is only a lookup hint. Both the automatic and receipt
-  // fallback paths require Google's account binding to match the native
-  // RevenueCat identity before they can touch an entitlement.
-  const verifyGoogleRecoveryOrder = async (
-    orderId: string,
-    proof: { kind: 'anonymous-device'; customerId: string } | { kind: 'signed-in-revenuecat' },
-  ) => {
-    const {
-      getGooglePlayOrderToken, verifySubscriptionPurchase,
-      matchesGooglePlayCustomer, isSubscriptionEntitled, isGoogleIapConfigured,
-    } = await import('./googleIap');
-    if (!isGoogleIapConfigured()) {
-      throw Object.assign(new Error('Google Play verification is unavailable.'), { status: 503 });
-    }
-    const order = await getGooglePlayOrderToken(GOOGLE_PLAY_PACKAGE_NAME, orderId);
-    if (order.state !== 'PROCESSED') {
-      throw Object.assign(new Error('This Google Play order is not completed.'), { status: 402 });
-    }
-    const purchase = await verifySubscriptionPurchase(GOOGLE_PLAY_PACKAGE_NAME, order.purchaseToken);
-    if (proof.kind === 'anonymous-device' &&
-        !matchesGooglePlayCustomer(proof.customerId, purchase.obfuscatedExternalAccountId)) {
-      throw Object.assign(new Error('This purchase does not match the current Android app. Contact support if you changed devices or Play accounts.'), { status: 403 });
-    }
-    if (!isSubscriptionEntitled(purchase.subscriptionState, purchase.expiryTimeMs) ||
-        !Number.isFinite(purchase.expiryTimeMs)) {
-      throw Object.assign(new Error('This Google Play subscription is not currently active.'), { status: 402 });
-    }
-    const role = GOOGLE_PLAY_PRODUCT_ROLES[purchase.productId];
-    if (!role || !order.productIds.includes(purchase.productId)) {
-      throw Object.assign(new Error('This order does not match an active Roster subscription.'), { status: 400 });
-    }
-    return { role, purchase };
-  };
-
-  const revenueCatRosterId = (userId: string) => {
-    const secret = process.env.SESSION_SECRET;
-    if (!secret) throw Object.assign(new Error('Account-linked restore is unavailable.'), { status: 503 });
-    return `roster_${createHmac('sha256', secret).update(`revenuecat-android:${userId}`).digest('hex')}`;
-  };
 
   app.get('/api/iap/revenuecat-login-id', isAuthenticated, (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      return res.json({ loginId: revenueCatRosterId(req.user.claims.sub) });
-    } catch (error: any) {
-      return sendGoogleRecoveryError(res, error);
+      return res.json({ loginId: nativePurchaseLoginId(req.user.claims.sub, 'android') });
+    } catch {
+      return res.status(503).json({ message: 'Purchase-account setup is unavailable. Please try later.' });
     }
   });
 
-  const sendGoogleRecoveryError = (res: any, error: any) => {
-    const status = [400, 402, 403, 404, 409, 503].includes(error.status) ? error.status : 502;
-    console.warn('[GoogleIAP] Recovery failed:', status);
-    return res.status(status).json({
-      message: status === 502 ? 'Could not verify this purchase right now. Please try again later.' : error.message,
+  const sendNativeVerificationError = (res: any, error: any) => {
+    const status = [400, 402, 403, 409, 503].includes(error?.status) ? error.status : 503;
+    console.warn('[NativeBilling] Server verification failed', { status });
+    return res.status(status).json({ message: [400, 402, 403, 409].includes(status)
+      ? error.message : 'Subscription verification is temporarily unavailable. Try Restore purchases later; do not purchase again.' });
+  };
+
+  // RevenueCat supplies an order, not a grant. Google independently verifies
+  // its token; the canonical token claims prevent cross-account recovery.
+  const verifyAccountGoogleOrder = async (orderId: string, loginId: string, originalId: string | undefined) => {
+    const { getGooglePlayOrderToken, verifySubscriptionPurchase } = await import('./googleIap');
+    const { verifyGoogleAccountOrder } = await import('./googleAccountPurchase');
+    return verifyGoogleAccountOrder({
+      orderId, loginId, originalId, products: GOOGLE_PLAY_PRODUCT_ROLES,
+      getOrder: id => getGooglePlayOrderToken(GOOGLE_PLAY_PACKAGE_NAME, id),
+      verifyToken: token => verifySubscriptionPurchase(GOOGLE_PLAY_PACKAGE_NAME, token),
     });
   };
 
-  const appleLoginIdForUser = (userId: string) => {
-    const secret = process.env.SESSION_SECRET;
-    if (!secret) throw Object.assign(new Error('Automatic Apple activation is unavailable.'), { status: 503 });
-    return `roster_ios_${createHmac('sha256', secret).update(`revenuecat-apple:${userId}`).digest('hex')}`;
-  };
-
-  const sendAppleAutomaticError = (res: any, error: any) => {
-    const status = [400, 402, 403, 409, 503].includes(error?.status) ? error.status : 502;
-    const message = typeof error?.message === 'string' &&
-      ['400', '402', '403', '409', '503'].includes(String(status))
-      ? error.message
-      : 'Apple could not verify this subscription right now. Please try again later.';
-    return res.status(status).json({ message });
-  };
-
-  // Do not start native checkout unless server verification can reach both
-  // RevenueCat and Apple's signed transaction lookup API.
-  app.get('/api/iap/apple-login-id', isAuthenticated, async (req: any, res) => {
+  app.post('/api/iap/confirm-native-account', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
-      const { isAppleIapSigningKeyUsable } = await import('./appleIap');
       const userId = req.user.claims.sub;
-      const signingKeyUsable = await isAppleIapSigningKeyUsable().catch(() => false);
-      const restoreOfOperatorLink = req.query?.mode === 'restore' && !signingKeyUsable
-        ? Boolean((await pool.query(
-            `SELECT 1 FROM apple_purchase_links
-              WHERE user_id = $1 AND association_source = 'operator_attested' LIMIT 1`,
-            [userId],
-          )).rowCount)
-        : false;
-      if (!isRevenueCatApiConfigured() ||
-          (!signingKeyUsable && !restoreOfOperatorLink) ||
-          !process.env.SESSION_SECRET) {
-        throw Object.assign(new Error('Automatic Apple activation is unavailable. Please contact support before purchasing.'), { status: 503 });
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
+      const { platform, loginId, loginReportedId, readBackId } = req.body ?? {};
+      if (platform !== 'ios' && platform !== 'android') {
+        return res.status(400).json({ message: 'The native purchase platform is not recognized.' });
       }
-      return res.json({ loginId: appleLoginIdForUser(userId), userId });
-    } catch (error: any) {
-      return sendAppleAutomaticError(res, error);
+      const expected = nativePurchaseLoginId(userId, platform);
+      if (loginId !== expected) return res.status(409).json({ message: 'Your signed-in purchase account changed. Reopen Roster.' });
+      const { getRevenueCatSubscriber, getActiveAppleSubscriptions, getActiveGoogleOrderIds } = await import('./revenueCatApi');
+      // Only our authenticated, server-derived ID is looked up. Never query
+      // a supplied anonymous ID, alias, subscriber attribute, or receipt hint.
+      const subscriber = await getRevenueCatSubscriber(expected);
+      const category = confirmReportedNativeIdentity(expected, subscriber.original_app_user_id, [loginReportedId, readBackId]);
+      let activeProductIds: string[] = [];
+      if (platform === 'ios') {
+        const subscriptions = getActiveAppleSubscriptions({ subscriber });
+        const foreign = await pool.query(
+          'SELECT 1 FROM apple_purchase_links WHERE user_id <> $1 AND customer_id IN ($2, $3) LIMIT 1',
+          [userId, expected, subscriber.original_app_user_id],
+        );
+        if (foreign.rowCount) throw Object.assign(new Error('This store purchase account is already linked to another Roster account. Contact support; do not buy again.'), { status: 409 });
+        // Canonical historical lineage remains owned even after SDK aliasing.
+        for (const sub of subscriptions) {
+          const conflicting = await pool.query(
+            'SELECT 1 FROM apple_purchase_links WHERE user_id <> $1 AND product_id = $2 AND original_purchased_at = $3::timestamptz LIMIT 1',
+            [userId, sub.productId, sub.originalPurchasedAt],
+          );
+          if (conflicting.rowCount) throw Object.assign(new Error('This Apple subscription is linked to another Roster account.'), { status: 409 });
+        }
+        activeProductIds = subscriptions.map(sub => sub.productId);
+        const own = await pool.query('SELECT product_id FROM apple_purchase_links WHERE user_id = $1 AND expires_at > NOW() AND revoked_by_apple = FALSE', [userId]);
+        activeProductIds.push(...own.rows.map(row => row.product_id));
+      } else {
+        for (const orderId of getActiveGoogleOrderIds({ subscriber }).slice(0, 4)) {
+          const { purchase } = await verifyAccountGoogleOrder(orderId, expected, subscriber.original_app_user_id);
+          const conflict = await db.execute(sql`
+            SELECT 1 FROM google_iap_claims WHERE token_hash IN (
+              ${hashGoogleIapToken(purchase.purchaseToken)}, ${hashGoogleIapToken(purchase.linkedPurchaseToken ?? purchase.purchaseToken)}
+            ) AND user_id <> ${userId}
+            UNION ALL SELECT 1 FROM users WHERE iap_original_transaction_id IN (
+              ${purchase.purchaseToken}, ${purchase.linkedPurchaseToken ?? purchase.purchaseToken}
+            ) AND id <> ${userId}
+            LIMIT 1
+          `);
+          if (conflict.rows.length) throw Object.assign(new Error('This Google Play subscription is linked to another Roster account.'), { status: 409 });
+          activeProductIds.push(purchase.productId);
+        }
+      }
+      console.info('[NativeBilling]', { stage: 'association', platform, identityCategory: category });
+      return res.json({ confirmed: true, activeProductIds: Array.from(new Set(activeProductIds)) });
+    } catch (error) {
+      return sendNativeVerificationError(res, error);
+    }
+  });
+
+  app.post('/api/iap/restore-google-automatic', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const userId = req.user.claims.sub;
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
+      const loginId = nativePurchaseLoginId(userId, 'android');
+      if (req.body?.loginId !== loginId) return res.status(409).json({ message: 'Your purchase account changed. Reopen Subscription.' });
+      const { getRevenueCatSubscriber, getActiveGoogleOrderIds } = await import('./revenueCatApi');
+      let orders: string[] = [];
+      let originalId: string | undefined;
+      // Retry only the provider read, never login, payment, or restore.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const subscriber = await getRevenueCatSubscriber(loginId);
+        orders = getActiveGoogleOrderIds({ subscriber });
+        originalId = subscriber.original_app_user_id;
+        if (orders.length) break;
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+      }
+      if (!orders.length) {
+        if (!req.body?.productId) return res.json({ role: 'free_tier', activeProductIds: [] });
+        return res.status(402).json({ message: 'No active Google Play purchase is verified for this account yet. Restore later or contact support; do not purchase again.' });
+      }
+      let best: Awaited<ReturnType<typeof verifyAccountGoogleOrder>> | undefined;
+      for (const order of orders.slice(0, 4)) {
+        const candidate = await verifyAccountGoogleOrder(order, loginId, originalId);
+        if (!best || candidate.role === 'commissioner') best = candidate;
+      }
+      const { role, purchase } = best!;
+      if (req.body?.productId && req.body.productId !== purchase.productId) {
+        return res.status(409).json({ message: 'The verified subscription does not match the selected plan.' });
+      }
+      const appliedRole = await claimGoogleIapRole(userId, role, purchase.purchaseToken, purchase.productId, purchase.expiryTimeMs!, false, purchase.linkedPurchaseToken);
+      if (purchase.acknowledgementState !== 'ACKNOWLEDGED') {
+        const { acknowledgeSubscriptionPurchase } = await import('./googleIap');
+        await acknowledgeSubscriptionPurchase(GOOGLE_PLAY_PACKAGE_NAME, purchase.productId, purchase.purchaseToken);
+      }
+      return res.json({ role: appliedRole, activeProductIds: [purchase.productId] });
+    } catch (error) {
+      return sendNativeVerificationError(res, error);
     }
   });
 
   app.post('/api/iap/verify-apple-automatic', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
-    const userId = req.user.claims.sub;
     try {
-      const loginId = appleLoginIdForUser(userId);
-      const { loginId: suppliedLoginId, expectedProductId } = req.body ?? {};
-      if (suppliedLoginId !== loginId) {
-        throw Object.assign(new Error('Your signed-in account changed. Reopen the purchase screen and try again.'), { status: 409 });
-      }
-      if (expectedProductId !== undefined &&
-          (typeof expectedProductId !== 'string' || !IAP_PRODUCT_ROLES[expectedProductId])) {
-        throw Object.assign(new Error('The selected Apple subscription is not recognized.'), { status: 400 });
-      }
-
-      // Existing operator-attributed links remain authoritative and can be
-      // reconciled for this account even when Apple's transaction API is down.
-      const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } =
-        await import('./applePurchaseLinks');
+      const userId = req.user.claims.sub;
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
+      const loginId = nativePurchaseLoginId(userId, 'ios');
+      if (req.body?.loginId !== loginId) return res.status(409).json({ message: 'Your purchase account changed. Reopen Subscription.' });
+      const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } = await import('./applePurchaseLinks');
       const existing = await reconcileApplePurchaseLinkForUser(userId);
-      if (existing?.active) {
-        if (expectedProductId !== undefined && expectedProductId !== existing.productId) {
-          throw Object.assign(new Error('The verified Apple subscription does not match the selected plan.'), { status: 409 });
+      if (existing?.active && (existing.role === 'commissioner' || existing.role === 'player_pro')) {
+        if (req.body?.expectedProductId && req.body.expectedProductId !== existing.productId) {
+          return res.status(409).json({ message: 'The verified Apple subscription does not match the selected plan.' });
         }
-        if (existing.role === 'commissioner' || existing.role === 'player_pro') {
-          return res.json({ role: existing.role, verified: true });
-        }
-        throw Object.assign(new Error('Your Apple purchase is verified, but this account needs support to resolve a subscription conflict.'), { status: 409 });
+        return res.json({ verified: true, role: existing.role });
       }
-
       const { activateAppleAutomatically } = await import('./appleAutomaticActivation');
       const { getRevenueCatActiveAppleSubscriptions } = await import('./revenueCatApi');
-      const { lookupTransactionById, isAppleIapSigningKeyUsable } = await import('./appleIap');
-      if (!process.env.REVENUECAT_API_KEY || !await isAppleIapSigningKeyUsable()) {
-        throw Object.assign(new Error('Apple purchase verification is unavailable. Please try again later.'), { status: 503 });
-      }
+      const { lookupTransactionById } = await import('./appleIap');
       const result = await activateAppleAutomatically({
-        userId,
-        loginId: suppliedLoginId,
-        expectedProductId,
+        userId, loginId, expectedProductId: req.body?.expectedProductId,
         dependencies: {
-          getSubscriptions: customerId => getRevenueCatActiveAppleSubscriptions(customerId),
-          lookupTransactionById,
-          claim: claimAutomaticApplePurchase,
-          reconcileUser: async accountId => {
-            const reconciled = await reconcileApplePurchaseLinkForUser(accountId);
-            if (!reconciled?.active ||
-                (reconciled.role !== 'commissioner' && reconciled.role !== 'player_pro')) {
-              throw Object.assign(new Error('Apple subscription reconciliation did not activate this account.'), { status: 409 });
+          getSubscriptions: async id => {
+            for (let attempt = 0; attempt < 3; attempt++) {
+              const records = await getRevenueCatActiveAppleSubscriptions(id);
+              if (records.length || attempt === 2) return records;
+              await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
             }
-            return reconciled.role;
+            return [];
+          },
+          lookupTransactionById, claim: claimAutomaticApplePurchase,
+          reconcileUser: async id => {
+            const role = (await reconcileApplePurchaseLinkForUser(id))?.role ?? 'free_tier';
+            return role === 'secondary_commissioner' ? 'player_pro' : role;
           },
         },
       });
       return res.json(result);
-    } catch (error: any) {
-      return sendAppleAutomaticError(res, error);
+    } catch (error) {
+      return sendNativeVerificationError(res, error);
     }
   });
 
-  // Natively restore may return CustomerInfo without Play's purchase token.
-  // RevenueCat v1 includes each active subscription's latest GPA order ID.
-  // Look it up server-side, then independently verify with Google as above.
-  app.post('/api/iap/restore-google-automatic', isAuthenticated, async (req: any, res) => {
+  app.get('/api/iap/apple-readiness', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      const { getRevenueCatGoogleOrderIds } = await import('./revenueCatApi');
-      // The client cannot select which customer the server looks up. Native
-      // logIn/restore must first attach the Play receipt to this signed-in
-      // account's opaque RevenueCat identity.
-      const orderIds = await getRevenueCatGoogleOrderIds(revenueCatRosterId(req.user.claims.sub));
-      if (!orderIds.length) {
-        return res.status(404).json({ message: 'No active Google Play purchase was found for this app identity.', receiptFallback: true });
-      }
-      let best: Awaited<ReturnType<typeof verifyGoogleRecoveryOrder>> | null = null;
-      let lastError: any = null;
-      for (const orderId of orderIds.slice(0, 4)) {
-        try {
-          const candidate = await verifyGoogleRecoveryOrder(orderId, { kind: 'signed-in-revenuecat' });
-          if (!best || (candidate.role === 'commissioner' && best.role !== 'commissioner')) {
-            best = candidate;
-          }
-        } catch (error) {
-          lastError = error;
-        }
-      }
-      if (!best) throw lastError ?? Object.assign(new Error('No verifiable Google Play purchase found.'), { status: 404 });
-      const { purchase, role } = best;
-      const appliedRole = await claimGoogleIapRole(
-        req.user.claims.sub, role, purchase.purchaseToken, purchase.productId, purchase.expiryTimeMs!, true,
-      );
-      return res.json({ role: appliedRole, message: 'Google Play subscription linked to your Roster account.' });
-    } catch (error: any) {
-      return sendGoogleRecoveryError(res, error);
+      const { isAppleIapSigningKeyUsable } = await import('./appleIap');
+      return res.json({ userId: req.user.claims.sub, available: await isAppleIapSigningKeyUsable() });
+    } catch {
+      return res.json({ userId: req.user.claims.sub, available: false });
     }
   });
 
-  // Receipt ID remains an explicit fallback if RevenueCat cannot supply an
-  // order ID. It never grants access from the GPA number alone.
-  app.post('/api/iap/restore-google-order', isAuthenticated, async (req: any, res) => {
+  app.get('/api/iap/apple-login-id', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
-    const { orderId, customerId } = req.body ?? {};
-    const { isValidGoogleReceiptRecoveryInput } = await import('./googleIap');
-    if (!isValidGoogleReceiptRecoveryInput(orderId, customerId)) {
-      return res.status(400).json({ message: 'Enter the Google Play GPA order ID from your receipt.' });
-    }
     try {
-      const { verifyGoogleOrderWithLinkedFallback } = await import('./googleOrderRecovery');
-      // Native restore may move the receipt to the signed-in account while
-      // Google's original binding still names the old anonymous identity.
-      const verified = await verifyGoogleOrderWithLinkedFallback(
-        orderId,
-        () => verifyGoogleRecoveryOrder(orderId, { kind: 'anonymous-device', customerId }),
-        async () => {
-          const { getRevenueCatGoogleOrderIds } = await import('./revenueCatApi');
-          return getRevenueCatGoogleOrderIds(revenueCatRosterId(req.user.claims.sub));
-        },
-        () => verifyGoogleRecoveryOrder(orderId, { kind: 'signed-in-revenuecat' }),
-      );
-      const { role, purchase } = verified;
-      const appliedRole = await claimGoogleIapRole(
-        req.user.claims.sub, role, purchase.purchaseToken, purchase.productId, purchase.expiryTimeMs!, true,
-      );
-      return res.json({ role: appliedRole, message: 'Google Play subscription linked to your Roster account.' });
-    } catch (error: any) {
-      return sendGoogleRecoveryError(res, error);
+      const userId = req.user.claims.sub;
+      const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+      const { isAppleIapSigningKeyUsable } = await import('./appleIap');
+      const existing = req.query?.mode === 'restore' ? await pool.query(
+        "SELECT 1 FROM apple_purchase_links WHERE user_id = $1 AND customer_id NOT LIKE 'apple_store_%' LIMIT 1", [userId],
+      ) : null;
+      return res.json({ userId, loginId: nativePurchaseLoginId(userId, 'ios'),
+        available: isRevenueCatApiConfigured() && (Boolean(existing?.rowCount) || await isAppleIapSigningKeyUsable()) });
+    } catch {
+      return res.status(503).json({ message: 'Apple purchase verification is unavailable. Try later; checkout was not opened.' });
     }
   });
+
 
   // Supabase storage routes for profile images  
   app.post("/api/profile-images/upload", isAuthenticated, async (req: any, res) => {

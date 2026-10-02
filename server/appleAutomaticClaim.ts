@@ -28,7 +28,7 @@ export async function claimAutomaticApplePurchaseWithClient(
 ): Promise<void> {
   const purchasedAt = new Date(input.originalPurchasedAt);
   const expiresAt = new Date(input.expiresAt);
-  if (!/^roster_ios_[a-f0-9]{64}$/.test(input.customerId) ||
+  if (!/^(?:roster_ios_|apple_store_)[a-f0-9]{64}$/.test(input.customerId) ||
       !/^\d{10,20}$/.test(input.originalTransactionId) ||
       !['com.rosterapp.player_pro_monthly', 'com.rosterapp.player_pro_yearly',
         'com.rosterapp.commissioner_monthly', 'com.rosterapp.commissioner_yearly'].includes(input.productId) ||

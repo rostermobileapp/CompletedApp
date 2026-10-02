@@ -13,6 +13,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
 import { activateIosPurchase } from '@/lib/iosPurchaseFlow';
+import { activateAndroidPurchase } from '@/lib/androidPurchaseFlow';
+import { activateAndroidRestore } from '@/lib/androidRestoreFlow';
+import { assertBillingAccount } from '@/lib/nativeBillingOperation';
+import { supabase } from '@/lib/supabase';
 import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
   isBillingSupported,
@@ -22,14 +26,11 @@ import {
   getIosProducts,
   getAndroidProducts,
   purchaseProduct,
-  loginIosPurchaseAccount,
-  getIosPurchaseCustomerId,
+  associateNativePurchaseAccount,
+  readNativePurchaseIdentity,
   purchaseProductAndroid,
   inspectAndroidPurchases,
-  getAndroidPurchaseCustomerId,
-  loginAndroidPurchaseAccount,
   restorePurchases,
-  restorePurchasesAndroid,
   PRODUCT_PLAYER_PRO,
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO_YEARLY,
@@ -38,8 +39,20 @@ import {
 
 export default function Subscription() {
   const { user } = usePermissions();
+  const authIdentityId = useRef(user?.id);
+  const billingAccountVersion = useRef(0);
   const purchaseUserId = useRef(user?.id);
-  purchaseUserId.current = user?.id;
+  purchaseUserId.current = authIdentityId.current === user?.id ? user?.id : undefined;
+  // Database queries can retain the previous account while auth is changing.
+  // Observe the auth event immediately rather than trusting that stale cache.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (authIdentityId.current !== session?.user.id) billingAccountVersion.current += 1;
+      authIdentityId.current = session?.user.id;
+      purchaseUserId.current = session?.user.id;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   const { role } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -52,9 +65,6 @@ export default function Subscription() {
   const [androidLookupAttempt, setAndroidLookupAttempt] = useState(0);
   const [androidOwnedProducts, setAndroidOwnedProducts] = useState<string[]>([]);
   const [showFreeHelp, setShowFreeHelp] = useState(false);
-  const [showGoogleOrderRecovery, setShowGoogleOrderRecovery] = useState(false);
-  const [googleOrderId, setGoogleOrderId] = useState('');
-  const [recoveryCustomerId, setRecoveryCustomerId] = useState<string | null>(null);
 
   // In-app embedded Stripe checkout for subscription upgrades — replaces the
   // hosted-checkout redirect we previously used. The server creates a Checkout
@@ -190,28 +200,10 @@ export default function Subscription() {
     if (!isAndroid || androidLookupState !== 'ready' || !googleBillingAvailability?.available) return;
     (async () => {
       try {
-        const { purchases, activeProductIds } = await inspectAndroidPurchases();
-        setAndroidOwnedProducts(activeProductIds);
-        if (!purchases.length) return;
-        let verified = false;
-        for (const p of purchases) {
-          try {
-            const response = await apiRequest('POST', '/api/iap/verify-google', {
-              purchaseToken: p.purchaseToken,
-              productId: p.productIdentifier,
-            });
-            const data = await response.json() as { role?: string; message?: string };
-            if (response.ok && data.role && data.role !== 'free_tier') {
-              verified = true;
-              break;
-            }
-          } catch {
-            // ignore individual token failures silently
-          }
-        }
-        if (verified) {
-          queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-        }
+        // Background checks only read server-verified purchases. Do not trigger
+        // a native restore or purchase transfer merely by opening this page.
+        const result = await restoreAndroidSubscription(false);
+        setAndroidOwnedProducts(result.activeProductIds);
       } catch {
         // silent — don't surface auto-check errors to the user
       }
@@ -521,20 +513,49 @@ export default function Subscription() {
   }, [activeCheckout, toast]);
 
   // --- iOS IAP helpers ---
-  const activateAppleSubscription = async (productId?: string) => activateIosPurchase({
+  const refreshNativeTier = async (userId: string, verifiedRole: string) => {
+    assertBillingAccount(userId, purchaseUserId.current);
+    const refreshed = await (await apiRequest('GET', '/api/user')).json() as { id?: string; role?: string };
+    assertBillingAccount(userId, purchaseUserId.current);
+    if (refreshed.id !== userId || !refreshed.role || refreshed.role === 'free_tier' ||
+        (verifiedRole === 'commissioner' && refreshed.role !== 'commissioner')) {
+      throw new Error('Your verified tier has not refreshed yet. Use Restore purchases; do not purchase again.');
+    }
+    queryClient.setQueryData(['/api/user'], refreshed);
+    await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'], refetchType: 'all' }, { throwOnError: true });
+    assertBillingAccount(userId, purchaseUserId.current);
+  };
+
+  const nativeAssociationFor = (platform: 'ios' | 'android') => ({
+    associate: associateNativePurchaseAccount,
+    nativeIdentity: readNativePurchaseIdentity,
+    confirmAssociation: async (payload: {
+      loginId: string; expectedUserId: string; loginReportedId: string; readBackId: string;
+    }) => (await apiRequest('POST', '/api/iap/confirm-native-account', { ...payload, platform })).json(),
+  });
+
+  const restoreAndroidSubscription = (restoreNative = true) => activateAndroidRestore({
+    ...nativeAssociationFor('android'),
     currentUserId: () => purchaseUserId.current,
+    accountVersion: () => billingAccountVersion.current,
+    account: async () => (await apiRequest('GET', '/api/iap/google-availability')).json(),
+    restore: restoreNative ? inspectAndroidPurchases : async () => ({ purchases: [], activeProductIds: [] }),
+    verify: async (purchaseToken, productId, expectedUserId) =>
+      (await apiRequest('POST', '/api/iap/verify-google', { purchaseToken, productId, expectedUserId })).json(),
+    recover: async (loginId, expectedUserId) =>
+      (await apiRequest('POST', '/api/iap/restore-google-automatic', { loginId, expectedUserId })).json(),
+    refresh: refreshNativeTier,
+  });
+
+  const activateAppleSubscription = async (productId?: string) => activateIosPurchase({
+    ...nativeAssociationFor('ios'),
+    currentUserId: () => purchaseUserId.current,
+    accountVersion: () => billingAccountVersion.current,
     account: async () => (await apiRequest('GET', `/api/iap/apple-login-id${productId ? '' : '?mode=restore'}`)).json(),
-    login: loginIosPurchaseAccount,
-    customerId: getIosPurchaseCustomerId,
     purchase: purchaseProduct,
     restore: restorePurchases,
     verify: async (payload) => (await apiRequest('POST', '/api/iap/verify-apple-automatic', payload)).json(),
-    refresh: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['/api/user'], refetchType: 'all' }, { throwOnError: true }),
-        queryClient.invalidateQueries({ queryKey: ['/api/auth/user'], refetchType: 'all' }, { throwOnError: true }),
-      ]);
-    },
+    refresh: refreshNativeTier,
   }, productId);
 
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
@@ -552,7 +573,8 @@ export default function Subscription() {
         return;
       }
       const purchaseNeedsVerification = error?.message?.startsWith('Purchase needs verification');
-      toast({ title: purchaseNeedsVerification ? 'Purchase needs verification' : 'Purchase failed',
+      toast({ title: purchaseNeedsVerification ? 'Purchase needs verification'
+          : error?.message?.startsWith('Checkout was not opened') ? 'Checkout unavailable' : 'Purchase failed',
         description: error.message || 'Something went wrong. Please try again.',
         variant: 'destructive' });
     } finally {
@@ -594,39 +616,25 @@ export default function Subscription() {
       return;
     }
     setIsLoading(true);
-    console.log(`Step 1: handleAndroidPurchase called with tier=${tier}`, {
-      billingPeriod,
-      isAndroid,
-      isIos,
-      iosProductPricesKeys: Object.keys(iosProductPrices),
-      ua: navigator.userAgent,
-      hasAgent: typeof (window as any).$agent !== 'undefined',
-    });
     try {
-      console.log(`Step 2: Calling Natively Google Play purchase method for productId=${productId}`);
-      const purchase = await purchaseProductAndroid(productId);
-      console.log('Step 3: Natively purchase callback received; requesting server verification');
-      const response = await apiRequest('POST', '/api/iap/verify-google', {
-        purchaseToken: purchase.purchaseToken,
-        productId: purchase.productIdentifier || productId,
-      });
-
-      const serverJson = await response.json().catch(() => ({}));
-      console.log(`Step 5: Server response: status=${response.status}`, serverJson);
-
-      if (!response.ok) {
-        throw new Error((serverJson as any).message || 'Purchase completed but role sync failed. Please tap Restore Purchases.');
-      }
-
-      // 202 = promo code accepted, payment pending — not yet activated.
-      // Start a lightweight poll (every 30 s, max 10 attempts) that silently
-      // re-runs restorePurchasesAndroid() + verify-google. The first active
-      // response stops the poll, invalidates the user query, and shows a
-      // success toast so the page upgrades automatically.
-      if (response.status === 202) {
+      const operationUserId = purchaseUserId.current;
+      const result = await activateAndroidPurchase({
+        ...nativeAssociationFor('android'),
+        currentUserId: () => purchaseUserId.current,
+        accountVersion: () => billingAccountVersion.current,
+        account: async () => (await apiRequest('GET', '/api/iap/google-availability')).json(),
+        purchase: purchaseProductAndroid,
+        verify: async (payload) => {
+          const response = await apiRequest('POST', payload.purchaseToken ? '/api/iap/verify-google' : '/api/iap/restore-google-automatic', payload);
+          const data = await response.json() as { role?: string };
+          return { ...data, pending: response.status === 202 };
+        },
+        refresh: refreshNativeTier,
+      }, productId);
+      if (result === 'pending') {
         toast({
-          title: 'Promo code accepted!',
-          description: (serverJson as any).message ?? 'Your subscription will activate once payment is confirmed — check back in a few minutes.',
+          title: 'Payment pending',
+          description: 'Your subscription will activate once Google Play confirms payment. Do not purchase again; use Restore purchases if it remains pending.',
         });
         setIsLoading(false);
 
@@ -639,30 +647,19 @@ export default function Subscription() {
         pendingPollRef.current = setInterval(async () => {
           attempts += 1;
           try {
-            const purchases = await restorePurchasesAndroid();
-            for (const p of purchases) {
-              try {
-                const pollResponse = await apiRequest('POST', '/api/iap/verify-google', {
-                  purchaseToken: p.purchaseToken,
-                  productId: p.productIdentifier,
-                });
-                if (pollResponse.status === 202) continue;
-                const pollData = await pollResponse.json().catch(() => ({})) as { role?: string };
-                if (pollResponse.ok && pollData.role && pollData.role !== 'free_tier') {
-                  clearInterval(pendingPollRef.current!);
-                  pendingPollRef.current = null;
-                  queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-                  toast({ title: 'Subscription activated!', description: 'Your subscription has been applied to your account.' });
-                  return;
-                }
-              } catch {
-                // ignore individual token failures
-              }
+            assertBillingAccount(operationUserId, purchaseUserId.current);
+            const restored = await restoreAndroidSubscription(false);
+            assertBillingAccount(operationUserId, purchaseUserId.current);
+            if (restored.active) {
+              clearInterval(pendingPollRef.current!);
+              pendingPollRef.current = null;
+              toast({ title: 'Subscription activated!', description: 'Your subscription has been applied to your account.' });
+              return;
             }
           } catch {
             // silent — don't surface poll errors
           }
-          if (attempts >= MAX_ATTEMPTS) {
+          if (attempts >= MAX_ATTEMPTS || operationUserId !== purchaseUserId.current) {
             clearInterval(pendingPollRef.current!);
             pendingPollRef.current = null;
           }
@@ -672,10 +669,7 @@ export default function Subscription() {
       }
 
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      window.location.reload();
     } catch (error: any) {
-      console.error('[Subscription/Android] Purchase error:', error?.message, error?.stack);
       const duplicate = error?.code === 'PURCHASE_ALREADY_OWNED' ||
         isAlreadyOwnedPurchaseError(error?.message ?? '');
       if (duplicate) {
@@ -699,12 +693,14 @@ export default function Subscription() {
       const msg = error?.message || 'Something went wrong. Please try again.';
       const isBridgeTimeout = msg.includes('NATIVELY_TIMEOUT');
       toast({
-        title: 'Purchase failed',
+        title: msg.startsWith('Purchase needs verification') ? 'Purchase needs verification' : 'Checkout not completed',
         description: isBridgeTimeout
-          ? 'Google Play didn\'t respond. The Play Billing service may not be set up in this build yet — try Subscribe via Roster instead, or contact support.'
+          ? 'The native bridge did not finish. Fully close and reopen Roster. Check Google Play subscriptions and use Restore purchases before trying another payment.'
           : msg,
         variant: 'destructive',
       });
+      setIsLoading(false);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -712,79 +708,14 @@ export default function Subscription() {
   const handleAndroidRestore = async () => {
     setIsLoading(true);
     try {
-      const { purchases, activeProductIds } = await inspectAndroidPurchases();
-      setAndroidOwnedProducts(activeProductIds);
-
-      if (!purchases.length) {
-        const originalCustomerId = await getAndroidPurchaseCustomerId();
-        setRecoveryCustomerId(originalCustomerId.startsWith('$RCAnonymousID:') ? originalCustomerId : null);
-        try {
-          const identityResponse = await apiRequest('GET', '/api/iap/revenuecat-login-id');
-          const { loginId } = await identityResponse.json() as { loginId: string };
-          await loginAndroidPurchaseAccount(loginId);
-          // RevenueCat associates the restored Play receipt with the
-          // authenticated Roster account's server-derived identity.
-          await inspectAndroidPurchases();
-          const response = await apiRequest('POST', '/api/iap/restore-google-automatic');
-          const data = await response.json() as { role?: string; message?: string };
-          if (!data.role) throw new Error(data.message || 'Google Play could not verify this purchase.');
-          toast({
-            title: 'Google Play purchase verified',
-            description: data.role === 'commissioner'
-              ? 'Commissioner remains your highest verified tier.'
-              : 'Your Player Pro subscription is linked to your Roster account.',
-          });
-          await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-          window.location.reload();
-        } catch (error: any) {
-          // Only an original anonymous identity can be matched to Google's
-          // purchase binding by the receipt fallback. A conflicting claim
-          // needs support rather than another attempted transfer.
-          if (originalCustomerId.startsWith('$RCAnonymousID:') &&
-              (error?.status == null || [402, 404, 502, 503].includes(error.status))) {
-            setShowGoogleOrderRecovery(true);
-          } else {
-            throw error;
-          }
-        }
-        return;
-      }
-
-      // Verify every restored token. An account may have both Pro and
-      // Commissioner purchases; stopping after the first would miss the
-      // higher tier and might leave the role too low.
-      let verifiedRole: string | null = null;
-      let lastError: string | null = null;
-      for (const p of purchases) {
-        try {
-          const response = await apiRequest('POST', '/api/iap/verify-google', {
-            purchaseToken: p.purchaseToken,
-            productId: p.productIdentifier,
-          });
-          const data = await response.json() as { role?: string; message?: string };
-          if (response.ok && data.role && data.role !== 'free_tier') {
-            verifiedRole = data.role;
-            continue;
-          }
-          lastError = data.message ?? null;
-        } catch (err: any) {
-          lastError = err?.message ?? 'Verification failed';
-        }
-      }
-
-      if (verifiedRole) {
-        toast({
-          title: 'Google Play purchase verified',
-          description: verifiedRole === 'commissioner'
-            ? 'Commissioner is still your highest verified tier. Check each billing source before changing plans.'
-            : 'Your Player Pro subscription is now linked to your Roster account.',
-        });
-        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-        window.location.reload();
+      const result = await restoreAndroidSubscription();
+      setAndroidOwnedProducts(result.activeProductIds);
+      if (result.active) {
+        toast({ title: 'Google Play purchase verified', description: 'Your highest verified subscription tier has refreshed.' });
       } else {
         toast({
           title: 'No active subscription',
-          description: lastError ?? 'No active subscription was found to restore.',
+          description: 'No active subscription was verified. Check Google Play subscriptions; contact support rather than purchasing again.',
         });
       }
     } catch (error: any) {
@@ -794,34 +725,6 @@ export default function Subscription() {
     }
   };
 
-  const handleGoogleOrderRecovery = async () => {
-    setIsLoading(true);
-    try {
-      // The native bridge supplies the original anonymous RevenueCat identity.
-      // Google must independently confirm that this identity belongs to the
-      // order. A receipt number by itself never grants access.
-      const customerId = recoveryCustomerId ?? (await getAndroidPurchaseCustomerId());
-      const response = await apiRequest('POST', '/api/iap/restore-google-order', {
-        orderId: googleOrderId.trim(),
-        customerId,
-      });
-      const data = await response.json() as { role?: string; message?: string };
-      if (!response.ok || !data.role) throw new Error(data.message || 'Google Play could not verify this purchase.');
-      setShowGoogleOrderRecovery(false);
-      toast({
-        title: 'Google Play purchase linked',
-        description: data.role === 'commissioner'
-          ? 'Commissioner remains your highest verified tier.'
-          : 'Your Player Pro purchase is now linked to your Roster account.',
-      });
-      await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      window.location.reload();
-    } catch (error: any) {
-      toast({ title: 'Could not link purchase', description: error.message || 'Please contact support.', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // --- Sync (Stripe fallback for web) ---
   const handleSyncSubscription = async () => {
@@ -876,35 +779,6 @@ export default function Subscription() {
         successHeadline="Subscription active"
         successMessage="Updating your account…"
       />
-      <Dialog open={showGoogleOrderRecovery} onOpenChange={setShowGoogleOrderRecovery}>
-        <DialogContent className="max-w-md" data-testid="dialog-google-order-recovery">
-          <DialogHeader>
-            <DialogTitle>Recover your Google Play purchase</DialogTitle>
-            <DialogDescription>
-              Automatic verification could not find this purchase. As a fallback, enter the GPA order ID from your Google Play receipt. Roster will still check the active subscription and this app's purchase identity. This does not charge you.
-            </DialogDescription>
-          </DialogHeader>
-          <label htmlFor="google-order-id" className="text-sm font-medium">Google Play order ID</label>
-          <input
-            id="google-order-id"
-            value={googleOrderId}
-            onChange={(event) => setGoogleOrderId(event.target.value)}
-            placeholder="GPA.0000-0000-0000-00000"
-            autoComplete="off"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
-            data-testid="input-google-order-id"
-          />
-          <button type="button" onClick={handleGoogleOrderRecovery}
-            disabled={isLoading || !/^GPA\.\d{4}-\d{4}-\d{4}-\d{5}(?:\.\.\d+)?$/.test(googleOrderId.trim())}
-            className="rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground disabled:opacity-50"
-            data-testid="button-verify-google-order">
-            {isLoading ? 'Verifying with Google Play…' : 'Verify existing purchase'}
-          </button>
-          <p className="text-xs text-muted-foreground">
-            If the purchase identity does not match, no access will change. Do not buy the plan again; contact support for account recovery.
-          </p>
-        </DialogContent>
-      </Dialog>
       <Dialog open={showFreeHelp} onOpenChange={setShowFreeHelp}>
         <DialogContent className="max-w-md" data-testid="dialog-switch-to-free">
           <DialogHeader>

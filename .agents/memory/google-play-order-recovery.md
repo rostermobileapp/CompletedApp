@@ -1,20 +1,24 @@
 ---
-name: Google Play order recovery
-description: Recovery limits when a Play subscription was recorded under a RevenueCat anonymous customer rather than a Roster user.
+name: Google Play recovery ownership
+description: Store-proof requirement, GPA lookup limits, and historical anonymous billing observations.
 ---
 
-Google Play's read-only orders.get can resolve a GPA order number to a purchase token. The token can then be checked with subscriptionsv2.get for current entitlement. RevenueCat customer search can match a Play order to a customer; Google Play's obfuscatedExternalAccountId may be the base64 SHA-256 of that RevenueCat anonymous customer ID. This confirms a provider-side purchase lineage, **not** ownership by a particular Roster account.
+Follow the owner's reporting-only RevenueCat directive in [Store billing authority](natively-revenuecat-proof.md). Earlier RevenueCat-linked restore/alias recommendations are superseded.
 
-**Why:** A real, active Play purchase can be bound to an anonymous RevenueCat identity while a signed-in Roster user has no linked Play claim. The GPA number is visible on a receipt or screenshot and is insufficient authority to transfer the entitlement or grant a tier.
+A Google GPA order number is a lookup hint, not authority to assign a purchase to a Roster account.
 
-The anonymous-identity plus GPA fallback has succeeded in an actual Android app. The account-linked, no-receipt path still requires native-device verification; browser tests cannot prove RevenueCat login or restore behavior.
+**Why:** Orders can reveal a purchase token while providing no Roster ownership evidence. Receipt screenshots can be copied.
 
-**How to apply:** Keep order lookup and account linking separate. Compare provider ownership and existing claims before any repair. If a native bridge omits the purchase token, its current anonymous RevenueCat customer ID can be checked against the SHA-256/base64 binding returned by Google's subscription API for that order's token. Require that match, a currently active verified Play product, and an unclaimed token before linking; never grant or move access solely from a supplied order ID. Do not automatically log the device into a different RevenueCat customer before checking its original anonymous identity.
+**How to apply:** Verify native Google purchase tokens directly with Google and enforce unique account-owned claims. Do not grant from GPA numbers, customer IDs, subscriber attributes, aliases, or RevenueCat subscriber lookup.
 
-For seamless restore, never let the client choose which RevenueCat subscriber the server reads. Log the native billing SDK into an opaque ID derived for the authenticated Roster user, restore there, then have the server query only that user's provider record. RevenueCat's active Play subscription may contain a GPA order ID; treat it as a lookup hint and verify the token and current entitlement with Google. The receipt fallback is a separate path and must require a nonempty anonymous customer ID that matches Google's original account binding. **Why:** A client-selected anonymous RevenueCat ID, even when its hash matches Google, can be copied and used to claim an unclaimed subscription without possession of that Google Play account. **How to apply:** Keep automatic account-linked restore and receipt-based recovery as distinct trust paths. If the server's per-account ID derivation secret changes, prior provider identities will no longer be found; plan identity migration before rotating it.
+Historical Google purchases can retain an obfuscated account binding derived from their original anonymous SDK identity even after reporting aliases change.
 
-RevenueCat's v1 Play subscriber response may omit `ownership_type` for a paid, active subscription while still providing its order ID. Treat a missing value as unknown rather than as proof of nonownership; reject explicit non-purchased values and rely on Google's independent verification before granting anything. **Why:** Requiring `PURCHASED` on this optional provider field can silently discard the only order lookup hint and strand a legitimate restore. **How to apply:** Check real provider response shapes before tightening restore filters, and keep RevenueCat identity aliasing distinct from Roster account ownership: an anonymous customer's canonical RevenueCat ID may resolve to a different Roster-linked identity.
+**Why:** A real verified Play order's binding remained anonymous after the reporting record appeared linked to a Roster account.
 
-RevenueCat v1's subscriptions map can show only one order per product even when v2 shows multiple simultaneously active purchases of the same Play product on the customer. The v1 order may not be the one a user just bought. **Why:** A read-only comparison found a valid, independently verified new Play order with the correct anonymous-customer binding that was absent from the v1 subscription entry. **How to apply:** For incident recovery, verify the user's own Play order directly with Google; do not conclude that an order is unrelated solely because it differs from RevenueCat v1's single order hint. Never use v1's hint as entitlement proof.
+**How to apply:** Do not interpret a reporting-ID mismatch as failed Google payment, force aliases, or transfer purchases. Current native tokens and the existing Roster ownership claim are the relevant verification path.
 
-Native restore can move a valid Play receipt to the signed-in Roster-derived RevenueCat customer while Google's obfuscated account binding still names the original anonymous customer. **Why:** A device-ID mismatch alone rejected a real active order even after RevenueCat showed that exact order under the signed-in account. Once the exact-order, account-linked fallback was released, the user confirmed the purchase linked on Android and the active Player Pro claim appeared in Roster. **How to apply:** If the original device check fails, allow only an exact-order match on the server-derived signed-in RevenueCat customer, followed by independent Google state/product verification and the existing cross-account claim check. Never infer ownership from the order number alone or a client-selected RevenueCat customer ID.
+RevenueCat v1 may expose only one order per product, while multiple legitimate purchases exist.
+
+**Why:** A valid new Play order was absent from that reporting entry.
+
+**How to apply:** Absence from reporting cannot reject a store-verified purchase, and presence cannot authorize one.

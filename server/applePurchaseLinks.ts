@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { pool } from './db';
 import { supabase } from './supabaseAuth';
-import { getRevenueCatAppleSubscriptions, type VerifiedAppleSubscription } from './revenueCatApi';
+import type { VerifiedAppleSubscription } from './revenueCatApi';
+import { getAppleStoreSubscriptions } from './appleStoreSubscriptions';
+import { getSubscriptionStatuses, lookupTransactionById } from './appleIap';
+import { getRevenueCatAppleSubscriptions } from './revenueCatApi';
 import { matchingApplePurchase, isLaterVerifiedPeriod } from './applePurchaseMatch';
 import { resolveAppleLinkedRole } from './linkedPurchaseRole';
 import { claimAutomaticApplePurchaseWithClient } from './appleAutomaticClaim';
@@ -15,7 +18,7 @@ type Link = ApplePurchaseLink;
 
 const reconciliationDependencies = {
   pool,
-  getSubscriptions: getRevenueCatAppleSubscriptions,
+  getSubscriptions: getStoreSubscriptionsForLink,
   updateUserMetadata: async (userId: string, role: string) => {
     const { error } = await supabase.auth.admin.updateUserById(userId, {
       user_metadata: { subscription_tier: role },
@@ -24,6 +27,20 @@ const reconciliationDependencies = {
   },
   log: (message: string) => console.warn(message),
 };
+
+async function getStoreSubscriptionsForLink(customerId: string): Promise<VerifiedAppleSubscription[]> {
+  if (!customerId.startsWith('apple_store_')) {
+    return getRevenueCatAppleSubscriptions(customerId);
+  }
+  const link = (await pool.query(
+    'SELECT original_transaction_id FROM apple_purchase_links WHERE customer_id = $1',
+    [customerId],
+  )).rows[0];
+  if (!link) throw new Error('The Apple purchase link no longer exists.');
+  return getAppleStoreSubscriptions(link.original_transaction_id, {
+    statuses: getSubscriptionStatuses, transaction: lookupTransactionById,
+  });
+}
 
 export async function initApplePurchaseLinks(): Promise<void> {
   await pool.query(`
@@ -154,7 +171,7 @@ export async function stageApplePurchaseLink(
 async function reconcileOneLegacy(link: Link): Promise<void> {
   let subscriptions: VerifiedAppleSubscription[] | undefined;
   try {
-    subscriptions = await getRevenueCatAppleSubscriptions(link.customer_id);
+    subscriptions = await getStoreSubscriptionsForLink(link.customer_id);
   } catch {
     console.warn('[Apple link] Provider verification unavailable.');
   }

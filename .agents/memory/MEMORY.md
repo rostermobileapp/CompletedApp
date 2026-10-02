@@ -55,8 +55,8 @@
 - [Badge backfill orphan safety](badge-backfill-orphan-safety.md) — historical game records may refer to removed users; filter startup award candidates through existing users before inserting.
 - [Badge artwork cache busting](badge-artwork-cache-busting.md) — when replacing a badge image at the same public path, version its catalog URL so mobile webviews request the new art.
 - [Google Play billing readiness](google-play-billing-readiness.md) — native product visibility and server purchase verification are separate prerequisites; test both before enabling payment.
-- [Natively RevenueCat proof gap](natively-revenuecat-proof.md) — purchase/restore callbacks do not supply Apple transaction proof; verify entitlements server-side before granting access.
-- [Google Play order recovery](google-play-order-recovery.md) — orders.get can reveal a token and RevenueCat anonymous owner; a GPA number alone does not establish the Roster account to link.
+- [Natively billing authority](natively-revenuecat-proof.md) — owner approved server-verified RevenueCat status; retain store verification, canonical ownership, and account-race safeguards.
+- [Google Play order recovery](google-play-order-recovery.md) — GPA numbers and reporting identities are not ownership proof; native Google tokens must drive verification.
 - [Overtime result eligibility](overtime-result-eligibility.md) — one-goal margin is required but not enough; overtime must be explicitly chosen for the final result.
 - [CARTO tile failure mode](carto-tile-failure.md) — CARTO's unauthenticated basemap URL can return HTTP 200 with an “API KEY REQUIRED” PNG, so status checks alone miss a broken map.
 - [Account merge safety boundary](account-merge-safety-boundary.md) — registered-account merges must fail closed on unclassified records, authority, and billing; never infer identity from name or email.

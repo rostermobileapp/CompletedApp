@@ -1,8 +1,112 @@
 # Android Billing — Testing Guide
 
-End-to-end testing instructions for the Google Play Billing integration added
-to the Roster app's Android build. iOS (StoreKit) and web (Stripe) flows are
-unchanged and aren't covered here.
+End-to-end testing instructions for the existing Natively/RevenueCat purchase
+integration. The owner approved server-verified RevenueCat subscription status
+on 2026-10-02, superseding the earlier reporting-only restriction. Roster login
+remains separate; native success callbacks never grant access. Google orders and
+Apple transactions are independently verified and claimed to one Roster account.
+Stripe remains an independent billing source.
+
+## Verification record — 2026-10-02
+
+### Completed in the workspace
+
+- Automated account/store-flow regressions: **220 passed** with isolated native,
+  provider, and SQL fixtures; no live customer purchases, grants, or aliases.
+  These exercise all four products, documented proofless callbacks, original
+  anonymous identity mapping, failed/malformed callbacks, delayed read-back,
+  store binding mismatch, account races, shared operation locking, and tier refresh.
+- `npm run build` passed. `npm run check` still fails with 224 diagnostics versus
+  227 in the saved baseline; the new billing modules have no diagnostics.
+  Workspace results are separate from the installed-build matrix below.
+- The application restarted and served the public landing page. The screenshot
+  browser was unauthenticated, so the signed-in Subscription UI was not visually
+  verified. Development logs reported Apple provider verification unavailable;
+  successful live Apple verification is not established by these tests.
+- All four Android plans and all four Apple plans exercise store-flow
+  orchestration and account refresh with injected fixtures. These fixtures
+  **do not establish an installed-device purchase or restore**.
+- Account switches (including away-and-back), simultaneous operations, timeouts,
+  cancellation, missing transaction data, pending payment, ownership conflicts,
+  independent billing precedence, and failed tier refresh are covered.
+- Existing operator-attributed Apple links retain their recorded RevenueCat
+  identity and source. Direct-store links retain direct Apple reconciliation.
+  Neither kind is silently reassigned.
+- Installed npm JavaScript wrapper observed: Natively 2.28.14. This is **not**
+  the installed Android/iOS shell version. The page's global bridge loader is
+  separately pinned to Natively 2.26.0; both expose the version-3 purchase actions.
+- The owner reports affected Android app version **3.1.3**. No APK or version-code
+  evidence was supplied. This identifies the reported release, not its purchase
+  token capability; installed-device callback evidence is still pending.
+
+### Awaiting installed-build/device access — NOT passed
+
+| Test | Status |
+| --- | --- |
+| Android Player Pro monthly/yearly license-test purchase and immediate tier | Not run |
+| Android Commissioner monthly/yearly license-test purchase and immediate tier | Not run |
+| Android restore for both tiers/periods | Not run |
+| Reinstall, Roster account switch, Play account switch | Not run |
+| Existing subscription duplicate-payment prevention on device | Not run |
+| iOS purchase/restore regression on installed shell | Not run |
+| Production web release and affected shell version comparison | Android version 3.1.3 reported; web-release/version-code correlation not established |
+| Sanitized real native callback field/type evidence | Not captured |
+
+The screenshot's exact anonymous-login message was absent from the initial
+workspace and the searched deployment log output. This does not establish which
+published release or installed shell produced it.
+
+### Supported association and recovery contract
+
+- Natively documents `login(userID, email, callback)` before purchase/restore,
+  with a successful native callback. The server, not the client, derives that
+  account-specific opaque ID from the authenticated Roster user.
+- The bridge's login and customer-ID observations must be either that requested
+  ID or an original anonymous ID **confirmed by the server lookup of that same
+  authenticated user's derived subscriber record**. The server never queries a
+  client-chosen anonymous customer. Unknown/malformed IDs and failed login remain
+  blocked before payment. A different registered original ID is not accepted.
+- RevenueCat explicitly documents original anonymous IDs surviving login under
+  a custom ID. This is evidence that comparing every reported customer ID to
+  the requested ID is unsafe, not proof of this installed shell's exact native
+  implementation. Actual sanitized callback evidence remains pending.
+- Read-back retries are bounded and read-only when a successful login explicitly
+  reported the requested ID; payment and login are never automatically repeated.
+- Android may provide a Google purchase token, but it is not required in the
+  documented JavaScript callback. Without one, the server discovers the order
+  from its authenticated subscriber record, obtains Google's token, verifies
+  the store state/product/account binding, and checks canonical token ownership.
+  A GPA number or customer callback alone cannot activate access.
+- Apple purchase callbacks may omit transaction/JWS data. The approved named-
+  customer flow discovers the transaction server-side and verifies its signed
+  Apple lineage before claiming it. The separate direct-proof endpoint retains
+  its deterministic `appAccountToken` requirement for new claims. Stock Natively
+  cannot pass that token through `purchasePackage`; it must not be routed into
+  the direct-proof first-claim flow.
+- The temporary blanket Apple checkout block was removed in favor of this
+  documented named-customer flow. Server verification readiness and confirmed
+  native association are still required **before** opening checkout.
+- Known active subscriptions block another checkout and direct users to restore
+  and manage the existing store plan. Existing ownership conflicts fail closed.
+  Background checks and pending-payment polling do not call native restore.
+- No vendor rebuild is established as necessary. It is required only if actual
+  installed-build evidence shows the supported association/purchase callbacks
+  are unavailable or incorrect; missing raw tokens alone is not that evidence.
+- Do not collect full provider responses, real customer IDs, order IDs, tokens,
+  JWS, credentials, or receipts in logs. Evidence should show only field names,
+  types, status categories, platform, and release/build versions.
+
+Existing verified claims are not deleted or transferred. Completed purchases
+awaiting provider verification get restore/support guidance, never an automatic
+second payment or a false success. Success is displayed only after the persisted
+account tier is refreshed. Native debug payload logging and billing JSON response
+logging are disabled; diagnostics contain only stages and identity categories.
+
+Reference contract sources consulted:
+- https://docs.buildnatively.com/natively-platform/features/purchases
+- https://www.revenuecat.com/docs/customers/identifying-customers
+- https://www.revenuecat.com/docs/api-v1/customer-info-model
+- https://www.revenuecat.com/docs/platform-resources/server-notifications/apple-server-notifications
 
 ---
 
@@ -11,8 +115,10 @@ unchanged and aren't covered here.
 - Android purchases go through the same Natively / RevenueCat bridge that
   iOS uses (`np.purchasePackage(packageId, cb)`), so no new IAP package was
   installed.
-- The client sends the resulting Google Play **purchase token** to a new
-  server route, **`POST /api/iap/verify-google`**, which:
+- If the callback includes a Google Play **purchase token**, the client sends
+  it to **`POST /api/iap/verify-google`**. Otherwise it uses authenticated
+  **`POST /api/iap/restore-google-automatic`** to discover the verified order.
+  Both paths:
   1. Verifies the token against the Google Play Developer API
      (`purchases.subscriptionsv2.get`).
   2. Confirms the subscription state is active / in grace period.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getActiveAppleSubscriptions, getRevenueCatAppleSubscriptions } from '../revenueCatApi';
+import { getActiveAppleSubscriptions, getRevenueCatAppleSubscriptions, getRevenueCatSubscriber } from '../revenueCatApi';
 
 const purchased = {
   store: 'app_store',
@@ -9,6 +9,29 @@ const purchased = {
   refunded_at: null,
   ownership_type: 'PURCHASED',
 };
+
+test('account confirmation reads only the derived custom ID and keeps original identity inside the provider context', async () => {
+  const loginId = 'roster_' + 'a'.repeat(64);
+  const result = await getRevenueCatSubscriber(loginId, {
+    apiKey: 'fixture-only-key',
+    fetcher: async url => {
+      assert.equal(String(url).split('/').pop(), loginId);
+      return new Response(JSON.stringify({ subscriber: {
+        original_app_user_id: '$RCAnonymousID:' + 'b'.repeat(32), subscriptions: {},
+      } }));
+    },
+  });
+  assert.equal(result.original_app_user_id, '$RCAnonymousID:' + 'b'.repeat(32));
+  await assert.rejects(getRevenueCatSubscriber('$RCAnonymousID:' + 'b'.repeat(32), { apiKey: 'fixture-only-key' }), { status: 400 });
+});
+test('failed and malformed provider records cannot confirm native association or expose provider details', async () => {
+  const loginId = 'roster_ios_' + 'a'.repeat(64);
+  for (const response of [new Response('private provider response', { status: 401 }),
+    new Response('{}'), new Response(JSON.stringify({ subscriber: { original_app_user_id: 'original', subscriptions: [] } }))]) {
+    await assert.rejects(getRevenueCatSubscriber(loginId, { apiKey: 'fixture-only-key', fetcher: async () => response }),
+      error => error instanceof Error && !error.message.includes('private provider') && (error as any).status === 503);
+  }
+});
 
 test('Apple transaction identifiers retain precision; unsafe numeric IDs are not lookup hints', () => {
   const parse = (id: string | number) => getActiveAppleSubscriptions({

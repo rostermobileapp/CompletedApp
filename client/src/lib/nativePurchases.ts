@@ -16,12 +16,8 @@ export function getAppAccountToken(userId: string): string {
   return uuidv5(userId, APP_NAMESPACE);
 }
 
-/**
- * Singleton NativelyPurchases instance.
- * window.$agent is injected by the Natively bridge and is only present
- * inside the native app — never in a browser or the Replit dev preview.
- */
-const np = new NativelyPurchases();
+// Each bridge action gets a fresh instance/response ID. Late callbacks must
+// not overwrite the callback belonging to a subsequent request.
 
 /**
  * Wrap a Natively callback into a Promise with a timeout.
@@ -34,8 +30,16 @@ function toPromise<T>(fn: (cb: (data: T) => void) => void, timeoutMs = 15000): P
       reject(new Error(`NATIVELY_TIMEOUT: Native bridge did not respond within ${timeoutMs / 1000}s`));
     }, timeoutMs);
     try {
-      fn((data: T) => {
+      fn((data: T, error?: { message?: unknown; code?: unknown }) => {
         clearTimeout(timer);
+        if (error?.message) {
+          if (error.code === 2 || error.code === 'PURCHASE_CANCELLED') {
+            reject(Object.assign(new Error('Purchase cancelled'), { code: 'PURCHASE_CANCELLED' }));
+          } else {
+            reject(new Error('The native billing operation reported an error. Reopen Roster and check store subscriptions before retrying.'));
+          }
+          return;
+        }
         resolve(data);
       });
     } catch (err) {
@@ -163,7 +167,7 @@ export async function getIosProducts(): Promise<NativelyProductPrice[]> {
         results.push({ identifier: id, priceString });
       }
     } catch (err: any) {
-      console.warn(`[IAP] packagePrice(${id}) failed:`, err?.message ?? err);
+      console.warn(`[IAP] packagePrice(${id}) failed`);
     }
   }
 
@@ -195,7 +199,7 @@ export async function getAndroidProducts(
       const instance = new NativelyPurchases();
       const data = await toPromise<any>((cb) => instance.packagePrice(id, cb), 10000);
       if (data?.status === 'FAILED') {
-        console.warn(`[IAP/Android] packagePrice(${id}) returned FAILED:`, String(data.error ?? 'unknown error').slice(0, 120));
+        console.warn(`[IAP/Android] packagePrice(${id}) returned FAILED`);
         return null;
       }
       const priceString = formatPrice(data, true);
@@ -204,10 +208,10 @@ export async function getAndroidProducts(
         onProduct?.(product);
         return product;
       } else {
-        console.warn(`[IAP/Android] packagePrice(${id}) returned no price (status=${String(data?.status ?? 'unknown')})`);
+        console.warn(`[IAP/Android] packagePrice(${id}) returned no price`);
       }
     } catch (err: any) {
-      console.warn(`[IAP/Android] packagePrice(${id}) failed:`, err?.message ?? err);
+      console.warn(`[IAP/Android] packagePrice(${id}) failed`);
     }
     return null;
   }));
@@ -222,8 +226,6 @@ export interface NativelyTransaction {
   jwsRepresentation?: string;
   /** StoreKit 1 transaction ID — fallback for server verification */
   transactionId?: string;
-  /** Raw callback payload — logged for debugging */
-  raw?: any;
 }
 
 /**
@@ -268,58 +270,61 @@ function applyPendingReferralAttribute(): void {
   }
 }
 
-/**
- * Purchase a subscription via the Natively StoreKit bridge.
- *
- * Natively callback shape (from Natively docs):
- *   resp.status        — "SUCCESS" or "FAILED"
- *   resp.transactionId — Apple transaction ID (may be absent in some builds)
- *   resp.error         — error message when status is "FAILED"
- *   resp.jwsRepresentation — StoreKit 2 JWS (if available)
- */
-/**
- * The callback is only a signal to start server verification. Recent native
- * builds return no transaction proof; identify the account before checkout.
- */
+export async function readNativePurchaseIdentity(): Promise<string> {
+  const bridge = new NativelyPurchases();
+  const data = await toPromise<any>(cb => bridge.customerId(cb));
+  if (data?.status !== 'SUCCESS' || typeof data.customerId !== 'string' ||
+      !data.customerId.trim() || data.customerId.length > 1500) {
+    throw new Error('Roster could not read the native purchase account. Update and reopen the app before purchasing.');
+  }
+  return data.customerId.trim();
+}
+
+export async function associateNativePurchaseAccount(
+  loginId: string,
+): Promise<{ loginReportedId: string; readBackId: string }> {
+  if (!/^roster_(?:ios_)?[a-f0-9]{64}$/.test(loginId)) {
+    throw new Error('Purchase-account setup is unavailable. Reopen Roster before purchasing.');
+  }
+  const bridge = new NativelyPurchases();
+  const data = await toPromise<any>(cb => bridge.login(loginId, undefined, cb));
+  if (data?.status !== 'SUCCESS' || typeof data.customerId !== 'string' ||
+      !data.customerId.trim() || data.customerId.length > 1500) {
+    throw new Error('Roster could not link the native purchase account. Update and reopen the app before purchasing.');
+  }
+  // Do not assume CustomerInfo's original ID is the SDK's current appUserID.
+  // The backend checks both observations against its derived subscriber record.
+  const loginReportedId = data.customerId.trim();
+  let readBackId = await readNativePurchaseIdentity();
+  // A SUCCESS explicitly returning our ID can precede native read-back
+  // readiness. Retry reads only, never repeat the identity-changing login.
+  if (loginReportedId === loginId) {
+    for (const delay of [150, 450]) {
+      if (readBackId === loginId) break;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      readBackId = await readNativePurchaseIdentity();
+    }
+  }
+  return { loginReportedId, readBackId };
+}
+
+/** Callback success starts server validation; it never grants account access. */
 export async function purchaseProduct(
   packageId: string,
 ): Promise<NativelyTransaction> {
   applyPendingReferralAttribute();
-  const data = await toPromise<any>((cb) => np.purchasePackage(packageId, cb));
-
-  if (!data) {
-    throw new Error('No response from App Store. Please try again.');
+  const bridge = new NativelyPurchases();
+  const data = await toPromise<any>(cb => bridge.purchasePackage(packageId, cb), 60_000);
+  if (data?.status === 'CANCELLED' ||
+      (data?.status === 'FAILED' && /cancel|^\s*2\s*$/i.test(String(data.error ?? '')))) {
+    throw Object.assign(new Error('Purchase cancelled'), { code: 'PURCHASE_CANCELLED' });
   }
-
-  // Handle failure status
-  if (data.status === 'FAILED') {
-    const errorMsg: string = data.error ?? '';
-    // StoreKit cancellation: SKErrorPaymentCancelled (code 2) or user-cancelled strings
-    if (
-      errorMsg.trim() === '2' ||
-      errorMsg.toLowerCase().includes('cancel')
-    ) {
-      const err: any = new Error('Purchase cancelled');
-      err.code = 'PURCHASE_CANCELLED';
-      throw err;
-    }
-    throw new Error(errorMsg || 'Purchase failed. Please try again.');
+  if (data?.status !== 'SUCCESS') {
+    throw new Error('The App Store did not confirm purchase completion. Check your subscriptions and restore before trying another payment.');
   }
-
-  if (data.status !== 'SUCCESS') {
-    throw new Error('The App Store did not confirm purchase completion. Use Restore purchases before trying again.');
-  }
-  const transactionId: string | undefined =
-    data.transactionId ?? data.transaction_id ?? undefined;
-  const jwsRepresentation: string | undefined =
-    data.jwsRepresentation ?? data.jws ?? undefined;
-
-  return {
-    productIdentifier: packageId,
-    jwsRepresentation,
-    transactionId,
-    raw: data,
-  };
+  return { productIdentifier: packageId,
+    transactionId: data.transactionId ?? data.transaction_id,
+    jwsRepresentation: data.jwsRepresentation ?? data.jws };
 }
 
 /**
@@ -327,37 +332,32 @@ export async function purchaseProduct(
  *
  * Uses the same `purchasePackage` method as iOS — Natively/RevenueCat routes
  * to the correct store based on the running platform. On Android the callback
- * payload includes a Google Play purchase token, which the server uses to
- * verify the purchase against the Play Developer API.
+ * may omit a token. In that case the backend obtains the store order from
+ * the authenticated account's RevenueCat record and independently verifies it.
  */
 export async function purchaseProductAndroid(
   packageId: string,
-): Promise<AndroidPurchaseResult> {
+): Promise<{ productIdentifier: string; purchaseToken?: string }> {
   applyPendingReferralAttribute();
-  console.log('[IAP/Android] purchasePackage() →', packageId, {
-    hasAgent: typeof (window as any).$agent !== 'undefined',
-    hasNatively: !!(window as any).natively,
-    hasPurchasePackage: typeof (np as any).purchasePackage === 'function',
-    ua: navigator.userAgent,
-  });
 
   // 60s timeout — enough for the Google Play sheet to come up and the user to
   // tap "Subscribe", but short enough that a non-responding bridge doesn't
   // hang the UI indefinitely. (Default toPromise timeout is 15s which is too
   // tight for an interactive purchase sheet.)
   const data = await toPromise<any>(
-    (cb) => np.purchasePackage(packageId, cb),
+    (cb) => new NativelyPurchases().purchasePackage(packageId, cb),
     60_000,
   );
-
-  console.log('[IAP/Android] purchasePackage() callback received', { status: data?.status });
 
   if (!data) {
     throw new Error('No response from Google Play. Please try again.');
   }
 
+  if (data.status === 'CANCELLED') {
+    throw Object.assign(new Error('Purchase cancelled'), { code: 'PURCHASE_CANCELLED' });
+  }
   if (data.status === 'FAILED') {
-    const errorMsg: string = data.error ?? '';
+    const errorMsg: string = typeof data.error === 'string' ? data.error : '';
     const lowered = errorMsg.toLowerCase();
     if (lowered.includes('cancel') || lowered.includes('user_canceled')) {
       const err: any = new Error('Purchase cancelled');
@@ -379,19 +379,16 @@ export async function purchaseProductAndroid(
         "This subscription isn't available right now. New products can take a few hours to propagate from Play Console — please try again shortly.",
       );
     }
-    throw new Error(errorMsg || 'Purchase failed. Please try again.');
+    throw new Error('Google Play could not complete this purchase. Check your store subscriptions and use Restore purchases before retrying.');
   }
 
+  if (data.status !== 'SUCCESS') {
+    throw new Error('Google Play did not confirm purchase completion. Check your subscriptions and use Restore purchases before trying again.');
+  }
   const purchaseToken = extractPurchaseToken(data);
   const productIdentifier = extractProductId(data, packageId);
 
-  if (!purchaseToken) {
-    throw new Error(
-      'Purchase completed but no purchase token was returned. Please tap Restore Purchases or contact support.',
-    );
-  }
-
-  return { productIdentifier, purchaseToken, raw: data };
+  return { productIdentifier, ...(purchaseToken ? { purchaseToken } : {}) };
 }
 
 /**
@@ -400,19 +397,19 @@ export async function purchaseProductAndroid(
  * Caveat: RevenueCat's restore returns aggregated CustomerInfo, and the
  * underlying Google Play purchase token is not always re-surfaced through
  * the bridge. When it is, we forward it for server-side verification; when
- * it isn't, the caller should fall back to a generic "Restore initiated"
- * message and let the user contact support if the entitlement doesn't apply.
+ * it isn't, the caller uses authenticated server order recovery. Callback
+ * CustomerInfo alone never grants access.
  */
 export async function inspectAndroidPurchases(): Promise<AndroidPurchaseStatus> {
-  const data = await toPromise<any>((cb) => np.restore(cb));
+  const data = await toPromise<any>((cb) => new NativelyPurchases().restore(cb));
   if (data == null) {
     throw new Error('Google Play restore returned no data. Please try again.');
   }
   if (data.status === 'FAILED') {
-    throw new Error(data.error ?? 'Restore failed. Please try again.');
+    throw new Error('Google Play could not restore purchases. Check the signed-in Play account, then reopen Roster and try Restore purchases.');
   }
   if (!Array.isArray(data) && data.status !== 'SUCCESS') {
-    throw new Error('The App Store did not confirm restore completion. Reopen the app and try Restore purchases again.');
+    throw new Error('Google Play did not confirm restore completion. Reopen the app and try Restore purchases again.');
   }
   return parseAndroidPurchaseStatus(data);
 }
@@ -421,77 +418,24 @@ export async function restorePurchasesAndroid(): Promise<AndroidPurchaseResult[]
   return (await inspectAndroidPurchases()).purchases;
 }
 
-/** Read the native RevenueCat identity before any login/logout operation.
- * It is used only alongside a verified Google order's account binding.
- */
-export async function getAndroidPurchaseCustomerId(): Promise<string> {
-  if (!await isAndroidBillingSupported()) {
-    throw new Error('Open Roster in the Android app to recover a Google Play purchase.');
-  }
-  const data = await toPromise<any>((cb) => np.customerId(cb));
-  if (data?.status === 'FAILED') throw new Error(data.error || 'Could not read the Android purchase identity.');
-  const id = data?.customerId;
-  if (typeof id !== 'string' || !id.trim()) {
-    throw new Error('The Android app did not provide its purchase identity. Contact support.');
-  }
-  return id.trim();
-}
-
-/** Identify RevenueCat with a server-issued ID for the authenticated Roster
- * account. Called only when the user chooses to restore an existing purchase.
- */
-export async function loginAndroidPurchaseAccount(loginId: string): Promise<void> {
-  if (!await isAndroidBillingSupported() || !/^roster_[a-f0-9]{64}$/.test(loginId)) {
-    throw new Error('Android purchase account linking is unavailable.');
-  }
-  const data = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
-  if (data?.status === 'FAILED' || !data) {
-    throw new Error(data?.error || 'Could not link the Android purchase account.');
-  }
-  if (await getAndroidPurchaseCustomerId() !== loginId) {
-    throw new Error('The Android app did not confirm the linked purchase account.');
-  }
-}
-
-/** Supported Natively identity API, not subscriber attributes. The server
- * issues an opaque iOS identity only to its authenticated account. */
-export async function getIosPurchaseCustomerId(): Promise<string> {
-  if (navigator.userAgent.toLowerCase().includes('android') || !await isBillingSupported()) {
-    throw new Error('Open Roster in the iOS app to use App Store purchases.');
-  }
-  const data = await toPromise<any>((cb) => np.customerId(cb));
-  if (data?.status === 'FAILED' || typeof data?.customerId !== 'string' || !data.customerId.trim()) {
-    throw new Error('The iOS app could not read its purchase account. Reopen the app and try again.');
-  }
-  return data.customerId.trim();
-}
-
-export async function loginIosPurchaseAccount(loginId: string): Promise<void> {
-  if (!/^roster_ios_[a-f0-9]{64}$/.test(loginId)) {
-    throw new Error('App Store account linking is unavailable. Try again later.');
-  }
-  await getIosPurchaseCustomerId();
-  const data = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
-  if (data?.status !== 'SUCCESS' || await getIosPurchaseCustomerId() !== loginId) {
-    throw new Error('The iOS app could not confirm your purchase account. Reopen the app and try again.');
-  }
-}
-
 /**
  * Restore previous purchases via the Natively StoreKit bridge.
  */
 export async function restorePurchases(): Promise<NativelyTransaction[]> {
-  const data = await toPromise<any>((cb) => np.restore(cb));
+  const data = await toPromise<any>((cb) => new NativelyPurchases().restore(cb));
 
   if (data == null) {
     throw new Error('App Store restore returned no data. Please try again.');
   }
 
   if (data.status === 'FAILED') {
-    throw new Error(data.error ?? 'Restore failed. Please try again.');
+    throw new Error('The App Store could not restore purchases. Check the signed-in Apple account, then reopen Roster and try Restore purchases.');
   }
 
   // The restore payload may be an array or have a purchases/transactions array
+  if (!Array.isArray(data) && data.status !== 'SUCCESS') {
+    throw new Error('The App Store did not confirm restore completion. Reopen the app and try Restore purchases again.');
+  }
   const items: any[] = Array.isArray(data)
     ? data
     : data.purchases ?? data.transactions ?? [];
@@ -500,6 +444,5 @@ export async function restorePurchases(): Promise<NativelyTransaction[]> {
     productIdentifier: item.productIdentifier ?? item.product_id ?? '',
     jwsRepresentation: item.jwsRepresentation ?? item.jws ?? undefined,
     transactionId: item.transactionId ?? item.transaction_id ?? undefined,
-    raw: item,
   }));
 }

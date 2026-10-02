@@ -7,10 +7,10 @@ import {
   canPurchaseAndroidProduct,
   getAndroidProducts,
   isAndroidBillingSupported,
-  loginIosPurchaseAccount,
-  getIosPurchaseCustomerId,
   purchaseProduct,
   restorePurchases,
+  purchaseProductAndroid,
+  associateNativePurchaseAccount,
 } from './nativePurchases';
 import { isNativelyAndroidApp } from '../hooks/useIosPlatform';
 
@@ -110,25 +110,131 @@ test('empty and failed product callbacks cannot enable checkout', async (t) => {
   assert.equal(canPurchaseAndroidProduct({}, PRODUCT_PLAYER_PRO, true, [PRODUCT_PLAYER_PRO]), false);
 });
 
-test('iOS uses supported login and customer identity APIs and accepts proofless callbacks', async (t) => {
+test('documented iOS purchase and restore callbacks need not expose transaction fields', async (t) => {
   const window = mockAndroid(t);
   window.$agent = {};
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Natively/iOS' } });
-  let customerId = 'test-anonymous';
   const actions: string[] = [];
   Object.defineProperty(globalThis, 'natively', {
     configurable: true,
-    value: { trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string, params: { login?: string }) {
+    value: { trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
       actions.push(action);
-      if (action === 'purchases_login') customerId = params.login!;
-      if (action === 'purchases_package') callback({ status: 'SUCCESS', packageId: PRODUCT_PLAYER_PRO });
-      else callback({ status: 'SUCCESS', customerId });
+      callback({ status: 'SUCCESS', customerId: 'test-anonymous' });
     } },
   });
-  const loginId = 'roster_ios_' + 'a'.repeat(64);
-  await loginIosPurchaseAccount(loginId);
-  assert.equal(await getIosPurchaseCustomerId(), loginId);
-  assert.equal((await purchaseProduct(PRODUCT_PLAYER_PRO)).transactionId, undefined);
+  assert.equal((await purchaseProduct(PRODUCT_PLAYER_PRO)).productIdentifier, PRODUCT_PLAYER_PRO);
   assert.deepEqual(await restorePurchases(), []);
-  assert.ok(actions.includes('purchases_login'));
+  assert.deepEqual(actions, ['purchases_package', 'purchases_restore']);
+});
+
+test('Android anonymous or original reporting identity neither authorizes nor blocks the store transaction', async t => {
+  const window = mockAndroid(t);
+  window.$agent = {};
+  const original = '$RCAnonymousID:' + 'b'.repeat(32);
+  const actions: string[] = [];
+  Object.defineProperty(globalThis, 'natively', {
+    configurable: true,
+    value: { trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string) {
+      actions.push(action);
+      assert.equal(action, 'purchases_package');
+      callback({ status: 'SUCCESS', customerId: original, packageId: PRODUCT_PLAYER_PRO, purchaseToken: 'fixture-google-proof' });
+    } },
+  });
+  assert.equal((await purchaseProductAndroid(PRODUCT_PLAYER_PRO)).purchaseToken, 'fixture-google-proof');
+  assert.deepEqual(actions, ['purchases_package']);
+});
+
+test('Android proofless success has no token and cannot authorize activation', async t => {
+  mockAndroid(t);
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+    trigger(_instance: unknown, _type: unknown, callback: (data: object) => void) {
+      callback({ status: 'SUCCESS', packageId: PRODUCT_PLAYER_PRO });
+    },
+  } });
+  assert.deepEqual(await purchaseProductAndroid(PRODUCT_PLAYER_PRO), { productIdentifier: PRODUCT_PLAYER_PRO });
+});
+
+test('documented CANCELLED callback preserves cancellation code', async t => {
+  mockAndroid(t);
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+    trigger(_instance: unknown, _type: unknown, callback: (data: object) => void) { callback({ status: 'CANCELLED' }); },
+  } });
+  await assert.rejects(purchaseProductAndroid(PRODUCT_PLAYER_PRO), { code: 'PURCHASE_CANCELLED' });
+  await assert.rejects(purchaseProduct(PRODUCT_PLAYER_PRO), { code: 'PURCHASE_CANCELLED' });
+});
+
+test('bridge login sends the server identity but preserves an original anonymous observation for server confirmation', async t => {
+  mockAndroid(t);
+  const loginId = 'roster_' + 'a'.repeat(64);
+  const original = '$RCAnonymousID:' + 'b'.repeat(32);
+  const actions: string[] = [];
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+    trigger(_instance: unknown, _version: unknown, cb: (data: object) => void, action: string, params: any) {
+      actions.push(action);
+      if (action === 'purchases_login') assert.equal(params.login, loginId);
+      cb({ status: 'SUCCESS', customerId: original });
+    },
+  } });
+  assert.deepEqual(await associateNativePurchaseAccount(loginId), { loginReportedId: original, readBackId: original });
+  assert.deepEqual(actions, ['purchases_login', 'purchases_customerid']);
+});
+
+for (const response of [{ status: 'FAILED' }, { status: 'SUCCESS' }, { status: 'SUCCESS', customerId: {} }, null]) {
+  test('malformed or failed login never requests a purchase', async t => {
+    mockAndroid(t);
+    const actions: string[] = [];
+    Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+      trigger(_instance: unknown, _version: unknown, cb: (data: object | null) => void, action: string) {
+        actions.push(action); cb(response);
+      },
+    } });
+    await assert.rejects(associateNativePurchaseAccount('roster_' + 'a'.repeat(64)), /could not link/);
+    assert.deepEqual(actions, ['purchases_login']);
+  });
+}
+
+test('successful current-ID login gets bounded read-only retries for delayed native read-back', async t => {
+  mockAndroid(t);
+  const loginId = 'roster_' + 'a'.repeat(64);
+  let reads = 0, logins = 0;
+  const oldTimeout = globalThis.setTimeout;
+  t.mock.method(globalThis, 'setTimeout', ((cb: any, ms: number) => oldTimeout(cb, ms <= 450 ? 0 : ms)) as any);
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+    trigger(_instance: unknown, _version: unknown, cb: (data: object) => void, action: string) {
+      if (action === 'purchases_login') { logins++; cb({ status: 'SUCCESS', customerId: loginId }); }
+      else cb({ status: 'SUCCESS', customerId: ++reads < 3 ? '$RCAnonymousID:' + 'b'.repeat(32) : loginId });
+    },
+  } });
+  assert.equal((await associateNativePurchaseAccount(loginId)).readBackId, loginId);
+  assert.equal(logins, 1); assert.equal(reads, 3);
+});
+
+test('a SUCCESS-shaped callback accompanied by a native error does not confirm login or expose the error payload', async t => {
+  mockAndroid(t);
+  const loginId = 'roster_' + 'a'.repeat(64);
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+    trigger(_instance: unknown, _version: unknown, cb: (data: object, error?: object) => void) {
+      cb({ status: 'SUCCESS', customerId: loginId }, { message: 'private provider payload' });
+    },
+  } });
+  await assert.rejects(associateNativePurchaseAccount(loginId),
+    error => error instanceof Error && /reported an error/.test(error.message) && !error.message.includes('private provider'));
+});
+
+test('malformed purchase callback with a token is not purchase completion', async t => {
+  mockAndroid(t);
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: {
+    trigger(_instance: unknown, _type: unknown, callback: (data: object) => void) { callback({ purchaseToken: 'unverified-proof' }); },
+  } });
+  await assert.rejects(purchaseProductAndroid(PRODUCT_PLAYER_PRO), /did not confirm purchase completion/);
+});
+
+test('an unresponsive real JavaScript wrapper rejects on its bounded timeout', async t => {
+  mockAndroid(t);
+  Object.defineProperty(globalThis, 'natively', { configurable: true, value: { trigger() {} } });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const pending = purchaseProductAndroid(PRODUCT_PLAYER_PRO);
+  const rejection = assert.rejects(pending, /NATIVELY_TIMEOUT/);
+  t.mock.timers.tick(60_000);
+  await rejection;
 });

@@ -142,10 +142,11 @@ export async function getGooglePlayOrderToken(
 export function matchesGooglePlayCustomer(
   customerId: string, obfuscatedExternalAccountId: string | undefined,
 ): boolean {
-  if (!/^\$RCAnonymousID:[A-Za-z0-9_-]{20,128}$/.test(customerId) ||
+  if (!/^(?:\$RCAnonymousID:[A-Za-z0-9_-]{20,128}|roster_[a-f0-9]{64})$/.test(customerId) ||
       !obfuscatedExternalAccountId) return false;
   const expected = createHash('sha256').update(customerId).digest();
-  const received = Buffer.from(obfuscatedExternalAccountId, 'base64');
+  const received = Buffer.from(obfuscatedExternalAccountId,
+    /^[a-f0-9]{64}$/i.test(obfuscatedExternalAccountId) ? 'hex' : 'base64');
   return received.length === expected.length && timingSafeEqual(received, expected);
 }
 
@@ -186,6 +187,8 @@ export interface GooglePlaySubscriptionPurchase {
   acknowledgementState: 'ACKNOWLEDGED' | 'PENDING' | string;
   /** Echo of the purchase token we queried with — useful for downstream lookups. */
   purchaseToken: string;
+  /** Previous token for an upgrade/resubscribe; ownership must remain bound. */
+  linkedPurchaseToken?: string;
   /** Linked profile token set by the client — analogous to Apple's appAccountToken. */
   obfuscatedExternalAccountId?: string;
   /** Raw payload for logging / debugging. */
@@ -240,6 +243,8 @@ export async function verifySubscriptionPurchase(
     productId,
     acknowledgementState: data.acknowledgementState ?? 'PENDING',
     purchaseToken,
+    linkedPurchaseToken: typeof data.linkedPurchaseToken === 'string' && data.linkedPurchaseToken
+      ? data.linkedPurchaseToken : undefined,
     obfuscatedExternalAccountId:
       data.externalAccountIdentifiers?.obfuscatedExternalAccountId ?? undefined,
     raw: data,

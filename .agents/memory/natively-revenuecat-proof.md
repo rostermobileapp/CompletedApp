@@ -1,38 +1,46 @@
 ---
-name: Natively RevenueCat proof gap
-description: Why the native purchase and restore callbacks do not prove Apple entitlement to the server.
+name: Store billing authority
+description: Approved Natively billing authority, native identity semantics, and preserved store ownership boundaries.
 ---
 
-Natively's documented RevenueCat purchase callback returns a package ID; its restore callback returns a customer ID. Neither promises an Apple transaction ID or signed JWS. Do not assume a successful native callback contains the proof required by the existing Apple verification endpoint, and do not grant access based on a client-supplied customer ID alone.
+On 2026-10-02 the owner explicitly chose “Repair the existing Natively flow” and permitted RevenueCat's server-verified subscription status to update Roster tiers. This supersedes the earlier reporting-only restriction.
 
-**Why:** An active Apple subscription was visible on an iPhone while the account remained Free; the app's restore flow expected transaction data, discarded the documented callback response, and never called server verification. Configuring Apple server credentials alone cannot repair that client/server contract mismatch.
+**Why:** Natively's documented native purchase infrastructure uses RevenueCat and does not promise raw Google purchase tokens or Apple transactions in its JavaScript callbacks. A strict store-only rewrite was incompatible with that contract.
 
-**How to apply:** Verify entitlement server-side through the existing RevenueCat project's authenticated API after establishing a trustworthy account identity, or obtain and verify a receipt/order transaction with Apple before linking a user. Treat the native callbacks as signals to begin verification, not verification itself.
+**How to apply:** Keep Roster login separate. Use authenticated, server-derived purchase identities and server-verified subscription records; preserve independent store verification and canonical ownership claims. Native callback success, arbitrary anonymous IDs, aliases, and attributes alone never grant access.
 
-An existing project app's public RevenueCat key can read the project's iOS subscriber status through the v1 subscriber endpoint, including an anonymous subscriber's active Apple product. That verifies the subscription **at RevenueCat**, not the ownership of a Roster account. Never grant roles from a client-supplied anonymous ID or leave a grant without a revocation path; a unique purchase-lineage claim and renewal/refund reconciliation are required. Key *presence* is also not proof that Apple API verification works: validate the signing key can actually import and make a lookup before depending on it.
+The owner reports that native purchases worked before the recent changes and supplied Natively's configured iOS/Android purchase settings plus its official purchases documentation.
 
-RevenueCat v1's subscriber GET is a **get-or-create** operation. Diagnostic reads of unknown IDs can create empty RevenueCat customers; restrict those checks to trusted operators and known IDs rather than treating the endpoint as a side-effect-free existence probe.
+**Why:** This is a regression report, not evidence of an unconfigured store. Natively documents RevenueCat as its native purchase/receipt/subscription infrastructure, not merely a sales dashboard.
 
-RevenueCat v2's `store_subscription_identifier` may be the **latest renewal** transaction, not Apple's stable original transaction ID. Query the subscription's transaction history in purchase-date order for the original, then search that identifier against the project's subscriptions to check lineage uniqueness. Anonymous customers may have no email attribute or Roster alias; matching their product and renewal date is not proof of Roster-account ownership.
+**How to apply:** Compare earlier billing code and recent identity gates before asking for new keys, store setup, or a rebuild. Do not equate RevenueCat's original anonymous customer ID with the current SDK appUserID; validate its relationship through the authenticated account's provider record, never by looking up a client-chosen customer.
 
-**Why:** A known active Apple monthly subscriber's current identifier differed from its earliest transaction, and the other anonymous subscribers had no account-identifying attributes. A support repair based on the current identifier or matching dates could grant the wrong account and miss later revocations.
+The documented Natively purchase/restore callbacks may omit store transaction proof; the JavaScript wrapper alone cannot establish what an installed native shell returns.
 
-**How to apply:** Keep diagnostic lookups read-only until an independently attested account-to-purchase binding and source-aware renewal/refund handling are in place. Do not stage a production role change merely because an anonymous customer's subscription resembles a user's plan.
+**Why:** Public success/package/customer callback documentation is not evidence that a specific installed shell exposes a Google purchase token or an Apple transaction/JWS.
 
-For an anonymous Apple subscriber with no account alias, explicit project-owner attribution can authorize an operator-assisted repair when the operator separately verifies the distinct original Apple transaction and RevenueCat lineage. This is an **attested** account association, not provider-proven Roster identity; never describe it as cryptographic ownership proof. A linked account remains pending until the deployed server independently confirms an active subscription against the attested purchase history.
+**How to apply:** Require sanitized field/type evidence from supported installed builds and record real device checks separately from mocked tests. Do not fabricate store proof or weaken ownership checks; use supported authenticated server recovery when callbacks omit proof.
 
-**Why:** Anonymous RevenueCat customers lacked Roster identifiers, while the owner could identify the affected accounts and their distinct Apple plans/renewal dates. Claiming stronger identity evidence would be misleading; granting before the deployed provider check would be unsafe.
+Direct store transaction proof after payment is not sufficient to establish pre-payment native account binding.
 
-**How to apply:** Keep real customer/transaction IDs out of source control and logs. Treat payment-provider outages as unknown, preserve access only through a previously verified expiry, and keep other payment sources independent when a refunded or expired Apple period is reconciled.
+**Why:** The direct Apple proof path requires an account-bound first transaction, but stock Natively cannot pass an appAccountToken through purchasePackage. Its separate named-customer flow uses authenticated server subscription lookup and canonical Apple lineage.
 
-Native account login is a supported Natively operation. Automatic checkout must use an opaque identity issued only to the authenticated account, confirm the native identity before charging, and derive that same identity on the server. Public user IDs or subscriber attributes are not authentication. Native callback success is still not entitlement proof.
+**How to apply:** Confirm native association and server verification readiness before checkout. Keep the direct-proof route's account-token safeguards, and do not confuse it with the approved Natively named-customer recovery path.
 
-**Why:** The documented bridge can associate purchases before checkout but does not return signed Apple proof afterward. An opaque association makes a server-side provider lookup account-specific without accepting an arbitrary anonymous customer ID.
+Existing operator-attributed lineages remain historical ownership claims. Preserve their original identity, refresh/revoke through their established source, and preserve independent billing sources.
 
-**How to apply:** Verify current provider entitlement and independently resolve Apple's stable original transaction; never claim the latest renewal ID as the original. Preserve both original-lineage ownership and source-aware revocation. Signing-key readiness must be checked before allowing a new purchase; a misconfigured verifier must not charge the customer first. Identity-key rotation requires explicit handling of existing purchase associations rather than silently changing their owner.
+**Why:** Anonymous historical purchases lacked Roster aliases; attribution was attested rather than cryptographically proven. Deleting those claims or replacing their identity can strand customers.
 
-An account's current role is the combined result of all billing sources, not proof of any individual provider's tier. Save a Stripe baseline only from an explicitly Stripe-verified update, and tie it to that subscription rather than trusting the aggregate role.
+**How to apply:** Never automatically transfer Roster claims, force provider alias changes, or manually grant production access. Native restore should be a deliberate user action, not a page-load or repeated polling side effect.
 
-**Why:** An Apple upgrade can make the account Commissioner while its Stripe subscription remains Player Pro. Reusing that aggregate role as Stripe's baseline would retain Commissioner after Apple ends; treating generic role changes as Stripe evidence can overwrite the actual Stripe tier.
+An aggregate account role is not proof of one billing source's tier. Preserve only an explicitly Stripe-verified baseline tied to that subscription.
 
-**How to apply:** Resolve live independent claims together, persist the resolved role even when it is lower, and fail explicitly when a billing update is skipped. Verification must check the persisted result, not just a successful pure role calculation. Refresh Stripe baselines on every verified Stripe update, including retained expired/refunded Apple links: those links still reconcile, and an old baseline can undo a later legitimate Stripe upgrade or downgrade.
+**Why:** An Apple Commissioner upgrade over Stripe Player Pro previously risked saving the aggregate Commissioner role as a Stripe baseline, retaining access after Apple ended.
+
+**How to apply:** Resolve live independent claims together, keep subscription-specific baselines, and validate the persisted role before showing success.
+
+RevenueCat v1 subscriber GET is get-or-create, not a side-effect-free existence probe.
+
+**Why:** Diagnostic reads of unknown IDs can create empty customers.
+
+**How to apply:** Restrict reporting diagnostics to known IDs and trusted operators. Do not probe arbitrary customer identifiers.
