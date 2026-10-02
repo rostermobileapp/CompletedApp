@@ -67,6 +67,7 @@ export function TriviaHost() {
   const currentUserId = useRef<string | null>(user?.id ?? null);
   currentUserId.current = user?.id ?? null;
   const manualOpenRequested = useRef(false);
+  const designReviewOpened = useRef(false);
   const triviaEngaged = useRef(false);
   const [submitError, setSubmitError] = useState("");
   const [hasExistingDialog, setHasExistingDialog] = useState(false);
@@ -197,6 +198,30 @@ export function TriviaHost() {
     if (!today || !today.answered || displayResult) return;
     setDismissed(true);
   }, [today?.date, today?.answered, displayResult]);
+
+  // One-time, development-only review requested by the owner. Restore the
+  // saved result without resetting an answer or touching earned progress.
+  useEffect(() => {
+    const reviewKey = "roster.trivia.design-review:1790950866";
+    if (!import.meta.env.DEV || Date.now() > 1790951466000 ||
+        designReviewOpened.current || permissionUser?.displayId !== "U00001" ||
+        !user || demoActive || !dismissalHydrated || !today?.answered ||
+        !today.feedback || waitingOnOtherHost || hasExistingDialog) return;
+    try { if (window.sessionStorage.getItem(reviewKey)) return; } catch {}
+    if (!HOME_OPPORTUNITY(path)) {
+      navigate("/");
+      return;
+    }
+    designReviewOpened.current = true;
+    try { window.sessionStorage.setItem(reviewKey, "opened"); } catch {}
+    triviaEngaged.current = true;
+    setChoice(today.chosen_index ?? null);
+    setFeedback(today.feedback as TriviaFeedback);
+    setFeedbackDate(today.date);
+    setDismissed(false);
+    console.info("[Trivia] Opened saved result for design review.");
+  }, [permissionUser?.displayId, user, demoActive, dismissalHydrated, today,
+    waitingOnOtherHost, hasExistingDialog, path, navigate]);
 
   useEffect(() => {
     const onManualOpen = () => {
