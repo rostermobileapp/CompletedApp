@@ -15,6 +15,7 @@ import {
   unique,
   check,
   primaryKey,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -4619,6 +4620,22 @@ export const triviaGenerationAttempts = pgTable("trivia_generation_attempts", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("idx_trivia_generation_attempts_date").on(table.targetDate, table.attempt),
+]);
+
+export const triviaPushDeliveries = pgTable("trivia_push_deliveries", {
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  triviaDate: date("trivia_date", { mode: "string" }).notNull(),
+  idempotencyKey: uuid("idempotency_key").notNull().defaultRandom().unique(),
+  leaseToken: uuid("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  attempts: integer("attempts").notNull().default(1),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.userId, table.triviaDate] }),
+  check("trivia_push_delivery_attempts_check", sql`${table.attempts} > 0`),
 ]);
 
 export const insertBadgeDefinitionSchema = createInsertSchema(badgeDefinitions).omit({

@@ -14,3 +14,9 @@ Daily trivia is expected to send an actual push notification at noon Eastern, no
 **Why:** The owner expected a noon reminder after testing manual trivia pushes. A generation-only schedule does not meet that delivery requirement.
 
 **How to apply:** Distinguish tomorrow's question generation from today's reminder delivery. Verify that a real sender is running and inspect provider acceptance before describing automated noon notifications as operational.
+
+The approved test rollout sends automatic noon announcements only to U00001. A noon announcement is independent of whether today's trivia was already answered.
+
+**Why:** The owner authorized U00001-only automation while test mode is active and expected a noon notification after completing the day's question during earlier testing.
+
+**How to apply:** Do not broaden automated test recipients merely because another account is added to the app's trivia-access allowlist. Do not suppress the daily announcement using answer or dismissal state without an explicit policy change.

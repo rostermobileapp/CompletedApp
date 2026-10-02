@@ -13,6 +13,7 @@ import { startBeerBadgeEvaluationWorker } from "./beerBadgeEvaluationQueue";
 import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runHistoricalBadgeBackfills } from "./badgeDbInit";
 import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
+import { startDailyTriviaPushJob } from "./triviaPushJob";
 
 const app = express();
 
@@ -139,6 +140,7 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    startDailyTriviaPushJob();
     // Backfill historical badges after readiness. Errors are logged per badge
     // family, so corrupt history cannot take down the API for every user.
     void runHistoricalBadgeBackfills().catch((error) =>

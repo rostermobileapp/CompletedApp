@@ -66,5 +66,5 @@
 - [Trivia scheduler boundary](trivia-scheduler-boundary.md) — use a separate scheduled project; never replace Roster’s web deployment or imply an unpublished schedule is active.
 - [Trivia presentation intent](trivia-presentation.md) — minimalist play, green/red results, Trophy Case consistency, and instant push opening.
 - [Anthropic model compatibility](anthropic-model-compatibility.md) — model availability checks do not validate Messages options; test the full generation/verification flow.
-- [Temporary test services](temporary-test-services.md) — run disposable test services as tracked background tasks; daemon startup success does not guarantee cross-call availability.
+- [Temporary test services](temporary-test-services.md) — use tracked background processes and explicit local DB connection parameters; workspace PG defaults can leak into fixtures.
 - [Verification runtime compatibility](verification-runtime-compatibility.md) — testing delegation may be unavailable; isolate dynamic import graphs in bundled checks without weakening auth.

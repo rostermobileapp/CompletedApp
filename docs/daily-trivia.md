@@ -102,9 +102,32 @@ other than the configured test account, and delegates to the transactional
 reset that removes the answer and reverses its recorded `progress_awarded`
 contribution.
 
-## Scheduled deployment
+## Automatic noon push notifications
 
-No scheduler is currently configured or live. `ops/trivia-schedule.json` is a
+The production web server starts a daily push sender at noon in
+`America/New_York` (DST-aware). This sender is separate from question generation
+and does not replace the independently scheduled generation project.
+It is disabled in development/preview, so publishing the backend is required
+to activate it. It announces today's available question, including to people
+who already played; it does not reset answers or change progress.
+
+With trivia test mode enabled, automatic pushes are restricted to U00001
+and only sent if that account is also in the configured test allowlist.
+With test mode disabled, eligible non-deleted, non-placeholder accounts with
+push enabled and a registered device can receive the daily announcement.
+
+`trivia_push_deliveries` records one delivery per account/Eastern date.
+Atomic five-minute leases coordinate replicas. Retries reuse the same OneSignal
+idempotency key, and only provider-confirmed acceptance marks a delivery sent.
+Failures retry after five minutes; provider requests time out after 20 seconds.
+A server starting after noon catches up today's unsent deliveries, but never
+replays older days. Pushes use the direct `/?trivia=1` launch link.
+Check `[TriviaPush]` logs and the delivery table for acceptance/failure status;
+provider acceptance is not a guarantee that the device displayed the push.
+
+## Scheduled question-generation deployment
+
+No separate question-generation scheduler is configured by this project. `ops/trivia-schedule.json` is a
 configuration manifest for the separate Scheduled Deployment that still needs
 to be created. Do not interpret the manifest as proof of an active schedule.
 

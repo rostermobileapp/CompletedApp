@@ -47,13 +47,15 @@ interface SendPushNotificationOptions {
   data?: Record<string, string>;
   /** Stable OneSignal key for retryable, once-per-occurrence sends. */
   idempotencyKey?: string;
+  /** Bound scheduled delivery attempts so failures can release their lease. */
+  timeoutMs?: number;
   /** Optional override for the large icon shown in the notification card.
    *  Falls back to the default Roster logo when omitted. */
   iconUrl?: string;
 }
 
 export async function sendPushNotificationToUser(options: SendPushNotificationOptions): Promise<boolean> {
-  const { userId, title, message, data, iconUrl, idempotencyKey } = options;
+  const { userId, title, message, data, iconUrl, idempotencyKey, timeoutMs } = options;
   const largeIcon = iconUrl ?? NOTIFICATION_ICON_URL;
   
   const oneSignalAppId = process.env.ONESIGNAL_APP_ID;
@@ -83,6 +85,7 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
     
     const response = await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
+      ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${oneSignalRestApiKey}`,

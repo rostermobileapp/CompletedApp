@@ -8,6 +8,14 @@ import {
 const PATCH_COLORS = ["#8B5A1A", "#909090", "#C9A84C", "#4a6a8a", "#188668", "#b9d4de", "#1a0a1a", "#F97316"];
 
 const TABLE_DDL = [
+  `CREATE TABLE IF NOT EXISTS trivia_push_deliveries (
+    user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE, trivia_date date NOT NULL,
+    idempotency_key uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE, lease_token uuid, lease_expires_at timestamptz,
+    next_attempt_at timestamptz NOT NULL DEFAULT now(), attempts integer NOT NULL DEFAULT 1
+      CONSTRAINT trivia_push_delivery_attempts_check CHECK (attempts > 0),
+    sent_at timestamptz, last_error text, created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, trivia_date)
+  )`,
   `CREATE TABLE IF NOT EXISTS daily_trivia (
     id varchar PRIMARY KEY DEFAULT gen_random_uuid(), date date NOT NULL UNIQUE, category trivia_category NOT NULL,
     question text NOT NULL, choices jsonb NOT NULL CHECK (jsonb_typeof(choices) = 'array' AND jsonb_array_length(choices) = 4),
