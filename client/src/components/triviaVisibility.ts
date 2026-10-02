@@ -5,6 +5,8 @@ export type TriviaToday = {
   choices: string[];
   difficulty: string;
   answered: boolean;
+  correct_index?: number;
+  explanation?: string;
   chosen_index?: number;
   feedback?: {
     is_correct: boolean;

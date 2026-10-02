@@ -109,8 +109,8 @@ test("daily trivia atomically answers once, preserves lifetime patch progress, a
     const freeViewer = { id: freeUserId, role: "free_tier", dateOfBirth: "1980-01-01" };
     const beforeAnswer = await getTodayTrivia(freeUserId, freeViewer, today);
     assert.equal(beforeAnswer.answered, false);
-    assert.equal("correct_index" in beforeAnswer, false);
-    assert.equal("explanation" in beforeAnswer, false);
+    assert.equal(beforeAnswer.correct_index, question.correct_index, "eligible clients receive the key for instant grading");
+    assert.equal(beforeAnswer.explanation, question.explanation);
     assert.equal("feedback" in beforeAnswer, false);
     assert.equal("patch" in beforeAnswer, false, "free responses must not expose tier or patch information");
     assert.equal("patch" in (await getTriviaStats(freeUserId, today)), false);
@@ -190,8 +190,8 @@ test("daily trivia atomically answers once, preserves lifetime patch progress, a
     assert.equal(canAccessTriviaPatches({ ...paidViewer, dateOfBirth: null }), false);
     assert.equal(canAccessTriviaPatches({ ...paidViewer, dateOfBirth: "2010-01-01" }), false);
     const paidBeforeAnswer = await getTodayTrivia(paidUserId, paidViewer, today);
-    assert.equal("correct_index" in paidBeforeAnswer, false);
-    assert.equal("explanation" in paidBeforeAnswer, false);
+    assert.equal(paidBeforeAnswer.correct_index, question.correct_index);
+    assert.equal(paidBeforeAnswer.explanation, question.explanation);
     assert.equal("feedback" in paidBeforeAnswer, false);
     assert.ok(paidBeforeAnswer.patch, "eligible paid users receive the category patch in today's response");
     const paidAnswer = await submitTriviaAnswer({

@@ -777,6 +777,10 @@ export async function getTodayTrivia(userId: string, viewer?: TriviaViewer, toda
     choices: question.choices,
     difficulty: question.difficulty,
     answered: !!answer,
+    // Deliberately delivered to eligible clients for immediate on-device
+    // feedback. Persistence and patch progress still use server-side grading.
+    correct_index: question.correct_index,
+    explanation: question.explanation,
   };
   if (answer) {
     response.chosen_index = answer.chosen_index;

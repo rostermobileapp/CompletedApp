@@ -14,6 +14,7 @@ import {
   type TriviaToday, writeTriviaDismissal,
 } from "./triviaVisibility";
 import "./TriviaHost.css";
+import { gradeTriviaChoice, type LocalTriviaResult } from "./triviaGrading";
 
 type TriviaStats = {
   total_answered: number; total_correct: number; accuracy: number;
@@ -56,6 +57,7 @@ export function TriviaHost() {
   const [choice, setChoice] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<TriviaFeedback | null>(null);
   const [feedbackDate, setFeedbackDate] = useState<string | null>(null);
+  const [localResult, setLocalResult] = useState<LocalTriviaResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   submittingRef.current = submitting;
@@ -99,21 +101,22 @@ export function TriviaHost() {
   });
   const today = isValidTriviaQuestion(todayQuery.data) ? todayQuery.data : null;
   const currentFeedback = today && feedbackDate === today.date ? feedback : null;
+  const displayResult = currentFeedback || (localResult?.date === today?.date ? localResult : null);
   const paid = hasPaidTrophyCaseAccess(permissionUser);
-  const eligible = !todayQuery.isError && !!today && (!today.answered || !!currentFeedback);
+  const eligible = (!todayQuery.isError || !!displayResult) && !!today && (!today.answered || !!displayResult);
   const waitingOnOtherHost = shouldShowBirthdayGreeting(birthdayQuery.data, Date.now(), badgeQuery.data)
     || (Array.isArray(badgeQuery.data) && badgeQuery.data.length > 0)
     || !birthdayQuery.isFetched || !badgeQuery.isFetched;
   const canInitiallyOpen = !!user && !demoActive && eligible && dismissalHydrated && shouldOfferTrivia({
     path,
-    answered: !!today?.answered && !currentFeedback,
+    answered: !!today?.answered && !displayResult,
     dismissed,
     otherOverlayActive: waitingOnOtherHost || hasExistingDialog,
   });
   const modalOpen = canInitiallyOpen || (!!user && !demoActive && shouldRetainTriviaPriority({
     path, engaged: triviaEngaged.current, eligible, dismissed,
   }));
-  const hasAnswer = !!currentFeedback;
+  const hasAnswer = !!displayResult;
   const categoryCount = useMemo(() => statsQuery.data?.categories?.find((item) => item.category === today?.category)?.correct_count ?? 0, [statsQuery.data, today?.category]);
   const errorStatus = todayQuery.error instanceof ApiError ? todayQuery.error.status : null;
 
@@ -128,6 +131,7 @@ export function TriviaHost() {
     setChoice(null);
     setFeedback(null);
     setFeedbackDate(null);
+    setLocalResult(null);
     setSubmitError("");
     manualOpenRequested.current = false;
   }, [user?.id]);
@@ -163,6 +167,7 @@ export function TriviaHost() {
       setChoice(null);
       setFeedback(null);
       setFeedbackDate(null);
+      setLocalResult(null);
       setSubmitError("");
     }
     lastTriviaDate.current = today.date;
@@ -189,9 +194,9 @@ export function TriviaHost() {
   }, [modalOpen]);
 
   useEffect(() => {
-    if (!today || !today.answered || currentFeedback) return;
+    if (!today || !today.answered || displayResult) return;
     setDismissed(true);
-  }, [today?.date, today?.answered, currentFeedback]);
+  }, [today?.date, today?.answered, displayResult]);
 
   useEffect(() => {
     const onManualOpen = () => {
@@ -237,8 +242,19 @@ export function TriviaHost() {
 
   async function submitAnswer(index: number) {
     if (!today || submittingRef.current || currentFeedback) return;
+    if (localResult?.date === today.date && localResult.chosen_index !== index) return;
+    let graded: LocalTriviaResult;
+    try {
+      graded = gradeTriviaChoice(today, index);
+    } catch (error) {
+      setSubmitError(responseMessage(error));
+      return;
+    }
     const submittedByUserId = user?.id;
     setChoice(index);
+    // No request is awaited before revealing the result and explanation.
+    setLocalResult(graded);
+    triviaEngaged.current = true;
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError("");
@@ -248,7 +264,7 @@ export function TriviaHost() {
         trivia_date: today.date,
       });
       const body = await response.json();
-      if (currentUserId.current !== submittedByUserId) return;
+      if (currentUserId.current !== submittedByUserId || lastTriviaDate.current !== today.date) return;
       const rawResult = (body.feedback || body) as TriviaFeedback;
       const questionPatch = (today as TriviaToday & { patch?: TriviaPatch }).patch;
       const mergedPatch = retainQuestionPatch<NonNullable<TriviaFeedback["patch"]>>(questionPatch, rawResult.patch);
@@ -260,6 +276,7 @@ export function TriviaHost() {
       setDismissed(false);
       setFeedback(result);
       setFeedbackDate(today.date);
+      setLocalResult(null);
       setSubmitting(false);
       // The answer response is authoritative. Refresh other views in the
       // background rather than fetching today's same result a second time.
@@ -280,16 +297,18 @@ export function TriviaHost() {
       // Reconcile an ambiguous network failure before offering a retry. The API
       // is idempotent per Eastern date; refreshing also catches day rollover.
       await queryClient.invalidateQueries({ queryKey: ["/api/trivia/today"] });
+      if (currentUserId.current !== submittedByUserId || lastTriviaDate.current !== today.date) return;
       const reconciled = queryClient.getQueryData<unknown>(todayKey);
       if (isValidTriviaQuestion(reconciled) && reconciled.answered) {
         if (reconciled.feedback) {
           setFeedback(reconciled.feedback as TriviaFeedback);
           setFeedbackDate(reconciled.date);
+          setLocalResult(null);
           setDismissed(false);
-          setChoice(typeof reconciled.chosen_index === "number" ? reconciled.chosen_index : choice);
+          setChoice(typeof reconciled.chosen_index === "number" ? reconciled.chosen_index : index);
         } else setDismissed(true);
       } else {
-        setSubmitError(responseMessage(error));
+        setSubmitError(`Your result is shown, but saving isn't confirmed. ${responseMessage(error)}`);
       }
     } finally {
       submittingRef.current = false;
@@ -298,7 +317,7 @@ export function TriviaHost() {
   }
 
   if (errorStatus === 403) return null;
-  if (todayQuery.isError && HOME_OPPORTUNITY(path) && !!user && !demoActive) {
+  if (todayQuery.isError && !displayResult && HOME_OPPORTUNITY(path) && !!user && !demoActive) {
     return <div className="trivia-host fixed bottom-24 left-1/2 z-[10004] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border border-[var(--trivia-edge)] bg-[var(--trivia-surface)] p-4 shadow-xl"><p role="alert" className="text-sm font-semibold">Daily trivia couldn’t load right now.</p><button type="button" onClick={() => void todayQuery.refetch()} className="mt-2 text-sm font-bold text-[var(--trivia-ink)] underline underline-offset-4">Try again</button></div>;
   }
   if (!modalOpen || !today) return null;
@@ -327,8 +346,8 @@ export function TriviaHost() {
         <p className="mt-5 text-lg font-semibold leading-snug sm:text-xl">{today.question}</p>
         <div role="group" aria-label="Choose one answer" className="mt-5 grid gap-2">
           {today.choices.map((answer, index) => {
-            const correct = hasAnswer && index === currentFeedback?.correct_index;
-            const wrong = hasAnswer && choice === index && !currentFeedback?.is_correct;
+            const correct = hasAnswer && index === displayResult?.correct_index;
+            const wrong = hasAnswer && choice === index && !displayResult?.is_correct;
             return <button key={`${index}-${answer}`} type="button" disabled={submitting || hasAnswer} onClick={() => void submitAnswer(index)} aria-pressed={choice === index} className={`trivia-choice flex min-h-[3.5rem] items-center gap-3 rounded-lg px-3.5 py-3 text-left text-sm font-semibold text-[var(--trivia-ink)] disabled:hover:translate-y-0 sm:text-base ${correct ? "is-correct" : wrong ? "is-wrong" : submitting && choice === index ? "is-selected" : ""}`}>
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-current/20 font-mono text-[11px]">{String.fromCharCode(65 + index)}</span>
               <span className="min-w-0 flex-1">{answer}</span>
@@ -337,26 +356,26 @@ export function TriviaHost() {
             </button>;
           })}
         </div>
-        {submitting && <p role="status" className="mt-3 text-center text-xs font-medium text-[var(--trivia-muted)]">Submitting your answer…</p>}
-        {submitError && <div className="mt-4 rounded-lg border border-[#e8c8cb] bg-[#fff5f5] p-3 text-sm text-[#78252c] dark:border-[#82444b] dark:bg-[#492b33] dark:text-[#ffe2e3]"><p role="alert">{submitError}</p><button type="button" onClick={() => choice !== null && void submitAnswer(choice)} className="mt-2 font-bold underline underline-offset-4">Retry answer</button></div>}
-        {currentFeedback && <div aria-live="polite" className="trivia-feedback mt-4 rounded-xl p-4">
+        {submitting && <p role="status" className="mt-3 text-center text-xs font-medium text-[var(--trivia-muted)]">Saving your answer…</p>}
+        {submitError && <div className="mt-4 rounded-lg border border-[#e8c8cb] bg-[#fff5f5] p-3 text-sm text-[#78252c] dark:border-[#82444b] dark:bg-[#492b33] dark:text-[#ffe2e3]"><p role="alert">{submitError}</p><button type="button" disabled={submitting} onClick={() => choice !== null ? void submitAnswer(choice) : void todayQuery.refetch().then(() => setSubmitError(""))} className="mt-2 font-bold underline underline-offset-4 disabled:opacity-40">{choice !== null ? "Retry saving answer" : "Reload question"}</button></div>}
+        {displayResult && <div aria-live="polite" className="trivia-feedback mt-4 rounded-xl p-4">
           <div className="flex items-center gap-2">
-            <span className={`flex h-7 w-7 items-center justify-center rounded-full ${currentFeedback.is_correct ? "bg-[#dcefe3] text-[#146b43] dark:bg-[#214d38] dark:text-[#83e0ae]" : "bg-[#f8e1e2] text-[#b52732] dark:bg-[#583139] dark:text-[#ff9aa1]"}`}>{currentFeedback.is_correct ? <Check size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}</span>
-            <p className={`font-bold ${currentFeedback.is_correct ? "text-[#146b43] dark:text-[#83e0ae]" : "text-[var(--trivia-red)]"}`}>{currentFeedback.is_correct ? "Correct." : "Incorrect."}<span className="ml-1.5 font-medium text-[var(--trivia-ink)]">Streak: {currentFeedback.streak} {currentFeedback.streak === 1 ? "day" : "days"}</span></p>
+            <span className={`flex h-7 w-7 items-center justify-center rounded-full ${displayResult.is_correct ? "bg-[#dcefe3] text-[#146b43] dark:bg-[#214d38] dark:text-[#83e0ae]" : "bg-[#f8e1e2] text-[#b52732] dark:bg-[#583139] dark:text-[#ff9aa1]"}`}>{displayResult.is_correct ? <Check size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}</span>
+            <p className={`font-bold ${displayResult.is_correct ? "text-[#146b43] dark:text-[#83e0ae]" : "text-[var(--trivia-red)]"}`}>{displayResult.is_correct ? "Correct." : "Incorrect."}{currentFeedback && <span className="ml-1.5 font-medium text-[var(--trivia-ink)]">Streak: {currentFeedback.streak} {currentFeedback.streak === 1 ? "day" : "days"}</span>}</p>
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--trivia-muted)]">{currentFeedback.explanation}</p>
-          {patchAccess && <div className="mt-4">
+          <p className="mt-2 text-sm leading-relaxed text-[var(--trivia-muted)]">{displayResult.explanation}</p>
+          {currentFeedback && patchAccess && <div className="mt-4">
             <div className="flex items-center justify-between gap-2 text-xs font-bold"><span>{currentFeedback.is_correct ? `+1 toward ${patch?.name || today.category}` : `No progress · ${patch?.name || today.category}`}</span><span className="font-mono">{progressGoal ? `${count} / ${progressGoal}` : `${count} correct`}</span></div>
             {progressGoal && <div className="trivia-progress-track mt-2 h-1.5 overflow-hidden rounded-full"><div className="h-full rounded-full bg-[#d52d3b] transition-[width] duration-500" style={{ width: `${progress}%` }} /></div>}
             {currentFeedback.patch?.unlocked_tier && <p className="mt-2 text-sm font-bold text-[#b52732] dark:text-[#ff9aa1]">Tier {currentFeedback.patch.unlocked_tier} unlocked. Your patch celebration will follow.</p>}
           </div>}
-          {!paid && currentFeedback.is_correct && <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--trivia-muted)]">
+          {currentFeedback && !paid && currentFeedback.is_correct && <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--trivia-muted)]">
             <span>{count} correct in {today.category}. Trivia patches are part of Trophy Case.</span>
             <button type="button" onClick={() => { dismiss(); navigate("/subscription"); }} className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 font-bold text-[#164a73] underline dark:text-[#b9d8ed]">See upgrade options <ChevronRight size={14} /></button>
           </div>}
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            {patchAccess && <button type="button" onClick={() => { dismiss(); navigate(`/trophy-case?triviaCategory=${encodeURIComponent(currentFeedback.category || today.category)}`); }} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--trivia-edge)] px-4 text-sm font-bold transition hover:bg-black/5"><Lock size={14} />View in Trophy Case</button>}
-            <button type="button" onClick={dismiss} className="min-h-11 flex-1 rounded-lg bg-[#164a73] px-4 text-sm font-bold text-white transition hover:bg-[#103a5b]">Done</button>
+            {currentFeedback && patchAccess && <button type="button" onClick={() => { dismiss(); navigate(`/trophy-case?triviaCategory=${encodeURIComponent(currentFeedback.category || today.category)}`); }} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--trivia-edge)] px-4 text-sm font-bold transition hover:bg-black/5"><Lock size={14} />View in Trophy Case</button>}
+            <button type="button" onClick={dismiss} disabled={submitting} className="min-h-11 flex-1 rounded-lg bg-[#164a73] px-4 text-sm font-bold text-white transition hover:bg-[#103a5b] disabled:opacity-40">Done</button>
           </div>
         </div>}
         {!hasAnswer && <button type="button" onClick={dismiss} className="mt-3 min-h-10 w-full text-xs font-semibold text-[var(--trivia-muted)] underline underline-offset-4">Not now</button>}
