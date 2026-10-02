@@ -3,7 +3,7 @@ name: Google Play recovery ownership
 description: Store-proof requirement, GPA lookup limits, and historical anonymous billing observations.
 ---
 
-Follow the owner's reporting-only RevenueCat directive in [Store billing authority](natively-revenuecat-proof.md). Earlier RevenueCat-linked restore/alias recommendations are superseded.
+Follow the owner's approved Natively billing authority in [Store billing authority](natively-revenuecat-proof.md). The earlier reporting-only restriction is superseded; independent Google verification and canonical ownership checks remain required.
 
 A Google GPA order number is a lookup hint, not authority to assign a purchase to a Roster account.
 
