@@ -21,6 +21,7 @@ import {
   type TriviaTierName,
 } from "@shared/trivia";
 import { getTrophyCaseAccess } from "./badges";
+import { buildTriviaPatchView, type TriviaPatchTierRow } from "@shared/triviaPatch";
 
 export { isTriviaDefinition } from "@shared/trivia";
 
@@ -699,20 +700,54 @@ export async function getTriviaPatches(userId: string, today = easternDateKey())
   return { categories, stats };
 }
 
+// Feedback must not invoke getTriviaPatches: that reconciles all nine families
+// and is intentionally reserved for opening the Trophy Case.
+async function getTriviaCategoryPatch(userId: string, category: TriviaCategory) {
+  const result = await pool.query<TriviaPatchTierRow & {
+    patch_id: string; name: string; description: string; correct_count: number;
+  }>(
+    `SELECT t.tier, t.correct_answers_required, c.patch_id, d.name, d.description,
+       bt.image_path, a.awarded_at, counts.correct_count
+     FROM trivia_category_patches c
+     JOIN badge_definitions d ON d.id = c.patch_id
+     CROSS JOIN trivia_tiers t
+     CROSS JOIN LATERAL (
+       SELECT COALESCE(sum(progress_awarded), 0)::int AS correct_count
+       FROM trivia_answers WHERE user_id = $1 AND category = c.category
+     ) counts
+     LEFT JOIN badge_tiers bt ON bt.badge_definition_id = c.patch_id
+       AND bt.tier::text = ($3::text[])[t.tier]
+     LEFT JOIN badge_awards a ON a.badge_definition_id = c.patch_id
+       AND a.user_id = $1 AND a.scope_key = 'trivia:lifetime:tier:' || t.tier::text
+     WHERE c.category = $2::trivia_category ORDER BY t.tier`,
+    [userId, category, [...TRIVIA_TIER_NAMES]],
+  );
+  const first = result.rows[0];
+  if (!first) throw new Error(`No trivia patch mapping is configured for ${category}.`);
+  return buildTriviaPatchView({
+    category, patchId: first.patch_id, name: first.name, description: first.description,
+    correctCount: Number(first.correct_count), tiers: result.rows,
+  });
+}
+
 async function answerFeedback(userId: string, dateKey: string, answerRow?: {
   category: TriviaCategory;
   chosen_index: number;
   is_correct: boolean;
-}, includePatch = false, unlockedTier: number | null = null) {
+}, includePatch = false, unlockedTier: number | null = null, knownQuestion?: TriviaQuestionRow) {
   if (!answerRow) return null;
-  const question = (await pool.query<TriviaQuestionRow>(
+  const question = knownQuestion ?? (await pool.query<TriviaQuestionRow>(
     `SELECT id, date::text, category::text, question, choices, correct_index, explanation, difficulty, format,
       verification_status, verification_notes, source_basis FROM daily_trivia WHERE date = $1::date`,
     [dateKey],
   )).rows[0];
   if (!question) return null;
-  const stats = await getTriviaStats(userId, dateKey);
-  const categoryCount = await loadCategoryCount(userId, answerRow.category);
+  const [stats, patch] = await Promise.all([
+    getTriviaStats(userId, dateKey),
+    includePatch ? getTriviaCategoryPatch(userId, answerRow.category) : Promise.resolve(null),
+  ]);
+  const categoryCount = stats.categories.find((item) =>
+    item.category === TRIVIA_CATEGORY_LABELS[answerRow.category])?.correct_count ?? 0;
   const result: Record<string, unknown> = {
     is_correct: answerRow.is_correct,
     correct_index: question.correct_index,
@@ -722,8 +757,7 @@ async function answerFeedback(userId: string, dateKey: string, answerRow?: {
     correct_count: categoryCount,
   };
   if (includePatch) {
-    const patchBundle = await getTriviaPatches(userId, dateKey);
-    result.patch = patchBundle.categories.find((item) => item.category === TRIVIA_CATEGORY_LABELS[answerRow.category]) ?? null;
+    result.patch = patch;
     result.unlocked_tier = unlockedTier;
   }
   return result;
@@ -744,10 +778,14 @@ export async function getTodayTrivia(userId: string, viewer?: TriviaViewer, toda
     difficulty: question.difficulty,
     answered: !!answer,
   };
-  if (answer) response.feedback = await answerFeedback(userId, today, answer, paidAccess);
+  if (answer) {
+    response.chosen_index = answer.chosen_index;
+    response.feedback = await answerFeedback(userId, today, answer, paidAccess, null, question);
+  }
   if (paidAccess) {
-    const bundle = await getTriviaPatches(userId, today);
-    response.patch = bundle.categories.find((item) => item.category === TRIVIA_CATEGORY_LABELS[question.category]) ?? null;
+    response.patch = answer
+      ? (response.feedback as Record<string, unknown> | null)?.patch ?? null
+      : await getTriviaCategoryPatch(userId, question.category);
   }
   return response;
 }
@@ -847,7 +885,7 @@ export async function submitTriviaAnswer(input: {
   if (responseStatus === "conflict") return { status: "conflict" };
   return {
     status: "answered",
-    feedback: (await answerFeedback(input.userId, today, persistedAnswer, canAccessTriviaPatches(input.viewer), newlyUnlockedTier)) ?? undefined,
+    feedback: (await answerFeedback(input.userId, today, persistedAnswer, canAccessTriviaPatches(input.viewer), newlyUnlockedTier, question)) ?? undefined,
   };
 }
 

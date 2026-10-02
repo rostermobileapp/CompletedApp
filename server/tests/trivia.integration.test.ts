@@ -208,7 +208,23 @@ test("daily trivia atomically answers once, preserves lifetime patch progress, a
       userId: paidUserId, viewer: paidViewer, chosenIndex: question.correct_index, triviaDate: today,
     });
     assert.equal(paidRetry.feedback?.unlocked_tier, null, "idempotent retries never replay an unlock");
-    assert.equal((await getTodayTrivia(paidUserId, paidViewer, today)).feedback?.unlocked_tier, null,
+    const statements: string[] = [];
+    const originalQuery = pool.query.bind(pool);
+    pool.query = ((...args: any[]) => {
+      statements.push(typeof args[0] === "string" ? args[0] : args[0].text);
+      return (originalQuery as any)(...args);
+    }) as typeof pool.query;
+    let paidAfterAnswer: Awaited<ReturnType<typeof getTodayTrivia>>;
+    try {
+      paidAfterAnswer = await getTodayTrivia(paidUserId, paidViewer, today);
+    } finally {
+      pool.query = originalQuery as typeof pool.query;
+    }
+    assert.equal(paidAfterAnswer.chosen_index, question.correct_index, "reconciliation restores the saved selection");
+    assert.equal(statements.some((statement) => /\b(BEGIN|INSERT|UPDATE|DELETE)\b/i.test(statement)), false,
+      "loading daily feedback must not reconcile or write all nine trophy patch families");
+    assert.deepEqual(paidAfterAnswer.patch, paidAfterAnswer.feedback?.patch, "daily feedback reuses its category patch");
+    assert.equal(paidAfterAnswer.feedback?.unlocked_tier, null,
       "loading submitted feedback never re-announces an unlock");
     assert.equal((await db.execute(sql`
       SELECT count(*)::int AS count FROM badge_earned_events

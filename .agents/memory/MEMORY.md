@@ -64,5 +64,7 @@
 - [Responsive fixture verification](responsive-fixture-verification.md) — phone-width containers still use desktop media queries; use iframe viewports and explicit UTF-8 in isolated checks.
 - [Tool clock compatibility](tool-clock-compatibility.md) — some operational sandbox versions reject durable clock reads; obtain real time in an impure function before checking expiry.
 - [Trivia scheduler boundary](trivia-scheduler-boundary.md) — use a separate scheduled project; never replace Roster’s web deployment or imply an unpublished schedule is active.
+- [Trivia presentation intent](trivia-presentation.md) — minimalist daily play, striking green/red results, and a collection that matches the surrounding Trophy Case.
 - [Anthropic model compatibility](anthropic-model-compatibility.md) — model availability checks do not validate Messages options; test the full generation/verification flow.
 - [Temporary test services](temporary-test-services.md) — run disposable test services as tracked background tasks; daemon startup success does not guarantee cross-call availability.
+- [Verification runtime compatibility](verification-runtime-compatibility.md) — a documented testing subagent kind may be unavailable; use isolated checks without weakening auth.

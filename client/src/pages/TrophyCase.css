@@ -106,26 +106,3 @@
     transition: none;
   }
 }
-
-.dark .trophy-case .trivia-patches.trophy-depth-panel {
-  background: linear-gradient(145deg, #1b3549, #203d53 72%);
-  border-color: #102638 #587389 #71899c #102638;
-  box-shadow: inset 4px 5px 12px rgba(4, 18, 29, .5);
-}
-.dark .trophy-case .trivia-patches .trophy-depth-slot {
-  background: linear-gradient(145deg, #38576d, #1a3245);
-  border-color: #587389 #102638 #0c2233 #587389;
-  color: #e2eff8;
-}
-.dark .trophy-case .trivia-patches .trophy-slot-well {
-  background: linear-gradient(155deg, #1b3549, #27465d 55%, #304f66);
-  border-color: #102638 #587389 #71899c #102638;
-}
-.dark .trophy-case .trivia-patches .trophy-depth-medallion {
-  border-color: #59778c;
-  background: #28475d;
-  color: #d4e8f5;
-}
-.dark .trophy-case .trivia-patches button[aria-label] span {
-  color: #d1e2ed;
-}

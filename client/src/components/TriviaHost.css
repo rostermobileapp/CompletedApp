@@ -1,31 +1,119 @@
 .trivia-host {
   --trivia-ink: #173d5b;
-  --trivia-muted: #647d91;
-  --trivia-edge: #a9bfd0;
-  --trivia-surface: #f4f9fc;
-  --trivia-red: #c92f3c;
+  --trivia-muted: #597087;
+  --trivia-edge: #c5d6e2;
+  --trivia-surface: #f4f8fb;
+  --trivia-panel: #fff;
+  --trivia-red: #b52732;
+  --trivia-green: #146b43;
   color: var(--trivia-ink);
 }
+
 .dark .trivia-host {
   --trivia-ink: #e2eff8;
-  --trivia-muted: #a4bbcc;
+  --trivia-muted: #b1c4d1;
   --trivia-edge: #49677e;
-  --trivia-surface: #182e40;
-  --trivia-red: #f17b84;
+  --trivia-surface: #1b3549;
+  --trivia-panel: #203d53;
+  --trivia-red: #ff9aa1;
+  --trivia-green: #83e0ae;
 }
-.trivia-choice {
-  border: 1px solid var(--trivia-edge);
-  background: linear-gradient(145deg, var(--trivia-surface), color-mix(in srgb, var(--trivia-surface) 78%, #c6d9e7));
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--trivia-edge) 65%, transparent), inset 0 1px 0 rgba(255,255,255,.75);
+
+.trivia-host .trivia-backdrop {
+  background: rgba(15, 39, 57, .74);
+  animation: trivia-fade-in 180ms ease-out both;
 }
-.trivia-choice:focus-visible { outline: 3px solid var(--trivia-red); outline-offset: 2px; }
-.trivia-choice:disabled { cursor: default; }
+
 .trivia-host .trivia-panel {
-  background: linear-gradient(150deg, var(--trivia-surface), color-mix(in srgb, var(--trivia-surface) 85%, #b9d0e0));
-  border: 2px solid;
-  border-color: #fff var(--trivia-edge) var(--trivia-edge) #fff;
-  box-shadow: 0 18px 45px rgba(18, 50, 75, .26), inset 0 1px 0 rgba(255,255,255,.8);
+  background: var(--trivia-panel);
+  border: 1px solid var(--trivia-edge);
+  box-shadow: 0 28px 80px rgba(9, 29, 45, .36);
+  animation: trivia-panel-in 220ms cubic-bezier(.2,.8,.2,1) both;
 }
+
+.trivia-host .trivia-choice {
+  border: 1px solid var(--trivia-edge);
+  background: var(--trivia-surface);
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.trivia-host .trivia-choice:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: #7292a8;
+  box-shadow: 0 4px 12px rgba(23, 61, 91, .1);
+}
+
+.trivia-host .trivia-choice:focus-visible {
+  outline: 3px solid #d52d3b;
+  outline-offset: 2px;
+}
+
+.trivia-host .trivia-choice:disabled { cursor: default; }
+
+.trivia-host .trivia-choice.is-correct {
+  border-color: #117847;
+  background: #117847;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(17,120,71,.2);
+}
+
+.dark .trivia-host .trivia-choice.is-correct {
+  border-color: #58d697;
+  background: #117847;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(88,214,151,.2);
+}
+
+.trivia-host .trivia-choice.is-wrong {
+  border-color: #b62e3a;
+  background: #b62e3a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(182,46,58,.2);
+}
+
+.dark .trivia-host .trivia-choice.is-wrong {
+  border-color: #ff939b;
+  background: #b62e3a;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255,147,155,.2);
+}
+
+.trivia-host .trivia-choice.is-selected {
+  border-color: #164a73;
+  background: #e0ebf3;
+  box-shadow: inset 3px 0 #164a73;
+}
+.dark .trivia-host .trivia-choice.is-selected {
+  border-color: #9ac3df;
+  background: #28475d;
+  box-shadow: inset 3px 0 #9ac3df;
+}
+
+.trivia-host .trivia-feedback {
+  border: 1px solid var(--trivia-edge);
+  background: var(--trivia-surface);
+}
+
+.trivia-host .trivia-progress-track {
+  background: #d9e5ed;
+  box-shadow: inset 0 1px 2px rgba(23, 61, 91, .16);
+}
+
+.dark .trivia-host .trivia-progress-track { background: #314e63; }
+
+@keyframes trivia-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes trivia-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .trivia-host *, .trivia-host *::before, .trivia-host *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .trivia-host *, .trivia-host *::before, .trivia-host *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
 }
