@@ -16,3 +16,9 @@ Trivia must grade immediately on the device rather than waiting for server verif
 **Why:** The owner explicitly chose instant on-device results after being told this makes the downloaded answer key inspectable.
 
 **How to apply:** Deliver the key to eligible clients and reveal correctness and explanation on selection. Keep saved answers, streaks, progress, and patch unlocks server-authoritative, and distinguish immediate results from confirmed saves.
+
+Prioritize sharp, readable trivia text over decorative blur or scaling effects.
+
+**Why:** The owner reported that the trivia screen looked blurry and was barely readable.
+
+**How to apply:** Keep the panel opaque and text on an untransformed surface. Use a dimmed background and simple fades; verify readability rather than assuming background effects cannot affect browser rendering.

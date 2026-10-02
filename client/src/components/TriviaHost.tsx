@@ -354,7 +354,7 @@ export function TriviaHost() {
   const progress = progressGoal ? Math.min(100, count / progressGoal * 100) : (patch?.complete ? 100 : 0);
 
   return (
-    <div className="trivia-host trivia-backdrop fixed inset-0 z-[10005] flex items-center justify-center overflow-y-auto p-3 backdrop-blur-sm sm:p-5" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
+    <div className="trivia-host trivia-backdrop fixed inset-0 z-[10005] flex items-center justify-center overflow-y-auto p-3 sm:p-5" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
       <section role="dialog" aria-modal="true" aria-labelledby="trivia-title" className="trivia-panel relative my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl p-5 sm:p-7">
         <button type="button" onClick={dismiss} disabled={submitting} aria-label="Not now" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-[var(--trivia-muted)] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73] disabled:opacity-40"><X size={18} /></button>
         <header className="border-b border-[var(--trivia-edge)] pb-5 pr-10">
