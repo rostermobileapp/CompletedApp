@@ -39,6 +39,12 @@ An aggregate account role is not proof of one billing source's tier. Preserve on
 
 **How to apply:** Resolve live independent claims together, keep subscription-specific baselines, and validate the persisted role before showing success.
 
+The owner confirmed the repaired Natively Android purchase flow works on a real device, although activation took a noticeable amount of time.
+
+**Why:** This confirms the approved existing integration is viable; delayed activation alone is not evidence that the store or native shell is unconfigured.
+
+**How to apply:** Preserve the approved flow and ownership safeguards. After a paid purchase, compare the persisted Roster tier and RevenueCat entitlement before recommending a retry; never suggest paying again to resolve a delay.
+
 RevenueCat v1 subscriber GET is get-or-create, not a side-effect-free existence probe.
 
 **Why:** Diagnostic reads of unknown IDs can create empty customers.
