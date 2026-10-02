@@ -278,9 +278,8 @@ function applyPendingReferralAttribute(): void {
  *   resp.jwsRepresentation — StoreKit 2 JWS (if available)
  */
 /**
- * Note: The Natively/RevenueCat bridge (`purchasePackage`) does not support
- * passing an appAccountToken to StoreKit. Server verification therefore cannot
- * rely on that field being present and proceeds on JWS cryptographic proof alone.
+ * The callback is only a signal to start server verification. Recent native
+ * builds return no transaction proof; identify the account before checkout.
  */
 export async function purchaseProduct(
   packageId: string,
@@ -297,7 +296,7 @@ export async function purchaseProduct(
     const errorMsg: string = data.error ?? '';
     // StoreKit cancellation: SKErrorPaymentCancelled (code 2) or user-cancelled strings
     if (
-      errorMsg.includes('2') ||
+      errorMsg.trim() === '2' ||
       errorMsg.toLowerCase().includes('cancel')
     ) {
       const err: any = new Error('Purchase cancelled');
@@ -307,17 +306,13 @@ export async function purchaseProduct(
     throw new Error(errorMsg || 'Purchase failed. Please try again.');
   }
 
-  // status === 'SUCCESS' (or undefined in older Natively builds — treat non-FAILED as success)
+  if (data.status !== 'SUCCESS') {
+    throw new Error('The App Store did not confirm purchase completion. Use Restore purchases before trying again.');
+  }
   const transactionId: string | undefined =
     data.transactionId ?? data.transaction_id ?? undefined;
   const jwsRepresentation: string | undefined =
     data.jwsRepresentation ?? data.jws ?? undefined;
-
-  if (!transactionId && !jwsRepresentation) {
-    throw new Error(
-      'Purchase completed but no transaction data was returned. Please contact support.'
-    );
-  }
 
   return {
     productIdentifier: packageId,
@@ -416,6 +411,9 @@ export async function inspectAndroidPurchases(): Promise<AndroidPurchaseStatus> 
   if (data.status === 'FAILED') {
     throw new Error(data.error ?? 'Restore failed. Please try again.');
   }
+  if (!Array.isArray(data) && data.status !== 'SUCCESS') {
+    throw new Error('The App Store did not confirm restore completion. Reopen the app and try Restore purchases again.');
+  }
   return parseAndroidPurchaseStatus(data);
 }
 
@@ -452,6 +450,30 @@ export async function loginAndroidPurchaseAccount(loginId: string): Promise<void
   }
   if (await getAndroidPurchaseCustomerId() !== loginId) {
     throw new Error('The Android app did not confirm the linked purchase account.');
+  }
+}
+
+/** Supported Natively identity API, not subscriber attributes. The server
+ * issues an opaque iOS identity only to its authenticated account. */
+export async function getIosPurchaseCustomerId(): Promise<string> {
+  if (navigator.userAgent.toLowerCase().includes('android') || !await isBillingSupported()) {
+    throw new Error('Open Roster in the iOS app to use App Store purchases.');
+  }
+  const data = await toPromise<any>((cb) => np.customerId(cb));
+  if (data?.status === 'FAILED' || typeof data?.customerId !== 'string' || !data.customerId.trim()) {
+    throw new Error('The iOS app could not read its purchase account. Reopen the app and try again.');
+  }
+  return data.customerId.trim();
+}
+
+export async function loginIosPurchaseAccount(loginId: string): Promise<void> {
+  if (!/^roster_ios_[a-f0-9]{64}$/.test(loginId)) {
+    throw new Error('App Store account linking is unavailable. Try again later.');
+  }
+  await getIosPurchaseCustomerId();
+  const data = await toPromise<any>((cb) => np.login(loginId, undefined, cb));
+  if (data?.status !== 'SUCCESS' || await getIosPurchaseCustomerId() !== loginId) {
+    throw new Error('The iOS app could not confirm your purchase account. Reopen the app and try again.');
   }
 }
 

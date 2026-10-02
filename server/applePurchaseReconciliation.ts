@@ -1,162 +1,63 @@
 import { createHash } from 'node:crypto';
-import { pool } from './db';
-import { supabase } from './supabaseAuth';
-import { getRevenueCatAppleSubscriptions, type VerifiedAppleSubscription } from './revenueCatApi';
 import { matchingApplePurchase, isLaterVerifiedPeriod } from './applePurchaseMatch';
 import { resolveAppleLinkedRole } from './linkedPurchaseRole';
-import { claimAutomaticApplePurchaseWithClient } from './appleAutomaticClaim';
-import {
-  reconcileOne as reconcileAppleLink,
-  reconcileApplePurchaseLinkForUser as reconcileAppleLinkForUser,
-  type ApplePurchaseLink,
-} from './applePurchaseReconciliation';
+import type { VerifiedAppleSubscription } from './revenueCatApi';
 
-type Link = ApplePurchaseLink;
-
-const reconciliationDependencies = {
-  pool,
-  getSubscriptions: getRevenueCatAppleSubscriptions,
-  updateUserMetadata: async (userId: string, role: string) => {
-    const { error } = await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: { subscription_tier: role },
-    });
-    if (error) throw error;
-  },
-  log: (message: string) => console.warn(message),
+export type ApplePurchaseLink = {
+  user_id: string;
+  customer_id: string;
+  original_transaction_id: string;
+  product_id: string;
+  original_purchased_at: Date;
+  expires_at: Date | null;
+  revoked_by_apple: boolean;
+  apple_revocation_reason: string | null;
+  revoked_period_expires_at: Date | null;
+  last_apple_signed_at: Date | null;
+  last_checked_at: Date | null;
 };
 
-export async function initApplePurchaseLinks(): Promise<void> {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS apple_purchase_links (
-      user_id VARCHAR PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      customer_id VARCHAR NOT NULL UNIQUE,
-      original_transaction_id VARCHAR NOT NULL UNIQUE,
-      product_id VARCHAR NOT NULL,
-      original_purchased_at TIMESTAMPTZ NOT NULL,
-      expires_at TIMESTAMPTZ,
-      revoked_by_apple BOOLEAN NOT NULL DEFAULT FALSE,
-      apple_revocation_reason VARCHAR,
-      revoked_period_expires_at TIMESTAMPTZ,
-      last_apple_signed_at TIMESTAMPTZ,
-      last_checked_at TIMESTAMPTZ,
-      association_source VARCHAR NOT NULL DEFAULT 'operator_attested',
-      role_before_apple VARCHAR,
-      stripe_role_before_apple VARCHAR,
-      stripe_subscription_id_before_apple VARCHAR,
-      attested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    revoked_by_apple BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    apple_revocation_reason VARCHAR`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    revoked_period_expires_at TIMESTAMPTZ`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    last_apple_signed_at TIMESTAMPTZ`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    association_source VARCHAR NOT NULL DEFAULT 'operator_attested'`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    role_before_apple VARCHAR`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    stripe_role_before_apple VARCHAR`);
-  await pool.query(`ALTER TABLE apple_purchase_links ADD COLUMN IF NOT EXISTS
-    stripe_subscription_id_before_apple VARCHAR`);
-  const duplicates = await pool.query(`
-    SELECT 1 FROM users WHERE iap_original_transaction_id IS NOT NULL
-    GROUP BY iap_original_transaction_id HAVING COUNT(*) > 1 LIMIT 1
-  `);
-  if (duplicates.rowCount) throw new Error('Duplicate legacy IAP claims require manual review before startup');
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_iap_original_transaction_unique
-    ON users (iap_original_transaction_id) WHERE iap_original_transaction_id IS NOT NULL`);
-}
+type QueryResult = { rows: any[]; rowCount: number | null };
+type Queryable = { query: (sql: string, params?: any[]) => Promise<QueryResult> };
+type Client = Queryable & { release: () => void };
 
-export async function claimAutomaticApplePurchase(input: {
-  userId: string;
-  customerId: string;
-  originalTransactionId: string;
-  productId: string;
-  originalPurchasedAt: string;
-  expiresAt: string;
-}): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await claimAutomaticApplePurchaseWithClient(client, input);
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * This is called only by an operator who has checked the customer's v2
- * transaction history and received the owner's account attribution.
- * Staging itself never grants access.
- */
-export async function stageApplePurchaseLink(
-  displayId: string, customerId: string, originalTransactionId: string,
-  productId: string, originalPurchasedAt: string,
+/** Retained Apple links continue to reconcile after expiry/refund, so every
+ * verified Stripe tier change must refresh their source-tagged baseline. */
+export async function refreshAppleStripeBaseline(
+  queryable: Queryable,
+  userId: string,
+  verifiedRole: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier',
 ): Promise<void> {
-  const purchasedAt = new Date(originalPurchasedAt);
-  if (!/^U\d{5}$/.test(displayId) || !/^\$RCAnonymousID:[\w-]+$/.test(customerId) ||
-      !/^\d{10,20}$/.test(originalTransactionId) ||
-      !['com.rosterapp.player_pro_monthly', 'com.rosterapp.player_pro_yearly'].includes(productId) ||
-      !Number.isFinite(purchasedAt.getTime()) || purchasedAt.getTime() > Date.now()) {
-    throw new Error('Invalid operator-attested purchase');
-  }
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [originalTransactionId]);
-    const user = (await client.query(
-      `SELECT id, role, stripe_subscription_id, iap_original_transaction_id
-         FROM users WHERE display_id = $1 FOR UPDATE`,
-      [displayId],
-    )).rows[0];
-    if (!user || user.role !== 'free_tier' || user.stripe_subscription_id || user.iap_original_transaction_id) {
-      throw new Error('Roster account is missing or already has a linked subscription');
-    }
-    const owner = (await client.query(
-      'SELECT id FROM users WHERE iap_original_transaction_id = $1 LIMIT 1',
-      [originalTransactionId],
-    )).rows[0];
-    if (owner) throw new Error('Original transaction is already owned');
-    const existing = (await client.query(
-      `SELECT user_id, customer_id, original_transaction_id, product_id, original_purchased_at
-         FROM apple_purchase_links
-        WHERE user_id = $1 OR customer_id = $2 OR original_transaction_id = $3`,
-      [user.id, customerId, originalTransactionId],
-    )).rows;
-    if (existing.length) {
-      if (existing.length !== 1 || existing[0].user_id !== user.id ||
-          existing[0].customer_id !== customerId ||
-          existing[0].original_transaction_id !== originalTransactionId ||
-          existing[0].product_id !== productId ||
-          +new Date(existing[0].original_purchased_at) !== +purchasedAt) {
-        throw new Error('Purchase, customer, or user is already claimed');
-      }
-    } else {
-      await client.query(
-        `INSERT INTO apple_purchase_links
-          (user_id, customer_id, original_transaction_id, product_id, original_purchased_at)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [user.id, customerId, originalTransactionId, productId, purchasedAt],
-      );
-    }
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  await queryable.query(
+    `UPDATE apple_purchase_links AS links
+        SET stripe_role_before_apple = CASE
+              WHEN NULLIF(account.stripe_subscription_id, '') IS NULL THEN NULL ELSE $2 END,
+            stripe_subscription_id_before_apple = NULLIF(account.stripe_subscription_id, '')
+       FROM users AS account
+      WHERE links.user_id = $1 AND account.id = links.user_id`,
+    [userId, verifiedRole],
+  );
 }
 
-async function reconcileOneLegacy(link: Link): Promise<void> {
+export type AppleReconciliationDependencies = {
+  pool: Queryable & { connect: () => Promise<Client> };
+  getSubscriptions: (customerId: string) => Promise<VerifiedAppleSubscription[]>;
+  updateUserMetadata: (userId: string, role: string) => Promise<void>;
+  now?: () => Date;
+  log?: (message: string) => void;
+};
+
+export async function reconcileOne(
+  link: ApplePurchaseLink,
+  dependencies: AppleReconciliationDependencies,
+): Promise<void> {
+  const { pool } = dependencies;
+  const now = dependencies.now ?? (() => new Date());
   let subscriptions: VerifiedAppleSubscription[] | undefined;
   try {
-    subscriptions = await getRevenueCatAppleSubscriptions(link.customer_id);
+    subscriptions = await dependencies.getSubscriptions(link.customer_id);
   } catch {
-    console.warn('[Apple link] Provider verification unavailable.');
+    dependencies.log?.('[Apple link] Provider verification unavailable.');
   }
   const candidate = subscriptions && matchingApplePurchase(subscriptions, link.original_purchased_at);
   const recovered = Boolean(link.revoked_by_apple &&
@@ -167,11 +68,11 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
   // A failed lookup cannot renew or create access. Previously verified access
   // ends at its last confirmed expiry, even if the provider is still down.
   if (!subscriptions && !link.revoked_by_apple &&
-      (!link.expires_at || link.expires_at > new Date())) return;
-  if (!expiry && !link.revoked_by_apple && link.expires_at && link.expires_at > new Date() &&
+      (!link.expires_at || link.expires_at > now())) return;
+  if (!expiry && !link.revoked_by_apple && link.expires_at && link.expires_at > now() &&
       link.last_apple_signed_at && (!link.last_checked_at ||
         link.last_apple_signed_at > link.last_checked_at) &&
-      Date.now() - link.last_apple_signed_at.getTime() < 15 * 60 * 1000) return;
+      now().getTime() - link.last_apple_signed_at.getTime() < 15 * 60 * 1000) return;
   const client = await pool.connect();
   let changedRole: string | null = null;
   try {
@@ -212,7 +113,7 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
     )).rows[0];
     const googleRole = google?.product_id?.startsWith('commissioner_')
       ? 'commissioner' : google ? 'player_pro' : null;
-    const appleRole = expiry && expiry > new Date() ? candidate?.role ?? null : null;
+    const appleRole = expiry && expiry > now() ? candidate?.role ?? null : null;
     const legacyAppleOwned = user.iap_original_transaction_id === link.original_transaction_id;
     const googleClaimForIapField = user.iap_original_transaction_id && !legacyAppleOwned
       ? (await client.query(
@@ -295,6 +196,8 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
         currentStripeSubscriptionId: user.stripe_subscription_id,
         legacyAppleOwned,
       });
+      const matchedStripeBaseline = Boolean(stripeBaseline &&
+        stripeBaselineSubscriptionId === user.stripe_subscription_id);
       const result = await client.query(
         `UPDATE users SET role = $3,
                 iap_original_transaction_id = CASE
@@ -302,12 +205,18 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
                     THEN $2 ELSE iap_original_transaction_id END,
                 last_updated = NOW(), updated_at = NOW()
            WHERE id = $1 AND role IN ('free_tier', 'player_pro', 'commissioner')
-             AND ($4 = TRUE OR stripe_subscription_id IS NULL)
+             AND ($4 = TRUE OR NULLIF(stripe_subscription_id, '') IS NULL)
              AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)`,
         [link.user_id, link.original_transaction_id, effectiveRole,
-          effectiveRole === 'commissioner', googleClaimForIapField],
+          effectiveRole === 'commissioner' || matchedStripeBaseline, googleClaimForIapField],
       );
-      if (result.rowCount && user.role !== effectiveRole) changedRole = effectiveRole;
+      if (!result.rowCount) {
+        throw Object.assign(
+          new Error('Apple purchase was verified, but the account role changed before access could be saved. Refresh and retry, or contact support.'),
+          { status: 409 },
+        );
+      }
+      if (user.role !== effectiveRole) changedRole = effectiveRole;
     } else if (!appleRole && ownsAppleClaim &&
                !(legacyOperatorPro && user.role !== 'player_pro') &&
                ['player_pro', 'commissioner'].includes(user.role)) {
@@ -324,14 +233,20 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
                   WHEN iap_original_transaction_id = $2 THEN NULL ELSE iap_original_transaction_id END,
                 last_updated = NOW(), updated_at = NOW()
              WHERE id = $1 AND role IN ('player_pro', 'commissioner')
-              AND (stripe_subscription_id IS NULL OR $4 = TRUE)
-                AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)`,
+               AND (NULLIF(stripe_subscription_id, '') IS NULL OR $4 = TRUE)
+               AND (iap_original_transaction_id IS NULL OR iap_original_transaction_id = $2 OR $5 = TRUE)`,
         [link.user_id, link.original_transaction_id, effectiveRole,
           Boolean(current.role_before_apple ||
             (stripeBaseline && stripeBaselineSubscriptionId === user.stripe_subscription_id)),
           googleClaimForIapField],
       );
-      if (result.rowCount && user.role !== effectiveRole) changedRole = effectiveRole;
+      if (!result.rowCount) {
+        throw Object.assign(
+          new Error('Apple access expired, but the account role could not be safely restored. Refresh and retry, or contact support.'),
+          { status: 409 },
+        );
+      }
+      if (user.role !== effectiveRole) changedRole = effectiveRole;
     }
     await client.query('COMMIT');
   } catch (error) {
@@ -342,57 +257,41 @@ async function reconcileOneLegacy(link: Link): Promise<void> {
   }
   if (changedRole) {
     try {
-      const { error } = await supabase.auth.admin.updateUserById(link.user_id, {
-        user_metadata: { subscription_tier: changedRole },
-      });
-      if (error) console.warn('[Apple link] Metadata sync failed.');
-    } catch (error) {
-      console.warn('[Apple link] Metadata sync failed.');
+      await dependencies.updateUserMetadata(link.user_id, changedRole);
+    } catch {
+      dependencies.log?.('[Apple link] Metadata sync failed.');
     }
-    console.info('[Apple link] Reconciled Apple access:', changedRole);
+    dependencies.log?.(`[Apple link] Reconciled Apple access: ${changedRole}`);
   }
 }
 
-async function reconcileOne(link: Link): Promise<void> {
-  await reconcileAppleLink(link, reconciliationDependencies);
-}
-
-let running = false;
-export async function reconcileApplePurchaseLinks(): Promise<void> {
-  if (running) return;
-  running = true;
-  try {
-    const rows = (await pool.query(
-      `SELECT user_id, customer_id, original_transaction_id, product_id,
-              original_purchased_at, expires_at, revoked_by_apple,
-              last_apple_signed_at, last_checked_at, apple_revocation_reason,
-              revoked_period_expires_at FROM apple_purchase_links`,
-    )).rows as Link[];
-    for (const link of rows) {
-      try {
-        await reconcileOne(link);
-      } catch (error) {
-        console.error('[Apple link] Reconciliation failed.');
-      }
-    }
-  } finally {
-    running = false;
-  }
-}
-
-/** Reconcile only this user's existing link; callers must not trigger a global job. */
 export async function reconcileApplePurchaseLinkForUser(
   userId: string,
+  dependencies: AppleReconciliationDependencies,
 ): Promise<{
   role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier';
   productId: string;
   active: boolean;
 } | null> {
-  return reconcileAppleLinkForUser(userId, reconciliationDependencies);
-}
-
-export function startApplePurchaseLinkJob(): void {
-  setInterval(() => {
-    reconcileApplePurchaseLinks().catch(() => console.error('[Apple link] Job failed.'));
-  }, 5 * 60 * 1000).unref();
+  const { pool } = dependencies;
+  const row = (await pool.query(
+    `SELECT user_id, customer_id, original_transaction_id, product_id,
+            original_purchased_at, expires_at, revoked_by_apple,
+            last_apple_signed_at, last_checked_at, apple_revocation_reason,
+            revoked_period_expires_at
+       FROM apple_purchase_links WHERE user_id = $1`, [userId],
+  )).rows[0] as ApplePurchaseLink | undefined;
+  if (!row) return null;
+  await reconcileOne(row, dependencies);
+  const user = (await pool.query('SELECT role FROM users WHERE id = $1', [userId])).rows[0];
+  const refreshed = (await pool.query(
+    `SELECT product_id, expires_at, revoked_by_apple FROM apple_purchase_links WHERE user_id = $1`,
+    [userId],
+  )).rows[0];
+  return user ? {
+    role: user.role,
+    productId: refreshed.product_id,
+    active: Boolean(refreshed && !refreshed.revoked_by_apple &&
+      refreshed.expires_at && new Date(refreshed.expires_at) > (dependencies.now?.() ?? new Date())),
+  } : null;
 }

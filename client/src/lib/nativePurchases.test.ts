@@ -7,6 +7,10 @@ import {
   canPurchaseAndroidProduct,
   getAndroidProducts,
   isAndroidBillingSupported,
+  loginIosPurchaseAccount,
+  getIosPurchaseCustomerId,
+  purchaseProduct,
+  restorePurchases,
 } from './nativePurchases';
 import { isNativelyAndroidApp } from '../hooks/useIosPlatform';
 
@@ -104,4 +108,27 @@ test('empty and failed product callbacks cannot enable checkout', async (t) => {
   });
   assert.deepEqual(await getAndroidProducts(), []);
   assert.equal(canPurchaseAndroidProduct({}, PRODUCT_PLAYER_PRO, true, [PRODUCT_PLAYER_PRO]), false);
+});
+
+test('iOS uses supported login and customer identity APIs and accepts proofless callbacks', async (t) => {
+  const window = mockAndroid(t);
+  window.$agent = {};
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Natively/iOS' } });
+  let customerId = 'test-anonymous';
+  const actions: string[] = [];
+  Object.defineProperty(globalThis, 'natively', {
+    configurable: true,
+    value: { trigger(_instance: unknown, _type: unknown, callback: (data: object) => void, action: string, params: { login?: string }) {
+      actions.push(action);
+      if (action === 'purchases_login') customerId = params.login!;
+      if (action === 'purchases_package') callback({ status: 'SUCCESS', packageId: PRODUCT_PLAYER_PRO });
+      else callback({ status: 'SUCCESS', customerId });
+    } },
+  });
+  const loginId = 'roster_ios_' + 'a'.repeat(64);
+  await loginIosPurchaseAccount(loginId);
+  assert.equal(await getIosPurchaseCustomerId(), loginId);
+  assert.equal((await purchaseProduct(PRODUCT_PLAYER_PRO)).transactionId, undefined);
+  assert.deepEqual(await restorePurchases(), []);
+  assert.ok(actions.includes('purchases_login'));
 });

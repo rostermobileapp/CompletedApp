@@ -316,7 +316,7 @@ export interface IStorage {
   updateUserTeamJerseyNumber(userId: string, teamId: string, jerseyNumber: number | null): Promise<boolean>;
   updateUserImage(id: string, profileImageUrl: string): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
-  updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User>;
+  updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier', stripeVerified?: boolean): Promise<User>;
   deleteUser(id: string): Promise<void>;
   updateUserNavigationPreferences(id: string, preferences: any): Promise<User>;
   updateUserOnboarding(id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'email' | 'phoneNumber' | 'dateOfBirth' | 'city' | 'playerType' | 'shoots' | 'profileImageUrl' | 'venmoUsername' | 'cashappUsername' | 'timezone' | 'competitiveLevel' | 'rosterUseCase' | 'selectedFacilityId' | 'onboardingProgress' | 'onboardingCompleted' | 'role' | 'referralPartnerId' | 'referralSourceOther' | 'referralCode'>>): Promise<User>;
@@ -1521,7 +1521,7 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         stripeCustomerId,
-        stripeSubscriptionId,
+        stripeSubscriptionId: stripeSubscriptionId || null,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
@@ -1529,10 +1529,10 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier'): Promise<User> {
+  async updateUserRole(id: string, role: 'commissioner' | 'secondary_commissioner' | 'player_pro' | 'free_tier', stripeVerified = false): Promise<User> {
     console.log('[updateUserRole] Updating user:', id, 'to role:', role);
     const { preserveLinkedAppleRole } = await import('./appleClaimRole');
-    role = await preserveLinkedAppleRole(id, role);
+    role = await preserveLinkedAppleRole(id, role, stripeVerified);
     
     // First verify the current value
     const [beforeUser] = await db.select().from(users).where(eq(users.id, id));

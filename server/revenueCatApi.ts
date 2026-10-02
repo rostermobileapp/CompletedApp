@@ -22,6 +22,7 @@ export interface VerifiedAppleSubscription {
   role: AppleRole;
   expiresAt: string;
   originalPurchasedAt: string;
+  storeTransactionId?: string;
 }
 
 /** This is a project app API key used only by the server; never expose it in responses. */
@@ -45,9 +46,22 @@ export function getActiveAppleSubscriptions(
     const expiry = Date.parse(sub.expires_date ?? '');
     const original = Date.parse(sub.original_purchase_date ?? '');
     if (!Number.isFinite(expiry) || expiry <= now || !Number.isFinite(original)) return [];
-    return [{ productId, role, expiresAt: new Date(expiry).toISOString(),
-      originalPurchasedAt: new Date(original).toISOString() }];
+    return [{
+      productId, role, expiresAt: new Date(expiry).toISOString(),
+      originalPurchasedAt: new Date(original).toISOString(),
+      ...(typeof sub.store_transaction_id === 'string' ||
+        (typeof sub.store_transaction_id === 'number' && Number.isSafeInteger(sub.store_transaction_id))
+        ? { storeTransactionId: String(sub.store_transaction_id) } : {}),
+    }];
   }).sort((a, b) => b.expiresAt.localeCompare(a.expiresAt));
+}
+
+/** Authenticated project lookup used only after deriving the app-user ID server-side. */
+export async function getRevenueCatActiveAppleSubscriptions(
+  customerId: string,
+  options: { apiKey?: string; fetcher?: typeof fetch } = {},
+): Promise<VerifiedAppleSubscription[]> {
+  return getRevenueCatAppleSubscriptions(customerId, options);
 }
 
 /**

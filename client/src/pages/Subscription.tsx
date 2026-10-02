@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useIosPlatform } from '@/hooks/useIosPlatform';
+import { activateIosPurchase } from '@/lib/iosPurchaseFlow';
 import { StripeCheckoutModal } from '@/components/StripeCheckoutModal';
 import {
   isBillingSupported,
@@ -21,6 +22,8 @@ import {
   getIosProducts,
   getAndroidProducts,
   purchaseProduct,
+  loginIosPurchaseAccount,
+  getIosPurchaseCustomerId,
   purchaseProductAndroid,
   inspectAndroidPurchases,
   getAndroidPurchaseCustomerId,
@@ -31,11 +34,12 @@ import {
   PRODUCT_COMMISSIONER,
   PRODUCT_PLAYER_PRO_YEARLY,
   PRODUCT_COMMISSIONER_YEARLY,
-  type NativelyTransaction,
 } from '@/lib/nativePurchases';
 
 export default function Subscription() {
   const { user } = usePermissions();
+  const purchaseUserId = useRef(user?.id);
+  purchaseUserId.current = user?.id;
   const { role } = usePermissions();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -517,49 +521,41 @@ export default function Subscription() {
   }, [activeCheckout, toast]);
 
   // --- iOS IAP helpers ---
+  const activateAppleSubscription = async (productId?: string) => activateIosPurchase({
+    currentUserId: () => purchaseUserId.current,
+    account: async () => (await apiRequest('GET', `/api/iap/apple-login-id${productId ? '' : '?mode=restore'}`)).json(),
+    login: loginIosPurchaseAccount,
+    customerId: getIosPurchaseCustomerId,
+    purchase: purchaseProduct,
+    restore: restorePurchases,
+    verify: async (payload) => (await apiRequest('POST', '/api/iap/verify-apple-automatic', payload)).json(),
+    refresh: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['/api/user'], refetchType: 'all' }, { throwOnError: true }),
+        queryClient.invalidateQueries({ queryKey: ['/api/auth/user'], refetchType: 'all' }, { throwOnError: true }),
+      ]);
+    },
+  }, productId);
+
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {
       const productId = billingPeriod === 'yearly'
         ? (tier === 'player_pro' ? PRODUCT_PLAYER_PRO_YEARLY : PRODUCT_COMMISSIONER_YEARLY)
         : (tier === 'player_pro' ? PRODUCT_PLAYER_PRO : PRODUCT_COMMISSIONER);
-      const transaction = await purchaseProduct(productId);
-
-      // Build the verification payload, preferring StoreKit 2 JWS > transactionId
-      const verifyPayload: Record<string, string> = {};
-      if (transaction.jwsRepresentation) {
-        verifyPayload.jws = transaction.jwsRepresentation;
-      } else if (transaction.transactionId) {
-        verifyPayload.transactionId = transaction.transactionId;
-      } else {
-        throw new Error('No verifiable data returned from App Store. Please try again.');
-      }
-
-      const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
-
-      if (!response.ok) {
-        const data = await response.json() as { message?: string };
-        throw new Error(data.message || 'Purchase completed but role sync failed. Please restart the app.');
-      }
+      await activateAppleSubscription(productId);
 
       toast({ title: 'Subscribed!', description: 'Your subscription is now active.' });
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-      window.location.reload();
     } catch (error: any) {
-      if (
-        error?.code === 'PURCHASE_CANCELLED' ||
-        error?.message?.toLowerCase().includes('cancel') ||
-        error?.message?.toLowerCase().includes('cancelled')
-      ) {
+      if (error?.code === 'PURCHASE_CANCELLED') {
         setIsLoading(false);
         return;
       }
-      const purchaseNeedsVerification = error?.message?.startsWith('Purchase completed');
+      const purchaseNeedsVerification = error?.message?.startsWith('Purchase needs verification');
       toast({ title: purchaseNeedsVerification ? 'Purchase needs verification' : 'Purchase failed',
-        description: purchaseNeedsVerification
-          ? `${error.message} Do not purchase again; contact support.`
-          : error.message || 'Something went wrong. Please try again.',
+        description: error.message || 'Something went wrong. Please try again.',
         variant: 'destructive' });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -567,42 +563,8 @@ export default function Subscription() {
   const handleIosRestore = async () => {
     setIsLoading(true);
     try {
-      const purchases = await restorePurchases();
-
-      if (!purchases.length) {
-        toast({ title: 'Purchase could not be verified', description: 'The App Store may have an active subscription, but this version of the app did not return transaction details. Please do not purchase again; contact support.' });
-        setIsLoading(false);
-        return;
-      }
-
-      // Prefer JWS > transactionId for restore verification
-      let verifyPayload: Record<string, string> | null = null;
-      for (const p of purchases as NativelyTransaction[]) {
-        if (p.jwsRepresentation) {
-          verifyPayload = { jws: p.jwsRepresentation };
-          break;
-        } else if (p.transactionId) {
-          verifyPayload = { transactionId: p.transactionId };
-          break;
-        }
-      }
-
-      if (!verifyPayload) {
-        toast({ title: 'Purchase could not be verified', description: 'The App Store may have an active subscription, but this version of the app did not return transaction details. Please do not purchase again; contact support.' });
-        setIsLoading(false);
-        return;
-      }
-
-      const response = await apiRequest('POST', '/api/iap/verify', verifyPayload);
-      const data = await response.json() as { role?: string; message?: string };
-
-      if (response.ok && data.role && data.role !== 'free_tier') {
-        toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
-        queryClient.invalidateQueries({ queryKey: ['/api/user'] });
-        window.location.reload();
-      } else {
-        toast({ title: 'No active subscription', description: 'No active subscription was found to restore.' });
-      }
+      await activateAppleSubscription();
+      toast({ title: 'Purchases restored!', description: 'Your subscription has been restored.' });
     } catch (error: any) {
       toast({ title: 'Restore failed', description: error.message || 'Failed to restore purchases.', variant: 'destructive' });
     } finally {

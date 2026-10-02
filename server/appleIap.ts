@@ -47,6 +47,7 @@ export interface AppleTransactionPayload {
   transactionId: string;
   originalTransactionId: string;
   purchaseDate: number;
+  originalPurchaseDate?: number;
   expiresDate?: number;
   appAccountToken?: string;
   environment: 'Sandbox' | 'Production';
@@ -86,6 +87,22 @@ export function isAppleIapConfigured(): boolean {
     process.env.APPLE_IAP_ISSUER_ID &&
     process.env.APPLE_IAP_PRIVATE_KEY
   );
+}
+
+/**
+ * Checkout readiness check. Presence-only checks are insufficient because a
+ * malformed PEM (or a key of the wrong type) cannot sign Apple API requests.
+ * This deliberately returns no provider detail and never logs credentials.
+ */
+export async function isAppleIapSigningKeyUsable(): Promise<boolean> {
+  if (!isAppleIapConfigured()) return false;
+  try {
+    const pem = process.env.APPLE_IAP_PRIVATE_KEY!.replace(/\\n/g, '\n');
+    await importPKCS8(pem, 'ES256');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -237,8 +254,7 @@ export async function lookupTransactionById(transactionId: string): Promise<{
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Apple transactions API error ${res.status}: ${body}`);
+    throw new Error(`Apple transactions API unavailable (HTTP ${res.status})`);
   }
 
   const data = await res.json() as { signedTransactionInfo: string };
@@ -270,8 +286,7 @@ export async function getSubscriptionStatuses(originalTransactionId: string): Pr
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Apple subscriptions API error ${res.status}: ${body}`);
+    throw new Error(`Apple subscriptions API unavailable (HTTP ${res.status})`);
   }
 
   const data = await res.json() as {
@@ -295,8 +310,8 @@ export async function getSubscriptionStatuses(originalTransactionId: string): Pr
           if (!decoded.expiresDate || decoded.expiresDate > now) {
             activePayloads.push(decoded);
           }
-        } catch (e) {
-          console.warn('[IAP] Failed to decode signedTransactionInfo in subscription status:', e);
+        } catch {
+          console.warn('[IAP] Failed to decode signed transaction in subscription status.');
         }
       }
     }

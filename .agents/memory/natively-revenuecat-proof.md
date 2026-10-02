@@ -24,3 +24,15 @@ For an anonymous Apple subscriber with no account alias, explicit project-owner 
 **Why:** Anonymous RevenueCat customers lacked Roster identifiers, while the owner could identify the affected accounts and their distinct Apple plans/renewal dates. Claiming stronger identity evidence would be misleading; granting before the deployed provider check would be unsafe.
 
 **How to apply:** Keep real customer/transaction IDs out of source control and logs. Treat payment-provider outages as unknown, preserve access only through a previously verified expiry, and keep other payment sources independent when a refunded or expired Apple period is reconciled.
+
+Native account login is a supported Natively operation. Automatic checkout must use an opaque identity issued only to the authenticated account, confirm the native identity before charging, and derive that same identity on the server. Public user IDs or subscriber attributes are not authentication. Native callback success is still not entitlement proof.
+
+**Why:** The documented bridge can associate purchases before checkout but does not return signed Apple proof afterward. An opaque association makes a server-side provider lookup account-specific without accepting an arbitrary anonymous customer ID.
+
+**How to apply:** Verify current provider entitlement and independently resolve Apple's stable original transaction; never claim the latest renewal ID as the original. Preserve both original-lineage ownership and source-aware revocation. Signing-key readiness must be checked before allowing a new purchase; a misconfigured verifier must not charge the customer first. Identity-key rotation requires explicit handling of existing purchase associations rather than silently changing their owner.
+
+An account's current role is the combined result of all billing sources, not proof of any individual provider's tier. Save a Stripe baseline only from an explicitly Stripe-verified update, and tie it to that subscription rather than trusting the aggregate role.
+
+**Why:** An Apple upgrade can make the account Commissioner while its Stripe subscription remains Player Pro. Reusing that aggregate role as Stripe's baseline would retain Commissioner after Apple ends; treating generic role changes as Stripe evidence can overwrite the actual Stripe tier.
+
+**How to apply:** Resolve live independent claims together, persist the resolved role even when it is lower, and fail explicitly when a billing update is skipped. Verification must check the persisted result, not just a successful pure role calculation. Refresh Stripe baselines on every verified Stripe update, including retained expired/refunded Apple links: those links still reconcile, and an old baseline can undo a later legitimate Stripe upgrade or downgrade.

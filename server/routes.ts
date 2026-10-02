@@ -4320,7 +4320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!activeSubscription) {
         // No active subscription - downgrade to free tier
-        await storage.updateUserRole(userId, 'free_tier');
+        await storage.updateUserRole(userId, 'free_tier', true);
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
         
         return res.json({ 
@@ -4333,7 +4333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if subscription should be active
       if (activeSubscription.cancel_at_period_end || activeSubscription.status === 'canceled' || activeSubscription.status === 'unpaid') {
-        await storage.updateUserRole(userId, 'free_tier');
+        await storage.updateUserRole(userId, 'free_tier', true);
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId, '');
         
         return res.json({ 
@@ -4360,7 +4360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update subscription ID and role
       await storage.updateUserStripeInfo(userId, user.stripeCustomerId, activeSubscription.id);
-      await storage.updateUserRole(userId, tier);
+      await storage.updateUserRole(userId, tier, true);
 
       
       res.json({ 
@@ -4404,7 +4404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if subscription should be downgraded
       if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid') {
-        await storage.updateUserRole(userId, 'free_tier');
+        await storage.updateUserRole(userId, 'free_tier', true);
         await storage.updateUserStripeInfo(userId, user.stripeCustomerId || '', '');
         
         return res.json({ 
@@ -4419,7 +4419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
         
         if (tier && tier !== user.role) {
-          await storage.updateUserRole(userId, tier);
+          await storage.updateUserRole(userId, tier, true);
           
           return res.json({ 
             message: 'User role updated', 
@@ -4854,7 +4854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                await storage.updateUserRole(user.id, tier);
+                await storage.updateUserRole(user.id, tier, true);
               } else {
                 console.warn('[Webhook] Unknown price ID:', priceId);
               }
@@ -4881,7 +4881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // IMMEDIATE ACCESS RESTRICTION: Check if subscription is cancelled or will be cancelled
             // This ensures users lose access immediately upon cancellation, not at period end
             if (subscription.cancel_at_period_end || subscription.status === 'canceled' || subscription.status === 'unpaid' || event.type === 'customer.subscription.deleted') {
-              await storage.updateUserRole(user.id, 'free_tier');
+              await storage.updateUserRole(user.id, 'free_tier', true);
               
               // Clear subscription ID when downgrading to free tier
               await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
@@ -4891,7 +4891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                await storage.updateUserRole(user.id, tier);
+                await storage.updateUserRole(user.id, tier, true);
                 
                 // Update subscription ID if it changed
                 if (user.stripeSubscriptionId !== subscription.id) {
@@ -4921,7 +4921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const tier = priceId ? PRICE_TO_ROLE[priceId] : null;
               
               if (tier) {
-                await storage.updateUserRole(user.id, tier);
+                await storage.updateUserRole(user.id, tier, true);
               } else {
                 console.warn('[Webhook] Unknown price ID in invoice:', priceId);
               }
@@ -4942,7 +4942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (user) {
               
               // Downgrade user to free tier
-              await storage.updateUserRole(user.id, 'free_tier');
+              await storage.updateUserRole(user.id, 'free_tier', true);
               
               // Clear subscription ID
               await storage.updateUserStripeInfo(user.id, user.stripeCustomerId || '', '');
@@ -5022,7 +5022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Stripe is only one payment source. A verified, still-active Play or
       // App Store claim may entitle this account to a higher tier.
       const { preserveLinkedAppleRole } = await import('./appleClaimRole');
-      const effectiveTier = await preserveLinkedAppleRole(userId, tier);
+      const effectiveTier = await preserveLinkedAppleRole(userId, tier, true);
       
       // Keep the explicit enum update used by this sync path, but parameterize
       // it and write the effective tier instead of blindly writing Stripe's.
@@ -5098,7 +5098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleChanged: false,
       });
     } catch (error) {
-      console.error('[IAP/RevenueCat] Read-only diagnostic failed:', error instanceof Error ? error.message : 'unknown error');
+      console.error('[IAP/RevenueCat] Read-only diagnostic failed.');
       return res.status(502).json({ message: 'Could not check RevenueCat. Confirm the API key and try again.' });
     }
   });
@@ -5123,15 +5123,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (tx.appAccountToken) {
       // If the token is present, enforce it — mismatches are a strong replay-attack signal.
       if (tx.appAccountToken.toLowerCase() !== expectedToken) {
-        console.warn('[IAP] appAccountToken mismatch — possible replay attack', { userId });
         throw Object.assign(new Error('Purchase does not belong to this account'), { status: 403 });
       }
     } else {
-      // The Natively/RevenueCat bridge does not forward appAccountToken to StoreKit,
-      // so legitimate purchases arrive without it. The JWS is already cryptographically
-      // verified against Apple Root CA G3 and the bundleId is enforced — it is safe to
-      // proceed. Log a warning for observability but do not block the purchase.
-      console.warn('[IAP] No appAccountToken in transaction — proceeding without account binding check', { userId });
+      // Tokenless transactions may only refresh an existing account-owned claim;
+      // a valid Apple signature alone does not identify the Roster account.
     }
 
     return tx;
@@ -5146,8 +5142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await supabase.auth.admin.updateUserById(userId, {
         user_metadata: { subscription_tier: newRole },
       });
-    } catch (supabaseErr) {
-      console.warn('[IAP] Failed to sync Supabase metadata:', supabaseErr);
+    } catch {
+      console.warn('[IAP] Failed to sync Supabase metadata.');
     }
   };
   const applyIapRole = async (
@@ -5215,11 +5211,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (result.rows[0].user_id !== userId) {
       throw Object.assign(new Error('This Apple purchase is linked to another account'), { status: 409 });
     }
-    const { reconcileApplePurchaseLinks } = await import('./applePurchaseLinks');
-    await reconcileApplePurchaseLinks();
+      const { reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
+      await reconcileApplePurchaseLinkForUser(userId);
     const current = await storage.getUser(userId);
     return { message: 'Apple purchase checked against current subscription status',
       role: current?.role ?? 'free_tier' };
+  };
+
+  const hasExistingAppleClaim = async (userId: string, originalTransactionId: string): Promise<boolean> => {
+    const claim = await db.execute(sql`
+      SELECT EXISTS(
+        SELECT 1 FROM apple_purchase_links
+         WHERE user_id = ${userId} AND original_transaction_id = ${originalTransactionId}
+      ) OR EXISTS(
+        SELECT 1 FROM users
+         WHERE id = ${userId} AND iap_original_transaction_id = ${originalTransactionId}
+      ) AS owned
+    `);
+    return claim.rows[0]?.owned === true;
   };
 
   // Serialize claims for the same token so two accounts cannot race to reuse
@@ -5259,11 +5268,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt: new Date(expiryTimeMs),
       }).where(eq(googleIapClaims.tokenHash, tokenHash));
       const linkedApple = await tx.execute(sql`
-        SELECT original_transaction_id FROM apple_purchase_links
+        SELECT original_transaction_id, product_id FROM apple_purchase_links
         WHERE user_id = ${userId} AND expires_at > NOW()
           AND revoked_by_apple = FALSE LIMIT 1
       `);
       const appleOriginal = linkedApple.rows[0]?.original_transaction_id as string | undefined;
+      const appleCommissioner = typeof linkedApple.rows[0]?.product_id === 'string' &&
+        linkedApple.rows[0].product_id.startsWith('com.rosterapp.commissioner_');
       const [user] = await tx.select({
         role: users.role, stripeSubscriptionId: users.stripeSubscriptionId,
         iapOriginalTransactionId: users.iapOriginalTransactionId,
@@ -5293,6 +5304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? 'commissioner' : newRole;
       const role = resolveLinkedPurchaseRole(requestedRole, {
         appleActive: Boolean(appleOriginal),
+        appleCommissioner,
         googleCommissioner: activeClaims.rows[0]?.google_commissioner === true,
         googlePro: activeClaims.rows[0]?.google_pro === true,
       });
@@ -5342,8 +5354,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
         if (linked) return res.json(linked);
+        if (!tx.appAccountToken && !await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Use automatic Apple activation or contact support.' });
+        }
         await applyIapRole(userId, newRole, tx.originalTransactionId);
-        console.log(`[IAP] JWS verified for user ${userId}: role → ${newRole} (${tx.environment})`);
+        console.log(`[IAP] JWS verified: role → ${newRole} (${tx.environment})`);
         return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
@@ -5365,18 +5380,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(402).json({ message: 'Subscription has expired' });
         }
 
-        // Verify account binding using the payload's appAccountToken (when present).
-        // The Natively/RevenueCat bridge does not forward appAccountToken to StoreKit,
-        // so legitimate purchases may arrive without it. Only hard-reject on a mismatch.
+        // Verify appAccountToken when Apple included it. Without it, allow only
+        // a purchase lineage already owned by this Roster account.
         const { v5: uuidv5 } = await import('uuid');
         const expectedToken = uuidv5(userId, IAP_APP_NAMESPACE).toLowerCase();
         if (tx.appAccountToken) {
           if (tx.appAccountToken.toLowerCase() !== expectedToken) {
-            console.warn('[IAP] appAccountToken mismatch (transactionId path)', { userId });
             return res.status(403).json({ message: 'Purchase does not belong to this account' });
           }
-        } else {
-          console.warn('[IAP] No appAccountToken in Apple response (transactionId path) — proceeding without binding check', { userId });
+        } else if (!await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Use automatic Apple activation or contact support.' });
         }
 
         const newRole = IAP_PRODUCT_ROLES[tx.productId] ?? null;
@@ -5386,17 +5399,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const linked = await verifyLinkedApplePurchase(userId, tx.originalTransactionId);
         if (linked) return res.json(linked);
+        if (!tx.appAccountToken && !await hasExistingAppleClaim(userId, tx.originalTransactionId)) {
+          return res.status(403).json({ message: 'Apple did not provide account binding for this purchase. Use automatic Apple activation or contact support.' });
+        }
         await applyIapRole(userId, newRole, tx.originalTransactionId);
-        console.log(`[IAP] Transaction ID verified for user ${userId}: role → ${newRole}`);
+        console.log(`[IAP] Transaction ID verified: role → ${newRole}`);
         return res.json({ message: 'IAP verified and role updated', role: newRole });
       }
 
       return res.status(400).json({ message: 'Missing jws or transactionId' });
 
     } catch (error: any) {
-      console.error('[IAP] Verification error:', error);
-      const status = typeof error.status === 'number' ? error.status : 500;
-      res.status(status).json({ message: error.message || 'IAP verification failed' });
+      const status = [400, 402, 403, 409, 503].includes(error?.status) ? error.status : 502;
+      console.warn('[IAP] Verification failed:', status);
+      const message = status === 502
+        ? 'Apple could not verify this purchase right now. Please try again later.'
+        : error.message;
+      res.status(status).json({ message });
     }
   });
 
@@ -5462,7 +5481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!notifUserId) {
         // User hasn't subscribed through this server yet — they will be updated on next app open
-        console.warn('[IAP/Notify] No user found for originalTransactionId:', originalTransactionId);
+        console.warn('[IAP/Notify] No account matched the Apple purchase claim.');
         return res.status(200).json({ message: 'Notification acknowledged (user not found)' });
       }
 
@@ -5496,7 +5515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `);
             return res.status(200).json({ message: 'Apple renewal queued for verification' });
           }
-          const changedRole = await db.transaction(async (tx) => {
+          const accepted = await db.transaction(async (tx) => {
             const locked = await tx.execute(sql`
               SELECT last_apple_signed_at, expires_at FROM apple_purchase_links
                WHERE original_transaction_id = ${originalTransactionId}
@@ -5526,32 +5545,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                      last_apple_signed_at = to_timestamp(${signedAtMs!} / 1000.0)
                WHERE original_transaction_id = ${originalTransactionId}
             `);
-            const user = await tx.execute(sql`
-              SELECT role, stripe_subscription_id, iap_original_transaction_id
-                FROM users WHERE id = ${notifUserId} FOR UPDATE
-            `);
-            const row = user.rows[0];
-            if (!row || row.role !== 'player_pro' || row.stripe_subscription_id ||
-                row.iap_original_transaction_id !== originalTransactionId) return false;
-            const google = await tx.execute(sql`
-              SELECT 1 FROM google_iap_claims WHERE user_id = ${notifUserId}
-                AND expires_at > NOW() LIMIT 1
-            `);
-            if (google.rows.length) return false;
-            await tx.execute(sql`
-              UPDATE users SET role = 'free_tier', iap_original_transaction_id = NULL,
-                  last_updated = NOW(), updated_at = NOW() WHERE id = ${notifUserId}
-            `);
             return true;
           });
-          if (changedRole) await syncIapRoleMetadata(notifUserId, 'free_tier');
+          if (accepted) {
+            const { reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
+            await reconcileApplePurchaseLinkForUser(notifUserId);
+          }
           return res.status(200).json({ message: 'Linked Apple purchase revoked' });
         }
       }
 
       if (decision.action === 'grant') {
         await applyIapRole(notifUserId, decision.role, originalTransactionId);
-        console.log(`[IAP/Notify] ${notificationType} → role set to ${decision.role} for user ${notifUserId}`);
+        console.log(`[IAP/Notify] ${notificationType} → role set to ${decision.role}`);
 
       } else if (decision.action === 'revoke') {
         // Legacy, unlinked Apple purchases still require source-aware downgrade.
@@ -5574,10 +5580,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               user_metadata: { subscription_tier: remainingRole },
             });
           }
-        } catch (e) {
-          console.warn('[IAP/Notify] Supabase metadata sync failed on revoke:', e);
+        } catch {
+          console.warn('[IAP/Notify] Supabase metadata sync failed on revoke.');
         }
-        console.log(`[IAP/Notify] ${notificationType} → Apple source revoked for user ${notifUserId}`);
+        console.log(`[IAP/Notify] ${notificationType} → Apple source revoked`);
 
       } else {
         console.log(`[IAP/Notify] ${decision.reason} — acknowledged, no role change`);
@@ -5586,7 +5592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({ message: 'Notification processed' });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[IAP/Notify] Error processing notification:', message);
+      console.error('[IAP/Notify] Error processing notification.');
       // Always return 200 to Apple — non-200 triggers retries
       res.status(200).json({ message: 'Notification acknowledged (internal error)' });
     }
@@ -5805,6 +5811,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       message: status === 502 ? 'Could not verify this purchase right now. Please try again later.' : error.message,
     });
   };
+
+  const appleLoginIdForUser = (userId: string) => {
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) throw Object.assign(new Error('Automatic Apple activation is unavailable.'), { status: 503 });
+    return `roster_ios_${createHmac('sha256', secret).update(`revenuecat-apple:${userId}`).digest('hex')}`;
+  };
+
+  const sendAppleAutomaticError = (res: any, error: any) => {
+    const status = [400, 402, 403, 409, 503].includes(error?.status) ? error.status : 502;
+    const message = typeof error?.message === 'string' &&
+      ['400', '402', '403', '409', '503'].includes(String(status))
+      ? error.message
+      : 'Apple could not verify this subscription right now. Please try again later.';
+    return res.status(status).json({ message });
+  };
+
+  // Do not start native checkout unless server verification can reach both
+  // RevenueCat and Apple's signed transaction lookup API.
+  app.get('/api/iap/apple-login-id', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+      const { isAppleIapSigningKeyUsable } = await import('./appleIap');
+      const userId = req.user.claims.sub;
+      const signingKeyUsable = await isAppleIapSigningKeyUsable().catch(() => false);
+      const restoreOfOperatorLink = req.query?.mode === 'restore' && !signingKeyUsable
+        ? Boolean((await pool.query(
+            `SELECT 1 FROM apple_purchase_links
+              WHERE user_id = $1 AND association_source = 'operator_attested' LIMIT 1`,
+            [userId],
+          )).rowCount)
+        : false;
+      if (!isRevenueCatApiConfigured() ||
+          (!signingKeyUsable && !restoreOfOperatorLink) ||
+          !process.env.SESSION_SECRET) {
+        throw Object.assign(new Error('Automatic Apple activation is unavailable. Please contact support before purchasing.'), { status: 503 });
+      }
+      return res.json({ loginId: appleLoginIdForUser(userId), userId });
+    } catch (error: any) {
+      return sendAppleAutomaticError(res, error);
+    }
+  });
+
+  app.post('/api/iap/verify-apple-automatic', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    const userId = req.user.claims.sub;
+    try {
+      const loginId = appleLoginIdForUser(userId);
+      const { loginId: suppliedLoginId, expectedProductId } = req.body ?? {};
+      if (suppliedLoginId !== loginId) {
+        throw Object.assign(new Error('Your signed-in account changed. Reopen the purchase screen and try again.'), { status: 409 });
+      }
+      if (expectedProductId !== undefined &&
+          (typeof expectedProductId !== 'string' || !IAP_PRODUCT_ROLES[expectedProductId])) {
+        throw Object.assign(new Error('The selected Apple subscription is not recognized.'), { status: 400 });
+      }
+
+      // Existing operator-attributed links remain authoritative and can be
+      // reconciled for this account even when Apple's transaction API is down.
+      const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } =
+        await import('./applePurchaseLinks');
+      const existing = await reconcileApplePurchaseLinkForUser(userId);
+      if (existing?.active) {
+        if (expectedProductId !== undefined && expectedProductId !== existing.productId) {
+          throw Object.assign(new Error('The verified Apple subscription does not match the selected plan.'), { status: 409 });
+        }
+        if (existing.role === 'commissioner' || existing.role === 'player_pro') {
+          return res.json({ role: existing.role, verified: true });
+        }
+        throw Object.assign(new Error('Your Apple purchase is verified, but this account needs support to resolve a subscription conflict.'), { status: 409 });
+      }
+
+      const { activateAppleAutomatically } = await import('./appleAutomaticActivation');
+      const { getRevenueCatActiveAppleSubscriptions } = await import('./revenueCatApi');
+      const { lookupTransactionById, isAppleIapSigningKeyUsable } = await import('./appleIap');
+      if (!process.env.REVENUECAT_API_KEY || !await isAppleIapSigningKeyUsable()) {
+        throw Object.assign(new Error('Apple purchase verification is unavailable. Please try again later.'), { status: 503 });
+      }
+      const result = await activateAppleAutomatically({
+        userId,
+        loginId: suppliedLoginId,
+        expectedProductId,
+        dependencies: {
+          getSubscriptions: customerId => getRevenueCatActiveAppleSubscriptions(customerId),
+          lookupTransactionById,
+          claim: claimAutomaticApplePurchase,
+          reconcileUser: async accountId => {
+            const reconciled = await reconcileApplePurchaseLinkForUser(accountId);
+            if (!reconciled?.active ||
+                (reconciled.role !== 'commissioner' && reconciled.role !== 'player_pro')) {
+              throw Object.assign(new Error('Apple subscription reconciliation did not activate this account.'), { status: 409 });
+            }
+            return reconciled.role;
+          },
+        },
+      });
+      return res.json(result);
+    } catch (error: any) {
+      return sendAppleAutomaticError(res, error);
+    }
+  });
 
   // Natively restore may return CustomerInfo without Play's purchase token.
   // RevenueCat v1 includes each active subscription's latest GPA order ID.

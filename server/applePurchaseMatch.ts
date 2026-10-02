@@ -8,8 +8,10 @@ export function matchingApplePurchase(
   originalPurchasedAt: Date,
 ): VerifiedAppleSubscription | undefined {
   return subscriptions.find(sub =>
-    sub.role === 'player_pro' &&
-    ['com.rosterapp.player_pro_monthly', 'com.rosterapp.player_pro_yearly'].includes(sub.productId) &&
+    ((sub.productId.startsWith('com.rosterapp.commissioner_') && sub.role === 'commissioner') ||
+      (sub.productId.startsWith('com.rosterapp.player_pro_') && sub.role === 'player_pro')) &&
+    ['com.rosterapp.player_pro_monthly', 'com.rosterapp.player_pro_yearly',
+      'com.rosterapp.commissioner_monthly', 'com.rosterapp.commissioner_yearly'].includes(sub.productId) &&
     Math.abs(Date.parse(sub.originalPurchasedAt) - originalPurchasedAt.getTime()) <= 1000
   );
 }

@@ -10,6 +10,17 @@ const purchased = {
   ownership_type: 'PURCHASED',
 };
 
+test('Apple transaction identifiers retain precision; unsafe numeric IDs are not lookup hints', () => {
+  const parse = (id: string | number) => getActiveAppleSubscriptions({
+    subscriber: { subscriptions: { 'com.rosterapp.player_pro_monthly': {
+      ...purchased, store_transaction_id: id,
+    } } },
+  }, Date.parse('2026-09-01T00:00:00Z'))[0];
+  assert.equal(parse('100000000001').storeTransactionId, '100000000001');
+  assert.equal(parse(100000000001).storeTransactionId, '100000000001');
+  assert.equal(parse(Number.MAX_SAFE_INTEGER + 1).storeTransactionId, undefined);
+});
+
 test('subscriber lookup queries the selected customer and never exposes the API key', async () => {
   const result = await getRevenueCatAppleSubscriptions('anonymous:customer', {
     apiKey: 'test-key',
