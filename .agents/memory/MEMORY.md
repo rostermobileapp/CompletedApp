@@ -62,3 +62,4 @@
 - [Account merge safety boundary](account-merge-safety-boundary.md) — registered-account merges must fail closed on unclassified records, authority, and billing; never infer identity from name or email.
 - [League merge dialog boundary](league-merge-dialog-boundary.md) — the U-account-only commissioner picker and placeholder replacement preview have different eligibility rules.
 - [Responsive fixture verification](responsive-fixture-verification.md) — phone-width containers still use desktop media queries; use iframe viewports and explicit UTF-8 in isolated checks.
+- [Tool clock compatibility](tool-clock-compatibility.md) — some operational sandbox versions reject durable clock reads; obtain real time in an impure function before checking expiry.
