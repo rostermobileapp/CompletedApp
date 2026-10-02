@@ -80,6 +80,11 @@ export function shouldOfferTrivia(input: {
   return isSafeTriviaOpportunity(input.path) && !input.answered && !input.dismissed && !input.otherOverlayActive;
 }
 
+/** An unresolved background check is not an active overlay. */
+export function triviaOverlayBlocksOpening(birthdayActive: boolean, pendingBadges: unknown): boolean {
+  return birthdayActive || (Array.isArray(pendingBadges) && pendingBadges.length > 0);
+}
+
 export function triviaPlayDestination(path: string): string {
   return isSafeTriviaOpportunity(path) ? path : "/";
 }

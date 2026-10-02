@@ -79,7 +79,7 @@ export function registerTriviaRoutes(app: Express): void {
   app.get("/api/trivia/today", isAuthenticated, triviaAccess, async (req: any, res: any) => {
     try {
       res.setHeader("Cache-Control", "no-store");
-      return res.json(await getTodayTrivia(req.triviaViewer.id, req.triviaViewer));
+      return res.json(await getTodayTrivia(req.triviaViewer.id, req.triviaViewer, undefined, { includeUnansweredPatch: false }));
     } catch (error) {
       console.error("[Trivia] Failed to load today's question:", error);
       return res.status(503).json({ code: "TRIVIA_UNAVAILABLE", message: error instanceof Error ? error.message : "Failed to load today's trivia." });

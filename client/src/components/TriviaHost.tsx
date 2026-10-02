@@ -10,11 +10,13 @@ import { shouldShowBirthdayGreeting, type BirthdayStatus } from "./birthdayVisib
 import {
   canStartManualTrivia, isSafeTriviaOpportunity, isValidTriviaQuestion,
   hasServerPatchAccess, readTriviaDismissal, retainQuestionPatch, shouldOfferTrivia,
-  shouldRetainTriviaPriority, triviaPlayDestination, savedTriviaReviewKey,
+  shouldRetainTriviaPriority, triviaPlayDestination, savedTriviaReviewKey, triviaOverlayBlocksOpening,
   type TriviaToday, writeTriviaDismissal,
 } from "./triviaVisibility";
 import "./TriviaHost.css";
 import { gradeTriviaChoice, type LocalTriviaResult } from "./triviaGrading";
+import { cacheTrivia, clearCachedTrivia, isTriviaPushLaunch, readCachedTrivia } from "./triviaCache";
+import { easternDateKey } from "@shared/trivia";
 
 type TriviaStats = {
   total_answered: number; total_correct: number; accuracy: number;
@@ -44,6 +46,11 @@ function getDismissalStorage(): Storage | null {
   try { return window.localStorage; } catch { return null; }
 }
 
+function otherDialogIsOpen(): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"], [data-radix-dialog-content]'))
+    .some((element) => !element.closest(".trivia-host"));
+}
+
 export function TriviaHost() {
   const { user } = useAuth();
   const { isActive: demoActive } = useDemo();
@@ -54,6 +61,7 @@ export function TriviaHost() {
   const statsKey = ["/api/trivia/stats", user?.id] as const;
   const [dismissed, setDismissed] = useState(false);
   const [dismissalHydrated, setDismissalHydrated] = useState(false);
+  const [pushLaunchRequested, setPushLaunchRequested] = useState(() => isTriviaPushLaunch(window.location.search));
   const [choice, setChoice] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<TriviaFeedback | null>(null);
   const [feedbackDate, setFeedbackDate] = useState<string | null>(null);
@@ -70,7 +78,7 @@ export function TriviaHost() {
   const savedReviewOpened = useRef(false);
   const triviaEngaged = useRef(false);
   const [submitError, setSubmitError] = useState("");
-  const [hasExistingDialog, setHasExistingDialog] = useState(false);
+  const [hasExistingDialog, setHasExistingDialog] = useState(otherDialogIsOpen);
   const todayQuery = useQuery<unknown>({
     queryKey: todayKey,
     queryFn: async () => (await apiRequest("GET", "/api/trivia/today")).json(),
@@ -79,11 +87,14 @@ export function TriviaHost() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     refetchInterval: 60_000,
+    initialData: () => user?.id ? readCachedTrivia(getDismissalStorage(), user.id, easternDateKey()) : undefined,
+    // The cache is for immediate rendering, never authoritative answer status.
+    initialDataUpdatedAt: 0,
   });
   const statsQuery = useQuery<TriviaStats>({
     queryKey: statsKey,
     queryFn: async () => (await apiRequest("GET", "/api/trivia/stats")).json(),
-    enabled: !!user && !demoActive,
+    enabled: !!user && !demoActive && !!feedback,
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
@@ -100,26 +111,55 @@ export function TriviaHost() {
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
-  const today = isValidTriviaQuestion(todayQuery.data) ? todayQuery.data : null;
+  const today = isValidTriviaQuestion(todayQuery.data) && todayQuery.data.date === easternDateKey() ? todayQuery.data : null;
   const currentFeedback = today && feedbackDate === today.date ? feedback : null;
   const displayResult = currentFeedback || (localResult?.date === today?.date ? localResult : null);
   const paid = hasPaidTrophyCaseAccess(permissionUser);
   const eligible = (!todayQuery.isError || !!displayResult) && !!today && (!today.answered || !!displayResult);
-  const waitingOnOtherHost = shouldShowBirthdayGreeting(birthdayQuery.data, Date.now(), badgeQuery.data)
-    || (Array.isArray(badgeQuery.data) && badgeQuery.data.length > 0)
-    || !birthdayQuery.isFetched || !badgeQuery.isFetched;
+  const waitingOnOtherHost = !pushLaunchRequested && triviaOverlayBlocksOpening(
+    shouldShowBirthdayGreeting(birthdayQuery.data, Date.now(), badgeQuery.data), badgeQuery.data,
+  );
+  const loadingPushModal = !!user && !demoActive && pushLaunchRequested
+    && HOME_OPPORTUNITY(path) && !today && todayQuery.isFetching && !hasExistingDialog;
   const canInitiallyOpen = !!user && !demoActive && eligible && dismissalHydrated && shouldOfferTrivia({
     path,
     answered: !!today?.answered && !displayResult,
-    dismissed,
+    dismissed: dismissed && !pushLaunchRequested,
     otherOverlayActive: waitingOnOtherHost || hasExistingDialog,
   });
-  const modalOpen = canInitiallyOpen || (!!user && !demoActive && shouldRetainTriviaPriority({
+  const modalOpen = loadingPushModal || canInitiallyOpen || (!!user && !demoActive && shouldRetainTriviaPriority({
     path, engaged: triviaEngaged.current, eligible, dismissed,
   }));
   const hasAnswer = !!displayResult;
   const categoryCount = useMemo(() => statsQuery.data?.categories?.find((item) => item.category === today?.category)?.correct_count ?? 0, [statsQuery.data, today?.category]);
   const errorStatus = todayQuery.error instanceof ApiError ? todayQuery.error.status : null;
+
+  useEffect(() => {
+    if (!user?.id || demoActive) return;
+    if (errorStatus === 403 || errorStatus === 401) {
+      clearCachedTrivia(getDismissalStorage(), user.id);
+    } else if (today && todayQuery.isFetched && !todayQuery.isError) {
+      cacheTrivia(getDismissalStorage(), user.id, today);
+    }
+  }, [user?.id, demoActive, today, todayQuery.isFetched, todayQuery.isError, errorStatus]);
+
+  useEffect(() => {
+    if (!user?.id || demoActive) return;
+    const refresh = () => { void queryClient.invalidateQueries({ queryKey: todayKey, exact: true }); };
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    const onLaunch = () => {
+      if (isTriviaPushLaunch(window.location.search)) setPushLaunchRequested(true);
+      refresh();
+    };
+    window.addEventListener("pageshow", onLaunch);
+    window.addEventListener("popstate", onLaunch);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("pageshow", onLaunch);
+      window.removeEventListener("popstate", onLaunch);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.id, demoActive, queryClient]);
 
   useEffect(() => {
     if (lastUserId.current === (user?.id ?? null)) return;
@@ -151,10 +191,7 @@ export function TriviaHost() {
   }, [user?.id, today?.date]);
 
   useEffect(() => {
-    const update = () => setHasExistingDialog(
-      Array.from(document.querySelectorAll('[role="dialog"], [data-radix-dialog-content]'))
-        .some((element) => !element.closest(".trivia-host")),
-    );
+    const update = () => setHasExistingDialog(otherDialogIsOpen());
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["role", "data-state", "aria-modal"] });
@@ -175,8 +212,8 @@ export function TriviaHost() {
   }, [today?.date]);
 
   useEffect(() => {
-    if (canInitiallyOpen) triviaEngaged.current = true;
-  }, [canInitiallyOpen]);
+    if (canInitiallyOpen || loadingPushModal) triviaEngaged.current = true;
+  }, [canInitiallyOpen, loadingPushModal]);
 
   useEffect(() => {
     fireTriviaModalEvent(modalOpen);
@@ -224,6 +261,7 @@ export function TriviaHost() {
 
   useEffect(() => {
     const onManualOpen = () => {
+      setPushLaunchRequested(true);
       manualOpenRequested.current = true;
       const destination = triviaPlayDestination(path);
       if (destination !== path) {
@@ -260,6 +298,12 @@ export function TriviaHost() {
     if (submittingRef.current) return;
     triviaEngaged.current = false;
     setDismissed(true);
+    setPushLaunchRequested(false);
+    if (isTriviaPushLaunch(window.location.search)) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("trivia");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
     setSubmitError("");
     if (user?.id && today?.date) writeTriviaDismissal(getDismissalStorage(), user.id, today.date, APP_LAUNCH_ID);
   }
@@ -340,10 +384,19 @@ export function TriviaHost() {
     }
   }
 
-  if (errorStatus === 403) return null;
+  if (errorStatus === 403 || errorStatus === 401) return null;
   if (todayQuery.isError && !displayResult && HOME_OPPORTUNITY(path) && !!user && !demoActive) {
     return <div className="trivia-host fixed bottom-24 left-1/2 z-[10004] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border border-[var(--trivia-edge)] bg-[var(--trivia-surface)] p-4 shadow-xl"><p role="alert" className="text-sm font-semibold">Daily trivia couldn’t load right now.</p><button type="button" onClick={() => void todayQuery.refetch()} className="mt-2 text-sm font-bold text-[var(--trivia-ink)] underline underline-offset-4">Try again</button></div>;
   }
+  if (loadingPushModal) return <div className="trivia-host trivia-backdrop fixed inset-0 z-[10003] flex items-center justify-center px-3 py-6">
+    <section role="dialog" aria-modal="true" aria-labelledby="trivia-loading-title" aria-describedby="trivia-loading-description" className="trivia-panel relative w-full max-w-[420px] rounded-[24px] px-5 py-6 sm:px-7 sm:py-7">
+      <button type="button" aria-label="Close daily trivia" onClick={dismiss} className="absolute right-5 top-5 text-[var(--trivia-muted)]"><X size={19} /></button>
+      <p className="text-[9px] font-bold uppercase tracking-[.25em] text-[var(--trivia-red)]">Daily Trivia</p>
+      <h2 id="trivia-loading-title" className="mt-3 text-2xl font-bold">Daily Hockey Trivia</h2>
+      <p id="trivia-loading-description" role="status" className="mt-4 text-sm text-[var(--trivia-muted)]">Loading today’s question…</p>
+      <div aria-hidden="true" className="mt-5 grid gap-3">{[0, 1, 2, 3].map(index => <div key={index} className="trivia-choice h-14 rounded-xl" />)}</div>
+    </section>
+  </div>;
   if (!modalOpen || !today) return null;
   const patch = currentFeedback?.patch || (today as TriviaToday & { patch?: TriviaPatch }).patch;
   const patchAccess = hasServerPatchAccess(paid, patch);

@@ -158,13 +158,18 @@ export async function publishTriviaQuestion(
 
 export async function ensureTodayQuestion(dateKey = easternDateKey()): Promise<ReturnType<typeof mapQuestion>> {
   if (!isTriviaDateKey(dateKey)) throw new Error(`Invalid trivia date: ${dateKey}`);
+  const publishedQuestionQuery = `SELECT id, date::text, category::text, question, choices, correct_index, explanation, difficulty, format,
+        verification_status, verification_notes, source_basis FROM daily_trivia WHERE date = $1::date`;
+  // Published questions need no reservation lock or transaction round trips.
+  // Missing-day publication still uses the locked, rechecked path below.
+  const published = (await pool.query<TriviaQuestionRow>(publishedQuestionQuery, [dateKey])).rows[0];
+  if (published) return mapQuestion(published);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`daily_trivia:${dateKey}`]);
     const existing = (await client.query<TriviaQuestionRow>(
-      `SELECT id, date::text, category::text, question, choices, correct_index, explanation, difficulty, format,
-        verification_status, verification_notes, source_basis FROM daily_trivia WHERE date = $1::date`,
+      publishedQuestionQuery,
       [dateKey],
     )).rows[0];
     if (existing) {
@@ -763,12 +768,12 @@ async function answerFeedback(userId: string, dateKey: string, answerRow?: {
   return result;
 }
 
-export async function getTodayTrivia(userId: string, viewer?: TriviaViewer, today = easternDateKey()) {
-  const question = await ensureTodayQuestion(today);
-  const answer = (await pool.query<{ category: TriviaCategory; chosen_index: number; is_correct: boolean }>(
+export async function getTodayTrivia(userId: string, viewer?: TriviaViewer, today = easternDateKey(), options: { includeUnansweredPatch?: boolean } = {}) {
+  const [question, answerResult] = await Promise.all([ensureTodayQuestion(today), pool.query<{ category: TriviaCategory; chosen_index: number; is_correct: boolean }>(
     `SELECT category::text, chosen_index, is_correct FROM trivia_answers WHERE user_id = $1 AND trivia_date = $2::date`,
     [userId, today],
-  )).rows[0];
+  )]);
+  const answer = answerResult.rows[0];
   const paidAccess = canAccessTriviaPatches(viewer);
   const response: Record<string, unknown> = {
     date: today,
@@ -786,7 +791,7 @@ export async function getTodayTrivia(userId: string, viewer?: TriviaViewer, toda
     response.chosen_index = answer.chosen_index;
     response.feedback = await answerFeedback(userId, today, answer, paidAccess, null, question);
   }
-  if (paidAccess) {
+  if (paidAccess && (answer || options.includeUnansweredPatch !== false)) {
     response.patch = answer
       ? (response.feedback as Record<string, unknown> | null)?.patch ?? null
       : await getTriviaCategoryPatch(userId, question.category);

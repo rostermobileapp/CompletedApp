@@ -108,6 +108,8 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
         // `large_icon` (this URL) shows the colored logo in the expanded
         // notification card.
         large_icon: largeIcon,
+        // Cold native launches and web push clicks request trivia immediately.
+        ...(data?.type === "daily_trivia" ? { url: `${APP_BASE_URL}/?trivia=1` } : {}),
         data,
       }),
     });
