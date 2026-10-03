@@ -5,7 +5,7 @@ description: Billing readiness must be checked in Railway production independent
 
 Treat Replit workspace secrets and Railway production secrets as separate configurations.
 
-**Why:** An Apple checkout investigation found all required names present in the workspace but absent from the running Railway service. The workspace signing credential also failed validation, so copying existing entries without validating them would not resolve readiness.
+**Why:** An Apple checkout investigation found all required names present in the workspace but absent from the running Railway service. The workspace signing credential also failed validation, so copying existing entries without validating them would not resolve readiness. The owner confirmed native Apple checkout worked after correcting the full `.p8` contents and redeploying Railway; this server-side credential repair did not require an iPhone app rebuild.
 
 **How to apply:** Check deployed secret names without retrieving values, and use safe readiness checks that return only status. Do not infer production readiness from workspace presence or bypass checkout verification when configuration is unavailable.
 
