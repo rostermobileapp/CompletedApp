@@ -68,3 +68,4 @@
 - [Anthropic model compatibility](anthropic-model-compatibility.md) — model availability checks do not validate Messages options; test the full generation/verification flow.
 - [Temporary test services](temporary-test-services.md) — use tracked background processes and explicit local DB connection parameters; workspace PG defaults can leak into fixtures.
 - [Verification runtime compatibility](verification-runtime-compatibility.md) — testing delegation may be unavailable; isolate dynamic import graphs in bundled checks without weakening auth.
+- [Production secret boundary](production-secret-boundary.md) — Replit workspace secret presence does not establish Railway billing readiness; validate configuration in its actual environment.
