@@ -248,6 +248,7 @@ export async function lookupTransactionById(transactionId: string): Promise<{
   }
 
   if (!res.ok) {
+    console.warn('[Apple IAP verification]', { stage: 'transaction_lookup', httpStatus: res.status, environment });
     throw new Error(`Apple transactions API unavailable (HTTP ${res.status})`);
   }
 

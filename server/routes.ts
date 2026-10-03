@@ -5947,26 +5947,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/iap/verify-apple-automatic', isAuthenticated, async (req: any, res) => {
-    res.set('Cache-Control', 'no-store');
-    try {
-      const userId = req.user.claims.sub;
-      assertNativeBillingRequestAccount(userId, req.body ?? {});
-      const loginId = nativePurchaseLoginId(userId, 'ios');
-      if (req.body?.loginId !== loginId) return res.status(409).json({ message: 'Your purchase account changed. Reopen Subscription.' });
+  const activateVerifiedAppleAccount = async (userId: string, loginId: string, expectedProductId?: unknown) => {
       const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } = await import('./applePurchaseLinks');
       const existing = await reconcileApplePurchaseLinkForUser(userId);
-      if (existing?.active && (existing.role === 'commissioner' || existing.role === 'player_pro')) {
-        if (req.body?.expectedProductId && req.body.expectedProductId !== existing.productId) {
-          return res.status(409).json({ message: 'The verified Apple subscription does not match the selected plan.' });
-        }
-        return res.json({ verified: true, role: existing.role });
+      if (existing?.active && (existing.role === 'commissioner' || existing.role === 'player_pro') &&
+          (!expectedProductId || expectedProductId === existing.productId)) {
+        return { verified: true, role: existing.role };
       }
       const { activateAppleAutomatically } = await import('./appleAutomaticActivation');
       const { getRevenueCatActiveAppleSubscriptions } = await import('./revenueCatApi');
       const { lookupTransactionById } = await import('./appleIap');
-      const result = await activateAppleAutomatically({
-        userId, loginId, expectedProductId: req.body?.expectedProductId,
+      return activateAppleAutomatically({
+        userId, loginId, expectedProductId,
         dependencies: {
           getSubscriptions: async id => {
             for (let attempt = 0; attempt < 3; attempt++) {
@@ -5983,9 +5975,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         },
       });
-      return res.json(result);
+  };
+
+  app.post('/api/iap/verify-apple-automatic', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const userId = req.user.claims.sub;
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
+      const loginId = nativePurchaseLoginId(userId, 'ios');
+      if (req.body?.loginId !== loginId) return res.status(409).json({ message: 'Your purchase account changed. Reopen Subscription.' });
+      return res.json(await activateVerifiedAppleAccount(userId, loginId, req.body?.expectedProductId));
     } catch (error) {
       return sendNativeVerificationError(res, error);
+    }
+  });
+
+  app.post('/api/webhooks/revenuecat-native', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const { handleNativeRevenueCatWebhook } = await import('./nativeRevenueCatWebhook');
+      const result = await handleNativeRevenueCatWebhook({
+        authorization: req.headers.authorization,
+        secret: process.env.REVENUECAT_WEBHOOK_SECRET,
+        body: req.body,
+      }, {
+        findAppleUser: async customerId => {
+          // The HMAC identity is intentionally not reversible. Match only IDs
+          // derived from existing Roster users; ignore client aliases/attributes.
+          let cursor = '';
+          for (;;) {
+            const page = await pool.query<{ id: string }>(
+              'SELECT id FROM users WHERE id > $1 ORDER BY id LIMIT 500', [cursor],
+            );
+            for (const user of page.rows) {
+              if (nativePurchaseLoginId(user.id, 'ios') === customerId) return user.id;
+            }
+            if (page.rows.length < 500) return undefined;
+            cursor = page.rows[page.rows.length - 1].id;
+          }
+        },
+        activateApple: async (userId, customerId, productId) => {
+          await activateVerifiedAppleAccount(userId, customerId, productId);
+        },
+      });
+      console.info('[NativeBilling webhook]', { status: result.status, processed: result.body.processed, reason: result.body.reason });
+      return res.status(result.status).json(result.body);
+    } catch (error) {
+      // Keep provider retries alive when verification is unavailable. Never
+      // acknowledge a failed grant, expose event/customer data, or grant from payload.
+      console.warn('[NativeBilling webhook]', { processed: false, stage: 'verification_failed',
+        status: typeof (error as any)?.status === 'number' ? (error as any).status : 503 });
+      return res.status(503).json({ processed: false, reason: 'verification_unavailable' });
     }
   });
 

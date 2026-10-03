@@ -14,3 +14,9 @@ The available Railway integration cannot execute commands in a live service cont
 **Why:** A runtime signing-key check could not be executed through the integration. Successful deployment, quiet logs, and sandbox results were insufficient to validate the deployed key.
 
 **How to apply:** Use authenticated readiness, authorized Railway SSH, or a sanitized startup self-test for live validation. Do not treat a sandbox check as production evidence or retrieve private-key values to work around missing execution access. A new diagnostic requires deploying its updated source build; redeploying the previous image only refreshes that old build.
+
+Local signing readiness does not establish Apple API authorization.
+
+**Why:** A correctly formatted key passed import/signing, while a read-only transaction lookup using workspace credentials returned Apple HTTP 401. A store purchase was independently active in RevenueCat while Roster access remained unchanged.
+
+**How to apply:** Separate key parsing/signing, Apple API authorization, canonical purchase ownership, and persisted account access. Diagnose each in its actual environment; never infer Railway authorization from a workspace lookup or grant access merely because checkout completed.

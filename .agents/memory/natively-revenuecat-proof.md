@@ -50,3 +50,9 @@ RevenueCat v1 subscriber GET is get-or-create, not a side-effect-free existence 
 **Why:** Diagnostic reads of unknown IDs can create empty customers.
 
 **How to apply:** Restrict reporting diagnostics to known IDs and trusted operators. Do not probe arbitrary customer identifiers.
+
+Activation needs a recovery path independent of the webview purchase callback.
+
+**Why:** A real Apple Commissioner purchase appeared active in RevenueCat, but no post-checkout verification request reached Roster. Refreshing and force-closing did not recover access; provider notifications were arriving at an unhandled endpoint.
+
+**How to apply:** Authenticated provider notifications may trigger the same independent Apple verification and canonical ownership checks as user-initiated recovery. Never grant from webhook product/entitlement fields alone, infer ownership from anonymous aliases, or acknowledge failed verification as successful processing.
