@@ -13,4 +13,4 @@ The available Railway integration cannot execute commands in a live service cont
 
 **Why:** A runtime signing-key check could not be executed through the integration. Successful deployment, quiet logs, and sandbox results were insufficient to validate the deployed key.
 
-**How to apply:** Use the existing authenticated readiness endpoint or authorized Railway SSH for live validation. Do not treat a sandbox check as production evidence or retrieve private-key values to work around missing execution access.
+**How to apply:** Use authenticated readiness, authorized Railway SSH, or a sanitized startup self-test for live validation. Do not treat a sandbox check as production evidence or retrieve private-key values to work around missing execution access. A new diagnostic requires deploying its updated source build; redeploying the previous image only refreshes that old build.

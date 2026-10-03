@@ -14,6 +14,7 @@ import { reconcileSeasonSubMagnet, reconcileSeasonRsvpKing } from "./badges";
 import { runHistoricalBadgeBackfills } from "./badgeDbInit";
 import { initAccountUserMergeDb } from "./accountUserMergeDbInit";
 import { startDailyTriviaPushJob } from "./triviaPushJob";
+import { checkAppleSigningReadiness } from "./appleSigningReadiness";
 
 const app = express();
 
@@ -85,6 +86,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Report only sanitized status from this actual runtime, never key material or JWTs.
+  const appleSigningReadiness = await checkAppleSigningReadiness();
+  console.info('[Apple IAP readiness]', JSON.stringify({
+    ...appleSigningReadiness,
+    revenueCatConfigured: Boolean(process.env.REVENUECAT_API_KEY),
+  }));
   // Initialize referral program tables before registering routes.
   await initReferralDb();
   await initDraftDb();

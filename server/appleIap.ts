@@ -14,6 +14,7 @@
 
 import { SignJWT, importPKCS8, decodeProtectedHeader, importX509, compactVerify } from 'jose';
 import { X509Certificate } from 'node:crypto';
+import { checkAppleSigningReadiness, normalizeApplePrivateKey } from './appleSigningReadiness';
 
 // Apple Root CA G3 (EC key) — publicly available at https://www.apple.com/certificateauthority/
 // This is the trust anchor for all Apple App Store Server API JWS payloads.
@@ -95,14 +96,7 @@ export function isAppleIapConfigured(): boolean {
  * This deliberately returns no provider detail and never logs credentials.
  */
 export async function isAppleIapSigningKeyUsable(): Promise<boolean> {
-  if (!isAppleIapConfigured()) return false;
-  try {
-    const pem = process.env.APPLE_IAP_PRIVATE_KEY!.replace(/\\n/g, '\n');
-    await importPKCS8(pem, 'ES256');
-    return true;
-  } catch {
-    return false;
-  }
+  return (await checkAppleSigningReadiness()).available;
 }
 
 /**
@@ -121,7 +115,7 @@ export async function generateAppleJWT(): Promise<string> {
   // Env vars often store multi-line PEM keys with literal \n instead of real newlines.
   // Normalize both forms so importPKCS8 can parse it correctly.
   const rawKey = process.env.APPLE_IAP_PRIVATE_KEY!;
-  const privateKeyPem = rawKey.replace(/\\n/g, '\n');
+  const privateKeyPem = normalizeApplePrivateKey(rawKey);
 
   const privateKey = await importPKCS8(privateKeyPem, 'ES256');
 
