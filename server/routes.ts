@@ -5947,18 +5947,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const activateVerifiedAppleAccount = async (userId: string, loginId: string, expectedProductId?: unknown) => {
+  const activateVerifiedAppleAccount = async (
+    userId: string, loginId: string, expectedProductId?: unknown,
+    trustedTransaction?: import('./revenueCatAppleActivation').TrustedRevenueCatTransaction,
+  ) => {
       const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } = await import('./applePurchaseLinks');
       const existing = await reconcileApplePurchaseLinkForUser(userId);
       if (existing?.active && (existing.role === 'commissioner' || existing.role === 'player_pro') &&
           (!expectedProductId || expectedProductId === existing.productId)) {
         return { verified: true, role: existing.role };
       }
-      const { activateAppleAutomatically } = await import('./appleAutomaticActivation');
+      const { activateRevenueCatApplePurchase } = await import('./revenueCatAppleActivation');
       const { getRevenueCatActiveAppleSubscriptions } = await import('./revenueCatApi');
-      const { lookupTransactionById } = await import('./appleIap');
-      return activateAppleAutomatically({
-        userId, loginId, expectedProductId,
+      return activateRevenueCatApplePurchase({
+        userId, loginId, expectedProductId, trustedTransaction,
         dependencies: {
           getSubscriptions: async id => {
             for (let attempt = 0; attempt < 3; attempt++) {
@@ -5968,7 +5970,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             return [];
           },
-          lookupTransactionById, claim: claimAutomaticApplePurchase,
+          getOwnedLineage: async (id, customerId) => {
+            const link = (await pool.query<{ original_transaction_id: string; original_purchased_at: Date }>(
+              'SELECT original_transaction_id, original_purchased_at FROM apple_purchase_links WHERE user_id = $1 AND customer_id = $2',
+              [id, customerId],
+            )).rows[0];
+            return link ? { originalTransactionId: link.original_transaction_id,
+              originalPurchasedAt: new Date(link.original_purchased_at).toISOString() } : undefined;
+          },
+          claim: claimAutomaticApplePurchase,
           reconcileUser: async id => {
             const role = (await reconcileApplePurchaseLinkForUser(id))?.role ?? 'free_tier';
             return role === 'secondary_commissioner' ? 'player_pro' : role;
@@ -5986,6 +5996,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body?.loginId !== loginId) return res.status(409).json({ message: 'Your purchase account changed. Reopen Subscription.' });
       return res.json(await activateVerifiedAppleAccount(userId, loginId, req.body?.expectedProductId));
     } catch (error) {
+      if ((error as any)?.status === 202) {
+        return res.status(202).json({ verified: false, pending: true,
+          message: 'Your purchase is recorded and activation is pending. Do not purchase again.' });
+      }
+      return sendNativeVerificationError(res, error);
+    }
+  });
+
+  app.post('/api/iap/sync-apple', isAuthenticated, async (req: any, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const userId = req.user.claims.sub;
+      assertNativeBillingRequestAccount(userId, req.body ?? {});
+      const loginId = nativePurchaseLoginId(userId, 'ios');
+      const result = await activateVerifiedAppleAccount(userId, loginId);
+      return res.json(result);
+    } catch (error) {
+      if ((error as any)?.status === 202) return res.status(202).json({ verified: false, pending: true });
+      if ((error as any)?.status === 402) return res.json({ verified: false, active: false });
       return sendNativeVerificationError(res, error);
     }
   });
@@ -6014,8 +6043,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cursor = page.rows[page.rows.length - 1].id;
           }
         },
-        activateApple: async (userId, customerId, productId) => {
-          await activateVerifiedAppleAccount(userId, customerId, productId);
+        activateApple: async (userId, customerId, productId, transaction) => {
+          await activateVerifiedAppleAccount(userId, customerId, productId, transaction);
+        },
+        reconcileApple: async userId => {
+          const { reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
+          const { getRevenueCatAppleSubscriptions } = await import('./revenueCatApi');
+          // Reconciliation retains last verified access during provider outages.
+          // A webhook must still retry instead of acknowledging that outage.
+          await getRevenueCatAppleSubscriptions(nativePurchaseLoginId(userId, 'ios'));
+          await reconcileApplePurchaseLinkForUser(userId);
         },
       });
       console.info('[NativeBilling webhook]', { status: result.status, processed: result.body.processed, reason: result.body.reason });
@@ -6032,8 +6069,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/iap/apple-readiness', isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      const { isAppleIapSigningKeyUsable } = await import('./appleIap');
-      return res.json({ userId: req.user.claims.sub, available: await isAppleIapSigningKeyUsable() });
+      const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+      return res.json({ userId: req.user.claims.sub,
+        available: isRevenueCatApiConfigured() && Boolean(process.env.REVENUECAT_WEBHOOK_SECRET) });
     } catch {
       return res.json({ userId: req.user.claims.sub, available: false });
     }
@@ -6044,12 +6082,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
-      const { isAppleIapSigningKeyUsable } = await import('./appleIap');
       const existing = req.query?.mode === 'restore' ? await pool.query(
         "SELECT 1 FROM apple_purchase_links WHERE user_id = $1 AND customer_id NOT LIKE 'apple_store_%' LIMIT 1", [userId],
       ) : null;
       return res.json({ userId, loginId: nativePurchaseLoginId(userId, 'ios'),
-        available: isRevenueCatApiConfigured() && (Boolean(existing?.rowCount) || await isAppleIapSigningKeyUsable()) });
+        available: isRevenueCatApiConfigured() && (Boolean(existing?.rowCount) || Boolean(process.env.REVENUECAT_WEBHOOK_SECRET)) });
     } catch {
       return res.status(503).json({ message: 'Apple purchase verification is unavailable. Try later; checkout was not opened.' });
     }

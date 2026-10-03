@@ -13,8 +13,8 @@ function fixture() {
     account: async () => { events.push('account'); return { userId: 'account-a', loginId: 'test-login', available: true }; },
     purchase: async product => { events.push('purchase'); return { productIdentifier: product, transactionId: 'apple-transaction' }; },
     restore: async () => { events.push('restore'); return [{ productIdentifier: 'player_pro_monthly', jwsRepresentation: 'signed-apple-proof' }]; },
-    verify: async payload => { events.push('verify'); assert.equal(payload.expectedUserId, 'account-a'); assert.equal(payload.loginId, 'test-login'); return { role: 'player_pro' }; },
-    refresh: async (id, role) => { events.push('refresh'); assert.equal(id, 'account-a'); assert.equal(role, 'player_pro'); },
+    verify: async payload => { events.push('verify'); assert.equal(payload.expectedUserId, 'account-a'); assert.equal(payload.loginId, 'test-login'); return { role: payload.expectedProductId?.includes('commissioner') ? 'commissioner' : 'player_pro' }; },
+    refresh: async (id, role) => { events.push('refresh'); assert.equal(id, 'account-a'); assert.ok(['player_pro', 'commissioner'].includes(role)); },
   };
   return { flow, events, switchUser() { user = 'account-b'; version++; } };
 }
@@ -97,6 +97,42 @@ test('cancellation is preserved and releases the shared lock', async () => {
   await assert.rejects(activateIosPurchase(flow, 'player_pro_monthly'), { code: 'PURCHASE_CANCELLED' });
   await activateIosPurchase(fixture().flow, 'player_pro_monthly');
 });
+test('pending webhook activation polls without starting another purchase', async () => {
+  const { flow, events } = fixture();
+  let attempts = 0;
+  flow.waitForVerification = async () => {};
+  flow.verify = async () => ++attempts < 3 ? { pending: true } : { role: 'commissioner' };
+  await activateIosPurchase(flow, 'commissioner_monthly');
+  assert.equal(attempts, 3);
+  assert.equal(events.filter(event => event === 'purchase').length, 1);
+  assert.equal(events.filter(event => event === 'refresh').length, 1);
+});
+
+test('pending activation never produces a false subscription success', async () => {
+  const { flow, events } = fixture();
+  flow.waitForVerification = async () => {};
+  flow.verify = async () => ({ pending: true });
+  await assert.rejects(activateIosPurchase(flow, 'commissioner_monthly'), /activation is pending.*Do not purchase again/);
+  assert.ok(!events.includes('refresh'));
+});
+
+test('account switching while waiting aborts further verification', async () => {
+  const f = fixture();
+  let calls = 0;
+  f.flow.verify = async () => { calls++; return { pending: true }; };
+  f.flow.waitForVerification = async () => f.switchUser();
+  await assert.rejects(activateIosPurchase(f.flow, 'commissioner_monthly'), /account changed/);
+  assert.equal(calls, 1);
+});
+
+test('Player Pro cannot satisfy a Commissioner purchase', async () => {
+  const { flow } = fixture();
+  flow.verify = async () => ({ role: 'player_pro' });
+  await assert.rejects(activateIosPurchase(flow, 'commissioner_monthly'), /Commissioner access has not been applied/);
+});
+
+// This deliberately poisons the native-operation state until webview restart.
+// Keep it last rather than weakening production timeout/account-race safeguards.
 test('iOS timeout is ambiguous, not an invitation to pay again', async () => {
   const { flow } = fixture();
   flow.purchase = async () => { throw new Error('NATIVELY_TIMEOUT'); };

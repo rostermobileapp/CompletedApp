@@ -80,14 +80,22 @@ export async function claimAutomaticApplePurchaseWithClient(
       if (existing.length !== 1 || link.user_id !== input.userId ||
           link.customer_id !== input.customerId ||
           link.original_transaction_id !== input.originalTransactionId ||
-          link.product_id !== input.productId ||
-          +new Date(link.original_purchased_at) !== +purchasedAt) {
+          (link.association_source !== 'automatic' && (
+            link.product_id !== input.productId ||
+            +new Date(link.original_purchased_at) !== +purchasedAt))) {
         throw conflict('This Apple subscription is already linked to another account. Contact support.');
       }
       if (link.association_source === 'operator_attested') {
         await client.query('COMMIT');
         return;
       }
+      // A verified same-owner/same-lineage plan change is not a new claim.
+      await client.query(
+        `UPDATE apple_purchase_links SET product_id = $2,
+                original_purchased_at = $3, expires_at = $4
+          WHERE user_id = $1`,
+        [input.userId, input.productId, purchasedAt, expiresAt],
+      );
     } else {
       await client.query(
         `INSERT INTO apple_purchase_links

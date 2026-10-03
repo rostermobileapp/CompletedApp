@@ -9,6 +9,8 @@ interface RevenueCatSubscription {
   refunded_at?: string | null;
   ownership_type?: string | null;
   store_transaction_id?: string | number | null;
+  grace_period_expires_date?: string | null;
+  is_sandbox?: boolean;
 }
 
 interface RevenueCatResponse {
@@ -64,9 +66,11 @@ export function getActiveAppleSubscriptions(
 
   return Object.entries(subscriptions).flatMap(([productId, sub]) => {
     const role = IAP_PRODUCT_ROLES[productId];
-    if (!role || !sub || sub.store !== 'app_store' ||
+    if (!role || !sub || sub.store !== 'app_store' || sub.is_sandbox === true ||
         sub.refunded_at || sub.ownership_type !== 'PURCHASED') return [];
-    const expiry = Date.parse(sub.expires_date ?? '');
+    const paidExpiry = Date.parse(sub.expires_date ?? '');
+    const graceExpiry = Date.parse(sub.grace_period_expires_date ?? '');
+    const expiry = Number.isFinite(graceExpiry) ? Math.max(paidExpiry, graceExpiry) : paidExpiry;
     const original = Date.parse(sub.original_purchase_date ?? '');
     if (!Number.isFinite(expiry) || expiry <= now || !Number.isFinite(original)) return [];
     return [{

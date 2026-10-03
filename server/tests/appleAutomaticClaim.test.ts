@@ -58,6 +58,12 @@ class MockClaimClient implements AppleClaimQueryClient {
         link.original_transaction_id === values[2]);
       return { rows, rowCount: rows.length };
     }
+    if (text.includes('UPDATE apple_purchase_links SET product_id')) {
+      const link = this.links.find(link => link.user_id === values[0])!;
+      link.product_id = String(values[1]);
+      link.original_purchased_at = values[2] as Date;
+      return { rows: [], rowCount: 1 };
+    }
     if (text.includes('INSERT INTO apple_purchase_links')) {
       this.inserted += 1;
       this.links.push({
@@ -169,4 +175,19 @@ test('matching operator-attested link is preserved without automatic rewrite', a
   );
   assert.equal(client.inserted, 0);
   assert.equal(client.links[0].association_source, 'operator_attested');
+});
+
+test('same-owner automatic Commissioner upgrade retains the original claim', async () => {
+  const client = new MockClaimClient();
+  const customerId = `roster_ios_${'a'.repeat(64)}`;
+  client.users.set('user-a', {
+    id: 'user-a', role: 'player_pro', stripe_subscription_id: null, iap_original_transaction_id: LINEAGE,
+  });
+  await claimAutomaticApplePurchaseWithClient(client, validInput('user-a', customerId));
+  await claimAutomaticApplePurchaseWithClient(client, {
+    ...validInput('user-a', customerId), productId: 'com.rosterapp.commissioner_monthly',
+  });
+  assert.equal(client.inserted, 1);
+  assert.equal(client.links[0].original_transaction_id, LINEAGE);
+  assert.equal(client.links[0].product_id, 'com.rosterapp.commissioner_monthly');
 });

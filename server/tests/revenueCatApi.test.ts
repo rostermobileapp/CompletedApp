@@ -96,3 +96,27 @@ test('provider errors fail explicitly and do not treat a failed lookup as no sub
     fetcher: async () => assert.fail('Invalid IDs must never reach RevenueCat'),
   }), /Invalid RevenueCat customer ID/);
 });
+
+test('cancelling renewal retains paid access until expiry', () => {
+  const response = { subscriber: { subscriptions: {
+    'com.rosterapp.player_pro_monthly': { ...purchased, unsubscribe_detected_at: '2026-09-27T00:00:00Z' },
+  } } };
+  assert.equal(getActiveAppleSubscriptions(response, Date.parse('2026-10-01')).length, 1);
+  assert.equal(getActiveAppleSubscriptions(response, Date.parse('2026-10-27')).length, 0);
+});
+
+test('verified billing grace extends access but a refund still removes it', () => {
+  const sub = { ...purchased, expires_date: '2026-09-01T00:00:00Z', grace_period_expires_date: '2026-09-05T00:00:00Z' };
+  const response = { subscriber: { subscriptions: { 'com.rosterapp.player_pro_monthly': sub } } };
+  assert.equal(getActiveAppleSubscriptions(response, Date.parse('2026-09-03'))[0].expiresAt, '2026-09-05T00:00:00.000Z');
+  assert.equal(getActiveAppleSubscriptions(response, Date.parse('2026-09-06')).length, 0);
+  assert.equal(getActiveAppleSubscriptions({ subscriber: { subscriptions: {
+    'com.rosterapp.player_pro_monthly': { ...sub, refunded_at: '2026-09-02T00:00:00Z' },
+  } } }, Date.parse('2026-09-03')).length, 0);
+});
+
+test('sandbox subscriptions cannot activate production access', () => {
+  assert.deepEqual(getActiveAppleSubscriptions({ subscriber: { subscriptions: {
+    'com.rosterapp.player_pro_monthly': { ...purchased, is_sandbox: true },
+  } } }, Date.parse('2026-09-27')), []);
+});

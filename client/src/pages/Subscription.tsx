@@ -558,6 +558,44 @@ export default function Subscription() {
     refresh: refreshNativeTier,
   }, productId);
 
+  // Read-only account recovery; never invokes native restore, reassociation,
+  // or checkout on page load/resume. Notifications can activate a purchase
+  // even when the installed shell never delivered its checkout callback.
+  useEffect(() => {
+    if (!platformReady || !isIos || !user?.id || isLoading) return;
+    const userId = user.id;
+    const version = billingAccountVersion.current;
+    let active = true;
+    let running = false;
+    const sync = async () => {
+      if (!active || running || document.visibilityState === 'hidden' ||
+          purchaseUserId.current !== userId || billingAccountVersion.current !== version) return;
+      running = true;
+      try {
+        await apiRequest('POST', '/api/iap/sync-apple', { expectedUserId: userId });
+        if (!active || purchaseUserId.current !== userId || billingAccountVersion.current !== version) return;
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['/api/user'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] }),
+        ]);
+      } catch {
+        // Keep the last confirmed UI; manual restore exposes actionable errors.
+      } finally {
+        running = false;
+      }
+    };
+    void sync();
+    const interval = window.setInterval(sync, 15000);
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('pageshow', sync);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('pageshow', sync);
+    };
+  }, [platformReady, isIos, user?.id, isLoading]);
+
   const handleIosPurchase = async (tier: 'player_pro' | 'commissioner') => {
     setIsLoading(true);
     try {

@@ -12,7 +12,8 @@ export interface IosPurchaseFlow extends NativeAssociationFlow {
   account(): Promise<{ userId: string; available: boolean; loginId?: string }>;
   purchase(productId: string): Promise<ApplePurchaseProof>;
   restore(): Promise<ApplePurchaseProof[]>;
-  verify(payload: { loginId: string; expectedUserId: string; expectedProductId?: string }): Promise<{ role?: string }>;
+  verify(payload: { loginId: string; expectedUserId: string; expectedProductId?: string }): Promise<{ role?: string; pending?: boolean }>;
+  waitForVerification?(): Promise<void>;
   refresh(userId: string, role: string): Promise<void>;
 }
 
@@ -41,12 +42,23 @@ export async function activateIosPurchase(flow: IosPurchaseFlow, productId?: str
       assertAccount();
       await assertNative();
       logBillingStage('ios', 'verify');
-      const result = await flow.verify({
+      const payload = {
           loginId: account.loginId!, expectedUserId: userId!,
           ...(productId ? { expectedProductId: `com.rosterapp.${productId}` } : {}),
-      });
+      };
+      let result = await flow.verify(payload);
+      for (let attempt = 0; result.pending && attempt < 10; attempt++) {
+        assertAccount();
+        await (flow.waitForVerification?.() ?? new Promise(resolve => setTimeout(resolve, 2000)));
+        assertAccount();
+        result = await flow.verify(payload);
+      }
       await assertNative();
+      if (result.pending) throw new Error('Your purchase is recorded and activation is pending. Reopen Subscription shortly.');
       if (!result.role || result.role === 'free_tier') throw new Error('No active App Store subscription was verified.');
+      if (productId?.startsWith('commissioner_') && result.role !== 'commissioner') {
+        throw new Error('Commissioner access has not been applied yet.');
+      }
       logBillingStage('ios', 'refresh');
       await flow.refresh(userId!, result.role);
       await assertNative();

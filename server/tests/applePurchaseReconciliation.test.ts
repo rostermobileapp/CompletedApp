@@ -8,12 +8,43 @@ import {
   type AppleReconciliationDependencies,
 } from '../applePurchaseReconciliation';
 import type { VerifiedAppleSubscription } from '../revenueCatApi';
+import { getActiveAppleSubscriptions } from '../revenueCatApi';
+import { handleNativeRevenueCatWebhook } from '../nativeRevenueCatWebhook';
 
 const USER_ID = 'user-1';
 const ORIGINAL = '100000000001';
 const PURCHASED = new Date('2025-02-01T00:00:00.000Z');
 const NOW = new Date('2026-03-01T00:00:00.000Z');
 const FUTURE_EXPIRY = new Date('2026-04-01T00:00:00.000Z');
+
+for (const scenario of ['cancel-renewal', 'expiration', 'refund'] as const) {
+  test(`RevenueCat lifecycle ${scenario} applies the actual paid-access state without Apple API lookup`, async () => {
+    const expiry = scenario === 'expiration' ? '2026-02-01T00:00:00Z' : FUTURE_EXPIRY.toISOString();
+    const link = makeLink({ expires_at: new Date(expiry) });
+    const db = makeDatabase({ link, role: 'commissioner', roleBeforeApple: 'free_tier' });
+    const subscriptions = getActiveAppleSubscriptions({ subscriber: { subscriptions: {
+      'com.rosterapp.commissioner_monthly': {
+        store: 'app_store', ownership_type: 'PURCHASED',
+        original_purchase_date: PURCHASED.toISOString(), expires_date: expiry,
+        refunded_at: scenario === 'refund' ? NOW.toISOString() : null,
+      },
+    } } }, NOW.getTime());
+    const result = await handleNativeRevenueCatWebhook({
+      authorization: 'fixture-secret', secret: 'fixture-secret',
+      body: { event: {
+        type: scenario === 'expiration' ? 'EXPIRATION' : 'CANCELLATION',
+        store: 'APP_STORE', environment: 'PRODUCTION',
+        app_user_id: `roster_ios_${'a'.repeat(64)}`, product_id: 'com.rosterapp.commissioner_monthly',
+      } },
+    }, {
+      findAppleUser: async () => USER_ID,
+      activateApple: async () => assert.fail('Lifecycle status must not grant from event fields'),
+      reconcileApple: async () => reconcileOne(link, dependencies(db, { subscriptions })),
+    });
+    assert.equal(result.status, 200);
+    assert.equal(db.user.role, scenario === 'cancel-renewal' ? 'commissioner' : 'free_tier');
+  });
+}
 
 function makeLink(overrides: Partial<ApplePurchaseLink> = {}): ApplePurchaseLink {
   return {

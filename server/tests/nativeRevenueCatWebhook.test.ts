@@ -15,7 +15,8 @@ function fixture() {
     calls,
     dependencies: {
       findAppleUser: async (id: string): Promise<string | undefined> => { calls.push(['find', id]); return 'account-a'; },
-      activateApple: async (...args: [string, string, string]) => { calls.push(['verify', ...args]); },
+      activateApple: async (...args: [string, string, string, unknown?]) => { calls.push(['verify', ...args]); },
+      reconcileApple: async (userId: string) => { calls.push(['reconcile', userId]); },
     },
   };
 }
@@ -27,7 +28,7 @@ for (const authorization of ['webhook-secret', 'Bearer webhook-secret']) {
       authorization, secret: 'webhook-secret', body: { event },
     }, f.dependencies);
     assert.deepEqual(result, { status: 200, body: { processed: true } });
-    assert.deepEqual(f.calls, [['find', customerId], ['verify', 'account-a', customerId, event.product_id]]);
+    assert.deepEqual(f.calls, [['find', customerId], ['verify', 'account-a', customerId, event.product_id, undefined]]);
   });
 }
 
@@ -62,7 +63,6 @@ for (const change of [
   { store: 'PLAY_STORE' },
   { environment: 'SANDBOX' },
   { type: 'TEST' },
-  { type: 'EXPIRATION' },
   { type: 'TRANSFER' },
 ]) {
   test(`unsupported event never grants (${JSON.stringify(change)})`, async () => {
@@ -108,5 +108,34 @@ test('a product change verifies the new plan instead of granting from a schedule
     body: { event: { ...event, type: 'PRODUCT_CHANGE',
       product_id: 'com.rosterapp.player_pro_monthly', new_product_id: event.product_id } },
   }, f.dependencies);
-  assert.deepEqual(f.calls[1], ['verify', 'account-a', customerId, event.product_id]);
+  assert.deepEqual(f.calls[1], ['verify', 'account-a', customerId, event.product_id, undefined]);
+});
+
+for (const type of ['CANCELLATION', 'EXPIRATION', 'BILLING_ISSUE', 'SUBSCRIPTION_PAUSED']) {
+  test(`${type} refreshes current status instead of granting or blindly revoking`, async () => {
+    const f = fixture();
+    const result = await handleNativeRevenueCatWebhook({
+      authorization: 'webhook-secret', secret: 'webhook-secret', body: { event: { ...event, type } },
+    }, f.dependencies);
+    assert.equal(result.status, 200);
+    assert.deepEqual(f.calls, [['find', customerId], ['reconcile', 'account-a']]);
+  });
+}
+
+test('an authenticated notification passes canonical lineage separately from client fields', async () => {
+  const f = fixture();
+  await handleNativeRevenueCatWebhook({
+    authorization: 'webhook-secret', secret: 'webhook-secret',
+    body: { event: { ...event, original_transaction_id: '100000000001', transaction_id: '200000000002' } },
+  }, f.dependencies);
+  assert.deepEqual(f.calls[1], ['verify', 'account-a', customerId, event.product_id,
+    { originalTransactionId: '100000000001', transactionId: '200000000002' }]);
+});
+
+test('provider failure during cancellation must remain retryable', async () => {
+  const f = fixture();
+  f.dependencies.reconcileApple = async () => { throw Object.assign(new Error('Unavailable'), { status: 503 }); };
+  await assert.rejects(handleNativeRevenueCatWebhook({
+    authorization: 'webhook-secret', secret: 'webhook-secret', body: { event: { ...event, type: 'CANCELLATION' } },
+  }, f.dependencies), { status: 503 });
 });

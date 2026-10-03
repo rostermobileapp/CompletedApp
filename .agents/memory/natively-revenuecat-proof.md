@@ -7,7 +7,7 @@ On 2026-10-02 the owner explicitly chose “Repair the existing Natively flow”
 
 **Why:** Natively's documented native purchase infrastructure uses RevenueCat and does not promise raw Google purchase tokens or Apple transactions in its JavaScript callbacks. A strict store-only rewrite was incompatible with that contract.
 
-**How to apply:** Keep Roster login separate. Use authenticated, server-derived purchase identities and server-verified subscription records; preserve independent store verification and canonical ownership claims. Native callback success, arbitrary anonymous IDs, aliases, and attributes alone never grant access.
+**How to apply:** Keep Roster login separate. Use authenticated, server-derived purchase identities and server-verified subscription records; preserve canonical ownership claims and the direct-store proof route's safeguards. Native callback success, arbitrary anonymous IDs, aliases, and attributes alone never grant access.
 
 The owner reports that native purchases worked before the recent changes and supplied Natively's configured iOS/Android purchase settings plus its official purchases documentation.
 
@@ -55,10 +55,16 @@ Activation needs a recovery path independent of the webview purchase callback.
 
 **Why:** A real Apple Commissioner purchase appeared active in RevenueCat, but no post-checkout verification request reached Roster. Refreshing and force-closing did not recover access; provider notifications were arriving at an unhandled endpoint.
 
-**How to apply:** Authenticated provider notifications may trigger the same independent Apple verification and canonical ownership checks as user-initiated recovery. Never grant from webhook product/entitlement fields alone, infer ownership from anonymous aliases, or acknowledge failed verification as successful processing.
+**How to apply:** Authenticate provider notifications, check current server-read RevenueCat status, and retain canonical ownership before activation. Never grant from webhook product/entitlement fields alone, infer ownership from anonymous aliases, or acknowledge failed verification as successful processing.
 
 Preserve automatic downgrade when an Apple subscription's paid access ends, even if native verification is simplified.
 
 **Why:** The owner specifically asked whether removing the additional Apple API lookup would compromise automatic downgrades after Apple cancellation. RevenueCat documents cancellation of renewal separately from expiration; a normal cancellation is not immediate loss of paid access.
 
-**How to apply:** Keep access until verified expiration, handle refunds/revocations from current provider status, and retain independent billing-source access. RevenueCat can supply these lifecycle changes without a separate Apple API call; this does not authorize removing canonical ownership safeguards or imply the current activation flow already supports that change.
+**How to apply:** Keep access until verified expiration, handle refunds/revocations from current provider status, and retain independent billing-source access.
+
+On 2026-10-03 the owner approved RevenueCat server-verified status as the authority for named-customer Apple activation and ongoing access, without a separate Apple API gate.
+
+**Why:** A paid Commissioner subscription was active in RevenueCat while the additional Apple API lookup failed. The owner's approval explicitly depends on preserving automatic downgrades after paid access ends.
+
+**How to apply:** First-time ownership requires the original transaction ID from an authenticated provider notification matched against a current RevenueCat transaction, not a client hint or latest renewal ID. Retain original ownership across renewals, check current expiry/refund/grace status, and preserve other billing sources. Do not replace legacy direct-Apple sources or their verification merely to simplify the named-customer path.
