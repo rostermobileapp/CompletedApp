@@ -15,8 +15,7 @@ function fixture() {
     calls,
     dependencies: {
       findAppleUser: async (id: string): Promise<string | undefined> => { calls.push(['find', id]); return 'account-a'; },
-      activateApple: async (...args: [string, string, string, unknown?]) => { calls.push(['verify', ...args]); },
-      reconcileApple: async (userId: string) => { calls.push(['reconcile', userId]); },
+      syncApple: async (...args: [string, string, unknown?]) => { calls.push(['sync', ...args]); },
     },
   };
 }
@@ -28,7 +27,7 @@ for (const authorization of ['webhook-secret', 'Bearer webhook-secret']) {
       authorization, secret: 'webhook-secret', body: { event },
     }, f.dependencies);
     assert.deepEqual(result, { status: 200, body: { processed: true } });
-    assert.deepEqual(f.calls, [['find', customerId], ['verify', 'account-a', customerId, event.product_id, undefined]]);
+    assert.deepEqual(f.calls, [['find', customerId], ['sync', 'account-a', customerId, undefined]]);
   });
 }
 
@@ -59,7 +58,6 @@ test('missing webhook configuration fails closed', async () => {
 for (const change of [
   { app_user_id: '$RCAnonymousID:anonymous', aliases: [customerId] },
   { app_user_id: 'account-a' },
-  { product_id: 'unrecognized' },
   { store: 'PLAY_STORE' },
   { environment: 'SANDBOX' },
   { type: 'TEST' },
@@ -87,7 +85,7 @@ test('deleted or unknown account never activates', async () => {
 for (const status of [402, 409, 503]) {
   test(`verification failure remains a failure (${status})`, async () => {
     const f = fixture();
-    f.dependencies.activateApple = async () => { throw Object.assign(new Error('Not verified'), { status }); };
+    f.dependencies.syncApple = async () => { throw Object.assign(new Error('Not verified'), { status }); };
     await assert.rejects(handleNativeRevenueCatWebhook({
       authorization: 'webhook-secret', secret: 'webhook-secret', body: { event },
     }, f.dependencies), { status });
@@ -101,14 +99,14 @@ test('malformed authorized request is rejected', async () => {
   }, f.dependencies)).status, 400);
 });
 
-test('a product change verifies the new plan instead of granting from a scheduled change', async () => {
+test('a product change syncs current status without selecting a scheduled future plan', async () => {
   const f = fixture();
   await handleNativeRevenueCatWebhook({
     authorization: 'webhook-secret', secret: 'webhook-secret',
     body: { event: { ...event, type: 'PRODUCT_CHANGE',
       product_id: 'com.rosterapp.player_pro_monthly', new_product_id: event.product_id } },
   }, f.dependencies);
-  assert.deepEqual(f.calls[1], ['verify', 'account-a', customerId, event.product_id, undefined]);
+  assert.deepEqual(f.calls[1], ['sync', 'account-a', customerId, undefined]);
 });
 
 for (const type of ['CANCELLATION', 'EXPIRATION', 'BILLING_ISSUE', 'SUBSCRIPTION_PAUSED']) {
@@ -118,7 +116,7 @@ for (const type of ['CANCELLATION', 'EXPIRATION', 'BILLING_ISSUE', 'SUBSCRIPTION
       authorization: 'webhook-secret', secret: 'webhook-secret', body: { event: { ...event, type } },
     }, f.dependencies);
     assert.equal(result.status, 200);
-    assert.deepEqual(f.calls, [['find', customerId], ['reconcile', 'account-a']]);
+    assert.deepEqual(f.calls, [['find', customerId], ['sync', 'account-a', customerId, undefined]]);
   });
 }
 
@@ -128,14 +126,76 @@ test('an authenticated notification passes canonical lineage separately from cli
     authorization: 'webhook-secret', secret: 'webhook-secret',
     body: { event: { ...event, original_transaction_id: '100000000001', transaction_id: '200000000002' } },
   }, f.dependencies);
-  assert.deepEqual(f.calls[1], ['verify', 'account-a', customerId, event.product_id,
+  assert.deepEqual(f.calls[1], ['sync', 'account-a', customerId,
     { originalTransactionId: '100000000001', transactionId: '200000000002' }]);
 });
 
 test('provider failure during cancellation must remain retryable', async () => {
   const f = fixture();
-  f.dependencies.reconcileApple = async () => { throw Object.assign(new Error('Unavailable'), { status: 503 }); };
+  f.dependencies.syncApple = async () => { throw Object.assign(new Error('Unavailable'), { status: 503 }); };
   await assert.rejects(handleNativeRevenueCatWebhook({
     authorization: 'webhook-secret', secret: 'webhook-secret', body: { event: { ...event, type: 'CANCELLATION' } },
   }, f.dependencies), { status: 503 });
+});
+
+for (const type of ['RENEWAL', 'REFUND_REVERSED', 'SUBSCRIPTION_EXTENDED', 'FUTURE_PROVIDER_EVENT']) {
+  test(`${type} syncs current subscriber rather than inferring access from event type`, async () => {
+    const f = fixture();
+    const result = await handleNativeRevenueCatWebhook({
+      authorization: 'webhook-secret', secret: 'webhook-secret',
+      body: { event: { ...event, type, entitlement_ids: ['commissioner'], expiration_at_ms: 0 } },
+    }, f.dependencies);
+    assert.equal(result.body.processed, true);
+    assert.deepEqual(f.calls[1], ['sync', 'account-a', customerId, undefined]);
+  });
+}
+
+test('event product and expiry hints are not required for a current subscriber sync', async () => {
+  const f = fixture();
+  await handleNativeRevenueCatWebhook({
+    authorization: 'webhook-secret', secret: 'webhook-secret',
+    body: { event: { type: 'RENEWAL', app_user_id: customerId, store: 'APP_STORE', environment: 'PRODUCTION' } },
+  }, f.dependencies);
+  assert.deepEqual(f.calls[1], ['sync', 'account-a', customerId, undefined]);
+});
+
+test('TRANSFER refreshes named sources and destinations without requiring purchase fields or trusting aliases', async () => {
+  const f = fixture();
+  const destination = `roster_ios_${'b'.repeat(64)}`;
+  await handleNativeRevenueCatWebhook({
+    authorization: 'webhook-secret', secret: 'webhook-secret',
+    body: { event: { type: 'TRANSFER',
+      transferred_from: ['$RCAnonymousID:ignored', customerId],
+      transferred_to: [destination, customerId],
+      aliases: [`roster_ios_${'c'.repeat(64)}`],
+      original_transaction_id: '100000000001', transaction_id: '200000000002' } },
+  }, f.dependencies);
+  assert.deepEqual(f.calls, [
+    ['find', customerId], ['sync', 'account-a', customerId, undefined],
+    ['find', destination], ['sync', 'account-a', destination, undefined],
+  ]);
+});
+
+for (const change of [
+  { transferred_from: null }, { transferred_to: [123] },
+  { transferred_to: Array(201).fill(customerId) },
+]) {
+  test(`malformed transfer is rejected (${Object.keys(change).join()})`, async () => {
+    const f = fixture();
+    const result = await handleNativeRevenueCatWebhook({
+      authorization: 'webhook-secret', secret: 'webhook-secret',
+      body: { event: { type: 'TRANSFER', transferred_from: [], transferred_to: [customerId], ...change } },
+    }, f.dependencies);
+    assert.equal(result.status, 400);
+    assert.deepEqual(f.calls, []);
+  });
+}
+
+test('TRANSFER verification failure remains retryable, not acknowledged as a processed grant', async () => {
+  const f = fixture();
+  f.dependencies.syncApple = async () => { throw Object.assign(new Error('Ownership proof missing'), { status: 202 }); };
+  await assert.rejects(handleNativeRevenueCatWebhook({
+    authorization: 'webhook-secret', secret: 'webhook-secret',
+    body: { event: { type: 'TRANSFER', transferred_from: [], transferred_to: [customerId] } },
+  }, f.dependencies), { status: 202 });
 });

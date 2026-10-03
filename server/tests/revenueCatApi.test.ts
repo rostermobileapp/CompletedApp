@@ -120,3 +120,85 @@ test('sandbox subscriptions cannot activate production access', () => {
     'com.rosterapp.player_pro_monthly': { ...purchased, is_sandbox: true },
   } } }, Date.parse('2026-09-27')), []);
 });
+
+const now = Date.parse('2026-09-27');
+const appleProduct = 'com.rosterapp.commissioner_monthly';
+const entitlement = { product_identifier: appleProduct, expires_date: purchased.expires_date };
+
+test('current subscriber entitlements determine the named Apple tier', () => {
+  const result = getActiveAppleSubscriptions({ subscriber: {
+    subscriptions: { [appleProduct]: purchased },
+    entitlements: { commissioner: entitlement },
+  } }, now, { requireEntitlements: true });
+  assert.equal(result[0].role, 'commissioner');
+  assert.equal(result[0].expiresAt, '2026-10-26T14:48:13.000Z');
+});
+
+test('missing entitlement schema is a provider error, while an empty map is verified inactive', () => {
+  assert.throws(() => getActiveAppleSubscriptions({ subscriber: {
+    subscriptions: { [appleProduct]: purchased },
+  } }, now, { requireEntitlements: true }), /invalid subscriber entitlements/);
+  assert.deepEqual(getActiveAppleSubscriptions({ subscriber: {
+    subscriptions: { [appleProduct]: purchased }, entitlements: {},
+  } }, now, { requireEntitlements: true }), []);
+});
+
+for (const changedEntitlement of [
+  { ...entitlement, expires_date: '2026-09-01T00:00:00Z' },
+  { ...entitlement, expires_date: null },
+  { ...entitlement, product_identifier: 'different_product' },
+]) {
+  test(`inactive or mismatched entitlement never grants (${JSON.stringify(changedEntitlement)})`, () => {
+    assert.deepEqual(getActiveAppleSubscriptions({ subscriber: {
+      subscriptions: { [appleProduct]: purchased }, entitlements: { commissioner: changedEntitlement },
+    } }, now, { requireEntitlements: true }), []);
+  });
+}
+
+test('current entitlement expiry caps access even when an older subscription period is later', () => {
+  const result = getActiveAppleSubscriptions({ subscriber: {
+    subscriptions: { [appleProduct]: purchased },
+    entitlements: { commissioner: { ...entitlement, expires_date: '2026-10-01T00:00:00Z' } },
+  } }, now, { requireEntitlements: true });
+  assert.equal(result[0].expiresAt, '2026-10-01T00:00:00.000Z');
+});
+
+test('entitlement grants cannot bypass production store, ownership, refund or expiry checks', () => {
+  for (const change of [
+    { is_sandbox: true }, { store: 'play_store' }, { ownership_type: 'FAMILY_SHARED' },
+    { refunded_at: '2026-09-01T00:00:00Z' }, { expires_date: '2026-09-01T00:00:00Z' },
+  ]) {
+    assert.deepEqual(getActiveAppleSubscriptions({ subscriber: {
+      subscriptions: { [appleProduct]: { ...purchased, ...change } },
+      entitlements: { commissioner: entitlement },
+    } }, now, { requireEntitlements: true }), []);
+  }
+});
+
+test('named subscriber HTTP lookup requires entitlements and reads them from RevenueCat, not a notification', async () => {
+  const result = await getRevenueCatAppleSubscriptions(`roster_ios_${'a'.repeat(64)}`, {
+    apiKey: 'fixture-key',
+    fetcher: async () => new Response(JSON.stringify({ subscriber: {
+      subscriptions: { [appleProduct]: { ...purchased, expires_date: '2099-01-01T00:00:00Z' } },
+      entitlements: { commissioner: { ...entitlement, expires_date: '2099-01-01T00:00:00Z' } },
+    } })),
+  });
+  assert.equal(result[0].role, 'commissioner');
+  await assert.rejects(getRevenueCatAppleSubscriptions(`roster_ios_${'a'.repeat(64)}`, {
+    apiKey: 'fixture-key', fetcher: async () => new Response(JSON.stringify({ subscriber: { subscriptions: {} } })),
+  }), /invalid subscriber entitlements/);
+});
+
+test('subscriber entitlement sync preserves verified grace, but never extends a refunded purchase', () => {
+  const grace = { ...purchased, refunded_at: null as string | null,
+    expires_date: '2026-09-01T00:00:00Z', grace_period_expires_date: '2026-09-05T00:00:00Z' };
+  const response = { subscriber: {
+    subscriptions: { [appleProduct]: grace },
+    entitlements: { commissioner: { ...entitlement, expires_date: grace.expires_date } },
+  } };
+  assert.equal(getActiveAppleSubscriptions(response, Date.parse('2026-09-03'), { requireEntitlements: true })[0].expiresAt,
+    '2026-09-05T00:00:00.000Z');
+  assert.deepEqual(getActiveAppleSubscriptions(response, Date.parse('2026-09-06'), { requireEntitlements: true }), []);
+  grace.refunded_at = '2026-09-02T00:00:00Z';
+  assert.deepEqual(getActiveAppleSubscriptions(response, Date.parse('2026-09-03'), { requireEntitlements: true }), []);
+});

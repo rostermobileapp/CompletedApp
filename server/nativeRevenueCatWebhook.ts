@@ -1,18 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { IAP_PRODUCT_ROLES } from './appleNotificationHandler';
 import type { TrustedRevenueCatTransaction } from './revenueCatAppleActivation';
 
 export interface NativeRevenueCatWebhookDependencies {
   findAppleUser(customerId: string): Promise<string | undefined>;
-  activateApple(userId: string, customerId: string, productId: string, transaction?: TrustedRevenueCatTransaction): Promise<void>;
-  reconcileApple(userId: string): Promise<void>;
+  syncApple(userId: string, customerId: string, transaction?: TrustedRevenueCatTransaction): Promise<void>;
 }
 
-const ACTIVATION_EVENTS = new Set([
-  'INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'SUBSCRIPTION_EXTENDED',
-  'PRODUCT_CHANGE',
-]);
-const STATUS_EVENTS = new Set(['CANCELLATION', 'EXPIRATION', 'BILLING_ISSUE', 'SUBSCRIPTION_PAUSED']);
+const APPLE_CUSTOMER_ID = /^roster_ios_[a-f0-9]{64}$/;
 
 function transactionId(value: unknown): string | undefined {
   const text = typeof value === 'string' ? value
@@ -42,33 +36,48 @@ export async function handleNativeRevenueCatWebhook(
   if (!event || typeof event !== 'object' || !('type' in event) || typeof event.type !== 'string') {
     return { status: 400, body: { processed: false, reason: 'invalid_event' } };
   }
-  if (!ACTIVATION_EVENTS.has(event.type) && !STATUS_EVENTS.has(event.type)) {
+  if (event.type === 'TEST') {
     return { status: 200, body: { processed: false, reason: 'event_not_used_for_activation' } };
   }
-  if (!('store' in event) || event.store !== 'APP_STORE' ||
-      !('environment' in event) || event.environment !== 'PRODUCTION') {
+  const transfer = event.type === 'TRANSFER';
+  // TRANSFER omits app_user_id/product/expiry and may omit store/environment.
+  // Its named accounts are checked against current production Apple records.
+  if ((!transfer && (!('store' in event) || !('environment' in event))) ||
+      ('store' in event && event.store !== 'APP_STORE') ||
+      ('environment' in event && event.environment !== 'PRODUCTION')) {
     return { status: 200, body: { processed: false, reason: 'not_production_apple' } };
   }
-  const customerId = 'app_user_id' in event ? event.app_user_id : undefined;
-  const productId = event.type === 'PRODUCT_CHANGE' && 'new_product_id' in event
-    ? event.new_product_id : 'product_id' in event ? event.product_id : undefined;
-  if (typeof customerId !== 'string' || !/^roster_ios_[a-f0-9]{64}$/.test(customerId) ||
-      typeof productId !== 'string' || !Object.hasOwn(IAP_PRODUCT_ROLES, productId)) {
-    // Anonymous customers, aliases and subscriber attributes are not ownership proof.
+  let customerIds: string[];
+  if (transfer) {
+    if (!('transferred_from' in event) || !Array.isArray(event.transferred_from) ||
+        !('transferred_to' in event) || !Array.isArray(event.transferred_to) ||
+        event.transferred_from.length + event.transferred_to.length > 200 ||
+        [...event.transferred_from, ...event.transferred_to].some(id => typeof id !== 'string')) {
+      return { status: 400, body: { processed: false, reason: 'invalid_transfer' } };
+    }
+    // Refresh sources before destinations; never move canonical Roster claims.
+    customerIds = Array.from(new Set([...event.transferred_from, ...event.transferred_to]))
+      .filter(id => APPLE_CUSTOMER_ID.test(id));
+  } else {
+    const customerId = 'app_user_id' in event ? event.app_user_id : undefined;
+    customerIds = typeof customerId === 'string' && APPLE_CUSTOMER_ID.test(customerId)
+      ? [customerId] : [];
+  }
+  if (!customerIds.length) {
+    // Anonymous customers and aliases are not Roster ownership proof.
     return { status: 200, body: { processed: false, reason: 'unrecognized_purchase_context' } };
   }
-  const userId = await dependencies.findAppleUser(customerId);
-  if (!userId) return { status: 200, body: { processed: false, reason: 'account_not_found' } };
-  if (STATUS_EVENTS.has(event.type)) {
-    // Cancellation alone is not expiry. Read the current provider record,
-    // including any grace period, refund, or independently paid tier.
-    await dependencies.reconcileApple(userId);
-  } else {
-    const originalTransactionId = transactionId('original_transaction_id' in event ? event.original_transaction_id : undefined);
-    const latestTransactionId = transactionId('transaction_id' in event ? event.transaction_id : undefined);
-    await dependencies.activateApple(userId, customerId, productId,
-      originalTransactionId && latestTransactionId
-        ? { originalTransactionId, transactionId: latestTransactionId } : undefined);
+  const originalTransactionId = transactionId('original_transaction_id' in event ? event.original_transaction_id : undefined);
+  const latestTransactionId = transactionId('transaction_id' in event ? event.transaction_id : undefined);
+  const transaction = !transfer && originalTransactionId && latestTransactionId
+    ? { originalTransactionId, transactionId: latestTransactionId } : undefined;
+  let processed = false;
+  for (const customerId of customerIds) {
+    const userId = await dependencies.findAppleUser(customerId);
+    if (!userId) continue;
+    await dependencies.syncApple(userId, customerId, transaction);
+    processed = true;
   }
-  return { status: 200, body: { processed: true } };
+  return { status: 200, body: processed ? { processed: true }
+    : { processed: false, reason: 'account_not_found' } };
 }

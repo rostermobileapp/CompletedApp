@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { activateRevenueCatApplePurchase, type RevenueCatAppleActivationDependencies } from '../revenueCatAppleActivation';
+import { activateRevenueCatApplePurchase, syncRevenueCatApplePurchase, type RevenueCatAppleActivationDependencies } from '../revenueCatAppleActivation';
+import { handleNativeRevenueCatWebhook } from '../nativeRevenueCatWebhook';
 import { appleRevenueCatLoginId } from '../appleAutomaticActivation';
 import type { AutomaticAppleClaimInput } from '../appleAutomaticClaim';
 
@@ -110,4 +111,72 @@ test('a different purchase history cannot reuse an existing canonical ownership 
   });
   await assert.rejects(activate(f.dependencies), { status: 202 });
   assert.equal(f.claims.length, 0);
+});
+
+test('a RENEWAL notification can establish the first canonical Commissioner claim', async () => {
+  const f = fixture();
+  const result = await handleNativeRevenueCatWebhook({
+    authorization: 'fixture-webhook-secret', secret: 'fixture-webhook-secret',
+    body: { event: {
+      type: 'RENEWAL', store: 'APP_STORE', environment: 'PRODUCTION',
+      app_user_id: loginId, original_transaction_id: originalTransactionId,
+      transaction_id: transactionId, entitlement_ids: ['commissioner'], expiration_at_ms: 0,
+    } },
+  }, {
+    findAppleUser: async id => id === loginId ? userId : undefined,
+    syncApple: async (id, customerId, transaction) => {
+      await syncRevenueCatApplePurchase({
+        userId: id, loginId: customerId, secret, now, dependencies: f.dependencies,
+        trustedTransaction: transaction,
+      });
+    },
+  });
+  assert.equal(result.body.processed, true);
+  assert.equal(f.claims[0].originalTransactionId, originalTransactionId);
+  assert.equal(f.claims[0].productId, subscription.productId);
+});
+
+test('sync uses the current plan instead of requiring a future PRODUCT_CHANGE product', async () => {
+  const f = fixture();
+  await syncRevenueCatApplePurchase({
+    userId, loginId, secret, now, dependencies: f.dependencies,
+    expectedProductId: 'com.rosterapp.player_pro_yearly',
+    trustedTransaction: { originalTransactionId, transactionId },
+  });
+  assert.equal(f.claims[0].productId, subscription.productId);
+});
+
+test('verified inactive status reconciles existing access without creating or moving claims', async () => {
+  const f = fixture();
+  let reconciled = false;
+  f.dependencies.getSubscriptions = async () => [];
+  f.dependencies.reconcileUser = async () => { reconciled = true; return 'player_pro'; };
+  assert.deepEqual(await syncRevenueCatApplePurchase({
+    userId, loginId, secret, now, dependencies: f.dependencies,
+  }), { verified: false, active: false });
+  assert.equal(reconciled, true);
+  assert.deepEqual(f.claims, []);
+});
+
+test('TRANSFER can refresh an existing claim but cannot invent first-time original lineage', async () => {
+  const f = fixture();
+  await assert.rejects(syncRevenueCatApplePurchase({
+    userId, loginId, secret, now, dependencies: f.dependencies,
+  }), { status: 202 });
+  assert.deepEqual(f.claims, []);
+  f.dependencies.getOwnedLineage = async () => ({
+    originalTransactionId, originalPurchasedAt: subscription.originalPurchasedAt,
+  });
+  await syncRevenueCatApplePurchase({ userId, loginId, secret, now, dependencies: f.dependencies });
+  assert.equal(f.claims[0].originalTransactionId, originalTransactionId);
+});
+
+test('sync provider outages do not downgrade and stay retryable', async () => {
+  const f = fixture();
+  f.dependencies.getSubscriptions = async () => { throw Object.assign(new Error('Unavailable'), { status: 503 }); };
+  f.dependencies.reconcileUser = async () => assert.fail('An outage must not be treated as expiry');
+  await assert.rejects(syncRevenueCatApplePurchase({
+    userId, loginId, secret, now, dependencies: f.dependencies,
+  }), { status: 503 });
+  assert.deepEqual(f.claims, []);
 });

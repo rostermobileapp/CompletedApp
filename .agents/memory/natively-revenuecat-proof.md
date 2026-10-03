@@ -53,9 +53,9 @@ RevenueCat v1 subscriber GET is get-or-create, not a side-effect-free existence 
 
 Activation needs a recovery path independent of the webview purchase callback.
 
-**Why:** A real Apple Commissioner purchase appeared active in RevenueCat, but no post-checkout verification request reached Roster. Refreshing and force-closing did not recover access; provider notifications were arriving at an unhandled endpoint.
+**Why:** A real Apple Commissioner purchase appeared active in RevenueCat, but no post-checkout verification request reached Roster. Refreshing and force-closing did not recover access; provider notifications were arriving at an unhandled endpoint. The owner later reported that this purchase appeared as RENEWAL, with TRANSFER and an earlier PRODUCT_CHANGE, not INITIAL_PURCHASE.
 
-**How to apply:** Authenticate provider notifications, check current server-read RevenueCat status, and retain canonical ownership before activation. Never grant from webhook product/entitlement fields alone, infer ownership from anonymous aliases, or acknowledge failed verification as successful processing.
+**How to apply:** Authenticate provider notifications, check current server-read RevenueCat status, and retain canonical ownership before activation. Do not assume a new purchase always has an INITIAL_PURCHASE event or ask the owner to resend an event that does not exist. Never grant from webhook product/entitlement fields alone, infer ownership from anonymous aliases, or acknowledge failed verification as successful processing.
 
 Preserve automatic downgrade when an Apple subscription's paid access ends, even if native verification is simplified.
 

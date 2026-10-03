@@ -18,6 +18,24 @@ export interface TrustedRevenueCatTransaction {
   transactionId: string;
 }
 
+/**
+ * All real provider events refresh the current server-side subscriber.
+ * No active entitlement means reconcile existing claims, not grant from a
+ * stale event. Missing ownership proof and provider failures remain retryable.
+ */
+export async function syncRevenueCatApplePurchase(
+  input: Parameters<typeof activateRevenueCatApplePurchase>[0],
+): Promise<{ verified: true; role: 'commissioner' | 'player_pro' } |
+  { verified: false; active: false }> {
+  try {
+    return await activateRevenueCatApplePurchase({ ...input, expectedProductId: undefined });
+  } catch (error) {
+    if ((error as { status?: number })?.status !== 402) throw error;
+    await input.dependencies.reconcileUser(input.userId);
+    return { verified: false, active: false };
+  }
+}
+
 export async function activateRevenueCatApplePurchase(input: {
   userId: string;
   loginId: unknown;
@@ -75,7 +93,7 @@ export async function activateRevenueCatApplePurchase(input: {
     });
     const role = await input.dependencies.reconcileUser(input.userId);
     if (role === 'free_tier' ||
-        (IAP_PRODUCT_ROLES[subscription.productId] === 'commissioner' && role !== 'commissioner')) {
+        (subscription.role === 'commissioner' && role !== 'commissioner')) {
       return fail('The verified subscription could not be applied to this account. Contact support.', 409);
     }
     return { verified: true, role };

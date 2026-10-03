@@ -28,7 +28,9 @@ for (const scenario of ['cancel-renewal', 'expiration', 'refund'] as const) {
         original_purchase_date: PURCHASED.toISOString(), expires_date: expiry,
         refunded_at: scenario === 'refund' ? NOW.toISOString() : null,
       },
-    } } }, NOW.getTime());
+    }, entitlements: { commissioner: {
+      product_identifier: 'com.rosterapp.commissioner_monthly', expires_date: expiry,
+    } } } }, NOW.getTime(), { requireEntitlements: true });
     const result = await handleNativeRevenueCatWebhook({
       authorization: 'fixture-secret', secret: 'fixture-secret',
       body: { event: {
@@ -38,8 +40,7 @@ for (const scenario of ['cancel-renewal', 'expiration', 'refund'] as const) {
       } },
     }, {
       findAppleUser: async () => USER_ID,
-      activateApple: async () => assert.fail('Lifecycle status must not grant from event fields'),
-      reconcileApple: async () => reconcileOne(link, dependencies(db, { subscriptions })),
+      syncApple: async () => reconcileOne(link, dependencies(db, { subscriptions })),
     });
     assert.equal(result.status, 200);
     assert.equal(db.user.role, scenario === 'cancel-renewal' ? 'commissioner' : 'free_tier');

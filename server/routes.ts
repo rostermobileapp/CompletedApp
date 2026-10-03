@@ -5950,16 +5950,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const activateVerifiedAppleAccount = async (
     userId: string, loginId: string, expectedProductId?: unknown,
     trustedTransaction?: import('./revenueCatAppleActivation').TrustedRevenueCatTransaction,
+    syncCurrentStatus = false,
   ) => {
       const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } = await import('./applePurchaseLinks');
-      const existing = await reconcileApplePurchaseLinkForUser(userId);
+      const existing = !syncCurrentStatus ? await reconcileApplePurchaseLinkForUser(userId) : null;
       if (existing?.active && (existing.role === 'commissioner' || existing.role === 'player_pro') &&
           (!expectedProductId || expectedProductId === existing.productId)) {
         return { verified: true, role: existing.role };
       }
-      const { activateRevenueCatApplePurchase } = await import('./revenueCatAppleActivation');
+      const { activateRevenueCatApplePurchase, syncRevenueCatApplePurchase } = await import('./revenueCatAppleActivation');
       const { getRevenueCatActiveAppleSubscriptions } = await import('./revenueCatApi');
-      return activateRevenueCatApplePurchase({
+      const activate = syncCurrentStatus ? syncRevenueCatApplePurchase : activateRevenueCatApplePurchase;
+      return activate({
         userId, loginId, expectedProductId, trustedTransaction,
         dependencies: {
           getSubscriptions: async id => {
@@ -6043,16 +6045,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cursor = page.rows[page.rows.length - 1].id;
           }
         },
-        activateApple: async (userId, customerId, productId, transaction) => {
-          await activateVerifiedAppleAccount(userId, customerId, productId, transaction);
-        },
-        reconcileApple: async userId => {
-          const { reconcileApplePurchaseLinkForUser } = await import('./applePurchaseLinks');
-          const { getRevenueCatAppleSubscriptions } = await import('./revenueCatApi');
-          // Reconciliation retains last verified access during provider outages.
-          // A webhook must still retry instead of acknowledging that outage.
-          await getRevenueCatAppleSubscriptions(nativePurchaseLoginId(userId, 'ios'));
-          await reconcileApplePurchaseLinkForUser(userId);
+        syncApple: async (userId, customerId, transaction) => {
+          // Never select access from event product/entitlement/expiry hints.
+          // Fresh GET /subscribers decides activation, renewal or downgrade.
+          await activateVerifiedAppleAccount(userId, customerId, undefined, transaction, true);
         },
       });
       console.info('[NativeBilling webhook]', { status: result.status, processed: result.body.processed, reason: result.body.reason });

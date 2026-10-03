@@ -17,6 +17,10 @@ interface RevenueCatResponse {
   subscriber?: {
     original_app_user_id?: string;
     subscriptions?: Record<string, RevenueCatSubscription>;
+    entitlements?: Record<string, {
+      product_identifier?: string;
+      expires_date?: string | null;
+    }>;
   };
 }
 
@@ -58,19 +62,41 @@ export function isRevenueCatApiConfigured(): boolean {
 export function getActiveAppleSubscriptions(
   data: RevenueCatResponse,
   now = Date.now(),
+  options: { requireEntitlements?: boolean } = {},
 ): VerifiedAppleSubscription[] {
   const subscriptions = data.subscriber?.subscriptions;
   if (!subscriptions || typeof subscriptions !== 'object' || Array.isArray(subscriptions)) {
     throw new Error('RevenueCat returned an invalid subscriber response');
   }
+  const entitlements = data.subscriber?.entitlements;
+  if ((options.requireEntitlements || entitlements !== undefined) &&
+      (!entitlements || typeof entitlements !== 'object' || Array.isArray(entitlements))) {
+    throw new Error('RevenueCat returned invalid subscriber entitlements');
+  }
 
   return Object.entries(subscriptions).flatMap(([productId, sub]) => {
-    const role = IAP_PRODUCT_ROLES[productId];
+    let role = IAP_PRODUCT_ROLES[productId];
     if (!role || !sub || sub.store !== 'app_store' || sub.is_sandbox === true ||
         sub.refunded_at || sub.ownership_type !== 'PURCHASED') return [];
     const paidExpiry = Date.parse(sub.expires_date ?? '');
     const graceExpiry = Date.parse(sub.grace_period_expires_date ?? '');
-    const expiry = Number.isFinite(graceExpiry) ? Math.max(paidExpiry, graceExpiry) : paidExpiry;
+    let expiry = Number.isFinite(graceExpiry) ? Math.max(paidExpiry, graceExpiry) : paidExpiry;
+    if (entitlements) {
+      // Current server-read entitlements, not webhook entitlement_ids or a
+      // scheduled product change, determine the named customer's paid tier.
+      const active = Object.entries(entitlements).flatMap(([id, entitlement]) => {
+        if ((id !== 'commissioner' && id !== 'player_pro') ||
+            entitlement?.product_identifier !== productId) return [];
+        const entitlementExpiry = Date.parse(entitlement.expires_date ?? '');
+        const end = Number.isFinite(graceExpiry)
+          ? Math.max(entitlementExpiry, graceExpiry) : entitlementExpiry;
+        if (!Number.isFinite(end) || end <= now) return [];
+        return [{ role: id as AppleRole, expiry: Math.min(expiry, end) }];
+      }).sort((a, b) => Number(b.role === 'commissioner') - Number(a.role === 'commissioner'));
+      if (!active.length) return [];
+      role = active[0].role;
+      expiry = active[0].expiry;
+    }
     const original = Date.parse(sub.original_purchase_date ?? '');
     if (!Number.isFinite(expiry) || expiry <= now || !Number.isFinite(original)) return [];
     return [{
@@ -118,7 +144,11 @@ export async function getRevenueCatAppleSubscriptions(
     // customer information or provider diagnostics.
     throw new Error(`RevenueCat subscriber lookup failed (HTTP ${response.status})`);
   }
-  return getActiveAppleSubscriptions(await response.json() as RevenueCatResponse);
+  return getActiveAppleSubscriptions(await response.json() as RevenueCatResponse, Date.now(), {
+    // Preserve legacy operator/direct-store behavior; named iOS accounts must
+    // provide an authoritative entitlement response, including an empty map.
+    requireEntitlements: customerId.startsWith('roster_ios_'),
+  });
 }
 
 const GOOGLE_ORDER_ID = /^GPA\.\d{4}-\d{4}-\d{4}-\d{5}(?:\.\.\d+)?$/;
