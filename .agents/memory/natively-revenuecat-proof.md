@@ -56,3 +56,9 @@ Activation needs a recovery path independent of the webview purchase callback.
 **Why:** A real Apple Commissioner purchase appeared active in RevenueCat, but no post-checkout verification request reached Roster. Refreshing and force-closing did not recover access; provider notifications were arriving at an unhandled endpoint.
 
 **How to apply:** Authenticated provider notifications may trigger the same independent Apple verification and canonical ownership checks as user-initiated recovery. Never grant from webhook product/entitlement fields alone, infer ownership from anonymous aliases, or acknowledge failed verification as successful processing.
+
+Preserve automatic downgrade when an Apple subscription's paid access ends, even if native verification is simplified.
+
+**Why:** The owner specifically asked whether removing the additional Apple API lookup would compromise automatic downgrades after Apple cancellation. RevenueCat documents cancellation of renewal separately from expiration; a normal cancellation is not immediate loss of paid access.
+
+**How to apply:** Keep access until verified expiration, handle refunds/revocations from current provider status, and retain independent billing-source access. RevenueCat can supply these lifecycle changes without a separate Apple API call; this does not authorize removing canonical ownership safeguards or imply the current activation flow already supports that change.
