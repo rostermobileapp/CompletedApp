@@ -20,7 +20,8 @@ test("isolated PostgreSQL delivery claims and recipient safety", { skip: !testUr
       CREATE TABLE users (id varchar PRIMARY KEY, display_id varchar, email varchar, deleted_at timestamptz);
       CREATE TABLE notification_preferences (
         user_id varchar PRIMARY KEY REFERENCES users(id), push_enabled boolean,
-        onesignal_external_id varchar, onesignal_player_id varchar
+        onesignal_external_id varchar, onesignal_player_id varchar,
+        notification_settings jsonb NOT NULL DEFAULT '{}'::jsonb
       );
     `);
     await db.query(readFileSync(new URL("../migrations/0041_daily_trivia_push_deliveries.sql", import.meta.url), "utf8"));
@@ -34,7 +35,7 @@ test("isolated PostgreSQL delivery claims and recipient safety", { skip: !testUr
       ('placeholder','U00004','fake@placeholder.roster',NULL),
       ('deleted','U00005','deleted@example.test',now()),
       ('unregistered','U00006','unregistered@example.test',NULL);
-      INSERT INTO notification_preferences VALUES
+      INSERT INTO notification_preferences (user_id,push_enabled,onesignal_external_id,onesignal_player_id) VALUES
       ('owner',true,'U00001',NULL),('other',true,NULL,'device'),
       ('optout',false,'U00003',NULL),('placeholder',true,'U00004',NULL),
       ('deleted',true,'U00005',NULL),('unregistered',true,'','');`);
@@ -45,6 +46,16 @@ test("isolated PostgreSQL delivery claims and recipient safety", { skip: !testUr
       assert.deepEqual(await store.list(date, []), []);
       assert.equal(await store.claim("other", date, ["U00001"]), null);
       assert.equal(await store.claim("optout", date, null), null);
+    });
+    await t.test("Trivia-only opt-out prevents selection and first claim without disabling other pushes", async () => {
+      await db.query(`UPDATE notification_preferences
+        SET notification_settings='{"triviaReminders":false,"inAppMessages":true}' WHERE user_id='other'`);
+      assert.deepEqual(await store.list(date, ["U00002"]), []);
+      assert.equal(await store.claim("other", date, ["U00002"]), null);
+      assert.equal((await db.query(`SELECT push_enabled FROM notification_preferences WHERE user_id='other'`)).rows[0].push_enabled, true);
+      await db.query(`UPDATE notification_preferences
+        SET notification_settings=notification_settings || '{"triviaReminders":true}'::jsonb WHERE user_id='other'`);
+      assert.deepEqual((await store.list(date, ["U00002"])).map(row => row.id), ["other"]);
     });
     const claims = await Promise.all(Array.from({ length: 12 }, () => store.claim("owner", date, ["U00001"])));
     const lease = claims.find(Boolean)!;
@@ -57,6 +68,21 @@ test("isolated PostgreSQL delivery claims and recipient safety", { skip: !testUr
       await db.query(`UPDATE notification_preferences SET push_enabled=false WHERE user_id='owner'`);
       assert.equal(await store.eligible("owner", date, lease, ["U00001"]), false);
       await db.query(`UPDATE notification_preferences SET push_enabled=true WHERE user_id='owner'`);
+      await db.query(`UPDATE notification_preferences
+        SET notification_settings='{"triviaReminders":false}' WHERE user_id='owner'`);
+      assert.deepEqual(await store.list(date, ["U00001"]), []);
+      assert.equal(await store.claim("owner", date, ["U00001"]), null);
+      assert.equal(await store.eligible("owner", date, lease, ["U00001"]), false);
+      await db.query(`UPDATE notification_preferences
+        SET notification_settings = notification_settings || '{"inAppMessages":false}'::jsonb
+        WHERE user_id='owner'`);
+      assert.equal(await store.eligible("owner", date, lease, ["U00001"]), false);
+      const prefs = (await db.query(`SELECT notification_settings FROM notification_preferences WHERE user_id='owner'`)).rows[0];
+      assert.deepEqual(prefs.notification_settings, { triviaReminders: false, inAppMessages: false });
+      await db.query(`UPDATE notification_preferences
+        SET notification_settings = notification_settings || '{"triviaReminders":true}'::jsonb
+        WHERE user_id='owner'`);
+      assert.equal(await store.eligible("owner", date, lease, ["U00001"]), clock.noon);
       assert.equal(await store.eligible("owner", "2000-01-01", lease, ["U00001"]), false);
     });
     await t.test("rejection persists retry state without marking a delivery sent", async () => {

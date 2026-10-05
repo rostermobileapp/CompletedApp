@@ -20,3 +20,9 @@ The approved test rollout sends automatic noon announcements only to U00001. A n
 **Why:** The owner authorized U00001-only automation while test mode is active and expected a noon notification after completing the day's question during earlier testing.
 
 **How to apply:** Do not broaden automated test recipients merely because another account is added to the app's trivia-access allowlist. Do not suppress the daily announcement using answer or dismissal state without an explicit policy change.
+
+Users may opt out of Trivia pushes independently of in-app Trivia and all other notification types. Missing Trivia-specific consent preserves the previous enabled behavior, but never overrides the master push opt-out.
+
+**Why:** The owner requested a Trivia push toggle in profile notification preferences, not a global switch that removes Trivia from the app. Preserving omitted settings also prevents older clients from undoing a user's opt-out.
+
+**How to apply:** Respect this choice during recipient selection, claim, final eligibility checks, and provider delivery. Keep partial preference updates from resetting omitted choices; leave in-app play, announcements, and patch progress unchanged.

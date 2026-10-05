@@ -2631,6 +2631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             playerRsvpUpdates: true,
             photoTagNotifications: true,
             newSignupAlerts: true,
+            triviaReminders: true,
           },
           pushEnabled: false,
           oneSignalPlayerId: null,
@@ -2652,14 +2653,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData: any = {};
       if (notificationSettings !== undefined) {
         // Validate notification settings structure
-        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents', 'newsAnnouncements', 'scrimmageInvites', 'playerRsvpUpdates', 'photoTagNotifications', 'newSignupAlerts'];
+        if (!notificationSettings || typeof notificationSettings !== 'object' || Array.isArray(notificationSettings)) {
+          return res.status(400).json({ message: "Notification settings must be an object." });
+        }
+        const validKeys = ['inAppMessages', 'paymentRequests', 'substitutionRequests', 'joinRequests', 'upcomingEvents', 'newsAnnouncements', 'scrimmageInvites', 'playerRsvpUpdates', 'photoTagNotifications', 'newSignupAlerts', 'triviaReminders'];
         const settings: Record<string, boolean> = {};
         
         for (const key of validKeys) {
+          if (!(key in notificationSettings)) continue;
           if (typeof notificationSettings[key] === 'boolean') {
             settings[key] = notificationSettings[key];
           } else {
-            settings[key] = true; // Default to enabled if not specified
+            return res.status(400).json({ message: `Notification setting ${key} must be true or false.` });
           }
         }
         

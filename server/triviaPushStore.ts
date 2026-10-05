@@ -9,6 +9,7 @@ const ELIGIBLE_RECIPIENT = `
   u.deleted_at IS NULL
   AND coalesce(u.email, '') NOT ILIKE '%@placeholder.roster'
   AND p.push_enabled = true
+  AND (p.notification_settings->>'triviaReminders') IS DISTINCT FROM 'false'
   AND (nullif(p.onesignal_external_id, '') IS NOT NULL OR nullif(p.onesignal_player_id, '') IS NOT NULL)
   AND ($2::text[] IS NULL OR u.display_id = ANY($2::text[]))
 `;

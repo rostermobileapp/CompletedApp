@@ -69,6 +69,8 @@ export async function sendPushNotificationToUser(options: SendPushNotificationOp
   try {
     const preferences = await storage.getNotificationPreferences(userId);
     if (preferences?.pushEnabled === false) return false;
+    const settings = preferences?.notificationSettings as Record<string, boolean> | undefined;
+    if (data?.type === "daily_trivia" && settings?.triviaReminders === false) return false;
     
     if (!preferences?.oneSignalPlayerId && !preferences?.oneSignalExternalId) {
       console.log(`[OneSignal] No subscription found for user ${userId}`);

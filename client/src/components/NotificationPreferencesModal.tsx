@@ -30,7 +30,8 @@ import {
   ChevronUp,
   BellRing,
   UserCheck,
-  Camera
+   Camera,
+   Brain
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -46,6 +47,7 @@ interface NotificationSettings {
   playerRsvpUpdates?: boolean;
   photoTagNotifications?: boolean;
   newSignupAlerts?: boolean;
+  triviaReminders: boolean;
 }
 
 interface NotificationPreferences {
@@ -71,6 +73,7 @@ const defaultSettings: NotificationSettings = {
   playerRsvpUpdates: true,
   photoTagNotifications: true,
   newSignupAlerts: true,
+  triviaReminders: true,
 };
 
 // Founder-only alert: real-time push whenever a brand-new user signs up.
@@ -135,6 +138,7 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
       toast({ title: 'Preferences saved' });
     },
     onError: (error) => {
+      setLocalSettings({ ...defaultSettings, ...preferences?.notificationSettings });
       toast({
         title: 'Failed to update preferences',
         description: String(error),
@@ -395,17 +399,20 @@ export function NotificationPreferencesModal({ open, onOpenChange }: Notificatio
                   { key: 'substitutionRequests', label: 'Substitutions', icon: Users, color: 'text-orange-500' },
                   { key: 'joinRequests', label: 'Join Requests', icon: UserPlus, color: 'text-purple-500' },
                   { key: 'upcomingEvents', label: 'Game Reminders', icon: Calendar, color: 'text-red-500' },
+                  { key: 'triviaReminders', label: 'Trivia', icon: Brain, color: 'text-amber-500' },
                   { key: 'newsAnnouncements', label: 'The Wall', icon: Newspaper, color: 'text-cyan-500' },
                   { key: 'photoTagNotifications', label: 'Photo Tags', icon: Camera, color: 'text-violet-500' },
                 ].map(({ key, label, icon: Icon, color }) => (
                   <div key={key} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50">
                     <div className="flex items-center gap-3">
                       <Icon className={`w-4 h-4 ${color}`} />
-                      <Label className="text-sm cursor-pointer font-normal">{label}</Label>
+                      <Label htmlFor={`notification-${key}`} className="text-sm cursor-pointer font-normal">{label}</Label>
                     </div>
                     <Switch
+                      id={`notification-${key}`}
                       checked={localSettings[key as keyof NotificationSettings] ?? true}
                       onCheckedChange={() => handleToggle(key as keyof NotificationSettings)}
+                      disabled={updateSettingsMutation.isPending}
                     />
                   </div>
                 ))}

@@ -382,6 +382,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
     playerRsvpUpdates: true,
     photoTagNotifications: true,
     newSignupAlerts: true,
+    triviaReminders: true,
   }).notNull(),
   pushEnabled: boolean("push_enabled").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -2816,6 +2817,7 @@ export const notificationSettingsSchema = z.object({
   playerRsvpUpdates: z.boolean().default(true),
   photoTagNotifications: z.boolean().default(true),
   newSignupAlerts: z.boolean().default(true),
+  triviaReminders: z.boolean().default(true),
 });
 
 export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
@@ -2827,7 +2829,7 @@ export const insertNotificationPreferencesSchema = createInsertSchema(notificati
 export const updateNotificationPreferencesSchema = z.object({
   oneSignalPlayerId: z.string().optional(),
   oneSignalExternalId: z.string().optional(),
-  notificationSettings: notificationSettingsSchema.optional(),
+  notificationSettings: notificationSettingsSchema.partial().optional(),
   pushEnabled: z.boolean().optional(),
 });
 

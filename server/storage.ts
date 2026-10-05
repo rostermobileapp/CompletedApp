@@ -1728,7 +1728,11 @@ export class DatabaseStorage implements IStorage {
       const updateData: any = { updatedAt: new Date() };
       if (data.oneSignalPlayerId !== undefined) updateData.oneSignalPlayerId = data.oneSignalPlayerId;
       if (data.oneSignalExternalId !== undefined) updateData.oneSignalExternalId = data.oneSignalExternalId;
-      if (data.notificationSettings !== undefined) updateData.notificationSettings = data.notificationSettings;
+      if (data.notificationSettings !== undefined) {
+        // Merge atomically so older clients and partial updates cannot silently
+        // re-enable an opted-out notification type they do not know about.
+        updateData.notificationSettings = sql`${notificationPreferences.notificationSettings} || ${JSON.stringify(data.notificationSettings)}::jsonb`;
+      }
       if (data.pushEnabled !== undefined) updateData.pushEnabled = data.pushEnabled;
       
       const [updated] = await db
@@ -1745,7 +1749,7 @@ export class DatabaseStorage implements IStorage {
           userId,
           oneSignalPlayerId: data.oneSignalPlayerId,
           oneSignalExternalId: data.oneSignalExternalId,
-          notificationSettings: data.notificationSettings || {
+          notificationSettings: {
             inAppMessages: true,
             paymentRequests: true,
             substitutionRequests: true,
@@ -1755,6 +1759,9 @@ export class DatabaseStorage implements IStorage {
             scrimmageInvites: true,
             playerRsvpUpdates: true,
             photoTagNotifications: true,
+            newSignupAlerts: true,
+            triviaReminders: true,
+            ...data.notificationSettings,
           },
           pushEnabled: data.pushEnabled ?? true,
         })
