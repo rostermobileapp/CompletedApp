@@ -14,13 +14,13 @@ import {
   DEFAULT_TRIVIA_THRESHOLDS,
 } from "./trivia";
 
-test("NHL History and Stanley Cup use uploaded artwork without changing other categories", () => {
+test("NHL History, Stanley Cup, and Players & Legends use uploaded artwork without changing other categories", () => {
   for (let tier = 1; tier <= 8; tier++) {
-    for (const category of ["nhl_history", "stanley_cup"] as const) {
+    for (const category of ["nhl_history", "stanley_cup", "players_legends"] as const) {
       assert.equal(triviaPatchImagePath(category, tier),
         `/badges/trivia/${category}/tier-${tier}.png?v=20261005`);
     }
-    for (const category of TRIVIA_CATEGORIES.filter((category) => category !== "nhl_history" && category !== "stanley_cup")) {
+    for (const category of TRIVIA_CATEGORIES.filter((category) => !["nhl_history", "stanley_cup", "players_legends"].includes(category))) {
       assert.equal(triviaPatchImagePath(category, tier), `/badges/trivia/${category}/tier-${tier}.svg`);
     }
   }
