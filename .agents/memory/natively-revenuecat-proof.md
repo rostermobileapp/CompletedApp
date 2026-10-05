@@ -45,6 +45,12 @@ The owner confirmed the repaired Natively Android purchase flow works on a real 
 
 **How to apply:** Preserve the approved flow and ownership safeguards. After a paid purchase, compare the persisted Roster tier and RevenueCat entitlement before recommending a retry; never suggest paying again to resolve a delay.
 
+Historical purchases can predate the RevenueCat webhook and have no delivery available to resend.
+
+**Why:** On 2026-10-05 the owner supplied RevenueCat's diagnosis that the webhook was created after an affected purchase and configured for RENEWAL only. Purchase and cancellation events had never been delivered, so waiting for or replaying those deliveries could not repair the account.
+
+**How to apply:** Treat that as reported provider configuration, not a permanently verified current setting. Check event selection, use current authenticated provider status for recovery, and preserve canonical ownership and paid-through expiration. Do not prescribe repeated restores as a substitute for a missing historical event.
+
 RevenueCat v1 subscriber GET is get-or-create, not a side-effect-free existence probe.
 
 **Why:** Diagnostic reads of unknown IDs can create empty customers.
