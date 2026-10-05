@@ -1,4 +1,4 @@
-import { appleRevenueCatLoginId } from './appleAutomaticActivation';
+import { nativePurchaseLoginId } from './nativePurchaseAccount';
 import { IAP_PRODUCT_ROLES } from './appleNotificationHandler';
 import type { VerifiedAppleSubscription } from './revenueCatApi';
 import type { AutomaticAppleClaimInput } from './appleAutomaticClaim';
@@ -8,11 +8,12 @@ export interface RevenueCatAppleActivationDependencies {
   getOwnedLineage(userId: string, customerId: string): Promise<{
     originalTransactionId: string; originalPurchasedAt: string;
   } | undefined>;
+  getHistoricalTransaction?(customerId: string, subscription: VerifiedAppleSubscription): Promise<TrustedRevenueCatTransaction | undefined>;
   claim(input: AutomaticAppleClaimInput): Promise<void>;
   reconcileUser(userId: string): Promise<'commissioner' | 'player_pro' | 'free_tier'>;
 }
 
-/** Only populated by the authenticated RevenueCat webhook, never request-body hints. */
+/** Only populated by an authenticated provider webhook or server history lookup, never request-body hints. */
 export interface TrustedRevenueCatTransaction {
   originalTransactionId: string;
   transactionId: string;
@@ -45,7 +46,20 @@ export async function activateRevenueCatApplePurchase(input: {
   secret?: string;
   now?: number;
 }): Promise<{ verified: true; role: 'commissioner' | 'player_pro' }> {
-  const customerId = appleRevenueCatLoginId(input.userId, input.secret);
+  const purchase = await prepareRevenueCatApplePurchase(input);
+  await input.dependencies.claim(purchase.claim);
+  const role = await input.dependencies.reconcileUser(input.userId);
+  if (role === 'free_tier' || (purchase.role === 'commissioner' && role !== 'commissioner')) {
+    throw Object.assign(new Error('The verified subscription could not be applied to this account. Contact support.'), { status: 409 });
+  }
+  return { verified: true, role };
+}
+
+/** Read-only verification shared with dry-run backfill; never creates a claim or changes a role. */
+export async function prepareRevenueCatApplePurchase(
+  input: Parameters<typeof activateRevenueCatApplePurchase>[0],
+): Promise<{ claim: AutomaticAppleClaimInput; role: 'commissioner' | 'player_pro' }> {
+  const customerId = nativePurchaseLoginId(input.userId, 'ios', input.secret);
   const fail = (message: string, status: number): never => {
     throw Object.assign(new Error(message), { status });
   };
@@ -70,8 +84,17 @@ export async function activateRevenueCatApplePurchase(input: {
   }
   const ownedLineage = await input.dependencies.getOwnedLineage(input.userId, customerId);
   for (const subscription of candidates) {
-    const transaction = input.trustedTransaction;
-    // A current, server-read subscription must match the trusted notification
+    let transaction = input.trustedTransaction;
+    const matchingOwnedLineage = ownedLineage &&
+      Date.parse(ownedLineage.originalPurchasedAt) === Date.parse(subscription.originalPurchasedAt)
+      ? ownedLineage.originalTransactionId : undefined;
+    if (!matchingOwnedLineage && (!transaction ||
+        !/^\d{10,20}$/.test(transaction.originalTransactionId) ||
+        !/^\d{10,20}$/.test(transaction.transactionId) ||
+        transaction.transactionId !== subscription.storeTransactionId)) {
+      transaction = await input.dependencies.getHistoricalTransaction?.(customerId, subscription);
+    }
+    // A current, server-read subscription must match the trusted provider event
     // before its original transaction is allowed to establish a first claim.
     const notifiedLineage = transaction &&
       /^\d{10,20}$/.test(transaction.originalTransactionId) &&
@@ -81,22 +104,13 @@ export async function activateRevenueCatApplePurchase(input: {
     if (ownedLineage && notifiedLineage && ownedLineage.originalTransactionId !== notifiedLineage) {
       fail('This account already owns a different Apple purchase lineage. Contact support.', 409);
     }
-    const matchingOwnedLineage = ownedLineage &&
-      Date.parse(ownedLineage.originalPurchasedAt) === Date.parse(subscription.originalPurchasedAt)
-      ? ownedLineage.originalTransactionId : undefined;
     const originalTransactionId = notifiedLineage ?? matchingOwnedLineage;
     if (!originalTransactionId || !/^\d{10,20}$/.test(originalTransactionId)) continue;
-    await input.dependencies.claim({
+    return { role: subscription.role, claim: {
       userId: input.userId, customerId, originalTransactionId,
       productId: subscription.productId,
       originalPurchasedAt: subscription.originalPurchasedAt, expiresAt: subscription.expiresAt,
-    });
-    const role = await input.dependencies.reconcileUser(input.userId);
-    if (role === 'free_tier' ||
-        (subscription.role === 'commissioner' && role !== 'commissioner')) {
-      return fail('The verified subscription could not be applied to this account. Contact support.', 409);
-    }
-    return { verified: true, role };
+    } };
   }
-  return fail('Your purchase is recorded. Waiting for its secure RevenueCat notification; do not purchase again.', 202);
+  return fail('Your purchase is recorded, but its original transaction could not be verified. Contact support; do not purchase again.', 202);
 }

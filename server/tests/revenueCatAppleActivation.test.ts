@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { activateRevenueCatApplePurchase, syncRevenueCatApplePurchase, type RevenueCatAppleActivationDependencies } from '../revenueCatAppleActivation';
+import { activateRevenueCatApplePurchase, syncRevenueCatApplePurchase, prepareRevenueCatApplePurchase, type RevenueCatAppleActivationDependencies } from '../revenueCatAppleActivation';
 import { handleNativeRevenueCatWebhook } from '../nativeRevenueCatWebhook';
 import { appleRevenueCatLoginId } from '../appleAutomaticActivation';
 import type { AutomaticAppleClaimInput } from '../appleAutomaticClaim';
@@ -45,6 +45,51 @@ test('latest renewal transaction is never used as an unproven original ownership
   const f = fixture();
   await assert.rejects(activate(f.dependencies), { status: 202 });
   assert.equal(f.claims.length, 0);
+});
+
+test('historical server lookup recovers purchases never delivered to a webhook', async () => {
+  const f = fixture();
+  f.dependencies.getHistoricalTransaction = async (id, current) => {
+    assert.equal(id, loginId);
+    assert.equal(current, subscription);
+    return { originalTransactionId, transactionId };
+  };
+  assert.deepEqual(await activate(f.dependencies), { verified: true, role: 'commissioner' });
+  assert.equal(f.claims[0].originalTransactionId, originalTransactionId);
+});
+
+test('dry-run verification reads current status and historical proof without a claim or role reconciliation', async () => {
+  const f = fixture();
+  f.dependencies.getHistoricalTransaction = async () => ({ originalTransactionId, transactionId });
+  f.dependencies.claim = async () => assert.fail('preview must not write');
+  f.dependencies.reconcileUser = async () => assert.fail('preview must not reconcile');
+  const prepared = await prepareRevenueCatApplePurchase({ userId, loginId, secret, now, dependencies: f.dependencies });
+  assert.equal(prepared.claim.originalTransactionId, originalTransactionId);
+  assert.equal(prepared.role, 'commissioner');
+});
+
+test('mismatched historical transaction or provider outage cannot create an account claim', async () => {
+  const f = fixture();
+  f.dependencies.getHistoricalTransaction = async () => ({ originalTransactionId, transactionId: '300000000003' });
+  await assert.rejects(activate(f.dependencies), { status: 202 });
+  f.dependencies.getHistoricalTransaction = async () => { throw Object.assign(new Error('Unavailable'), { status: 503 }); };
+  await assert.rejects(activate(f.dependencies), { status: 503 });
+  assert.equal(f.claims.length, 0);
+});
+
+test('existing lineage refresh does not require historical API access', async () => {
+  const f = fixture();
+  f.dependencies.getOwnedLineage = async () => ({ originalTransactionId, originalPurchasedAt: subscription.originalPurchasedAt });
+  f.dependencies.getHistoricalTransaction = async () => assert.fail('history unnecessary');
+  await activate(f.dependencies);
+  assert.equal(f.claims.length, 1);
+});
+
+test('historical proof still uses the atomic claim owner checks', async () => {
+  const f = fixture();
+  f.dependencies.getHistoricalTransaction = async () => ({ originalTransactionId, transactionId });
+  f.dependencies.claim = async () => { throw Object.assign(new Error('Owned elsewhere'), { status: 409 }); };
+  await assert.rejects(activate(f.dependencies), { status: 409 });
 });
 
 test('renewals use previously owned canonical lineage, not a new latest transaction ID', async () => {

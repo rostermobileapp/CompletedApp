@@ -73,4 +73,10 @@ On 2026-10-03 the owner approved RevenueCat server-verified status as the author
 
 **Why:** A paid Commissioner subscription was active in RevenueCat while the additional Apple API lookup failed. The owner's approval explicitly depends on preserving automatic downgrades after paid access ends.
 
-**How to apply:** First-time ownership requires the original transaction ID from an authenticated provider notification matched against a current RevenueCat transaction, not a client hint or latest renewal ID. Retain original ownership across renewals, check current expiry/refund/grace status, and preserve other billing sources. Do not replace legacy direct-Apple sources or their verification merely to simplify the named-customer path.
+**How to apply:** First-time ownership requires the original transaction ID from an authenticated provider notification or server-read historical provider event matched against a current RevenueCat transaction, not a client hint or latest renewal ID. Retain original ownership across renewals, check current expiry/refund/grace status, and preserve other billing sources. Do not replace legacy direct-Apple sources or their verification merely to simplify the named-customer path.
+
+On 2026-10-05 the owner approved safe recovery/backfill for purchases whose original webhooks were missed, retaining ownership checks and automatic expiration.
+
+**Why:** Historical provider events can exist even when they were never delivered to the app's webhook. Querying the server-derived named customer can return an older anonymous-authored event without requiring arbitrary alias attribution.
+
+**How to apply:** Server-read history is another trusted source of original transaction proof, not an exemption from proof. Match its original transaction to the exact current transaction and product from fresh subscription verification. V2's `store_subscription_identifier` is documented as the latest Apple transaction, not the original; never substitute it for canonical lineage. Historical access/expiry hints do not grant access.

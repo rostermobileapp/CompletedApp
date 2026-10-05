@@ -5094,7 +5094,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ID is NOT proof of ownership of a Roster account.
   app.get('/api/admin/iap/revenuecat/availability', isAuthenticated, loadUserPermissions, requireSpecialPermission('admin'), async (_req, res) => {
     const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
-    res.json({ configured: isRevenueCatApiConfigured() });
+    const { isRevenueCatAppleHistoryConfigured } = await import('./revenueCatAppleHistory');
+    res.json({ configured: isRevenueCatApiConfigured(),
+      historicalRecoveryConfigured: isRevenueCatAppleHistoryConfigured() });
   });
 
   app.post('/api/admin/iap/revenuecat/check', isAuthenticated, loadUserPermissions, requireSpecialPermission('admin'), async (req: any, res) => {
@@ -5957,40 +5959,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     trustedTransaction?: import('./revenueCatAppleActivation').TrustedRevenueCatTransaction,
     syncCurrentStatus = false,
   ) => {
-      const { reconcileApplePurchaseLinkForUser, claimAutomaticApplePurchase } = await import('./applePurchaseLinks');
-      const existing = !syncCurrentStatus ? await reconcileApplePurchaseLinkForUser(userId) : null;
-      if (existing?.active && (existing.role === 'commissioner' || existing.role === 'player_pro') &&
-          (!expectedProductId || expectedProductId === existing.productId)) {
-        return { verified: true, role: existing.role };
-      }
-      const { activateRevenueCatApplePurchase, syncRevenueCatApplePurchase } = await import('./revenueCatAppleActivation');
-      const { getRevenueCatActiveAppleSubscriptions } = await import('./revenueCatApi');
-      const activate = syncCurrentStatus ? syncRevenueCatApplePurchase : activateRevenueCatApplePurchase;
-      return activate({
-        userId, loginId, expectedProductId, trustedTransaction,
-        dependencies: {
-          getSubscriptions: async id => {
-            for (let attempt = 0; attempt < 3; attempt++) {
-              const records = await getRevenueCatActiveAppleSubscriptions(id);
-              if (records.length || attempt === 2) return records;
-              await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
-            }
-            return [];
-          },
-          getOwnedLineage: async (id, customerId) => {
-            const link = (await pool.query<{ original_transaction_id: string; original_purchased_at: Date }>(
-              'SELECT original_transaction_id, original_purchased_at FROM apple_purchase_links WHERE user_id = $1 AND customer_id = $2',
-              [id, customerId],
-            )).rows[0];
-            return link ? { originalTransactionId: link.original_transaction_id,
-              originalPurchasedAt: new Date(link.original_purchased_at).toISOString() } : undefined;
-          },
-          claim: claimAutomaticApplePurchase,
-          reconcileUser: async id => {
-            const role = (await reconcileApplePurchaseLinkForUser(id))?.role ?? 'free_tier';
-            return role === 'secondary_commissioner' ? 'player_pro' : role;
-          },
-        },
+      const { refreshRevenueCatAppleAccount } = await import('./revenueCatAppleAccount');
+      return refreshRevenueCatAppleAccount({
+        userId, loginId, expectedProductId, trustedTransaction, syncCurrentStatus,
       });
   };
 
@@ -6011,13 +5982,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/iap/sync-apple', isAuthenticated, async (req: any, res) => {
+  app.post(['/api/iap/sync-apple', '/api/iap/refresh-apple'], isAuthenticated, async (req: any, res) => {
     res.set('Cache-Control', 'no-store');
     try {
       const userId = req.user.claims.sub;
       assertNativeBillingRequestAccount(userId, req.body ?? {});
       const loginId = nativePurchaseLoginId(userId, 'ios');
-      const result = await activateVerifiedAppleAccount(userId, loginId);
+      const result = await activateVerifiedAppleAccount(userId, loginId, undefined, undefined, true);
       return res.json(result);
     } catch (error) {
       if ((error as any)?.status === 202) return res.status(202).json({ verified: false, pending: true });
@@ -6071,8 +6042,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.set('Cache-Control', 'no-store');
     try {
       const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+      const { isRevenueCatAppleHistoryConfigured } = await import('./revenueCatAppleHistory');
       return res.json({ userId: req.user.claims.sub,
-        available: isRevenueCatApiConfigured() && Boolean(process.env.REVENUECAT_WEBHOOK_SECRET) });
+        available: isRevenueCatApiConfigured() &&
+          (Boolean(process.env.REVENUECAT_WEBHOOK_SECRET) || isRevenueCatAppleHistoryConfigured()) });
     } catch {
       return res.json({ userId: req.user.claims.sub, available: false });
     }
@@ -6083,11 +6056,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { isRevenueCatApiConfigured } = await import('./revenueCatApi');
+      const { isRevenueCatAppleHistoryConfigured } = await import('./revenueCatAppleHistory');
       const existing = req.query?.mode === 'restore' ? await pool.query(
         "SELECT 1 FROM apple_purchase_links WHERE user_id = $1 AND customer_id NOT LIKE 'apple_store_%' LIMIT 1", [userId],
       ) : null;
       return res.json({ userId, loginId: nativePurchaseLoginId(userId, 'ios'),
-        available: isRevenueCatApiConfigured() && (Boolean(existing?.rowCount) || Boolean(process.env.REVENUECAT_WEBHOOK_SECRET)) });
+        available: isRevenueCatApiConfigured() && (Boolean(existing?.rowCount) ||
+          Boolean(process.env.REVENUECAT_WEBHOOK_SECRET) || isRevenueCatAppleHistoryConfigured()) });
     } catch {
       return res.status(503).json({ message: 'Apple purchase verification is unavailable. Try later; checkout was not opened.' });
     }

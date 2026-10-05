@@ -56,6 +56,7 @@ externalPort = 3000
 [userenv]
 
 [userenv.shared]
+REVENUECAT_PROJECT_ID = "proje0bd95aa"
 
 [postMerge]
 path = "scripts/post-merge.sh"
