@@ -15,6 +15,12 @@ Database health is transport-specific: a successful native PostgreSQL query does
 
 **How to apply:** Check the running app's logs alongside direct SQL checks when diagnosing preview failures. Distinguish connection-path failures from missing assets or incorrect catalog data; don't change correct artwork mappings to address a database transport error.
 
+A successful non-TLS native probe is not sufficient justification for changing the application's secure database transport.
+
+**Why:** Native read-only probes succeeded, but a certificate-validated TLS probe failed with a self-signed certificate-chain error. Replacing the existing secure connection with plaintext or disabling certificate verification would weaken security rather than fix connection resilience.
+
+**How to apply:** Verify the provider's trusted CA and certificate-validated TLS before considering a native-transport migration. Preserve the existing secure transport until that prerequisite is met; never disable certificate verification just to make a connectivity check pass.
+
 Manual PostgreSQL clients that use default `PG*` environment settings may connect to a different database with similarly named but outdated tables. For direct app-data investigation, use the app's configured `DATABASE_URL` through the database driver, without printing its value.
 
 **Why:** A read-only lookup through the default driver settings saw a schema missing active app columns; the app's configured connection showed the expected data.
