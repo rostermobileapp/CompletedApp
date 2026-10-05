@@ -9,6 +9,12 @@ The project uses Supabase for PostgreSQL hosting. The `DATABASE_URL` environment
 
 **How to apply:** Use the same database connection source as the running app. Do not reference Neon in documentation or troubleshooting notes.
 
+Database health is transport-specific: a successful native PostgreSQL query does not establish that the running application's database connection is healthy.
+
+**Why:** The app's WebSocket connection has disconnected or timed out while a native client could still read the same Supabase catalog. One unhandled connection error stopped the preview independently of the static artwork changes being verified.
+
+**How to apply:** Check the running app's logs alongside direct SQL checks when diagnosing preview failures. Distinguish connection-path failures from missing assets or incorrect catalog data; don't change correct artwork mappings to address a database transport error.
+
 Manual PostgreSQL clients that use default `PG*` environment settings may connect to a different database with similarly named but outdated tables. For direct app-data investigation, use the app's configured `DATABASE_URL` through the database driver, without printing its value.
 
 **Why:** A read-only lookup through the default driver settings saw a schema missing active app columns; the app's configured connection showed the expected data.

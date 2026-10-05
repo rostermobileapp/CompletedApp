@@ -30,10 +30,14 @@ export const TRIVIA_TIER_NAMES: readonly TriviaTierName[] = [
   "bronze", "silver", "gold", "platinum", "emerald", "diamond", "legend", "god_mode",
 ];
 
-/** Uploaded artwork replaces placeholders only for the specified category. */
+export const TRIVIA_UPLOADED_ART_CATEGORIES: ReadonlySet<TriviaCategory> = new Set<TriviaCategory>([
+  "nhl_history", "stanley_cup",
+]);
+
+/** Uploaded artwork replaces placeholders only for the specified categories. */
 export function triviaPatchImagePath(category: TriviaCategory, tier: number): string {
-  return category === "nhl_history"
-    ? `/badges/trivia/nhl_history/tier-${tier}.png?v=20261005`
+  return TRIVIA_UPLOADED_ART_CATEGORIES.has(category)
+    ? `/badges/trivia/${category}/tier-${tier}.png?v=20261005`
     : `/badges/trivia/${category}/tier-${tier}.svg`;
 }
 

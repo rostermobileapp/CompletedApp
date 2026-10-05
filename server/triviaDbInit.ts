@@ -1,5 +1,5 @@
 import { pool } from "./db";
-import { DEFAULT_TRIVIA_THRESHOLDS, TRIVIA_CATEGORIES, TRIVIA_CATEGORY_LABELS, TRIVIA_TIER_NAMES, triviaPatchImagePath } from "@shared/trivia";
+import { DEFAULT_TRIVIA_THRESHOLDS, TRIVIA_CATEGORIES, TRIVIA_CATEGORY_LABELS, TRIVIA_TIER_NAMES, TRIVIA_UPLOADED_ART_CATEGORIES, triviaPatchImagePath } from "@shared/trivia";
 import {
   migrateSupersededTriviaFallbackQuestions,
   TRIVIA_FALLBACK_QUESTIONS,
@@ -90,7 +90,7 @@ export async function ensureTriviaTables(): Promise<void> {
     )).rows;
     const badge = definition ?? (await pool.query(`SELECT id FROM badge_definitions WHERE slug = $1`, [slug])).rows[0];
     if (!badge) throw new Error(`Could not initialize trivia patch family ${slug}`);
-    if (category === "nhl_history") {
+    if (TRIVIA_UPLOADED_ART_CATEGORIES.has(category)) {
       await pool.query(
         `UPDATE badge_definitions SET image_path = $2
          WHERE id = $1 AND image_path IS DISTINCT FROM $2`,
@@ -120,7 +120,7 @@ export async function ensureTriviaTables(): Promise<void> {
           Number(threshold),
           triviaPatchImagePath(category, index + 1),
           PATCH_COLORS[index],
-          category === "nhl_history",
+          TRIVIA_UPLOADED_ART_CATEGORIES.has(category),
         ],
       );
     }

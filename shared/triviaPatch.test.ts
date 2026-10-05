@@ -12,17 +12,19 @@ const base = {
   })),
 };
 
-test("NHL History artwork matches every earned tier and the unearned Tier 1 preview", () => {
-  for (let tier = 0; tier <= 8; tier++) {
-    const patch = buildTriviaPatchView({
-      ...base, category: "nhl_history",
-      correctCount: tier === 0 ? 0 : DEFAULT_TRIVIA_THRESHOLDS[tier - 1],
-      tiers: base.tiers.map((row) => ({ ...row, image_path: null })),
-    });
-    assert.equal(patch.current_tier, tier);
-    assert.equal(patch.imagePath, triviaPatchImagePath("nhl_history", Math.max(1, tier)));
-    assert.deepEqual(patch.tiers.map((row) => row.imagePath),
-      Array.from({ length: 8 }, (_, index) => triviaPatchImagePath("nhl_history", index + 1)));
+test("uploaded category artwork matches every earned tier and the unearned Tier 1 preview", () => {
+  for (const category of ["nhl_history", "stanley_cup"] as const) {
+    for (let tier = 0; tier <= 8; tier++) {
+      const patch = buildTriviaPatchView({
+        ...base, category,
+        correctCount: tier === 0 ? 0 : DEFAULT_TRIVIA_THRESHOLDS[tier - 1],
+        tiers: base.tiers.map((row) => ({ ...row, image_path: null })),
+      });
+      assert.equal(patch.current_tier, tier);
+      assert.equal(patch.imagePath, triviaPatchImagePath(category, Math.max(1, tier)));
+      assert.deepEqual(patch.tiers.map((row) => row.imagePath),
+        Array.from({ length: 8 }, (_, index) => triviaPatchImagePath(category, index + 1)));
+    }
   }
 });
 
