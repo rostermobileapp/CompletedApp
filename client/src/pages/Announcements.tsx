@@ -54,6 +54,7 @@ import { apiRequest, getImageUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { EnhancedMediaUploader } from '@/components/EnhancedMediaUploader';
+import { getWallAuthorLabel } from '@/lib/wallAuthorLabel';
 
 // Types
 type AnnouncementReaction = {
@@ -96,6 +97,7 @@ type Announcement = {
   createdAt: string;
   author: {
     id: string;
+    displayId?: string | null;
     firstName: string;
     lastName: string;
     profileImageUrl?: string;
@@ -792,7 +794,7 @@ function AnnouncementCard({
                   {announcement.author.firstName || 'Unknown'} {announcement.author.lastName || 'User'}
                 </span>
                 <Badge variant="secondary" className="text-xs">
-                  {announcement.teamId ? 'Team Captain' : 'Commissioner'}
+                  {getWallAuthorLabel(announcement.author.displayId, announcement.teamId)}
                 </Badge>
                 {announcement.isPinned && (
                   <Badge variant="default" className="text-xs">
