@@ -5,6 +5,7 @@ import { ArrowUpRight, Check, ChevronRight, CircleHelp, X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { findTriviaCategory } from "@/components/triviaVisibility";
+import { countEarnedTriviaPatches } from "@shared/triviaPatch";
 import "./TriviaPatchesSection.css";
 
 type Tier = { tier: number | string; threshold: number; unlocked_at?: string | null; imagePath?: string | null };
@@ -34,7 +35,10 @@ function launchTrivia() {
   window.setTimeout(() => window.dispatchEvent(new CustomEvent("roster:trivia-open")), 180);
 }
 
-export function TriviaPatchesSection({ enabled = true }: { enabled?: boolean }) {
+export function TriviaPatchesSection({ enabled = true, onEarnedCountChange }: {
+  enabled?: boolean;
+  onEarnedCountChange?: (count: number) => void;
+}) {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -47,6 +51,9 @@ export function TriviaPatchesSection({ enabled = true }: { enabled?: boolean }) 
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
+  useEffect(() => {
+    onEarnedCountChange?.(enabled ? countEarnedTriviaPatches(data?.categories) : 0);
+  }, [enabled, data, onEarnedCountChange]);
   const { data: today } = useQuery<Today>({
     queryKey: ["/api/trivia/today", user?.id],
     queryFn: async () => (await apiRequest("GET", "/api/trivia/today")).json(),

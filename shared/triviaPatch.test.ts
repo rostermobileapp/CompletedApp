@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTriviaPatchView } from "./triviaPatch";
+import { buildTriviaPatchView, countEarnedTriviaPatches } from "./triviaPatch";
 import { DEFAULT_TRIVIA_THRESHOLDS, triviaPatchImagePath } from "./trivia";
 
 const base = {
@@ -11,6 +11,29 @@ const base = {
     image_path: `/custom/tier-${index + 1}.png`, awarded_at: null as string | null,
   })),
 };
+
+test("patch total includes every unlocked Trivia tier across categories, not just category count", () => {
+  const tiers = DEFAULT_TRIVIA_THRESHOLDS.map((_, index) => ({ tier: index + 1, unlocked_at: null }));
+  assert.equal(countEarnedTriviaPatches(), 0);
+  assert.equal(countEarnedTriviaPatches([{ current_tier: 0, tiers }]), 0);
+  assert.equal(countEarnedTriviaPatches([
+    { current_tier: 3, tiers },
+    { current_tier: 2, tiers },
+    { current_tier: 0, tiers },
+  ]), 5);
+  assert.equal(countEarnedTriviaPatches([{ current_tier: 8, tiers }]), 8);
+});
+
+test("patch total preserves separately recorded unlocks and supports string tier numbers", () => {
+  assert.equal(countEarnedTriviaPatches([{
+    current_tier: 1,
+    tiers: [
+      { tier: "1", unlocked_at: null },
+      { tier: "2", unlocked_at: null },
+      { tier: "3", unlocked_at: "2026-10-05T12:00:00Z" },
+    ],
+  }]), 2);
+});
 
 test("uploaded category artwork matches every earned tier and the unearned Tier 1 preview", () => {
   for (const category of ["nhl_history", "stanley_cup"] as const) {

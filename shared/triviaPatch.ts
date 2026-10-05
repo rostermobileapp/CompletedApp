@@ -1,5 +1,16 @@
 import { TRIVIA_CATEGORY_LABELS, validateTriviaTiers, triviaPatchImagePath, type TriviaCategory } from "./trivia";
 
+/** Count individually unlocked patches, using the same rules as the collection. */
+export function countEarnedTriviaPatches(categories: readonly {
+  current_tier: number;
+  tiers: readonly { tier: number | string; unlocked_at?: string | null }[];
+}[] = []): number {
+  return categories.reduce((total, category) =>
+    total + category.tiers.filter(tier =>
+      Number(tier.tier) <= category.current_tier || !!tier.unlocked_at,
+    ).length, 0);
+}
+
 export type TriviaPatchTierRow = {
   tier: number;
   correct_answers_required: number;
