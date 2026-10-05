@@ -9,9 +9,20 @@ import {
   shiftDateKey,
   triviaStreaks,
   TRIVIA_CATEGORIES,
+  triviaPatchImagePath,
   validateTriviaTiers,
   DEFAULT_TRIVIA_THRESHOLDS,
 } from "./trivia";
+
+test("NHL History uses the uploaded artwork for each tier without changing other categories", () => {
+  for (let tier = 1; tier <= 8; tier++) {
+    assert.equal(triviaPatchImagePath("nhl_history", tier),
+      `/badges/trivia/nhl_history/tier-${tier}.png?v=20261005`);
+    for (const category of TRIVIA_CATEGORIES.filter((category) => category !== "nhl_history")) {
+      assert.equal(triviaPatchImagePath(category, tier), `/badges/trivia/${category}/tier-${tier}.svg`);
+    }
+  }
+});
 
 test("Eastern trivia date rolls over at midnight across both daylight-saving transitions", () => {
   assert.equal(easternDateKey(new Date("2024-03-10T04:59:59.999Z")), "2024-03-09");

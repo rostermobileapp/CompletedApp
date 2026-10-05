@@ -1,5 +1,5 @@
 import { pool } from "./db";
-import { DEFAULT_TRIVIA_THRESHOLDS, TRIVIA_CATEGORIES, TRIVIA_CATEGORY_LABELS, TRIVIA_TIER_NAMES } from "@shared/trivia";
+import { DEFAULT_TRIVIA_THRESHOLDS, TRIVIA_CATEGORIES, TRIVIA_CATEGORY_LABELS, TRIVIA_TIER_NAMES, triviaPatchImagePath } from "@shared/trivia";
 import {
   migrateSupersededTriviaFallbackQuestions,
   TRIVIA_FALLBACK_QUESTIONS,
@@ -85,11 +85,18 @@ export async function ensureTriviaTables(): Promise<void> {
         `Lifetime correct answers in ${TRIVIA_CATEGORY_LABELS[category]} daily trivia. Progress never resets.`,
         `trivia:${category}`,
         JSON.stringify({ trivia: true, lifetime: true }),
-        `/badges/trivia/${category}/tier-1.svg`,
+        triviaPatchImagePath(category, 1),
       ],
     )).rows;
     const badge = definition ?? (await pool.query(`SELECT id FROM badge_definitions WHERE slug = $1`, [slug])).rows[0];
     if (!badge) throw new Error(`Could not initialize trivia patch family ${slug}`);
+    if (category === "nhl_history") {
+      await pool.query(
+        `UPDATE badge_definitions SET image_path = $2
+         WHERE id = $1 AND image_path IS DISTINCT FROM $2`,
+        [badge.id, triviaPatchImagePath(category, 1)],
+      );
+    }
 
     await pool.query(
       `INSERT INTO trivia_category_patches (category, patch_id) VALUES ($1, $2) ON CONFLICT (category) DO NOTHING`,
@@ -104,13 +111,16 @@ export async function ensureTriviaTables(): Promise<void> {
       await pool.query(
         `INSERT INTO badge_tiers (badge_definition_id, tier, threshold, image_path, color)
          VALUES ($1, $2::badge_tier, $3, $4, $5)
-         ON CONFLICT (badge_definition_id, tier) DO UPDATE SET threshold = EXCLUDED.threshold`,
+          ON CONFLICT (badge_definition_id, tier) DO UPDATE SET
+            threshold = EXCLUDED.threshold,
+            image_path = CASE WHEN $6::boolean THEN EXCLUDED.image_path ELSE badge_tiers.image_path END`,
         [
           badge.id,
           tierName,
           Number(threshold),
-          `/badges/trivia/${category}/tier-${index + 1}.svg`,
+          triviaPatchImagePath(category, index + 1),
           PATCH_COLORS[index],
+          category === "nhl_history",
         ],
       );
     }

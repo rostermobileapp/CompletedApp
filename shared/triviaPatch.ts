@@ -1,4 +1,4 @@
-import { TRIVIA_CATEGORY_LABELS, validateTriviaTiers, type TriviaCategory } from "./trivia";
+import { TRIVIA_CATEGORY_LABELS, validateTriviaTiers, triviaPatchImagePath, type TriviaCategory } from "./trivia";
 
 export type TriviaPatchTierRow = {
   tier: number;
@@ -28,7 +28,7 @@ export function buildTriviaPatchView(input: {
       tier,
       threshold: correctAnswersRequired,
       unlocked_at: unlockedAt,
-      imagePath: row.image_path ?? `/badges/trivia/${input.category}/tier-${tier}.svg`,
+      imagePath: row.image_path ?? triviaPatchImagePath(input.category, tier),
       earned: input.correctCount >= correctAnswersRequired || unlockedAt !== null,
     };
   });

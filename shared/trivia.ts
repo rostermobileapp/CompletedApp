@@ -30,6 +30,13 @@ export const TRIVIA_TIER_NAMES: readonly TriviaTierName[] = [
   "bronze", "silver", "gold", "platinum", "emerald", "diamond", "legend", "god_mode",
 ];
 
+/** Uploaded artwork replaces placeholders only for the specified category. */
+export function triviaPatchImagePath(category: TriviaCategory, tier: number): string {
+  return category === "nhl_history"
+    ? `/badges/trivia/nhl_history/tier-${tier}.png?v=20261005`
+    : `/badges/trivia/${category}/tier-${tier}.svg`;
+}
+
 export const DEFAULT_TRIVIA_THRESHOLDS = [1, 5, 10, 25, 50, 100, 150, 200] as const;
 export const TRIVIA_TEST_DISPLAY_IDS = ["U00001"] as const;
 export const TRIVIA_TIME_ZONE = "America/New_York";

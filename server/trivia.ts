@@ -14,6 +14,7 @@ import {
   TRIVIA_TEST_DISPLAY_IDS,
   TRIVIA_TIER_NAMES,
   triviaStreaks,
+  triviaPatchImagePath,
   validateTriviaTiers,
   type TriviaCategory,
   type TriviaDifficulty,
@@ -681,7 +682,7 @@ export async function getTriviaPatches(userId: string, today = easternDateKey())
         tier: tier.tier,
         threshold: tier.threshold,
         unlocked_at: unlockDate,
-        imagePath: images.get(`${category}:${tier.badgeTier}`) ?? `/badges/trivia/${category}/tier-${tier.tier}.svg`,
+        imagePath: images.get(`${category}:${tier.badgeTier}`) ?? triviaPatchImagePath(category, tier.tier),
         earned: correctCount >= tier.threshold || unlockDate !== null,
       };
     });
@@ -694,7 +695,7 @@ export async function getTriviaPatches(userId: string, today = easternDateKey())
       name: row.name,
       description: row.description,
       imagePath: images.get(`${category}:${TRIVIA_TIER_NAMES[currentTier > 0 ? currentTier - 1 : 0]}`)
-        ?? `/badges/trivia/${category}/tier-${currentTier || 1}.svg`,
+        ?? triviaPatchImagePath(category, currentTier || 1),
       correct_count: correctCount,
       current_tier: currentTier,
       next_threshold: next?.threshold ?? null,

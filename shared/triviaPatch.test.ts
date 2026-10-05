@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildTriviaPatchView } from "./triviaPatch";
-import { DEFAULT_TRIVIA_THRESHOLDS } from "./trivia";
+import { DEFAULT_TRIVIA_THRESHOLDS, triviaPatchImagePath } from "./trivia";
 
 const base = {
   category: "movies_media" as const, patchId: "patch", name: "Movies & Media Trivia",
@@ -11,6 +11,20 @@ const base = {
     image_path: `/custom/tier-${index + 1}.png`, awarded_at: null as string | null,
   })),
 };
+
+test("NHL History artwork matches every earned tier and the unearned Tier 1 preview", () => {
+  for (let tier = 0; tier <= 8; tier++) {
+    const patch = buildTriviaPatchView({
+      ...base, category: "nhl_history",
+      correctCount: tier === 0 ? 0 : DEFAULT_TRIVIA_THRESHOLDS[tier - 1],
+      tiers: base.tiers.map((row) => ({ ...row, image_path: null })),
+    });
+    assert.equal(patch.current_tier, tier);
+    assert.equal(patch.imagePath, triviaPatchImagePath("nhl_history", Math.max(1, tier)));
+    assert.deepEqual(patch.tiers.map((row) => row.imagePath),
+      Array.from({ length: 8 }, (_, index) => triviaPatchImagePath("nhl_history", index + 1)));
+  }
+});
 
 test("daily patch feedback preserves the full trophy patch contract at every count", () => {
   for (const count of [0, 1, 4, 5, 10, 25, 50, 100, 150, 200, 300]) {
