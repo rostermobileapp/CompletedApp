@@ -586,7 +586,7 @@ export default function OnboardingQuestionnaire() {
                   placeholder="Who referred you? (e.g. organization name, coach's name)"
                   maxLength={200}
                   rows={2}
-                  className="mt-2 w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#3c82f4] transition-colors resize-none"
+                  className="mt-2 w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-500 bg-white caret-gray-900 [color-scheme:light] focus:outline-none focus:border-[#3c82f4] transition-colors resize-none"
                   autoFocus
                 />
               )}
