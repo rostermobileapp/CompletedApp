@@ -3,6 +3,12 @@ name: Badge announcement presentation
 description: How earned-badge announcements should relate to the screen where the achievement happened.
 ---
 
+Stats and beer unlocks still celebrate for everyone, but free users see only a generic locked patch icon. Paid Trophy Case entitlements reveal the awarded artwork. Keep trivia's separate free-user behavior unchanged.
+
+**Why:** The owner explicitly chose to preserve the reward moment while using the concealed artwork to encourage Player Pro upgrades.
+
+**How to apply:** Gate artwork in both announcement delivery and rendering without deleting awards or progress. Do not replace the lock with a blurred earned image.
+
 Earned-badge announcements are global, full-screen overlays: center the announcement card and strongly blur the existing screen through a translucent backdrop. The ice photograph belongs to the Trophy Case page, not to the global announcement backdrop.
 
 For tiered awards, carry the awarded tier's image path in both live and persisted events. The badge definition image can be Bronze artwork, so using it without the tier override makes higher-tier announcements display the wrong medal.

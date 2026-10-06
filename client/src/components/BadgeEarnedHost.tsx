@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Lock, X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useWebSocket } from "@/context/WebSocketContext";
 import confettiVideo from "@/assets/badge-confetti.webm";
@@ -12,6 +12,7 @@ type EarnedEvent = {
   badge?: any;
   payload?: any;
   definition?: any;
+  artworkLocked?: boolean;
 };
 
 function hasTransparentVideoFrame(video: HTMLVideoElement): boolean {
@@ -85,11 +86,13 @@ export function BadgeConfettiOverlay() {
 export function BadgeEarnedAnnouncement({
   badge,
   payload = {},
+  artworkLocked = false,
   onDismiss,
   onViewTrophyCase,
 }: {
   badge: any;
   payload?: any;
+  artworkLocked?: boolean;
   onDismiss: () => void | Promise<void>;
   onViewTrophyCase?: () => void | Promise<void>;
 }) {
@@ -121,11 +124,18 @@ export function BadgeEarnedAnnouncement({
         <div className="pointer-events-none absolute inset-1 rounded-[1.2rem] border border-white/80" />
         <button onClick={() => { void onDismiss(); }} className="absolute right-3 top-3 rounded-full p-2 text-[#597087] transition hover:bg-[#e8f0f6] hover:text-[#173d5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#164a73] sm:right-4 sm:top-4" aria-label="Close achievement announcement"><X size={20} /></button>
         <p className="px-9 text-[10px] font-bold uppercase tracking-[.24em] text-[#d52d3b]">{triviaTier ? `Trivia patch · ${triviaTier}` : tier ? `Upgraded to ${String(tier).toUpperCase()}` : "Achievement unlocked"}</p>
-        <div className={`badge-click-pop relative mx-auto mt-5 flex h-40 w-40 items-center justify-center sm:h-48 sm:w-48 ${badge.imagePath ? "bg-transparent" : "rounded-full bg-[#e8f0f6]"}`}>
-          {badge.imagePath ? <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full object-contain" /> : <span className="px-5 text-center text-sm font-bold uppercase text-[#164a73]">{badge.name || "Badge"}</span>}
+        <div className={`badge-click-pop relative mx-auto mt-5 flex h-40 w-40 items-center justify-center sm:h-48 sm:w-48 ${artworkLocked || !badge.imagePath ? "rounded-full bg-[#e8f0f6]" : "bg-transparent"}`}>
+          {artworkLocked ? (
+            <Lock size={34} role="img" aria-label="Patch artwork locked" className="text-[#728699]" />
+          ) : badge.imagePath ? (
+            <img src={getImageUrl(badge.imagePath) ?? undefined} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span className="px-5 text-center text-sm font-bold uppercase text-[#164a73]">{badge.name || "Badge"}</span>
+          )}
         </div>
         <h2 className="mt-5 text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">{badge.name || "New badge"}</h2>
         <p className="mt-2 text-sm text-[#597087]">{badge.description || "You earned a new badge."}</p>
+        {artworkLocked && <p className="mt-3 text-xs leading-relaxed text-[#597087]">Your patch is saved in the Trophy Case. Player Pro reveals its artwork there.</p>}
         {isMultiplier && <p className="mt-4 text-2xl font-bold text-[#d52d3b]">×{payload.count}</p>}
         {onViewTrophyCase && <button onClick={() => { void onViewTrophyCase(); }} className="mt-6 w-full rounded-lg bg-[#164a73] px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">View in Trophy Case</button>}
       </div>
@@ -196,6 +206,7 @@ export function BadgeEarnedHost() {
       key={eventId}
       badge={badge}
       payload={payload}
+      artworkLocked={current.artworkLocked !== false}
       onDismiss={dismiss}
       onViewTrophyCase={async () => { await dismiss(); navigate("/trophy-case"); }}
     />

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { isTriviaDefinition, isTriviaUserEnabled } from "@shared/trivia";
 import { hasPaidTrophyCaseAccess } from "@shared/trophyCaseAccess";
+import { badgeAnnouncementPresentation } from "@shared/badgeAnnouncementPresentation";
 import {
   badgeAwards,
   badgeDefinitions,
@@ -1160,7 +1161,17 @@ function scopeKeyFor(definition: Pick<BadgeDefinition, "category">, context?: { 
 async function broadcastEarnedEvent(userId: string, event: BadgeEarnedEvent, definition: BadgeDefinition, payload: Record<string, unknown>) {
   try {
     const { broadcastToUser } = await import("./routes");
-    if (broadcastToUser(userId, { type: "badge_earned", eventId: event.id, badge: { ...definition, ...payload } })) {
+    const [viewer] = await db.select({
+      role: users.role,
+      isPrimaryCommissioner: users.isPrimaryCommissioner,
+    }).from(users).where(eq(users.id, userId)).limit(1);
+    const presentation = badgeAnnouncementPresentation(definition, payload, hasPaidTrophyCaseAccess(viewer));
+    if (broadcastToUser(userId, {
+      type: "badge_earned",
+      eventId: event.id,
+      artworkLocked: presentation.artworkLocked,
+      badge: { ...presentation.definition, ...presentation.payload },
+    })) {
       await db.update(badgeEarnedEvents).set({ deliveredAt: new Date() }).where(eq(badgeEarnedEvents.id, event.id));
     }
   } catch (error) {
@@ -1906,6 +1917,18 @@ export async function getPendingBadgeEvents(userId: string) {
     .where(and(eq(badgeEarnedEvents.userId, userId), sql`${badgeEarnedEvents.acknowledgedAt} IS NULL`))
     .orderBy(asc(badgeEarnedEvents.createdAt));
 
+  const [viewer] = await db.select({
+    role: users.role,
+    isPrimaryCommissioner: users.isPrimaryCommissioner,
+  }).from(users).where(eq(users.id, userId)).limit(1);
+  const canRevealArtwork = hasPaidTrophyCaseAccess(viewer);
+  const presentEvent = (event: typeof events[number]) => ({
+    ...event,
+    ...badgeAnnouncementPresentation(
+      event.definition, (event.payload ?? {}) as Record<string, unknown>, canRevealArtwork,
+    ),
+  });
+
   const centuryYear = currentCenturyClubYear();
   const goalieEligible = events.some((event) => event.definition.triggerKey === "career_shutouts")
     ? await isCareerGoalie(userId) : false;
@@ -1934,7 +1957,7 @@ export async function getPendingBadgeEvents(userId: string) {
     event.definition.triggerKey !== "season_48hr_rsvp_perfect"
     || earlyBirdStatuses.get((event.payload as Record<string, unknown>).seasonId as string) === true);
   const tieredEvents = validEvents.filter((event) => typeof (event.payload as Record<string, unknown>)?.tier === "string");
-  if (!tieredEvents.length) return validEvents;
+  if (!tieredEvents.length) return validEvents.map(presentEvent);
 
   const definitionIds = Array.from(new Set(tieredEvents.map((event) => event.definition.id)));
   const tiers = await db.select({
@@ -1996,7 +2019,7 @@ export async function getPendingBadgeEvents(userId: string) {
       ?? existingImagePath
       ?? null;
     return imagePath ? { ...event, payload: { ...payload, imagePath } } : event;
-  });
+  }).map(presentEvent);
 }
 
 export async function acknowledgeBadgeEvent(userId: string, eventId: string) {
