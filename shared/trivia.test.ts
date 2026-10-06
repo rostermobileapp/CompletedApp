@@ -16,11 +16,11 @@ import {
 
 test("Uploaded Trivia categories use original PNG artwork without changing other categories", () => {
   for (let tier = 1; tier <= 8; tier++) {
-    for (const category of ["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media"] as const) {
+    for (const category of ["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media", "nicknames_slang"] as const) {
       assert.equal(triviaPatchImagePath(category, tier),
         `/badges/trivia/${category}/tier-${tier}.png?v=20261005`);
     }
-    for (const category of TRIVIA_CATEGORIES.filter((category) => !["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media"].includes(category))) {
+    for (const category of TRIVIA_CATEGORIES.filter((category) => !["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media", "nicknames_slang"].includes(category))) {
       assert.equal(triviaPatchImagePath(category, tier), `/badges/trivia/${category}/tier-${tier}.svg`);
     }
   }
