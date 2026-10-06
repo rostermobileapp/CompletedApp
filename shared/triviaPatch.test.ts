@@ -36,7 +36,7 @@ test("patch total preserves separately recorded unlocks and supports string tier
 });
 
 test("uploaded category artwork matches every earned tier and the unearned Tier 1 preview", () => {
-  for (const category of ["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media", "nicknames_slang"] as const) {
+  for (const category of ["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media", "nicknames_slang", "arenas_fans"] as const) {
     for (let tier = 0; tier <= 8; tier++) {
       const patch = buildTriviaPatchView({
         ...base, category,
