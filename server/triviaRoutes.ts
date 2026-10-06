@@ -3,7 +3,7 @@ import { isAuthenticated } from "./supabaseAuth";
 import { pool } from "./db";
 import { getTrophyCaseAccess } from "./badges";
 import { hasPaidTrophyCaseAccess } from "../shared/trophyCaseAccess";
-import { TRIVIA_TEST_DISPLAY_IDS, isTriviaDateKey } from "@shared/trivia";
+import { TRIVIA_TEST_DISPLAY_IDS, isTriviaDateKey, isTriviaTestMode } from "@shared/trivia";
 import {
   canAccessTriviaPatches,
   getTodayTrivia,
@@ -139,10 +139,10 @@ export function registerTriviaRoutes(app: Express): void {
   // U00001 account, and the data helper repeats that identity check in SQL.
   app.post("/api/trivia/test-reset", isAuthenticated, triviaAccess, async (req: TriviaRequest & any, res: any) => {
     try {
-      if (process.env.TRIVIA_TEST_MODE === "false") {
+      if (!isTriviaTestMode()) {
         return res.status(403).json({
           code: "TRIVIA_RESET_DISABLED",
-          message: "Trivia answer reset is disabled when TRIVIA_TEST_MODE=false.",
+          message: "Trivia answer reset is disabled outside test mode.",
         });
       }
       if (req.triviaViewer.displayId !== TRIVIA_TEST_DISPLAY_IDS[0]) {

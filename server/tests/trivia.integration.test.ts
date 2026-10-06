@@ -21,6 +21,7 @@ import {
 import {
   categoryForTriviaDate,
   easternDateKey,
+  isTriviaTestMode,
   shiftDateKey,
   TRIVIA_CATEGORY_LABELS,
   TRIVIA_TEST_DISPLAY_IDS,
@@ -442,12 +443,12 @@ test("daily trivia atomically answers once, preserves lifetime patch progress, a
       process.env.TRIVIA_TEST_USER_IDS = TRIVIA_TEST_DISPLAY_IDS.join(",");
       process.env.TRIVIA_TEST_MODE = "true";
       assert.equal(isTriviaEligible(TRIVIA_TEST_DISPLAY_IDS[0]), true);
-      assert.equal(isTriviaEligible("U99999"), false);
+      assert.equal(isTriviaEligible("U99999"), !isTriviaTestMode());
       process.env.TRIVIA_TEST_MODE = "false";
       assert.equal(isTriviaEligible("U99999"), true, "production mode opens play to every authenticated display ID");
       await assert.rejects(
         resetTriviaAnswer(today),
-        /disabled when TRIVIA_TEST_MODE=false/,
+        /disabled outside test mode/,
       );
     } finally {
       if (originalTestMode === undefined) delete process.env.TRIVIA_TEST_MODE;

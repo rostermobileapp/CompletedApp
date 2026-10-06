@@ -6,6 +6,8 @@ import {
   isTriviaDateKey,
   isTriviaDefinition,
   isTriviaUserEnabled,
+  isTriviaTestMode,
+  TRIVIA_PUBLIC_LAUNCH_AT,
   shiftDateKey,
   triviaStreaks,
   TRIVIA_CATEGORIES,
@@ -68,6 +70,21 @@ test("test access resolves display IDs and disables the allowlist outside test m
   assert.equal(isTriviaUserEnabled("U00002", true, ["U00001"]), false);
   assert.equal(isTriviaUserEnabled("U00002", false, ["U00001"]), true);
   assert.equal(isTriviaUserEnabled(null, false, ["U00001"]), true);
+});
+
+test("public launch opens all users at October 7 noon Eastern, even with an old test flag", () => {
+  const before = new Date("2026-10-07T15:59:59.999Z");
+  const launch = new Date(TRIVIA_PUBLIC_LAUNCH_AT);
+  assert.equal(easternDateKey(launch), "2026-10-07");
+  for (const env of [{}, { TRIVIA_TEST_MODE: "true" }]) {
+    assert.equal(isTriviaTestMode(env, before), true);
+    assert.equal(isTriviaUserEnabled("U00002", isTriviaTestMode(env, before), ["U00001"]), false);
+    assert.equal(isTriviaTestMode(env, launch), false);
+    assert.equal(isTriviaUserEnabled("U00002", isTriviaTestMode(env, launch), ["U00001"]), true);
+    assert.equal(isTriviaUserEnabled(null, isTriviaTestMode(env, launch), []), true);
+    assert.equal(isTriviaTestMode(env, new Date("2026-11-01T17:00:00Z")), false);
+  }
+  assert.equal(isTriviaTestMode({}, new Date(NaN)), true);
 });
 
 test("trivia patch definitions can be recognized for generic Trophy Case filtering", () => {

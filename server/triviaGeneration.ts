@@ -10,6 +10,7 @@ import {
   easternDateKey,
   isTriviaCategory,
   isTriviaDateKey,
+  isTriviaTestMode,
   shiftDateKey,
   TRIVIA_CATEGORY_LABELS,
   TRIVIA_TIME_ZONE,
@@ -676,6 +677,6 @@ export function triviaGenerationConfiguration() {
   return {
     model: TRIVIA_MODEL,
     timezone: TRIVIA_TIME_ZONE,
-    testMode: process.env.TRIVIA_TEST_MODE !== "false",
+    testMode: isTriviaTestMode(),
   };
 }

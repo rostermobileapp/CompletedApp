@@ -15,11 +15,11 @@ Daily trivia is expected to send an actual push notification at noon Eastern, no
 
 **How to apply:** Distinguish tomorrow's question generation from today's reminder delivery. Verify that a real sender is running and inspect provider acceptance before describing automated noon notifications as operational.
 
-The approved test rollout sends automatic noon announcements only to U00001. A noon announcement is independent of whether today's trivia was already answered.
+Before public launch, automated test announcements are limited to U00001. The owner has now approved public play and daily announcements to the full eligible audience at the launch time documented in replit.md. A noon announcement is independent of whether today's trivia was already answered.
 
-**Why:** The owner authorized U00001-only automation while test mode is active and expected a noon notification after completing the day's question during earlier testing.
+**Why:** The owner first authorized U00001-only testing, then explicitly requested a timed public rollout. They expected a noon notification even after completing the day's question.
 
-**How to apply:** Do not broaden automated test recipients merely because another account is added to the app's trivia-access allowlist. Do not suppress the daily announcement using answer or dismissal state without an explicit policy change.
+**How to apply:** Keep the prelaunch test audience restricted, then broaden play and pushes together. Do not suppress the daily announcement using answer or dismissal state without an explicit policy change. A scheduled source change is not a live launch until deployed.
 
 Users may opt out of Trivia pushes independently of in-app Trivia and all other notification types. Missing Trivia-specific consent preserves the previous enabled behavior, but never overrides the master push opt-out.
 

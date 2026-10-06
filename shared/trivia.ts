@@ -44,6 +44,18 @@ export function triviaPatchImagePath(category: TriviaCategory, tier: number): st
 export const DEFAULT_TRIVIA_THRESHOLDS = [1, 5, 10, 25, 50, 100, 150, 200] as const;
 export const TRIVIA_TEST_DISPLAY_IDS = ["U00001"] as const;
 export const TRIVIA_TIME_ZONE = "America/New_York";
+// October 7, 2026 at noon New York time (EDT, UTC-04:00).
+export const TRIVIA_PUBLIC_LAUNCH_AT = "2026-10-07T16:00:00.000Z";
+
+/** A shipped build opens automatically, even if an old test flag remains set. */
+export function isTriviaTestMode(
+  env: { TRIVIA_TEST_MODE?: string } = process.env,
+  now: Date = new Date(),
+): boolean {
+  if (!Number.isFinite(now.getTime())) return true;
+  if (now.getTime() >= Date.parse(TRIVIA_PUBLIC_LAUNCH_AT)) return false;
+  return env.TRIVIA_TEST_MODE !== "false";
+}
 
 export type TriviaTierConfig = { tier: number; correctAnswersRequired: number };
 export type TriviaStreaks = { current: number; best: number };
@@ -137,7 +149,7 @@ export function isTriviaDefinition(definition: {
 
 export function isTriviaUserEnabled(
   displayId: string | null | undefined,
-  testMode = process.env.TRIVIA_TEST_MODE !== "false",
+  testMode = isTriviaTestMode(),
   allowlist = (process.env.TRIVIA_TEST_USER_IDS ?? TRIVIA_TEST_DISPLAY_IDS.join(","))
     .split(",").map((id) => id.trim()).filter(Boolean),
 ): boolean {

@@ -1,5 +1,5 @@
 import { fromZonedTime } from "date-fns-tz";
-import { easternDateKey, TRIVIA_TEST_DISPLAY_IDS, type TriviaCategory } from "../shared/trivia";
+import { easternDateKey, isTriviaTestMode, TRIVIA_TEST_DISPLAY_IDS, type TriviaCategory } from "../shared/trivia";
 
 export type TriviaPushRecipient = { id: string; displayId: string | null };
 export type TriviaPushScope = string[] | null;
@@ -25,8 +25,8 @@ export function triviaPushNextDelay(now: Date): number {
   return Math.max(25, Math.min(60_000, noon.getTime() - now.getTime()));
 }
 
-export function triviaPushScope(env: { TRIVIA_TEST_MODE?: string; TRIVIA_TEST_USER_IDS?: string }): TriviaPushScope {
-  if (env.TRIVIA_TEST_MODE === "false") return null;
+export function triviaPushScope(env: { TRIVIA_TEST_MODE?: string; TRIVIA_TEST_USER_IDS?: string }, now: Date = new Date()): TriviaPushScope {
+  if (!isTriviaTestMode(env, now)) return null;
   const configured = (env.TRIVIA_TEST_USER_IDS ?? TRIVIA_TEST_DISPLAY_IDS.join(","))
     .split(",").map(id => id.trim()).filter(Boolean);
   // The initial automated-push rollout was explicitly approved for U00001 only.

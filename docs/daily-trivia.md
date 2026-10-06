@@ -48,11 +48,16 @@ are at most three generation/verification attempts per date.
 
 The temporary audience gate is independent of patch entitlements:
 
-- `TRIVIA_TEST_MODE` defaults to `true`.
+- Public access automatically opens on **October 7, 2026 at 12:00 PM America/New_York**
+  (`2026-10-07T16:00:00Z`, EDT). The updated web build must be deployed before
+  this time; source configuration alone does not schedule a live launch.
+- Before this launch, `TRIVIA_TEST_MODE` defaults to `true`.
 - `TRIVIA_TEST_USER_IDS` defaults to `U00001`.
-- Set `TRIVIA_TEST_MODE=false` to open trivia to all authenticated users;
-  the allowlist is then ignored. Do not change the Trophy Case's existing
-  subscription gate when changing this flag.
+- At launch, the allowlist and stale `TRIVIA_TEST_MODE=true` flags are ignored
+  for both play and the daily noon push audience; no restart is required.
+  `TRIVIA_TEST_MODE=false` remains an early manual override, so do not set it
+  before the scheduled launch. Trophy Case subscription/age gates are unchanged.
+- Test answer resets are disabled once public access opens.
 - Startup prints whether test mode is enabled and which display IDs are
   allowed.
 

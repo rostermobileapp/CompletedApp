@@ -78,11 +78,34 @@ test("timer aligns with noon instead of delaying until the next minute", () => {
 });
 
 test("test mode is fail-closed and restricted to the explicitly approved account", () => {
-  assert.deepEqual(triviaPushScope({}), ["U00001"]);
-  assert.deepEqual(triviaPushScope({ TRIVIA_TEST_USER_IDS: " U00001,U00002 " }), ["U00001"]);
-  assert.deepEqual(triviaPushScope({ TRIVIA_TEST_USER_IDS: "U00002" }), []);
-  assert.deepEqual(triviaPushScope({ TRIVIA_TEST_USER_IDS: "" }), []);
-  assert.equal(triviaPushScope({ TRIVIA_TEST_MODE: "false" }), null);
+  const beforeLaunch = new Date("2026-10-06T16:00:00Z");
+  assert.deepEqual(triviaPushScope({}, beforeLaunch), ["U00001"]);
+  assert.deepEqual(triviaPushScope({ TRIVIA_TEST_USER_IDS: " U00001,U00002 " }, beforeLaunch), ["U00001"]);
+  assert.deepEqual(triviaPushScope({ TRIVIA_TEST_USER_IDS: "U00002" }, beforeLaunch), []);
+  assert.deepEqual(triviaPushScope({ TRIVIA_TEST_USER_IDS: "" }, beforeLaunch), []);
+  assert.equal(triviaPushScope({ TRIVIA_TEST_MODE: "false" }, beforeLaunch), null);
+});
+
+test("noon launch broadens delivery without replaying earlier dates or duplicate pushes", async () => {
+  const f = fixture();
+  const env = { TRIVIA_TEST_MODE: "true", TRIVIA_TEST_USER_IDS: "U00001" };
+  f.recipients([{ id: "owner", displayId: "U00001" }, { id: "player", displayId: "U00002" }]);
+  f.time("2026-10-06T16:00:00Z");
+  f.deps.scope = triviaPushScope(env, f.deps.now());
+  assert.equal((await runTriviaPushDelivery(f.deps)).accepted, 1);
+  f.time("2026-10-07T15:59:59.999Z");
+  f.deps.scope = triviaPushScope(env, f.deps.now());
+  assert.deepEqual(f.deps.scope, ["U00001"]);
+  assert.equal((await runTriviaPushDelivery(f.deps)).accepted, 0);
+  f.time("2026-10-07T16:00:00.000Z");
+  f.deps.scope = triviaPushScope(env, f.deps.now());
+  assert.equal(f.deps.scope, null);
+  assert.equal((await runTriviaPushDelivery(f.deps)).accepted, 2);
+  assert.equal((await runTriviaPushDelivery(f.deps)).accepted, 0);
+  assert.deepEqual(f.calls.map(call => [call.userId, call.date]), [
+    ["owner", "2026-10-06"], ["owner", "2026-10-07"], ["player", "2026-10-07"],
+  ]);
+  assert.equal(triviaPushScope({ TRIVIA_TEST_USER_IDS: "" }, f.deps.now()), null);
 });
 
 test("before noon and empty allowlists perform no database or provider work", async () => {

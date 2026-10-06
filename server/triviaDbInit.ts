@@ -1,5 +1,5 @@
 import { pool } from "./db";
-import { DEFAULT_TRIVIA_THRESHOLDS, TRIVIA_CATEGORIES, TRIVIA_CATEGORY_LABELS, TRIVIA_TIER_NAMES, TRIVIA_UPLOADED_ART_CATEGORIES, triviaPatchImagePath } from "@shared/trivia";
+import { DEFAULT_TRIVIA_THRESHOLDS, TRIVIA_CATEGORIES, TRIVIA_CATEGORY_LABELS, TRIVIA_TIER_NAMES, TRIVIA_UPLOADED_ART_CATEGORIES, TRIVIA_PUBLIC_LAUNCH_AT, isTriviaTestMode, triviaPatchImagePath } from "@shared/trivia";
 import {
   migrateSupersededTriviaFallbackQuestions,
   TRIVIA_FALLBACK_QUESTIONS,
@@ -138,7 +138,8 @@ export async function ensureTriviaTables(): Promise<void> {
     );
   }
 
-  const testMode = process.env.TRIVIA_TEST_MODE !== "false";
+  const testMode = isTriviaTestMode();
   const allowlist = (process.env.TRIVIA_TEST_USER_IDS ?? "U00001").split(",").map((id) => id.trim()).filter(Boolean);
   console.log(`[Trivia] Test mode ${testMode ? "ON" : "OFF"}; allowed display IDs: ${testMode ? allowlist.join(", ") || "(none)" : "all authenticated users"}`);
+  console.log(`[Trivia] Public launch: ${TRIVIA_PUBLIC_LAUNCH_AT} (October 7, noon America/New_York); no restart required at launch.`);
 }

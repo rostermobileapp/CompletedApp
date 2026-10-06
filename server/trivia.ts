@@ -8,6 +8,7 @@ import {
   isTriviaDefinition,
   isTriviaDateKey,
   isTriviaUserEnabled,
+  isTriviaTestMode,
   shiftDateKey,
   TRIVIA_CATEGORIES,
   TRIVIA_CATEGORY_LABELS,
@@ -900,8 +901,8 @@ export async function submitTriviaAnswer(input: {
 }
 
 export async function resetTriviaAnswer(dateKey: string): Promise<{ reset: boolean; progressReversed: number }> {
-  if (process.env.TRIVIA_TEST_MODE === "false") {
-    throw new Error("Trivia answer reset is disabled when TRIVIA_TEST_MODE=false.");
+  if (!isTriviaTestMode()) {
+    throw new Error("Trivia answer reset is disabled outside test mode.");
   }
   if (!isTriviaDateKey(dateKey)) throw new Error("A valid trivia date is required for reset.");
   const client = await pool.connect();
