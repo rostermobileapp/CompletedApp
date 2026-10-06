@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, ChevronDown, ChevronRight, Lock, Sparkles, Trophy, X } from "lucide-react";
 import { BadgeEarnedAnnouncement } from "@/components/BadgeEarnedHost";
 import { FeatureLockOverlay } from "@/components/FeatureLockOverlay";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { usePermissions } from "@/context/SubscriptionContext";
 import { getImageUrl } from "@/lib/queryClient";
 import { hasPaidTrophyCaseAccess } from "@shared/trophyCaseAccess";
@@ -118,16 +119,33 @@ function SectionHeading({ label, description, count, expanded, onToggle, content
   onToggle?: () => void;
   contentId?: string;
 }) {
-  const content = <>
-    <span className="min-w-0 flex-1 text-left">
-      <span className="block text-base font-bold tracking-tight text-[#173d5b] sm:text-lg">{label}</span>
-      <span className="mt-1 block text-[11px] leading-relaxed text-[#718394] sm:text-xs">{description}</span>
-    </span>
-    {count !== undefined && <span className="shrink-0 rounded-full bg-[#e8f0f6] px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">{count} {count === 1 ? "award" : "spots"}</span>}
-    {onToggle && <ChevronDown aria-hidden="true" size={17} className={`shrink-0 text-[#164a73] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />}
-  </>;
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpTitleId = `category-help-title-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const helpDescriptionId = `${helpTitleId}-description`;
   return <div className="mb-4 border-b border-[#d7e2eb] pb-3">
-    {onToggle ? <h3><button type="button" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle} className="flex min-h-11 w-full items-center gap-3 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">{content}</button></h3> : <div className="flex items-end justify-between gap-3">{content}</div>}
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <h3 className="min-w-0">
+          {onToggle ? <button type="button" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle} className="inline-flex min-h-11 items-center gap-2 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">
+            <span className="text-base font-bold tracking-tight text-[#173d5b] sm:text-lg">{label}</span>
+            <ChevronDown aria-hidden="true" size={17} className={`shrink-0 text-[#164a73] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+          </button> : <span className="text-base font-bold tracking-tight text-[#173d5b] sm:text-lg">{label}</span>}
+        </h3>
+        <Popover open={helpOpen} onOpenChange={setHelpOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" aria-label={`About ${label}`} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#b7c9d7] bg-[#edf5fb] text-xs font-bold leading-none text-[#164a73] transition hover:border-[#164a73] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">?</button>
+          </PopoverTrigger>
+          <PopoverContent side="bottom" align="start" collisionPadding={12} aria-labelledby={helpTitleId} aria-describedby={helpDescriptionId} className="w-[calc(100vw-2rem)] max-w-[20rem] rounded-xl border-[#c8dbe8] bg-[#f8fbfd] p-4 text-[#173d5b] shadow-[0_16px_35px_#23415d25]">
+            <div className="flex items-start justify-between gap-3">
+              <h4 id={helpTitleId} className="text-sm font-bold tracking-tight">About {label}</h4>
+              <button type="button" aria-label={`Close ${label} description`} onClick={() => setHelpOpen(false)} className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#718394] transition hover:bg-[#e8f0f6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#164a73]"><X size={16} /></button>
+            </div>
+            <p id={helpDescriptionId} className="mt-2 text-xs leading-relaxed text-[#597087]">{description}</p>
+          </PopoverContent>
+        </Popover>
+      </div>
+      {count !== undefined && <span className="shrink-0 rounded-full bg-[#e8f0f6] px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">{count} {count === 1 ? "award" : "spots"}</span>}
+    </div>
   </div>;
 }
 
