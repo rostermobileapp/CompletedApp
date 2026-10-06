@@ -36,7 +36,7 @@ test("patch total preserves separately recorded unlocks and supports string tier
 });
 
 test("uploaded category artwork matches every earned tier and the unearned Tier 1 preview", () => {
-  for (const category of ["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture"] as const) {
+  for (const category of ["nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises", "hockey_culture", "movies_media"] as const) {
     for (let tier = 0; tier <= 8; tier++) {
       const patch = buildTriviaPatchView({
         ...base, category,
@@ -81,6 +81,6 @@ test("missing artwork uses the category tier path and invalid configuration fail
   const patch = buildTriviaPatchView({
     ...base, correctCount: 5, tiers: base.tiers.map((tier) => ({ ...tier, image_path: null })),
   });
-  assert.equal(patch.imagePath, "/badges/trivia/movies_media/tier-2.svg");
+  assert.equal(patch.imagePath, "/badges/trivia/movies_media/tier-2.png?v=20261005");
   assert.throws(() => buildTriviaPatchView({ ...base, tiers: base.tiers.slice(1) }));
 });
