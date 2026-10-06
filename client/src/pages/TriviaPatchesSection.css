@@ -13,18 +13,6 @@
   color: #597087;
 }
 
-.trivia-patches .trivia-patch-slot {
-  color: #173d5b;
-}
-
-.trivia-patches .trivia-patch-slot .trophy-slot-well {
-  background: linear-gradient(155deg, #cfdfeb 0%, #e3eef5 45%, #eef5f9 100%);
-}
-
-.trivia-patches .trivia-patch-name { color: #164a73; }
-.trivia-patches .trivia-patch-status { color: #b52732; }
-.trivia-patches .trivia-patch-description { color: #455f74; }
-
 .trivia-patches .trivia-loading-slot {
   background: linear-gradient(145deg, #dce8f0, #cbdbe6);
 }
@@ -41,35 +29,13 @@
   background: rgba(255,255,255,.32);
 }
 
-.trivia-patch-detail {
-  border-color: #c7d8e5;
-  background: linear-gradient(145deg, #fff, #edf5fb);
-  color: #1e3345;
-  box-shadow: 0 24px 80px rgba(23,61,91,.34);
-}
-
-.trivia-patch-detail .trivia-tier-row {
-  border-color: #c7d8e5;
-  background: rgba(255,255,255,.58);
-  color: #173d5b;
-}
-
-.trivia-patch-detail .trivia-tier-row > span:first-child {
-  background: #e3eef5;
-  color: #164a73;
-}
-
-.trivia-patch-detail .trivia-tier-row > span:first-child:has(svg) {
-  color: #164a73;
-}
-
 .trivia-patches button:focus-visible {
   outline-color: #164a73;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .trivia-patches .trivia-patch-slot,
-  .trivia-patches .trivia-patch-slot img {
+  .trivia-patches .trophy-depth-slot,
+  .trivia-patches .trophy-depth-slot img {
     transition: none !important;
   }
 }

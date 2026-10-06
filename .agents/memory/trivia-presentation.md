@@ -11,6 +11,12 @@ The trivia collection must match the surrounding Trophy Case, not introduce a se
 
 **How to apply:** Check the actual surrounding Trophy Case surfaces before restyling trivia; don't assume the app's dark-mode flag means every section should become navy.
 
+Trivia categories must follow the achievement patches' compact, independently expandable category layout and tier grid, with categories collapsed by default. Earned tiers show their own uploaded artwork and open a larger view; locked artwork stays concealed.
+
+**Why:** The owner explicitly requested the same category layout and design as achievement patches, not category tiles that open a separate tier-list popup.
+
+**How to apply:** Preserve this shared presentation when extending trivia categories or patch tiers; changes to Trophy Case category styling should remain consistent across both collections.
+
 The owner confirmed that the completed popup looks great after trying its answer flow. Preserve that presentation when changing delivery or performance.
 
 Trivia must grade immediately on the device rather than waiting for server verification.
