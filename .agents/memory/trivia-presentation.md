@@ -17,6 +17,12 @@ Trivia categories must follow the achievement patches' compact, independently ex
 
 **How to apply:** Preserve this shared presentation when extending trivia categories or patch tiers; changes to Trophy Case category styling should remain consistent across both collections.
 
+The enlarged trivia patch viewer should show only the transparent uploaded PNG over a dimmed backdrop, with an X at the top right. No visible title, stats, card, or inner image panel.
+
+**Why:** The owner explicitly rejected the boxed popup in favor of the patch PNG alone.
+
+**How to apply:** Keep screen-reader labels and accessible dismissal, but don't add visible modal chrome around enlarged trivia artwork.
+
 The owner confirmed that the completed popup looks great after trying its answer flow. Preserve that presentation when changing delivery or performance.
 
 Trivia must grade immediately on the device rather than waiting for server verification.

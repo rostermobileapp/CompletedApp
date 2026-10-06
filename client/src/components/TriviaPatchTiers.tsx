@@ -156,7 +156,7 @@ export function TriviaPatchTiers({
             onClick={(event) => event.stopPropagation()}
           />
           <DialogContent
-            className="fixed left-1/2 top-1/2 z-[10021] grid max-h-[92dvh] w-[calc(100vw-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 gap-3 overflow-y-auto rounded-2xl border border-[#c7d8e5] bg-[#f5f9fc] p-5 text-[#173d5b] shadow-[0_24px_80px_#173d5b66] sm:p-7"
+            className="fixed left-1/2 top-1/2 z-[10021] flex max-h-[90dvh] max-w-[94vw] -translate-x-1/2 -translate-y-1/2 items-center justify-center bg-transparent p-0 outline-none"
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onCloseAutoFocus={(event) => {
@@ -164,36 +164,32 @@ export function TriviaPatchTiers({
               viewerTrigger.current?.focus();
             }}
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <DialogTitle className="text-xl font-bold">Tier {viewingTier?.tier} · {categoryName}</DialogTitle>
-                <DialogDescription className="mt-1 text-sm text-[#597087]">
-                  {viewingTier ? `${viewingTier.threshold} correct answers` : ""}
-                </DialogDescription>
-              </div>
-              <DialogClose asChild>
-                <button
-                  type="button"
-                  aria-label="Close patch artwork viewer"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#597087] transition hover:bg-[#e5eef5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#164a73]"
-                >
-                  <X size={20} />
-                </button>
-              </DialogClose>
-            </div>
-            <div className="flex min-h-[min(62dvh,34rem)] items-center justify-center rounded-xl bg-[#eaf2f7] p-4 sm:p-8">
-              {viewingTier && viewingImage ? (
-                <img
-                  src={viewingImage}
-                  alt={`${categoryName} tier ${viewingTier.tier} patch artwork`}
-                  className="max-h-[min(58dvh,32rem)] max-w-full object-contain"
-                />
-              ) : (
-                <p className="max-w-sm text-center text-sm font-semibold text-[#597087]">
-                  Artwork unavailable for this tier.
-                </p>
-              )}
-            </div>
+            <DialogTitle className="sr-only">
+              {viewingTier ? `${categoryName} Tier ${viewingTier.tier} patch` : "Trivia patch artwork"}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {viewingTier ? `Patch artwork for ${categoryName}, Tier ${viewingTier.tier}.` : "Patch artwork unavailable."}
+            </DialogDescription>
+            <DialogClose asChild>
+              <button
+                type="button"
+                aria-label="Close patch artwork viewer"
+                className="fixed right-4 top-4 z-[10022] flex h-12 w-12 items-center justify-center rounded-full border border-white/55 bg-[#173d5b]/70 text-white shadow-lg transition hover:bg-[#173d5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                <X size={22} />
+              </button>
+            </DialogClose>
+            {viewingTier && viewingImage ? (
+              <img
+                src={viewingImage}
+                alt={`${categoryName} tier ${viewingTier.tier} patch artwork`}
+                className="max-h-[88dvh] max-w-[92vw] object-contain"
+              />
+            ) : (
+              <p className="max-w-sm text-center text-sm font-semibold text-white">
+                Artwork unavailable for this tier.
+              </p>
+            )}
           </DialogContent>
         </DialogPortal>
       </Dialog>
