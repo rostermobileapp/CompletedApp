@@ -122,7 +122,7 @@ function SectionHeading({ label, description, count, expanded, onToggle, content
   const [helpOpen, setHelpOpen] = useState(false);
   const helpTitleId = `category-help-title-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const helpDescriptionId = `${helpTitleId}-description`;
-  return <div className="mb-4 border-b border-[#d7e2eb] pb-3">
+  return <div className={expanded ? "mb-3 border-b border-[#d7e2eb] pb-2" : "mb-0 border-b-0 pb-0"}>
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <h3 className="min-w-0">
@@ -159,7 +159,7 @@ function AchievementSection({ label, description, badges, onSelect, preview = fa
     (badge.slug === "hat_trick" || badge.slug === "beer_me" || badge.slug === "on_fire") && badge.legacyAwards?.length);
   const legacyAwards = legacyBadge?.legacyAwards ?? [];
   return (
-    <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5">
+    <section className={`trophy-depth-section rounded-2xl px-3.5 sm:px-5 ${expanded ? "pt-2 pb-3.5 sm:pt-3 sm:pb-5" : "py-1 sm:py-1.5"}`}>
       <SectionHeading label={label} description={description} count={spotCount} expanded={expanded} onToggle={() => setExpanded((open) => !open)} contentId={contentId} />
       <div id={contentId} hidden={!expanded}>
         <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
@@ -186,7 +186,7 @@ function TrophyAwardSection({ section, visibleBadges, preview, onSelect }: {
 }) {
   const [expanded, setExpanded] = useState(false);
   const contentId = `trophy-awards-${section.category}`;
-  return <section className="trophy-depth-panel rounded-2xl p-3.5 sm:p-5">
+  return <section className={`trophy-depth-panel rounded-2xl px-3.5 sm:px-5 ${expanded ? "pt-2 pb-3.5 sm:pt-3 sm:pb-5" : "py-1 sm:py-1.5"}`}>
     <SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={visibleBadges.length} expanded={expanded} onToggle={() => setExpanded((open) => !open)} contentId={contentId} />
     <div id={contentId} hidden={!expanded} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{visibleBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />)}</div>
   </section>;
@@ -250,7 +250,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
         {ageAccess !== "loading" && ageAccess !== "eligible" && <div className="mx-auto max-w-lg rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center shadow-[0_16px_35px_#23415d12]"><Lock className="mx-auto text-[#164a73]" size={28} /><h2 className="mt-4 text-xl font-bold text-[#173d5b]">Age verification required</h2><p className="mt-2 text-sm text-[#718394]">{ageAccess === "under_21" ? "The Trophy Case is available only to users who are 21 or older." : "Enter your date of birth in your profile so we can verify that you are 21 or older."}</p><button onClick={() => navigate("/profile")} className="mt-6 rounded-lg bg-[#164a73] px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#103a5b]">Go to Profile <ChevronRight className="ml-1 inline" size={14} /></button></div>}
         {ageAccess === "eligible" && <>{isLoading && <div className="rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center text-[#718394]">Loading {preview ? "the badge preview" : "your trophy case"}…</div>}{isError && <div className="rounded-2xl border border-[#edc6ca] bg-[#fff5f5] p-8 text-center text-[#b52732]">Could not load {preview ? "the badge preview" : "your trophy case"}.</div>}{data && <main className="trophy-depth-main mx-auto max-w-5xl rounded-[1.5rem] p-3 sm:p-6">
           <section className="trophy-depth-panel mb-5 rounded-2xl p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">{preview ? "Catalog preview" : "The collection of"}</p><h2 className="mt-1 text-xl font-bold tracking-tight text-[#173d5b] sm:text-2xl">{preview ? "Every badge, on display" : "Your career, on display"}</h2></div><div className="rounded-lg border border-[#c8dbe8] bg-white/75 px-2.5 py-1.5 text-center"><div className="font-mono text-[9px] font-bold tracking-[.15em] text-[#164a73]">ROSTER HOCKEY</div><div className="mt-0.5 text-[7px] uppercase tracking-[.15em] text-[#718394]">Player honors</div></div></div></section>
-          <div className="space-y-5">{data.sections.filter((section) => section.category !== "achievement").map((section) => { const visibleBadges = preview ? section.badges : section.badges.filter((badge) => badge.isEarned); if (!visibleBadges.length) return null; return <TrophyAwardSection key={section.category} section={section} visibleBadges={visibleBadges} preview={preview} onSelect={selectBadge} />; })}</div>
+          <div className="space-y-3">{data.sections.filter((section) => section.category !== "achievement").map((section) => { const visibleBadges = preview ? section.badges : section.badges.filter((badge) => badge.isEarned); if (!visibleBadges.length) return null; return <TrophyAwardSection key={section.category} section={section} visibleBadges={visibleBadges} preview={preview} onSelect={selectBadge} />; })}</div>
           <section className="trophy-depth-panel mt-5 rounded-2xl p-3.5 sm:p-5">
             <div className="mb-5 flex flex-col gap-3 border-b border-[#d7e2eb] pb-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -260,7 +260,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
               </div>
               {preview ? <span className="w-fit rounded-full bg-[#e8f0f6] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">Progress tracked</span> : user?.displayId === "U00001" ? <button onClick={() => navigate("/trophy-case/earned-patches")} className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg bg-[#164a73] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#103a5b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">View All Patches <ChevronRight size={15} /></button> : null}
             </div>
-            <div className="space-y-5">
+            <div className="space-y-3">
               {ACHIEVEMENT_SECTIONS.filter((group) => !("goalieOnly" in group) || !group.goalieOnly || data.isGoalie).map((group) => {
                 const achievementBadges = data.sections.find((section) => section.category === "achievement")?.badges ?? [];
                 const badges = "slug" in group ? achievementBadges.filter((badge) => badge.slug === group.slug) : achievementBadges.filter((badge) => group.types.includes(badge.achievementType as typeof group.types[number]));
