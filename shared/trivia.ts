@@ -31,7 +31,7 @@ export const TRIVIA_TIER_NAMES: readonly TriviaTierName[] = [
 ];
 
 export const TRIVIA_UPLOADED_ART_CATEGORIES: ReadonlySet<TriviaCategory> = new Set<TriviaCategory>([
-  "nhl_history", "stanley_cup", "players_legends", "records_stats",
+  "nhl_history", "stanley_cup", "players_legends", "records_stats", "teams_franchises",
 ]);
 
 /** Uploaded artwork replaces placeholders only for the specified categories. */
