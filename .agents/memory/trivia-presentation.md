@@ -36,3 +36,9 @@ Opening daily trivia from a push must show the trivia interface immediately once
 **Why:** The owner observed almost 20 seconds between opening a trivia push and seeing the popup, and explicitly required instant opening.
 
 **How to apply:** Keep dashboard loading, progress details, and unresolved birthday/badge checks off trivia's opening path. Preserve protection against overlapping a dialog already on screen and keep answer persistence and awards server-authoritative.
+
+Daily push wording should stay simple and omit the category: title "Daily Hockey Trivia"; message "Today's question is live.  Tap to play!"
+
+**Why:** The owner explicitly requested this category-independent wording.
+
+**How to apply:** Preserve this wording when changing the scheduler or push delivery unless the owner requests new copy.

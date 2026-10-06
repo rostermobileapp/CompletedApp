@@ -1,7 +1,6 @@
 import { pool } from "./db";
 import { ensureTodayQuestion } from "./trivia";
 import { sendPushNotificationToUser } from "./oneSignalNotifications";
-import { TRIVIA_CATEGORY_LABELS } from "../shared/trivia";
 import { runTriviaPushDelivery, triviaPushDate, triviaPushNextDelay, triviaPushScope } from "./triviaPushDelivery";
 import { createTriviaPushStore } from "./triviaPushStore";
 
@@ -31,9 +30,9 @@ export function startDailyTriviaPushJob(): void {
             }),
             store,
             ensureQuestion: ensureTodayQuestion,
-            send: ({ userId, date, category, idempotencyKey }) => sendPushNotificationToUser({
+            send: ({ userId, date, idempotencyKey }) => sendPushNotificationToUser({
               userId, title: "Daily Hockey Trivia",
-              message: `Today's ${TRIVIA_CATEGORY_LABELS[category]} question is ready. Tap to play!`,
+              message: "Today's question is live.  Tap to play!",
               data: { type: "daily_trivia", trivia_date: date },
               idempotencyKey, timeoutMs: 20_000,
             }),
