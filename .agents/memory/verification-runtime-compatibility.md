@@ -14,3 +14,9 @@ Isolated bundled tests must mock unexecuted dynamic application-entry imports to
 **Why:** The bundler resolves dependencies before tree-shaking. An unused dynamic entry import pulled in the full application and caused misleading mock-export errors; missing mock resolution context also prevented legitimate imports from resolving.
 
 **How to apply:** Isolate the full import graph before executing a fixture, including dynamic startup paths, and provide mock resolve directories. Match connection and query interfaces accurately, and replace external clients and credentials with test-only values.
+
+For direct headless Chromium/CDP checks of native Enter activation, enable focus emulation and send rawKeyDown, a char event with carriage-return text, then keyUp.
+
+**Why:** In this environment, keyDown/keyUp alone left a focused native button unchanged; the complete native key sequence successfully activated it.
+
+**How to apply:** Use the complete sequence for keyboard interaction checks rather than treating a failed abbreviated CDP sequence as an application regression.

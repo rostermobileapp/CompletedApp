@@ -46,6 +46,10 @@
   box-shadow: inset 4px 5px 12px rgba(31, 63, 93, 0.18);
 }
 
+.trophy-case [hidden] {
+  display: none !important;
+}
+
 .trophy-case .trophy-depth-section::before {
   border-top: 1px solid rgba(46, 82, 112, 0.35);
   border-left: 1px solid rgba(46, 82, 112, 0.25);

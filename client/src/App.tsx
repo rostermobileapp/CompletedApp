@@ -232,7 +232,7 @@ function Router() {
   }
 
   if (import.meta.env.DEV && location === '/trophy-case-preview') {
-    return <TrophyCasePreview />;
+    return <PermissionProvider><TrophyCasePreview /></PermissionProvider>;
   }
 
   if (authLoading) {

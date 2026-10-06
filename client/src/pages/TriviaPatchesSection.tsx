@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowUpRight, Check, ChevronRight, CircleHelp, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, X } from "lucide-react";
 import { apiRequest, getImageUrl } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { findTriviaCategory } from "@/components/triviaVisibility";
@@ -44,6 +44,7 @@ export function TriviaPatchesSection({ enabled = true, onEarnedCountChange }: {
   const queryClient = useQueryClient();
   const patchKey = ["/api/trivia/patches", user?.id] as const;
   const [selected, setSelected] = useState<CategoryPatch | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const { data, isLoading, isError, refetch } = useQuery<PatchData>({
     queryKey: patchKey,
     queryFn: async () => (await apiRequest("GET", "/api/trivia/patches")).json(),
@@ -98,48 +99,56 @@ export function TriviaPatchesSection({ enabled = true, onEarnedCountChange }: {
   return (
     <section className="trivia-patches trophy-depth-panel mt-5 rounded-2xl p-3.5 sm:p-5" aria-labelledby="trivia-patches-heading">
       <div className="trivia-patches-heading mb-5 flex flex-col gap-3 border-b border-[#d7e2eb] pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">Daily knowledge · lifetime keepsakes</p>
-          <h2 id="trivia-patches-heading" className="mt-1 text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">Trivia Patches</h2>
-          <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-[#597087] sm:text-xs">Nine hockey subjects. Every correct answer earns permanent progress.</p>
-        </div>
+        <h2 id="trivia-patches-heading" className="flex min-w-0 flex-1">
+        <button type="button" aria-expanded={expanded} aria-controls="trivia-patches-content" onClick={() => setExpanded((open) => !open)} className="flex min-h-12 w-full items-center gap-3 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">Daily knowledge · lifetime keepsakes</span>
+            <span className="mt-1 block text-2xl font-bold tracking-tight text-[#173d5b] sm:text-3xl">Trivia Patches</span>
+            <span className="mt-1 block max-w-xl text-[11px] leading-relaxed text-[#597087] sm:text-xs">Nine hockey subjects. Every correct answer earns permanent progress.</span>
+          </span>
+          <span className="shrink-0 rounded-full bg-[#e8f0f6] px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">9 categories</span>
+          <ChevronDown aria-hidden="true" size={19} className={`shrink-0 text-[#164a73] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+        </button>
+        </h2>
         <button type="button" onClick={playToday} disabled={today?.answered} className="trivia-play-button inline-flex min-h-10 w-fit items-center gap-2 rounded-lg bg-[#164a73] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#103a5b] disabled:cursor-not-allowed disabled:opacity-55">
           {today?.answered ? "Today complete" : "Play today"} <ArrowUpRight size={14} />
         </button>
       </div>
-      {isLoading && <div aria-label="Loading trivia patches" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="trivia-loading-slot h-48 animate-pulse rounded-xl" />)}</div>}
-      {isError && <div className="trivia-error-state rounded-xl border p-5 text-center text-sm"><p>Couldn’t load your trivia patches.</p><button type="button" onClick={() => void refetch()} className="mt-2 font-bold underline underline-offset-4">Try again</button></div>}
-      {data && <div className="trivia-stats mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Trivia lifetime summary">
-        {[
-          ["Answered", data.stats.total_answered], ["Correct", data.stats.total_correct],
-          ["Accuracy", `${Number(data.stats.accuracy || 0).toFixed(1)}%`],
-          ["Current streak", data.stats.current_streak], ["Best streak", data.stats.best_streak],
-        ].map(([label, value]) => <div key={String(label)} className="trivia-stat rounded-lg border px-3 py-2.5">
-          <div className="font-mono text-lg font-bold">{value}</div>
-          <div className="text-[9px] font-bold uppercase tracking-[.12em]">{label}</div>
-        </div>)}
-      </div>}
-      {data && ordered.length === 0 && <div className="trivia-empty-state rounded-xl border border-dashed p-6 text-center text-sm">Trivia patch details are being prepared. Your answers still count.</div>}
-      {data && ordered.length > 0 && <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
-        {ordered.map((patch) => {
-          const nextTier = patch.current_tier >= 8 || patch.complete ? 8 : patch.current_tier + 1;
-          const target = patch.next_threshold ?? patch.tiers.find((tier) => Number(tier.tier) === nextTier)?.threshold;
-          const ratio = target ? Math.min(100, patch.correct_count / target * 100) : patch.complete ? 100 : 0;
-          const status = patch.complete ? "Complete" : patch.current_tier ? `Tier ${patch.current_tier}` : "Not started";
-          const description = patch.complete ? `${patch.correct_count} correct · Complete` : target ? `${status} · ${patch.correct_count} / ${target} toward Tier ${nextTier}` : `${status} · ${patch.correct_count} correct`;
-          const image = patch.imagePath ? getImageUrl(patch.imagePath) : null;
-          return <button type="button" key={patch.category} onClick={() => setSelected(patch)} aria-label={`${patch.name} patch, ${description}`} className="trophy-depth-slot trivia-patch-slot group min-w-0 rounded-xl text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">
-            <div className="trophy-slot-well">
-              {image ? <img src={image} alt="" className="h-16 w-16 object-contain transition-transform duration-200 group-hover:scale-[1.04] sm:h-[4.5rem] sm:w-[4.5rem]" /> : <span aria-hidden="true" className="trophy-depth-medallion flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#b7c9d7] bg-[#edf5fb] text-[10px] font-extrabold uppercase tracking-wide text-[#164a73]">{patch.name.split(/\s+/).map((word) => word[0]).join("").slice(0, 3)}</span>}
-              <span className="trivia-patch-name mt-2 max-w-full truncate text-[10px] font-bold uppercase tracking-[.09em]">{patch.name}</span>
-              <span className="trivia-patch-status mt-1 text-[9px] font-semibold uppercase tracking-[.12em]">{status}</span>
-              <span className="trivia-patch-description mt-1 text-[9px] leading-tight">{description}</span>
-              <span className="trophy-depth-track mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#d8e3eb]" aria-hidden="true"><span className="block h-full rounded-full bg-[#d52d3b] transition-[width] duration-500" style={{ width: `${ratio}%` }} /></span>
-            </div>
-          </button>;
-        })}
-      </div>}
-      {data?.stats.total_answered === 0 && <p className="mt-4 text-center text-xs text-[#597087]">Answer daily trivia to start earning these patches. Every correct answer stays with you.</p>}
+      <div id="trivia-patches-content" hidden={!expanded}>
+        {isLoading && <div aria-label="Loading trivia patches" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="trivia-loading-slot h-48 animate-pulse rounded-xl" />)}</div>}
+        {isError && <div className="trivia-error-state rounded-xl border p-5 text-center text-sm"><p>Couldn’t load your trivia patches.</p><button type="button" onClick={() => void refetch()} className="mt-2 font-bold underline underline-offset-4">Try again</button></div>}
+        {data && <div className="trivia-stats mb-5 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Trivia lifetime summary">
+          {[
+            ["Answered", data.stats.total_answered], ["Correct", data.stats.total_correct],
+            ["Accuracy", `${Number(data.stats.accuracy || 0).toFixed(1)}%`],
+            ["Current streak", data.stats.current_streak], ["Best streak", data.stats.best_streak],
+          ].map(([label, value]) => <div key={String(label)} className="trivia-stat rounded-lg border px-3 py-2.5">
+            <div className="font-mono text-lg font-bold">{value}</div>
+            <div className="text-[9px] font-bold uppercase tracking-[.12em]">{label}</div>
+          </div>)}
+        </div>}
+        {data && ordered.length === 0 && <div className="trivia-empty-state rounded-xl border border-dashed p-6 text-center text-sm">Trivia patch details are being prepared. Your answers still count.</div>}
+        {data && ordered.length > 0 && <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+          {ordered.map((patch) => {
+            const nextTier = patch.current_tier >= 8 || patch.complete ? 8 : patch.current_tier + 1;
+            const target = patch.next_threshold ?? patch.tiers.find((tier) => Number(tier.tier) === nextTier)?.threshold;
+            const ratio = target ? Math.min(100, patch.correct_count / target * 100) : patch.complete ? 100 : 0;
+            const status = patch.complete ? "Complete" : patch.current_tier ? `Tier ${patch.current_tier}` : "Not started";
+            const description = patch.complete ? `${patch.correct_count} correct · Complete` : target ? `${status} · ${patch.correct_count} / ${target} toward Tier ${nextTier}` : `${status} · ${patch.correct_count} correct`;
+            const image = patch.imagePath ? getImageUrl(patch.imagePath) : null;
+            return <button type="button" key={patch.category} onClick={() => setSelected(patch)} aria-label={`${patch.name} patch, ${description}`} className="trophy-depth-slot trivia-patch-slot group min-w-0 rounded-xl text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">
+              <div className="trophy-slot-well">
+                {image ? <img src={image} alt="" className="h-16 w-16 object-contain transition-transform duration-200 group-hover:scale-[1.04] sm:h-[4.5rem] sm:w-[4.5rem]" /> : <span aria-hidden="true" className="trophy-depth-medallion flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#b7c9d7] bg-[#edf5fb] text-[10px] font-extrabold uppercase tracking-wide text-[#164a73]">{patch.name.split(/\s+/).map((word) => word[0]).join("").slice(0, 3)}</span>}
+                <span className="trivia-patch-name mt-2 max-w-full truncate text-[10px] font-bold uppercase tracking-[.09em]">{patch.name}</span>
+                <span className="trivia-patch-status mt-1 text-[9px] font-semibold uppercase tracking-[.12em]">{status}</span>
+                <span className="trivia-patch-description mt-1 text-[9px] leading-tight">{description}</span>
+                <span className="trophy-depth-track mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#d8e3eb]" aria-hidden="true"><span className="block h-full rounded-full bg-[#d52d3b] transition-[width] duration-500" style={{ width: `${ratio}%` }} /></span>
+              </div>
+            </button>;
+          })}
+        </div>}
+        {data?.stats.total_answered === 0 && <p className="mt-4 text-center text-xs text-[#597087]">Answer daily trivia to start earning these patches. Every correct answer stays with you.</p>}
+      </div>
       {selected && <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-[#173d5b]/55 p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
         <section role="dialog" aria-modal="true" aria-labelledby="trivia-patch-detail-title" className="trivia-patch-detail max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border p-5 shadow-[0_24px_80px_#173d5b55] sm:p-7" onClick={(event) => event.stopPropagation()}>
           <div className="mb-4 flex justify-end">

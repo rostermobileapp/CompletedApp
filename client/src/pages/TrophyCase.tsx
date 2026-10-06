@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, ChevronRight, Lock, Sparkles, Trophy, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Lock, Sparkles, Trophy, X } from "lucide-react";
 import { BadgeEarnedAnnouncement } from "@/components/BadgeEarnedHost";
 import { FeatureLockOverlay } from "@/components/FeatureLockOverlay";
 import { usePermissions } from "@/context/SubscriptionContext";
@@ -110,11 +110,30 @@ function BadgeSpot({ badge, onClick, preview = false }: { badge: Badge; onClick:
   );
 }
 
-function SectionHeading({ label, description, count }: { label: string; description: string; count?: number }) {
-  return <div className="mb-4 flex items-end justify-between gap-3 border-b border-[#d7e2eb] pb-3"><div className="min-w-0"><h3 className="text-base font-bold tracking-tight text-[#173d5b] sm:text-lg">{label}</h3><p className="mt-1 text-[11px] leading-relaxed text-[#718394] sm:text-xs">{description}</p></div>{count !== undefined && <span className="shrink-0 rounded-full bg-[#e8f0f6] px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">{count} {count === 1 ? "award" : "spots"}</span>}</div>;
+function SectionHeading({ label, description, count, expanded, onToggle, contentId }: {
+  label: string;
+  description: string;
+  count?: number;
+  expanded?: boolean;
+  onToggle?: () => void;
+  contentId?: string;
+}) {
+  const content = <>
+    <span className="min-w-0 flex-1 text-left">
+      <span className="block text-base font-bold tracking-tight text-[#173d5b] sm:text-lg">{label}</span>
+      <span className="mt-1 block text-[11px] leading-relaxed text-[#718394] sm:text-xs">{description}</span>
+    </span>
+    {count !== undefined && <span className="shrink-0 rounded-full bg-[#e8f0f6] px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-[#164a73]">{count} {count === 1 ? "award" : "spots"}</span>}
+    {onToggle && <ChevronDown aria-hidden="true" size={17} className={`shrink-0 text-[#164a73] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />}
+  </>;
+  return <div className="mb-4 border-b border-[#d7e2eb] pb-3">
+    {onToggle ? <h3><button type="button" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle} className="flex min-h-11 w-full items-center gap-3 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#164a73]">{content}</button></h3> : <div className="flex items-end justify-between gap-3">{content}</div>}
+  </div>;
 }
 
 function AchievementSection({ label, description, badges, onSelect, preview = false }: { label: string; description: string; badges: Badge[]; onSelect: (badge: Badge, tier?: Tier) => void; preview?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = `achievement-category-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const isTiered = badges.some((badge) => badge.achievementType === "tiered");
   const spotCount = isTiered ? badges.reduce((total, badge) => total + (badge.achievementType === "tiered" ? badge.tiers.length : 1), 0) : badges.length;
   const fiveStars = badges.length === 1 && (badges[0].slug === "three_stars" || badges[0].slug === "century_club");
@@ -123,20 +142,36 @@ function AchievementSection({ label, description, badges, onSelect, preview = fa
   const legacyAwards = legacyBadge?.legacyAwards ?? [];
   return (
     <section className="trophy-depth-section rounded-2xl p-3.5 sm:p-5">
-      <SectionHeading label={label} description={description} count={spotCount} />
-      <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
-        {badges.flatMap((badge) => badge.achievementType === "tiered"
-          ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} preview={preview} onClick={() => onSelect(badge, tier)} />)
-          : [<BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />])}
+      <SectionHeading label={label} description={description} count={spotCount} expanded={expanded} onToggle={() => setExpanded((open) => !open)} contentId={contentId} />
+      <div id={contentId} hidden={!expanded}>
+        <div className={`grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 ${fiveStars ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+          {badges.flatMap((badge) => badge.achievementType === "tiered"
+            ? badge.tiers.map((tier) => <TierSpot key={`${badge.id}-${tier.tier}`} badge={badge} tier={tier} preview={preview} onClick={() => onSelect(badge, tier)} />)
+            : [<BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />])}
+        </div>
+        {legacyAwards.length > 0 && (
+          <p className="mt-3 text-xs text-[#597087]">
+            Earlier {legacyBadge?.name} awards: {legacyAwards.map((award) => award.tier ? formatTier(award.tier) : "Badge").join(", ")}.
+            These remain in your history but do not count toward {legacyBadge?.slug === "beer_me" ? "this year’s" : "the selected season’s"} progress.
+          </p>
+        )}
       </div>
-      {legacyAwards.length > 0 && (
-        <p className="mt-3 text-xs text-[#597087]">
-          Earlier {legacyBadge?.name} awards: {legacyAwards.map((award) => award.tier ? formatTier(award.tier) : "Badge").join(", ")}.
-          These remain in your history but do not count toward {legacyBadge?.slug === "beer_me" ? "this year’s" : "the selected season’s"} progress.
-        </p>
-      )}
     </section>
   );
+}
+
+function TrophyAwardSection({ section, visibleBadges, preview, onSelect }: {
+  section: Section;
+  visibleBadges: Badge[];
+  preview: boolean;
+  onSelect: (badge: Badge, tier?: Tier) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = `trophy-awards-${section.category}`;
+  return <section className="trophy-depth-panel rounded-2xl p-3.5 sm:p-5">
+    <SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={visibleBadges.length} expanded={expanded} onToggle={() => setExpanded((open) => !open)} contentId={contentId} />
+    <div id={contentId} hidden={!expanded} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{visibleBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => onSelect(badge)} />)}</div>
+  </section>;
 }
 
 function otherAchievements(badges: Badge[]) {
@@ -197,7 +232,7 @@ export default function TrophyCase({ preview = false }: { preview?: boolean } = 
         {ageAccess !== "loading" && ageAccess !== "eligible" && <div className="mx-auto max-w-lg rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center shadow-[0_16px_35px_#23415d12]"><Lock className="mx-auto text-[#164a73]" size={28} /><h2 className="mt-4 text-xl font-bold text-[#173d5b]">Age verification required</h2><p className="mt-2 text-sm text-[#718394]">{ageAccess === "under_21" ? "The Trophy Case is available only to users who are 21 or older." : "Enter your date of birth in your profile so we can verify that you are 21 or older."}</p><button onClick={() => navigate("/profile")} className="mt-6 rounded-lg bg-[#164a73] px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#103a5b]">Go to Profile <ChevronRight className="ml-1 inline" size={14} /></button></div>}
         {ageAccess === "eligible" && <>{isLoading && <div className="rounded-2xl border border-[#d7e2eb] bg-white p-8 text-center text-[#718394]">Loading {preview ? "the badge preview" : "your trophy case"}…</div>}{isError && <div className="rounded-2xl border border-[#edc6ca] bg-[#fff5f5] p-8 text-center text-[#b52732]">Could not load {preview ? "the badge preview" : "your trophy case"}.</div>}{data && <main className="trophy-depth-main mx-auto max-w-5xl rounded-[1.5rem] p-3 sm:p-6">
           <section className="trophy-depth-panel mb-5 rounded-2xl p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#d52d3b]">{preview ? "Catalog preview" : "The collection of"}</p><h2 className="mt-1 text-xl font-bold tracking-tight text-[#173d5b] sm:text-2xl">{preview ? "Every badge, on display" : "Your career, on display"}</h2></div><div className="rounded-lg border border-[#c8dbe8] bg-white/75 px-2.5 py-1.5 text-center"><div className="font-mono text-[9px] font-bold tracking-[.15em] text-[#164a73]">ROSTER HOCKEY</div><div className="mt-0.5 text-[7px] uppercase tracking-[.15em] text-[#718394]">Player honors</div></div></div></section>
-          <div className="space-y-5">{data.sections.filter((section) => section.category !== "achievement").map((section) => { const visibleBadges = preview ? section.badges : section.badges.filter((badge) => badge.isEarned); if (!visibleBadges.length) return null; return <section key={section.category} className="trophy-depth-panel rounded-2xl p-3.5 sm:p-5"><SectionHeading label={section.label} description={section.category === "nhl_trophy" ? "League-awarded trophies." : "Badges awarded by team captains."} count={visibleBadges.length} /><div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">{visibleBadges.map((badge) => <BadgeSpot key={badge.id} badge={badge} preview={preview} onClick={() => selectBadge(badge)} />)}</div></section>; })}</div>
+          <div className="space-y-5">{data.sections.filter((section) => section.category !== "achievement").map((section) => { const visibleBadges = preview ? section.badges : section.badges.filter((badge) => badge.isEarned); if (!visibleBadges.length) return null; return <TrophyAwardSection key={section.category} section={section} visibleBadges={visibleBadges} preview={preview} onSelect={selectBadge} />; })}</div>
           <section className="trophy-depth-panel mt-5 rounded-2xl p-3.5 sm:p-5">
             <div className="mb-5 flex flex-col gap-3 border-b border-[#d7e2eb] pb-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
