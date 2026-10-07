@@ -17,6 +17,7 @@ import "./TriviaHost.css";
 import { gradeTriviaChoice, type LocalTriviaResult } from "./triviaGrading";
 import { cacheTrivia, clearCachedTrivia, isTriviaPushLaunch, readCachedTrivia } from "./triviaCache";
 import { easternDateKey } from "@shared/trivia";
+import { triviaReleaseNextDelay, triviaReleasedDate } from "@shared/triviaRelease";
 
 type TriviaStats = {
   total_answered: number; total_correct: number; accuracy: number;
@@ -57,6 +58,7 @@ export function TriviaHost() {
   const [path, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { data: permissionUser } = useQuery<any>({ queryKey: ["/api/user"], enabled: !!user });
+  const [releaseClock, setReleaseClock] = useState(() => new Date());
   const todayKey = ["/api/trivia/today", user?.id] as const;
   const statsKey = ["/api/trivia/stats", user?.id] as const;
   const [dismissed, setDismissed] = useState(false);
@@ -111,7 +113,12 @@ export function TriviaHost() {
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
-  const today = isValidTriviaQuestion(todayQuery.data) && todayQuery.data.date === easternDateKey() ? todayQuery.data : null;
+  const releasedDate = triviaReleasedDate(releaseClock);
+  const renderReleasedDate = triviaReleasedDate(new Date());
+  const releaseIsCurrent = !!releasedDate && releasedDate === renderReleasedDate;
+  const today = releaseIsCurrent && isValidTriviaQuestion(todayQuery.data) && todayQuery.data.date === releasedDate
+    ? todayQuery.data
+    : null;
   const currentFeedback = today && feedbackDate === today.date ? feedback : null;
   const displayResult = currentFeedback || (localResult?.date === today?.date ? localResult : null);
   const paid = hasPaidTrophyCaseAccess(permissionUser);
@@ -133,6 +140,29 @@ export function TriviaHost() {
   const hasAnswer = !!displayResult;
   const categoryCount = useMemo(() => statsQuery.data?.categories?.find((item) => item.category === today?.category)?.correct_count ?? 0, [statsQuery.data, today?.category]);
   const errorStatus = todayQuery.error instanceof ApiError ? todayQuery.error.status : null;
+
+  useEffect(() => {
+    let timer: number | undefined;
+    const refresh = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      const now = new Date();
+      setReleaseClock(now);
+      timer = window.setTimeout(refresh, triviaReleaseNextDelay(now));
+    };
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    timer = window.setTimeout(refresh, triviaReleaseNextDelay(new Date()));
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user?.id || demoActive) return;
@@ -384,6 +414,7 @@ export function TriviaHost() {
     }
   }
 
+  if (!releaseIsCurrent) return null;
   if (errorStatus === 403 || errorStatus === 401) return null;
   if (todayQuery.isError && !displayResult && HOME_OPPORTUNITY(path) && !!user && !demoActive) {
     return <div className="trivia-host fixed bottom-24 left-1/2 z-[10004] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl border border-[var(--trivia-edge)] bg-[var(--trivia-surface)] p-4 shadow-xl"><p role="alert" className="text-sm font-semibold">Daily trivia couldn’t load right now.</p><button type="button" onClick={() => void todayQuery.refetch()} className="mt-2 text-sm font-bold text-[var(--trivia-ink)] underline underline-offset-4">Try again</button></div>;

@@ -15,6 +15,12 @@ Daily trivia is expected to send an actual push notification at noon Eastern, no
 
 **How to apply:** Distinguish tomorrow's question generation from today's reminder delivery. Verify that a real sender is running and inspect provider acceptance before describing automated noon notifications as operational.
 
+The in-app trivia popup must also wait until noon America/New_York every day, including for founder/test accounts and already-cached questions.
+
+**Why:** The owner reported receiving the popup at 11 AM and explicitly stated that it must not display until noon. A noon push schedule alone does not constrain in-app presentation.
+
+**How to apply:** Treat popup release separately from question generation and account eligibility. Recheck at noon, day rollover, and app return; use Eastern daylight-saving rules, not a fixed UTC offset.
+
 Before public launch, automated test announcements are limited to U00001. The owner has now approved public play and daily announcements to the full eligible audience at the launch time documented in replit.md. A noon announcement is independent of whether today's trivia was already answered.
 
 **Why:** The owner first authorized U00001-only testing, then explicitly requested a timed public rollout. They expected a noon notification even after completing the day's question.

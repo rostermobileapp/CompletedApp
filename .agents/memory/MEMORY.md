@@ -64,7 +64,7 @@
 - [League merge dialog boundary](league-merge-dialog-boundary.md) — the U-account-only commissioner picker and placeholder replacement preview have different eligibility rules.
 - [Responsive fixture verification](responsive-fixture-verification.md) — phone-width containers still use desktop media queries; use iframe viewports and explicit UTF-8 in isolated checks.
 - [Tool clock compatibility](tool-clock-compatibility.md) — some operational sandbox versions reject durable clock reads; obtain real time in an impure function before checking expiry.
-- [Trivia scheduler boundary](trivia-scheduler-boundary.md) — use a separate scheduled project; never replace Roster’s web deployment or imply an unpublished schedule is active.
+- [Trivia scheduler boundary](trivia-scheduler-boundary.md) — separate scheduled project; both push and in-app popup wait until noon Eastern, including founder/test accounts.
 - [Trivia presentation intent](trivia-presentation.md) — minimalist play, green/red results, Trophy Case consistency, and instant push opening.
 - [All-patches button visibility](all-patches-button-visibility.md) — keep View All Patches visible only to U00001, independent of trivia's public launch.
 - [Anthropic model compatibility](anthropic-model-compatibility.md) — model availability checks do not validate Messages options; test the full generation/verification flow.
