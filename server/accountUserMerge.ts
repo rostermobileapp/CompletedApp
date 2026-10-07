@@ -124,7 +124,8 @@ export async function searchAccountUsers(search = ''): Promise<UserSummary[]> {
       AND email NOT ILIKE '%@placeholder.roster'
       AND ($1='' OR id=$1 OR display_id ILIKE '%' || $1 || '%'
         OR email ILIKE '%' || $1 || '%' OR first_name ILIKE '%' || $1 || '%'
-        OR last_name ILIKE '%' || $1 || '%')
+        OR last_name ILIKE '%' || $1 || '%'
+        OR concat_ws(' ', first_name, last_name) ILIKE '%' || $1 || '%')
     ORDER BY CASE WHEN upper(display_id)=upper($1) THEN 0 ELSE 1 END,
       display_id NULLS LAST, id LIMIT 100`, [term]);
   return result.rows;
