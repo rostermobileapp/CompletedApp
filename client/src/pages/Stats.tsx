@@ -713,6 +713,9 @@ export default function Stats() {
                     <tr>
                       <th className="text-left px-2 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 w-8">#</th>
                       <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Player</th>
+                      {sortBy === 'patchesEarned' && !isTournamentContext && (
+                        <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400" data-testid="column-patches">Patches</th>
+                      )}
                       {activeTab === 'skaters' ? (
                         <>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">G</th>
@@ -720,7 +723,7 @@ export default function Stats() {
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PTS</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PIM</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">🍺</th>
-                          {!isTournamentContext && <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Patches</th>}
+                          {!isTournamentContext && sortBy !== 'patchesEarned' && <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400" data-testid="column-patches">Patches</th>}
                         </>
                       ) : (
                         <>
@@ -730,7 +733,7 @@ export default function Stats() {
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">T</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GAA</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">SO</th>
-                          {!isTournamentContext && <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Patches</th>}
+                          {!isTournamentContext && sortBy !== 'patchesEarned' && <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400" data-testid="column-patches">Patches</th>}
                         </>
                       )}
                     </tr>
@@ -774,6 +777,9 @@ export default function Stats() {
                               </div>
                             </div>
                           </td>
+                          {sortBy === 'patchesEarned' && !isTournamentContext && (
+                            <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm" data-testid="cell-patches">{getPatchesEarned(stat)}</td>
+                          )}
                           {activeTab === 'skaters' && stat.type === 'skater' ? (
                             <>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goals || 0}</td>
@@ -781,7 +787,7 @@ export default function Stats() {
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.points || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.penaltyMinutes || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.beers || 0}</td>
-                              {!isTournamentContext && <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{getPatchesEarned(stat)}</td>}
+                              {!isTournamentContext && sortBy !== 'patchesEarned' && <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm" data-testid="cell-patches">{getPatchesEarned(stat)}</td>}
                             </>
                           ) : stat.type === 'goalie' ? (
                             <>
@@ -791,7 +797,7 @@ export default function Stats() {
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.ties || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goalsAgainstAverage?.toFixed(2) || '0.00'}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.shutouts || 0}</td>
-                              {!isTournamentContext && <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{getPatchesEarned(stat)}</td>}
+                              {!isTournamentContext && sortBy !== 'patchesEarned' && <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm" data-testid="cell-patches">{getPatchesEarned(stat)}</td>}
                             </>
                           ) : null}
                         </tr>
