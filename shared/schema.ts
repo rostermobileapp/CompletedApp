@@ -3740,6 +3740,7 @@ export type GoalieStats = {
   goalsAgainst: number;
   shutouts: number;
   goalsAgainstAverage: number;
+  patchesEarned?: number;
   user: User;
 };
 
@@ -3755,6 +3756,7 @@ export type SkaterStats = {
   penaltyMinutes: number;
   points: number;
   beers?: number;
+  patchesEarned?: number;
   isGoalie?: boolean;
   user: User;
 };

@@ -79,7 +79,7 @@ export default function Stats() {
   const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'skaters' | 'goalies'>('skaters');
   const [viewMode, setViewMode] = useState<'summary' | 'table' | 'stars'>('summary');
-  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
+  const [sortBy, setSortBy] = useState<'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'patchesEarned' | 'wins' | 'goalsAgainstAverage' | 'shutouts'>('points');
   const [actionSheetPlayer, setActionSheetPlayer] = useState<{
     userId: string;
     firstName: string;
@@ -285,7 +285,13 @@ export default function Stats() {
   });
 
   // Get top players by category
-  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
+  const getPatchesEarned = (stat: PlayerStatsUnion) =>
+    Number((stat as PlayerStatsUnion & { patchesEarned?: number }).patchesEarned || 0);
+
+  const comparePlayerNames = (a: PlayerStatsUnion, b: PlayerStatsUnion) =>
+    formatPlayerName(a).localeCompare(formatPlayerName(b), undefined, { sensitivity: 'base' });
+
+  const getTopPlayers = (category: 'points' | 'goals' | 'assists' | 'penaltyMinutes' | 'beers' | 'patchesEarned' | 'wins' | 'goalsAgainstAverage' | 'shutouts', limit: number = 3) => {
     if (activeTab === 'goalies') {
       const goalieStats = filteredStats.filter((stat): stat is GoalieStats => stat.type === 'goalie');
       if (category === 'wins') {
@@ -301,6 +307,10 @@ export default function Stats() {
       } else if (category === 'shutouts') {
         return goalieStats
           .sort((a, b) => (b.shutouts || 0) - (a.shutouts || 0))
+          .slice(0, limit);
+      } else if (category === 'patchesEarned') {
+        return goalieStats
+          .sort((a, b) => getPatchesEarned(b) - getPatchesEarned(a) || comparePlayerNames(a, b))
           .slice(0, limit);
       }
       return [];
@@ -327,6 +337,10 @@ export default function Stats() {
         case 'beers':
           return skaterStats
             .sort((a, b) => (b.beers || 0) - (a.beers || 0))
+            .slice(0, limit);
+        case 'patchesEarned':
+          return skaterStats
+            .sort((a, b) => getPatchesEarned(b) - getPatchesEarned(a) || comparePlayerNames(a, b))
             .slice(0, limit);
         default:
           return [];
@@ -365,6 +379,8 @@ export default function Stats() {
           });
         case 'shutouts':
           return goalieStats.sort((a, b) => (b.shutouts || 0) - (a.shutouts || 0));
+        case 'patchesEarned':
+          return goalieStats.sort((a, b) => getPatchesEarned(b) - getPatchesEarned(a) || comparePlayerNames(a, b));
         default:
           return goalieStats;
       }
@@ -382,6 +398,8 @@ export default function Stats() {
           return skaterStats.sort((a, b) => (b.penaltyMinutes || 0) - (a.penaltyMinutes || 0));
         case 'beers':
           return skaterStats.sort((a, b) => (b.beers || 0) - (a.beers || 0));
+        case 'patchesEarned':
+          return skaterStats.sort((a, b) => getPatchesEarned(b) - getPatchesEarned(a) || comparePlayerNames(a, b));
         default:
           return skaterStats;
       }
@@ -685,7 +703,7 @@ export default function Stats() {
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h2 className="text-xl font-bold text-[#212121] dark:text-white capitalize" data-testid="text-table-title">
-                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy === 'beers' ? 'Beers Drank 🍺' : sortBy}
+                  {sortBy === 'penaltyMinutes' ? 'Penalty Minutes' : sortBy === 'goalsAgainstAverage' ? 'Goals Against Average' : sortBy === 'beers' ? 'Beers Drank 🍺' : sortBy === 'patchesEarned' ? 'Patches Earned' : sortBy}
                 </h2>
               </div>
               {/* Stats Table */}
@@ -702,6 +720,7 @@ export default function Stats() {
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PTS</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">PIM</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">🍺</th>
+                          {!isTournamentContext && <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Patches</th>}
                         </>
                       ) : (
                         <>
@@ -711,6 +730,7 @@ export default function Stats() {
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">T</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">GAA</th>
                           <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">SO</th>
+                          {!isTournamentContext && <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400">Patches</th>}
                         </>
                       )}
                     </tr>
@@ -761,6 +781,7 @@ export default function Stats() {
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.points || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.penaltyMinutes || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.beers || 0}</td>
+                              {!isTournamentContext && <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{getPatchesEarned(stat)}</td>}
                             </>
                           ) : stat.type === 'goalie' ? (
                             <>
@@ -770,6 +791,7 @@ export default function Stats() {
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.ties || 0}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm font-medium">{stat.goalsAgainstAverage?.toFixed(2) || '0.00'}</td>
                               <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{stat.shutouts || 0}</td>
+                              {!isTournamentContext && <td className="text-center px-4 py-3 text-[#212121] dark:text-white text-sm">{getPatchesEarned(stat)}</td>}
                             </>
                           ) : null}
                         </tr>
@@ -781,7 +803,7 @@ export default function Stats() {
             </div>)
           ) : (
             /* Summary View */
-            (<div className="space-y-8">
+            (<div className="space-y-6">
               {/* Points Section */}
               {activeTab !== 'goalies' && (
                 <StatSection
@@ -858,6 +880,20 @@ export default function Stats() {
 
                 />
               )}
+              {/* Patches Earned Section (leagues only) */}
+              {!isTournamentContext && activeTab !== 'goalies' && (
+                <StatSection
+                  title="Patches Earned"
+                  players={getTopPlayers('patchesEarned', 1)}
+                  renderStat={getPatchesEarned}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
+                  onClick={() => handleStatClick('patchesEarned')}
+                />
+              )}
               {/* Wins Section (Goalies) */}
               {activeTab === 'goalies' && (
                 <StatSection
@@ -901,6 +937,20 @@ export default function Stats() {
                   teamMap={teamMap}
                   onClick={() => handleStatClick('shutouts')}
 
+                />
+              )}
+              {/* Patches Earned Section (goalies, leagues only) */}
+              {!isTournamentContext && activeTab === 'goalies' && (
+                <StatSection
+                  title="Patches Earned"
+                  players={getTopPlayers('patchesEarned', 1)}
+                  renderStat={getPatchesEarned}
+                  formatPlayerName={formatPlayerName}
+                  getInitials={getInitials}
+                  showPosition={true}
+                  membershipMap={membershipMap}
+                  teamMap={teamMap}
+                  onClick={() => handleStatClick('patchesEarned')}
                 />
               )}
             </div>)

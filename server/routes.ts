@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { hasPaidTrophyCaseAccess } from "../shared/trophyCaseAccess";
 import { hasOneGoalMargin } from "@shared/gameResultType";
 import { createServer, type Server } from "http";
+import { getSeasonPatchCounts } from "./seasonPatchStats";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { findLeagueMergeCandidates, previewLeaguePlayerMerge, mergeLeaguePlayer, PlayerMergeConflict, leagueMergeDialogPreviewSchema, leagueMergeDialogConfirmSchema } from "./leaguePlayerMerge";
@@ -21775,6 +21776,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (playerType === 'goalies') {
         // Get goalie statistics with discriminated union type
         const goalieStats = await storage.getGoalieStats(leagueId, seasonId);
+        const patchCounts = await getSeasonPatchCounts(db, {
+          leagueId, seasonId, userIds: goalieStats.map(stat => stat.userId),
+        });
         const response = goalieStats.map(stat => ({
           type: 'goalie' as const,
           userId: stat.userId,
@@ -21787,12 +21791,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           goalsAgainst: stat.goalsAgainst,
           shutouts: stat.shutouts,
           goalsAgainstAverage: stat.goalsAgainstAverage,
+          patchesEarned: patchCounts.get(stat.userId ?? "") ?? 0,
           user: stat.user
         }));
         res.json(await filterPlayerStats(req.userWithPermissions, response, leagueId));
       } else {
         // Get regular player statistics with discriminated union type
         const playerStats = await storage.getPlayerStats(leagueId, seasonId, playerType as 'non-goalies' | undefined);
+        const patchCounts = await getSeasonPatchCounts(db, {
+          leagueId, seasonId, userIds: playerStats.map(stat => stat.userId),
+        });
 
         // Beer totals per user for this league/season
         const beerSeasonFilter = seasonId ? sql`AND g.season_id = ${seasonId}` : sql``;
@@ -21821,6 +21829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           penaltyMinutes: stat.penaltyMinutes,
           points: stat.goals + stat.assists,
           beers: beerMap.get(stat.userId) ?? 0,
+          patchesEarned: patchCounts.get(stat.userId ?? "") ?? 0,
           isGoalie: stat.isGoalie,
           user: stat.user
         }));

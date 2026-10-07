@@ -72,3 +72,4 @@
 - [Verification runtime compatibility](verification-runtime-compatibility.md) — testing delegation may be unavailable; isolate dynamic import graphs in bundled checks without weakening auth.
 - [Production secret boundary](production-secret-boundary.md) — Replit workspace secret presence does not establish Railway billing readiness; validate configuration in its actual environment.
 - [Badge tier sort order](badge-tier-sort-order.md) — use explicit progression ranks; the live PostgreSQL enum's native sort order differs from achievement order.
+- [Season patch statistics](season-patch-statistics.md) — count all categories earned within season dates; tiers count separately and cumulative repeat totals need a pre-season baseline.
