@@ -150,7 +150,6 @@ function ScrollStory() {
           alt="Hockey teammates sharing a relaxed laugh and catching up outside the arena."
           fetchPriority="high"
         />
-        <div className="rs-eyebrow">Time off the ice is yours.</div>
         <h1>More time together.<br /><span>Less time on admin.</span></h1>
         <p className="rs-hero-copy">The best part of hockey is the people. Catch up after the game, share a laugh, enjoy being together. Roster handles the team admin, so your time off the ice can be about each other.</p>
         <div className="rs-hero-actions">
