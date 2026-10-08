@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowRight, BarChart3, BellRing, CalendarDays, Check, ClipboardList, CreditCard, MessageCircle, ShieldCheck, Trophy, Users, Zap } from "lucide-react";
 import { RosterPageFooter, RosterPageNav } from "./RosterPageNav";
+import { AnimatedBracket } from "./_shared/AnimatedBracket";
 import "./FeaturesPage.css";
 
 const tournamentFeatures = [
@@ -64,10 +65,8 @@ export function FeaturesPage() {
           </div>
           <div className="rp-bracket-card">
             <div className="rp-bracket-head"><span>PLAYOFFS · LIVE</span><span className="rp-live-dot">UPDATING</span></div>
-            <div className="rp-bracket-rounds">
-              <div><small>QUARTERFINALS</small><p>Ice Dogs <b>4</b></p><p>Pucks <b>2</b></p><p>Frostbites <b>1</b></p><p>Slapshots <b>3</b></p></div>
-              <div><small>SEMIFINAL</small><p>Ice Dogs <b>—</b></p><p>Slapshots <b>—</b></p></div>
-              <div><small>FINAL</small><p>TBD <b>—</b></p></div>
+            <div className="rp-bracket-animation">
+              <AnimatedBracket />
             </div>
             <div className="rp-bracket-foot"><Check size={15} /> Winner advances automatically when the game is scored.</div>
           </div>

@@ -20,3 +20,9 @@ Keep Features, Pricing, About, and Partners discoverable when redesigning the ho
 **Why:** The user explicitly objected to losing these existing destinations in the new homepage design.
 
 **How to apply:** Preserve navigation access to all four as separate page previews when redesigning the site. Homepage sections alone do not satisfy a request to redesign these pages.
+
+Preserve the existing playoff-bracket automation animation exactly when restyling the Features page.
+
+**Why:** The user specifically requested the same animation as the current site, not a static bracket or a newly designed sequence.
+
+**How to apply:** Reuse the original animation, including timing and visual progression; apply the new theme to the surrounding page rather than changing the animation.
