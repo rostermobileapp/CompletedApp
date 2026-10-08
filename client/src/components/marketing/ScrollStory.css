@@ -83,6 +83,7 @@
 .rs-story { position:sticky;top:0;min-height:100svh;background:#0b1a2b;display:grid;grid-template-columns:1fr 1fr;gap:8vw;align-items:center; }
 .rs-story-copy { max-width:535px; }
 .rs-display { font-size:clamp(54px,7vw,94px);margin:18px 0 23px; }
+.rs-story-copy > .rs-display { letter-spacing:.01em;line-height:1.02; }
 .rs-copy { font-size:17px;line-height:1.8;color:#a7bbd0; }
 .rs-wordline { display:block; }
 .rs-word { display:inline-block;margin-right:.24em;color:#52708d;transition:color .15s ease; }
