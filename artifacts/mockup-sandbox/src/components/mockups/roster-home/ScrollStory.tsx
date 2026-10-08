@@ -130,15 +130,15 @@ function ScrollStory() {
           <img src={image("logo-dark.png")} alt="Roster" />
         </a>
         <nav className="rs-nav-links" aria-label="Main navigation">
-          <a href="#team" onClick={(e) => { e.preventDefault(); jumpTo("team"); }}>The problem</a>
-          <a href="#platform" onClick={(e) => { e.preventDefault(); jumpTo("platform"); }}>The platform</a>
-          <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches & extras</a>
-          <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Daily trivia</a>
+          <a href="#features" onClick={(e) => { e.preventDefault(); jumpTo("features"); }}>Features</a>
+          <a href="#pricing" onClick={(e) => { e.preventDefault(); jumpTo("pricing"); }}>Pricing</a>
+          <a href="#about" onClick={(e) => { e.preventDefault(); jumpTo("about"); }}>About</a>
+          <a href="#partners" onClick={(e) => { e.preventDefault(); jumpTo("partners"); }}>Partners</a>
         </nav>
         <button className="rs-nav-cta" onClick={() => previewFlow(signupDestination)}>Get started <ArrowRight size={15} /></button>
         <button className="rs-nav-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
         {menuOpen && <nav className="rs-mobile-menu" aria-label="Mobile navigation">
-          {["team", "platform", "patches", "trivia"].map((id, i) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); jumpTo(id); }}>{["The problem", "The platform", "Patches & extras", "Daily trivia"][i]}</a>)}
+          {["features", "pricing", "about", "partners"].map((id) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); jumpTo(id); }}>{id[0].toUpperCase() + id.slice(1)}</a>)}
           <a href="#start" onClick={(e) => { e.preventDefault(); setMenuOpen(false); jumpTo("start"); }}>Get started</a>
         </nav>}
       </header>
@@ -188,7 +188,7 @@ function ScrollStory() {
         </div>
       </section>
 
-      <section className="rs-section rs-white" id="platform">
+      <section className="rs-section rs-white" id="features">
         <div className="rs-section-inner rs-platform">
           <div>
             <div className="rs-section-kicker">The whole season, in one place</div>
@@ -201,6 +201,47 @@ function ScrollStory() {
             </div>
           </div>
           <img src={image("features-phones.png")} alt="Roster scheduling, team and player management screens" />
+        </div>
+      </section>
+
+      <section className="rs-section rs-pricing" id="pricing">
+        <div className="rs-section-inner rs-pricing-layout">
+          <div className="rs-pricing-intro">
+            <div className="rs-section-kicker">Clear access. No surprises.</div>
+            <h2 className="rs-display">Start free.<br />Find your<br />next level.</h2>
+            <p className="rs-copy">Roster has a free-forever tier, with no ads. Current plan and purchase details are shown in the app, so this preview won’t guess at prices or billing.</p>
+            <div className="rs-store-links">
+              <a className="rs-button" href={appStore} target="_blank" rel="noreferrer"><SiAppstore size={18} /> App Store</a>
+              <a className="rs-button secondary" href={playStore} target="_blank" rel="noreferrer"><SiGoogleplay size={18} /> Google Play</a>
+            </div>
+          </div>
+          <div className="rs-pricing-details">
+            <div className="rs-price-row">
+              <span className="rs-price-tier">Free, forever</span>
+              <strong>Play more. Coordinate less.</strong>
+              <p>Daily hockey trivia and your personal beer counter are free. Patch progress builds on every plan.</p>
+            </div>
+            <div className="rs-price-row rs-price-featured">
+              <span className="rs-price-tier">Player Pro or Commissioner</span>
+              <strong>The full Trophy Case</strong>
+              <p>Full Trophy Case access and patch artwork are part of paid access. Paid artwork requires verified age 21+.</p>
+            </div>
+            <p className="rs-pricing-note">Exact plan availability and pricing may vary by platform and are confirmed in Roster before purchase.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rs-section rs-about" id="about">
+        <div className="rs-section-inner rs-about-layout">
+          <div>
+            <div className="rs-section-kicker">About Roster</div>
+            <h2 className="rs-display">Built around<br />the game.</h2>
+          </div>
+          <div className="rs-about-copy">
+            <p className="rs-about-lede">Hockey should take up your time on the ice—not every minute around it.</p>
+            <p className="rs-copy">Roster brings schedules, attendance, team communication, payments, and game-day tools into one shared place. Fewer “who’s in?” messages. More time with the people who make the season.</p>
+            <a className="rs-text-link" href="#features" onClick={(e) => { e.preventDefault(); jumpTo("features"); }}>Take a look at the features <ArrowRight size={16} /></a>
+          </div>
         </div>
       </section>
 
@@ -297,6 +338,20 @@ function ScrollStory() {
         </div>
       </section>
 
+      <section className="rs-section rs-partners" id="partners">
+        <div className="rs-section-inner rs-partners-layout">
+          <div>
+            <div className="rs-section-kicker">For the whole hockey community</div>
+            <h2 className="rs-display">Good teams<br />start together.</h2>
+          </div>
+          <div className="rs-partners-copy">
+            <p className="rs-copy">Leagues, arenas, and hockey organizations help make the game possible. Roster gives the teams in your community one place to organize the season and stay connected.</p>
+            <button className="rs-button" onClick={() => setNotice("Preview only — partnership enquiries aren’t connected here. No message has been sent.")}>Explore a Roster partnership <ArrowRight size={16} /></button>
+            <span className="rs-partners-note">This preview won’t send an enquiry or share your details.</span>
+          </div>
+        </div>
+      </section>
+
       <section className="rs-section rs-final" id="start">
         <div className="rs-section-inner">
           <div className="rs-eyebrow">Built for hockey. Ad-free. Always.</div>
@@ -314,7 +369,10 @@ function ScrollStory() {
         <div className="rs-footer-inner">
           <a href="#top" onClick={(e) => { e.preventDefault(); jumpTo("top"); }}><img src={image("logo-dark.png")} alt="Roster" style={{ width: 96, height: 34, objectFit: "contain" }} /></a>
           <div className="rs-footer-links">
-            <a href="#platform" onClick={(e) => { e.preventDefault(); jumpTo("platform"); }}>Features</a>
+          <a href="#features" onClick={(e) => { e.preventDefault(); jumpTo("features"); }}>Features</a>
+          <a href="#pricing" onClick={(e) => { e.preventDefault(); jumpTo("pricing"); }}>Pricing</a>
+          <a href="#about" onClick={(e) => { e.preventDefault(); jumpTo("about"); }}>About</a>
+          <a href="#partners" onClick={(e) => { e.preventDefault(); jumpTo("partners"); }}>Partners</a>
             <a href="#patches" onClick={(e) => { e.preventDefault(); jumpTo("patches"); }}>Patches</a>
             <a href="#trivia" onClick={(e) => { e.preventDefault(); jumpTo("trivia"); }}>Trivia</a>
             <a href={appStore} target="_blank" rel="noreferrer">App Store</a>

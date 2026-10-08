@@ -101,6 +101,26 @@
 .rs-platform img { width:100%;display:block;mix-blend-mode:multiply; }
 .rs-platform-list { display:grid;gap:14px;margin-top:25px; }
 .rs-platform-list div { border-top:1px solid #c7d8e9;padding-top:13px;font-size:13px;font-weight:600;color:#233e5c; }
+.rs-pricing { background:#dceafb;color:#07182c; }
+.rs-pricing-layout { display:grid;grid-template-columns:.9fr 1.1fr;gap:9vw;align-items:center; }
+.rs-pricing .rs-display { color:#091b30;font-size:clamp(58px,7vw,88px); }
+.rs-pricing .rs-copy { color:#50677f;max-width:440px; }
+.rs-store-links { display:flex;gap:11px;flex-wrap:wrap;margin-top:26px; }
+.rs-store-links .rs-button.secondary { background:#f4f8fd;border-color:#b7cadf;color:#173452!important; }
+.rs-pricing-details { border-top:1px solid #b7cadf; }
+.rs-price-row { padding:27px 4px 25px;border-bottom:1px solid #b7cadf; }
+.rs-price-row strong { display:block;margin-top:8px;font-family:"Barlow Condensed",sans-serif;font-size:34px;line-height:1.05;letter-spacing:.01em;color:#091b30; }
+.rs-price-row p { margin:8px 0 0;max-width:580px;color:#50677f;font-size:14px;line-height:1.65; }
+.rs-price-tier { color:#1765ce;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase; }
+.rs-price-featured { border-left:3px solid #3d8df5;padding-left:19px; }
+.rs-pricing-note { margin:18px 0 0;color:#60778e;font-size:11px;line-height:1.6; }
+.rs-about { background:#0b1a2b; }
+.rs-about-layout,.rs-partners-layout { display:grid;grid-template-columns:1fr 1fr;gap:8vw;align-items:center; }
+.rs-about .rs-display,.rs-partners .rs-display { margin-top:18px; }
+.rs-about-copy { max-width:560px; }
+.rs-about-lede { margin:0 0 17px;font-family:"Barlow Condensed",sans-serif;font-size:clamp(28px,3.3vw,44px);font-weight:700;line-height:1.07;letter-spacing:.01em;color:#f2f8ff; }
+.rs-text-link { display:inline-flex;align-items:center;gap:9px;margin-top:23px;color:#8fc5ff!important;font-size:13px;font-weight:700;text-decoration:none; }
+.rs-text-link:hover { color:#fff!important; }
 .rs-product-band { background:#0d2036;min-height:800px;overflow:hidden; }
 .rs-product-top { display:flex;justify-content:space-between;gap:40px;align-items:end;margin-bottom:42px; }
 .rs-product-top .rs-copy { max-width:390px; }
@@ -144,6 +164,13 @@
 .rs-gallery-card { width:clamp(300px,39vw,510px);padding:18px;border:1px solid #29445f;background:#112740;border-radius:17px; }
 .rs-gallery-card img { width:100%;display:block;border-radius:9px; }
 .rs-gallery-card span { display:block;color:#c6d9eb;font-size:12px;margin-top:14px; }
+.rs-partners { background:#e6f1fc;color:#091b30; }
+.rs-partners .rs-section-kicker { color:#2675cf; }
+.rs-partners .rs-display { color:#091b30; }
+.rs-partners-copy { max-width:540px; }
+.rs-partners .rs-copy { color:#50677f; }
+.rs-partners-copy .rs-button { margin-top:17px; }
+.rs-partners-note { display:block;margin-top:13px;color:#60778e;font-size:11px;line-height:1.5; }
 .rs-final { background:#155db4;position:relative;overflow:hidden;padding:135px 7vw;text-align:center; }
 .rs-final:after { content:"R";position:absolute;right:3%;bottom:-43%;font-family:"Barlow Condensed";font-weight:900;font-size:60vw;line-height:1;color:rgba(199,227,255,.06);pointer-events:none; }
 .rs-final .rs-section-inner { position:relative;z-index:1; }
@@ -173,6 +200,8 @@
   .rs-hero-copy { margin-top:80px;font-size:16px;max-width:35rem; }
   .rs-section { padding:88px 24px; }
   .rs-story,.rs-platform,.rs-benefit-inner,.rs-trivia-grid { grid-template-columns:1fr;gap:42px; }
+  .rs-pricing-layout,.rs-about-layout,.rs-partners-layout { grid-template-columns:1fr;gap:32px; }
+  .rs-pricing .rs-display { font-size:clamp(58px,15vw,84px); }
   .rs-story { position:relative;min-height:unset; }
   .rs-story-scene,.rs-benefit-scene { min-height:unset; }
   .rs-patches-head { padding-inline:24px; }
