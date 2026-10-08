@@ -151,7 +151,7 @@ function ScrollStory() {
           fetchPriority="high"
         />
         <h1 className="rs-hero-title mt-[1px] text-[#ffffff]">More time together.<br /><span>Less time on admin.</span></h1>
-        <p className="rs-hero-copy">The best part of hockey is the people. Catch up after the game, share a laugh, enjoy being together. Roster handles the team admin, so your time off the ice can be about each other.</p>
+        <p className="rs-hero-copy text-[#ffffff] font-semibold">When the game ends, the memories begin. Roster handles the admin, so you can enjoy the parking lot party.</p>
         <div className="rs-hero-actions">
           <button className="rs-button" onClick={() => previewFlow(signupDestination)}>Bring your team together <ArrowRight size={16} /></button>
           <button className="rs-button secondary" onClick={() => previewFlow("/login")}>Log in</button>
