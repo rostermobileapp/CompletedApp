@@ -30,9 +30,9 @@ import { TriviaHost } from "@/components/TriviaHost";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/Landing";
-import Pricing from "@/pages/Pricing";
-import About from "@/pages/About";
+import Landing from "@/components/marketing/ScrollStory";
+import { PricingPage as Pricing } from "@/components/marketing/PricingPage";
+import { AboutPage as About } from "@/components/marketing/AboutPage";
 import SportLanding from "@/pages/SportLanding";
 import SegmentLanding from "@/pages/SegmentLanding";
 import Login from "@/pages/Login";
@@ -89,8 +89,8 @@ import PlayerStatsTrends from "@/pages/PlayerStatsTrends";
 import TeamEventDetails from "@/pages/TeamEventDetails";
 import Onboarding from "@/pages/Onboarding";
 import OnboardingQuestionnaire from "@/pages/OnboardingQuestionnaire";
-import FeaturesLanding from "@/pages/FeaturesLanding";
-import ReferralProgram from "@/pages/ReferralProgram";
+import { FeaturesPage as FeaturesLanding } from "@/components/marketing/FeaturesPage";
+import { PartnersPage as ReferralProgram } from "@/components/marketing/PartnersPage";
 import ReferralApplicationVerification from "@/pages/ReferralApplicationVerification";
 import ReferralPortalLogin from "@/pages/ReferralPortalLogin";
 import ReferralPortalAuth from "@/pages/ReferralPortalAuth";
@@ -238,6 +238,13 @@ function Router() {
   if (authLoading) {
     return <LoadingScreen />;
   }
+
+  // Public marketing pages use their own navigation, including for signed-in users.
+  const marketingPage = location === '/features' ? <FeaturesLanding />
+    : location === '/pricing' ? <Pricing />
+    : location === '/about' ? <About />
+    : location === '/referral-program' ? <ReferralProgram /> : null;
+  if (marketingPage) return <><ScrollToTop />{marketingPage}</>;
 
   // Development-only entry point for visually reviewing each profile onboarding step.
   // This intentionally works without a session because the preview is visual-only.

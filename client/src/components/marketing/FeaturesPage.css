@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap");
+.rp-features { --rp-blue:#3d8df5;--rp-ice:#a8d8ff;--rp-ink:#071323;--rp-paper:#edf5fc;background:var(--rp-ink);color:var(--rp-paper);font-family:"DM Sans",sans-serif;min-height:100vh;overflow:hidden; }
+.rp-features * { box-sizing:border-box; }
+.rp-features a:focus-visible,.rp-features button:focus-visible { outline:3px solid #a8d8ff;outline-offset:4px; }
+.rp-container { width:min(1160px,calc(100% - 48px));margin:0 auto; }
+.rp-feature-hero { padding:148px 0 104px;background:radial-gradient(ellipse at 80% 35%,rgba(38,113,188,.25),transparent 40%),linear-gradient(180deg,#081629 0%,#0b1d31 100%); }
+.rp-kicker { display:block;color:#83baff;text-transform:uppercase;letter-spacing:.18em;font-size:10px;font-weight:700; }
+.rp-title { margin:18px 0 20px;font:900 clamp(62px,8.2vw,112px)/.88 "Barlow Condensed",sans-serif;letter-spacing:.012em;text-transform:uppercase;color:#f1f7fd; }
+.rp-title em { color:#4c98ff;font-style:normal; }
+.rp-feature-hero .rp-container > p { max-width:590px;color:#b4c6d8;font-size:18px;line-height:1.7; }
+.rp-primary-link { display:inline-flex;align-items:center;gap:10px;margin-top:16px;padding:13px 19px;border:1px solid rgba(144,194,239,.3);border-radius:999px;background:#3d8df5;color:#fff;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 12px 30px rgba(29,99,173,.27); }
+.rp-primary-link:hover { background:#60a5ff;transform:translateY(-1px); }
+.rp-feature-art { margin-top:60px;padding:28px 34px 18px;border:1px solid rgba(148,196,238,.18);border-radius:24px;background:linear-gradient(145deg,rgba(24,54,82,.84),rgba(10,29,48,.9));box-shadow:0 28px 75px rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.06); }
+.rp-feature-art img { width:100%;display:block;filter:drop-shadow(0 22px 24px rgba(0,0,0,.28)); }
+.rp-feature-art span { display:block;margin-top:12px;text-align:right;color:#9cb4ca;font-size:11px;letter-spacing:.04em; }
+.rp-season-section { padding:104px 0 112px;background:radial-gradient(ellipse at 14% 30%,rgba(42,105,162,.17),transparent 34%),#0a1a2c; }
+.rp-section-heading { display:flex;align-items:end;justify-content:space-between;gap:60px;margin-bottom:40px; }
+.rp-title-sm { font-size:clamp(48px,6vw,78px); }
+.rp-section-heading > p { max-width:360px;margin:0 0 24px;color:#a9bdd1;line-height:1.7; }
+.rp-season-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }
+.rp-season-card { position:relative;min-height:220px;padding:25px;border:1px solid rgba(151,195,236,.15);border-radius:16px;background:linear-gradient(145deg,rgba(21,49,77,.87),rgba(12,31,51,.92));box-shadow:0 16px 36px rgba(0,0,0,.18); }
+.rp-card-index { position:absolute;top:21px;right:23px;color:#54708a;font:700 11px "DM Sans",sans-serif;letter-spacing:.12em; }
+.rp-icon-box { width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(91,162,243,.31);border-radius:12px;background:rgba(61,141,245,.13);color:#83bdff; }
+.rp-season-card h3,.rp-tournament-list h3 { margin:23px 0 7px;color:#eef6ff;font-size:16px;font-weight:700; }
+.rp-season-card p,.rp-tournament-list p { margin:0;color:#9fb4c8;font-size:13px;line-height:1.65; }
+.rp-tournament-section { padding:112px 0;background:#0d2035;border-top:1px solid rgba(151,195,236,.1);border-bottom:1px solid rgba(151,195,236,.1); }
+.rp-tournament-layout { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,546px);gap:48px;align-items:center; }
+.rp-section-lede { color:#b2c5d8;line-height:1.7; }
+.rp-tournament-list { display:grid;gap:20px;margin-top:30px; }
+.rp-tournament-list article { display:grid;grid-template-columns:42px 1fr;align-items:start;gap:15px; }
+.rp-tournament-list h3 { margin:2px 0 5px;font-size:15px; }
+.rp-bracket-card { min-width:0;padding:24px;border:1px solid rgba(151,195,236,.18);border-radius:18px;background:linear-gradient(145deg,#122c47,#0b1e32);box-shadow:0 30px 70px rgba(0,0,0,.3); }
+.rp-bracket-animation { margin:30px 0; }
+.rp-bracket-head { display:flex;justify-content:space-between;align-items:center;color:#abc1d6;font-size:10px;letter-spacing:.13em;font-weight:700; }
+.rp-live-dot { color:#87d7b4; }
+.rp-live-dot:before { content:"";display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#60c79b; }
+.rp-bracket-rounds { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:30px 0; }
+.rp-bracket-rounds > div { min-width:0; }
+.rp-bracket-rounds small { display:block;margin-bottom:12px;color:#7897b3;font-size:8px;letter-spacing:.12em; }
+.rp-bracket-rounds p { display:flex;justify-content:space-between;gap:6px;margin:8px 0;padding:9px 8px;border:1px solid rgba(145,185,223,.12);border-radius:8px;background:rgba(25,57,88,.68);color:#d7e6f4;font-size:10px; }
+.rp-bracket-rounds b { color:#8fc4ff; }
+.rp-bracket-foot { display:flex;align-items:center;gap:8px;padding-top:16px;border-top:1px solid rgba(151,195,236,.14);color:#9cb4ca;font-size:11px; }
+.rp-bracket-foot svg { color:#83bdff;flex-shrink:0; }
+.rp-draft-section { padding:120px 0;background:radial-gradient(ellipse at 34% 45%,rgba(50,125,195,.17),transparent 35%),#081729; }
+.rp-draft-layout { display:grid;grid-template-columns:1fr 1fr;gap:8vw;align-items:center; }
+.rp-draft-layout > div:last-child > p { max-width:490px;color:#a9bdd1;line-height:1.7; }
+.rp-draft-orbit { display:grid;place-items:center;min-height:480px;border:1px solid rgba(109,165,218,.12);border-radius:50%;background:radial-gradient(circle,rgba(65,135,203,.14),rgba(17,45,72,.08) 52%,transparent 72%); }
+.rp-phone-shell { position:relative;width:min(278px,72%);padding:10px;border:1px solid #49627a;border-radius:35px;background:#101820;box-shadow:0 32px 65px rgba(0,0,0,.45),inset 0 1px rgba(255,255,255,.12);transform:rotate(-3deg); }
+.rp-phone-top { position:absolute;z-index:2;top:13px;left:50%;width:82px;height:17px;transform:translateX(-50%);border-radius:99px;background:#07101a; }
+.rp-phone-screen { min-height:410px;padding:46px 17px 18px;border-radius:27px;background:linear-gradient(180deg,#15314d,#0c2035); }
+.rp-phone-screen > span,.rp-phone-screen label { display:block;color:#8fb7de;font-size:8px;letter-spacing:.14em; }
+.rp-phone-screen strong { display:block;margin:18px 0 25px;color:#f0f7ff;font:700 29px/1 "Barlow Condensed",sans-serif; }
+.rp-phone-screen > div { display:flex;justify-content:space-between;padding:12px 0;border-top:1px solid #294762;border-bottom:1px solid #294762;color:#8bbcff;font-size:11px; }
+.rp-phone-screen label { margin-top:22px; }
+.rp-phone-screen p { display:flex;justify-content:space-between;align-items:center;margin:7px 0;padding:11px 9px;border:1px solid #264664;border-radius:8px;background:#122d48;color:#d8e8f7;font-size:10px; }
+.rp-phone-screen p i { color:#82b8ef;font-size:7px;font-style:normal; }
+.rp-demo-pick { width:100%;display:flex;justify-content:center;align-items:center;gap:8px;margin-top:17px;padding:11px;border-radius:8px;background:#3d8df5;color:#fff;font-size:9px;font-weight:700; }
+.rp-draft-points { display:grid;gap:13px;margin-top:26px; }
+.rp-draft-points span { display:flex;align-items:center;gap:10px;color:#c6d8e9;font-size:13px; }
+.rp-draft-points svg { color:#7fb9fb; }
+.rp-feature-close { padding:92px 0;text-align:center;background:linear-gradient(130deg,#15569e,#1c6fc6 58%,#174c86); }
+.rp-feature-close .rp-container { display:flex;flex-direction:column;align-items:center; }
+.rp-feature-close .rp-kicker { margin-top:15px;color:#b7d7fa; }
+.rp-feature-close .rp-title { margin:16px 0 10px; }
+.rp-feature-close .rp-primary-link { background:#071b31;border-color:#467bb0; }
+@media(max-width:850px) { .rp-season-grid { grid-template-columns:repeat(2,1fr); }.rp-tournament-layout,.rp-draft-layout { grid-template-columns:1fr;gap:48px; }.rp-tournament-list { max-width:650px; }.rp-draft-orbit { min-height:400px; } }
+@media(max-width:600px) { .rp-container { width:calc(100% - 40px); }.rp-feature-hero { padding:112px 0 75px; }.rp-title { font-size:clamp(52px,15vw,76px); }.rp-feature-hero .rp-container>p { font-size:16px; }.rp-feature-art { margin-top:40px;padding:16px 14px 12px;border-radius:16px; }.rp-feature-art span { font-size:9px; }.rp-season-section,.rp-tournament-section,.rp-draft-section { padding:78px 0; }.rp-section-heading { display:block;margin-bottom:28px; }.rp-section-heading>p { margin:0; }.rp-season-grid { grid-template-columns:1fr;gap:10px; }.rp-season-card { min-height:unset;padding:22px; }.rp-season-card h3 { margin-top:17px; }.rp-title-sm { font-size:clamp(48px,13vw,65px); }.rp-bracket-card { padding:15px; }.rp-bracket-rounds { gap:7px; }.rp-bracket-rounds p { font-size:9px;padding:8px 5px; }.rp-draft-orbit { min-height:370px; }.rp-phone-screen { min-height:385px; }.rp-feature-close { padding:72px 0; } }
+@media(prefers-reduced-motion:reduce) { .rp-features * { scroll-behavior:auto!important;transition:none!important; } }

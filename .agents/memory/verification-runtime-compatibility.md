@@ -20,3 +20,9 @@ For direct headless Chromium/CDP checks of native Enter activation, enable focus
 **Why:** In this environment, keyDown/keyUp alone left a focused native button unchanged; the complete native key sequence successfully activated it.
 
 **How to apply:** Use the complete sequence for keyboard interaction checks rather than treating a failed abbreviated CDP sequence as an application regression.
+
+For animated UI, source equality and timer-driven final-state text are not sufficient evidence that the rendered animation completed.
+
+**Why:** A marketing graduation preserved the original bracket source exactly, while a headless check reached the champion state without observing completion of all SVG connectors.
+
+**How to apply:** Check the actual animated paths or visual progression independently. If browser checks fail or the browser crashes, report the limitation instead of treating source parity or skipped checks as a passing playback test.
